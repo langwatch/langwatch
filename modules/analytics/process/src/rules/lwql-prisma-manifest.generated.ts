@@ -1711,6 +1711,7 @@ export interface LwqlPrismaRows {
     readonly expiresAt: "DateTime?";
     readonly maxViews: "Int?";
     readonly condition: "Json?";
+    readonly replacesGrantId: "String?";
     readonly occurredAt: "DateTime";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";

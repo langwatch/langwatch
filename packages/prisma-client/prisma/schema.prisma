@@ -4589,7 +4589,7 @@ model Grant {
   // lets a projection reloaded from these rows reconstruct the fact rather
   // than a lossy copy. Null on everything ledger-born; retired at cutover.
   legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
-  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration | aggregate-reconciler (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-process; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
+  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration | aggregate-reconciler | braid (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-process; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
 
   scopeType GrantScopeType
   scopeId   String
@@ -4616,9 +4616,15 @@ model Grant {
 
   // ADR-177 / ADR-166: what a SHARED grant lets its principal reach. Null on
   // every own grant. Shape: { type: "trace" | "span" | "log", where?: OTTL
-  // (empty in v1), from?: ISO date, until?: ISO date }. Owned by the fold
+  // (a braid's span condition alone), compiledWhere?: its compiled form, from?: ISO date,
+  // until?: ISO date }. Owned by the fold
   // like every other fact column; the proof minted at the door copies it.
   condition Json?
+
+  // ADR-185 §2: on a braid change's attach, the braid it replaces. Null on every other grant and
+  // on braids attached before the column; the fold writes it from the attach event, so a replay
+  // rebuilds it.
+  replacesGrantId String?
 
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())

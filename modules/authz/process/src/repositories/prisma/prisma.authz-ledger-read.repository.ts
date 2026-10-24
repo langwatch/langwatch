@@ -12,7 +12,7 @@ import {
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
 import { liveGrants, liveRoles } from "../eventing/eventing.authz-live-rows.mapper.ts";
-import { sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
+import { NOT_A_BRAID, sharedProjectReadsOf } from "../eventing/eventing.authz-read.mapper.ts";
 import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository.ts";
 import {
   GRANT_ROW_COLUMNS,
@@ -157,7 +157,7 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
   }): Promise<AuthzSharedProjectGrant[]> {
     const rows = sharedProjectGrantRowsSchema.parse(
       await liveGrants(this.prisma).findMany({
-        where: sharedProjectReadsOf({ organizationId, readerProjectId }),
+        where: { ...sharedProjectReadsOf({ organizationId, readerProjectId }), ...NOT_A_BRAID },
         select: { id: true, scopeId: true, condition: true },
         orderBy: { scopeId: "asc" },
       }),

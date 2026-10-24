@@ -262,6 +262,21 @@ describe("PrismaAuthzProjectionRepository", () => {
       expect(executeRaw.mock.calls[0]).toContain(JSON.stringify(condition));
     });
 
+    /** @scenario "A braid's row keeps the braid it replaces through a later write" */
+    it("writes and restates the braid a braid's row replaces", async () => {
+      const { repository, executeRaw } = build();
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow({ principalType: "PROJECT", source: "braid", replacesGrantId: "grant_old" }),
+      } as GrantProjectionWrite);
+
+      const [insert, update] = sqlFrom(executeRaw).split("DO UPDATE SET");
+      expect(insert).toContain('"replacesGrantId"');
+      expect(update).toContain('"replacesGrantId" = EXCLUDED."replacesGrantId"');
+      expect(executeRaw.mock.calls[0]).toContain("grant_old");
+    });
+
     /** @scenario "The insert is fenced on the lifetime the fact was stamped against" */
     it("fences a stamped USER insert on the live membership row", async () => {
       const { repository, executeRaw } = build();
