@@ -275,24 +275,50 @@ export function DocsSource({ src, srcSet, ...rest }: ComponentProps<"source">) {
   );
 }
 
+/** A YouTube embed's privacy-enhanced address, or null for any other frame. */
+export function youtubeEmbed({ src }: { src?: string }) {
+  const id = /^https:\/\/www\.youtube(?:-nocookie)?\.com\/embed\/([\w-]+)/.exec(src ?? "")?.[1];
+  return id ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+}
+
+/* A YouTube player loads only when the reader presses play: until then the page fetches none of
+   its scripts and sets none of its cookies. The media island swaps the button for the player. */
 export function DocsIframe({ title, src, ...rest }: ComponentProps<"iframe">) {
   const basePath = useContext(MediaBasePath);
+  const embed = youtubeEmbed({ src });
+  const name = title ?? "Embedded content";
   return (
     <Box
       marginY="6"
+      width={embed ? "720px" : void 0}
+      maxWidth="100%"
       borderWidth="1px"
       borderColor="border"
       borderRadius="showcase"
       overflow="hidden"
       css={{ aspectRatio: "16 / 9" }}
     >
-      <iframe
-        title={title ?? "Embedded content"}
-        loading="lazy"
-        style={{ width: "100%", height: "100%", border: 0 }}
-        {...rest}
-        src={mediaPath({ basePath, path: src })}
-      />
+      {embed ? (
+        <button
+          type="button"
+          className="docs-embed-play"
+          data-docs-video=""
+          data-docs-embed={embed}
+          data-docs-embed-title={name}
+          aria-label={`Play the video: ${name}`}
+        >
+          <Play size={28} aria-hidden="true" />
+          <span>Play the video</span>
+        </button>
+      ) : (
+        <iframe
+          title={name}
+          loading="lazy"
+          style={{ width: "100%", height: "100%", border: 0 }}
+          {...rest}
+          src={mediaPath({ basePath, path: src })}
+        />
+      )}
     </Box>
   );
 }

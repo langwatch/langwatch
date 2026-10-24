@@ -17,11 +17,25 @@ function onMediaError(event: Event) {
   if (video) playbackFailed({ video });
 }
 
+/** Replaces a video's play button with its player, which starts at once. */
+function playEmbed({ button, embed }: { button: HTMLButtonElement; embed: string }) {
+  const player = document.createElement("iframe");
+  player.src = `${embed}?autoplay=1`;
+  player.title = button.dataset.docsEmbedTitle ?? "Video";
+  player.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+  player.allowFullscreen = true;
+  player.style.cssText = "width:100%;height:100%;border:0";
+  button.replaceWith(player);
+  player.focus();
+}
+
 export function installMedia() {
   document.addEventListener("error", onMediaError, true);
   document.addEventListener("click", (event) => {
     const button =
       event.target instanceof Element ? event.target.closest<HTMLButtonElement>("button") : null;
+    const embed = button?.dataset.docsEmbed;
+    if (button && embed) return playEmbed({ button, embed });
     if (!button?.textContent?.includes("Watch the product tour")) return;
     const figure = button.closest("figure");
     const video = figure?.querySelector("video");

@@ -53,10 +53,10 @@ describe("when the docs are built under a base path", () => {
   it("prefixes a root-relative embed but leaves an external one alone", () => {
     const local = render({ element: <DocsIframe src="/media/demo.html" title="Demo" /> });
     const external = render({
-      element: <DocsIframe src="https://www.youtube.com/embed/x" title="Video" />,
+      element: <DocsIframe src="https://player.vimeo.com/video/1" title="Video" />,
     });
     expect(local).toContain('src="/docs/media/demo.html"');
-    expect(external).toContain('src="https://www.youtube.com/embed/x"');
+    expect(external).toContain('src="https://player.vimeo.com/video/1"');
   });
 });
 

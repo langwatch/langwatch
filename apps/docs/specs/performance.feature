@@ -111,6 +111,14 @@ Feature: Static documentation with progressive interaction
     And reduced motion keeps it paused on its poster with playback controls
     And without JavaScript the poster and controls remain available
 
+  @integration
+  Scenario: Load an embedded YouTube player only when the reader presses play
+    Given a guide embeds a YouTube video
+    When the page loads
+    Then it shows a play button in the video's frame and loads nothing from YouTube
+    When the reader presses play
+    Then the privacy-enhanced player replaces the button and starts playing
+
   @unit
   Scenario: Extract the exact server styles
     When a page is prerendered

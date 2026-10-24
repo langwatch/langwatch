@@ -462,6 +462,28 @@ figure > .docs-shot {
 .docs-shot[data-shot="diagram"] {
   padding: 16px;
 }
+.docs-embed-play {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--chakra-colors-bg-subtle);
+  color: var(--chakra-colors-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.docs-embed-play:hover {
+  background: var(--chakra-colors-bg-hover);
+}
+.docs-embed-play:focus-visible {
+  outline: 2px solid var(--chakra-colors-accent-solid);
+  outline-offset: -4px;
+}
 
 /* Code: build-time highlighted lines carry both colour modes as variables. */
 .docs-code {
