@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.2.0](https://github.com/langwatch/langwatch/compare/langevals@v3.1.0...langevals@v3.2.0) (2026-10-24)
+
+
+### Features
+
+* **self-hosting:** third-party calls off by default, managed models only for langwatch/ models ([#8396](https://github.com/langwatch/langwatch/issues/8396)) ([9deb5ab](https://github.com/langwatch/langwatch/commit/9deb5ab54decc5169b0942b1e0ccd2e36b32f558))
+* **sso:** an organization brings its own identity provider (2/2) ([#7633](https://github.com/langwatch/langwatch/issues/7633)) ([d41f19a](https://github.com/langwatch/langwatch/commit/d41f19a46efa61e7f792dfff6e7fc6e94d873ffc))
+
+
+### Bug Fixes
+
+* **evaluators:** forward generation params on every path, Claude temperature/top_p rule in langevals, lift the ragas 16384 cap, skipped rows show as skipped ([#8154](https://github.com/langwatch/langwatch/issues/8154)) ([3d3dc10](https://github.com/langwatch/langwatch/commit/3d3dc1042097e8433e217ad88c833db7f46226be))
+* **langevals:** restore the ragas evaluators and close 84 of 90 alerts ([#6777](https://github.com/langwatch/langwatch/issues/6777)) ([9383116](https://github.com/langwatch/langwatch/commit/93831164b0a0a1bd867d8c1a8361a29d6c203efb))
+* **model-provider:** hold an evaluator's max tokens to the model's limit on Vertex AI ([#8824](https://github.com/langwatch/langwatch/issues/8824)) ([e34afda](https://github.com/langwatch/langwatch/commit/e34afda1f608f9a113079517136da47a322efc11))
+* production error findings since the strict-layout deploy ([#8817](https://github.com/langwatch/langwatch/issues/8817)) ([42f3364](https://github.com/langwatch/langwatch/commit/42f3364c8eec7e6aa9a6dcc29fcb7b899bcd7c82))
+* **security:** close the nine alerts raised on 2026-10-22 ([#8982](https://github.com/langwatch/langwatch/issues/8982)) ([7eca2c2](https://github.com/langwatch/langwatch/commit/7eca2c24ccba4b38a1636048ea18801a2fd1d2b1))
+* **selfhost:** issues found dogfooding the 3.18 Helm install on EKS ([#8313](https://github.com/langwatch/langwatch/issues/8313)) ([0b5f84c](https://github.com/langwatch/langwatch/commit/0b5f84cf0c60e915360e7b12455d2e74117f807f))
+
 ## [3.1.0](https://github.com/langwatch/langwatch/compare/langevals@v3.0.0...langevals@v3.1.0) (2026-09-12)
 
 ### Features
