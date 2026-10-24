@@ -809,6 +809,13 @@ export class PrismaProjectRepository
     return row?.id ?? null;
   }
 
+  async markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: { id: input.projectId },
+      data: { legacyApiKeyLastUsedAt: toDate(input.at) },
+    });
+  }
+
   async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
     const result = await this.prisma.project.updateMany({
       where: { id: input.projectId, archivedAt: null },
@@ -1014,11 +1021,13 @@ export class PrismaProjectRepository
   }
 
   private mapProject(row: PrismaProject | null): Project | null {
-    return row ? projectSchema.parse(row) : null;
+    return row ? this.mapProjectRequired(row) : null;
   }
 
+  /** The legacy key's usage stamp is an operator column, not part of the project value. */
   private mapProjectRequired(row: PrismaProject): Project {
-    return projectSchema.parse(row);
+    const { legacyApiKeyLastUsedAt: _usage, ...project } = row;
+    return projectSchema.parse(project);
   }
 
   private mapInternal(row: PrismaProject | null): InternalProject | null {

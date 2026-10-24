@@ -6255,6 +6255,15 @@
           "documentation": ""
         },
         {
+          "name": "legacyApiKeyLastUsedAt",
+          "columnName": "legacyApiKeyLastUsedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When the legacy apiKey last authenticated a request, written at most once a\nminute per project and process. Spec: modules/api-key/specs/request-credential-type.feature"
+        },
+        {
           "name": "lwqlKey",
           "columnName": "lwqlKey",
           "type": "String",

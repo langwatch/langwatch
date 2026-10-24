@@ -476,6 +476,7 @@ export const APP_ERROR_CODES = [
   "langy_worker_spawn_failed",
   "langy_worker_stopped",
   "last_authentication_method",
+  "legacy_project_key_ingestion_only",
   "license_already_registered",
   "license_already_reissued",
   "license_expired",
