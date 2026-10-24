@@ -186,6 +186,7 @@ exports[`the @langwatch/eventing public surface > given the . entry > exports ex
   "toDispatchError: function",
   "toSafeFailureDiagnostic: function",
   "trackDeliveryProgress: function",
+  "unbindProcessFleetMetricsSource: function",
   "unionReplayTenants: function",
   "unmarkBatch: function",
   "unmarkForProjections: function",

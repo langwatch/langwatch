@@ -39,6 +39,7 @@ import { MemoryOpsMetricsRepository } from "./memory.ops-metrics.repository.ts";
 import { MemoryOpsMigrationRepository } from "./memory.ops-migration.repository.ts";
 import { MemoryOpsSnapshotRepository } from "./memory.ops-snapshot.repository.ts";
 import { MemoryOpsStore } from "./memory.ops.store.ts";
+import { MemoryProcessFleetReadingsRepository } from "./memory.process-fleet-readings.repository.ts";
 import { MemoryProcessManagerPurgeRepository } from "./memory.process-manager-purge.repository.ts";
 import { MemoryProcessOpsRepository } from "./memory.process-ops.repository.ts";
 import { MemoryReplayRepository } from "./memory.replay.repository.ts";
@@ -190,6 +191,7 @@ export class MemoryOpsRepositories {
       anomalyState: MemoryAnomalyStateRepository.create({ store }),
       rateTracker: MemoryAnomalyRateTrackerRepository.create({ store }),
       storageReadings: MemoryStorageStatsReadingsRepository.create({ store }),
+      processFleetReadings: MemoryProcessFleetReadingsRepository.create({ store }),
       cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({ store }),
       cloudNotices: MemoryCloudNoticeRepository.create({ store }),
       redisHealth: MemoryRedisHealthRepository.create(),

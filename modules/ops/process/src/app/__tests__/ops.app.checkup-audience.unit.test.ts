@@ -82,6 +82,7 @@ function checkupService(): OpsCheckupService {
     config: {
       apiKey: undefined,
       clickhouseOpsUrl: undefined,
+      clickhouseCluster: undefined,
       usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
       collectClickHouseBackupMetrics: true,
       noticesDisabled: false,
