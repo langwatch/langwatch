@@ -124,7 +124,7 @@ describe("parseDecisionResponse", () => {
     expect(response).toBeDefined();
     expect(readClassifierVerdicts({ questions: QUESTIONS, response: response! })).toEqual([
       { questionId: "polite", probability: 0.9 },
-      { questionId: "quality", score: 3 },
+      { questionId: "quality", score: 3, spread: 0 },
       { questionId: "topic", label: "billing", probabilities: { billing: 0.7, other: 0.3 } },
     ]);
   });

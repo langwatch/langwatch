@@ -237,6 +237,11 @@ export interface InstantEvalVerdict {
   readonly probability?: number;
   /** The probability-weighted mean inside the declared range, for a score. */
   readonly score?: number;
+  /**
+   * The probability-weighted standard deviation of the levels, for a score read from a
+   * distribution: how unsure the score is. Absent when the judge gave a single level.
+   */
+  readonly spread?: number;
   /** The most likely option name, for a category. */
   readonly label?: string;
   /** Every option's probability, for a category. Sums to one. */

@@ -235,3 +235,55 @@ describe("spent cost", () => {
     expect(instantEvalSpentCostUsd({ inputTokens: 1_000_000, costNanoUsd: 2_500 })).toBe(0.0000025);
   });
 });
+
+describe("judge route table, given score and category routes", () => {
+  const issuesOf = (kinds: unknown) => {
+    const parsed = instantEvalJudgeRouteTableSchema.safeParse(tableWith({ kinds }));
+    return parsed.success ? [] : parsed.error.issues.map((issue) => issue.message);
+  };
+
+  /** @scenario "The public default table sends every slot to the hosted classifier" */
+  it("ships no score or category routes, so those kinds keep today's classifier call", () => {
+    expect(INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_TABLE.kinds).toEqual({});
+  });
+
+  /** @scenario "The route table refuses a slot without an instant entry" */
+  it("accepts a kind's default and job slots, and refuses an unknown slot key or rule", () => {
+    const score = {
+      sureness: "spread",
+      default: {
+        instant: { primary: "jev" },
+        balanced: { primary: "jev", escalateTo: "llm-a", threshold: 0.5 },
+      },
+      routes: { search: { all: { instant: { primary: "jev" } } } },
+    };
+    expect(issuesOf({ score })).toEqual([]);
+    expect(
+      issuesOf({
+        score: { ...score, routes: { search: { huge: { instant: { primary: "jev" } } } } },
+      }),
+    ).toEqual(["score / search / huge: not a bucket or the arithmetic slot"]);
+    expect(issuesOf({ category: { ...score, sureness: "spread" } }).length).toBeGreaterThan(0);
+    expect(issuesOf({ category: { ...score, sureness: "top" } })).toEqual([]);
+  });
+
+  /** @scenario "The route table refuses a slot without an instant entry" */
+  it("checks a kind's slots as it checks yes-or-no ones", () => {
+    expect(
+      issuesOf({
+        score: {
+          sureness: "spread",
+          default: { instant: { primary: "jev", escalateTo: "llm-a" } },
+        },
+      }),
+    ).toEqual(["score / default / instant: escalateTo needs a threshold"]);
+    expect(
+      issuesOf({
+        category: {
+          sureness: "margin",
+          default: { instant: { primary: "jev", pairWith: "llm-a" } },
+        },
+      }),
+    ).toEqual(["category / default / instant: a pair or its fallbacks may not be an LLM backend"]);
+  });
+});

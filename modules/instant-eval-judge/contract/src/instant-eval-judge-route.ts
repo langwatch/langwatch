@@ -41,6 +41,25 @@ export const INSTANT_EVAL_JUDGE_ARITHMETIC_SOURCES = [
 /** The slot an arithmetic question takes instead of its length bucket. */
 export const INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT = "arithmetic";
 
+/**
+ * How sure a score answer is: `spread` reads the levels' weighted standard deviation against
+ * half the range, so one level is sure and an even split between the ends is not.
+ */
+export const INSTANT_EVAL_JUDGE_SCORE_SURENESS_RULES = ["spread"] as const;
+
+/**
+ * How sure a category answer is: `margin` is the likeliest option's probability less the
+ * runner-up's, `top` the likeliest option's probability alone.
+ */
+export const INSTANT_EVAL_JUDGE_CATEGORY_SURENESS_RULES = ["margin", "top"] as const;
+export type InstantEvalJudgeSurenessRule =
+  | (typeof INSTANT_EVAL_JUDGE_SCORE_SURENESS_RULES)[number]
+  | (typeof INSTANT_EVAL_JUDGE_CATEGORY_SURENESS_RULES)[number];
+
+/** The question kinds the table may route besides yes or no; one it leaves out is not routed. */
+export const INSTANT_EVAL_JUDGE_ROUTED_KINDS = ["score", "category"] as const;
+export type InstantEvalJudgeRoutedKind = (typeof INSTANT_EVAL_JUDGE_ROUTED_KINDS)[number];
+
 const jobSchema = z.enum(INSTANT_EVAL_JUDGE_JOBS);
 const modeSchema = z.enum(INSTANT_EVAL_JUDGE_MODES);
 const inputViewSchema = z.enum(INSTANT_EVAL_JUDGE_INPUT_VIEWS);
@@ -51,7 +70,10 @@ const routeEntrySchema = z
   .object({
     primary: z.string().min(1),
     escalateTo: z.string().min(1).optional(),
-    /** Escalate when |2p - 1| is below it: 0.7 escalates 0.15 < p < 0.85. */
+    /**
+     * Escalate when the answer's sureness is below it. Yes or no: |2p - 1|, so 0.7 escalates
+     * 0.15 < p < 0.85. A score or a category: its kind's sureness rule, also from 0 to 1.
+     */
     threshold: z.number().gt(0).lte(1).optional(),
     pairWith: z.string().min(1).optional(),
   })
@@ -83,6 +105,26 @@ export type InstantEvalJudgeBackend = z.infer<typeof backendSchema>;
 
 const perJob = <T extends z.ZodType>(schema: T) =>
   z.object({ search: schema, llm_judge: schema, scenario_judge: schema });
+
+/**
+ * One question kind's routes: the slot any job, bucket or arithmetic call takes unless `routes`
+ * names its own. A job's arithmetic call with no arithmetic slot takes its length bucket's.
+ */
+const kindRoutingSchema = <T extends readonly [string, ...string[]]>(rules: T) =>
+  z
+    .object({
+      sureness: z.enum(rules),
+      default: routeSlotSchema,
+      routes: perJob(z.record(z.string(), routeSlotSchema)).partial().default({}),
+    })
+    .readonly();
+
+const kindsSchema = z
+  .object({
+    score: kindRoutingSchema(INSTANT_EVAL_JUDGE_SCORE_SURENESS_RULES).optional(),
+    category: kindRoutingSchema(INSTANT_EVAL_JUDGE_CATEGORY_SURENESS_RULES).optional(),
+  })
+  .readonly();
 
 const instantEvalJudgeRouteTableSchemaDefinition = z
   .object({
@@ -118,7 +160,10 @@ const instantEvalJudgeRouteTableSchemaDefinition = z
         allowedKinds: { text: ["decisions"], tools: [] },
       }),
     backends: z.record(z.string(), backendSchema),
+    /** Yes-or-no questions' slots. */
     routes: perJob(z.record(z.string(), routeSlotSchema)),
+    /** Score and category questions' slots; a kind left out takes today's classifier call. */
+    kinds: kindsSchema.default({}),
   })
   .superRefine((table, ctx) => {
     for (const issue of routeTableIssues(table)) ctx.addIssue({ code: "custom", message: issue });
@@ -149,7 +194,47 @@ function routeTableIssues(table: RouteTableShape): string[] {
   for (const [name, backend] of Object.entries(table.backends)) {
     issues.push(...backendIssues({ table, name, backend }));
   }
+  issues.push(...kindIssues({ table, slotKeys }));
   return issues;
+}
+
+/** Each routed kind's default slot and every slot it names, on known jobs and slot keys. */
+function kindIssues({
+  table,
+  slotKeys,
+}: {
+  table: RouteTableShape;
+  slotKeys: readonly string[];
+}): string[] {
+  const issues: string[] = [];
+  for (const kind of INSTANT_EVAL_JUDGE_ROUTED_KINDS) {
+    const routing = table.kinds[kind];
+    if (!routing) continue;
+    issues.push(...slotIssues({ table, slot: routing.default, where: `${kind} / default` }));
+    for (const job of INSTANT_EVAL_JUDGE_JOBS) {
+      for (const [key, slot] of Object.entries(routing.routes[job] ?? {})) {
+        const where = `${kind} / ${job} / ${key}`;
+        if (!slotKeys.includes(key)) issues.push(`${where}: not a bucket or the arithmetic slot`);
+        issues.push(...slotIssues({ table, slot, where }));
+      }
+    }
+  }
+  return issues;
+}
+
+/** Every slot of the table, yes-or-no and per routed kind, so a check misses none. */
+export function instantEvalJudgeRouteSlotsOf(
+  table: InstantEvalJudgeRouteTable,
+): InstantEvalJudgeRouteSlot[] {
+  const slots = INSTANT_EVAL_JUDGE_JOBS.flatMap((job) => Object.values(table.routes[job]));
+  for (const kind of INSTANT_EVAL_JUDGE_ROUTED_KINDS) {
+    const routing = table.kinds[kind];
+    if (!routing) continue;
+    slots.push(routing.default);
+    for (const job of INSTANT_EVAL_JUDGE_JOBS)
+      slots.push(...Object.values(routing.routes[job] ?? {}));
+  }
+  return slots;
 }
 
 /** Unique names, bounds strictly ascending, and only the last bucket open. */
