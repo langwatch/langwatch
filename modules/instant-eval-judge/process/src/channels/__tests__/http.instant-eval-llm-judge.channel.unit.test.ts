@@ -218,7 +218,8 @@ describe("HttpInstantEvalLlmJudgeChannel, given a score or category question", (
       maximum: 5,
       description: "The score on the instructions' scale, from 1 to 5.",
     });
-    expect(String(sent.body?.system)).toContain("on their scale from 1 to 5");
+    expect(String(sent.body?.system)).toContain("on a scale from 1 (the lowest they allow) to 5");
+    expect(String(sent.body?.system)).toContain("map it linearly onto this one");
     expect(JSON.stringify(sent.body?.messages)).toContain("Score from 1 to 5.");
   });
 

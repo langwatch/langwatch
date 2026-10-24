@@ -34,11 +34,15 @@ const RESULT_FRAMING = [
   "never invert it.",
 ].join(" ");
 
+/**
+ * The leaf may ask a judge's own range on another scale (0 to 1 is asked 1 to 10), so the
+ * framing names the asked scale and maps the prompt's onto it rather than trusting "their scale".
+ */
 const scoreFraming = ({ min, max }: { min: number; max: number }) =>
   [
     "Answer by calling the `evaluation` function, setting `score` to the number the instructions",
-    `above ask for, on their scale from ${min} to ${max}. Use the scale as the instructions`,
-    "define it; never invert it.",
+    `above ask for, on a scale from ${min} (the lowest they allow) to ${max} (the highest). If`,
+    "they state another scale, map it linearly onto this one; never invert it.",
   ].join(" ");
 
 const CATEGORY_FRAMING = [

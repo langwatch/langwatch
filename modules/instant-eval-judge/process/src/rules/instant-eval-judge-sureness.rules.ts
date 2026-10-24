@@ -59,8 +59,11 @@ function categorySureness({
 }): number {
   const { probabilities } = verdict;
   if (!probabilities) return 0;
+  // Own keys only, so an option named like `toString` never reads a prototype; no negatives.
   const offered = question.options
-    .map((option) => probabilities[option.name] ?? 0)
+    .map((option) =>
+      Object.hasOwn(probabilities, option.name) ? Math.max(0, probabilities[option.name] ?? 0) : 0,
+    )
     .toSorted((a, b) => b - a);
   const total = offered.reduce((sum, p) => sum + p, 0);
   if (total <= 0) return 0;

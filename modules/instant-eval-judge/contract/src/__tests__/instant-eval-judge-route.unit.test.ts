@@ -265,6 +265,9 @@ describe("judge route table, given score and category routes", () => {
     ).toEqual(["score / search / huge: not a bucket or the arithmetic slot"]);
     expect(issuesOf({ category: { ...score, sureness: "spread" } }).length).toBeGreaterThan(0);
     expect(issuesOf({ category: { ...score, sureness: "top" } })).toEqual([]);
+    // A misspelt kind or job is refused, never dropped.
+    expect(issuesOf({ scores: score }).length).toBeGreaterThan(0);
+    expect(issuesOf({ score: { ...score, routes: { serch: {} } } }).length).toBeGreaterThan(0);
   });
 
   /** @scenario "The route table refuses a slot without an instant entry" */

@@ -67,6 +67,18 @@ describe("the sureness of a category", () => {
     expect(of({ billing: 0.6, shipping: 0.3, other: 0.1 }, "top")).toBeCloseTo(0.6, 10);
     expect(of(undefined, "margin")).toBe(0);
     expect(of({ stray: 1 }, "margin")).toBe(0);
+    const prototypeNamed = instantEvalVerdictSurenessOf({
+      question: choiceOf("t", "x", ["toString", "other"]),
+      verdict: { questionId: "t", label: "other", probabilities: { other: 0.55, toString: 0.45 } },
+      rule: "margin",
+    });
+    expect(prototypeNamed).toBeCloseTo(0.1, 10);
+    const missing = instantEvalVerdictSurenessOf({
+      question: choiceOf("t", "x", ["toString", "other"]),
+      verdict: { questionId: "t", label: "other", probabilities: { other: 0.6 } },
+      rule: "margin",
+    });
+    expect(missing).toBe(1);
   });
 
   it("escalates anything below the threshold, so an answer with nothing to read always does", () => {
@@ -168,18 +180,15 @@ describe("the slot of a score or category question", () => {
 
 describe("a call with questions of several kinds", () => {
   /** @scenario "A kind the table does not route takes today's classifier call" */
-  it("routes yes or no always, a score or category only when the table names its kind", () => {
+  it("groups by kind only when every question can be routed", () => {
     const upset = yesNo("q", "upset");
     const bare = syntheticRouteTable();
-    expect(
-      instantEvalJudgeKindGroupsOf({ questions: [POLITE, upset, TOPIC], table: bare }),
-    ).toEqual({
-      routed: [{ kind: "boolean", questions: [upset] }],
-      unrouted: [POLITE, TOPIC],
-    });
+    expect(instantEvalJudgeKindGroupsOf({ questions: [POLITE, upset], table: bare })).toEqual([]);
+    expect(instantEvalJudgeKindGroupsOf({ questions: [upset], table: bare })).toEqual([
+      { kind: "boolean", questions: [upset] },
+    ]);
     const both = instantEvalJudgeKindGroupsOf({ questions: [POLITE, upset, TOPIC], table });
-    expect(both.routed.map((group) => group.kind)).toEqual(["boolean", "score", "category"]);
-    expect(both.unrouted).toEqual([]);
+    expect(both.map((group) => group.kind)).toEqual(["boolean", "score", "category"]);
   });
 
   /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
@@ -196,8 +205,7 @@ describe("a call with questions of several kinds", () => {
       questions: [POLITE, TOPIC],
       parts: [
         {
-          kinds: ["category"],
-          isRouted: true,
+          kind: "category",
           judgement: {
             verdicts: [{ questionId: "topic", label: "other" }],
             inputTokens: 10,
@@ -208,8 +216,7 @@ describe("a call with questions of several kinds", () => {
           },
         },
         {
-          kinds: ["score"],
-          isRouted: false,
+          kind: "score",
           judgement: {
             verdicts: [{ questionId: "polite", score: 3 }],
             inputTokens: 20,
@@ -229,14 +236,13 @@ describe("a call with questions of several kinds", () => {
       isTextTruncated: true,
       limiterWaitMs: 7,
       costNanoUsd: 7,
-      routing: { ...routing("llm-b"), flags: ["category:escalation_failed", "score:unrouted"] },
+      routing: { ...routing("llm-b"), flags: ["category:escalation_failed"] },
     });
     const skipped = instantEvalMergedJudgementOf({
       questions: [POLITE],
       parts: [
         {
-          kinds: ["score"],
-          isRouted: false,
+          kind: "score",
           judgement: {
             verdicts: [],
             skippedReason: "classifier_rate_limited",

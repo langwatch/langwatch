@@ -1,7 +1,6 @@
 /**
  * The router's LLM legs over HTTP, on LangWatch's keys: one forced tool call per question of any
- * kind, no
- * retry (the router decides what a failure means). Only the status is read from a refusal.
+ * kind, no retry (the router decides what a failure means). Only the status is read from a refusal.
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 

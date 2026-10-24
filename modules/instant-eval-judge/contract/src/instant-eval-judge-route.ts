@@ -115,8 +115,9 @@ const kindRoutingSchema = <T extends readonly [string, ...string[]]>(rules: T) =
     .object({
       sureness: z.enum(rules),
       default: routeSlotSchema,
-      routes: perJob(z.record(z.string(), routeSlotSchema)).partial().default({}),
+      routes: perJob(z.record(z.string(), routeSlotSchema)).partial().strict().default({}),
     })
+    .strict()
     .readonly();
 
 const kindsSchema = z
@@ -124,6 +125,8 @@ const kindsSchema = z
     score: kindRoutingSchema(INSTANT_EVAL_JUDGE_SCORE_SURENESS_RULES).optional(),
     category: kindRoutingSchema(INSTANT_EVAL_JUDGE_CATEGORY_SURENESS_RULES).optional(),
   })
+  // A misspelt kind or job would otherwise vanish and leave those questions unrouted unseen.
+  .strict()
   .readonly();
 
 const instantEvalJudgeRouteTableSchemaDefinition = z

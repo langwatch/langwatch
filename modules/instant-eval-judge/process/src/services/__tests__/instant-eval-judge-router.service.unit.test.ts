@@ -404,32 +404,18 @@ describe("InstantEvalJudgeRouterService", () => {
   });
 
   /** @scenario "A kind the table does not route takes today's classifier call" */
-  it("routes the yes-or-no questions and sends a score the table does not route to the classifier", async () => {
+  it("sends a call with a score the table does not route to the classifier whole, as before", async () => {
     const score: InstantEvalQuestion = {
       id: "s",
       kind: "score",
       instructions: "how polite",
       range: { min: 1, max: 5 },
     };
-    const { classify, hostedDecisions, jevCalls } = harness({
-      decisions: () => judged(0.05),
-      jev: () => ({
-        verdicts: [{ questionId: "s", score: 4 }],
-        inputTokens: 500,
-        isTextTruncated: false,
-      }),
-    });
-    const judgement = await classify(SHORT, [score, Q]);
+    const { classify, hostedDecisions, jevCalls } = harness({ jev: () => judged(0.5) });
+    const judgement = await classify(SHORT, [Q, score]);
     expect(jevCalls()).toBe(1);
-    expect(hostedDecisions.requests).toHaveLength(1);
-    expect(hostedDecisions.requests[0]?.questions.map((q) => q.id)).toEqual(["q"]);
-    expect(judgement.verdicts).toEqual([
-      { questionId: "s", score: 4 },
-      { questionId: "q", probability: 0.05 },
-    ]);
-    expect(judgement.routing?.answeredBy).toEqual({ "decision-a": 1 });
-    expect(judgement.routing?.flags).toContain("score:unrouted");
-    expect(judgement.inputTokens).toBe(1500);
+    expect(hostedDecisions.requests).toHaveLength(0);
+    expect(judgement.routing).toBeUndefined();
   });
 
   /** @scenario "Every judgement a routed call returns carries its cost" */
@@ -448,6 +434,10 @@ describe("InstantEvalJudgeRouterService", () => {
 
   describe("given score and category questions the table routes", () => {
     const table = syntheticRouteTable({ kinds: SYNTHETIC_KINDS });
+    const noFallbackTable = syntheticRouteTable({
+      kinds: SYNTHETIC_KINDS,
+      backends: { "decision-a": { kind: "decisions", model: "decision-model-a" } },
+    });
     const POLITE = rating("polite", "how polite is the reply, 1 to 5");
     const TOPIC = choiceOf("topic", "which topic is this", ["billing", "shipping", "other"]);
     const scored = (spread?: number): InstantEvalJudgement => ({
@@ -562,6 +552,107 @@ describe("InstantEvalJudgeRouterService", () => {
       const judgement = await classify({ job: "llm_judge", tokens: 500 }, [POLITE]);
       expect(judgement.verdicts).toEqual([{ questionId: "polite", score: 4.1, spread: 1.8 }]);
       expect(judgement.routing?.flags).toContain("escalation_failed");
+    });
+    /** @scenario "A kind the table does not route takes today's classifier call" */
+    it("sends a call with a malformed score or category question to the classifier whole", async () => {
+      for (const odd of [
+        rating("polite", "how polite", { min: 5, max: 1 }),
+        rating("polite", "how polite", { min: 0, max: 0.5 }),
+        choiceOf("topic", "which", []),
+        choiceOf("topic", "which", ["billing", "billing"]),
+      ]) {
+        const { classify, hostedDecisions, jevCalls } = harness({ table });
+        await classify({ job: "llm_judge", tokens: 500 }, [Q, odd]);
+        expect(jevCalls()).toBe(1);
+        expect(hostedDecisions.requests).toHaveLength(0);
+      }
+    });
+
+    /** @scenario "The confident pair keeps the more confident answer" */
+    it("keeps the score with the smaller spread from a pair", async () => {
+      const pairTable = syntheticRouteTable({
+        kinds: {
+          score: {
+            sureness: "spread",
+            default: { instant: { primary: "decision-a", pairWith: "decision-b" } },
+          },
+        },
+      });
+      const { classify } = harness({
+        table: pairTable,
+        decisions: () => scored(1.2),
+        jev: () => ({
+          verdicts: [{ questionId: "polite", score: 2, spread: 0.2 }],
+          inputTokens: 1000,
+          isTextTruncated: false,
+        }),
+      });
+      const judgement = await classify({ job: "search", tokens: 500 }, [POLITE]);
+      expect(judgement.verdicts).toEqual([{ questionId: "polite", score: 2, spread: 0.2 }]);
+      expect(judgement.routing?.answeredBy).toEqual({ "decision-b": 1 });
+    });
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("skips only the kind whose run threw when another kind answered, keeping its spend", async () => {
+      // scenario_judge asks yes or no of the classifier alone and a score of Decisions alone.
+      const { classify } = harness({
+        table: noFallbackTable,
+        decisions: () => {
+          throw new Error("socket closed");
+        },
+        jev: () => judged(0.05),
+      });
+      const judgement = await classify({ job: "scenario_judge", tokens: 500 }, [POLITE, Q]);
+      expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0.05 }]);
+      expect(judgement.skippedReason).toBeUndefined();
+      expect(judgement.inputTokens).toBe(1000);
+      expect(judgement.routing?.flags).toContain("score:skipped:classifier_failed");
+    });
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("rethrows when no kind answered, as an unrouted call would", async () => {
+      const { classify } = harness({
+        table: noFallbackTable,
+        decisions: () => {
+          throw new Error("socket closed");
+        },
+        jev: () => {
+          throw new Error("socket closed");
+        },
+      });
+      await expect(classify({ job: "scenario_judge", tokens: 500 }, [POLITE, Q])).rejects.toThrow(
+        "socket closed",
+      );
+    });
+
+    /** @scenario "Questions of several kinds in one call are routed per kind and merged in order" */
+    it("carries every kind's paid spend on a caller's stop", async () => {
+      const stop = new AbortController();
+      let booleanAnswered: () => void = () => undefined;
+      const answered = new Promise<void>((resolve) => {
+        booleanAnswered = resolve;
+      });
+      const { classify, hostedDecisions } = harness({
+        table,
+        decisions: async (signal) => {
+          const asked = hostedDecisions.requests.at(-1)?.questions[0];
+          if (asked?.kind === "boolean") {
+            booleanAnswered();
+            return judged(0.05);
+          }
+          const hung = hangUntilAborted<InstantEvalJudgement>(signal);
+          await answered;
+          stop.abort();
+          return hung;
+        },
+      });
+      const error = await classify(
+        { job: "llm_judge", tokens: 500 },
+        [POLITE, Q],
+        stop.signal,
+      ).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(InstantEvalJudgeStoppedError);
+      expect((error as InstantEvalJudgeStoppedError).inputTokens).toBe(1000);
     });
   });
 });

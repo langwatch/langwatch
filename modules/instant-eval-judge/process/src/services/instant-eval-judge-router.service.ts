@@ -6,6 +6,7 @@
  */
 
 import {
+  INSTANT_EVAL_QUESTION_KINDS,
   InstantEvalJudgeStoppedError,
   instantEvalSkipped,
   type InstantEvalClassification,
@@ -50,31 +51,18 @@ export class InstantEvalJudgeRouterService {
   }
 
   /**
-   * Yes-or-no questions are always routed, a score or category one when the table routes its
-   * kind; the rest take today's classifier call together, priced as a routed one so a run whose
-   * calls all carry a route never bills some tokens at zero.
+   * Routed when the router can take every question (yes or no always, a score or category when
+   * the table routes its kind); otherwise the whole call takes today's classifier call, priced as
+   * a routed one so a run whose calls all carry a route never bills some tokens at zero.
    */
   async classify(input: RoutedClassification): Promise<InstantEvalJudgement> {
     const { questions } = input;
-    const { routed, unrouted } = instantEvalJudgeKindGroupsOf({
-      questions,
-      table: this.deps.table,
-    });
-    if (routed.length === 0) return this.unrouted(input);
-    const parts: Promise<InstantEvalJudgeKindPart>[] = routed.map(async (group) => ({
-      kinds: [group.kind],
-      isRouted: true,
+    const groups = instantEvalJudgeKindGroupsOf({ questions, table: this.deps.table });
+    if (groups.length === 0) return this.unrouted(input);
+    const parts = groups.map(async (group) => ({
+      kind: group.kind,
       judgement: await this.routedRun({ input, questions: group.questions, kind: group.kind }),
     }));
-    if (unrouted.length > 0) {
-      parts.push(
-        this.unrouted({ ...input, questions: unrouted }).then((judgement) => ({
-          kinds: [...new Set(unrouted.map((question) => question.kind))],
-          isRouted: false,
-          judgement,
-        })),
-      );
-    }
     if (parts.length === 1) return (await parts[0]!).judgement;
     return this.merged({ questions, parts, signal: input.signal });
   }
@@ -102,8 +90,9 @@ export class InstantEvalJudgeRouterService {
   }
 
   /**
-   * Every part's verdicts in the order asked. A part that threw fails the call as it would alone;
-   * on a caller's stop the error carries every part's paid spend, so the stopped batch bills it.
+   * Every part's verdicts in the order asked. A kind whose run threw while another answered is a
+   * skip of that kind, so the paid parts stay billed; when none answered the throw is today's. On
+   * a caller's stop the error carries every part's paid spend, so the stopped batch bills it.
    */
   private async merged({
     questions,
@@ -118,7 +107,26 @@ export class InstantEvalJudgeRouterService {
     const done = settled.flatMap((part) => (part.status === "fulfilled" ? [part.value] : []));
     const failure = settled.find((part) => part.status === "rejected");
     if (!failure) return instantEvalMergedJudgementOf({ questions, parts: done });
-    if (!signal?.aborted) throw failure.reason;
+    if (signal?.aborted) throw this.stopped({ settled, done, cause: failure.reason });
+    if (!done.some((part) => part.judgement.verdicts.length > 0)) throw failure.reason;
+    const failed = groupsThatThrew({ settled, kinds: kindsOf(questions) });
+    const skips = failed.map((kind) => ({
+      kind,
+      judgement: instantEvalSkipped("classifier_failed"),
+    }));
+    return instantEvalMergedJudgementOf({ questions, parts: [...done, ...skips] });
+  }
+
+  /** The caller's stop, carrying what every part paid; the bare stop when nothing was paid. */
+  private stopped({
+    settled,
+    done,
+    cause,
+  }: {
+    settled: readonly PromiseSettledResult<InstantEvalJudgeKindPart>[];
+    done: readonly InstantEvalJudgeKindPart[];
+    cause: unknown;
+  }): unknown {
     const stopped = settled.flatMap((part) =>
       part.status === "rejected" && part.reason instanceof InstantEvalJudgeStoppedError
         ? [part.reason]
@@ -130,8 +138,8 @@ export class InstantEvalJudgeRouterService {
       inputTokens += paid.inputTokens;
       costNanoUsd += paid.costNanoUsd ?? 0;
     }
-    if (inputTokens <= 0) throw failure.reason;
-    throw new InstantEvalJudgeStoppedError({ inputTokens, costNanoUsd, cause: failure.reason });
+    if (inputTokens <= 0) return cause;
+    return new InstantEvalJudgeStoppedError({ inputTokens, costNanoUsd, cause });
   }
 
   private async unrouted({
@@ -153,4 +161,20 @@ export class InstantEvalJudgeRouterService {
       costNanoUsd: instantEvalJudgeClassifierCostOf({ table, pricing, inputTokens }),
     };
   }
+}
+
+/** The kinds asked, in the order the parts were started (the kinds' own order). */
+function kindsOf(questions: readonly InstantEvalQuestion[]): InstantEvalQuestionKind[] {
+  return INSTANT_EVAL_QUESTION_KINDS.filter((kind) => questions.some((q) => q.kind === kind));
+}
+
+/** The kinds whose run threw, by position: parts start in the kinds' order. */
+function groupsThatThrew({
+  settled,
+  kinds,
+}: {
+  settled: readonly PromiseSettledResult<InstantEvalJudgeKindPart>[];
+  kinds: readonly InstantEvalQuestionKind[];
+}): InstantEvalQuestionKind[] {
+  return kinds.filter((_, at) => settled[at]?.status === "rejected");
 }

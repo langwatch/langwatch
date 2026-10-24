@@ -239,7 +239,7 @@ export interface InstantEvalVerdict {
   readonly score?: number;
   /**
    * The probability-weighted standard deviation of the levels, for a score read from a
-   * distribution: how unsure the score is. Absent when the judge gave a single level.
+   * distribution: how unsure the score is. Absent when the judge gave no distribution.
    */
   readonly spread?: number;
   /** The most likely option name, for a category. */

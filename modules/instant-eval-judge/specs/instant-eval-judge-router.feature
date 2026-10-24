@@ -121,8 +121,8 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
   Scenario: A kind the table does not route takes today's classifier call
     Given a route table with no routes for score or category questions, as the public one ships
     When a routed call asks a score or category question, alone or beside yes-or-no questions
-    Then those questions take today's single classifier call together, priced at the routed rate
-    And the yes-or-no questions are still routed, and the routing flags the unrouted kind
+    Then the whole call takes today's single classifier call, priced at the routed rate
+    And the same holds for a malformed score or category question, so no text is sent twice
 
   @unit
   Scenario: A score or category question takes its kind's slot, else the kind's default
@@ -151,6 +151,8 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When it is judged
     Then each kind is planned and judged on its own, side by side
     And the verdicts come back in the order asked with tokens and cost summed and each flag naming its kind
+    And a kind whose run threw while another answered is a skip of that kind, keeping the paid parts billed
+    And a caller's stop carries every part's paid spend
 
   @unit
   Scenario: A backend that is down falls back to its configured fallback
@@ -200,12 +202,12 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then each request forces the evaluation tool, and the answer is read from its result
     And a refused key, a rate limit and an outage map to the platform's skip reasons
 
-
   @unit
   Scenario: The LLM legs send one forced score or category tool call and read it back
     Given a score or category question on an Anthropic Messages or OpenAI Responses leg
     When it is asked
     Then the forced evaluation tool takes a number bounded by the range, or a label from the offered names
+    And a score's framing names the asked scale and maps a scale the prompt states onto it
     And a number outside the range, or a name never offered, is no answer rather than a guess
 
   @unit
@@ -214,6 +216,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When they are turned into a routed call
     Then each criterion is one yes-or-no question with the measured instructions and both sides spelled out
     And the text is the scenario description then the conversation, and an unanswered criterion reads as null, never as not met
+
   @unit
   Scenario: A routed judgement is priced from the summed cost of every call
     Given a routed judge call whose legs cost a known amount
