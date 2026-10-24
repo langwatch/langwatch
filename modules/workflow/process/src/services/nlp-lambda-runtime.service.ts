@@ -118,13 +118,15 @@ export class NlpLambdaRuntimeService {
   }
 
   private async resolveAndShare(projectId: string): Promise<string> {
-    const { imageUri, imageOrder, configFingerprint } = this.options;
-    const arn = await this.options.resolver.resolve({ projectId, imageUri });
+    const { imageUri, configFingerprint } = this.options;
+    const resolved = await this.options.resolver.resolve({ projectId, imageUri });
+    // Filed under what the function carries, which is a newer release's image
+    // when this pod's resolver left it alone, so that entry does not read stale.
     const entry: NlpLambdaArnEntry = {
-      arn,
-      imageUri,
+      arn: resolved.arn,
+      imageUri: resolved.imageUri,
       configFingerprint,
-      ...(imageOrder === undefined ? {} : { imageOrder }),
+      ...(resolved.imageOrder === undefined ? {} : { imageOrder: resolved.imageOrder }),
     };
     try {
       await this.options.cache.set({
@@ -139,7 +141,7 @@ export class NlpLambdaRuntimeService {
       );
     }
 
-    return arn;
+    return resolved.arn;
   }
 
   private async forget(key: string, projectId: string): Promise<void> {

@@ -53,6 +53,8 @@ function resolver(options: {
   reads: readonly unknown[];
   /** What UpdateFunctionConfiguration rejects with, when AWS refuses it. */
   rejectUpdateWith?: Error;
+  /** What TagResource rejects with, when AWS refuses it. */
+  rejectTagWith?: Error;
   config?: StudioLambdaConfig;
 }) {
   const sent: Sent[] = [];
@@ -62,7 +64,9 @@ function resolver(options: {
       sent.push({ name: command.constructor.name, input: command.input });
       if (command instanceof CreateFunctionCommand) return Promise.resolve(READY);
       if (command instanceof UpdateFunctionCodeCommand) return Promise.resolve(READY);
-      if (command instanceof TagResourceCommand) return Promise.resolve({});
+      if (command instanceof TagResourceCommand) {
+        return options.rejectTagWith ? Promise.reject(options.rejectTagWith) : Promise.resolve({});
+      }
       if (command instanceof UpdateFunctionConfigurationCommand) {
         return options.rejectUpdateWith
           ? Promise.reject(options.rejectUpdateWith)
@@ -99,7 +103,7 @@ describe("given a project whose studio engine needs a function", () => {
 
       const arn = await subject.resolve({ projectId: "project-1" });
 
-      expect(arn).toBe(ARN);
+      expect(arn.arn).toBe(ARN);
       const created = sent.find((call) => call.name === "CreateFunctionCommand");
       if (!created) throw new Error("expected CreateFunctionCommand");
       expect(created.input).toMatchObject({
@@ -214,7 +218,7 @@ describe("given a project whose studio engine needs a function", () => {
 
       const arn = await subject.resolve({ projectId: "project-1" });
 
-      expect(arn).toBe(ARN);
+      expect(arn.arn).toBe(ARN);
       expect(updates(sent)).toHaveLength(0);
       expect(sent.some((call) => call.name === "CreateFunctionCommand")).toBe(false);
       expect(sent.some((call) => call.name === "UpdateFunctionCodeCommand")).toBe(false);
@@ -261,7 +265,7 @@ describe("given a project whose studio engine needs a function", () => {
 
       const arn = await subject.resolve({ projectId: "project-1" });
 
-      expect(arn).toBe(ARN);
+      expect(arn.arn).toBe(ARN);
       expect(updates(sent)).toHaveLength(1);
     });
 
@@ -275,7 +279,9 @@ describe("given a project whose studio engine needs a function", () => {
         rejectUpdateWith: new Conflict("the message is not the point"),
       });
 
-      await expect(subject.resolve({ projectId: "project-1" })).resolves.toBe(ARN);
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toMatchObject({
+        arn: ARN,
+      });
     });
 
     /** @scenario "AWS errors are matched by exception name, not message text" */
@@ -285,7 +291,9 @@ describe("given a project whose studio engine needs a function", () => {
         rejectUpdateWith: new Error("An update is in progress"),
       });
 
-      await expect(subject.resolve({ projectId: "project-1" })).resolves.toBe(ARN);
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toMatchObject({
+        arn: ARN,
+      });
     });
 
     /** @scenario "AWS errors are matched by exception name, not message text" */
@@ -303,7 +311,12 @@ describe("given a project whose studio engine needs a function", () => {
 describe("given pods of two releases serving the same project during a rollout", () => {
   const ORDERED: StudioLambdaConfig = { ...CONFIG, imageOrder: 1_700_000_200 };
   const desired = buildStudioLambdaEnvironment(ORDERED);
-  const onImage = (input: { image: string; tags?: Record<string, string>; memory?: number }) => {
+  const onImage = (input: {
+    image: string;
+    tags?: Record<string, string>;
+    tagsError?: { ErrorCode: string; Message: string };
+    memory?: number;
+  }) => {
     const configuration = {
       ...READY,
       MemorySize: input.memory ?? 2048,
@@ -312,7 +325,12 @@ describe("given pods of two releases serving the same project during a rollout",
 
     return [
       { Configuration: configuration },
-      { Code: { ImageUri: input.image }, Configuration: configuration, Tags: input.tags },
+      {
+        Code: { ImageUri: input.image },
+        Configuration: configuration,
+        Tags: input.tags,
+        TagsError: input.tagsError,
+      },
       { Configuration: READY },
     ];
   };
@@ -331,10 +349,48 @@ describe("given pods of two releases serving the same project during a rollout",
         }),
       });
 
-      const arn = await subject.resolve({ projectId: "project-1" });
+      const resolution = await subject.resolve({ projectId: "project-1" });
 
-      expect(arn).toBe(ARN);
+      expect(resolution).toEqual({
+        arn: ARN,
+        imageUri: "registry/nlp:v10",
+        imageOrder: 1700000300,
+      });
       expect(writes(sent)).toEqual([]);
+    });
+  });
+
+  describe("when Lambda cannot return the function's tags", () => {
+    /** @scenario "A pod that cannot read the function's order leaves it alone" */
+    it("writes nothing and reports the image the function still carries", async () => {
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: onImage({
+          image: "registry/nlp:v10",
+          tagsError: { ErrorCode: "AccessDeniedException", Message: "lambda:ListTags" },
+        }),
+      });
+
+      const resolution = await subject.resolve({ projectId: "project-1" });
+
+      expect(resolution).toEqual({ arn: ARN, imageUri: "registry/nlp:v10", imageOrder: undefined });
+      expect(writes(sent)).toEqual([]);
+    });
+  });
+
+  describe("when Lambda refuses to record the pod's order", () => {
+    /** @scenario "A pod that cannot record its order does not move the image" */
+    it("leaves the image and configuration as they are", async () => {
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: onImage({ image: "registry/nlp:v8", memory: 1024 }),
+        rejectTagWith: new Error("not authorized to perform lambda:TagResource"),
+      });
+
+      const resolution = await subject.resolve({ projectId: "project-1" });
+
+      expect(resolution).toMatchObject({ arn: ARN, imageUri: "registry/nlp:v8" });
+      expect(writes(sent)).toEqual(["TagResourceCommand"]);
     });
   });
 

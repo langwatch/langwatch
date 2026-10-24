@@ -29,8 +29,6 @@ type ProbeCaller = Readonly<{
   legacyKeyOutsideScope: Readonly<{ organizationId: string; enforced: boolean }> | null;
 }>;
 
-const legacyKeyLogger = createLogger(LEGACY_PROJECT_KEY_LOGGER_NAME);
-
 /** Resolves a raw token, project key or API key, to its caller as main's TokenResolver did. */
 type ProbeCallerResolver = (
   input: Readonly<{ token: string; projectId: string | null }>,
@@ -139,6 +137,8 @@ export class ProjectKeyedProbeService {
       now: nowInstant().epochMilliseconds,
     });
     if (suppressed === undefined) return;
+    // Looked up per use, not at import: a module graph shared across test files would pin it.
+    const legacyKeyLogger = createLogger(LEGACY_PROJECT_KEY_LOGGER_NAME);
     for (const line of legacyProjectKeyUseLines({ use, decision, suppressed })) {
       legacyKeyLogger[line.level](line.fields, line.message);
     }

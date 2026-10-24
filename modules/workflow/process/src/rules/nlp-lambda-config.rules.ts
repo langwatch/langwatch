@@ -73,24 +73,38 @@ export function clampCodeBlockTimeoutSeconds(rawValue: string | undefined): numb
 /** The function tag recording the rollout order of the image a pod last put on it. */
 export const NLP_LAMBDA_IMAGE_ORDER_TAG = "ImageOrder";
 
+/** The order a function's tags record; `none` when they hold no whole number. */
+export type RecordedImageOrder = { kind: "recorded"; order: number } | { kind: "none" };
+
+export function recordedImageOrder(
+  tags: Readonly<Record<string, string>> | undefined,
+): RecordedImageOrder {
+  const raw = tags?.[NLP_LAMBDA_IMAGE_ORDER_TAG];
+
+  return raw !== undefined && /^\d+$/.test(raw)
+    ? { kind: "recorded", order: Number(raw) }
+    : { kind: "none" };
+}
+
 /**
  * Where a pod's image stands against the one a function was last moved to.
- * `behind` means a newer release owns the function and the pod leaves it alone;
- * `unordered` (the fleet names no order) keeps converging on the pod's own image.
+ * `behind` (a newer release owns it) and `unknown` (its tags could not be read)
+ * leave the function alone; `unordered` (no order named) converges as before.
  */
-export type StudioLambdaRolloutStanding = "ahead" | "level" | "behind" | "unordered";
+export type StudioLambdaRolloutStanding = "ahead" | "level" | "behind" | "unknown" | "unordered";
 
 export function studioLambdaRolloutStanding(input: {
   ours: number | undefined;
   tags: Readonly<Record<string, string>> | undefined;
+  tagsUnreadable: boolean;
 }): StudioLambdaRolloutStanding {
   if (input.ours === undefined) return "unordered";
-  const raw = input.tags?.[NLP_LAMBDA_IMAGE_ORDER_TAG];
-  const recorded = raw !== undefined && /^\d+$/.test(raw) ? Number(raw) : void 0;
-  // A function with no readable order predates ordering, so any ordered pod is ahead of it.
-  if (recorded === undefined || input.ours > recorded) return "ahead";
+  if (input.tagsUnreadable) return "unknown";
+  const recorded = recordedImageOrder(input.tags);
+  // A function with no usable order predates ordering, so any ordered pod is ahead of it.
+  if (recorded.kind === "none" || input.ours > recorded.order) return "ahead";
 
-  return input.ours === recorded ? "level" : "behind";
+  return input.ours === recorded.order ? "level" : "behind";
 }
 
 /**

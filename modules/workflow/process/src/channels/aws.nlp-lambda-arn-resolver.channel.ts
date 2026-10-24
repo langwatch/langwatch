@@ -23,10 +23,11 @@ import {
   NLP_LAMBDA_MEMORY_SIZE_MB,
   NLP_LAMBDA_NAME_PREFIX,
   buildStudioLambdaEnvironment,
+  recordedImageOrder,
   studioLambdaRolloutStanding,
   type StudioLambdaConfig,
 } from "../rules/nlp-lambda-config.rules.ts";
-import { type NlpLambdaArnResolver } from "./nlp-lambda.channel.ts";
+import { type NlpLambdaArnResolver, type NlpLambdaResolution } from "./nlp-lambda.channel.ts";
 
 const LOG_GROUP_ROOT = "/aws/lambda/";
 const LOG_RETENTION_DAYS = 365;
@@ -55,21 +56,28 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
     },
   ) {}
 
-  async resolve(input: { projectId: string }): Promise<string> {
+  async resolve(input: { projectId: string }): Promise<NlpLambdaResolution> {
     const functionName = `${NLP_LAMBDA_NAME_PREFIX}${input.projectId}`;
     const existing = await this.tryReadConfiguration(functionName);
-    const current = existing
+    const synced = existing
       ? await this.sync({ functionName, existing, projectId: input.projectId })
-      : await this.createFunction({ functionName, projectId: input.projectId });
+      : {
+          current: await this.createFunction({ functionName, projectId: input.projectId }),
+          ...this.ownImage(),
+        };
 
     await this.pollUntilReady(functionName);
 
-    const arn = current.FunctionArn;
+    const arn = synced.current.FunctionArn;
     if (!arn) {
       throw new Error(`AWS reported no ARN for the studio Lambda ${functionName}.`);
     }
 
-    return arn;
+    return { arn, imageUri: synced.imageUri, imageOrder: synced.imageOrder };
+  }
+
+  private ownImage(): { imageUri: string; imageOrder: number | undefined } {
+    return { imageUri: this.options.config.imageUri, imageOrder: this.options.config.imageOrder };
   }
 
   private async tryReadConfiguration(functionName: string): Promise<FunctionConfiguration | null> {
@@ -158,36 +166,52 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
 
   /**
    * Brings an existing function's image, then its configuration, up to date,
-   * unless a newer release already moved it: that pod owns both.
+   * unless a newer release already moved it (that pod owns both) or this pod
+   * cannot read or write the order that would protect the move.
    */
   private async sync(input: {
     functionName: string;
     existing: FunctionConfiguration;
     projectId: string;
-  }): Promise<FunctionConfiguration> {
+  }): Promise<{
+    current: FunctionConfiguration;
+    imageUri: string;
+    imageOrder: number | undefined;
+  }> {
     const { config } = this.options;
     const details = await this.options.lambda.send(
       new GetFunctionCommand({ FunctionName: input.functionName }),
     );
     let current = input.existing;
+    const recorded = recordedImageOrder(details.Tags);
+    const left = {
+      current,
+      imageUri: details.Code?.ImageUri ?? config.imageUri,
+      imageOrder: recorded.kind === "recorded" ? recorded.order : void 0,
+    };
 
-    const standing = studioLambdaRolloutStanding({ ours: config.imageOrder, tags: details.Tags });
-    if (standing === "behind") {
+    const standing = studioLambdaRolloutStanding({
+      ours: config.imageOrder,
+      tags: details.Tags,
+      tagsUnreadable: details.TagsError !== undefined,
+    });
+    if (standing === "behind" || standing === "unknown") {
       this.options.logger?.info(
-        { projectId: input.projectId, imageOrder: config.imageOrder },
-        "a newer release owns the studio Lambda; leaving its image and configuration",
+        { projectId: input.projectId, imageOrder: config.imageOrder, standing },
+        "the studio Lambda's rollout order is newer or unreadable; leaving it as it is",
       );
 
-      return current;
+      return left;
     }
 
     // Recorded before the image moves, so a pod still on the older release
     // that reads the function mid-update already sees it is behind.
     if (standing === "ahead") {
-      await this.recordImageOrder({
+      const recorded = await this.recordImageOrder({
         functionArn: details.Configuration?.FunctionArn ?? input.existing.FunctionArn,
         projectId: input.projectId,
       });
+      if (!recorded) return left;
     }
 
     const deployedImage = details.Code?.ImageUri;
@@ -207,24 +231,28 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
       deployed: details.Configuration ?? input.existing,
     });
 
-    return reconciled ?? current;
+    return { current: reconciled ?? current, ...this.ownImage() };
   }
 
-  /** A failed tag degrades to converging without the guard, never to a stuck function. */
+  /** An image moved without its order would be reverted by the older release, so none moves. */
   private async recordImageOrder(input: {
     functionArn: string | undefined;
     projectId: string;
-  }): Promise<void> {
-    if (!input.functionArn) return;
+  }): Promise<boolean> {
+    if (!input.functionArn) return false;
     try {
       await this.options.lambda.send(
         new TagResourceCommand({ Resource: input.functionArn, Tags: this.imageOrderTag() }),
       );
+
+      return true;
     } catch (error) {
       this.options.logger?.warn(
         { projectId: input.projectId, error },
-        "could not record the image order on the studio Lambda",
+        "could not record the image order on the studio Lambda; leaving it as it is",
       );
+
+      return false;
     }
   }
 

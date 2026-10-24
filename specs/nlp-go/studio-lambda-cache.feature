@@ -133,6 +133,27 @@ Feature: Per-project NLP Lambda resolution
     And it sends no UpdateFunctionCode, UpdateFunctionConfiguration or TagResource call
 
   @unit
+  Scenario: A pod that cannot read the function's order leaves it alone
+    Given the fleet configuration names an image_order
+    And Lambda answers GetFunction with a TagsError instead of the function's tags
+    When the pod resolves that project
+    Then it answers with the function's ARN and the image it still carries
+    And it sends no UpdateFunctionCode, UpdateFunctionConfiguration or TagResource call
+
+  @unit
+  Scenario: A pod that cannot record its order does not move the image
+    Given a function on an older release's image
+    And Lambda refuses the TagResource call
+    When the pod resolves that project
+    Then it sends no UpdateFunctionCode or UpdateFunctionConfiguration call
+
+  @unit
+  Scenario: An ImageOrder tag that is not a whole number counts as no order
+    Given a function whose ImageOrder tag is not a whole number
+    When a pod with an image_order compares its standing
+    Then the pod is ahead of the function
+
+  @unit
   Scenario: A pod on a newer release upgrades an older or untagged function
     Given a function tagged with a lower image order, or with none
     When the pod resolves that project
@@ -164,3 +185,9 @@ Feature: Per-project NLP Lambda resolution
     When a runtime on a lower image order resolves "projectA"
     Then it returns the cached ARN without calling AWS
     And it leaves the shared entry in place
+
+  @unit
+  Scenario: A pod that leaves a newer function alone files it under the newer image
+    Given a pod on a lower image order resolves "projectA" and its resolver leaves the function alone
+    Then the shared entry carries the image and order the function holds
+    And a pod on that newer order serves the entry without calling AWS
