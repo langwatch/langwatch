@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.21.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.20.0...typescript-sdk@v1.21.0) (2026-10-24)
+
+
+### Features
+
+* **auth:** record each request's credential type and make legacy project keys ingestion-only ([#8962](https://github.com/langwatch/langwatch/issues/8962)) ([ec41367](https://github.com/langwatch/langwatch/commit/ec41367384ebda1e5cbe3d0ed16b1797b9769575))
+* **coding-agent:** copilot CLI and VS Code sessions become rows ([#8884](https://github.com/langwatch/langwatch/issues/8884)) ([e5c5e8c](https://github.com/langwatch/langwatch/commit/e5c5e8c3eb372ac02eed8ad7e5bd1810fc3c3be1))
+* **model-providers:** add Doubleword provider (strict layout) ([#8557](https://github.com/langwatch/langwatch/issues/8557)) ([4304116](https://github.com/langwatch/langwatch/commit/4304116811863d149b2eae9a114516df00778834))
+
+
+### Bug Fixes
+
+* **security:** close the nine alerts raised on 2026-10-22 ([#8982](https://github.com/langwatch/langwatch/issues/8982)) ([7eca2c2](https://github.com/langwatch/langwatch/commit/7eca2c24ccba4b38a1636048ea18801a2fd1d2b1))
+* **security:** raise JS security floors for the root workspace and SDK examples ([#6569](https://github.com/langwatch/langwatch/issues/6569)) ([2adf11f](https://github.com/langwatch/langwatch/commit/2adf11f42e98b42f8508a87e29be33c3264e07f3))
+
+
+### Miscellaneous
+
+* **deps:** bump ip-address ([864fe2b](https://github.com/langwatch/langwatch/commit/864fe2bb0bb6464bccac776b8eb42898690a9fcd))
+* **deps:** bump ip-address from 10.7.2 to 10.7.4 in /sdks/typescript/examples/mastra in the npm_and_yarn group across 1 directory ([#8973](https://github.com/langwatch/langwatch/issues/8973)) ([864fe2b](https://github.com/langwatch/langwatch/commit/864fe2bb0bb6464bccac776b8eb42898690a9fcd))
+
 ## [1.20.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.19.0...typescript-sdk@v1.20.0) (2026-10-21)
 
 
