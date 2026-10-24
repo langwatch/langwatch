@@ -239,12 +239,12 @@ test_app_pre_stop_sleep() {
   local block
   block=$(render_component "app" "$BASE")
   case "$block" in
-    *'command: ["sleep", "5"]'*) echo "ok   [app preStop] sleeps 5s before SIGTERM" ;;
-    *) fail "app preStop" "the app container has no 5s preStop sleep" ;;
+    *'command: ["sleep", "15"]'*) echo "ok   [app preStop] sleeps 15s before SIGTERM" ;;
+    *) fail "app preStop" "the app container has no 15s preStop sleep" ;;
   esac
   expect_render_refused "preStop too long for the grace" \
-    "--set app.preStopSleepSeconds=10" \
-    "too short for a 10s preStop sleep"
+    "--set app.preStopSleepSeconds=20" \
+    "too short for a 20s preStop sleep"
   local bad
   for bad in "--set-string app.preStopSleepSeconds=5.5" "--set-string app.preStopSleepSeconds=abc" \
     "--set app.preStopSleepSeconds=-1" "--set-string app.preStopSleepSeconds=99999999999999999999"; do
