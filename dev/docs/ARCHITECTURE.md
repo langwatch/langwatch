@@ -1115,7 +1115,7 @@ export const billingConfig = Config.define((c) => ({
 - `NODE_ENV` → `nodeEnvironment`, the raw string. The `http` owner **derives** `production` from it,
   because a derived value is not a second claim. A module wanting a boolean derives it the same way.
 - `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` and their lower-case spellings → `outboundProxy`, raw by env
-  name; notification and webhook parse it.
+  name; notification, webhook and identity parse it.
 
 Framework owners (process, observability) pick from the same object.
 

@@ -25,3 +25,36 @@ Feature: An SSO connection reaches the endpoints its issuer's discovery document
     Given a registered issuer whose discovery document names an http endpoint and one resolving to a private address
     When a sign-in request names that issuer
     Then neither origin is trusted
+
+  @unit
+  Scenario: Issuer discovery leaves through the deployment's outbound proxy
+    Given the deployment reaches the internet only through an outbound proxy
+    When an administrator saves an OpenID Connect connection
+    Then the issuer's discovery document is read through the proxy
+    And the issuer's address is still judged public before the request is sent
+
+  @unit
+  Scenario: An issuer origin an operator vouched for is reached directly, not through the proxy
+    Given the deployment has an outbound proxy configured
+    And SSO_TRUSTED_IDP_ORIGINS names an issuer origin inside the network
+    And NO_PROXY does not name it
+    When an administrator saves a connection with that issuer
+    Then the discovery document is read directly from the vouched origin
+    And a redirect out of that origin is judged again and travels through the proxy
+
+  @unit
+  Scenario: NO_PROXY does not lift the public-address check on discovery
+    Given NO_PROXY names an issuer's host
+    And that host resolves to a private address the operator has not trusted
+    When an administrator saves a connection with that issuer
+    Then discovery is refused, and nothing is fetched directly or through the proxy
+
+  # Sign-in goes through better-auth's use of Node's global fetch, which the
+  # egress fence does not carry yet (ADR-187).
+  @integration @unimplemented
+  Scenario: Sign-in reaches the identity provider through the deployment's outbound proxy
+    Given the deployment reaches the internet only through an outbound proxy
+    And an active OpenID Connect connection to a public identity provider
+    When a user signs in through it
+    Then the token exchange and the signing keys are fetched through the proxy
+    And the sign-in completes

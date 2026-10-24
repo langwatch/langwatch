@@ -64275,7 +64275,7 @@ Use this for an internal relay, Azure Communication Services, Office 365, Google
 
 ### Sending through an outbound proxy
 
-Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses`, `resend` and `sendgrid` gateways all route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses`, `resend` and `sendgrid` gateways all route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`. Single sign-on setup uses the same variables: see [Single sign-on](/self-hosting/configuration/sso#behind-a-corporate-proxy).
 
 The `smtp` gateway ignores these variables on purpose, because an SMTP relay is normally an internal host that must be reached directly. Point it at your relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
 
@@ -65037,6 +65037,20 @@ Replace `YOUR_TENANT_ID` with your tenant id, or set `ISSUER` to your provider's
 ISSUER="https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0"
 curl "$ISSUER/.well-known/openid-configuration"
 ```
+
+### Behind a corporate proxy
+
+If your installation reaches the internet only through an HTTP proxy, set the
+standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables on the app and
+the workers. LangWatch fetches the discovery document, and the domain
+verification file, through the proxy. It still checks that the address is
+public first, and checks every redirect again.
+
+`NO_PROXY` only chooses a
+direct connection: it does not lift that check. An identity provider inside
+your network needs its origin in `SSO_TRUSTED_IDP_ORIGINS`. LangWatch then
+reaches that origin directly, never through the proxy, so it needs no `NO_PROXY`
+entry.
 
 Register the client with the authorization code flow and the `openid`,
 `email` and `profile` scopes. GitHub sign-in is OAuth without OpenID Connect,
