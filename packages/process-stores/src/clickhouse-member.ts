@@ -140,6 +140,7 @@ const STATEMENT_BOUND_INSTANCE = "routed";
  * package may not import the trace contract's twin; both answer the one registered code.
  */
 class ClickHouseOverloadedError extends HandledError {
+  static readonly code = "clickhouse_overloaded" as const;
   declare readonly code: "clickhouse_overloaded";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -162,6 +163,7 @@ export class OverloadedRefusal extends ClickHouseOverloadErrorFactory {
 
 /** Main's refusal for a read whose ClickHouse did not answer (analytics-contract's twin). */
 class ClickHouseUnavailableError extends HandledError {
+  static readonly code = "clickhouse_unavailable" as const;
   declare readonly code: "clickhouse_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {

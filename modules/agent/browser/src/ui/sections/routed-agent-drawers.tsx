@@ -13,12 +13,12 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, VStack } from "@langwatch/design-system/primitives";
 import { VariablesSection } from "@langwatch/design-system/variable-mapping";
 import { WorkflowCardDisplay } from "@langwatch/design-system/workflow-card";
+import { OutputsSection } from "@langwatch/prompt-client";
 import { toEpochMs } from "@langwatch/time";
+import { SetupWithAgentButton } from "@langwatch/trace-client";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 
-import { OutputsSection } from "../../behavior/lent-outputs-section.tsx";
-import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
 import { useConnectedAgentDetail } from "../../behavior/use-connected-agent-detail.ts";
 import { useCreateWorkflowAgent } from "../../behavior/use-create-workflow-agent.ts";
 import { useRoutedAgentList } from "../../behavior/use-routed-agent-list.ts";

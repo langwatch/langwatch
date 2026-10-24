@@ -10,6 +10,7 @@ import {
   type AuthzApi,
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   SharedCredentialPendingError,
   mintOnce,
@@ -144,7 +145,7 @@ export class RunKeyMintService {
     } catch (error) {
       if (
         error instanceof SharedCredentialPendingError ||
-        (AuthzGrantNotConfirmedError.is(error) && !error.retryable)
+        (AuthzGrantNotConfirmedError.is(error) && !readHandledError(error)?.retryable)
       ) {
         throw new AuthzGrantNotConfirmedError({ retryable: true });
       }

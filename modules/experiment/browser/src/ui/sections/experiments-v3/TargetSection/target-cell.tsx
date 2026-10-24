@@ -14,6 +14,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
 import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import type { SerializedHandledError } from "@langwatch/handled-error";
+import { TraceIdPeek } from "@langwatch/trace-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuListTree, LuPlay, LuPlus, LuSquare } from "react-icons/lu";
 
@@ -21,7 +22,6 @@ import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-e
 import { useCodeEvaluatorIds } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";
 import { useOpenEvaluatorEditor } from "../../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
 import { useTargetName } from "../../../../behavior/experiments-v3/use-target-name.ts";
-import { TraceIdPeek } from "../../../../behavior/lent-trace.tsx";
 import { describeCellFailure } from "../../../../model/cell-failure.ts";
 import type { EvaluatorConfig, TargetConfig } from "../../../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
@@ -113,7 +113,7 @@ function CellFailure({
             whiteSpace="pre-wrap"
             wordBreak="break-word"
           >
-            {parseLLMError(failure.title).message /* no-raw-error-toast-ok */}
+            {parseLLMError(failure.title).message}
           </Alert.Title>
           {failure.description && (
             <Alert.Description userSelect="text">{failure.description}</Alert.Description>
@@ -128,7 +128,7 @@ function CellFailure({
               whiteSpace="pre-wrap"
               wordBreak="break-word"
             >
-              {parseLLMError(failure.raw).message /* no-raw-error-toast-ok */}
+              {parseLLMError(failure.raw).message}
             </Alert.Description>
           )}
         </Alert.Content>

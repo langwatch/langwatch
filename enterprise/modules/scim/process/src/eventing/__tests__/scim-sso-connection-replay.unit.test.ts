@@ -15,9 +15,11 @@ import {
   EventSourcing,
   InMemoryProcessStore,
   type OccurredAtBounds,
+  pipelineUpcastsOf,
   type ReplayEvent,
   type ReplayEventSource,
   ReplayService,
+  upcastReplayEventSource,
 } from "@langwatch/eventing";
 import { testEventSchema } from "@langwatch/eventing/testing";
 import {
@@ -26,6 +28,10 @@ import {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
+import {
+  CONNECTION_REGISTERED_V1_EVENT_TYPE,
+  registrationFromV1,
+} from "@langwatch/identity-contract/sso-connection-registration-v1";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -177,13 +183,26 @@ const identityLog = [
   }),
 ];
 
-/** Identity's connection pipeline as a stand-in owner, as a worker installing both registers it. */
+/**
+ * Identity's connection pipeline as a stand-in owner, as a worker installing both registers it.
+ * Like identity's own, it upcasts a stored version 1 registration through the contract's one
+ * transform, the copy identity's upcast declares.
+ */
 function identityStandIn() {
   return definePipeline({
     name: SSO_CONNECTION_PIPELINE_NAME,
     aggregate: defineAggregate({ type: SSO_CONNECTION_AGGREGATE_TYPE }),
   })
     .withEvents(scimSsoConnectionPeerEvents.map(({ type, data }) => testEventSchema(type, data)))
+    .withUpcasts({
+      events: [
+        {
+          from: { type: CONNECTION_REGISTERED_V1_EVENT_TYPE },
+          to: CONNECTION_REGISTERED_EVENT_TYPE,
+          data: registrationFromV1,
+        },
+      ],
+    })
     .build();
 }
 
@@ -193,9 +212,13 @@ async function bootWorker({ log = identityLog }: { log?: ReplayEvent[] } = {}) {
   const eventing = new EventSourcing({
     enabled: false,
     processStore: InMemoryProcessStore.createForTesting(),
-    replayEngine: () => ({
+    // As production's engine: the log read through every registered pipeline's upcasts.
+    replayEngine: ({ definitions }) => ({
       service: new ReplayService({
-        eventSource: new SeededIdentityLog(log),
+        eventSource: upcastReplayEventSource({
+          source: new SeededIdentityLog(log),
+          upcasts: pipelineUpcastsOf(definitions),
+        }),
         redis: memoryRedisDouble({
           script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
         }),
@@ -295,8 +318,8 @@ describe("given a worker installing SCIM over identity's connection log", () => 
 });
 
 /**
- * A registration written between 2026-08-25 and 2026-09-21 (95512d492b6..d41f19a46ef) states
- * `allowsJit` and no `arrivalPolicy`; production's log still holds them.
+ * A version 1 registration written between 2026-08-25 and 2026-09-21 (95512d492b6..d41f19a46ef)
+ * states `allowsJit` and no `arrivalPolicy`; production's log still holds them.
  */
 function legacyRegistration({ id, allowsJit }: { id: string; allowsJit?: boolean }): ReplayEvent {
   const data: Record<string, unknown> = {
@@ -309,7 +332,7 @@ function legacyRegistration({ id, allowsJit }: { id: string; allowsJit?: boolean
   };
   if (allowsJit !== undefined) data.allowsJit = allowsJit;
   return {
-    ...fact({ n: 1, type: CONNECTION_REGISTERED_EVENT_TYPE, data }),
+    ...fact({ n: 1, type: CONNECTION_REGISTERED_V1_EVENT_TYPE, data }),
     id: `${id}-1`,
     aggregateId: id,
   };

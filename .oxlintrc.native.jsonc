@@ -113,9 +113,31 @@
     },
     {
       // Only the design system imports Chakra or Emotion; everything else takes it from there
-      // (Alex, 2026-10-10). Later overrides that set no-restricted-imports restate this entry.
+      // (Alex, 2026-10-10), and only packages/observability imports prom-client (Alex, 2026-10-20).
+      // Later overrides that set no-restricted-imports restate this entry.
       "files": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.mjs"],
       "excludeFiles": ["packages/design-system/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@chakra-ui/*", "@emotion/*"],
+                "message": "Import it from @langwatch/design-system (a named subpath, or ./primitives); only the design system imports Chakra.",
+              },
+              {
+                "group": ["prom-client", "prom-client/*"],
+                "message": "Record metrics through counter/histogram/gauge from @langwatch/observability/metrics; only packages/observability touches prom-client.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // The observability package is the one place that touches prom-client; it keeps the Chakra ban.
+      "files": ["packages/observability/**"],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -153,6 +175,12 @@
                 "message": "Delete it and throw a HandledError from the handler; the mount serialises every response.",
               },
             ],
+            "patterns": [
+              {
+                "group": ["prom-client", "prom-client/*"],
+                "message": "Record metrics through counter/histogram/gauge from @langwatch/observability/metrics; only packages/observability touches prom-client.",
+              },
+            ],
           },
         ],
       },
@@ -180,6 +208,10 @@
                 "group": ["@chakra-ui/*", "@emotion/*"],
                 "message": "Import it from @langwatch/design-system (a named subpath, or ./primitives); only the design system imports Chakra.",
               },
+              {
+                "group": ["prom-client", "prom-client/*"],
+                "message": "Record metrics through counter/histogram/gauge from @langwatch/observability/metrics; only packages/observability touches prom-client.",
+              },
             ],
           },
         ],
@@ -202,6 +234,10 @@
               {
                 "group": ["@chakra-ui/*", "@emotion/*"],
                 "message": "Import it from @langwatch/design-system (a named subpath, or ./primitives); only the design system imports Chakra.",
+              },
+              {
+                "group": ["prom-client", "prom-client/*"],
+                "message": "Record metrics through counter/histogram/gauge from @langwatch/observability/metrics; only packages/observability touches prom-client.",
               },
             ],
           },
@@ -231,6 +267,10 @@
               {
                 "group": ["@chakra-ui/*", "@emotion/*"],
                 "message": "Import it from @langwatch/design-system (a named subpath, or ./primitives); only the design system imports Chakra.",
+              },
+              {
+                "group": ["prom-client", "prom-client/*"],
+                "message": "Record metrics through counter/histogram/gauge from @langwatch/observability/metrics; only packages/observability touches prom-client.",
               },
             ],
           },

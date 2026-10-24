@@ -20,9 +20,14 @@
   },
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/module": "workspace:*"
   },
   "devDependencies": {
+    "@types/react": "catalog:",
     "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
   }
 }

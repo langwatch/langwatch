@@ -6,6 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
  * and the caller have genuinely diverged.
  */
 export class UnknownFeatureFlagError extends HandledError {
+  static readonly code = "feature_flag_unknown" as const;
   declare readonly code: "feature_flag_unknown";
 
   constructor(flagKey: string) {
@@ -18,6 +19,7 @@ export class UnknownFeatureFlagError extends HandledError {
 }
 
 export class UnknownFeatureFlagExperimentError extends HandledError {
+  static readonly code = "feature_flag_experiment_unknown" as const;
   declare readonly code: "feature_flag_experiment_unknown";
 
   constructor() {
@@ -34,6 +36,7 @@ export class UnknownFeatureFlagExperimentError extends HandledError {
  * caller can act on it: stop offering the experiment.
  */
 export class FeatureFlagExperimentUnavailableError extends HandledError {
+  static readonly code = "feature_flag_experiment_unavailable" as const;
   declare readonly code: "feature_flag_experiment_unavailable";
 
   constructor() {

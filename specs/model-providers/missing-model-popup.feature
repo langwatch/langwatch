@@ -176,14 +176,14 @@ Feature: Missing-model toast when a feature can't resolve a model
     # ai_call_failed code.
     And the provider's own error message is not shown to the user
 
-  # The commit-message autogen (and AI search, ...) is assistive: it failing
-  # does not break anything the user was doing, so a yellow warning is the
-  # right level, not a red error.
+  # A failed call is a failure with a code, even when the feature is assistive:
+  # it is worded by the registry and traced, not a hand-built warning.
   @integration
-  Scenario: A failed assistive AI call warns, it does not error
+  Scenario: A failed assistive AI call is reported as a failure with a code
     Given the Fast role resolves to a model whose provider key is invalid
     When the workflow auto-commit fires and the provider returns 401
-    Then the toast severity is a warning, not an error
+    Then the toast is a failure worded by the ai_call_failed registry entry
+    And it names the feature and offers an "Open settings" action
 
   # ============================================================================
   # Background-task / no-UI-context surface (future)
@@ -242,6 +242,20 @@ Feature: Missing-model toast when a feature can't resolve a model
       When the AI search fails for a project-level user without team:manage
       Then the toast still names the team-scope disabled default
       But the primary action falls back to "Open settings" (no inline swap)
+
+    @integration
+    Scenario: A provider-disabled failure stays up until the reader acts on it
+      Given a project-scope override with a disabled provider and an enabled org alternate
+      When the provider-disabled toast opens
+      Then it asks the feedback host for a sticky failure
+      And the variant that only links to settings is sticky as well, since the reader must still act
+
+    @integration
+    Scenario: A toast raised with no working feedback host is logged, not lost silently
+      Given no feedback host is mounted
+      When a provider-disabled or a failed-AI-call toast is raised
+      Then the console carries a warning naming the feature
+      And nothing throws into the caller
 
     @integration
     Scenario: Repeated failures within the same scope coalesce into one toast

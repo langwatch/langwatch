@@ -5,9 +5,9 @@
  */
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { EditModelProviderForm as LentEditModelProviderForm } from "@langwatch/model-provider-client";
 import { useRef, useState } from "react";
 
-import { LentEditModelProviderForm } from "../../behavior/lent-edit-model-provider-form.tsx";
 import { useLangyHost } from "../../model/langy-host.ts";
 import {
   langyModelProviders,

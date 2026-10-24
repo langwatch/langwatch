@@ -47,7 +47,7 @@ type CardState = "shown" | "raising" | "unavailable";
 type DeleteConfirmationMembers = Readonly<{
   confirmations: LangyDeleteConfirmationRepository;
   answers: Pick<LangyConfirmationAnswersService, "decide">;
-  waits: Pick<UserWaitService, "startQuestion" | "poll" | "getWait" | "answer">;
+  waits: Pick<UserWaitService, "startQuestion" | "poll" | "findWait" | "answer">;
   /** The folder-sharing key's own binding, which names its conversation too. */
   localKeys: Pick<LangyLocalControlRequestRepository, "findKeyBinding">;
   conversations: {
@@ -346,12 +346,7 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
   }
 
   private async readWait(waitId: string): Promise<StoredUserWait | undefined> {
-    return this.members.waits.getWait(waitId).catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
-        return undefined;
-      }
-      throw error;
-    });
+    return this.members.waits.findWait(waitId);
   }
 }
 

@@ -178,9 +178,6 @@
       "path": "./modules/analytics/contract"
     },
     {
-      "path": "./modules/analytics/filters"
-    },
-    {
       "path": "./modules/analytics/process"
     },
     {
@@ -797,6 +794,9 @@
     },
     {
       "path": "./modules/ops/client"
+    },
+    {
+      "path": "./modules/insight/client"
     },
     {
       "path": "./modules/insight/contract"

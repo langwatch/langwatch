@@ -8,6 +8,7 @@ import type {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { langyProbeResponseOf } from "../../transport/platform-health-probe.rest.ts";
 import { LangyCanaryService } from "../langy-canary.service.ts";
 
 class FakeHandledError extends HandledError {}
@@ -55,10 +56,14 @@ function canary(options: {
     startConversationTurn,
     awaitTurnSettlement: options.settle ?? (async () => SETTLED),
   });
-  const service = LangyCanaryService.create({
+  const canaryService = LangyCanaryService.create({
     langy,
     clock: { now: options.now ?? (() => Date.now()), budgetMs: options.budgetMs ?? 1_000 },
   });
+  // Read through the door, so each answer is checked as the HTTP response the caller sees.
+  const service = {
+    probe: async (key: LangyKeyCaller) => langyProbeResponseOf(await canaryService.probe(key)),
+  };
   return { service, startConversationTurn };
 }
 

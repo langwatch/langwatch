@@ -28,7 +28,7 @@ const schedule = (over: Partial<OpsInsightSchedule> = {}): OpsInsightSchedule =>
   lastRunOutcome: "filed",
   lastRunReason: null,
   consecutiveSkips: 0,
-  skippedDaysBeforeOff: 7,
+  daysUntilOff: 7,
   ...over,
 });
 
@@ -108,7 +108,13 @@ describe("the words of a row", () => {
     expect(lastRunWords({ lastRunOutcome: null, lastRunReason: null })).toBe("no run yet");
   });
 
-  it("says the skipped days out of how many turn the schedule off", () => {
-    expect(skippedDaysWords({ consecutiveSkips: 2, skippedDaysBeforeOff: 7 })).toBe("2 of 7");
+  it("says the skipped days and how many more turn the schedule off", () => {
+    expect(skippedDaysWords({ consecutiveSkips: 2, daysUntilOff: 5 })).toBe(
+      "2 skipped, off after 5 more",
+    );
+  });
+
+  it("says only the skipped days once the schedule is off", () => {
+    expect(skippedDaysWords({ consecutiveSkips: 7, daysUntilOff: null })).toBe("7 skipped");
   });
 });

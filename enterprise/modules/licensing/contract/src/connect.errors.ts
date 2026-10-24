@@ -8,6 +8,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 /** The license is valid, and the service is not part of what was agreed. */
 export class ConnectServiceNotEntitledError extends HandledError {
+  static readonly code = "connect_service_not_entitled" as const;
   declare readonly code: "connect_service_not_entitled";
 
   constructor(service: string) {
@@ -22,6 +23,7 @@ export class ConnectServiceNotEntitledError extends HandledError {
 
 /** A virtual key asked to change a contract cap, which only a license holds. */
 export class ConnectLicenseRequiredError extends HandledError {
+  static readonly code = "connect_license_required" as const;
   declare readonly code: "connect_license_required";
 
   constructor() {
@@ -36,6 +38,7 @@ export class ConnectLicenseRequiredError extends HandledError {
 
 /** No commit or overage was agreed yet, so there is no cap to move. */
 export class ConnectBudgetNotSetError extends HandledError {
+  static readonly code = "connect_budget_not_set" as const;
   declare readonly code: "connect_budget_not_set";
 
   constructor() {
@@ -49,6 +52,7 @@ export class ConnectBudgetNotSetError extends HandledError {
 
 /** The cap asked for is above the commit plus the agreed overage maximum. */
 export class ConnectBudgetAboveContractMaximumError extends HandledError {
+  static readonly code = "connect_budget_above_contract_maximum" as const;
   declare readonly code: "connect_budget_above_contract_maximum";
 
   constructor(maximumUsd: number) {
@@ -66,6 +70,7 @@ export class ConnectBudgetAboveContractMaximumError extends HandledError {
  * caller knows this; the host is never reached to say it.
  */
 export class ConnectDisabledError extends HandledError {
+  static readonly code = "connect_disabled" as const;
   declare readonly code: "connect_disabled";
 
   constructor() {
@@ -79,6 +84,7 @@ export class ConnectDisabledError extends HandledError {
 
 /** The hosted usage budget is spent. The cap is the customer's own to raise. */
 export class ConnectBudgetExhaustedError extends HandledError {
+  static readonly code = "connect_budget_exhausted" as const;
   declare readonly code: "connect_budget_exhausted";
 
   constructor(options: { capUsd?: number } = {}) {
@@ -97,6 +103,7 @@ export class ConnectBudgetExhaustedError extends HandledError {
  * which one to write.
  */
 export class ConnectUnreachableError extends HandledError {
+  static readonly code = "connect_unreachable" as const;
   declare readonly code: "connect_unreachable";
 
   constructor({ host, port, cause }: { host: string; port: number; cause?: Error }) {
@@ -115,6 +122,7 @@ export class ConnectUnreachableError extends HandledError {
  * The same code the gateway raises for it, so one piece of copy covers both.
  */
 export class HostedServiceUnavailableError extends HandledError {
+  static readonly code = "hosted_service_unavailable" as const;
   declare readonly code: "hosted_service_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -133,6 +141,7 @@ export class HostedServiceUnavailableError extends HandledError {
  * throws it, because there the caller is a person pasting a code.
  */
 export class ConnectInstanceRequiredError extends HandledError {
+  static readonly code = "connect_instance_required" as const;
   declare readonly code: "connect_instance_required";
 
   constructor() {

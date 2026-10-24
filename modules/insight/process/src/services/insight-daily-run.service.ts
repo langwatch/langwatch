@@ -16,8 +16,14 @@ import type {
   InsightScheduleOffReason,
   InsightSource,
 } from "@langwatch/insight-contract";
-import type { LangyApi } from "@langwatch/langy-contract";
+import {
+  type LangyApi,
+  LangyIdempotencyMismatchError,
+  LangyInsufficientScopeError,
+  LangyTurnsRateLimitedError,
+} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+import { AggregateProjectIsReadOnlyError, ProjectNotFoundError } from "@langwatch/project-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
@@ -88,11 +94,11 @@ const START_REFUSALS: Readonly<Record<string, Pick<RunEnd, "outcome" | "reason">
   langy_unattended_actor_missing: { outcome: "skipped", reason: "user_missing" },
   langy_unattended_actor_deactivated: { outcome: "skipped", reason: "no_access" },
   langy_unattended_no_langy_access: { outcome: "skipped", reason: "langy_off" },
-  langy_insufficient_scope: { outcome: "skipped", reason: "no_access" },
-  aggregate_project_is_read_only: { outcome: "skipped", reason: "project_unavailable" },
-  project_not_found: { outcome: "skipped", reason: "project_unavailable" },
+  [LangyInsufficientScopeError.code]: { outcome: "skipped", reason: "no_access" },
+  [AggregateProjectIsReadOnlyError.code]: { outcome: "skipped", reason: "project_unavailable" },
+  [ProjectNotFoundError.code]: { outcome: "skipped", reason: "project_unavailable" },
   // The same run asked a different question: its inputs changed between two attempts.
-  langy_idempotency_mismatch: { outcome: "failed", reason: "brief_changed" },
+  [LangyIdempotencyMismatchError.code]: { outcome: "failed", reason: "brief_changed" },
 };
 
 /** The code a peer refused with; empty for a failure that is no refusal. */
@@ -164,7 +170,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     } catch (error) {
       if (!input.isFinalAttempt) throw error;
       logger.warn({ error, projectId: input.projectId, runId: input.runId }, "daily run failed");
-      const reason = codeOf(error) === "langy_turns_rate_limited" ? "rate_limited" : "error";
+      const reason = LangyTurnsRateLimitedError.is(error) ? "rate_limited" : "error";
       await settle(failed(reason, conversationId));
       throw error;
     }

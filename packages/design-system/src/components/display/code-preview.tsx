@@ -260,7 +260,7 @@ async function copyWithToast({ text, what }: { text: string; what: string }): Pr
     toaster.create({
       title: "Failed to copy",
       description: "Couldn't copy. Please try again.",
-      type: "error", // no-raw-error-toast-ok
+      type: "error",
     });
     return false;
   }

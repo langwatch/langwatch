@@ -1,0 +1,14 @@
+{
+  "record": "dev/docs/ARCHITECTURE.md §17, the metric-instrument-home list: in a module, a metric instrument is created only in a file whose name contains \"metrics\" (Alex, 2026-10-20). Shrink-only: lower a count in the change that moves an instrument into the module's metrics service.",
+  "findings": {
+    "enterprise/modules/governance/process/src/features/cost/services/cost-rollup-day-comparer.service.ts": 2,
+    "modules/authz/process/src/repositories/authz-revocation.repository.ts": 1,
+    "modules/authz/process/src/services/authz-cutover-gate.service.ts": 1,
+    "modules/automation/process/src/features/settlement/services/automation-settlement-observability.service.ts": 1,
+    "modules/coding-agent/process/src/repositories/clickhouse/clickhouse.coding-agent.repositories.ts": 1,
+    "modules/identity/process/src/eventing/identity-ledger.store.ts": 2,
+    "modules/ops/process/src/services/storage-stats-gauges.service.ts": 1,
+    "modules/stored-object/process/src/services/stored-objects-telemetry.service.ts": 1,
+    "modules/trace/process/src/features/media/services/trace-edge-media-telemetry.service.ts": 1
+  }
+}

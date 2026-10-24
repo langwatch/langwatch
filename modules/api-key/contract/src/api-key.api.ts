@@ -116,8 +116,8 @@ export interface ApiKeyApi {
   findResolvedToken(input: ApiKeyTokenResolutionInput): Promise<ResolvedApiKeyCredential | null>;
   /**
    * A key for one run's calls back into LangWatch, reused per (user, project, permissions) while
-   * it has `minRemainingMs` (default 5 minutes) left. With a user, refuses with
-   * `ApiKeyPermissionDeniedError` on the first permission they lack, cached key or not.
+   * it has `minRemainingMs` left (default 5 minutes; `"fresh"` asks for a full lifetime). With a
+   * user, refuses with `ApiKeyPermissionDeniedError` on a missing permission, cached or not.
    */
   mintRunKey(input: MintRunKeyInput): Promise<string>;
   /**

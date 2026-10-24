@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { identifierProviderFor } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
@@ -84,7 +85,7 @@ export class IdentityCeremoniesService implements IdentityAccountCeremonies {
     if (!(await this.isLatched({ userId }))) return { pinned: false };
 
     const { email: value } = await this.users.getUserEmail({ userId }).catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "user_not_found") return { email: null };
+      if (UserNotFoundError.is(error)) return { email: null };
       throw error;
     });
     if (!value) {

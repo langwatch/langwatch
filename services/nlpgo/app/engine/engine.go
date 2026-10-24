@@ -709,6 +709,22 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		if errors.Is(err, httpblock.ErrSSRFBlocked) {
 			return nil, &NodeError{Type: "ssrf_blocked", Message: msg}
 		}
+		// Each failure the author can act on has a code of its own, so the
+		// test panel names the fix instead of one "couldn't reach the agent".
+		switch httpblock.ClassifyFailure(err) {
+		case httpblock.FailureTimeout:
+			return nil, &NodeError{Type: "http_timeout", Message: msg}
+		case httpblock.FailureDNS:
+			return nil, &NodeError{Type: "http_dns_error", Message: msg}
+		case httpblock.FailureConnectionRefused:
+			return nil, &NodeError{Type: "http_connection_refused", Message: msg}
+		case httpblock.FailureTLS:
+			return nil, &NodeError{Type: "http_tls_error", Message: msg}
+		case httpblock.FailureInvalidResponse:
+			return nil, &NodeError{Type: "http_invalid_response", Message: msg}
+		case httpblock.FailureOther:
+			return nil, &NodeError{Type: "http_error", Message: msg}
+		}
 		return nil, &NodeError{Type: "http_error", Message: msg}
 	}
 	out := make(map[string]any, 1)

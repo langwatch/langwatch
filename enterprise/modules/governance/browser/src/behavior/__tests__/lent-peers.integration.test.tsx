@@ -6,15 +6,11 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
-import { ModelSelectorToken } from "@langwatch/model-provider-client";
-import { GuidedOnboardingOfferToken } from "@langwatch/onboarding-client";
-import { HeroAskFieldToken } from "@langwatch/project-client";
+import { ModelSelectorToken, ModelSelector } from "@langwatch/model-provider-client";
+import { GuidedOnboardingOfferToken, GuidedOnboardingOffer } from "@langwatch/onboarding-client";
+import { HeroAskFieldToken, HeroAskField } from "@langwatch/project-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import { GuidedOnboardingOffer } from "../lent-guided-onboarding-offer.tsx";
-import { HeroAskField } from "../lent-hero-ask-field.tsx";
-import { ModelSelector } from "../lent-model-provider.tsx";
 
 const peersLend = uiDeclarations([
   {

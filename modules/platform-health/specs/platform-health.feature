@@ -254,3 +254,33 @@ Feature: One platform health answer for an external monitor
       Given a Langy check timed out
       When the same caller checks again inside one budget
       Then it is busy, and once the budget has passed a check runs again
+
+  Rule: Each probe answer reaches the monitor as JSON, cached or not as the probe says
+
+    @unit
+    Scenario: A project-keyed probe answer is JSON at its own status with no cache header
+      Given a project-keyed probe whose answer may be cached
+      When the monitor reads the answer
+      Then it is JSON at the probe's own status
+      And it carries no cache header
+
+    @unit
+    Scenario: A scenario canary answer is marked no-store
+      Given a scenario canary answered
+      When the monitor reads the answer
+      Then it is JSON
+      And it is marked no-store
+
+    @unit
+    Scenario: A dark Langy probe is a plain not-found
+      Given the Langy surface is dark
+      When the monitor asks the Langy probe
+      Then it answers a plain 404 with the body "404 Not Found"
+      And it carries no cache header
+
+    @unit
+    Scenario: A Langy canary answer is uncacheable JSON at its status
+      Given the Langy canary answered unhealthy
+      When the monitor asks the Langy probe
+      Then it is JSON at the canary's status
+      And it is marked no-store

@@ -285,9 +285,10 @@ export function useMermaidRenderer({
           setError(null);
         }
       })
-      .catch((err: unknown) => {
+      .catch(() => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : String(err));
+        // The renderer's message describes the generated diagram text; the reader cannot act on it.
+        setError("The sequence diagram could not be drawn.");
         stage.innerHTML = "";
       });
 

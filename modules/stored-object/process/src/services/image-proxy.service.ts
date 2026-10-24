@@ -1,30 +1,20 @@
-import {
-  safeMediaType,
-  sanitizeFilenameSegment,
-  STORED_OBJECT_RESPONSE_BASE_HEADERS,
-} from "@langwatch/api/rest";
+import { safeMediaType, sanitizeFilenameSegment } from "@langwatch/api/rest";
 import { isReadbackSafe, type ImageProxyRequest } from "@langwatch/stored-object-contract";
 
 import {
   type ExternalImageChannel,
   ExternalImageTooLargeError,
 } from "../channels/external-image.channel.ts";
+import type { ImageProxyAnswer } from "../rules/image-proxy-answer.rules.ts";
 
 /** Pictures are immutable at their address, so the browser may keep one for a year. */
 const IMAGE_CACHE_CONTROL = "public, max-age=31536000";
 
-/** Every answer carries stored-object's read headers, so relayed bytes cannot run as a page. */
-const relayed = (
-  body: Uint8Array<ArrayBuffer>,
-  status: number,
-  headers: Readonly<Record<string, string>>,
-): Response =>
-  new Response(body, { status, headers: { ...STORED_OBJECT_RESPONSE_BASE_HEADERS, ...headers } });
-
-const refusal = (status: number, error: string): Response =>
-  relayed(new TextEncoder().encode(JSON.stringify({ error })), status, {
-    "Content-Type": "application/json",
-  });
+const refusal = (status: number, error: string): ImageProxyAnswer => ({
+  kind: "refused",
+  status,
+  error,
+});
 
 /** The bare media type, with the upstream's `; charset=...` parameters dropped. */
 const mediaTypeOf = (contentType: string): string =>
@@ -36,7 +26,7 @@ const proxiedFilename = (requestedUrl: string): string => {
   return sanitizeFilenameSegment(segments[segments.length - 1] ?? "") || "image";
 };
 
-/** `GET /api/image-proxy`, answering each outcome with main's status and body. */
+/** `GET /api/image-proxy`, deciding each outcome's status and body as main did. */
 export class ImageProxyService {
   readonly #images: ExternalImageChannel;
 
@@ -48,7 +38,7 @@ export class ImageProxyService {
     return new ImageProxyService(options.images);
   }
 
-  async proxy({ url }: ImageProxyRequest): Promise<Response> {
+  async proxy({ url }: ImageProxyRequest): Promise<ImageProxyAnswer> {
     if (!url) return refusal(400, "Missing url");
 
     try {
@@ -62,14 +52,19 @@ export class ImageProxyService {
         return refusal(400, "URL does not point to an image");
       }
 
-      return relayed(await response.bytes(), 200, {
-        "Content-Type": safeMediaType({
-          mediaType: mediaTypeOf(contentType),
-          readbackSafe: isReadbackSafe,
-        }),
-        "Content-Disposition": `inline; filename="${proxiedFilename(url)}"`,
-        "Cache-Control": IMAGE_CACHE_CONTROL,
-      });
+      return {
+        kind: "image",
+        status: 200,
+        body: await response.bytes(),
+        headers: {
+          "Content-Type": safeMediaType({
+            mediaType: mediaTypeOf(contentType),
+            readbackSafe: isReadbackSafe,
+          }),
+          "Content-Disposition": `inline; filename="${proxiedFilename(url)}"`,
+          "Cache-Control": IMAGE_CACHE_CONTROL,
+        },
+      };
     } catch (error) {
       if (error instanceof ExternalImageTooLargeError) return refusal(413, "Image is too large");
 

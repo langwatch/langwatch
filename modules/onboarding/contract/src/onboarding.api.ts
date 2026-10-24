@@ -83,6 +83,7 @@ export const OnboardingApi = moduleApi<OnboardingApi>()("onboarding");
  */
 
 export class GuidedOnboardingPathUnknownError extends HandledError {
+  static readonly code = "guided_onboarding_path_unknown" as const;
   declare readonly code: "guided_onboarding_path_unknown";
 
   constructor(path: string) {

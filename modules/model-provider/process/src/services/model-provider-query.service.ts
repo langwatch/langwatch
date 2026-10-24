@@ -1,4 +1,3 @@
-import { HandledError } from "@langwatch/handled-error";
 import {
   ModelProviderNotFoundError,
   modelProviderExecutionSchema,
@@ -10,6 +9,7 @@ import {
   type ModelProviderExecution,
   type ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
@@ -55,7 +55,7 @@ export class ModelProviderQueryService {
         ),
       )
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "project_not_found") return [];
+        if (ProjectNotFoundError.is(error)) return [];
         throw error;
       });
   }
@@ -70,7 +70,7 @@ export class ModelProviderQueryService {
           this.options.catalog.systemProviders({ ...parsed, referenceCreatedAt }),
         )
         .catch((error: unknown) => {
-          if (HandledError.isHandled(error) && error.code === "project_not_found") return [];
+          if (ProjectNotFoundError.is(error)) return [];
           throw error;
         }),
     ]);
@@ -145,12 +145,7 @@ export class ModelProviderQueryService {
         }),
       )
       .catch((error: unknown) => {
-        if (
-          HandledError.isHandled(error) &&
-          (error.code === "project_not_found" || error.code === "model_provider_not_found")
-        ) {
-          return null;
-        }
+        if (ProjectNotFoundError.is(error) || ModelProviderNotFoundError.is(error)) return null;
         throw error;
       });
   }
@@ -159,8 +154,7 @@ export class ModelProviderQueryService {
     const projectScopes = await this.options.scopes
       .getProjectScopes(input.projectId)
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "project_not_found")
-          throw new ModelProviderNotFoundError();
+        if (ProjectNotFoundError.is(error)) throw new ModelProviderNotFoundError();
         throw error;
       });
 

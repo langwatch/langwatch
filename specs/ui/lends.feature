@@ -17,6 +17,23 @@ Feature: Lent components, hooks and drawers
     Then it answers nothing
 
   @integration
+  Scenario: A client's ready component renders what its owner lent
+    Given an owner's client exports the ready component of its token
+    When a borrower renders that component with its props
+    Then the lent component renders with those props, and the borrower wrote no wrapper
+
+  @integration
+  Scenario: A ready component draws its fallback while nothing is lent
+    Given a ready component made with a fallback from its props
+    When nobody lends its token
+    Then it draws that fallback, and without one it draws nothing
+
+  @integration
+  Scenario: A ready component is named after its token
+    When a ready component is made from a token
+    Then its display name carries the token's key
+
+  @integration
   Scenario: An extension token reads as a list in install order
     When several modules lend one extension token
     Then the reader gets every lender in install order

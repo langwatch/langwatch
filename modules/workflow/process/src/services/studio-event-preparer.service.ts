@@ -1,5 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { ApiKeyApi, MintRunKeyInput } from "@langwatch/api-key-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { StudioClientEvent, WorkflowRunPrincipal } from "@langwatch/workflow-contract";
 
@@ -27,7 +27,7 @@ type StudioEventPreparerOptions = {
   projectEnvironment: WorkflowProjectEnvironment;
   llmParameters: WorkflowLlmParameters;
   runKeys: Pick<ApiKeyApi, "mintRunKey">;
-  dispatchKeyFloorMs: number;
+  dispatchKeyFloorMs: NonNullable<MintRunKeyInput["minRemainingMs"]>;
 };
 
 export class StudioEventPreparerService implements StudioEventPreparer {

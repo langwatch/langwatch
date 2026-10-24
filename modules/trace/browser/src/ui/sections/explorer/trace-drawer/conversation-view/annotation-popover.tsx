@@ -1,13 +1,13 @@
+import {
+  AnnotateBody,
+  AnnotationFormFooter as FormFooter,
+  SuggestBody,
+} from "@langwatch/annotation-client";
 import { type PopoverAnnotationFormInput } from "@langwatch/annotation-contract";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 
-import {
-  AnnotateBody,
-  FormFooter,
-  SuggestBody,
-} from "../../../../../features/annotation/behavior/lent-annotation-form.tsx";
 import { usePopoverAnnotationForm } from "./use-annotation-form.ts";
 
 interface AnnotationPopoverProps extends PopoverAnnotationFormInput {

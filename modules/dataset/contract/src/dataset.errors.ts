@@ -22,6 +22,7 @@ const BAD_REQUEST_REFUSALS: ReadonlySet<UploadRefusal> = new Set([
 
 /** A posted or imported file the dataset cannot take; too big, too long or mismatched is a 400. */
 export class UploadValidationError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
   readonly kind: UploadRefusal;
 
@@ -42,6 +43,7 @@ export class UploadValidationError extends HandledError {
  * a handled 404 rather than an unknown failure (ADR-045).
  */
 export class DatasetNotFoundError extends HandledError {
+  static readonly code = "dataset_not_found" as const;
   declare readonly code: "dataset_not_found";
 
   constructor(message = "Dataset not found") {
@@ -56,6 +58,7 @@ export class DatasetNotFoundError extends HandledError {
  * and the caller can split the batch and retry.
  */
 export class DatasetBatchTooLargeError extends HandledError {
+  static readonly code = "dataset_batch_too_large" as const;
   declare readonly code: "dataset_batch_too_large";
 
   constructor({ count, maxEntries }: { count: number; maxEntries: number }) {
@@ -73,6 +76,7 @@ export class DatasetBatchTooLargeError extends HandledError {
  * chunk's keys yet (Decision 6 defers that migration).
  */
 export class ColumnTypeChangeNotSupportedError extends HandledError {
+  static readonly code = "dataset_column_type_change_unsupported" as const;
   declare readonly code: "dataset_column_type_change_unsupported";
 
   constructor() {
@@ -89,6 +93,7 @@ export class ColumnTypeChangeNotSupportedError extends HandledError {
 }
 
 export class DatasetConflictError extends HandledError {
+  static readonly code = "dataset_conflict" as const;
   declare readonly code: "dataset_conflict";
 
   constructor(message = "A dataset with this name already exists") {
@@ -101,6 +106,7 @@ export class DatasetConflictError extends HandledError {
  * The handled-error form of `DatasetConflictError` (ADR-045).
  */
 export class DatasetNameTakenError extends HandledError {
+  static readonly code = "dataset_name_taken" as const;
   declare readonly code: "dataset_name_taken";
 
   constructor() {
@@ -118,6 +124,7 @@ export class DatasetNameTakenError extends HandledError {
  * (optimistic concurrency, no partial rewrite).
  */
 export class DatasetStaleColumnsError extends HandledError {
+  static readonly code = "dataset_stale_columns" as const;
   declare readonly code: "dataset_stale_columns";
 
   constructor() {
@@ -133,6 +140,7 @@ export class DatasetStaleColumnsError extends HandledError {
  * Thrown when a write would persist two rows with the same id.
  */
 export class DuplicateRecordIdError extends HandledError {
+  static readonly code = "dataset_duplicate_record_id" as const;
   declare readonly code: "dataset_duplicate_record_id";
 
   constructor(id: string) {
@@ -163,6 +171,7 @@ export class MalformedColumnTypesError extends Error {
  * The caller can fix the entry, so it is a handled 422; REST still answers it 400 by name.
  */
 export class InvalidColumnError extends HandledError {
+  static readonly code = "dataset_invalid_column" as const;
   declare readonly code: "dataset_invalid_column";
   readonly columnName: string;
   readonly validColumns: string[];
@@ -190,6 +199,7 @@ export class InvalidColumnError extends HandledError {
 
 /** Thrown when a retry names a dataset that has no failed or stuck import to run again. */
 export class UploadNotPendingError extends HandledError {
+  static readonly code = "dataset_upload_not_pending" as const;
   declare readonly code: "dataset_upload_not_pending";
 
   constructor(message = "Upload is not pending finalization") {
@@ -203,6 +213,7 @@ export class UploadNotPendingError extends HandledError {
  * (still `uploading`/`processing`, or `failed`). ADR-032 Decision 6 / I-READY:
  */
 export class DatasetNotReadyError extends HandledError {
+  static readonly code = "dataset_not_ready" as const;
   declare readonly code: "dataset_not_ready";
 
   readonly status: string;
@@ -226,6 +237,7 @@ export class DatasetNotReadyError extends HandledError {
  * ADR-032 I-RECOVER: recoverable only when there's something to recover from.
  */
 export class DatasetNotRetryableError extends HandledError {
+  static readonly code = "dataset_not_retryable" as const;
   declare readonly code: "dataset_not_retryable";
 
   constructor(message = "Dataset cannot be retried") {
@@ -239,6 +251,7 @@ export class DatasetNotRetryableError extends HandledError {
  * `CHUNK_MAX_BYTES`, breaking the size invariant (Decision 2).
  */
 export class ChunkTooLargeError extends HandledError {
+  static readonly code = "dataset_chunk_too_large" as const;
   declare readonly code: "dataset_chunk_too_large";
 
   readonly byteSize: number;
@@ -258,6 +271,7 @@ export class ChunkTooLargeError extends HandledError {
 
 /** A search would read more rows or bytes than the organization's whole-read limits. */
 export class DatasetTooLargeToSearchError extends HandledError {
+  static readonly code = "dataset_too_large_to_search" as const;
   declare readonly code: "dataset_too_large_to_search";
 
   readonly measured: number;
@@ -285,6 +299,7 @@ export class DatasetTooLargeToSearchError extends HandledError {
 
 /** A download of every row would hold more than the organization's whole-read limits. */
 export class DatasetTooLargeToExportError extends HandledError {
+  static readonly code = "dataset_too_large_to_export" as const;
   declare readonly code: "dataset_too_large_to_export";
 
   constructor(
@@ -310,6 +325,7 @@ export class DatasetTooLargeToExportError extends HandledError {
  * the advisory-locked transaction (ADR-032 v19). That buffer is bounded ONLY by
  */
 export class DatasetTooLargeToEditColumnsError extends HandledError {
+  static readonly code = "dataset_too_large_to_edit_columns" as const;
   declare readonly code: "dataset_too_large_to_edit_columns";
   readonly sizeBytes: number;
   readonly maxBytes: number;
@@ -365,6 +381,7 @@ export class DatasetRecordNotFoundError extends Error {
 
 /** The file is over the ceiling; `meta.maxBytes` is the number the copy shows. */
 export class DatasetAttachmentTooLargeError extends HandledError {
+  static readonly code = "dataset_attachment_too_large" as const;
   declare readonly code: "dataset_attachment_too_large";
 
   constructor(maxBytes: number) {
@@ -383,6 +400,7 @@ export class DatasetAttachmentTooLargeError extends HandledError {
 
 /** The file is of a type a browser can run; `meta.refused` is our own list, not customer input. */
 export class DatasetAttachmentTypeRefusedError extends HandledError {
+  static readonly code = "dataset_attachment_type_refused" as const;
   declare readonly code: "dataset_attachment_type_refused";
 
   constructor(mediaType: string) {
@@ -397,6 +415,7 @@ export class DatasetAttachmentTypeRefusedError extends HandledError {
 
 /** A file the row names that the run cannot read; `meta.fileName` tells the reader which cell. */
 export class DatasetAttachmentUnavailableError extends HandledError {
+  static readonly code = "dataset_attachment_unavailable" as const;
   declare readonly code: "dataset_attachment_unavailable";
 
   constructor(fileName: string) {
@@ -417,6 +436,7 @@ export type DatasetStoredObjectRefusal =
 
 /** A cell names a stored file this dataset cannot hold (ADR-158 §6). */
 export class DatasetAttachmentReferenceRefusedError extends HandledError {
+  static readonly code = "dataset_attachment_reference_refused" as const;
   declare readonly code: "dataset_attachment_reference_refused";
 
   constructor(input: { reason: DatasetStoredObjectRefusal; column: string }) {
@@ -431,6 +451,7 @@ export class DatasetAttachmentReferenceRefusedError extends HandledError {
 
 /** The file a dataset is built from is missing, unconfirmed or not a dataset import. */
 export class DatasetImportSourceRefusedError extends HandledError {
+  static readonly code = "dataset_import_source_refused" as const;
   declare readonly code: "dataset_import_source_refused";
 
   constructor(reason: DatasetStoredObjectRefusal) {
@@ -448,6 +469,7 @@ export class DatasetImportSourceRefusedError extends HandledError {
  * page instead, which has no size ceiling.
  */
 export class DatasetTooLargeToReadInlineError extends HandledError {
+  static readonly code = "dataset_too_large_to_read_inline" as const;
   declare readonly code: "dataset_too_large_to_read_inline";
 
   constructor({ maxBytes, totalRows }: { maxBytes: number; totalRows: number }) {
@@ -467,6 +489,7 @@ export class DatasetTooLargeToReadInlineError extends HandledError {
  * `(page - 1) * limit / suggestedLimit + 1` without skipping or repeating a row.
  */
 export class DatasetPageTooLargeError extends HandledError {
+  static readonly code = "dataset_page_too_large" as const;
   declare readonly code: "dataset_page_too_large";
 
   constructor({
@@ -505,6 +528,7 @@ export type DatasetRowMeasure = "uploaded" | "stored";
 
 /** One row is over the size a dataset takes; `meta.maxBytes` is the number the copy shows. */
 export class DatasetRowTooLargeError extends HandledError {
+  static readonly code = "dataset_row_too_large" as const;
   declare readonly code: "dataset_row_too_large";
 
   constructor({ maxBytes, measure }: { maxBytes: number; measure: DatasetRowMeasure }) {
@@ -522,6 +546,7 @@ export class DatasetRowTooLargeError extends HandledError {
 
 /** An image or file cell held inline content that is not readable base64. */
 export class DatasetInlineFileUnreadableError extends HandledError {
+  static readonly code = "dataset_inline_file_unreadable" as const;
   declare readonly code: "dataset_inline_file_unreadable";
 
   constructor(column: string) {

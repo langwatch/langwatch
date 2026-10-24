@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class GroupNotFoundError extends NotFoundError {
+  static readonly code = "group_not_found" as const;
   declare readonly code: "group_not_found";
 
   constructor(groupId?: string) {
@@ -14,6 +15,7 @@ export class GroupNotFoundError extends NotFoundError {
 }
 
 export class ScimManagedGroupError extends HandledError {
+  static readonly code = "scim_managed_group" as const;
   declare readonly code: "scim_managed_group";
 
   constructor(groupId?: string) {
@@ -27,6 +29,7 @@ export class ScimManagedGroupError extends HandledError {
 }
 
 export class GroupBindingNotFoundError extends NotFoundError {
+  static readonly code = "role_binding_not_found" as const;
   declare readonly code: "role_binding_not_found";
 
   constructor(bindingId?: string) {
@@ -40,6 +43,7 @@ export class GroupBindingNotFoundError extends NotFoundError {
 }
 
 export class GroupMemberAlreadyAddedError extends HandledError {
+  static readonly code = "group_member_already_added" as const;
   declare readonly code: "group_member_already_added";
 
   constructor(userId?: string) {
@@ -52,6 +56,7 @@ export class GroupMemberAlreadyAddedError extends HandledError {
 }
 
 export class GroupMembershipNotFoundError extends NotFoundError {
+  static readonly code = "group_membership_not_found" as const;
   declare readonly code: "group_membership_not_found";
 
   constructor(userId?: string) {
@@ -65,6 +70,7 @@ export class GroupMembershipNotFoundError extends NotFoundError {
 }
 
 export class GroupScopeNotInOrganizationError extends HandledError {
+  static readonly code = "scope_not_in_organization" as const;
   declare readonly code: "scope_not_in_organization";
 
   constructor(scopeType?: string) {
@@ -77,6 +83,7 @@ export class GroupScopeNotInOrganizationError extends HandledError {
 }
 
 export class GroupCustomRoleRequiredError extends HandledError {
+  static readonly code = "custom_role_id_required" as const;
   declare readonly code: "custom_role_id_required";
 
   constructor() {
@@ -88,6 +95,7 @@ export class GroupCustomRoleRequiredError extends HandledError {
 }
 
 export class GroupRoleNotAssignableError extends HandledError {
+  static readonly code = "custom_role_not_assignable" as const;
   declare readonly code: "custom_role_not_assignable";
 
   constructor(customRoleId?: string) {
@@ -100,6 +108,7 @@ export class GroupRoleNotAssignableError extends HandledError {
 }
 
 export class GroupBindingAlreadyExistsError extends HandledError {
+  static readonly code = "role_binding_already_exists" as const;
   declare readonly code: "role_binding_already_exists";
 
   constructor() {

@@ -14,6 +14,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
  * discovering the size of their query from the bill.
  */
 export class InstantEvalQueryBudgetExceededError extends HandledError {
+  static readonly code = "instant_eval_query_budget_exceeded" as const;
   declare readonly code: "instant_eval_query_budget_exceeded";
 
   constructor({
@@ -43,6 +44,7 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
  * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 export class InstantEvalOptInNotOfferedError extends HandledError {
+  static readonly code = "instant_eval_opt_in_not_offered" as const;
   declare readonly code: "instant_eval_opt_in_not_offered";
 
   constructor({ deployment }: { readonly deployment: "enterprise" | "self_hosted" }) {
@@ -64,6 +66,7 @@ export class InstantEvalOptInNotOfferedError extends HandledError {
 
 /** The questions alone fill the judge's state, leaving no room for any text. */
 export class InstantEvalQuestionsTooLongError extends HandledError {
+  static readonly code = "instant_eval_questions_too_long" as const;
   declare readonly code: "instant_eval_questions_too_long";
 
   constructor({
@@ -88,6 +91,7 @@ export class InstantEvalQuestionsTooLongError extends HandledError {
 
 /** The project may not run Instant Evals at all. */
 export class InstantEvalNotEnabledError extends HandledError {
+  static readonly code = "instant_eval_not_enabled" as const;
   declare readonly code: "instant_eval_not_enabled";
 
   constructor() {
@@ -105,6 +109,7 @@ export class InstantEvalNotEnabledError extends HandledError {
  * operator can act on it, which is why it is not folded into `instant_eval_not_enabled`.
  */
 export class InstantEvalClassifierNotConfiguredError extends HandledError {
+  static readonly code = "instant_eval_classifier_not_configured" as const;
   declare readonly code: "instant_eval_classifier_not_configured";
 
   constructor() {
@@ -123,6 +128,7 @@ export class InstantEvalClassifierNotConfiguredError extends HandledError {
 
 /** The memory judge answers from a hash, not the text, so a production process refuses it. */
 export class InstantEvalMemoryJudgeInProductionError extends HandledError {
+  static readonly code = "instant_eval_memory_judge_in_production" as const;
   declare readonly code: "instant_eval_memory_judge_in_production";
 
   constructor() {
@@ -137,6 +143,7 @@ export class InstantEvalMemoryJudgeInProductionError extends HandledError {
 
 /** No run of this project has that id. */
 export class InstantEvalRunNotFoundError extends HandledError {
+  static readonly code = "instant_eval_not_found" as const;
   declare readonly code: "instant_eval_not_found";
 
   constructor({ runId }: { runId: string }) {
@@ -155,6 +162,7 @@ export class InstantEvalRunNotFoundError extends HandledError {
  * query policy refuses raises the policy's own error instead.
  */
 export class InstantEvalQueryInvalidError extends HandledError {
+  static readonly code = "instant_eval_query_invalid" as const;
   declare readonly code: "instant_eval_query_invalid";
 
   constructor({
@@ -188,6 +196,7 @@ export class InstantEvalQueryInvalidError extends HandledError {
 
 /** The statement does not project what a run needs to judge and record. */
 export class InstantEvalQueryMissingColumnsError extends HandledError {
+  static readonly code = "instant_eval_query_missing_columns" as const;
   declare readonly code: "instant_eval_query_missing_columns";
 
   constructor({
@@ -214,6 +223,7 @@ export class InstantEvalQueryMissingColumnsError extends HandledError {
 
 /** The run asked for more rows than this plan may judge. */
 export class InstantEvalRowCapExceededError extends HandledError {
+  static readonly code = "instant_eval_row_cap_exceeded" as const;
   declare readonly code: "instant_eval_row_cap_exceeded";
 
   constructor({
@@ -245,6 +255,7 @@ export class InstantEvalRowCapExceededError extends HandledError {
 
 /** The run is over, so there is nothing left to cancel. */
 export class InstantEvalAlreadyFinishedError extends HandledError {
+  static readonly code = "instant_eval_already_finished" as const;
   declare readonly code: "instant_eval_already_finished";
 
   constructor({ runId, status }: { runId: string; status: string }) {
@@ -263,6 +274,7 @@ export class InstantEvalAlreadyFinishedError extends HandledError {
  * caller's own statement through our query path, so a failure here is ours.
  */
 export class InstantEvalEstimateUnavailableError extends HandledError {
+  static readonly code = "instant_eval_estimate_unavailable" as const;
   declare readonly code: "instant_eval_estimate_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {

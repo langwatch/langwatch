@@ -4,7 +4,6 @@
  *
  * @see modules/api-key/specs/api-key.feature
  */
-import { RUN_KEY_LIFETIME_MS } from "@langwatch/api-key-contract";
 import {
   AuthzGrantNotConfirmedError,
   authzEffectivePermissionsOutputSchema,
@@ -21,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
+import { RUN_KEY_LIFETIME_MS } from "../../rules/run-key.rules.ts";
 import { ApiKeyTokenService } from "../api-key-token.service.ts";
 import { ApiKeyService } from "../api-key.service.ts";
 import { RunKeyMintService } from "../run-key-mint.service.ts";

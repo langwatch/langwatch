@@ -1,11 +1,11 @@
 import { AskChip } from "@langwatch/design-system/ask-chip";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-
-import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
-import { GuidedOnboardingOffer, InlineCommandPalette } from "../../../../behavior/lent-peers.tsx";
-import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import { InlineCommandPalette } from "@langwatch/navigation-client";
+import { GuidedOnboardingOffer } from "@langwatch/onboarding-client";
 
 import "./homeHeroScroll.css";
+import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
+import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { selectLangySuggestions } from "../../langy/langy-home-suggestions.ts";
 import { ContinueLine } from "./continue-line.tsx";
 import { OnboardAgentPill } from "./onboard-agent-pill.tsx";

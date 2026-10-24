@@ -212,11 +212,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
     // raised by the personal-workspace guards, and its message is a sentence
     // written for the customer; RBAC failures arrive as UNAUTHORIZED.
     if (code === "FORBIDDEN") {
-      toaster.create({
-        title: trpcErrorMessage(error) ?? "That change was refused", // no-raw-error-toast-ok
-        type: "error",
-        duration: 8000,
-      });
+      showErrorToast({ error, fallbackTitle: "That change was refused" });
       return;
     }
 

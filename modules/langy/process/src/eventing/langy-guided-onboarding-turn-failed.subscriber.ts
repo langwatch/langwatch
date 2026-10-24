@@ -12,6 +12,7 @@ import {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { GuidedPath, OnboardingVariant } from "@langwatch/onboarding-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 
@@ -131,7 +132,7 @@ async function trackGuidedTurnFailure({
   sourceEvent: { id: string; occurredAt: number };
 }): Promise<void> {
   const guided = await deps.guidedOnboarding.getByProject({ projectId }).catch((error: unknown) => {
-    if (HandledError.isHandled(error) && error.code === "project_not_found") return null;
+    if (ProjectNotFoundError.is(error)) return null;
     throw error;
   });
   if (!guided || guided.conversationId !== conversationId) return;

@@ -15,10 +15,7 @@ import { UpgradeDiagnosticsService } from "../upgrade-diagnostics.service.ts";
 
 type Licensing = Pick<
   LicensingApi,
-  | "findInstanceIdentity"
-  | "getUpgradeDiagnosticsAvailability"
-  | "sendUpgradeDiagnostics"
-  | "setUpgradeDiagnosticsOptOut"
+  "getUpgradeDiagnosticsSettings" | "sendUpgradeDiagnostics" | "setUpgradeDiagnosticsOptOut"
 >;
 
 const NOW = "2026-10-20T10:00:00.000Z";
@@ -54,8 +51,12 @@ function setup({
   const service = UpgradeDiagnosticsService.create({
     ledger,
     licensing: createApiFixture<Licensing>({
-      findInstanceIdentity: async () => identities,
-      getUpgradeDiagnosticsAvailability: async () => availability,
+      getUpgradeDiagnosticsSettings: async () => ({
+        available: availability.available,
+        reason: availability.reason,
+        instanceId: identities[0]?.instanceId ?? null,
+        optOut: identities[0]?.upgradeDiagnosticsOptOut ?? false,
+      }),
       sendUpgradeDiagnostics: async ({ trigger, bundle }) => {
         sent.push({ trigger, bundle });
         return RECEIPT;

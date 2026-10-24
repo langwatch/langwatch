@@ -15,6 +15,8 @@ defect.
 1. **The linters.** `pnpm lint` (oxlint + the `langwatch` plugin, every rule at
    `error`) and `pnpm lint:architecture` (whole-tree policies). Every finding
    carries its own fix: do what it says. Never game a rule by renaming.
+   **When no rule decides it, neither do you**: ask your human with options
+   and the ARCHITECTURE.md sections behind each, then add the rule they chose.
 2. **`dev/docs/ARCHITECTURE.md`**, the architecture record. Read the relevant
    section before composing a process, writing a module or citing a shape.
    §15 lists deleted spellings (writing one is a defect); §16 maps target
@@ -147,9 +149,8 @@ them. Module code never reads `process.env`.
   before committing. Don't push or open a PR unless asked.
 - British English in prose; no em dashes; no attribution lines or agent names in
   commits, PRs or specs. Never name a customer: the repo is public.
-- Every PR description fills `## Architecture` honestly: tick the box only after reading the
-  sections of `dev/docs/ARCHITECTURE.md` the change touches, and list anything unusual under
-  "Needs a human look" rather than leaving it for the reviewer to find.
+- `## Architecture` in a PR body records your human's decisions under
+  "Decisions no check makes", and anything unusual under "Needs a human look".
 - Review feedback is one round per batch, never one push per comment. Read every
   open thread, fix the real ones, reply to the wrong ones (leave those threads
   open: the review bot only accepts a reply on an open thread), push once, then

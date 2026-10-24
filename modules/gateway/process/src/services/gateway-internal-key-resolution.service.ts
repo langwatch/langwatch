@@ -1,5 +1,6 @@
 /** §4.1 of the internal door: a raw virtual key or license token resolved to a signed JWT. */
 import type { RestDeclaredResult } from "@langwatch/api/rest";
+import { ConnectLicenseTokenMalformedError } from "@langwatch/enterprise-licensing-contract";
 import {
   type gatewayInternalResolveKeyAnswers,
   gatewayInternalResolveKeySchema,
@@ -28,7 +29,10 @@ const LICENSE_TOKEN_REFUSALS: Record<
   GatewayLicenseTokenRefusal,
   { status: 400 | 401 | 403 | 503; message: string }
 > = {
-  connect_license_token_malformed: { status: 401, message: "the license token is malformed" },
+  [ConnectLicenseTokenMalformedError.code]: {
+    status: 401,
+    message: "the license token is malformed",
+  },
   connect_instance_required: {
     status: 400,
     message: "a license token must be presented with an instance id",

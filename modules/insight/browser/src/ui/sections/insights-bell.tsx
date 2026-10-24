@@ -6,7 +6,7 @@
 
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
-import type { InsightsBellProps } from "@langwatch/insight-contract";
+import type { InsightsBellProps } from "@langwatch/insight-client";
 import { Bell } from "lucide-react";
 import { useState } from "react";
 

@@ -5,6 +5,13 @@
  * @see specs/identity/sso-signin-error-boundary.feature
  */
 
+import {
+  IdentityJitDisabledError,
+  IdentityLinkProposedError,
+  SsoMemberDeactivatedError,
+} from "@langwatch/identity-contract";
+import { SignUpRestrictedError } from "@langwatch/organization-contract";
+
 /** Better Auth's granular link-account codes, folded to one spelling per failure. */
 export const normalizeSignInErrorCode = (error: string | null | undefined): string | null => {
   if (!error) return null;
@@ -62,14 +69,14 @@ export const STABLE_AUTH_ERRORS = [
   // proof or the provider's claim has to change (sso-link-unconfirmed-local-account.feature).
   "sso_existing_account_unconfirmed",
   // The directory turned the person off: only an administrator can turn them back on.
-  "sso_member_deactivated",
+  SsoMemberDeactivatedError.code,
   // The ID token's issuer is not the connection's: the connection's issuer has to change.
   "sso_issuer_mismatch",
   // The installation's sign-up policy does not admit this address: an invitation has to change.
-  "auth_sign_up_restricted",
+  SignUpRestrictedError.code,
   // The connection's arrival policy refused or held a newcomer: an administrator has to act.
-  "identity_jit_disabled",
-  "identity_link_proposed",
+  IdentityJitDisabledError.code,
+  IdentityLinkProposedError.code,
   // better-auth's state check: the attempt expired or began in another tab or browser. Starting
   // again is the remedy, and a bounce would start it from the same stale state.
   "state_mismatch",

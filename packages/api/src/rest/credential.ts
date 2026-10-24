@@ -438,6 +438,7 @@ export function organizationOf(
  * the key from their own personal workspace.
  */
 export class PersonalProjectKeyRequiredError extends HandledError {
+  static readonly code = "personal_project_key_required" as const;
   declare readonly code: "personal_project_key_required";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -462,6 +463,7 @@ export class PersonalProjectKeyRequiredError extends HandledError {
  * answers the very question the refusal exists to withhold.
  */
 export class PersonalUsageKeyMismatchError extends HandledError {
+  static readonly code = "personal_usage_key_mismatch" as const;
   declare readonly code: "personal_usage_key_mismatch";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -486,6 +488,7 @@ export class PersonalUsageKeyMismatchError extends HandledError {
  * key its creator's identity rather than its own.
  */
 export class PersonalUsageServiceKeyUnsupportedError extends HandledError {
+  static readonly code = "personal_usage_service_key_unsupported" as const;
   declare readonly code: "personal_usage_service_key_unsupported";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {

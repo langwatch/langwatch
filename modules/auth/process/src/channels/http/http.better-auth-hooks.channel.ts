@@ -23,7 +23,11 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi, SignUpVerdict } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  SignUpRestrictedError,
+  type SignUpVerdict,
+} from "@langwatch/organization-contract";
 import { fromDate, nowInstant } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -131,7 +135,7 @@ async function refuseRestrictedSignUp({
 }
 
 /** The code the sign-in screen and the passkey ceremony read a restricted sign-up by. */
-export const SIGN_UP_RESTRICTED_CODE = "auth_sign_up_restricted";
+export const SIGN_UP_RESTRICTED_CODE = SignUpRestrictedError.code;
 
 /**
  * The organization-scoped grant that comes with a default membership. Idempotent by

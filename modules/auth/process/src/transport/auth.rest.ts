@@ -16,6 +16,7 @@ import {
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
+import type { AuthHandshakeAnswer } from "../rules/auth-handshake-answer.rules.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { isBetterAuthPath } from "../rules/better-auth-path.rules.ts";
 
@@ -38,7 +39,7 @@ export interface AuthDoorApi {
   /** Ends the browser session its cookies name. */
   revokeSessionFromCookies(input: { cookie: string | undefined }): Promise<void>;
   /** Better Auth's own fetch handler, behind the origin gate and the resolved caller. */
-  betterAuthHandshake(request: Request): Promise<Response>;
+  betterAuthHandshake(request: Request): Promise<AuthHandshakeAnswer>;
   /** The origin a GET logout returns to; an operation, as the API proxy serves no properties. */
   baseUrl: () => string;
   /** Where a GET logout lands, once the local cookies are cleared. */
@@ -48,6 +49,26 @@ export interface AuthDoorApi {
 export const AuthDoorApi = moduleApi<AuthDoorApi>()("auth");
 
 const JSON_MEDIA_TYPE = "application/json";
+
+/**
+ * The handshake's answer as the HTTP response: Better Auth's own response untouched, or with
+ * its `location` replaced; the bare 403 for another origin; the 302 to the sign-in error screen.
+ */
+export function authHandshakeResponseOf(answer: AuthHandshakeAnswer): Response {
+  switch (answer.kind) {
+    case "refused-origin":
+      return Response.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, { status: 403 });
+    case "sign-in-failed":
+      return new Response(null, { status: 302, headers: { location: answer.location } });
+    case "engine": {
+      const { response, location } = answer;
+      if (location === undefined) return response;
+      const headers = new Headers(response.headers);
+      headers.set("location", location);
+      return new Response(response.body, { status: response.status, headers });
+    }
+  }
+}
 
 /**
  * The sign-in door answers Better Auth's own responses, which are passed
@@ -133,7 +154,7 @@ export const authRest = defineRestRouter(AuthDoorApi)
   .anyMethod()
   .handle(async ({ app, request, response }) =>
     isBetterAuthPath({ pathname: new URL(request.url).pathname })
-      ? response.pass(await app.betterAuthHandshake(request))
+      ? response.pass(authHandshakeResponseOf(await app.betterAuthHandshake(request)))
       : response.decline(),
   )
   .build();

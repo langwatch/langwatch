@@ -30,7 +30,8 @@ vi.mock("../../../../../behavior/use-workflow-store.ts", async (importOriginal) 
       deselectAllNodes: mockDeselectAllNodes,
     }),
 }));
-vi.mock("../../../../../behavior/lent-prompt.tsx", () => ({
+vi.mock("@langwatch/prompt-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   StudioPromptEditor: (props: any) => {
     capturedProps = props;
     return <div data-testid="mock-prompt-editor" />;

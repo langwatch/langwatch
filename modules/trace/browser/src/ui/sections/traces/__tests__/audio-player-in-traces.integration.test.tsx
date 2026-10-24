@@ -18,10 +18,10 @@ import { TraceMediaPart } from "../trace-media-part.tsx";
 
 // TraceMediaPart resolves the owning project from context; MediaPart needs a
 // real id for its stored-object existence probe.
-vi.mock(
-  "../../../../behavior/lent-media-part.tsx",
-  () => import("../../__tests__/lent-media-part.stand-in.tsx"),
-);
+vi.mock("@langwatch/scenario-client/lent", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../__tests__/media-part.stand-in.tsx")),
+}));
 
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),

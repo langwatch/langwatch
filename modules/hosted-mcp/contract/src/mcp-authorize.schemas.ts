@@ -72,9 +72,71 @@ export interface HostedMcpApiContract {
   createHandler(): HostedMcpHandler;
 }
 
+/** A body read once and capped, or the cap it passed. */
+export type McpDoorBodyRead =
+  | Readonly<{ kind: "read"; body: string }>
+  | Readonly<{ kind: "too-large" }>;
+
+/** One request as the raw HTTP door hands it to the endpoint: plain values, never the exchange. */
+export type McpDoorRequest = Readonly<{
+  method: string;
+  /** The request target, path and query. */
+  url: string;
+  /** Lower-cased names, as Node reads them. */
+  headers: Readonly<Record<string, string | readonly string[] | undefined>>;
+  /** The caller's address as the process resolved it, else the socket's peer. */
+  clientAddress: string | undefined;
+  /** Read only by the routes that take a body, after any refusal that needs none. */
+  readBody: () => Promise<McpDoorBodyRead>;
+}>;
+
+/**
+ * A session's SDK transport, which writes the streamed response itself, and the key the session
+ * runs as. Data only: the door runs it through the session runner it was composed with.
+ */
+export type McpDoorStream = Readonly<{
+  transport: { handleRequest(request: object, response: object, body?: unknown): Promise<void> };
+  apiKey: string;
+  body: unknown;
+}>;
+
+/** Runs work as a session's key; the door is handed one where it is composed. */
+export interface McpSessionRunner {
+  runAs<T>(apiKey: string, work: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * The fields of a request's access log line: what was asked, who asked, and the identifiers the
+ * endpoint met while deciding. The door adds the status and the duration and writes the line.
+ */
+export type McpDoorAccessLog = Readonly<Record<string, unknown>>;
+
+/** An answer, the access log fields of the request it answers, and what to run once it closes. */
+export type McpDoorReply = Readonly<{
+  answer: McpDoorAnswer;
+  accessLog: McpDoorAccessLog;
+  onClosed: (status: number) => void;
+}>;
+
+/** What the endpoint answers, as data: the door writes it. Headers are set before the head. */
+export type McpDoorAnswer =
+  | Readonly<{
+      kind: "json";
+      status: number;
+      headers: Readonly<Record<string, string>>;
+      body: unknown;
+    }>
+  | Readonly<{ kind: "empty"; status: number; headers: Readonly<Record<string, string>> }>
+  | Readonly<{ kind: "stream"; headers: Readonly<Record<string, string>>; stream: McpDoorStream }>;
+
 /** Portable shape of the long-lived MCP HTTP surface. */
 export interface HostedMcpHandler {
-  handleRequest(request: object, response: object): void;
+  /** Decides the answer to one request. Never rejects: a failure answers in the endpoint shape. */
+  answer(request: McpDoorRequest): Promise<McpDoorReply>;
+  /** The answer to a failure met after `answer`, while the door was writing a stream. */
+  answerFailure(input: { error: unknown; url: string }): McpDoorAnswer;
+  /** The runner a stream answer is driven through, as the session's key. */
+  sessionRunner: McpSessionRunner;
   isMcpRoute: (pathname: string) => boolean;
   clearTokenCache: () => void;
   clearRateLimiters: () => void;

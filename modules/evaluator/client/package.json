@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/module": "workspace:*"
   },

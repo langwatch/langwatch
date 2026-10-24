@@ -10,12 +10,12 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { RenderInputOutput } from "@langwatch/trace-client";
 import type { ExecutionState } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { useDebounceValue } from "usehooks-ts";
 import { z } from "zod";
 
-import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
 import { SpanDuration } from "../../elements/span-duration.tsx";
 import { RedactedField } from "../redacted-field.tsx";
 

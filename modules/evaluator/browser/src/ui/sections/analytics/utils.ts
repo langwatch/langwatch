@@ -1,4 +1,4 @@
-import type { FilterField } from "@langwatch/analytics-filters";
+import type { FilterField } from "@langwatch/analytics-contract";
 
 import type { FilterParam } from "./use-filter-params.ts";
 

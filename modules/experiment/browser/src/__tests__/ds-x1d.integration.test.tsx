@@ -45,7 +45,8 @@ vi.mock("../behavior/experiment-api.ts", () => ({
     },
   },
 }));
-vi.mock("../behavior/lent-trace.tsx", () => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   RenderInputOutput: ({ value }: { value: string }) => <pre data-testid="raw-json">{value}</pre>,
 }));
 

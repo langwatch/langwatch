@@ -446,6 +446,7 @@ export function isDatabaseBusy(error: unknown): boolean {
 
 /** Postgres had no connection to give in time. The request did nothing wrong; retry shortly. */
 export class DatabaseBusyError extends HandledError {
+  static readonly code = "database_busy" as const;
   declare readonly code: "database_busy";
 
   constructor() {
@@ -514,6 +515,7 @@ function causeOf(node: object): unknown {
 
 /** The code is ahead of the Postgres schema while the worker upgrades it (NO-HOLDS); retry soon. */
 export class UpgradeInProgressError extends HandledError {
+  static readonly code = "upgrade_in_progress" as const;
   declare readonly code: "upgrade_in_progress";
 
   constructor() {
@@ -530,6 +532,7 @@ export class UpgradeInProgressError extends HandledError {
 
 /** A tab still running the release before plain JSON; its page must reload onto this one. */
 export class ClientOutdatedError extends HandledError {
+  static readonly code = "client_outdated" as const;
   declare readonly code: "client_outdated";
 
   constructor() {
@@ -650,6 +653,7 @@ export const INVALID_PROJECT_CREDENTIAL_MESSAGE = "Invalid auth token.";
 
 /** No credential at all reached a project surface. */
 export class ProjectMissingCredentialsError extends HandledError {
+  static readonly code = "missing_credentials" as const;
   declare readonly code: "missing_credentials";
 
   constructor() {
@@ -664,6 +668,7 @@ export class ProjectMissingCredentialsError extends HandledError {
 
 /** The token reached a project surface and stands for nothing this deployment knows. */
 export class ProjectInvalidCredentialsError extends HandledError {
+  static readonly code = "invalid_credentials" as const;
   declare readonly code: "invalid_credentials";
 
   constructor() {
@@ -681,6 +686,7 @@ export class ProjectInvalidCredentialsError extends HandledError {
  * project names it by itself; one that reaches several, or the whole organization, has to say.
  */
 export class ProjectRequiredError extends HandledError {
+  static readonly code = "project_required" as const;
   declare readonly code: "project_required";
 
   /** `projects`: the ones the key reaches, so a caller can pick one (Q30). */
@@ -701,6 +707,7 @@ export class ProjectRequiredError extends HandledError {
 
 /** No credential at all reached an organization surface. */
 export class OrganizationMissingCredentialsError extends HandledError {
+  static readonly code = "missing_credentials" as const;
   declare readonly code: "missing_credentials";
 
   constructor() {
@@ -715,6 +722,7 @@ export class OrganizationMissingCredentialsError extends HandledError {
 
 /** A PROJECT key was presented at an organization surface: a different mistake. */
 export class OrganizationCredentialClassMismatchError extends HandledError {
+  static readonly code = "credential_class_mismatch" as const;
   declare readonly code: "credential_class_mismatch";
 
   constructor() {
@@ -730,6 +738,7 @@ export class OrganizationCredentialClassMismatchError extends HandledError {
 
 /** The token reached the surface and stands for nothing this deployment knows. */
 export class OrganizationInvalidCredentialsError extends HandledError {
+  static readonly code = "invalid_credentials" as const;
   declare readonly code: "invalid_credentials";
 
   constructor() {
@@ -744,6 +753,7 @@ export class OrganizationInvalidCredentialsError extends HandledError {
  * credential gets to learn.
  */
 export class OrganizationNotFoundForCredentialError extends HandledError {
+  static readonly code = "organization_not_found" as const;
   declare readonly code: "organization_not_found";
 
   constructor() {
@@ -758,6 +768,7 @@ export class OrganizationNotFoundForCredentialError extends HandledError {
 
 /** The lookup behind the surface broke. The caller learns nothing of the cause. */
 export class OrganizationAuthenticationUnavailableError extends HandledError {
+  static readonly code = "internal_error" as const;
   declare readonly code: "internal_error";
 
   constructor() {
@@ -804,6 +815,7 @@ export class SurfaceUnverifiedError extends HandledError {
 
 /** The route is served and this deployment composed nothing behind it. */
 export class SurfaceCapabilityUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {
@@ -833,6 +845,7 @@ export class SurfaceUnconfiguredError extends HandledError {
  * one, which the 404 above is for, but a mis-set key, said out loud.
  */
 export class SurfaceBlankSecretError extends HandledError {
+  static readonly code = "internal_error" as const;
   declare readonly code: "internal_error";
 
   constructor(surface: string) {
@@ -854,6 +867,7 @@ export class SurfaceBlankSecretError extends HandledError {
 
 /** The composed router carries no procedure at the requested path. */
 export class LiveStreamNotFoundError extends HandledError {
+  static readonly code = "live_stream_not_found" as const;
   declare readonly code: "live_stream_not_found";
 
   constructor() {
@@ -870,6 +884,7 @@ export class LiveStreamNotFoundError extends HandledError {
  * The path names a real procedure, but a query or a mutation.
  */
 export class LiveStreamUnsupportedProcedureError extends HandledError {
+  static readonly code = "live_stream_unsupported_procedure" as const;
   declare readonly code: "live_stream_unsupported_procedure";
 
   constructor() {
@@ -885,6 +900,7 @@ export class LiveStreamUnsupportedProcedureError extends HandledError {
 
 /** The request did not originate from this application's own origin. */
 export class LiveStreamCrossSiteBlockedError extends HandledError {
+  static readonly code = "live_stream_cross_site_blocked" as const;
   declare readonly code: "live_stream_cross_site_blocked";
 
   constructor() {

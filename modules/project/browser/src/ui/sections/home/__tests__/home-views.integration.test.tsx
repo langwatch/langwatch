@@ -23,9 +23,16 @@ vi.mock("../components/use-project-reach.ts", () => ({
 vi.mock("../../../../behavior/home-api.ts", () => ({
   homeApi: { plan: { getActivePlan: { useQuery: () => ({ data: { free: false } }) } } },
 }));
-vi.mock("../../../../behavior/lent-peers.tsx", () => ({
+vi.mock("@langwatch/organization-client/lent", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   PendingJoinRequests: () => null,
+}));
+vi.mock("@langwatch/ops-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   UpgradeActionNeeded: () => null,
+}));
+vi.mock("@langwatch/onboarding-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   GuidedOnboardingOffer: () => null,
 }));
 vi.mock("../components/langy-home-hero.tsx", () => ({

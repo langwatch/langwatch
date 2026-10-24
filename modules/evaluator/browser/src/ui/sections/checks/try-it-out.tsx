@@ -1,3 +1,4 @@
+import { FilterSidebar } from "@langwatch/analytics-client";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { PeriodSelector, usePeriodSelector } from "@langwatch/browser-host/period-selector";
 import { toaster } from "@langwatch/browser-host/toaster";
@@ -30,6 +31,7 @@ import {
 import { createLogger } from "@langwatch/observability/browser";
 import { readableDate } from "@langwatch/time";
 import type { CheckPreconditions, ElasticSearchTrace } from "@langwatch/trace-contract";
+import { HoverableBigText } from "@langwatch/workflow-client";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
@@ -37,8 +39,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
-import { FilterSidebar } from "../../../behavior/lent-peers.tsx";
-import { HoverableBigText, RedactedField } from "../../../behavior/lent-workflow.tsx";
+import { RedactedField } from "../../../behavior/lent-workflow.tsx";
 import { evaluationStatusColor } from "../../../model/evaluation-status.ts";
 import {
   buildPreconditionTraceDataFromTrace,

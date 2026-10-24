@@ -11,9 +11,15 @@ import type { ConnectedAgentBrowser } from "../../../model/agent-client.ts";
 
 const turns: unknown[] = [];
 
-vi.mock("@langwatch/scenario-client", async () => {
+vi.mock("@langwatch/scenario-client/lent", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ParameterLineField: () => null,
+}));
+
+vi.mock("@langwatch/scenario-client", async (importOriginal) => {
   const { useState } = await import("react");
   return {
+    ...(await importOriginal<object>()),
     scenarioClient: {
       scenarios: {
         testAgentTurn: {
@@ -38,10 +44,6 @@ vi.mock("@langwatch/scenario-client", async () => {
     },
   };
 });
-
-vi.mock("../../../behavior/lent-parameter-line-field.tsx", () => ({
-  ParameterLineField: () => null,
-}));
 
 // This package runs without isolation: start from fresh modules, and leave none behind.
 vi.resetModules();

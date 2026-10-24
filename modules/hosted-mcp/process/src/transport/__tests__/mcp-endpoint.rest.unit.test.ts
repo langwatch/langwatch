@@ -8,9 +8,13 @@ import { mcpEndpointDoor } from "../mcp-endpoint.rest.ts";
 function recordingEndpoint(): HostedMcpHandler & { closed: number } {
   return {
     closed: 0,
-    handleRequest: () => {
+    answer: () => {
       throw new Error("the shutdown test sends no request");
     },
+    answerFailure: () => {
+      throw new Error("the shutdown test sends no request");
+    },
+    sessionRunner: { runAs: (_apiKey, work) => work() },
     isMcpRoute: () => true,
     clearTokenCache: () => undefined,
     clearRateLimiters: () => undefined,

@@ -1,12 +1,12 @@
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack } from "@langwatch/design-system/primitives";
+import { ModelDisplay as LLMModelDisplay } from "@langwatch/model-provider-client";
 import type { ModelOption } from "@langwatch/topic-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { LLMModelDisplay } from "../../../../behavior/lent-model-provider.tsx";
 import { AddModelProviderKey } from "../../../elements/llmPromptConfigs/add-model-provider-key.tsx";
 import { LLMConfigPopover, type Output } from "./llm-config-popover.tsx";
 

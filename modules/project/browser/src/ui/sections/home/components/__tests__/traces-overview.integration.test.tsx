@@ -15,7 +15,8 @@ vi.mock("../../../../elements/analytics/period-selector.tsx", async (importOrigi
   usePeriodSelector: () => ({ ...period, setRelativePeriod }),
 }));
 
-vi.mock("../../../../../behavior/lent-peers.tsx", () => ({
+vi.mock("@langwatch/analytics-client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   CustomGraph: ({
     emptyState,
     input,

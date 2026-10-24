@@ -1,6 +1,6 @@
 /** Holds personal actions while the first visit's personal workspace is still being created. */
 
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { PersonalWorkspacePendingError } from "@langwatch/organization-contract";
 import { useState } from "react";
 
 import { api } from "./personal-workspace-api.ts";
@@ -8,7 +8,7 @@ import { api } from "./personal-workspace-api.ts";
 export const PERSONAL_WORKSPACE_WAIT_HINT = "Setting up your workspace. This takes a moment.";
 
 export function isPersonalWorkspacePending(error: unknown): boolean {
-  return readHandledError(error)?.code === "personal_workspace_pending";
+  return PersonalWorkspacePendingError.is(error);
 }
 
 /**

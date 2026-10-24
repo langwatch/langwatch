@@ -145,6 +145,8 @@ func (j *jsonWriter) value(v any) {
 		j.b.WriteString(jsonString(v))
 	case int:
 		j.b.WriteString(strconv.Itoa(v))
+	case bool:
+		j.b.WriteString(strconv.FormatBool(v))
 	case []string:
 		array(j, v, func(s string) { j.b.WriteString(jsonString(s)) })
 	case func():
@@ -153,7 +155,7 @@ func (j *jsonWriter) value(v any) {
 }
 
 func (j *jsonWriter) scenario(s Scenario, bindings []BindingRef, withBindings bool) {
-	kv := []any{"title", s.Title, "tags", s.Tags, "line", s.Line}
+	kv := []any{"title", s.Title, "tags", s.Tags, "line", s.Line, "citesIssue", s.CitesIssue}
 	if withBindings {
 		kv = append(kv, "bindings", func() { array(j, bindings, j.ref) })
 	}
@@ -166,8 +168,21 @@ func (j *jsonWriter) inert(r InertReport) {
 	j.object("feature", r.Feature, "totalScenarios", r.TotalScenarios, "unimplemented", r.Unimplemented)
 }
 
-func (j *jsonWriter) partial(r PartialReport) {
-	j.object("feature", r.Feature, "totalScenarios", r.TotalScenarios, "enforced", r.Enforced, "untagged", r.Untagged)
+func (j *jsonWriter) scenarioRef(r ScenarioRef) {
+	kv := []any{"feature", r.Feature, "title", r.Title}
+	if r.Line > 0 {
+		kv = append(kv, "line", r.Line)
+	}
+	j.object(kv...)
+}
+
+func (j *jsonWriter) frozenVerdict(v FrozenVerdict) {
+	j.object("fresh", func() { array(j, v.Fresh, j.scenarioRef) }, "stale", func() { array(j, v.Stale, j.scenarioRef) }, "tolerated", v.Tolerated)
+}
+
+func (j *jsonWriter) annotation(a AnnotationOnUntagged) {
+	j.object("title", a.Title, "ref", func() { j.ref(a.Ref) }, "scenario", func() { j.scenarioRef(a.Scenario) },
+		"missingTag", a.MissingTag, "parked", a.Parked)
 }
 
 func writeJSON(w io.Writer, a Analysis) {
@@ -186,6 +201,8 @@ func writeJSON(w io.Writer, a Analysis) {
 					"totalScenarios", r.TotalScenarios,
 					"unimplementedScenarios", r.UnimplementedScenarios,
 					"untaggedScenarios", r.UntaggedScenarios,
+					"untagged", func() { array(j, r.Untagged, func(s Scenario) { j.scenario(s, nil, false) }) },
+					"unimplementedWithoutIssue", func() { array(j, r.UnimplementedWithoutIssue, func(s Scenario) { j.scenario(s, nil, false) }) },
 				)
 			})
 		},
@@ -199,12 +216,14 @@ func writeJSON(w io.Writer, a Analysis) {
 		},
 		"listErrors", a.ListErrors,
 		"staleLegacy", staleLegacy,
-		"inert", func() { array(j, a.ExemptInert, j.inert) },
-		"newInert", func() { array(j, a.NewInert, j.inert) },
-		"staleInert", a.StaleInert,
-		"partial", func() { array(j, a.ExemptPartial, j.partial) },
-		"newPartial", func() { array(j, a.NewPartial, j.partial) },
-		"stalePartial", a.StalePartial,
+		"inert", func() { array(j, a.Inert, j.inert) },
+		"untagged", func() { j.frozenVerdict(a.Untagged) },
+		"unimplementedWithoutIssue", func() { j.frozenVerdict(a.UnimplementedWithoutIssue) },
+		"annotationsOnUntagged", func() {
+			j.object("fresh", func() { array(j, a.AnnotationsOnUntagged.Fresh, j.annotation) },
+				"stale", func() { array(j, a.AnnotationsOnUntagged.Stale, j.scenarioRef) },
+				"tolerated", a.AnnotationsOnUntagged.Tolerated)
+		},
 	)
 	fmt.Fprintln(w, j.b.String())
 }

@@ -29,6 +29,7 @@
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -52,7 +53,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",

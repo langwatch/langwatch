@@ -162,7 +162,7 @@ Feature: Scenario setup and teardown hooks on connected agents (SDK and protocol
     Then the call fails as a result LangWatch cannot read
     But when it answers a teardown it is accepted
 
-  @integration @unimplemented
+  @integration @unimplemented @issue:8894
   Scenario: The platform refuses an envelope whose state is over the cap
     Given a call envelope with more than 64 KiB of state
     When the platform dispatches it

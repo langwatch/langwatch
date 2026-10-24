@@ -2,6 +2,16 @@
  * The words a customer reads for the codes the FRONT DOOR raises.
  */
 
+import { IdentityJitDisabledError, IdentityLinkProposedError } from "@langwatch/identity-contract";
+import {
+  InviteExpiredError,
+  InviteNotFoundError,
+  InviteThrottledError,
+  InviteWrongAccountError,
+  SignUpRestrictedError,
+} from "@langwatch/organization-contract";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
+
 import { safeProse, type AuthHandledError } from "./read-handled-error.ts";
 
 /** One entry, exactly as the registry writes one. */
@@ -52,13 +62,13 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
     },
   },
 
-  auth_sign_up_restricted: {
+  [SignUpRestrictedError.code]: {
     title: "Sign-up on this installation is by invitation",
     describe: () =>
       "Ask an administrator to invite your email address, then use the link in the invitation to create your account.",
   },
 
-  email_already_registered: {
+  [EmailAlreadyRegisteredError.code]: {
     // Reached from the sign-up screen, and the reader there is usually looking at their own
     // account: either a previous sign-up created it and could not sign them in, or they were a
     // member before and an invite asked them to create an account they already have. The screen
@@ -68,18 +78,18 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
     describe: () => "Sign in with it, or reset the password if you don't have it.",
   },
 
-  invite_expired: {
+  [InviteExpiredError.code]: {
     title: "This invitation has expired",
     describe: () => "Ask for a fresh one and whoever invited you can send it in one click.",
   },
 
-  invite_not_found: {
+  [InviteNotFoundError.code]: {
     title: "Invite not found",
     describe: () =>
       "It may have been revoked or already accepted. Reload to see the pending invites.",
   },
 
-  invite_throttled: {
+  [InviteThrottledError.code]: {
     title: "That was just sent",
     describe: (error) => {
       const seconds = num(error, "retryAfterSeconds", 0);
@@ -90,7 +100,7 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
     },
   },
 
-  invite_wrong_account: {
+  [InviteWrongAccountError.code]: {
     title: "You're signed in as a different account",
     describe: (error) => {
       const hint = str(error, "invitedHint", "");
@@ -123,12 +133,12 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
       "It is already verified, or it was removed. Refresh the page to see its current state.",
   },
 
-  identity_jit_disabled: {
+  [IdentityJitDisabledError.code]: {
     title: "This workspace does not create accounts automatically",
     describe: () => "Ask a workspace administrator to invite you, then sign in again.",
   },
 
-  identity_link_proposed: {
+  [IdentityLinkProposedError.code]: {
     title: "An administrator needs to confirm this sign-in",
     // Deliberately says nothing about whether an account exists, who holds the
     // address, or what the evidence was. This is answered to whoever arrived,

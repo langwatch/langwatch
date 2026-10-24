@@ -21,6 +21,12 @@ import { loadChunk } from "./navigation.ts";
 /** One lender of an extension point, with its component. */
 export type UiLentComponent<Props> = Readonly<{ owner: string; Component: ComponentType<Props> }>;
 
+/**
+ * A lent token's ready component: a named function component, so it fills a slot typed as a
+ * render function as well as one typed as a `ComponentType`.
+ */
+export type LentComponent<Props> = ((props: Props) => ReactNode) & { displayName: string };
+
 /** The lent component of a token, or nothing while no module lends it. */
 export function useLent<Props>(token: UiComponentToken<Props>): ComponentType<Props> | undefined {
   const declarations = useUiDeclarations();
@@ -84,6 +90,21 @@ export function Lent<Props extends object>({
     { fallbackRender: () => fallback },
     createElement(Suspense, { fallback }, createElement(Component, props)),
   );
+}
+
+/**
+ * The ready component of a lent token. The owner's client exports this beside the token, so a
+ * borrower imports a component and writes no wrapper of its own (ARCHITECTURE.md 10.1). It draws
+ * the lent component, or `fallback` while nothing lends it or its code will not load.
+ */
+export function lentComponent<Props extends object>(
+  token: UiComponentToken<Props>,
+  { fallback }: { fallback?: (props: Props) => ReactNode } = {},
+): LentComponent<Props> {
+  const Drawn = (props: Props): ReactNode =>
+    createElement(Lent<Props>, { of: token, props, fallback: fallback?.(props) });
+  Drawn.displayName = `Lent(${token.key})`;
+  return Drawn;
 }
 
 function lentComponents<Props>({

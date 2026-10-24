@@ -39,6 +39,7 @@ import type { StoredObjectChannels } from "../channels/stored-object.channels.ts
 import type { StoredObjectBytesRepository } from "../repositories/stored-object-bytes.repository.ts";
 import type { StoredObjectRateLimitRepository } from "../repositories/stored-object-rate-limit.repository.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
+import type { ImageProxyAnswer } from "../rules/image-proxy-answer.rules.ts";
 import type {
   StoredObjectFileBytes,
   StoredObjectFileReadInput,
@@ -193,7 +194,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
   }
 
   /** `GET /api/image-proxy`: an outside picture fetched behind the egress fence. */
-  proxyImage(input: ImageProxyRequest): Promise<Response> {
+  proxyImage(input: ImageProxyRequest): Promise<ImageProxyAnswer> {
     return this.#images.proxy(input);
   }
 

@@ -11,6 +11,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { LicenseRegistryAuditService } from "../services/license-registry-audit.service.ts";
 import { SelfHostedInstanceAuditService } from "../services/self-hosted-instance-audit.service.ts";
 import { SelfHostedNoticeAuditService } from "../services/self-hosted-notice-audit.service.ts";
+import { UpgradeDiagnosticsAuditService } from "../services/upgrade-diagnostics-audit.service.ts";
 
 type EnterpriseOpsSetup = FeatureSetup<typeof EnterpriseOpsModule.dependencies, undefined>;
 
@@ -22,17 +23,20 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
   readonly #ops: Pick<OpsApi, "admitCloudAdmin" | "admitOperator">;
   readonly #licenses: LicenseRegistryAuditService;
   readonly #instances: SelfHostedInstanceAuditService;
+  readonly #diagnostics: UpgradeDiagnosticsAuditService;
   readonly #notices: SelfHostedNoticeAuditService;
 
   private constructor(deps: {
     ops: Pick<OpsApi, "admitCloudAdmin" | "admitOperator">;
     licenses: LicenseRegistryAuditService;
     instances: SelfHostedInstanceAuditService;
+    diagnostics: UpgradeDiagnosticsAuditService;
     notices: SelfHostedNoticeAuditService;
   }) {
     this.#ops = deps.ops;
     this.#licenses = deps.licenses;
     this.#instances = deps.instances;
+    this.#diagnostics = deps.diagnostics;
     this.#notices = deps.notices;
   }
 
@@ -42,6 +46,7 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
       ops,
       licenses: LicenseRegistryAuditService.create({ registry: licensing, auditLog }),
       instances: SelfHostedInstanceAuditService.create({ instances: licensing, auditLog }),
+      diagnostics: UpgradeDiagnosticsAuditService.create({ diagnostics: licensing, auditLog }),
       notices: SelfHostedNoticeAuditService.create({ notices: licensing, auditLog }),
     });
   }
@@ -122,11 +127,11 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
   findUpgradeDiagnostics: EnterpriseOpsApiContract["findUpgradeDiagnostics"] = async ({
     operator,
     instanceRowId,
-  }) => this.#instances.findDiagnostics({ instanceRowId, operatorId: await this.#staff(operator) });
+  }) => this.#diagnostics.find({ instanceRowId, operatorId: await this.#staff(operator) });
 
   getUpgradeDiagnosticsDownload: EnterpriseOpsApiContract["getUpgradeDiagnosticsDownload"] =
     async ({ operator, id }) =>
-      this.#instances.getDiagnosticsDownload({ id, operatorId: await this.#manager(operator) });
+      this.#diagnostics.getDownload({ id, operatorId: await this.#manager(operator) });
 
   findSelfHostedNotices: EnterpriseOpsApiContract["findSelfHostedNotices"] = async ({ operator }) =>
     this.#notices.findAll({ operatorId: await this.#staff(operator) });

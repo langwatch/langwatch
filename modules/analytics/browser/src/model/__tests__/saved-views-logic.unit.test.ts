@@ -1,4 +1,4 @@
-import type { FilterField } from "@langwatch/analytics-filters";
+import type { FilterField } from "@langwatch/analytics-contract";
 import { subDays } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

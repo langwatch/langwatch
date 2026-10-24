@@ -1,4 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { AddOrEditDatasetDrawer, DatasetRecordSync } from "@langwatch/dataset-client";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { Box } from "@langwatch/design-system/primitives";
 import { isRowEmpty, isCellInExecution, toComparisonConfig } from "@langwatch/experiment-contract";
@@ -7,10 +8,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useShallow } from "zustand/react/shallow";
 
 import { useTableKeyboardNavigation } from "../../../behavior/dataset/use-table-keyboard-navigation.ts";
-import {
-  AddOrEditDatasetDrawer,
-  DatasetRecordSync,
-} from "../../../behavior/experiments-v3/lent-dataset-capabilities.tsx";
 import { useDatasetSyncProps } from "../../../behavior/experiments-v3/use-dataset-sync.ts";
 import { useSyncPromptEditorMappings } from "../../../behavior/experiments-v3/use-evaluation-mappings.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";

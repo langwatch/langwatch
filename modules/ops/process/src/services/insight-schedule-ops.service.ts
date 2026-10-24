@@ -1,8 +1,4 @@
-import {
-  INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF,
-  type InsightApi,
-  type InsightOperatorDailySchedule,
-} from "@langwatch/insight-contract";
+import type { InsightApi, InsightOperatorDailySchedule } from "@langwatch/insight-contract";
 import type { OpsInsightSchedule } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
@@ -60,7 +56,7 @@ export class InsightScheduleOpsService {
       lastRunOutcome: schedule.lastRun?.outcome ?? null,
       lastRunReason: schedule.lastRun?.reason ?? null,
       consecutiveSkips: schedule.consecutiveSkips,
-      skippedDaysBeforeOff: INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF,
+      daysUntilOff: schedule.daysUntilOff,
     }));
   }
 

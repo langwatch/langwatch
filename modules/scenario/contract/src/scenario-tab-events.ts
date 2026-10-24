@@ -6,7 +6,11 @@
 
 export const SCENARIO_TAB_NAVIGATE_EVENT = "scenario_tab_navigate";
 
-/** Query param the SDK appends when it opens a tab, carrying the machine key. */
+/**
+ * Query param the SDK appends when it opens a tab, carrying the machine key.
+ * @ownerOnly Scenario's own address; a peer asks scenario for a link instead of spelling the
+ * parameter.
+ */
 export const SCENARIO_TAB_QUERY_PARAM = "scenarioTab";
 
 export interface ScenarioTabNavigatePayload {

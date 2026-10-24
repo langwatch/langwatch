@@ -2,6 +2,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import type { ZodError } from "zod";
 
 export class MonitorNotFoundError extends HandledError {
+  static readonly code = "monitor_not_found" as const;
   declare readonly code: "monitor_not_found";
 
   constructor(readonly monitorId: string) {
@@ -16,6 +17,7 @@ export class MonitorNotFoundError extends HandledError {
 }
 
 export class MonitorEvaluatorRequiredError extends HandledError {
+  static readonly code = "monitor_evaluator_required" as const;
   declare readonly code: "monitor_evaluator_required";
 
   constructor() {
@@ -33,6 +35,7 @@ export class MonitorEvaluatorRequiredError extends HandledError {
  * with them would save cleanly and never run. Refused instead.
  */
 export class MonitorParametersUnusedError extends HandledError {
+  static readonly code = "monitor_parameters_unused" as const;
   declare readonly code: "monitor_parameters_unused";
 
   constructor(readonly evaluatorId: string) {
@@ -53,6 +56,7 @@ export class MonitorParametersUnusedError extends HandledError {
 
 /** The monitor names a check this platform runs no evaluator for. */
 export class MonitorCheckTypeUnknownError extends HandledError {
+  static readonly code = "monitor_check_type_unknown" as const;
   declare readonly code: "monitor_check_type_unknown";
 
   constructor(readonly checkType: string) {
@@ -68,6 +72,7 @@ export class MonitorCheckTypeUnknownError extends HandledError {
 
 /** The settings do not match the schema the named evaluator declares. */
 export class MonitorCheckSettingsInvalidError extends HandledError {
+  static readonly code = "monitor_check_settings_invalid" as const;
   declare readonly code: "monitor_check_settings_invalid";
 
   constructor(checkType: string, cause: ZodError) {
@@ -83,6 +88,7 @@ export class MonitorCheckSettingsInvalidError extends HandledError {
 
 /** The caller may manage evaluations here, but not in the project copied from. */
 export class MonitorSourceProjectForbiddenError extends HandledError {
+  static readonly code = "monitor_source_project_forbidden" as const;
   declare readonly code: "monitor_source_project_forbidden";
 
   constructor(readonly sourceProjectId: string) {
@@ -102,6 +108,7 @@ export class MonitorSourceProjectForbiddenError extends HandledError {
 
 /** A capability this deployment did not compose, refused by name. */
 export class MonitorCapabilityUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {

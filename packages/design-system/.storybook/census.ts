@@ -10,9 +10,16 @@ import path from "node:path";
 
 import { parseSync } from "oxc-parser";
 
-import { isBrowserColourSource } from "./raw-colours.ts";
-
 const ROOT = path.resolve(import.meta.dirname, "../../..");
+
+function isBrowserColourSource(file: string): boolean {
+  return (
+    /^(apps\/ui\/src\/|(?:enterprise\/)?modules\/[^/]+\/browser\/src\/)/.test(file) &&
+    /\.[cm]?[jt]sx?$/.test(file) &&
+    !/(?:^|\/)(__tests__|__fixtures__)\//.test(file) &&
+    !/\.(test|spec|stories|fixture)\.[cm]?[jt]sx?$/.test(file)
+  );
+}
 const PACKAGE_JSON = path.resolve(import.meta.dirname, "../package.json");
 const ESCAPES_FILE = path.resolve(import.meta.dirname, "census-escapes.json");
 

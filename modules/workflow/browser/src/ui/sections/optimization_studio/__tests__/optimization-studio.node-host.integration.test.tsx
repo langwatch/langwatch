@@ -46,7 +46,10 @@ vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
       }),
     ),
 }));
-vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({ LLMModelDisplay: () => null }));
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ModelDisplay: () => null,
+}));
 vi.mock("../../../../behavior/use-workflow-agent-picker-flow.ts", () => ({
   useWorkflowAgentPickerFlow: () => ({ handleAgentDragEnd: vi.fn() }),
 }));

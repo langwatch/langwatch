@@ -261,7 +261,8 @@ describe("given the event read seat member", () => {
 
       const members = buildProcessStores({ config: config(), members: { eventing } }).members;
 
-      expect(members.read("eventReadSeat")).toBe(eventReadSeat);
+      // Eventing hands out the seat it was given, read through its pipelines' upcasts.
+      expect(members.read("eventReadSeat")).toBe(eventing.eventReadSeat);
     });
   });
 

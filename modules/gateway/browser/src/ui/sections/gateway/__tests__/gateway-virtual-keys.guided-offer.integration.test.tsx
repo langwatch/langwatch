@@ -14,7 +14,8 @@ const world = vi.hoisted(() => ({
   keys: { data: [] as unknown[] | undefined, isError: false },
 }));
 
-vi.mock("../../../../behavior/lent-guided-onboarding-offer.tsx", () => ({
+vi.mock("@langwatch/onboarding-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   GuidedOnboardingOffer: ({ space, spaceInUse }: { space: string; spaceInUse: boolean | null }) => (
     <p data-testid="guided-offer-probe">{`${space}:${String(spaceInUse)}`}</p>
   ),

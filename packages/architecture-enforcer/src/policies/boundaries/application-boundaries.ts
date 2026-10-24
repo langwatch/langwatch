@@ -203,7 +203,7 @@ function targetPackage(
 }
 
 function compatibleEnterpriseTarget(target: ClassifiedPackage): boolean {
-  if (target.kind === "contract" || target.kind === "library") return true;
+  if (target.kind === "contract") return true;
 
   return Boolean(target.enterprise && target.feature && target.kind === "process");
 }

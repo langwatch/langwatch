@@ -3,7 +3,7 @@
 // Spec: specs/home/home-views.feature
 
 import "@testing-library/jest-dom/vitest";
-import { CustomGraphToken, type CustomGraphInput } from "@langwatch/analytics-client";
+import { CustomGraph, CustomGraphToken, type CustomGraphInput } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,8 +16,6 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useUiDeclarations: () => declarations.current,
 }));
-
-import { CustomGraph } from "../lent-peers.tsx";
 
 const graphInput: CustomGraphInput = {
   graphId: "custom",

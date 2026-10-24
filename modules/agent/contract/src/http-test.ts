@@ -26,7 +26,8 @@ export type HttpTestResult = {
   warnings?: string[];
 };
 
-export type HttpTestErrorExplanation = (input: { errorCode?: string; error?: string }) => {
+/** Copy for a failed test, from its code and the endpoint's status; never from the raw message. */
+export type HttpTestErrorExplanation = (input: { errorCode?: string; status?: number }) => {
   title: string;
   description?: string;
 };

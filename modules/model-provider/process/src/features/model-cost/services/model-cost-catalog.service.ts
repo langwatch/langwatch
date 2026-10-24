@@ -1,5 +1,5 @@
-import { HandledError } from "@langwatch/handled-error";
 import { modelCostListInputSchema, type ModelCost } from "@langwatch/model-provider-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { ModelCostRepository } from "../../../repositories/model-cost.repository.ts";
 import type { ModelCostProjectScope } from "../../../services/model-provider-project-scope.service.ts";
@@ -28,7 +28,7 @@ export class ModelCostCatalogService {
       .getProjectScopes(projectId)
       .then((projectScopes) => this.costs.findForProject(projectScopes))
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "project_not_found") return [];
+        if (ProjectNotFoundError.is(error)) return [];
         throw error;
       });
   }

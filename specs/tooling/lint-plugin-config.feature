@@ -18,6 +18,13 @@ Feature: The langwatch plugin registry and the oxlint configs agree
     Then every registered rule is enabled
 
   @unit
+  Scenario: No override turns a registered rule down unless a human decided it
+    Given the override entries in every config
+    When one sets a registered langwatch rule to off or warn
+    Then it fails unless that config, file list and rule are named in the test's decided list
+    And enabling the rule at error somewhere else does not excuse it
+
+  @unit
   Scenario: Every configured langwatch rule is registered
     Given the langwatch rules the configs name
     When they are compared with the plugin registry

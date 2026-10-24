@@ -1,5 +1,4 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { HandledError } from "@langwatch/handled-error";
 import {
   accountLivenessKey,
   type BackfillDiff,
@@ -8,7 +7,7 @@ import {
   normalizeIdentifierValue,
   orphanedIdentifierRows,
 } from "@langwatch/identity-contract";
-import type { UserApi } from "@langwatch/user-contract";
+import { type UserApi, UserNotFoundError } from "@langwatch/user-contract";
 
 import type {
   BackfillAccountRow,
@@ -136,7 +135,7 @@ export class IdentityBackfillService {
 
   async migrateUser({ userId }: { userId: string }): Promise<IdentityBackfillOutcome> {
     const user = await this.reads.getUser({ userId }).catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "user_not_found") return null;
+      if (UserNotFoundError.is(error)) return null;
       throw error;
     });
     if (!user) {

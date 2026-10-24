@@ -29,7 +29,6 @@
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/trace-client": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*",
     "lucide-react": "catalog:",
     "react-icons": "catalog:"
   },

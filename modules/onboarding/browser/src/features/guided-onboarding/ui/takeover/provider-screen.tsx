@@ -6,10 +6,10 @@ import { Dialog } from "@langwatch/design-system/dialog";
  */
 import { Box, chakra, Flex, Text } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { EditModelProviderForm as LentEditModelProviderForm } from "@langwatch/model-provider-client";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 
-import { LentEditModelProviderForm } from "../../../../behavior/lent-edit-model-provider-form.tsx";
 import { useGuidedProviderConnect } from "../../behavior/use-guided-provider-connect.ts";
 import { providerSegments, SKIP_TOUR_COPY } from "../../model/copy.ts";
 import { guidedProvidersFor } from "../../model/guided-providers.ts";

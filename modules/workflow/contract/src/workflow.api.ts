@@ -48,6 +48,14 @@ export type WorkflowReference = { workflowId: string; projectId: string };
 /** Who a write is attributed to. */
 export type WorkflowCaller = Readonly<{ id: string }>;
 
+/**
+ * How a relayed scenario turn ended: the engine's own status and body, or the relay's refusal
+ * (504 past the turn ceiling, 408 once the caller went away). The door writes the response.
+ */
+export type ExecuteSyncRelayAnswer =
+  | { kind: "engine"; status: number; body: string }
+  | { kind: "refused"; status: 504 | 408; error: string };
+
 /** The workflow being copied, as the row its caller already read carries it. */
 export type WorkflowStudioCopySource = {
   id: string;
@@ -292,7 +300,7 @@ export interface WorkflowApi {
     projectId: string;
     event: ExecuteSyncRelayEvent;
     signal: AbortSignal;
-  }): Promise<Response>;
+  }): Promise<ExecuteSyncRelayAnswer>;
   /** True when this deployment names a per-project engine fleet, so a scenario turn must relay. */
   hasPerProjectEngines(): boolean;
   /** Where an unexpected studio failure is reported. Best effort. */

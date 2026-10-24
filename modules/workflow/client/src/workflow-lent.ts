@@ -1,5 +1,6 @@
 /** Workflow UI lent by token to modules that show a version, run a workflow or clamp text. */
 
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 import type { ReactNode } from "react";
@@ -47,3 +48,9 @@ export const HoverableBigTextToken =
   uiTokens("workflow").component<HoverableBigTextProps>("hoverableBigText");
 export const RedactedFieldToken =
   uiTokens("workflow").component<RedactedFieldProps>("redactedField");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const RunExperimentViaApiDialog = lentComponent(RunExperimentViaApiDialogToken);
+export const HoverableBigText = lentComponent(HoverableBigTextToken, {
+  fallback: ({ children }) => children,
+});

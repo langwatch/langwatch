@@ -12,6 +12,7 @@ import type {
 } from "@langwatch/insight-contract";
 
 import type { InsightDailyScheduleState } from "../eventing/insight-daily-schedule.projection.ts";
+import { skippedDaysUntilOff } from "./insight-daily-skip-streak.rules.ts";
 
 /** How the row's last run ended; null until a run recorded an outcome. */
 function lastRunOf(state: InsightDailyScheduleState): InsightDailyRun["lastRun"] {
@@ -111,8 +112,18 @@ export function decidedScheduleFromState({
   const board = { kind: state.boardKind, id: state.boardId, name: state.boardName };
   const { userId, consecutiveSkips } = state;
   const setting = dailyRunSettingFromState(state);
+  const daysUntilOff = state.state === "on" ? skippedDaysUntilOff({ consecutiveSkips }) : null;
   return [
-    { scheduleId, projectId, userId, board, ...setting, state: state.state, consecutiveSkips },
+    {
+      scheduleId,
+      projectId,
+      userId,
+      board,
+      ...setting,
+      state: state.state,
+      consecutiveSkips,
+      daysUntilOff,
+    },
   ];
 }
 

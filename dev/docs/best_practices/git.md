@@ -21,7 +21,7 @@
 ## Worktrees
 
 Worktrees live in the `.worktrees/` directory at the repo root (gitignored).
-Agents too: not `.claude/worktrees/`, where Claude Code's own worktree tool
+Agents too: never Claude Code's own `.claude/worktrees/`, where its worktree tool
 puts them, and not a sibling checkout.
 
 | Branch                | Directory                        |

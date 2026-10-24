@@ -14,6 +14,7 @@ export type PrivateDataplaneRefusal = PrivateRouteRefusal & { readonly kind: Pri
 const KIND_NAMES: Record<PrivateDataplaneKind, string> = { clickhouse: "ClickHouse", s3: "S3" };
 
 export class PrivateDataplaneUnavailableError extends HandledError {
+  static readonly code = "private_dataplane_unavailable" as const;
   declare readonly code: "private_dataplane_unavailable";
 
   constructor({ organizationId, kind, variable, problem }: PrivateDataplaneRefusal) {

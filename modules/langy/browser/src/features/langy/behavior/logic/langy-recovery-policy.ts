@@ -1,3 +1,5 @@
+import { AggregateProjectIsReadOnlyError } from "@langwatch/project-contract";
+
 import { KNOWN_LANGY_ERROR_KINDS } from "./langy-error-explainer.ts";
 
 /**
@@ -120,7 +122,7 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
 
   // A turn on an aggregate project, which takes no writes: the identical turn is refused
   // identically for as long as the project is an aggregate, so there is nothing to retry.
-  aggregate_project_is_read_only: terminal("aggregate_project_is_read_only"),
+  [AggregateProjectIsReadOnlyError.code]: terminal(AggregateProjectIsReadOnlyError.code),
 
   // A spawn that failed is usually transient (a slow skill install, a readiness
   // timeout under load) and the next one succeeds. Retry it here, bounded — the

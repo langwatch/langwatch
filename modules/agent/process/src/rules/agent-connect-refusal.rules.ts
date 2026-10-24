@@ -9,6 +9,11 @@ import {
   type RefusedCode,
   type RefusedFrame,
 } from "@langwatch/agent-contract";
+import { ProjectInvalidCredentialsError } from "@langwatch/api";
+import {
+  ApiKeyPermissionDeniedError,
+  ApiKeyPermissionNotDelegableError,
+} from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 /** A refused frame to write, or nothing of the protocol's own. */
@@ -58,8 +63,8 @@ type ConnectRefusal =
 const INVALID_KEY = "The API key is not valid for this project.";
 
 const PERMISSION_DENIALS: ReadonlySet<string> = new Set([
-  "api_key_permission_denied",
-  "api_key_permission_not_delegable",
+  ApiKeyPermissionDeniedError.code,
+  ApiKeyPermissionNotDelegableError.code,
 ]);
 
 const UNFRAMED: ConnectRefusal = { framed: false };
@@ -83,7 +88,7 @@ export function connectRefusalOf(failure: Error): ConnectRefusal {
         reason: "api_key_invalid",
         message: "Send the API key as Authorization: Bearer <key>.",
       });
-    case "invalid_credentials":
+    case ProjectInvalidCredentialsError.code:
       return framed({ reason: "api_key_invalid", message: INVALID_KEY });
     case "key_type_not_allowed":
       return failure.meta.kind === "access_token"

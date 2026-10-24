@@ -66,20 +66,6 @@ vi.mock("../../../../behavior/experiment-api.ts", () => ({
     },
   },
 }));
-vi.mock("@langwatch/dataset-client", () => ({
-  datasetClient: {
-    useUtils: () => ({
-      agents: { getById: { fetch: vi.fn() } },
-      prompts: { getByIdOrHandle: { fetch: vi.fn().mockResolvedValue(null) } },
-      evaluators: { getById: { fetch: vi.fn().mockResolvedValue(null) } },
-    }),
-    datasetRecord: {
-      getAll: { useQuery: () => ({ data: null, isLoading: false }) },
-      update: { useMutation: () => ({ mutate: vi.fn() }) },
-      deleteMany: { useMutation: () => ({ mutate: vi.fn() }) },
-    },
-  },
-}));
 
 vi.mock("@langwatch/evaluator-client", () => ({
   evaluatorClient: {
@@ -110,11 +96,25 @@ vi.mock("@langwatch/prompt-client", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/experiments-v3/lent-dataset-capabilities.tsx", () => ({
-  AddOrEditDatasetDrawer: () => null,
-  DatasetRecordSync: () => null,
-}));
-
+vi.mock("@langwatch/dataset-client", async (importOriginal) => {
+  return {
+    ...(await importOriginal<object>()),
+    AddOrEditDatasetDrawer: () => null,
+    DatasetRecordSync: () => null,
+    datasetClient: {
+      useUtils: () => ({
+        agents: { getById: { fetch: vi.fn() } },
+        prompts: { getByIdOrHandle: { fetch: vi.fn().mockResolvedValue(null) } },
+        evaluators: { getById: { fetch: vi.fn().mockResolvedValue(null) } },
+      }),
+      datasetRecord: {
+        getAll: { useQuery: () => ({ data: null, isLoading: false }) },
+        update: { useMutation: () => ({ mutate: vi.fn() }) },
+        deleteMany: { useMutation: () => ({ mutate: vi.fn() }) },
+      },
+    },
+  };
+});
 const columns = [
   { id: "question", name: "question", type: "string" as const },
   { id: "expected_output", name: "expected_output", type: "string" as const },

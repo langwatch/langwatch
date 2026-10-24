@@ -32,11 +32,11 @@ import {
 import { AggregateReadOnlyGate } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { readableDate } from "@langwatch/time";
+import { SetupWithAgentButton } from "@langwatch/trace-client";
 import { ChevronDown, Copy, Pencil, Plus, Table as TableIcon, Trash2, Upload } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
-import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
 import { useDatasetRecordCounts } from "../../behavior/use-dataset-record-counts.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DeleteDatasetDialog } from "../../ui/blocks/delete-dataset-dialog.tsx";

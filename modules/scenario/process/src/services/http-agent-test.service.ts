@@ -98,7 +98,7 @@ export class HttpAgentTestService {
       // Dispatch errors can contain credentials and internal addresses. Only engine node
       // errors are customer-facing; transport failures remain a generic failed test.
       logger.error({ projectId, agentId }, "agent test dispatch failed");
-      result = { success: false };
+      result = { success: false, errorCode: "http_executor_unavailable" };
     }
 
     if (agentId) {
@@ -246,7 +246,8 @@ function toProxyResult(state: ExecutionState, fallbackDuration: number): HttpPro
       ...detail,
       success: false,
       response: parseUpstreamBody(state.http?.response_body),
-      errorCode: state.error_type,
+      // Every failure carries a code: the engine's, or the generic one when it left it unnamed.
+      errorCode: state.error_type ?? "http_error",
       error: state.error ?? "The request failed",
     };
   }

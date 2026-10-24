@@ -167,16 +167,19 @@ function checkFeatureRoot({
       policy: "feature-layout",
       file: featureManifest,
       message: "A feature ownership directory cannot itself be a package.",
-      allowed: "Put package.json inside contract, process, browser, or a named library folder.",
+      allowed: "Put package.json inside contract, process, browser, or client.",
     });
   }
 }
 
-/** `client` holds the derived hooks and lent tokens (§3.4, §10.1); other folders are libraries. */
-function packageKindOf(folder: string): FeaturePackageRole | "client" | "library" {
+/**
+ * `client` holds the derived hooks and lent tokens (§3.4, §10.1). Any other folder is no package
+ * kind at all: a module has contract, process, browser and client packages only.
+ */
+function packageKindOf(folder: string): FeaturePackageRole | "client" | undefined {
   if (isFeatureRole(folder)) return folder;
 
-  return folder === "client" ? "client" : "library";
+  return folder === "client" ? "client" : undefined;
 }
 
 function discoverFeatureRoles({
@@ -197,6 +200,16 @@ function discoverFeatureRoles({
     if (!existsSync(manifestPath)) continue;
 
     const role = packageKindOf(roleName);
+    if (role === undefined) {
+      violations.push({
+        policy: "feature-layout",
+        file: manifestPath,
+        message:
+          "A module holds contract, process, browser and client packages only; put this code in one of them (shared vocabulary goes in the contract).",
+        allowed: "Move the code into the module's contract, process, browser or client package.",
+      });
+      continue;
+    }
     const manifest = readManifest(manifestPath);
 
     const expectedName = featurePackageName({ feature, role: roleName, enterprise });

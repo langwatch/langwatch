@@ -11,6 +11,7 @@ type ExternalIdResource = "virtual_key" | "budget";
 
 /** The internal gateway's signed request could not be authenticated. */
 export class GatewayInternalAuthenticationError extends HandledError {
+  static readonly code = "permission_denied" as const;
   declare readonly code: "permission_denied";
 
   constructor(reason: string, message: string) {
@@ -25,6 +26,7 @@ export class GatewayInternalAuthenticationError extends HandledError {
 
 /** This process has no secret with which to authenticate its gateway. */
 export class GatewayInternalAuthenticationUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor() {
@@ -42,6 +44,7 @@ export class GatewayInternalAuthenticationUnavailableError extends HandledError 
  * where the capability went, rather than reading a bare 404.
  */
 export class GatewayProviderBindingsGoneError extends HandledError {
+  static readonly code = "gateway_provider_bindings_gone" as const;
   declare readonly code: "gateway_provider_bindings_gone";
 
   constructor(replacement: string) {
@@ -56,6 +59,7 @@ export class GatewayProviderBindingsGoneError extends HandledError {
 
 /** A project holds no live agent-cache entry under the requested name. */
 export class GatewayAgentCacheEntryNotFoundError extends HandledError {
+  static readonly code = "cache_entry_not_found" as const;
   declare readonly code: "cache_entry_not_found";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -77,6 +81,7 @@ export class GatewayAgentCacheEntryNotFoundError extends HandledError {
  * Caller lacks permission to attach guardrails to this virtual key's project.
  */
 export class GuardrailAttachForbiddenError extends HandledError {
+  static readonly code = "guardrail_attach_forbidden" as const;
   declare readonly code: "guardrail_attach_forbidden";
 
   constructor() {
@@ -94,6 +99,7 @@ export class GuardrailAttachForbiddenError extends HandledError {
  * to prevent key-existence oracles.
  */
 export class VirtualKeyNotFoundError extends HandledError {
+  static readonly code = "virtual_key_not_found" as const;
   declare readonly code: "virtual_key_not_found";
 
   constructor() {
@@ -107,6 +113,7 @@ export class VirtualKeyNotFoundError extends HandledError {
 
 /** A revoked key cannot be rotated, updated, enabled or disabled; revocation is terminal. */
 export class VirtualKeyRevokedError extends HandledError {
+  static readonly code = "bad_request" as const;
   declare readonly code: "bad_request";
 
   constructor(message: string) {
@@ -123,6 +130,7 @@ export class VirtualKeyRevokedError extends HandledError {
  * the field on screen.
  */
 export class VirtualKeyExpiryInPastError extends HandledError {
+  static readonly code = "virtual_key_expiry_in_past" as const;
   declare readonly code: "virtual_key_expiry_in_past";
 
   constructor() {
@@ -142,6 +150,7 @@ export class VirtualKeyExpiryInPastError extends HandledError {
 
 /** A gateway budget the caller asked for isn't there. */
 export class GatewayBudgetNotFoundError extends HandledError {
+  static readonly code = "budget_not_found" as const;
   declare readonly code: "budget_not_found";
 
   constructor() {
@@ -155,6 +164,7 @@ export class GatewayBudgetNotFoundError extends HandledError {
 
 /** A voice provider has no usable API key; the scenario voice session refuses with it too. */
 export class GatewayVoiceKeyMissingError extends HandledError {
+  static readonly code = "voice_key_missing" as const;
   declare readonly code: "voice_key_missing";
 
   constructor() {
@@ -171,6 +181,7 @@ export class GatewayVoiceKeyMissingError extends HandledError {
  * never a typo.
  */
 export class GatewayScopeOrgMismatchError extends HandledError {
+  static readonly code = "gateway_scope_org_mismatch" as const;
   declare readonly code: "gateway_scope_org_mismatch";
 
   constructor(scopeType: string) {
@@ -185,6 +196,7 @@ export class GatewayScopeOrgMismatchError extends HandledError {
 
 /** A guardrail being attached belongs to a different project than the key. */
 export class GatewayGuardrailProjectMismatchError extends HandledError {
+  static readonly code = "gateway_guardrail_project_mismatch" as const;
   declare readonly code: "gateway_guardrail_project_mismatch";
 
   constructor() {
@@ -201,6 +213,7 @@ export class GatewayGuardrailProjectMismatchError extends HandledError {
  * was well-formed a moment earlier.
  */
 export class GatewayExternalIdConflictError extends HandledError {
+  static readonly code = "external_id_conflict" as const;
   declare readonly code: "external_id_conflict";
 
   constructor(resource: ExternalIdResource, externalId: string) {
@@ -254,6 +267,7 @@ const prismaUniqueConstraintErrorSchema = z
  * recoverable.
  */
 export class GatewayGroupBudgetUnsupportedError extends HandledError {
+  static readonly code = "gateway_group_budget_unsupported" as const;
   declare readonly code: "gateway_group_budget_unsupported";
 
   constructor() {
@@ -272,6 +286,7 @@ export class GatewayGroupBudgetUnsupportedError extends HandledError {
  * and uncapped by any budget. Reached only in the older self-hosted shape.
  */
 export class GatewayTraceProjectRequiredError extends HandledError {
+  static readonly code = "trace_project_required" as const;
   declare readonly code: "trace_project_required";
 
   constructor() {
@@ -289,6 +304,7 @@ export class GatewayTraceProjectRequiredError extends HandledError {
  * prevent traffic mismapping.
  */
 export class GatewayTraceProjectUnknownError extends HandledError {
+  static readonly code = "gateway_trace_project_unknown" as const;
   declare readonly code: "gateway_trace_project_unknown";
 
   constructor() {
@@ -306,6 +322,7 @@ export class GatewayTraceProjectUnknownError extends HandledError {
  * on read, but rejected at write.
  */
 export class GatewayTraceProjectAmbiguousError extends HandledError {
+  static readonly code = "gateway_trace_project_ambiguous" as const;
   declare readonly code: "gateway_trace_project_ambiguous";
 
   constructor({ projectScopeCount }: { projectScopeCount: number }) {
@@ -334,6 +351,7 @@ const REACHABLE_PROJECT_HINT_LIMIT = 10;
  * control rejected at write-time.
  */
 export class GatewayBudgetScopeUnreachableError extends HandledError {
+  static readonly code = "gateway_budget_scope_unreachable" as const;
   declare readonly code: "gateway_budget_scope_unreachable";
 
   constructor({
@@ -369,6 +387,7 @@ export class GatewayBudgetScopeUnreachableError extends HandledError {
  * Rollup on unstable groups; page walk not exact until window settles.
  */
 export class GatewaySpendGroupByUnstableError extends HandledError {
+  static readonly code = "gateway_spend_group_by_unstable" as const;
   declare readonly code: "gateway_spend_group_by_unstable";
 
   constructor({ groupBy, settlesAtMs }: { groupBy: string[]; settlesAtMs: number }) {
@@ -395,6 +414,7 @@ export class GatewaySpendGroupByUnstableError extends HandledError {
  * budget rejected.
  */
 export class GatewayBudgetCycleAnchorInvalidError extends HandledError {
+  static readonly code = "gateway_budget_cycle_anchor_invalid" as const;
   declare readonly code: "gateway_budget_cycle_anchor_invalid";
 
   constructor(window: string) {
@@ -409,6 +429,7 @@ export class GatewayBudgetCycleAnchorInvalidError extends HandledError {
 
 /** A key named an aggregate project as its trace destination; it owns no traces (ADR-177 #7). */
 export class GatewayTraceProjectNotADestinationError extends HandledError {
+  static readonly code = "gateway_trace_project_not_a_destination" as const;
   declare readonly code: "gateway_trace_project_not_a_destination";
 
   constructor() {
@@ -423,6 +444,7 @@ export class GatewayTraceProjectNotADestinationError extends HandledError {
 
 /** A page cursor this surface never issued; restarting the walk would re-serve every row. */
 export class GatewayInvalidCursorError extends HandledError {
+  static readonly code = "invalid_cursor" as const;
   declare readonly code: "invalid_cursor";
 
   constructor() {
@@ -437,6 +459,7 @@ export class GatewayInvalidCursorError extends HandledError {
 
 /** A spend window whose start is not before its end. */
 export class GatewaySpendWindowInvertedError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor() {
@@ -451,6 +474,7 @@ export class GatewaySpendWindowInvertedError extends HandledError {
 
 /** This deployment has no spend source; a confident $0.00 would read as a zero-spend key. */
 export class GatewaySpendSourceUnavailableError extends HandledError {
+  static readonly code = "spend_source_unavailable" as const;
   declare readonly code: "spend_source_unavailable";
 
   constructor() {
@@ -465,6 +489,7 @@ export class GatewaySpendSourceUnavailableError extends HandledError {
 
 /** A virtual key was written with no scope, so nothing could ever reach it. */
 export class VirtualKeyScopesRequiredError extends HandledError {
+  static readonly code = "bad_request" as const;
   declare readonly code: "bad_request";
 
   constructor() {
@@ -478,6 +503,7 @@ export class VirtualKeyScopesRequiredError extends HandledError {
 
 /** Routing mode POLICY was chosen without saying which routing policy. */
 export class VirtualKeyRoutingPolicyRequiredError extends HandledError {
+  static readonly code = "routing_policy_required" as const;
   declare readonly code: "routing_policy_required";
 
   constructor() {
@@ -492,6 +518,7 @@ export class VirtualKeyRoutingPolicyRequiredError extends HandledError {
 
 /** A routing policy was named on a key whose routing mode does not use one. */
 export class VirtualKeyRoutingPolicyConflictError extends HandledError {
+  static readonly code = "routing_policy_conflict" as const;
   declare readonly code: "routing_policy_conflict";
 
   constructor(routingMode: string) {
@@ -506,6 +533,7 @@ export class VirtualKeyRoutingPolicyConflictError extends HandledError {
 
 /** An empty provider allow-list would leave a key that can serve nothing. */
 export class VirtualKeyProvidersAllowedEmptyError extends HandledError {
+  static readonly code = "providers_allowed_empty" as const;
   declare readonly code: "providers_allowed_empty";
 
   constructor() {
@@ -520,6 +548,7 @@ export class VirtualKeyProvidersAllowedEmptyError extends HandledError {
 
 /** A provider the key's ownership does not reach was put on its allow-list. */
 export class VirtualKeyProvidersNotInScopeError extends HandledError {
+  static readonly code = "providers_not_in_scope" as const;
   declare readonly code: "providers_not_in_scope";
 
   constructor(providerIds: readonly string[]) {
@@ -533,6 +562,7 @@ export class VirtualKeyProvidersNotInScopeError extends HandledError {
 
 /** A key named a routing policy that does not exist. */
 export class GatewayRoutingPolicyNotFoundError extends HandledError {
+  static readonly code = "not_found" as const;
   declare readonly code: "not_found";
 
   constructor(routingPolicyId: string) {
@@ -546,6 +576,7 @@ export class GatewayRoutingPolicyNotFoundError extends HandledError {
 
 /** A key named a routing policy that belongs to another organization. */
 export class GatewayRoutingPolicyForeignError extends HandledError {
+  static readonly code = "forbidden" as const;
   declare readonly code: "forbidden";
 
   constructor() {
@@ -559,6 +590,7 @@ export class GatewayRoutingPolicyForeignError extends HandledError {
 
 /** An organization id named no organization. */
 export class GatewayOrganizationNotFoundError extends HandledError {
+  static readonly code = "not_found" as const;
   declare readonly code: "not_found";
 
   constructor() {

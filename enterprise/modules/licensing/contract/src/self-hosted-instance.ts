@@ -173,6 +173,7 @@ export interface IncomingUsageReport {
 
 /** The registry has never heard from an install with that id. */
 export class SelfHostedInstanceNotFoundError extends HandledError {
+  static readonly code = "self_hosted_instance_not_found" as const;
   declare readonly code: "self_hosted_instance_not_found";
 
   constructor() {

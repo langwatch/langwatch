@@ -60,7 +60,7 @@ import {
   type SeatChangeResult,
   type SignedIssuedLicense,
   type StoreLicenseResult,
-  type UpgradeDiagnosticsAvailability,
+  type UpgradeDiagnosticsSettings,
   type UpgradeDiagnosticsDownload,
   type UpgradeDiagnosticsReceipt,
   type UpgradeDiagnosticsReport,
@@ -822,8 +822,16 @@ export class LicensingModule implements LicensingApiContract {
     return this.#diagnosticsSender.send(submission);
   }
 
-  getUpgradeDiagnosticsAvailability(): Promise<UpgradeDiagnosticsAvailability> {
-    return this.#diagnosticsSender.availability();
+  async getUpgradeDiagnosticsSettings(): Promise<UpgradeDiagnosticsSettings> {
+    const [availability, [identity]] = await Promise.all([
+      this.#diagnosticsSender.availability(),
+      this.#identity.findView(),
+    ]);
+    return {
+      ...availability,
+      instanceId: identity?.instanceId ?? null,
+      optOut: identity?.upgradeDiagnosticsOptOut ?? false,
+    };
   }
 
   recordUpgradeDiagnostics(input: {

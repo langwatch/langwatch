@@ -19,7 +19,7 @@ vi.mock("../../../../behavior/stored-object/use-stored-object-url.ts", () => ({
 }));
 
 // Trace lends the thread; a synchronous stand-in keeps this suite on what this module wires.
-vi.mock("../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ConversationThread: (await import("./stub-conversation-thread.tsx")).StubConversationThread,
 }));

@@ -282,6 +282,8 @@ export function toChartQueryErrorPayload(error: unknown): ChartQueryError {
     code: unknown;
     title: unknown;
     message: unknown;
+    traceId?: unknown;
+    meta?: unknown;
     retryable?: unknown;
     missingGates?: unknown;
   };
@@ -292,6 +294,10 @@ export function toChartQueryErrorPayload(error: unknown): ChartQueryError {
     code: String(shaped.code),
     title: String(shaped.title),
     message: String(shaped.message),
+    ...(typeof shaped.traceId === "string" ? { traceId: shaped.traceId } : {}),
+    ...(typeof shaped.meta === "object" && shaped.meta !== null && !Array.isArray(shaped.meta)
+      ? { meta: shaped.meta as Readonly<Record<string, unknown>> }
+      : {}),
     ...(shaped.retryable === true ? { retryable: true } : {}),
     ...(missingGates.length > 0 ? { missingGates } : {}),
   };

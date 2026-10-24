@@ -69,7 +69,7 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../analytics/filters/tsconfig.build.json"
+      "path": "../../analytics/contract/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).

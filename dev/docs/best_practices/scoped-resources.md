@@ -197,7 +197,7 @@ Migrations are immutable once deployed (see `feedback_never_modify_deployed_migr
 - **Decision record:** `dev/docs/adr/021-multi-scope-targeting-and-tenancy.md`
 - **Shared contract:** `modules/data-retention/contract/src/data-retention.ts` (`ScopeAssignment`, `retentionScopeTypes`, `resolveScopeChain`)
 - **Storage + read grouping:** `modules/model-provider/process/src/transport/model-provider.trpc.ts` → `getDefaultModelsForProject`
-- **Write per-scope:** `modules/model-provider/process/src/services/model-provider-defaults-write.service.ts`
+- **Write per-scope:** `modules/model-provider/process/src/features/defaults/services/model-provider-defaults-write.service.ts`
 - **Multi-scope authz:** `modules/gateway/process/src/app/gateway.app.ts` → `assertCanManageAllScopes`
 - **UI primitive:** `packages/design-system/src/components/scope/scope-chip-picker.tsx`
 - **Cascade-FK variant:** `GatewayBudget` model in `prisma/schema.prisma`

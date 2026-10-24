@@ -2,6 +2,9 @@
  * @vitest-environment jsdom
  * UX contract: specs/model-providers/missing-model-popup.feature.
  */
+import type { UiFailureNotice } from "@langwatch/browser-host/capabilities";
+import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -18,8 +21,10 @@ import {
 
 beforeEach(() => {
   toaster.remove();
+  setUiFeedbackHost(BrowserUiFeedback.create());
 });
 afterEach(() => {
+  setUiFeedbackHost(void 0);
   cleanup();
   toaster.remove();
 });
@@ -155,8 +160,8 @@ describe("showAiCallFailedToast", () => {
       expect(screen.queryByText(/401 Unauthorized/i)).not.toBeInTheDocument();
     });
 
-    /** @scenario A failed assistive AI call warns, it does not error */
-    it("renders as a warning toast, not an error", async () => {
+    /** @scenario A failed assistive AI call is reported as a failure with a code */
+    it("renders as an error toast with an Open settings action", async () => {
       mountToaster();
       showAiCallFailedToast({
         featureKey: "workflows.commit_message",
@@ -169,7 +174,8 @@ describe("showAiCallFailedToast", () => {
       const title = await screen.findByText(/Workflow commit message failed/i);
       const root = title.closest("[data-type]");
       expect(root).not.toBeNull();
-      expect(root!.getAttribute("data-type")).toBe("warning");
+      expect(root!.getAttribute("data-type")).toBe("error");
+      expect(screen.getByText("Open settings")).toBeInTheDocument();
     });
   });
 });
@@ -255,6 +261,48 @@ describe("showProviderDisabledToast", () => {
       expect(screen.getByText(/openai\/gpt-4o is set at team scope/i)).toBeInTheDocument();
       expect(screen.getByText("Open settings")).toBeInTheDocument();
       expect(screen.queryByText(/Use organization default/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a provider-disabled failure the reader must act on", () => {
+    /** @scenario A provider-disabled failure stays up until the reader acts on it */
+    it("asks the feedback host for a sticky failure, swap or settings link alike", () => {
+      const failures: UiFailureNotice[] = [];
+      setUiFeedbackHost({
+        succeeded: vi.fn(),
+        warned: vi.fn(),
+        informed: vi.fn(),
+        failed: (failure) => void failures.push(failure),
+      });
+
+      showProviderDisabledToast(buildProviderDisabledInfo({ onSwapToAlternate: vi.fn() }));
+      showProviderDisabledToast(
+        buildProviderDisabledInfo({ resolvedScope: "team", onSwapToAlternate: undefined }),
+      );
+
+      expect(failures[0]?.sticky).toBe(true);
+      expect(failures[1]?.sticky).toBe(true);
+    });
+  });
+
+  describe("given no feedback host is mounted", () => {
+    /** @scenario A toast raised with no working feedback host is logged, not lost silently */
+    it("warns with the feature's title and does not throw", () => {
+      setUiFeedbackHost(void 0);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => showProviderDisabledToast(buildProviderDisabledInfo())).not.toThrow();
+      expect(() =>
+        showAiCallFailedToast({
+          featureKey: "traces.ai_search",
+          featureDisplayName: "AI search",
+          role: "FAST",
+          navigate: vi.fn(),
+        }),
+      ).not.toThrow();
+
+      expect(warn).toHaveBeenCalledWith(expect.any(String), "Model unavailable for AI search");
+      expect(warn).toHaveBeenCalledWith(expect.any(String), "AI search failed");
     });
   });
 

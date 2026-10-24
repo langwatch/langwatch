@@ -2,7 +2,7 @@
 // A legacy project key as an MCP bearer, through the real endpoint and the real project lookup:
 // admitted and logged, refused once its project is enforced, admitted silently on full access
 // (modules/auth/specs/legacy-project-key-scope.feature).
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import { createServer, type Server } from "node:http";
 
 import { LEGACY_PROJECT_KEY_SCOPE_FLAGS } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -16,7 +16,11 @@ import { RedisMcpOAuthTokenRepository } from "../../repositories/redis/redis.mcp
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
 import { type McpHandler, McpEndpointService } from "../../services/mcp-endpoint.service.ts";
 import { ProjectMcpProjectLookupService } from "../../services/project-mcp-project-lookup.service.ts";
-import type { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
+import type {
+  McpClientAddressSource,
+  ResolvedMcpClientAddressService,
+} from "../../services/resolved-mcp-client-address.service.ts";
+import { answerMcpExchange } from "../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 const LEGACY_KEY = "legacy-project-key";
@@ -42,8 +46,8 @@ class GrantHolds implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
 }
 
 class LoopbackAddress implements Pick<ResolvedMcpClientAddressService, "clientIp"> {
-  clientIp(request: IncomingMessage): string {
-    return request.socket.remoteAddress ?? "127.0.0.1";
+  clientIp(request: McpClientAddressSource): string {
+    return request.clientAddress ?? "127.0.0.1";
   }
 }
 
@@ -89,7 +93,9 @@ async function endpoint({
     address: new LoopbackAddress(),
     baseHost: "https://app.langwatch.ai",
   });
-  const server = createServer((req, res) => handler.handleRequest(req, res));
+  const server = createServer((request, response) =>
+    answerMcpExchange({ endpoint: handler, runner: handler.sessionRunner, request, response }),
+  );
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   open.push({ handler, server });
   const address = server.address();

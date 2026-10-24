@@ -633,6 +633,47 @@ const presentations = {
     describe: () =>
       "It may have been deleted, or it belongs to another project. Check the list of dashboard widgets.",
   },
+  // A chart's own `LW.query(name, params)` refused before it ran: the reader is the chart's author.
+  dashboard_widget_query_not_found: {
+    title: "This chart asks for a query the widget doesn't have",
+    describe: (error) =>
+      `There is no query named "${str(error, "queryName", "that")}". Add it on the Queries tab, or fix the name in the chart's code.`,
+  },
+  // The frame refuses a query past its in-flight cap before it starts; the reader is the chart's author.
+  dashboard_widget_query_overloaded: {
+    title: "This chart asks for too many queries at once",
+    describe: () =>
+      "A widget only runs a few queries at a time, and this one was not started. Wait for the others to finish, or run the queries one after another in the chart's code.",
+  },
+  dashboard_widget_query_undeclared_param: {
+    title: "This chart passes a parameter the query doesn't declare",
+    describe: (error) => {
+      const declared = str(error, "declared", "");
+      return `"${str(error, "parameter", "That parameter")}" isn't declared on this query. ${
+        declared ? `It declares: ${declared}.` : "It declares no parameters."
+      }`;
+    },
+  },
+  dashboard_widget_query_reserved_param: {
+    title: "This chart sets a parameter the dashboard fills in",
+    describe: (error) =>
+      `"${str(error, "parameter", "That parameter")}" comes from the dashboard's own time window and granularity. Leave it out of the chart's call.`,
+  },
+  dashboard_widget_query_missing_param: {
+    title: "This chart leaves out a required parameter",
+    describe: (error) =>
+      `"${str(error, "parameter", "A parameter")}" has no default. Pass a value for it, or give it a default on the Queries tab.`,
+  },
+  dashboard_widget_query_mistyped_param: {
+    title: "This chart passes a parameter of the wrong type",
+    describe: (error) =>
+      `"${str(error, "parameter", "A parameter")}" must be a ${str(error, "expected", "value of its declared type")}, not a ${str(error, "received", "value of another type")}.`,
+  },
+  dashboard_widget_query_invalid_param: {
+    title: "This chart passes a parameter value that's out of range",
+    describe: (error) =>
+      `"${str(error, "parameter", "A parameter")}" is outside what a ${str(error, "expected", "value of its type")} may hold. Pass a shorter text or a finite number.`,
+  },
   dashboard_widget_definition_invalid: {
     title: "This dashboard widget can't be opened",
     describe: () => "We can't read what was stored for it. Rebuild the widget and save it again.",
@@ -753,6 +794,12 @@ const presentations = {
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",
+  },
+  // The browser refused a copy: no clipboard access, or the page was not allowed to write.
+  clipboard_unavailable: {
+    title: "Couldn't copy to your clipboard",
+    describe: () =>
+      "Your browser blocked clipboard access. Select the text and copy it by hand, or allow clipboard access for this site and try again.",
   },
   // A link or button named a drawer no installed module declares (ADR-148 §8).
   browser_drawer_undeclared: {
@@ -1529,6 +1576,26 @@ const presentations = {
     describe: (error) => {
       const featureDisplayName = str(error, "featureDisplayName", "this feature");
       return `Pick a different default model for ${featureDisplayName} in your project's model settings.`;
+    },
+  },
+  // The model a feature resolves to belongs to a provider that was turned off; the browser
+  // raises it with the scope, model and (when one is still usable) the alternate default.
+  model_default_provider_disabled: {
+    title: "This model's provider is turned off",
+    titleFor: (error) => {
+      const feature = str(error, "feature", "");
+      return feature ? `Model unavailable for ${feature}` : undefined;
+    },
+    describe: (error) => {
+      const model = str(error, "model", "The default model");
+      const scope = str(error, "scope", "project");
+      const providerKey = str(error, "providerKey", "its provider");
+      const alternateScope = str(error, "alternateScope", "");
+      const alternateModel = str(error, "alternateModel", "");
+      const head = `${model} is set at ${scope} scope, but its provider "${providerKey}" is disabled.`;
+      return alternateScope && alternateModel
+        ? `${head} The ${alternateScope} default (${alternateModel}) is still available.`
+        : `${head} Re-enable it in Settings, or pick a different default.`;
     },
   },
   model_provider_disabled: {
@@ -4973,7 +5040,18 @@ const presentations = {
     // model is the action that actually changes the outcome; "we've been
     // notified" would be both wrong and useless here.
     title: "That model call didn't go through",
-    describe: () => "Try again in a moment, or pick a different model.",
+    // The browser raises it with the feature and role it was for; a server-raised one carries
+    // neither, and reads the generic title and line.
+    titleFor: (error) => {
+      const feature = str(error, "feature", "");
+      return feature ? `${feature} failed` : undefined;
+    },
+    describe: (error) => {
+      const role = str(error, "roleLabel", "");
+      return role
+        ? `Double-check your ${role} model configuration in Model Providers.`
+        : "Try again in a moment, or pick a different model.";
+    },
   },
   ai_query_provider_error: {
     // fault: provider. Same shape as above, but the reader is mid-search, so
@@ -6033,6 +6111,30 @@ const presentations = {
   http_error: {
     title: "Couldn't reach the agent",
     describe: () => "Check the URL is correct and the service is reachable, then run again.",
+  },
+  // The HTTP agent test's transport failures, one code per fix the author can make.
+  http_timeout: {
+    title: "The agent took too long to answer",
+    describe: () =>
+      "Check the endpoint is responding, or raise the request's timeout, then run again.",
+  },
+  http_dns_error: {
+    title: "That address couldn't be found",
+    describe: () => "Check the host name in the URL is spelled right and publicly resolvable.",
+  },
+  http_connection_refused: {
+    title: "The agent refused the connection",
+    describe: () => "Check the service is running and listening on the port in the URL.",
+  },
+  http_tls_error: {
+    title: "A secure connection to the agent couldn't be made",
+    describe: () =>
+      "Check the endpoint's certificate is valid and issued by a public authority, or use its correct https address.",
+  },
+  http_invalid_response: {
+    title: "The agent's answer couldn't be read",
+    describe: () =>
+      "Check the output path matches what your endpoint returns, and that it sends the full body.",
   },
   http_executor_unavailable: {
     title: "HTTP requests are temporarily unavailable",

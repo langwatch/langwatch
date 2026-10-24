@@ -6,6 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
  * `fault: platform` explicit since this is a 5xx that would otherwise be routine noise.
  */
 export class ExportFailedError extends HandledError {
+  static readonly code = "export_failed" as const;
   declare readonly code: "export_failed";
 
   constructor(cause?: unknown) {
@@ -24,6 +25,7 @@ export class ExportFailedError extends HandledError {
  * own plan's, and the retry-after is theirs to wait out.
  */
 export class TraceExportRateLimitedError extends HandledError {
+  static readonly code = "trace_export_rate_limited" as const;
   declare readonly code: "trace_export_rate_limited";
 
   constructor(input: { reason: "rate" | "concurrency"; retryAfterSeconds?: number | undefined }) {

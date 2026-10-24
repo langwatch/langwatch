@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 /** The scope a rule was aimed at is not there to hang a rule on. */
 export class ScopeTargetNotFoundError extends HandledError {
+  static readonly code = "data_privacy_scope_target_not_found" as const;
   declare readonly code: "data_privacy_scope_target_not_found";
 
   constructor(message = "That privacy scope no longer exists.") {
@@ -12,6 +13,7 @@ export class ScopeTargetNotFoundError extends HandledError {
 
 /** The scope exists, but under a different organization than the project. */
 export class ScopeOutsideOrganizationError extends HandledError {
+  static readonly code = "data_privacy_scope_outside_organization" as const;
   declare readonly code: "data_privacy_scope_outside_organization";
 
   constructor() {
@@ -26,6 +28,7 @@ export class ScopeOutsideOrganizationError extends HandledError {
 
 /** The caller may not write a rule at the tier they aimed at. */
 export class ScopeWriteForbiddenError extends HandledError {
+  static readonly code = "data_privacy_scope_write_forbidden" as const;
   declare readonly code: "data_privacy_scope_write_forbidden";
 
   constructor(
@@ -47,6 +50,7 @@ export class ScopeWriteForbiddenError extends HandledError {
  * can act on — the wire message is the code.
  */
 export class InvalidDataPrivacyConfigError extends HandledError {
+  static readonly code = "data_privacy_config_invalid" as const;
   declare readonly code: "data_privacy_config_invalid";
 
   constructor(message: string) {
@@ -64,6 +68,7 @@ export class InvalidDataPrivacyConfigError extends HandledError {
  * The caller can act — every other tier still takes the same rule.
  */
 export class DepartmentScopeOwnershipUnavailableError extends HandledError {
+  static readonly code = "data_privacy_department_scope_unavailable" as const;
   declare readonly code: "data_privacy_department_scope_unavailable";
 
   constructor() {

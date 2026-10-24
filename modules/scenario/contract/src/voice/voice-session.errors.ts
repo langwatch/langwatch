@@ -3,6 +3,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 /** The project has no key for this transport, so no session can be minted. */
 export class VoiceKeyMissingError extends HandledError {
+  static readonly code = "voice_key_missing" as const;
   declare readonly code: "voice_key_missing";
   constructor(message: string) {
     super("voice_key_missing", message, { httpStatus: 400 });
@@ -13,6 +14,7 @@ export class VoiceKeyMissingError extends HandledError {
 /** A run cannot be created for an unsaved agent without a name to save it
  *  under. The panel collects one and retries. */
 export class VoiceNameRequiredError extends HandledError {
+  static readonly code = "voice_name_required" as const;
   declare readonly code: "voice_name_required";
   constructor() {
     super("voice_name_required", "A name is required to save the agent", {
@@ -24,6 +26,7 @@ export class VoiceNameRequiredError extends HandledError {
 
 /** The provider refused the mint (bad agent id, network, API error). */
 export class VoiceMintFailedError extends HandledError {
+  static readonly code = "voice_mint_failed" as const;
   declare readonly code: "voice_mint_failed";
   constructor(message: string) {
     super("voice_mint_failed", message, { httpStatus: 400 });
@@ -37,6 +40,7 @@ export class VoiceMintFailedError extends HandledError {
  * project cannot pull another's conversation into its runs.
  */
 export class VoiceConversationMismatchError extends HandledError {
+  static readonly code = "voice_conversation_mismatch" as const;
   declare readonly code: "voice_conversation_mismatch";
   constructor() {
     super(
@@ -54,6 +58,7 @@ export class VoiceConversationMismatchError extends HandledError {
  * vendor agent id (AC13/AC29) — the row is the only source of it.
  */
 export class VoiceAgentRowNotFoundError extends HandledError {
+  static readonly code = "agent_not_found" as const;
   declare readonly code: "agent_not_found";
   constructor() {
     super("agent_not_found", "The voice agent was not found in this project", {
@@ -69,6 +74,7 @@ export class VoiceAgentRowNotFoundError extends HandledError {
  * than silently downgrading to an unjudged drawer call (#8019).
  */
 export class VoiceScenarioNotFoundError extends HandledError {
+  static readonly code = "scenario_not_found" as const;
   declare readonly code: "scenario_not_found";
   constructor() {
     super("scenario_not_found", "The scenario was not found in this project", {
@@ -80,6 +86,7 @@ export class VoiceScenarioNotFoundError extends HandledError {
 
 /** The session token failed verification, or was minted for another project. */
 export class VoiceSessionInvalidError extends HandledError {
+  static readonly code = "voice_session_invalid" as const;
   declare readonly code: "voice_session_invalid";
   constructor() {
     super("voice_session_invalid", "The session is invalid or has expired", {
@@ -91,6 +98,7 @@ export class VoiceSessionInvalidError extends HandledError {
 
 /** No live auth session behind a voice request. */
 export class VoiceUnauthenticatedError extends HandledError {
+  static readonly code = "unauthorized" as const;
   declare readonly code: "unauthorized";
   constructor() {
     super("unauthorized", "Sign in to continue", { httpStatus: 401 });
@@ -104,6 +112,7 @@ export class VoiceUnauthenticatedError extends HandledError {
  * 403 that would leak that the door exists at all (AC29).
  */
 export class VoiceAgentsGateDisabledError extends HandledError {
+  static readonly code = "voice_agents_disabled" as const;
   declare readonly code: "voice_agents_disabled";
   constructor() {
     super("voice_agents_disabled", VOICE_AGENTS_DISABLED_MESSAGE, {
@@ -119,6 +128,7 @@ export class VoiceAgentsGateDisabledError extends HandledError {
  * row-not-found responses on the same door.
  */
 export class VoiceRecordingUnavailableError extends HandledError {
+  static readonly code = "voice_recording_unavailable" as const;
   declare readonly code: "voice_recording_unavailable";
   constructor() {
     super("voice_recording_unavailable", "The call recording is not available", {
@@ -130,6 +140,7 @@ export class VoiceRecordingUnavailableError extends HandledError {
 
 /** The audio proxy has no provider key to fetch the recording with. */
 export class VoiceRecordingKeyMissingError extends HandledError {
+  static readonly code = "voice_recording_key_missing" as const;
   declare readonly code: "voice_recording_key_missing";
   constructor() {
     super("voice_recording_key_missing", "The call recording is not available", {
@@ -152,6 +163,7 @@ export const PHONE_NO_BROWSER_CALL_MESSAGE =
  * same everywhere; extends the same HandledError base as voice-session.
  */
 export class VoicePhoneTransportUnavailableError extends HandledError {
+  static readonly code = "voice_phone_transport_unavailable" as const;
   declare readonly code: "voice_phone_transport_unavailable";
   constructor(message: string = PHONE_NO_BROWSER_CALL_MESSAGE) {
     super("voice_phone_transport_unavailable", message, { httpStatus: 400 });

@@ -43,6 +43,7 @@ import {
 } from "../../sso-domain/services/sso-domain-proof-notification.service.ts";
 import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connection.repository.ts";
 import type { SsoEngineProviderProjection } from "../repositories/sso-engine-provider.repository.ts";
+import { CONNECTION_REGISTERED_V1_UPCAST } from "../rules/sso-connection-registration-upcast.rules.ts";
 import type { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
 import type { SsoConnectionGuardsDeps } from "../services/sso-connection-guard-checks.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
@@ -214,6 +215,8 @@ function defineSsoConnectionPipeline(deps: SsoConnectionPipelineDeps): SsoConnec
       migrationFinalizationStartedEventSchema,
       migrationFinalizedEventSchema,
     ])
+    // Version 1 registrations, stored before the arrival policy, read as version 2.
+    .withUpcasts({ events: [CONNECTION_REGISTERED_V1_UPCAST] })
     .withPostgresProjection(
       new SsoConnectionStateFoldProjection({
         store: deps.connectionProjectionStore,

@@ -25,6 +25,7 @@ function isEnterpriseFeature(value: string): value is EnterpriseFeature {
 }
 
 export class EnterprisePlanRequiredError extends HandledError {
+  static readonly code = "enterprise_plan_required" as const;
   declare readonly code: "enterprise_plan_required";
 
   constructor(featureOrMessage: string, httpStatus: 402 | 403 = 402) {

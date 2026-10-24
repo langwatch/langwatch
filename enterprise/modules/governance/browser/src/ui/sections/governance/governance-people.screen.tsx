@@ -17,8 +17,8 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
+import { EnterprisePlanRequiredError } from "@langwatch/entitlement-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   Archive,
   Building2,
@@ -250,8 +250,7 @@ function usePeopleReads({
   );
 
   const lockedByPlan =
-    (!isPlanLoading && !isEnterprise) ||
-    readHandledError(spend.error)?.code === "enterprise_plan_required";
+    (!isPlanLoading && !isEnterprise) || EnterprisePlanRequiredError.is(spend.error);
 
   return {
     spend,

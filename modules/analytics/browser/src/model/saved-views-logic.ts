@@ -4,7 +4,7 @@
  * (Prisma, registry).
  */
 
-import type { FilterField } from "@langwatch/analytics-filters";
+import type { FilterField } from "@langwatch/analytics-contract";
 import { differenceInCalendarDays, nowInstant, subDays } from "@langwatch/time";
 
 import { availableFilters } from "./analytics-filter-catalogue.ts";

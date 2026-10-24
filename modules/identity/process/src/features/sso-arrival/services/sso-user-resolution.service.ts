@@ -1,6 +1,5 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
-import { HandledError } from "@langwatch/handled-error";
 import {
   IdentityJitDisabledError,
   IdentityLinkProposedError,
@@ -17,7 +16,7 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { IdentityLinkProposalWrites } from "../../../rules/identity-writes.rules.ts";
@@ -425,7 +424,7 @@ export class SsoUserResolutionService {
       });
       return member.disabledAt === null;
     } catch (error) {
-      if (HandledError.isHandled(error) && error.code === "member_not_found") return false;
+      if (MemberNotFoundError.is(error)) return false;
       throw error;
     }
   }

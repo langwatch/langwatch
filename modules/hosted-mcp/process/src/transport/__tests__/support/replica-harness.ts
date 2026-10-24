@@ -2,7 +2,7 @@
  * Two hosted MCP replicas sharing one Redis, for the cross-replica suites, kept
  * apart from the scenarios so those read as behaviour rather than as plumbing.
  */
-import { createServer, type Server, type IncomingMessage } from "node:http";
+import { createServer, type Server } from "node:http";
 
 import { type Cluster, Redis } from "ioredis";
 
@@ -16,7 +16,11 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../../services/project-mcp-project-lookup.service.ts";
-import type { ResolvedMcpClientAddressService } from "../../../services/resolved-mcp-client-address.service.ts";
+import type {
+  McpClientAddressSource,
+  ResolvedMcpClientAddressService,
+} from "../../../services/resolved-mcp-client-address.service.ts";
+import { answerMcpExchange } from "../../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./fake-cli-sessions.ts";
 
 export const SESSION_PREFIX = "mcp:session:";
@@ -65,8 +69,8 @@ class HarnessCipher implements McpSessionCipher {
 
 /** Every replica answers on loopback, so every caller is the same address. */
 class HarnessClientAddress implements Pick<ResolvedMcpClientAddressService, "clientIp"> {
-  clientIp(request: IncomingMessage): string {
-    return request.socket.remoteAddress ?? "127.0.0.1";
+  clientIp(request: McpClientAddressSource): string {
+    return request.clientAddress ?? "127.0.0.1";
   }
 }
 
@@ -129,7 +133,9 @@ export async function startReplicaPair({
         address: new HarnessClientAddress(),
         baseHost: "https://app.langwatch.ai",
       }).createHandler();
-      const server = createServer((req, res) => handler.handleRequest(req, res));
+      const server = createServer((request, response) =>
+        answerMcpExchange({ endpoint: handler, runner: handler.sessionRunner, request, response }),
+      );
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       const address = server.address();
       if (typeof address !== "object" || !address) {

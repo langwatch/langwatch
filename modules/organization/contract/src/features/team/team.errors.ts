@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 export class TeamNotFoundError extends NotFoundError {
+  static readonly code = "team_not_found" as const;
   declare readonly code: "team_not_found";
 
   constructor(teamId?: string) {
@@ -14,6 +15,7 @@ export class TeamNotFoundError extends NotFoundError {
 }
 
 export class TeamSlugConflictError extends HandledError {
+  static readonly code = "team_name_taken" as const;
   declare readonly code: "team_name_taken";
 
   constructor(name: string) {
@@ -34,6 +36,7 @@ export const PERSONAL_TEAM_MEMBERSHIP_REFUSAL =
   "Personal workspace teams have exactly one member: their owner. Create a shared team to collaborate with others.";
 
 export class PersonalTeamProtectedError extends HandledError {
+  static readonly code = "personal_workspace_not_managed_here" as const;
   declare readonly code: "personal_workspace_not_managed_here";
 
   constructor(message: string) {
@@ -43,6 +46,7 @@ export class PersonalTeamProtectedError extends HandledError {
 }
 
 export class TeamMembershipNotFoundError extends NotFoundError {
+  static readonly code = "team_membership_not_found" as const;
   declare readonly code: "team_membership_not_found";
 
   constructor(userId: string) {
@@ -58,6 +62,7 @@ export class TeamMembershipNotFoundError extends NotFoundError {
 }
 
 export class TeamMemberAlreadyAddedError extends HandledError {
+  static readonly code = "team_member_already_added" as const;
   declare readonly code: "team_member_already_added";
 
   constructor(userId: string) {
@@ -73,6 +78,7 @@ export class TeamMemberAlreadyAddedError extends HandledError {
  * The named user is not a member of the organization the write is scoped to.
  */
 export class UserNotInOrganizationError extends HandledError {
+  static readonly code = "user_not_in_organization" as const;
   declare readonly code: "user_not_in_organization";
 
   constructor(userId: string) {
@@ -85,6 +91,7 @@ export class UserNotInOrganizationError extends HandledError {
 }
 
 export class PersonalWorkspaceNotManagedHereError extends HandledError {
+  static readonly code = "personal_workspace_not_managed_here" as const;
   declare readonly code: "personal_workspace_not_managed_here";
 
   constructor(ownerName?: string | null) {
@@ -98,6 +105,7 @@ export class PersonalWorkspaceNotManagedHereError extends HandledError {
 }
 
 export class TeamLastAdminRequiredError extends HandledError {
+  static readonly code = "team_last_admin_required" as const;
   declare readonly code: "team_last_admin_required";
 
   constructor(teamName?: string | null) {
@@ -115,6 +123,7 @@ export class TeamLastAdminRequiredError extends HandledError {
 }
 
 export class CannotRemoveSelfAsLastAdminError extends HandledError {
+  static readonly code = "cannot_remove_self_as_last_admin" as const;
   declare readonly code: "cannot_remove_self_as_last_admin";
 
   constructor(teamName?: string | null) {
@@ -132,6 +141,7 @@ export class CannotRemoveSelfAsLastAdminError extends HandledError {
 }
 
 export class LiteMemberViewerOnlyError extends HandledError {
+  static readonly code = "lite_member_viewer_only" as const;
   declare readonly code: "lite_member_viewer_only";
 
   constructor(teamName?: string | null) {
@@ -150,6 +160,7 @@ export class LiteMemberViewerOnlyError extends HandledError {
  * is a different seat, and the message says so.
  */
 export class DeveloperSeatNoSharedAccessError extends HandledError {
+  static readonly code = "developer_seat_no_shared_access" as const;
   declare readonly code: "developer_seat_no_shared_access";
 
   constructor(scopeName?: string | null) {
@@ -167,6 +178,7 @@ export class DeveloperSeatNoSharedAccessError extends HandledError {
 }
 
 export class TeamMembershipChangedError extends HandledError {
+  static readonly code = "team_membership_changed" as const;
   declare readonly code: "team_membership_changed";
 
   constructor(teamId: string) {
@@ -184,6 +196,7 @@ export class TeamMembershipChangedError extends HandledError {
 }
 
 export class TeamCustomRoleRequiredError extends HandledError {
+  static readonly code = "team_custom_role_required" as const;
   declare readonly code: "team_custom_role_required";
 
   constructor() {
@@ -197,6 +210,7 @@ export class TeamCustomRoleRequiredError extends HandledError {
 }
 
 export class TeamCustomRoleNotAssignableError extends HandledError {
+  static readonly code = "team_custom_role_not_assignable" as const;
   declare readonly code: "team_custom_role_not_assignable";
 
   constructor(customRoleId: string) {

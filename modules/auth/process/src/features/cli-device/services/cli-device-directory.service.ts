@@ -1,5 +1,8 @@
-import { HandledError } from "@langwatch/handled-error";
-import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import {
+  MemberNotFoundError,
+  OrganizationNotFoundError,
+  type OrganizationApi,
+} from "@langwatch/organization-contract";
 import { type Project, ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { AuthDirectoryRepository } from "../../../repositories/auth-directory.repository.ts";
@@ -101,7 +104,7 @@ export class CliDeviceDirectoryService implements CliDeviceDirectory {
       const member = await this.deps.organizations.getMember(params);
       return member.disabledAt === null ? member.role : null;
     } catch (error) {
-      if (HandledError.isHandled(error) && error.code === "member_not_found") return null;
+      if (MemberNotFoundError.is(error)) return null;
       throw error;
     }
   }

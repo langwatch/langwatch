@@ -20,8 +20,8 @@ Feature: Blocking the private control plane at the chart's ingress
   # (test_access_ingress), which runs in CI via `make test-e2e-overlays`. They carry
   # @unimplemented because the parity checker scans .bats files under
   # DEFAULT_BATS_TEST_ROOTS and cannot see a .sh suite under charts/ — the gap is in
-  # the checker's reach, not in the coverage. See LEGACY_INERT in
-  # langwatch/scripts/check-feature-parity.ts.
+  # the checker's reach, not in the coverage. See feature-parity-frozen.json in
+  # packages/architecture-enforcer/src/tools.
 
   Rule: The private control plane is blocked by default
 

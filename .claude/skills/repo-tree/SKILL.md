@@ -50,10 +50,9 @@ disagree, the linter wins (§17).
 7. **A package named by a module has four suffixes:** `@langwatch/<f>-contract`,
    `-process`, `-browser`, `-client`. Enterprise ones carry `enterprise-` in the
    name (`@langwatch/enterprise-billing-process`).
-8. **A portable library both halves import** sits inside the owning module
-   (`modules/analytics/filters` exists; the record also names
-   `modules/trace/query-language`, not in the tree yet), never in `packages/` (§2). It is the one
-   sanctioned folder beside the four halves, `specs/` and `adrs/`.
+8. **A module holds no other package.** Code both halves share goes in the
+   contract; a fifth folder with a `package.json` is refused (§3). Beside the four
+   halves sit only `specs/` and `adrs/`.
 
 ## Placement test
 

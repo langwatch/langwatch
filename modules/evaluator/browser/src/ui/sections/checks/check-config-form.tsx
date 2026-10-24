@@ -32,6 +32,7 @@ import {
   findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import { EvaluatorTracesMapping } from "@langwatch/trace-client";
 import { type CheckPreconditions, checkPreconditionsSchema } from "@langwatch/trace-contract";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import {
@@ -54,7 +55,6 @@ import {
 import { z } from "zod";
 
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
-import { EvaluatorTracesMapping } from "../../../behavior/lent-peers.tsx";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
 import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";

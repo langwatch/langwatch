@@ -6,9 +6,9 @@
 
 import { Card } from "@langwatch/design-system/card";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { ModelDisplay as LLMModelDisplay } from "@langwatch/model-provider-client";
 import type { ReactNode } from "react";
 
-import { LLMModelDisplay } from "../../../../behavior/lent-model-provider.tsx";
 import { TargetMark } from "../../../elements/agent-testing/shared/target-mark.tsx";
 import type { RunSettingParameter, RunSettings } from "./run-settings.ts";
 import type { BatchTarget } from "./use-batch-targets.ts";

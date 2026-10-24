@@ -26,7 +26,6 @@
     "@dnd-kit/utilities": "catalog:",
     "@langwatch/analytics-client": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
-    "@langwatch/analytics-filters": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/browser": "workspace:*",

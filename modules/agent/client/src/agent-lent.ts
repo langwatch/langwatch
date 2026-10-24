@@ -2,6 +2,7 @@
 
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 
 /** What an HTTP agent's properties panel hands agent's configuration editor. */
@@ -26,3 +27,6 @@ export type HttpConfigEditorProps = {
 
 export const HttpConfigEditorToken =
   uiTokens("agent").component<HttpConfigEditorProps>("httpConfigEditor");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const HttpConfigEditor = lentComponent(HttpConfigEditorToken);

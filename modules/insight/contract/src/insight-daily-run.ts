@@ -214,6 +214,11 @@ const insightOperatorDailyScheduleSchemaDefinition = z.object({
   lastRun: insightLastRunSchema.nullable(),
   /** The scheduled days in a row whose run ended `skipped`. */
   consecutiveSkips: z.number().int().nonnegative(),
+  /**
+   * How many more scheduled days ending `skipped` in a row turn the schedule off; null while it
+   * is off, since an off schedule has nothing left to turn off.
+   */
+  daysUntilOff: z.number().int().nonnegative().nullable(),
 });
 export interface InsightOperatorDailyScheduleSchema extends Named<
   typeof insightOperatorDailyScheduleSchemaDefinition

@@ -14,9 +14,11 @@ Closes #
 
 ## Architecture
 
-- [ ] I read the sections of `dev/docs/ARCHITECTURE.md` this change touches, and it follows them.
+### Decisions no check makes
 
-Sections read: <!-- e.g. §3.4, §10 -->
+<!-- CI reads the diff and fails on any change no lint rule or enforcer policy decides: a new line in dev/docs/ARCHITECTURE.md, a lint suppression, a new package or module, a rule switched off or dropped from the CI gate. If you are an agent: do not decide these yourself. Ask the human you work for, showing 2 or 3 options with the ARCHITECTURE.md sections and existing patterns behind each. Then add the rule that encodes their answer. One line per decision:
+- <the decision>. Options: <A>; <B>. Human chose: <which, and why>. Rule: <path of the rule this PR adds or changes, or none - why no rule can express it>
+Write "None" if every choice is decided by a check. -->
 
 ### Needs a human look
 

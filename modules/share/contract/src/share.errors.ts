@@ -1,6 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 export class PinnedToActiveShareError extends HandledError {
+  static readonly code = "share_trace_pinned" as const;
   declare readonly code: "share_trace_pinned";
 
   constructor(message = "This trace is currently shared. Disable the share before unpinning.") {
@@ -13,6 +14,7 @@ export class PinnedToActiveShareError extends HandledError {
 }
 
 export class ShareLinkNotFoundError extends HandledError {
+  static readonly code = "share_link_not_found" as const;
   declare readonly code: "share_link_not_found";
 
   constructor() {
@@ -24,6 +26,7 @@ export class ShareLinkNotFoundError extends HandledError {
 }
 
 export class ShareLinkExpiredError extends HandledError {
+  static readonly code = "share_link_expired" as const;
   declare readonly code: "share_link_expired";
 
   constructor() {
@@ -35,6 +38,7 @@ export class ShareLinkExpiredError extends HandledError {
 }
 
 export class ShareLinkExhaustedError extends HandledError {
+  static readonly code = "share_link_exhausted" as const;
   declare readonly code: "share_link_exhausted";
 
   constructor() {
@@ -46,6 +50,7 @@ export class ShareLinkExhaustedError extends HandledError {
 }
 
 export class ShareLinkForbiddenError extends HandledError {
+  static readonly code = "share_link_forbidden" as const;
   declare readonly code: "share_link_forbidden";
 
   constructor() {
@@ -57,6 +62,7 @@ export class ShareLinkForbiddenError extends HandledError {
 }
 
 export class TraceSharingDisabledError extends HandledError {
+  static readonly code = "trace_sharing_disabled" as const;
   declare readonly code: "trace_sharing_disabled";
 
   constructor() {
@@ -68,6 +74,7 @@ export class TraceSharingDisabledError extends HandledError {
 }
 
 export class ShareReadRateLimitedError extends HandledError {
+  static readonly code = "share_read_rate_limited" as const;
   declare readonly code: "share_read_rate_limited";
 
   constructor() {

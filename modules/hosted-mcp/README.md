@@ -6,14 +6,14 @@ The hosted MCP server, and the MCP OAuth flow that admits its clients.
 
 ## At a glance
 
-|                |                                                                                                                              |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Classification | core (`modules/catalogue.json`)                                                                                              |
-| Subjects       | hosted-mcp, mcp-oauth                                                                                                        |
-| Halves         | [contract](contract) · [process](process/README.md)                                                                          |
-| Api token      | `HostedMcpApi` = `moduleApi<HostedMcpApiContract>()("hosted-mcp")`, `contract/src/mcp-authorize.schemas.ts:84` (1 operation) |
-| Other token    | `McpAuthorizeApi`, `process/src/transport/mcp-authorize.rest.ts:23`                                                          |
-| Installed by   | api, worker, tasks (process)                                                                                                 |
+|                |                                                                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                                               |
+| Subjects       | hosted-mcp, mcp-oauth                                                                                                         |
+| Halves         | [contract](contract) · [process](process/README.md)                                                                           |
+| Api token      | `HostedMcpApi` = `moduleApi<HostedMcpApiContract>()("hosted-mcp")`, `contract/src/mcp-authorize.schemas.ts:146` (1 operation) |
+| Other token    | `McpAuthorizeApi`, `process/src/transport/mcp-authorize.rest.ts:23`                                                           |
+| Installed by   | api, worker, tasks (process)                                                                                                  |
 
 ## What hosted-mcp owns
 

@@ -1,3 +1,4 @@
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import type { ModelErrorRole } from "@langwatch/browser-host/model-error";
 import { toaster } from "@langwatch/design-system/toaster";
 
@@ -93,24 +94,21 @@ export function showAiCallFailedToast(info: AiCallFailedInfo): void {
   const roleLabel = MODEL_ROLE_LABEL[info.role];
   const href = settingsHref(info);
 
-  const description = `Double-check your ${roleLabel} model configuration in Model Providers.`;
-
-  toaster.create({
+  showErrorToast({
     id,
-    // Warning, not error: the AI call is an assistive convenience (commit
-    // messages, AI search, ...) failing, not something the user was doing.
-    type: "warning",
-    duration: 10000,
-    title: `${info.featureDisplayName} failed`,
-    description,
+    error: {
+      code: "ai_call_failed",
+      httpStatus: 0,
+      meta: { feature: info.featureDisplayName, roleLabel },
+    },
+    fallbackTitle: `${info.featureDisplayName} failed`,
     action: {
       label: "Open settings",
-      onClick: () => {
+      run: () => {
         toaster.dismiss(id);
         info.navigate(href);
       },
     },
-    meta: { type: "ai-call-failed" },
   });
 }
 
@@ -160,33 +158,38 @@ export function showProviderDisabledToast(info: ProviderDisabledInfo): void {
   const swapAvailable = info.alternate?.providerEnabled === true && info.onSwapToAlternate;
   const altSummary = info.alternate ? info.alternate.model : null;
 
-  const description = swapAvailable
-    ? `${info.resolvedModel} is set at ${SCOPE_LABEL[info.resolvedScope]} scope, but its provider "${info.providerKey}" is disabled. The ${info.alternate?.scope} default (${info.alternate?.model}) is still available.`
-    : `${info.resolvedModel} is set at ${SCOPE_LABEL[info.resolvedScope]} scope, but its provider "${info.providerKey}" is disabled. Re-enable it in Settings, or pick a different default.`;
-
-  toaster.create({
+  showErrorToast({
     id,
-    // The feedback port carries no offered ACTION, and this toast's whole point
-    // is the one-click swap to the parent scope's default.
-    type: "error", // no-raw-error-toast-ok
-    duration: Infinity,
-    title: `Model unavailable for ${info.featureDisplayName}`,
-    description,
+    error: {
+      code: "model_default_provider_disabled",
+      httpStatus: 0,
+      meta: {
+        feature: info.featureDisplayName,
+        model: info.resolvedModel,
+        scope: SCOPE_LABEL[info.resolvedScope],
+        providerKey: info.providerKey,
+        ...(swapAvailable
+          ? { alternateScope: info.alternate?.scope, alternateModel: info.alternate?.model }
+          : {}),
+      },
+    },
+    fallbackTitle: `Model unavailable for ${info.featureDisplayName}`,
+    // The reader must take the offered action; nothing else clears the problem.
+    sticky: true,
     action: swapAvailable
       ? {
           label: `Use ${info.alternate?.scope} default${altSummary ? ` (${altSummary})` : ""}`,
-          onClick: () => {
+          run: () => {
             toaster.dismiss(id);
             void Promise.resolve(info.onSwapToAlternate?.());
           },
         }
       : {
           label: "Open settings",
-          onClick: () => {
+          run: () => {
             toaster.dismiss(id);
             info.navigate(href);
           },
         },
-    meta: { type: "provider-disabled" },
   });
 }

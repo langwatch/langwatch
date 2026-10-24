@@ -1,4 +1,5 @@
 import type { SignInMethod } from "@langwatch/identity-contract";
+import { SignUpRestrictedError } from "@langwatch/organization-contract";
 import { useRef, useState } from "react";
 
 import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client.tsx";
@@ -24,7 +25,7 @@ const PASSKEY: SignInMethod = {
 const EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
 
 /** The server's code for an address the installation's sign-up policy refuses. */
-const SIGN_UP_RESTRICTED = "auth_sign_up_restricted";
+const SIGN_UP_RESTRICTED = SignUpRestrictedError.code;
 
 /** The passkey sign-up's 403 for an address that must use its organization's sign-in. */
 const REGISTRATION_NOT_ALLOWED = "REGISTRATION_NOT_ALLOWED";

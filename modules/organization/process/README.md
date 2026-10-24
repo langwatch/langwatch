@@ -2115,7 +2115,7 @@ Contract `../contract/src/personal-workspace-features.trpc.ts:20`, router `src/t
 interface Input {
   projectId: string;
 }
-// Output: personalFeaturesSchema, ../contract/src/personal-workspace.ts:101
+// Output: personalFeaturesSchema, ../contract/src/personal-workspace.ts:102
 interface Output {
   evaluations: boolean;
   datasets: boolean;
@@ -2125,11 +2125,11 @@ interface Output {
 
 // personalWorkspaceFeatures.enableAll
 type Input = z.infer<typeof personalWorkspaceFeaturesScopeSchema>; // ../contract/src/personal-workspace-features.trpc.ts:17
-type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:101
+type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:102
 
 // personalWorkspaceFeatures.disableAll
 type Input = z.infer<typeof personalWorkspaceFeaturesScopeSchema>; // ../contract/src/personal-workspace-features.trpc.ts:17
-type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:101
+type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:102
 ```
 
 ### `team`

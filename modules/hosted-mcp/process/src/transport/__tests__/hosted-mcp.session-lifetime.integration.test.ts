@@ -2,7 +2,7 @@
 // A session outlives the replica that opened it: a deploy, an idle local copy dropped to free
 // memory or a refreshed token must never end it, and a client is only sent to sign in again
 // when its credential is bad. Two replicas share one record store here, as in production.
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import { createServer, type Server } from "node:http";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -15,7 +15,11 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
-import type { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
+import type {
+  McpClientAddressSource,
+  ResolvedMcpClientAddressService,
+} from "../../services/resolved-mcp-client-address.service.ts";
+import { answerMcpExchange } from "../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 const PROJECT_KEY = "lw_lifetime_key";
@@ -41,8 +45,8 @@ class SwitchableGrant implements Pick<AuthzMcpSessionGrantService, "stillGranted
 }
 
 class LoopbackAddress implements Pick<ResolvedMcpClientAddressService, "clientIp"> {
-  clientIp(request: IncomingMessage): string {
-    return request.socket.remoteAddress ?? "127.0.0.1";
+  clientIp(request: McpClientAddressSource): string {
+    return request.clientAddress ?? "127.0.0.1";
   }
 }
 
@@ -67,7 +71,9 @@ function deployment() {
       address: new LoopbackAddress(),
       baseHost: "https://app.langwatch.ai",
     });
-    const server = createServer((req, res) => handler.handleRequest(req, res));
+    const server = createServer((request, response) =>
+      answerMcpExchange({ endpoint: handler, runner: handler.sessionRunner, request, response }),
+    );
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     const port = typeof address === "object" && address ? address.port : 0;

@@ -646,6 +646,7 @@ export async function drainWithinCap(
  * Spec: specs/observability/request-log-cause-and-level.feature
  */
 export class RequestBodyUnreadableError extends HandledError {
+  static readonly code = "request_body_unreadable" as const;
   declare readonly code: "request_body_unreadable";
 
   constructor({ cause }: Readonly<{ cause?: unknown }> = {}) {

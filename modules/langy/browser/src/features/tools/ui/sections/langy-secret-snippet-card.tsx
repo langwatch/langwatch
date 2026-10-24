@@ -4,6 +4,7 @@
  * Spec: specs/langy/langy-secret-snippet.feature
  */
 import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { SecretAlreadyRevealedError, SecretRevealExpiredError } from "@langwatch/secret-contract";
 import { KeyRound } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 
@@ -25,7 +26,10 @@ export const LANGY_SECRET_GONE_LINE =
 const LANGY_SECRET_READING_LINE = "Reading the key";
 
 /** The refusals that mean the value is gone for good. */
-const GONE_CODES = new Set(["secret_already_revealed", "secret_reveal_expired"]);
+const GONE_CODES = new Set<string>([
+  SecretAlreadyRevealedError.code,
+  SecretRevealExpiredError.code,
+]);
 
 export interface LangySecretSnippetCardProps {
   /** The organization the key belongs to. Absent = the read cannot start. */

@@ -1,5 +1,6 @@
 /** Trace UI that reads trace's own data, lent by token to the modules that show it (§10, §10.1). */
 
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 import type {
   AnnotationQueueConversationProps,
@@ -179,3 +180,16 @@ export const ConversationThreadToken =
   trace.component<ConversationThreadProps>("conversationThread");
 export const TracePreviewHoverCardToken =
   trace.component<TracePreviewHoverCardProps>("tracePreviewHoverCard");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const EvaluatorTracesMapping = lentComponent(EvaluatorTracesMappingToken);
+export const SetupWithAgentButton = lentComponent(SetupWithAgentButtonToken);
+export const TraceEditButton = lentComponent(TraceEditButtonToken);
+export const AnnotationQueueConversation = lentComponent(AnnotationQueueConversationToken);
+export const AgentActionsMenu = lentComponent(AgentActionsMenuToken);
+export const ConversationThread = lentComponent(ConversationThreadToken);
+export const RenderInputOutput = lentComponent(RenderInputOutputToken);
+export const TraceIdPeek = lentComponent(TraceIdPeekToken);
+export const TracePreviewHoverCard = lentComponent(TracePreviewHoverCardToken, {
+  fallback: ({ children }) => children,
+});

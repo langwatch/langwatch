@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./lent": {
+      "types": "./dist/scenario-lent-components.d.ts",
+      "default": "./src/scenario-lent-components.ts"
     }
   },
   "scripts": {
@@ -20,6 +24,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*"
   },

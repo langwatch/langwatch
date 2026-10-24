@@ -1,4 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { RunExperimentViaApiDialog } from "@langwatch/workflow-client";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 /**
  * "Run via API" dialog for the evaluations-v3 workbench.
@@ -6,7 +7,6 @@ import type { WorkflowField } from "@langwatch/workflow-contract";
 import { useShallow } from "zustand/react/shallow";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
-import { RunExperimentViaApiDialog } from "../../../behavior/lent-workflow.tsx";
 
 /**
  * Page-level wrapper: reads the experiment slug and the active dataset (name + columns)

@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class OrganizationNotFoundForTeamError extends NotFoundError {
+  static readonly code = "organization_not_found_for_team" as const;
   declare readonly code: "organization_not_found_for_team";
 
   constructor(teamId: string, options: { reasons?: readonly Error[] } = {}) {
@@ -18,6 +19,7 @@ export class OrganizationNotFoundForTeamError extends NotFoundError {
 
 /** No administrator exists to approve actions. */
 export class NoAdminConfiguredError extends HandledError {
+  static readonly code = "no_admin_configured" as const;
   declare readonly code: "no_admin_configured";
 
   constructor() {
@@ -34,6 +36,7 @@ export class NoAdminConfiguredError extends HandledError {
 
 /** The user id is not a member of the caller's organization. */
 export class MemberNotFoundError extends NotFoundError {
+  static readonly code = "member_not_found" as const;
   declare readonly code: "member_not_found";
 
   constructor(userId: string) {
@@ -54,6 +57,7 @@ export class MemberNotFoundError extends NotFoundError {
  * anyone else remains a normal, reversible operation.
  */
 export class CannotDisableSelfError extends HandledError {
+  static readonly code = "cannot_disable_self" as const;
   declare readonly code: "cannot_disable_self";
 
   constructor() {
@@ -70,6 +74,7 @@ export class CannotDisableSelfError extends HandledError {
  * on every disable path, and it maps to a stable 400.
  */
 export class CannotDisableLastAdminError extends HandledError {
+  static readonly code = "cannot_disable_last_admin" as const;
   declare readonly code: "cannot_disable_last_admin";
 
   constructor() {
@@ -88,6 +93,7 @@ export class CannotDisableLastAdminError extends HandledError {
  * role-change path, mapped to a stable 400.
  */
 export class CannotDemoteLastAdminError extends HandledError {
+  static readonly code = "cannot_demote_last_admin" as const;
   declare readonly code: "cannot_demote_last_admin";
 
   constructor() {
@@ -104,6 +110,7 @@ export class CannotDemoteLastAdminError extends HandledError {
  * the only irreversible one of the three — mapped to a stable 400.
  */
 export class CannotRemoveLastAdminError extends HandledError {
+  static readonly code = "cannot_remove_last_admin" as const;
   declare readonly code: "cannot_remove_last_admin";
 
   constructor() {
@@ -118,6 +125,7 @@ export class CannotRemoveLastAdminError extends HandledError {
 
 /** The removal named the caller's own membership. Same guard as disabling. */
 export class CannotRemoveSelfError extends HandledError {
+  static readonly code = "cannot_remove_self" as const;
   declare readonly code: "cannot_remove_self";
 
   constructor() {
@@ -130,6 +138,7 @@ export class CannotRemoveSelfError extends HandledError {
 
 /** No member seats available: plan limit reached, not a billing issue. */
 export class MemberSeatLimitReachedError extends HandledError {
+  static readonly code = "member_seat_limit_reached" as const;
   declare readonly code: "member_seat_limit_reached";
 
   constructor(
@@ -151,6 +160,7 @@ export class MemberSeatLimitReachedError extends HandledError {
  * it (retry with another slug, or adopt the existing organization).
  */
 export class OrganizationSlugTakenError extends HandledError {
+  static readonly code = "organization_slug_taken" as const;
   declare readonly code: "organization_slug_taken";
 
   constructor(slug: string) {
@@ -169,6 +179,7 @@ export class OrganizationSlugTakenError extends HandledError {
  * either way. The rule that refused travels as the reason.
  */
 export class SignUpRestrictedError extends HandledError {
+  static readonly code = "auth_sign_up_restricted" as const;
   declare readonly code: "auth_sign_up_restricted";
 
   constructor(detail: string) {
@@ -187,6 +198,7 @@ export class SignUpRestrictedError extends HandledError {
  * administrator founds a new one.
  */
 export class OrganizationCreationRestrictedError extends HandledError {
+  static readonly code = "organization_creation_restricted" as const;
   declare readonly code: "organization_creation_restricted";
 
   constructor() {
@@ -201,6 +213,7 @@ export class OrganizationCreationRestrictedError extends HandledError {
 
 /** Custom role is not assignable: belongs to another org or is built-in. */
 export class CustomRoleNotAssignableError extends HandledError {
+  static readonly code = "custom_role_not_assignable" as const;
   declare readonly code: "custom_role_not_assignable";
 
   constructor(customRoleId: string) {

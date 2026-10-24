@@ -38,6 +38,7 @@ export class ScenarioParameterError extends HandledError {
  * declared names, and target label on meta for the run dialog.
  */
 export class ScenarioParameterUnknownError extends ScenarioParameterError {
+  static readonly code = "scenario_parameter_unknown" as const;
   declare readonly code: "scenario_parameter_unknown";
 
   constructor({
@@ -72,6 +73,7 @@ export class ScenarioParameterUnknownError extends ScenarioParameterError {
  * customer sees what was accepted next to the value that was refused.
  */
 export class ScenarioParameterOptionInvalidError extends ScenarioParameterError {
+  static readonly code = "scenario_parameter_option_invalid" as const;
   declare readonly code: "scenario_parameter_option_invalid";
 
   constructor({
@@ -99,6 +101,7 @@ export class ScenarioParameterOptionInvalidError extends ScenarioParameterError 
  * parameters with no code default. Names on meta for run dialog.
  */
 export class ScenarioParameterRequiredError extends ScenarioParameterError {
+  static readonly code = "scenario_parameter_required" as const;
   declare readonly code: "scenario_parameter_required";
 
   constructor({ names }: { names: string[] }) {
@@ -118,6 +121,7 @@ export class ScenarioParameterRequiredError extends ScenarioParameterError {
  * at the situation or criterion instead of making the customer search for it.
  */
 export class ScenarioParameterMissingError extends ScenarioParameterError {
+  static readonly code = "scenario_parameter_missing" as const;
   declare readonly code: "scenario_parameter_missing";
 
   constructor({ names, field }: { names: string[]; field: ScenarioContentField }) {
@@ -137,6 +141,7 @@ export class ScenarioParameterMissingError extends ScenarioParameterError {
  * keep the value out of messages, logs and stores.
  */
 export class ScenarioSecretParameterMissingError extends ScenarioParameterError {
+  static readonly code = "scenario_secret_parameter_missing" as const;
   declare readonly code: "scenario_secret_parameter_missing";
 
   constructor({ names }: { names: string[] }) {
@@ -156,6 +161,7 @@ export class ScenarioSecretParameterMissingError extends ScenarioParameterError 
  * plain scenario's rendered text and recorded run.
  */
 export class ScenarioSecretParameterConflictError extends ScenarioParameterError {
+  static readonly code = "scenario_secret_parameter_conflict" as const;
   declare readonly code: "scenario_secret_parameter_conflict";
 
   constructor({ names }: { names: string[] }) {
@@ -175,6 +181,7 @@ export class ScenarioSecretParameterConflictError extends ScenarioParameterError
  * with the run, so a secret read there is a secret written down.
  */
 export class ScenarioSecretParameterInTextError extends ScenarioParameterError {
+  static readonly code = "scenario_secret_parameter_in_text" as const;
   declare readonly code: "scenario_secret_parameter_in_text";
 
   constructor({ names, field }: { names: string[]; field: ScenarioContentField }) {
@@ -194,6 +201,7 @@ export class ScenarioSecretParameterInTextError extends ScenarioParameterError {
  * its internals, so it stays in the log line next to the throw.
  */
 export class ScenarioParameterTemplateInvalidError extends ScenarioParameterError {
+  static readonly code = "scenario_parameter_template_invalid" as const;
   declare readonly code: "scenario_parameter_template_invalid";
 
   constructor({ field }: { field: ScenarioContentField }) {

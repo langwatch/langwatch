@@ -27,7 +27,8 @@ vi.mock("@paper-design/shaders-react", () => ({
     return <div data-testid="mesh-ground" />;
   },
 }));
-vi.mock("../../../../behavior/lent-hero-ask-field.tsx", () => ({
+vi.mock("@langwatch/project-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   HeroAskField: ({ placeholder }: { placeholder: string }) => (
     <input data-testid="ask-field" placeholder={placeholder} />
   ),

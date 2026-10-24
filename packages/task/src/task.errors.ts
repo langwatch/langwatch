@@ -1,6 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 export class TaskNotFoundError extends HandledError {
+  static readonly code = "task_not_found" as const;
   declare readonly code: "task_not_found";
 
   constructor({ task, availableNames }: { task: string; availableNames: readonly string[] }) {
@@ -14,6 +15,7 @@ export class TaskNotFoundError extends HandledError {
 }
 
 export class TaskInfrastructureUnavailableError extends HandledError {
+  static readonly code = "task_infrastructure_unavailable" as const;
   declare readonly code: "task_infrastructure_unavailable";
 
   constructor({ handle }: { handle: string }) {

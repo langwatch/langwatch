@@ -330,7 +330,7 @@ type Input = unknown;
 type Output = z.infer<typeof selfHostedInstanceSummarySchema>; // ../../licensing/contract/src/self-hosted-instance.ts:162
 
 // selfHostedInstances.findDiagnostics
-// Input: findUpgradeDiagnosticsInputSchema, ../../licensing/contract/src/upgrade-diagnostics.ts:86
+// Input: findUpgradeDiagnosticsInputSchema, ../../licensing/contract/src/upgrade-diagnostics.ts:101
 interface Input {
   instanceRowId: string;
 }
@@ -349,7 +349,7 @@ type Output = {
 }[];
 
 // selfHostedInstances.getDiagnosticsDownload
-// Input: upgradeDiagnosticsIdInputSchema, ../../licensing/contract/src/upgrade-diagnostics.ts:94
+// Input: upgradeDiagnosticsIdInputSchema, ../../licensing/contract/src/upgrade-diagnostics.ts:109
 interface Input {
   id: string;
 }

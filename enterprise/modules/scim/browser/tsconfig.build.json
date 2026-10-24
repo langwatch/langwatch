@@ -39,6 +39,9 @@
       "path": "../../../../packages/error-views/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {

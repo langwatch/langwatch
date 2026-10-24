@@ -72,9 +72,9 @@ import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { LLMIcon } from "@langwatch/design-system/icons";
 import { Switch } from "@langwatch/design-system/switch";
 import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
+import { RenderInputOutput } from "@langwatch/trace-client";
 
 import { experimentApi } from "../../../behavior/experiment-api.ts";
-import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
 import { VersionBox } from "../../../behavior/lent-workflow.tsx";
 import type { ExperimentApiRouter, ExperimentRow } from "../../../model/experiment-api-map.ts";
 import { readKey } from "../../../model/experiments/BatchEvaluationV2/utils.ts";

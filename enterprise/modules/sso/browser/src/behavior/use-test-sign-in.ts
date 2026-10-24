@@ -10,6 +10,7 @@
  * the reader has to work from, and a toast is gone in eight seconds, cannot be
  * copied comfortably, and sits nowhere near the connection it is about.
  */
+import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { useState } from "react";
 
 import { useSsoHost } from "../model/sso-host.ts";
@@ -29,6 +30,21 @@ export interface TestSignIn {
   /** The most recent verdict, whichever half of the round trip produced it. */
   failure: TestSignInFailure | null;
   dismissFailure: () => void;
+}
+
+/**
+ * What a thrown failure says in the detail line. The words come from the registry by the error's
+ * code, never from its own message, which is a code slug or an internal. A failure the registry
+ * has nothing on reads as the generic line, with the trace id when one rode along.
+ */
+function thrownFailureDetail(error: unknown): string {
+  const { title, description, traceId } = resolveUiFailureCopy({
+    error,
+    fallbackTitle: "Something went wrong",
+  });
+  const words = [title, description].filter(Boolean).join(". ");
+
+  return traceId ? `${words} (reference ${traceId})` : words;
 }
 
 export function useTestSignIn({ connectionId }: { connectionId: string }): TestSignIn {
@@ -66,11 +82,7 @@ export function useTestSignIn({ connectionId }: { connectionId: string }): TestS
       });
       if (error) setStartFailure(testSignInStartFailure(error));
     } catch (error) {
-      setStartFailure(
-        testSignInStartFailure({
-          message: error instanceof Error ? error.message : String(error),
-        }),
-      );
+      setStartFailure(testSignInStartFailure({ message: thrownFailureDetail(error) }));
     } finally {
       setSending(false);
     }

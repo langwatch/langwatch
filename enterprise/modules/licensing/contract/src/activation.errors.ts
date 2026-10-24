@@ -9,6 +9,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 /** The text presented is not shaped like a code at all. */
 export class ActivationCodeMalformedError extends HandledError {
+  static readonly code = "activation_code_malformed" as const;
   declare readonly code: "activation_code_malformed";
 
   constructor() {
@@ -25,6 +26,7 @@ export class ActivationCodeMalformedError extends HandledError {
  * tell the caller something about our customers.
  */
 export class ActivationCodeNotFoundError extends HandledError {
+  static readonly code = "activation_code_not_found" as const;
   declare readonly code: "activation_code_not_found";
 
   constructor() {
@@ -38,6 +40,7 @@ export class ActivationCodeNotFoundError extends HandledError {
 
 /** The code's own term ended, which is not the term of what it would mint. */
 export class ActivationCodeExpiredError extends HandledError {
+  static readonly code = "activation_code_expired" as const;
   declare readonly code: "activation_code_expired";
 
   constructor() {
@@ -51,6 +54,7 @@ export class ActivationCodeExpiredError extends HandledError {
 
 /** A single-use code another install already claimed. */
 export class ActivationCodeAlreadyRedeemedError extends HandledError {
+  static readonly code = "activation_code_already_redeemed" as const;
   declare readonly code: "activation_code_already_redeemed";
 
   constructor() {
@@ -64,6 +68,7 @@ export class ActivationCodeAlreadyRedeemedError extends HandledError {
 
 /** Too many attempts against one code, which is what bounds guessing it. */
 export class ActivationRateLimitedError extends HandledError {
+  static readonly code = "activation_rate_limited" as const;
   declare readonly code: "activation_rate_limited";
 
   constructor() {

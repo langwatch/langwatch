@@ -5,6 +5,7 @@ import { FILTER_TOO_COMPLEX_MESSAGE } from "./features/query/trace-query-analysi
 
 /** The configured model provider did not produce a usable trace query. */
 export class AiQueryProviderError extends HandledError {
+  static readonly code = "ai_query_provider_error" as const;
   declare readonly code: "ai_query_provider_error";
 
   constructor(details: AiActionErrorDetails = {}) {
@@ -18,6 +19,7 @@ export class AiQueryProviderError extends HandledError {
 }
 
 export class TraceNotFoundError extends NotFoundError {
+  static readonly code = "trace_not_found" as const;
   declare readonly code: "trace_not_found";
 
   constructor(
@@ -39,6 +41,7 @@ export class TraceNotFoundError extends NotFoundError {
 
 /** A trace ID prefix a caller sent matches more than one trace. */
 export class TraceIdAmbiguousError extends HandledError {
+  static readonly code = "trace_id_ambiguous" as const;
   declare readonly code: "trace_id_ambiguous";
 
   constructor(
@@ -54,6 +57,7 @@ export class TraceIdAmbiguousError extends HandledError {
 }
 
 export class FilterParseError extends HandledError {
+  static readonly code = "filter_parse_error" as const;
   declare readonly code: "filter_parse_error";
 
   constructor(message: string, position?: number) {
@@ -75,6 +79,7 @@ export class FilterParseError extends HandledError {
  * client checks the same number before sending.
  */
 export class FilterTooComplexError extends HandledError {
+  static readonly code = "filter_too_complex" as const;
   declare readonly code: "filter_too_complex";
 
   constructor({ maxNodes }: { readonly maxNodes: number }) {
@@ -89,6 +94,7 @@ export class FilterTooComplexError extends HandledError {
 }
 
 export class FilterFieldUnknownError extends HandledError {
+  static readonly code = "filter_field_unknown" as const;
   declare readonly code: "filter_field_unknown";
 
   constructor(field: string, knownFields: string[]) {
@@ -103,6 +109,7 @@ export class FilterFieldUnknownError extends HandledError {
 
 /** A filter value the trace view cannot answer exactly: refused, never guessed at. */
 export class FilterValueRefusedError extends HandledError {
+  static readonly code = "filter_value_refused" as const;
   declare readonly code: "filter_value_refused";
 
   constructor({ field, reason }: { readonly field: string; readonly reason: string }) {
@@ -116,6 +123,7 @@ export class FilterValueRefusedError extends HandledError {
 }
 
 export class SpanNotFoundError extends NotFoundError {
+  static readonly code = "span_not_found" as const;
   declare readonly code: "span_not_found";
 
   constructor(spanId: string, options: { reasons?: readonly Error[] } = {}) {
@@ -133,6 +141,7 @@ export class SpanNotFoundError extends NotFoundError {
 }
 
 export class PageTooDeepError extends HandledError {
+  static readonly code = "page_too_deep" as const;
   declare readonly code: "page_too_deep";
 
   constructor(maxRows: number) {
@@ -157,6 +166,7 @@ export class PageTooDeepError extends HandledError {
  * bound at the first oversized request.
  */
 export class TraceIdsTooManyError extends HandledError {
+  static readonly code = "trace_ids_too_many" as const;
   declare readonly code: "trace_ids_too_many";
 
   constructor(maxIds: number) {
@@ -179,6 +189,7 @@ export class TraceIdsTooManyError extends HandledError {
  * silently receiving fewer rows than it asked for.
  */
 export class TracePageSizeTooLargeError extends HandledError {
+  static readonly code = "trace_page_size_too_large" as const;
   declare readonly code: "trace_page_size_too_large";
 
   constructor({
@@ -206,6 +217,7 @@ export class TracePageSizeTooLargeError extends HandledError {
  * full, so it never reached ClickHouse.
  */
 export class ClickHouseOverloadedError extends HandledError {
+  static readonly code = "clickhouse_overloaded" as const;
   declare readonly code: "clickhouse_overloaded";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -235,6 +247,7 @@ export class TraceIngestionUnavailableError extends HandledError {
  * exactly those namespaces. The key itself stays in the discovery payload.
  */
 export class TraceAttributeValuesWithheldError extends HandledError {
+  static readonly code = "trace_attribute_values_withheld" as const;
   declare readonly code: "trace_attribute_values_withheld";
 
   constructor(field: string) {
@@ -269,6 +282,7 @@ export class TraceAiQueryUnavailableError extends HandledError {
 
 /** A capability this deployment did not compose, refused by name at the call. */
 export class TraceCapabilityUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(role: string, capability: string) {
@@ -283,6 +297,7 @@ export class TraceCapabilityUnavailableError extends HandledError {
 
 /** A tracked-event body that does not parse or does not match its event type's shape. */
 export class TrackedEventInvalidError extends HandledError {
+  static readonly code = "tracked_event_invalid" as const;
   declare readonly code: "tracked_event_invalid";
 
   constructor(message: string) {

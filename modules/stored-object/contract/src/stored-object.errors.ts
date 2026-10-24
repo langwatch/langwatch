@@ -286,6 +286,7 @@ export class IdempotencyConflictError extends StoredObjectHandledError {
  * capability is missing, and that is the `capability` the message carries.
  */
 export class StoredObjectCapabilityUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {
@@ -299,6 +300,7 @@ export class StoredObjectCapabilityUnavailableError extends HandledError {
 
 /** One caller read more files in the window than the byte door allows; retry after the wait. */
 export class StoredObjectFilesRateLimitedError extends HandledError {
+  static readonly code = "stored_object_files_rate_limited" as const;
   declare readonly code: "stored_object_files_rate_limited";
 
   constructor(retryAfterMs: number) {

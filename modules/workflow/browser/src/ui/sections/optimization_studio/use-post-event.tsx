@@ -1,3 +1,4 @@
+import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
 import {
   describeError,
   showErrorToast,
@@ -6,7 +7,6 @@ import {
 import { fetchSSE } from "@langwatch/browser-host/fetch-sse";
 import { usePageVisibility } from "@langwatch/browser-host/page-visibility";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { createLogger } from "@langwatch/observability/browser";
 import { nowInstant } from "@langwatch/time";
 import type {
@@ -29,7 +29,6 @@ const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
 
 /** A run's access still being set up while the worker catches up: wait, then send it again. */
-const PENDING_ACCESS_CODE = "authz_grant_not_confirmed";
 const PENDING_ACCESS_RESEND_MS = 5_000;
 const PENDING_ACCESS_MAX_RESENDS = 12;
 
@@ -107,7 +106,7 @@ function resendWhileAccessPending({
   resend: () => void;
   setEvaluationState: WorkflowStore["setEvaluationState"];
 }): boolean {
-  if (readHandledError(error)?.code !== PENDING_ACCESS_CODE) return false;
+  if (!AuthzGrantNotConfirmedError.is(error)) return false;
   if (resends >= PENDING_ACCESS_MAX_RESENDS) return false;
   if (event.type === "execute_evaluation") {
     setEvaluationState({ status: "waiting", run_id: undefined });

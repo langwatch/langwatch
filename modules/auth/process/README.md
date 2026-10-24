@@ -591,20 +591,20 @@ type Response = unknown;
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/auth.rest.ts:89`        |
+| Declared at | `src/transport/auth.rest.ts:110`       |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/auth/validate` · `validateProjectAuthToken`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:94`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:115`.
 
 Answers at `/api/auth/validate`.
 
 ```typescript
-type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:66
-// Response: inline, src/transport/auth.rest.ts:99
+type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:87
+// Response: inline, src/transport/auth.rest.ts:120
 interface Response {
   projectSlug: string;
 }
@@ -612,46 +612,46 @@ interface Response {
 
 #### `GET /api/auth/session` · `readBrowserAuthSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:105`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:126`.
 
 Answers at `/api/auth/session`.
 
 ```typescript
-type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:68
-// Response: inline, src/transport/auth.rest.ts:108
+type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:89
+// Response: inline, src/transport/auth.rest.ts:129
 type Response = unknown;
 ```
 
 #### `GET /api/auth/logout` · `endBrowserSessionAndRedirect`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:113`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:134`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:115
+// Response: inline, src/transport/auth.rest.ts:136
 type Response = unknown;
 ```
 
 #### `POST /api/auth/logout` · `endBrowserSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:118`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:139`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:122
+// Response: inline, src/transport/auth.rest.ts:143
 type Response = unknown;
 ```
 
 #### `ALL /api/auth/*` · `betterAuthHandshake`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:130`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:151`.
 
 Answers at `/api/auth/*`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:132
+// Response: inline, src/transport/auth.rest.ts:153
 type Response = unknown;
 ```
 
@@ -924,7 +924,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:276`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:277`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -934,7 +934,7 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:279`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:280`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:43`                  |

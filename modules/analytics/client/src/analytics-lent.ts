@@ -8,6 +8,7 @@ import type {
   AnalyticsChartSeries,
   FilterField,
 } from "@langwatch/analytics-contract";
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 import type { ReactNode } from "react";
 
@@ -135,3 +136,7 @@ export type BoardHeaderActionProps = {
 
 export const BoardHeaderActionToken =
   uiTokens("analytics").extension<BoardHeaderActionProps>("boardHeaderAction");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const FilterSidebar = lentComponent(FilterSidebarToken);
+export const CustomGraph = lentComponent(CustomGraphToken);

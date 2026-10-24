@@ -14,11 +14,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { scenarioClient } from "@langwatch/scenario-client";
+import { ParameterLineField } from "@langwatch/scenario-client/lent";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Play } from "lucide-react";
 import { useState } from "react";
 
-import { ParameterLineField } from "../../behavior/lent-parameter-line-field.tsx";
 import { toLineRunParameters } from "../../model/parameter-line.ts";
 import { OFFLINE_AGENT_TEST_COPY } from "../blocks/connected-agents-section.tsx";
 import { FieldLabel } from "../elements/field-label.tsx";

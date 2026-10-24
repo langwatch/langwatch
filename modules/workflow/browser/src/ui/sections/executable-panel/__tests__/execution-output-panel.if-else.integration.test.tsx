@@ -10,7 +10,8 @@ vi.mock("../../../../behavior/use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({ isRedacted: false, isLoading: false }),
 }));
 
-vi.mock("../../../../behavior/lent-trace.tsx", () => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   RenderInputOutput: ({ value }: { value: unknown }) => (
     <span>{typeof value === "string" ? value : JSON.stringify(value)}</span>
   ),

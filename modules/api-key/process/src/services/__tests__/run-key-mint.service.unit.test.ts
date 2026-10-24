@@ -1,8 +1,4 @@
-import {
-  RUN_KEY_LIFETIME_MS,
-  RUN_KEY_MAX_REMAINING_MS,
-  type CreateApiKeyInput,
-} from "@langwatch/api-key-contract";
+import { RUN_KEY_MAX_REMAINING_MS, type CreateApiKeyInput } from "@langwatch/api-key-contract";
 import {
   AuthzGrantNotConfirmedError,
   type AuthzApi,
@@ -23,7 +19,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import { RUN_KEY_REUSE_MARGIN_MS } from "../../rules/run-key.rules.ts";
+import { RUN_KEY_LIFETIME_MS, RUN_KEY_REUSE_MARGIN_MS } from "../../rules/run-key.rules.ts";
 import type { DisabledApiKey } from "../api-key-lifecycle.service.ts";
 import { RunKeyMintService } from "../run-key-mint.service.ts";
 
@@ -416,6 +412,21 @@ describe("RunKeyMintService", () => {
       new Date("2026-10-01T10:00:00.000Z").getTime() + lambdaFloorMs + RUN_KEY_REUSE_MARGIN_MS,
     );
     expect(await service.mintRunKey({ ...input, minRemainingMs: lambdaFloorMs })).toBe(bounded);
+  });
+
+  /** @scenario "A dispatch never holds a key that lapses before the dispatch can end" */
+  it("mints a fresh key with a full lifetime for a caller with no bound of its own", async () => {
+    const { service, created } = createService(["traces:create"]);
+    const input = { userId: starter, projectId, permissions: ["traces:create"] };
+
+    const fresh = await service.mintRunKey({ ...input, minRemainingMs: "fresh" });
+
+    expect(created).toHaveLength(1);
+    const mintedAtMs = new Date("2026-10-01T10:00:00.000Z").getTime();
+    expect(created[0]?.expiresAt?.getTime()).toBe(
+      mintedAtMs + RUN_KEY_LIFETIME_MS + RUN_KEY_REUSE_MARGIN_MS,
+    );
+    expect(await service.mintRunKey({ ...input, minRemainingMs: "fresh" })).toBe(fresh);
   });
 
   describe("given the grants projection is behind the run's first mint", () => {

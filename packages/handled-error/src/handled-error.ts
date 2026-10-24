@@ -53,6 +53,18 @@ export function traceLinksFor(traceId: string | undefined): TraceLinks {
   return HandledError.traceLinks(traceId);
 }
 
+/** Type-only brand; nothing at runtime carries it. */
+declare const carriesHandledCode: unique symbol;
+
+/**
+ * What a code-matching `SomeError.is(err)` proves: `err` carries the class's code on a shape
+ * `readHandledError` reads. No field is guaranteed, so read code and meta with `readHandledError`.
+ * The brand is type-only: no real value has it, so the check's `false` branch excludes nothing.
+ */
+export interface HandledErrorCarrier {
+  readonly [carriesHandledCode]: true;
+}
+
 /** One runtime constructor shared by every copy of this package in a realm. */
 const HANDLED_ERROR_RUNTIME = Symbol.for("@langwatch/handled-error/runtime/v1");
 
@@ -156,15 +168,27 @@ abstract class HandledErrorRuntime extends Error {
   }
 
   /**
-   * Narrows `error` to the concrete subclass this is called on: EvaluationNotFoundError.is(err)
-   * // error is EvaluationNotFoundError NotFoundError.is(err) // error is NotFoundError This is
-   * a subclass-specific `instanceof`.
+   * True for an instance of this class or, with a `static readonly code`, any shape
+   * `readHandledError` reads carrying that code (another bundle's copy, a wire body). Then it
+   * narrows only to {@link HandledErrorCarrier}: read code and meta with `readHandledError`.
    */
+  static is<T extends HandledErrorRuntime>(
+    this: (abstract new (...args: never) => T) & { readonly code: string },
+    error: unknown,
+  ): error is HandledErrorCarrier;
   static is<T extends HandledErrorRuntime>(
     this: abstract new (...args: never) => T,
     error: unknown,
-  ): error is T {
-    return error instanceof this;
+  ): error is T;
+  static is<T extends HandledErrorRuntime>(
+    this: abstract new (...args: never) => T,
+    error: unknown,
+  ): boolean {
+    if (error instanceof this) return true;
+
+    const code: unknown = "code" in this ? this.code : undefined;
+
+    return typeof code === "string" && codeCarriedBy(error) === code;
   }
 
   /**
@@ -215,6 +239,41 @@ function handledErrorConstructor(): typeof HandledErrorRuntime {
     writable: false,
   });
   return HandledErrorRuntime;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+const stringOf = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
+
+/**
+ * The handled error code `error` carries, read off the same shapes in the same order as
+ * `readHandledError` (handled error, tRPC envelope, canonical envelope, flat REST body, serialised
+ * payload). Kept here rather than calling `readHandledError`, which imports this module.
+ */
+function codeCarriedBy(error: unknown): string | undefined {
+  if (!isRecord(error)) return undefined;
+  if (error.isHandled === true && typeof error.code === "string") return error.code;
+
+  const trpc = isRecord(error.data) && isRecord(error.data.error) ? error.data.error : undefined;
+  if (trpc && typeof trpc.httpStatus === "number")
+    return stringOf(trpc.code) ?? stringOf(trpc.kind);
+
+  const nested = isRecord(error.error) ? error.error : undefined;
+  const atRoot =
+    typeof error.type === "string" &&
+    typeof error.code === "string" &&
+    typeof error.retryable === "boolean";
+  const envelope = nested ?? (atRoot ? error : undefined);
+  if (envelope) return stringOf(envelope.code) ?? stringOf(envelope.type);
+
+  if (typeof error.error === "string") return error.error;
+
+  return typeof error.httpStatus === "number"
+    ? (stringOf(error.code) ?? stringOf(error.kind))
+    : undefined;
 }
 
 /** A declared fault wins; an undeclared one at 5xx is presumed ours, below 5xx the caller's. */

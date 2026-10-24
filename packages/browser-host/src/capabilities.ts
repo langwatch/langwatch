@@ -99,6 +99,11 @@ export type UiFailureNotice = {
    * as well as the button. Stays rare: a re-run-what-just-failed button is noise.
    */
   action?: UiFailureAction;
+  /**
+   * The failure stays until the reader dismisses it, because it asks them to act. Rare: every
+   * other failure leaves after the host's own duration, which the host owns.
+   */
+  sticky?: boolean;
   id?: string;
 };
 

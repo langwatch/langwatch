@@ -1,5 +1,8 @@
-import { type ExperimentApi, getStatePayloadSchema } from "@langwatch/experiment-contract";
-import { HandledError } from "@langwatch/handled-error";
+import {
+  type ExperimentApi,
+  getStatePayloadSchema,
+  StaleWorkbenchStateError,
+} from "@langwatch/experiment-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type {
@@ -17,7 +20,7 @@ type Experiments = Pick<
 
 /** Whether a save lost to a concurrent writer: the stale code, read off the handled payload. */
 function isStaleSave(error: unknown): boolean {
-  return HandledError.isHandled(error) && error.code === "experiment_stale_workbench_state";
+  return StaleWorkbenchStateError.is(error);
 }
 
 /**

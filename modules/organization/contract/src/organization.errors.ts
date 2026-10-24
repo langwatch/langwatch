@@ -1,6 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 export class OrganizationNotFoundError extends HandledError {
+  static readonly code = "organization_not_found" as const;
   declare readonly code: "organization_not_found";
 
   constructor(organizationId?: string) {
@@ -19,6 +20,7 @@ export class OrganizationNotFoundError extends HandledError {
  * which an administrator acts on by inviting the same person twice.
  */
 export class OrganizationCapabilityUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {
@@ -49,6 +51,7 @@ export class OrganizationHasNoTeamError extends Error {
  * invited account is the one thing that fixes it.
  */
 export class SignedInAddressRequiredError extends HandledError {
+  static readonly code = "unauthorized" as const;
   declare readonly code: "unauthorized";
 
   constructor() {
@@ -65,6 +68,7 @@ export class SignedInAddressRequiredError extends HandledError {
  * member, or a team outside the organization whose seats are being changed.
  */
 export class TeamRoleUpdateRejectedError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor(message: string, meta: Readonly<Record<string, unknown>>) {
@@ -79,6 +83,7 @@ export class TeamRoleUpdateRejectedError extends HandledError {
  * because an unnamed 500 here reads as "sign-up is broken" when it is not.
  */
 export class OnboardingProjectNotCreatedError extends HandledError {
+  static readonly code = "project_creation_failed" as const;
   declare readonly code: "project_creation_failed";
 
   constructor() {
@@ -100,6 +105,7 @@ export class OnboardingProjectNotCreatedError extends HandledError {
  * so the customer reads one sentence either way.
  */
 export class AuditTrailDeniedError extends HandledError {
+  static readonly code = "permission_denied" as const;
   declare readonly code: "permission_denied";
 
   constructor() {
@@ -113,6 +119,7 @@ export class AuditTrailDeniedError extends HandledError {
 
 /** First-time storage setup with no secret: a stored secret may stay blank, an absent one not. */
 export class OrganizationS3SecretRequiredError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor() {

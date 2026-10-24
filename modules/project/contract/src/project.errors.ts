@@ -7,6 +7,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { PROJECT_KIND } from "./project.ts";
 
 export class ProjectNotFoundError extends HandledError {
+  static readonly code = "project_not_found" as const;
   declare readonly code: "project_not_found";
 
   constructor(message = "Project not found", options: { meta?: Record<string, unknown> } = {}) {
@@ -20,6 +21,7 @@ export class ProjectNotFoundError extends HandledError {
 }
 
 export class ProjectSlugConflictError extends HandledError {
+  static readonly code = "project_slug_taken" as const;
   declare readonly code: "project_slug_taken";
 
   constructor(message: string, options: { meta?: Record<string, unknown> } = {}) {
@@ -33,6 +35,7 @@ export class ProjectSlugConflictError extends HandledError {
 }
 
 export class TeamNotInOrganizationError extends HandledError {
+  static readonly code = "team_not_in_organization" as const;
   declare readonly code: "team_not_in_organization";
 
   constructor(message: string, options: { meta?: Record<string, unknown> } = {}) {
@@ -46,6 +49,7 @@ export class TeamNotInOrganizationError extends HandledError {
 }
 
 export class DestinationTeamNotFoundError extends HandledError {
+  static readonly code = "project_destination_team_not_found" as const;
   declare readonly code: "project_destination_team_not_found";
 
   constructor(message: string, options: { meta?: Record<string, unknown> } = {}) {
@@ -59,6 +63,7 @@ export class DestinationTeamNotFoundError extends HandledError {
 }
 
 export class PersonalWorkspaceBoundaryError extends HandledError {
+  static readonly code = "personal_workspace_boundary" as const;
   declare readonly code: "personal_workspace_boundary";
 
   constructor(message: string, options: { meta?: Record<string, unknown> } = {}) {
@@ -72,6 +77,7 @@ export class PersonalWorkspaceBoundaryError extends HandledError {
 }
 
 export class PersonalProjectProtectedError extends HandledError {
+  static readonly code = "personal_project_protected" as const;
   declare readonly code: "personal_project_protected";
 
   constructor(message: string, options: { meta?: Record<string, unknown> } = {}) {
@@ -89,6 +95,7 @@ export class PersonalProjectProtectedError extends HandledError {
  * performed: it would leave the caller inside something that no longer exists.
  */
 export class CannotArchiveCurrentProjectError extends HandledError {
+  static readonly code = "project_cannot_archive_current" as const;
   declare readonly code: "project_cannot_archive_current";
 
   constructor() {
@@ -105,6 +112,7 @@ export class CannotArchiveCurrentProjectError extends HandledError {
  * the caller could be judged at. Refused before any standing is resolved.
  */
 export class ProjectCreateTargetMissingError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor() {
@@ -118,6 +126,7 @@ export class ProjectCreateTargetMissingError extends HandledError {
 
 /** The caller may not create a project at the tier they named. */
 export class ProjectCreateDeniedError extends HandledError {
+  static readonly code = "permission_denied" as const;
   declare readonly code: "permission_denied";
 
   constructor() {
@@ -131,6 +140,7 @@ export class ProjectCreateDeniedError extends HandledError {
 
 /** The caller may update the project but not change who outside it can read. */
 export class TraceSharingDeniedError extends HandledError {
+  static readonly code = "permission_denied" as const;
   declare readonly code: "permission_denied";
 
   constructor() {
@@ -147,6 +157,7 @@ export class TraceSharingDeniedError extends HandledError {
  * a throw) so a host mounting this on an open procedure gets a 401, not a 500.
  */
 export class ProjectCallerUnauthenticatedError extends HandledError {
+  static readonly code = "unauthorized" as const;
   declare readonly code: "unauthorized";
 
   constructor() {
@@ -163,6 +174,7 @@ export const GOVERNANCE_PROJECT_ROUTE_REFUSAL =
 
 /** The hidden governance project was aimed at by a route that serves workspaces. */
 export class GovernanceProjectProtectedError extends HandledError {
+  static readonly code = "forbidden" as const;
   declare readonly code: "forbidden";
 
   constructor(message: string = GOVERNANCE_PROJECT_ROUTE_REFUSAL) {
@@ -218,6 +230,7 @@ export function assertPersonalWorkspaceCreate(isDestinationTeamPersonal: boolean
 
 /** First-time storage setup with no secret: a stored secret may stay blank, an absent one not. */
 export class ProjectS3SecretRequiredError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor() {
@@ -232,6 +245,7 @@ export class ProjectS3SecretRequiredError extends HandledError {
 
 /** A write was aimed at an aggregate project, which is read only (ADR-177 decision 8). */
 export class AggregateProjectIsReadOnlyError extends HandledError {
+  static readonly code = "aggregate_project_is_read_only" as const;
   declare readonly code: "aggregate_project_is_read_only";
 
   constructor() {
@@ -246,6 +260,7 @@ export class AggregateProjectIsReadOnlyError extends HandledError {
 
 /** A non-admin asked to create an aggregate or edit its rule (ADR-177 decision 5). */
 export class AggregateProjectAdminOnlyError extends HandledError {
+  static readonly code = "aggregate_project_admin_only" as const;
   declare readonly code: "aggregate_project_admin_only";
 
   constructor() {
@@ -264,6 +279,7 @@ export class AggregateProjectAdminOnlyError extends HandledError {
  * confirmed to exist elsewhere.
  */
 export class AggregateRuleOutsideOrganizationError extends HandledError {
+  static readonly code = "aggregate_rule_outside_organization" as const;
   declare readonly code: "aggregate_rule_outside_organization";
 
   constructor() {

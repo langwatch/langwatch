@@ -1,6 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 export class AnnotationNotFoundError extends HandledError {
+  static readonly code = "annotation_not_found" as const;
   declare readonly code: "annotation_not_found";
 
   constructor(id: string) {
@@ -15,6 +16,7 @@ export class AnnotationNotFoundError extends HandledError {
 }
 
 export class AnnotationQueueMemberInvalidError extends HandledError {
+  static readonly code = "annotation_queue_member_invalid" as const;
   declare readonly code: "annotation_queue_member_invalid";
 
   constructor() {
@@ -29,6 +31,7 @@ export class AnnotationQueueMemberInvalidError extends HandledError {
 }
 
 export class AnnotationScoreInvalidError extends HandledError {
+  static readonly code = "annotation_score_invalid" as const;
   declare readonly code: "annotation_score_invalid";
 
   constructor() {
@@ -42,6 +45,7 @@ export class AnnotationScoreInvalidError extends HandledError {
 }
 
 export class AnnotationScoreNotFoundError extends HandledError {
+  static readonly code = "annotation_score_not_found" as const;
   declare readonly code: "annotation_score_not_found";
 
   constructor(scoreId: string) {
@@ -56,6 +60,7 @@ export class AnnotationScoreNotFoundError extends HandledError {
 }
 
 export class AnnotationAnnotatorInvalidError extends HandledError {
+  static readonly code = "annotation_annotator_invalid" as const;
   declare readonly code: "annotation_annotator_invalid";
 
   constructor() {

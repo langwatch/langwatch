@@ -2,13 +2,13 @@ import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-co
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { ModelDisplay as LLMModelDisplay } from "@langwatch/model-provider-client";
 import { allModelOptions } from "@langwatch/model-provider-contract";
 import { type LlmConfigOutputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { ChevronDown } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
-import { LLMModelDisplay } from "../../../../behavior/lent-model-provider.tsx";
 import { useModelSelectionOptions } from "../../../../features/model-selection/behavior/use-model-selection-options.ts";
 import {
   LLMConfigPopover,

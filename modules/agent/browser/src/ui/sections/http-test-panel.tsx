@@ -22,7 +22,10 @@ import { useCallback, useMemo, useState } from "react";
 
 import { TestMessagesBuilder } from "../blocks/http-test-messages-builder.tsx";
 import { HttpTestRequestPreview } from "../blocks/http-test-request-preview.tsx";
-import { HttpTestResponseDisplay } from "../blocks/http-test-response-display.tsx";
+import {
+  HttpTestResponseDisplay,
+  type ThrownTestFailure,
+} from "../blocks/http-test-response-display.tsx";
 import { HttpJsonPathText } from "../elements/http-json-path-text.tsx";
 
 const DEFAULT_THREAD_ID = "test-thread-123";
@@ -79,6 +82,7 @@ export function HttpTestPanel({
     setMessages,
     isLoading,
     result,
+    thrownFailure,
     renderedBody,
     bodyValidation,
     headerValidation,
@@ -118,9 +122,7 @@ export function HttpTestPanel({
           </Alert.Indicator>
           <Alert.Content>
             <Alert.Title>Invalid JSON in body template</Alert.Title>
-            <Alert.Description fontFamily="mono">
-              {bodyValidation.error /* no-raw-error-toast-ok */}
-            </Alert.Description>
+            <Alert.Description fontFamily="mono">{bodyValidation.error}</Alert.Description>
           </Alert.Content>
         </Alert.Root>
       )}
@@ -183,6 +185,7 @@ export function HttpTestPanel({
         <HttpTestResponseDisplay
           result={result}
           explainError={explainError}
+          thrownFailure={thrownFailure}
           outputPath={outputPath}
         />
       )}
@@ -215,6 +218,7 @@ function useHttpTestPanel({ onTest, bodyTemplate, headers, onResult }: HttpTestP
   const [messages, setMessages] = useState<TestMessage[]>(DEFAULT_MESSAGES);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<HttpTestResult | null>(null);
+  const [thrownFailure, setThrownFailure] = useState<ThrownTestFailure | undefined>();
 
   const messagesJson = useMemo(() => messagesToJson(messages), [messages]);
   const renderedBody = useMemo(() => {
@@ -228,15 +232,14 @@ function useHttpTestPanel({ onTest, bodyTemplate, headers, onResult }: HttpTestP
   const handleTest = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
+    setThrownFailure(undefined);
     try {
       const response = await onTest({ threadId, messages });
       setResult(response);
       onResult?.(response);
     } catch (error) {
-      setResult({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      setThrownFailure({ error, fallbackTitle: "The test request failed" });
+      setResult({ success: false });
     } finally {
       setIsLoading(false);
     }
@@ -249,6 +252,7 @@ function useHttpTestPanel({ onTest, bodyTemplate, headers, onResult }: HttpTestP
     setMessages,
     isLoading,
     result,
+    thrownFailure,
     renderedBody,
     bodyValidation,
     headerValidation,

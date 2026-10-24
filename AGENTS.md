@@ -17,6 +17,12 @@ architecture linter.
 
 ## Architecture
 
+- The linters decide; you do not. When no lint rule or enforcer policy decides a
+  choice (a new package or module, reaching into another module, a suppression,
+  a new ARCHITECTURE.md sentence), stop and ask your human. Show 2 or 3 options
+  with the ARCHITECTURE.md sections and existing patterns behind each, then add
+  the rule that encodes their answer and record it under "Decisions no check
+  makes" in the PR. CI fails the PR until you do.
 - `modules/catalogue.json` is the ownership authority. Feature names
   are singular. Do not create a package per endpoint, table, or helper.
 - A feature may have `contract`, `server`, and `web` workspace packages. Create

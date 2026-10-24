@@ -65,6 +65,7 @@ export class UserToImpersonateNotFoundError extends NotFoundError {
  * fields. Lives in the operations contract since two surfaces must answer identically.
  */
 export class AdminSurfaceHiddenError extends HandledError {
+  static readonly code = "not_found" as const;
   declare readonly code: "not_found";
 
   constructor() {
@@ -75,6 +76,7 @@ export class AdminSurfaceHiddenError extends HandledError {
 
 /** The cookie is gone, so there is nobody to attach an impersonation to. */
 export class AdminSessionExpiredError extends HandledError {
+  static readonly code = "unauthorized" as const;
   declare readonly code: "unauthorized";
 
   constructor() {
@@ -88,6 +90,7 @@ export class AdminSessionExpiredError extends HandledError {
 
 /** The instance admin sent something that was not a JSON object. */
 export class AdminMalformedBodyError extends HandledError {
+  static readonly code = "malformed_request" as const;
   declare readonly code: "malformed_request";
 
   constructor() {

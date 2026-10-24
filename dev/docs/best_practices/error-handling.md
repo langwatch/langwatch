@@ -145,60 +145,22 @@ in order of how often they are violated:
    _inside_ that helper and described under "The 4xx authored-prose channel"
    below; it is not something to reimplement at a call site.
 
-   `logic/__tests__/noRawErrorToasts.unit.test.ts` scans the tree for it. It is
-   now the only guard: an author-time GritQL plugin used to run alongside it and
-   went with the linter that hosted it (see
-   `packages/architecture-enforcer/adrs/003-unified-oxc-toolchain.md`). The scanner
-   was always the authority on what may ship, and it catches everything the
-   plugin did except one shape — a copy object built outside the toast call's
-   own argument list, `toaster.create(buildToast({ description: error.message
-}))`, which the scanner attributes to `buildToast`. Rewriting the plugin as
-   an oxlint JavaScript plugin is open follow-up work.
+   The lint rule `langwatch/no-raw-error-message-in-ui` (spec
+   `specs/tooling/lint-no-raw-error-message-in-ui.feature`) blocks it in browser
+   code. It reports a caught error's `.message` reaching JSX, a toast, a `set*`
+   setter or `form.setError(name, { message })`, and the failure text of a typed
+   failure value: `run.error.message`, `queryError.message`, or a `result.error`
+   rendered as JSX. A failure value carries a code; render the code's registry
+   entry (for a chart query, `explainChartQueryError`). The rule is syntactic and
+   prefers a miss to a false report, and it has no per-line marker. One shape is
+   allowed by design: the message of a `SyntaxError` the screen's own `JSON.parse`
+   raised over what the customer typed, written as
+   `failure instanceof SyntaxError ? failure.message : ""`.
 
-   The scanner works by derivation, so it will occasionally flag a value that
-   only _looks_ message-derived — a string that went through a sanitiser, or a
-   local parser's message that never crossed the wire. Mark that one line
-   `// no-raw-error-toast-ok` with a reason. Prefer the marker to the guard's
-   file-level allowlist: an exemption entry blinds the guard to the whole file.
-
-   **The marker goes where the value is _used_, not where it is derived.** The
-   scanner tracks taint through locals to a fixpoint — `const message = e
-instanceof Error ? e.message : "…"` taints `message`, and so does a second
-   local assigned from it — but it only ever reports the copy slot the tainted
-   value reaches. Suppression is matched against the line of that slot's key
-   (`title`, `description` or `fallbackTitle`), so a marker parked on the
-   assignment suppresses nothing:
-
-   ```ts
-   const friendly = e instanceof Error ? e.message : "Couldn't save";
-   toaster.create({
-     description: friendly, // no-raw-error-toast-ok — sanitised local, never on the wire
-     type: "error",
-   });
-   ```
-
-   When the formatter wraps a long value onto its own line, the marker may sit
-   anywhere from the key's line to the line the value ends on — so both the
-   compact and the wrapped spelling work.
-
-   **Write the marker _inside_ the call or element it exempts.** The scanner
-   matches it against the line of the copy slot's key, and writing it inside the
-   construct is what keeps it on that line through a reformat. Either spelling
-   is honoured:
-
-   ```tsx
-   toaster.create({
-     description: friendly, // no-raw-error-toast-ok — sanitised local
-     type: "error",
-   });
-
-   <Alert.Description>
-     {parseFailure /* no-raw-error-toast-ok — local parser, never on the wire */}
-   </Alert.Description>;
-   ```
-
-   There is no blanket escape hatch. The scanner has a file-level allowlist,
-   which blinds it to the whole file; use the per-line marker instead.
+   On the server side, the shrink-only policy `handled-error-sentence-copy`
+   counts `{ code, message }` failures built in module contract or process code
+   whose message is a customer sentence: carry the code and meta, and write the
+   words in the registry.
 
 2. **Title and description both come from the `code`**, not the server. The
    registry owns the customer-facing copy. A code the registry does not know

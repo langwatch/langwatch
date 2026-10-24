@@ -12,7 +12,6 @@ const DEBT: { key: keyof NonNullable<typeof adoption>["debt"]; label: string; ru
     label: "Files importing Chakra or Emotion directly",
     rule: "no-direct-chakra",
   },
-  { key: "rawColour", label: "Hex or rgb() literals in browser code", rule: "no-raw-color" },
   { key: "paletteStep", label: "Palette steps named as a colour prop", rule: "no-raw-color" },
   { key: "handRolledTable", label: "Table.Root outside a List table", rule: "list-table.md" },
   {

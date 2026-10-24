@@ -6,6 +6,7 @@ import type { AgentType } from "./config/index.ts";
 
 /** No agent with that id; ADR-045 maps it to 404 with actionable remediation. */
 export class AgentNotFoundError extends HandledError {
+  static readonly code = "agent_not_found" as const;
   declare readonly code: "agent_not_found";
 
   constructor(
@@ -34,6 +35,7 @@ export class AgentNotFoundError extends HandledError {
  * `reason` carries the same message a queued run would fail with.
  */
 export class AgentTestRefusedError extends HandledError {
+  static readonly code = "agent_test_refused" as const;
   declare readonly code: "agent_test_refused";
 
   constructor({ reason }: { reason: string }) {
@@ -50,6 +52,7 @@ export class AgentTestRefusedError extends HandledError {
 /** Voice agents are behind the project's release flag (AC29); a write that would leave one in a
  * project with the flag off is refused, as the run dialog and the drawer refuse it. */
 export class VoiceAgentsDisabledError extends HandledError {
+  static readonly code = "voice_agents_disabled" as const;
   declare readonly code: "voice_agents_disabled";
 
   constructor() {
@@ -64,6 +67,7 @@ export class VoiceAgentsDisabledError extends HandledError {
 /** Stored credentials stay at the address they were saved for: a test call, a run or an update
  * that would carry them elsewhere is refused, and the credential is re-entered for the new one. */
 export class AgentStoredCredentialsDestinationError extends HandledError {
+  static readonly code = "agent_stored_credentials_destination_mismatch" as const;
   declare readonly code: "agent_stored_credentials_destination_mismatch";
 
   constructor() {
@@ -78,6 +82,7 @@ export class AgentStoredCredentialsDestinationError extends HandledError {
 
 /** Only the SDK may change connected-agent registration fields; callers may archive it. */
 export class AgentRegisterOnlyError extends HandledError {
+  static readonly code = "agent_register_only" as const;
   declare readonly code: "agent_register_only";
 
   constructor() {

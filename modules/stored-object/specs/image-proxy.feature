@@ -37,3 +37,17 @@ Feature: The image proxy shows a picture from an outside address
     Given an outside address the egress fence refuses
     When the browser asks the image proxy for that address
     Then it answers 500 with the body {"error":"Failed to fetch image"}
+
+  @unit
+  Scenario: A picture answer carries its own headers over stored-object's read headers
+    Given the image service answered with a picture, a status and its own headers
+    When the answer is written
+    Then the status, bytes and the picture's own headers are kept
+    And every other stored-object read header, such as nosniff, is present
+
+  @unit
+  Scenario: A picture over the size limit is refused rather than relayed
+    Given the image service refused a picture over the size limit
+    When the answer is written
+    Then it is that status with the error as JSON
+    And stored-object's read headers, such as nosniff, are present

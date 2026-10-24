@@ -36,23 +36,30 @@ import { idGenerationOriginRule } from "./rules/id-generation-origin.rule.mjs";
 import { idempotencyKeyIsStableRule } from "./rules/idempotency-key-is-stable.rule.mjs";
 import { jsxFromHookRule } from "./rules/jsx-from-hook.rule.mjs";
 import { legacyMonolithPathRule } from "./rules/legacy-monolith-path.rule.mjs";
+import { metricInstrumentInAServiceRule } from "./rules/metric-instrument-in-a-service.rule.mjs";
 import { moduleClassesRule } from "./rules/module-classes.rule.mjs";
 import { moduleLayersRule } from "./rules/module-layers.rule.mjs";
 import { namespaceClassRule } from "./rules/namespace-class.rule.mjs";
 import { noAliasReexportRule } from "./rules/no-alias-reexport.rule.mjs";
 import { noAmbientContextRule } from "./rules/no-ambient-context.rule.mjs";
 import { noBootHookOutsideGuardRule } from "./rules/no-boot-hook-outside-guard.rule.mjs";
+import { noCallerBoundBypassRule } from "./rules/no-caller-bound-bypass.rule.mjs";
+import { noFailureOnToasterRule } from "./rules/no-failure-on-toaster.rule.mjs";
 import { noFormWatchInChildRule } from "./rules/no-form-watch-in-child.rule.mjs";
 import { noHandRolledPlanGateRule } from "./rules/no-hand-rolled-plan-gate.rule.mjs";
 import { noHonoHttpExceptionRule } from "./rules/no-hono-http-exception.rule.mjs";
 import { noInlineDynamicImportRule } from "./rules/no-inline-dynamic-import.rule.mjs";
 import { noLoggerSpyRule } from "./rules/no-logger-spy.rule.mjs";
+import { noModuleToasterRule } from "./rules/no-module-toaster.rule.mjs";
 import { noPortVocabularyRule } from "./rules/no-port-vocabulary.rule.mjs";
+import { noPreprocessInEventSchemaRule } from "./rules/no-preprocess-in-event-schema.rule.mjs";
 import { noPrototypeStubRule } from "./rules/no-prototype-stub.rule.mjs";
+import { noRawErrorMessageInUiRule } from "./rules/no-raw-error-message-in-ui.rule.mjs";
 import { noRawFontSizeRule } from "./rules/no-raw-font-size.rule.mjs";
 import { noReduxRule } from "./rules/no-redux.rule.mjs";
 import { noRuntimeReflectionRule } from "./rules/no-runtime-reflection.rule.mjs";
 import { noTautologicalAssertionRule } from "./rules/no-tautological-assertion.rule.mjs";
+import { noTransportInServiceRule } from "./rules/no-transport-in-service.rule.mjs";
 import { overloadByLiteralRule } from "./rules/overload-by-literal.rule.mjs";
 import { boundaryRule } from "./rules/package-boundaries.rule.mjs";
 import { passThroughClassRule } from "./rules/pass-through-class.rule.mjs";
@@ -125,11 +132,18 @@ const HOUSE_RULES = [
   idempotencyKeyIsStableRule,
   jsxFromHookRule,
   legacyMonolithPathRule,
+  metricInstrumentInAServiceRule,
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  noCallerBoundBypassRule,
+  noFailureOnToasterRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
+  noModuleToasterRule,
+  noPreprocessInEventSchemaRule,
+  noRawErrorMessageInUiRule,
+  noTransportInServiceRule,
   sliceReaderIsAHookRule,
   accessEscapeKindRule,
   authzMembersRequiredRule,
@@ -225,11 +239,18 @@ export {
   idempotencyKeyIsStableRule,
   jsxFromHookRule,
   legacyMonolithPathRule,
+  metricInstrumentInAServiceRule,
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  noCallerBoundBypassRule,
+  noFailureOnToasterRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
+  noModuleToasterRule,
+  noPreprocessInEventSchemaRule,
+  noRawErrorMessageInUiRule,
+  noTransportInServiceRule,
   sliceReaderIsAHookRule,
   accessEscapeKindRule,
   authzMembersRequiredRule,

@@ -2,7 +2,12 @@
 
 import "@testing-library/jest-dom/vitest";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { SetupWithAgentButtonToken, TracePreviewHoverCardToken } from "@langwatch/trace-client";
+import {
+  SetupWithAgentButton,
+  SetupWithAgentButtonToken,
+  TracePreviewHoverCard,
+  TracePreviewHoverCardToken,
+} from "@langwatch/trace-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,8 +19,6 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useUiDeclarations: () => declarations.current,
 }));
-
-import { SetupWithAgentButton, TracePreviewHoverCard } from "../lent-trace.tsx";
 
 const traceLends = uiDeclarations([
   {

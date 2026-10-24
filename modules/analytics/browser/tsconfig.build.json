@@ -69,9 +69,6 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../filters/tsconfig.build.json"
-    },
-    {
       "path": "../contract/tsconfig.build.json"
     },
     {

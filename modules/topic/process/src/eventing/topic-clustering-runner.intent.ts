@@ -4,6 +4,7 @@ import {
   type LangevalsClusteringFailureCode,
   type TopicClusteringRequest,
 } from "@langwatch/evaluation-contract";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 import {
@@ -607,7 +608,7 @@ type ClusteringCall = TopicClusteringRequest extends infer R
 const CLUSTERING_CODE_OF_LANGEVALS_FAILURE: Partial<
   Record<LangevalsClusteringFailureCode, ClusteringErrorCode>
 > = {
-  model_not_configured: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+  [ModelNotConfiguredError.code]: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
   model_provider_auth_failed: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH,
   model_provider_rate_limited: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA,
 };

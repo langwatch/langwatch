@@ -4,7 +4,7 @@
  * client hosted-mcp, by the kind of bearer it was sent, never the bearer itself.
  * @see modules/auth/specs/request-credential-census.feature
  */
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import { createServer, type Server } from "node:http";
 
 import type * as Census from "@langwatch/observability/credential-census";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,7 +18,11 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
-import type { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
+import type {
+  McpClientAddressSource,
+  ResolvedMcpClientAddressService,
+} from "../../services/resolved-mcp-client-address.service.ts";
+import { answerMcpExchange } from "../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 const counted = vi.hoisted(() => [] as Census.CensusRequest[]);
@@ -53,8 +57,8 @@ class AlwaysGranted implements Pick<AuthzMcpSessionGrantService, "stillGranted">
 }
 
 class LoopbackAddress implements Pick<ResolvedMcpClientAddressService, "clientIp"> {
-  clientIp(request: IncomingMessage): string {
-    return request.socket.remoteAddress ?? "127.0.0.1";
+  clientIp(request: McpClientAddressSource): string {
+    return request.clientAddress ?? "127.0.0.1";
   }
 }
 
@@ -95,7 +99,9 @@ describe("the credential census on the hosted MCP endpoint", () => {
       address: new LoopbackAddress(),
       baseHost: "https://app.langwatch.ai",
     });
-    server = createServer((req, res) => handler.handleRequest(req, res));
+    server = createServer((request, response) =>
+      answerMcpExchange({ endpoint: handler, runner: handler.sessionRunner, request, response }),
+    );
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     baseUrl = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;

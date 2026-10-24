@@ -72,7 +72,7 @@ describe("HTTP agent test boundary", () => {
 
     const result = await createHttpAgentTestCaller(dispatch).execute(request);
 
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: false, errorCode: "http_executor_unavailable" });
     expect(JSON.stringify(dispatch.recordCapturedSpan.mock.calls)).not.toContain("secret-token");
     expect(dispatch.recordCapturedSpan).toHaveBeenCalledOnce();
   });
@@ -96,7 +96,7 @@ describe("HTTP agent test boundary", () => {
 
     const result = await createHttpAgentTestCaller(dispatch).execute(request);
 
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: false, errorCode: "http_executor_unavailable" });
     expect(dispatch.recordCapturedSpan).toHaveBeenCalledOnce();
   });
 });

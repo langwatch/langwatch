@@ -1,9 +1,6 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-/** How long a run's key lives when no caller needs it to outlast a longer bound. */
-export const RUN_KEY_LIFETIME_MS = 15 * 60 * 1000;
-
 /**
  * The longest life a caller may ask a handed-out run key to still have; a run outliving it is
  * refused.
@@ -33,8 +30,13 @@ const mintRunKeyInputSchemaDefinition = z
     callerApiKeyId: z.string().min(1).nullable().optional(),
     projectId: z.string().min(1),
     permissions: z.array(z.string().min(1)).min(1),
-    /** The life the handed-out key must still have: the bound of whatever will hold it. */
-    minRemainingMs: z.number().int().positive().max(RUN_KEY_MAX_REMAINING_MS).optional(),
+    /**
+     * The life the handed-out key must still have: the bound of whatever will hold it, or
+     * `"fresh"` for a holder with no bound of its own, which gets a full lifetime.
+     */
+    minRemainingMs: z
+      .union([z.number().int().positive().max(RUN_KEY_MAX_REMAINING_MS), z.literal("fresh")])
+      .optional(),
   })
   .strict();
 export interface MintRunKeyInputSchema extends Named<typeof mintRunKeyInputSchemaDefinition> {}

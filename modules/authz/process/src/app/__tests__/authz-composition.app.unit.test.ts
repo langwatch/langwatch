@@ -3,16 +3,18 @@ import { createRecordingMeterProvider } from "@langwatch/observability/metrics/t
  * AuthzModule.create composes the whole feature from the registry's rows, with
  * no member and no store client: what the old hand-built graph returned.
  */
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import type { AuthzAuditRow } from "../../repositories/authz-audit-trail.repository.ts";
-import { authzDirectProjectionWriteTotal } from "../../repositories/authz-revocation.repository.ts";
+import { AuthzCutoverRepository } from "../../repositories/authz-cutover.repository.ts";
 import type { AuthzRepositories } from "../../repositories/authz.repositories.ts";
 import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
-import { authzEngineGateReadFailuresTotal } from "../../services/authz-cutover-gate.service.ts";
+import { PrismaAuthzRevocationRepository } from "../../repositories/prisma/prisma.authz-revocation.repository.ts";
+import { AuthzCutoverGateService } from "../../services/authz-cutover-gate.service.ts";
 import { AuthzModule, type AuthzSetup } from "../authz.app.ts";
 
 const CONFIG = {
@@ -21,6 +23,23 @@ const CONFIG = {
   demoProjectUserId: undefined,
   demoProjectSlug: undefined,
 };
+
+/** An engine switch whose every read fails, as a down Postgres answers. */
+class FailingCutoverRepository extends AuthzCutoverRepository {
+  async getEngineSwitch(): Promise<never> {
+    throw new Error("pg is down");
+  }
+
+  async carryOverEngineSwitch(): Promise<number> {
+    return 0;
+  }
+
+  async switchOnEngine(): Promise<boolean> {
+    return true;
+  }
+
+  async pinEngineSwitch(): Promise<void> {}
+}
 
 function compose(repositories: AuthzRepositories = MemoryAuthzRepositories.create()) {
   return AuthzModule.create({
@@ -57,10 +76,19 @@ describe("AuthzModule.create", () => {
     afterEach(() => meter.uninstall());
 
     /** @scenario "AuthZ counts on the process registry" */
-    it("counts both of its series through the metrics facade", () => {
+    it("counts both of its series through the metrics facade", async () => {
       compose();
-      authzEngineGateReadFailuresTotal.inc();
-      authzDirectProjectionWriteTotal.inc({ reason: "revocation" });
+      await PrismaAuthzRevocationRepository.create({
+        database: { grant: { updateMany: async () => ({ count: 0 }) } },
+      }).enforceGrantRevocation({
+        organizationId: "organization-1",
+        grantIds: ["grant-1"],
+        reason: "revocation",
+      });
+      await AuthzCutoverGateService.create({
+        repository: new FailingCutoverRepository(),
+        logger: createTestLogger().logger,
+      }).query({ organizationId: "organization-1" });
 
       expect(meter.valueOf("authz_engine_gate_read_failures_total")).toBe(1);
       expect(

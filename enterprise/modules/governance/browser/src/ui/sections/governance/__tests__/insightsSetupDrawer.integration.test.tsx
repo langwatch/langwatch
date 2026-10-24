@@ -23,7 +23,8 @@ const harness = vi.hoisted(() => ({
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
-vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   ModelSelector: (props: { model: string; options: readonly string[]; mode?: string }) => {
     harness.picker.push(props);
     return <div data-testid="model-picker" data-model={props.model} />;

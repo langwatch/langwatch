@@ -12,6 +12,7 @@ import { remediation } from "./langy.error-remediation.ts";
  * FORBIDDEN, so the gate cannot double as a probe for whether Langy exists for the account.
  */
 export class LangyNotEnabledError extends HandledError {
+  static readonly code = "langy_not_enabled" as const;
   declare readonly code: "langy_not_enabled";
 
   constructor() {
@@ -28,6 +29,7 @@ export class LangyNotEnabledError extends HandledError {
  * synthesized from the actor id alone would provision credentials under an incomplete user.
  */
 export class LangySessionRequiredError extends HandledError {
+  static readonly code = "unauthorized" as const;
   declare readonly code: "unauthorized";
 
   constructor() {
@@ -41,6 +43,7 @@ export class LangySessionRequiredError extends HandledError {
 
 /** The requested conversation does not exist, or has been archived (HTTP 404). */
 export class LangyConversationNotFoundError extends NotFoundError {
+  static readonly code = "langy_conversation_not_found" as const;
   declare readonly code: "langy_conversation_not_found";
 
   constructor(conversationId: string, options: { reasons?: readonly Error[] } = {}) {
@@ -63,6 +66,7 @@ export class LangyConversationNotFoundError extends NotFoundError {
  * boundary rather than offering to start fresh.
  */
 export class LangyConversationNotOwnedError extends HandledError {
+  static readonly code = "langy_conversation_not_owned" as const;
   declare readonly code: "langy_conversation_not_owned";
 
   constructor(public readonly conversationId: string) {
@@ -81,6 +85,7 @@ export class LangyConversationNotOwnedError extends HandledError {
  * whose closed history must not be silently resurrected (HTTP 409). Loud on purpose.
  */
 export class LangyConversationIdUnadoptableError extends HandledError {
+  static readonly code = "langy_conversation_id_unadoptable" as const;
   declare readonly code: "langy_conversation_id_unadoptable";
 
   constructor(
@@ -108,6 +113,7 @@ export class LangyConversationIdUnadoptableError extends HandledError {
  * message so the caller can self-correct to an ungated alternative.
  */
 export class LangySkillNotAvailableError extends HandledError {
+  static readonly code = "langy_skill_not_available" as const;
   declare readonly code: "langy_skill_not_available";
   constructor(
     public readonly skillId: string,
@@ -128,6 +134,7 @@ export class LangySkillNotAvailableError extends HandledError {
 
 /** No model is configured for the project's Langy (HTTP 409). */
 export class LangyModelNotConfiguredError extends HandledError {
+  static readonly code = "langy_model_not_configured" as const;
   declare readonly code: "langy_model_not_configured";
   constructor(options: { reasons?: readonly Error[] } = {}) {
     super("langy_model_not_configured", "No model configured for this project.", {
@@ -144,6 +151,7 @@ export class LangyModelNotConfiguredError extends HandledError {
  * allowlist.
  */
 export class LangyModelNotAllowedError extends HandledError {
+  static readonly code = "langy_model_not_allowed" as const;
   declare readonly code: "langy_model_not_allowed";
   constructor(public readonly model: string) {
     super(
@@ -161,6 +169,7 @@ export class LangyModelNotAllowedError extends HandledError {
 
 /** The project's Langy egress allow-list is misconfigured; fail closed (HTTP 409). */
 export class LangyEgressMisconfiguredError extends HandledError {
+  static readonly code = "langy_egress_misconfigured" as const;
   declare readonly code: "langy_egress_misconfigured";
   constructor() {
     super("langy_egress_misconfigured", "Langy egress policy is misconfigured for this project.", {
@@ -173,6 +182,7 @@ export class LangyEgressMisconfiguredError extends HandledError {
 
 /** The caller holds none of Langy's permissions in this project (HTTP 409). */
 export class LangyInsufficientScopeError extends HandledError {
+  static readonly code = "langy_insufficient_scope" as const;
   declare readonly code: "langy_insufficient_scope";
   constructor(message: string) {
     super("langy_insufficient_scope", message, {
@@ -188,6 +198,7 @@ export class LangyInsufficientScopeError extends HandledError {
  * SAME send byte-for-byte; a new send mints a new key.
  */
 export class LangyIdempotencyMismatchError extends HandledError {
+  static readonly code = "langy_idempotency_mismatch" as const;
   declare readonly code: "langy_idempotency_mismatch";
   constructor() {
     super(
@@ -208,6 +219,7 @@ export class LangyIdempotencyMismatchError extends HandledError {
  * poison the process outbox with endless retries.
  */
 export class LangyEmptyMessageError extends HandledError {
+  static readonly code = "langy_empty_message" as const;
   declare readonly code: "langy_empty_message";
   constructor() {
     super("langy_empty_message", "The message has no text content.", {
@@ -224,6 +236,7 @@ export class LangyEmptyMessageError extends HandledError {
  * HandledError's `message` on the wire, so per ADR-045 `meta.message` is the one
  */
 export class LangyRateLimitedError extends HandledError {
+  static readonly code = "langy_rate_limited" as const;
   declare readonly code: "langy_rate_limited";
   constructor(message = "Too many messages. Please slow down.") {
     super("langy_rate_limited", message, {
@@ -242,6 +255,7 @@ export class LangyRateLimitedError extends HandledError {
  * slow-down: this counter is the project's, because the invoice is too.
  */
 export class LangyTurnsRateLimitedError extends HandledError {
+  static readonly code = "langy_turns_rate_limited" as const;
   declare readonly code: "langy_turns_rate_limited";
   constructor(input: { retryAfterSeconds?: number | undefined }) {
     super("langy_turns_rate_limited", "Too many Langy turns for this project.", {
@@ -259,6 +273,7 @@ export class LangyTurnsRateLimitedError extends HandledError {
 
 /** A turn is already in flight for the conversation — one at a time (HTTP 409). */
 export class LangyTurnInProgressError extends HandledError {
+  static readonly code = "langy_turn_in_progress" as const;
   declare readonly code: "langy_turn_in_progress";
   constructor() {
     super("langy_turn_in_progress", "A response is already in progress for this conversation.", {
@@ -275,6 +290,7 @@ export class LangyTurnInProgressError extends HandledError {
  * trust.
  */
 export class LangyTurnNotStoppableError extends HandledError {
+  static readonly code = "langy_turn_not_stoppable" as const;
   declare readonly code: "langy_turn_not_stoppable";
   constructor(turnId: string) {
     super(
@@ -296,6 +312,7 @@ export class LangyTurnNotStoppableError extends HandledError {
  * alternative was an outbox retrying the same rejection forever.
  */
 export class LangyDispatchRejectedError extends HandledError {
+  static readonly code = "langy_dispatch_rejected" as const;
   declare readonly code: "langy_dispatch_rejected";
   constructor() {
     super("langy_dispatch_rejected", "The agent rejected this turn's request as invalid.", {
@@ -311,6 +328,7 @@ export class LangyDispatchRejectedError extends HandledError {
  * can change that. Distinct from `langy_agent_unavailable`, which is a transient outage.
  */
 export class LangyAgentNotConfiguredError extends HandledError {
+  static readonly code = "langy_agent_not_configured" as const;
   declare readonly code: "langy_agent_not_configured";
   constructor() {
     super("langy_agent_not_configured", "No Langy agent is configured on this deployment.", {
@@ -324,6 +342,7 @@ export class LangyAgentNotConfiguredError extends HandledError {
 
 /** The agent/transport is temporarily unavailable (HTTP 503). */
 export class LangyAgentUnavailableError extends HandledError {
+  static readonly code = "langy_agent_unavailable" as const;
   declare readonly code: "langy_agent_unavailable";
   /**
    * `status`: HTTP status when manager answered with one (bare code, safe to
@@ -349,6 +368,7 @@ export class LangyAgentUnavailableError extends HandledError {
  * time rather than accepting frames nothing can read back.
  */
 export class LangyRelayUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor() {
@@ -368,6 +388,7 @@ export class LangyRelayUnavailableError extends HandledError {
 
 /** No credential presented at all. */
 export class LangyApiCredentialMissingError extends HandledError {
+  static readonly code = "langy_api_credential_missing" as const;
   declare readonly code: "langy_api_credential_missing";
   constructor() {
     super("langy_api_credential_missing", "Authentication token is required.", {
@@ -380,6 +401,7 @@ export class LangyApiCredentialMissingError extends HandledError {
 
 /** A credential was presented but resolved to no project. */
 export class LangyApiCredentialInvalidError extends HandledError {
+  static readonly code = "langy_api_credential_invalid" as const;
   declare readonly code: "langy_api_credential_invalid";
   constructor() {
     super("langy_api_credential_invalid", "Invalid auth token.", {
@@ -436,6 +458,7 @@ export class LangyUnattendedTurnRefusedError extends HandledError {
 
 /** The body did not parse against the turn schema. */
 export class LangyApiRequestInvalidError extends HandledError {
+  static readonly code = "langy_api_request_invalid" as const;
   declare readonly code: "langy_api_request_invalid";
   constructor(issues: readonly unknown[]) {
     super("langy_api_request_invalid", "Invalid request body.", {
@@ -455,6 +478,7 @@ export class LangyApiRequestInvalidError extends HandledError {
 
 /** The conversation has no turn in flight, so no page is listening (HTTP 409). */
 export class LangyUiTurnInactiveError extends HandledError {
+  static readonly code = "langy_ui_turn_inactive" as const;
   declare readonly code: "langy_ui_turn_inactive";
   constructor() {
     super(
@@ -474,6 +498,7 @@ export class LangyUiTurnInactiveError extends HandledError {
  * It has no page to act on, so no UI action is published for it (HTTP 409).
  */
 export class LangyUiRunConversationError extends HandledError {
+  static readonly code = "langy_ui_run_conversation" as const;
   declare readonly code: "langy_ui_run_conversation";
   constructor() {
     super("langy_ui_run_conversation", "A run conversation has no page to act on.", {
@@ -486,6 +511,7 @@ export class LangyUiRunConversationError extends HandledError {
 
 /** `kind` names no entry in any page's action manifest (HTTP 400). */
 export class LangyUiActionUnknownError extends HandledError {
+  static readonly code = "langy_ui_action_unknown" as const;
   declare readonly code: "langy_ui_action_unknown";
   constructor(kind: string) {
     super("langy_ui_action_unknown", `Unknown UI action "${kind}".`, {
@@ -500,6 +526,7 @@ export class LangyUiActionUnknownError extends HandledError {
 
 /** The payload failed the action's schema (HTTP 400). `meta.issues` names the fields. */
 export class LangyUiPayloadInvalidError extends HandledError {
+  static readonly code = "langy_ui_payload_invalid" as const;
   declare readonly code: "langy_ui_payload_invalid";
   constructor(kind: string, issues: readonly unknown[]) {
     super(
@@ -522,6 +549,7 @@ export class LangyUiPayloadInvalidError extends HandledError {
  * backend execution; this refusal remains for kinds only a live page can run.
  */
 export class LangyUiNoBrowserError extends HandledError {
+  static readonly code = "langy_ui_no_browser" as const;
   declare readonly code: "langy_ui_no_browser";
   constructor(kind: string) {
     super("langy_ui_no_browser", `No open page claimed "${kind}" in time.`, {
@@ -539,6 +567,7 @@ export class LangyUiNoBrowserError extends HandledError {
  * caller must re-read state before retrying rather than firing again blind.
  */
 export class LangyUiTimeoutError extends HandledError {
+  static readonly code = "langy_ui_timeout" as const;
   declare readonly code: "langy_ui_timeout";
   constructor(kind: string) {
     super(
@@ -561,6 +590,7 @@ export class LangyUiTimeoutError extends HandledError {
  * this: the open page IS the experiment. The CLI passes `--experiment <slug>`.
  */
 export class LangyUiExperimentRequiredError extends HandledError {
+  static readonly code = "langy_ui_experiment_required" as const;
   declare readonly code: "langy_ui_experiment_required";
   constructor(kind: string) {
     super(
@@ -587,6 +617,7 @@ const UNTYPED_HANDLER_FAILURE = "langy_ui_handler_failed";
  * The action ran on the page or on the backend and failed there (HTTP 502).
  */
 export class LangyUiHandlerFailedError extends HandledError {
+  static readonly code = "langy_ui_handler_failed" as const;
   declare readonly code: "langy_ui_handler_failed";
   constructor(kind: string, errorCode?: string) {
     super("langy_ui_handler_failed", `The page could not carry out "${kind}".`, {

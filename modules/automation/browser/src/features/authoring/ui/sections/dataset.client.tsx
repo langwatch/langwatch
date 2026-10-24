@@ -5,10 +5,10 @@ import {
   mappingStateSchema,
 } from "@langwatch/dataset-contract";
 import { Text, VStack } from "@langwatch/design-system/primitives";
+import { EvaluatorTracesMapping as TracesMapping } from "@langwatch/trace-client";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
 
-import { TracesMapping } from "../../../../behavior/lent-peers.tsx";
 import { useProjectDatasets } from "../../../../behavior/use-automation-reads.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
 import type {

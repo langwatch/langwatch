@@ -3,9 +3,9 @@
 import { AppTopBar } from "@langwatch/design-system/app-shell";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
 import { HStack, Text } from "@langwatch/design-system/primitives";
+import { InsightsBell } from "@langwatch/insight-client";
 import { Settings as SettingsIcon } from "lucide-react";
 
-import { InsightsBell } from "../../behavior/lent-insights.tsx";
 import type { NavigationShellReadyState } from "../../behavior/use-navigation-shell-state.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";

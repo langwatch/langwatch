@@ -14,6 +14,7 @@ import {
   accountNotLinkedRedirectOf,
   isAccountNotLinkedRedirect,
 } from "../rules/account-not-linked.rules.ts";
+import type { AuthHandshakeAnswer } from "../rules/auth-handshake-answer.rules.ts";
 import { isAllowedAuthOrigin, parseOrigin } from "../rules/auth-origin.rules.ts";
 import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { issuerMismatchRedirectOf } from "../rules/id-token-issuer-mismatch.rules.ts";
@@ -28,6 +29,14 @@ import {
 import { findConnectionIdsInPath } from "../rules/sso-request-target.rules.ts";
 
 const logger = createLogger("langwatch:auth");
+
+/** Better Auth's response on its way out, with the redirect target a step replaced, if any. */
+type EngineAnswer = Readonly<{ response: Response; location?: string }>;
+
+/** The redirect target the browser is sent to: a replaced one, else the engine's own, if any. */
+function extractRedirectLocation(answer: EngineAnswer): string | null {
+  return answer.location ?? answer.response.headers.get("location");
+}
 
 /** What the sign-in door reads through: the one Better Auth instance and the session reads. */
 export interface AuthDoorDeps {
@@ -120,47 +129,43 @@ export class AuthDoorService {
    *  `sso_issuer_mismatch` with both issuers (specs/identity/sso-issuer-mismatch.feature). */
   private async nameIssuerMismatch({
     request,
-    response,
+    answer,
   }: {
     request: Request;
-    response: Response;
-  }): Promise<Response> {
+    answer: EngineAnswer;
+  }): Promise<EngineAnswer> {
     const [received] = this.deps.idTokenIssuerRefusals.findRefusedIssuers();
-    if (received === undefined) return response;
+    if (received === undefined) return answer;
     const [connectionId] = findConnectionIdsInPath(request.url);
     const [expected] = connectionId
       ? await this.deps.connectionIssuers.findIssuersForConnection({ connectionId })
       : [];
     const redirect = issuerMismatchRedirectOf({
-      location: response.headers.get("location"),
+      location: extractRedirectLocation(answer),
       received,
       expected,
     });
-    if (redirect.kind === "pass") return response;
-    const headers = new Headers(response.headers);
-    headers.set("location", redirect.location);
-    return new Response(response.body, { status: response.status, headers });
+    if (redirect.kind === "pass") return answer;
+    return { response: answer.response, location: redirect.location };
   }
 
   /** A refused link, answered with the connection that governs the provider's address
    *  (specs/auth/sso-wrong-provider-recovery.feature). */
-  private async nameGoverningConnection(response: Response): Promise<Response> {
-    const location = response.headers.get("location");
-    if (!isAccountNotLinkedRedirect({ location })) return response;
+  private async nameGoverningConnection(answer: EngineAnswer): Promise<EngineAnswer> {
+    const location = extractRedirectLocation(answer);
+    if (!isAccountNotLinkedRedirect({ location })) return answer;
     const email = this.deps.oauthProfileEmails.findEmail();
-    if (email === undefined) return response;
+    if (email === undefined) return answer;
     const [connectionId] = await this.deps.governingConnections.findGoverningConnections({
       email,
     });
     const redirect = accountNotLinkedRedirectOf({ location, connectionId });
-    if (redirect.kind === "pass") return response;
-    const headers = new Headers(response.headers);
-    headers.set("location", redirect.location);
-    return new Response(response.body, { status: response.status, headers });
+    if (redirect.kind === "pass") return answer;
+    return { response: answer.response, location: redirect.location };
   }
 
   /** Better Auth's own fetch handler, behind the origin gate. */
-  async betterAuthHandshake(request: Request): Promise<Response> {
+  async betterAuthHandshake(request: Request): Promise<AuthHandshakeAnswer> {
     const origin = request.headers.get("origin");
     const referer = request.headers.get("referer");
     const baseUrl = this.deps.baseUrl();
@@ -186,7 +191,7 @@ export class AuthDoorService {
         "rejected auth request: origin does not match the deployment's base URL",
       );
 
-      return Response.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, { status: 403 });
+      return { kind: "refused-origin" };
     }
 
     const betterAuth = await this.deps.betterAuth();
@@ -199,7 +204,10 @@ export class AuthDoorService {
     const answered = await this.deps.oauthProfileEmails.runWithScope(async () =>
       this.deps.idTokenIssuerRefusals.runWithScope(async () =>
         this.nameGoverningConnection(
-          await this.nameIssuerMismatch({ request, response: await betterAuth.handler(stated) }),
+          await this.nameIssuerMismatch({
+            request,
+            answer: { response: await betterAuth.handler(stated) },
+          }),
         ),
       ),
     );
@@ -207,7 +215,7 @@ export class AuthDoorService {
     const errorPageUrl = `${baseUrl}/auth/error`;
     const traceId = getActiveTraceId();
     return landFailedSignInCallback({
-      response: withholdInternalSignInError({ response: answered, errorPageUrl, traceId }),
+      answer: withholdInternalSignInError({ answer: answered, errorPageUrl, traceId }),
       pathname: new URL(request.url).pathname,
       errorPageUrl,
       traceId,
@@ -235,29 +243,27 @@ function withMicrosoftCallbackPath(request: Request): Request {
  * (specs/identity/sso-signin-error-boundary.feature).
  */
 function withholdInternalSignInError({
-  response,
+  answer,
   errorPageUrl,
   traceId,
 }: {
-  response: Response;
+  answer: EngineAnswer;
   errorPageUrl: string;
   traceId: string | undefined;
-}): Response {
+}): EngineAnswer {
   const redirect = signInErrorRedirectOf({
-    status: response.status,
-    location: response.headers.get("location"),
+    status: answer.response.status,
+    location: extractRedirectLocation(answer),
     errorPageUrl,
     traceId,
   });
-  if (redirect.kind === "pass") return response;
+  if (redirect.kind === "pass") return answer;
 
   logger.error(
     { code: redirect.code, description: redirect.description, traceId: traceId ?? null },
     "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
   );
-  const headers = new Headers(response.headers);
-  headers.set("location", redirect.location);
-  return new Response(response.body, { status: response.status, headers });
+  return { response: answer.response, location: redirect.location };
 }
 
 /**
@@ -266,17 +272,20 @@ function withholdInternalSignInError({
  * its callers read it (specs/identity/sso-signin-error-boundary.feature).
  */
 async function landFailedSignInCallback({
-  response,
+  answer,
   pathname,
   errorPageUrl,
   traceId,
 }: {
-  response: Response;
+  answer: EngineAnswer;
   pathname: string;
   errorPageUrl: string;
   traceId: string | undefined;
-}): Promise<Response> {
-  if (response.status < 500 || !isSignInCallbackPath({ pathname })) return response;
+}): Promise<AuthHandshakeAnswer> {
+  const { response } = answer;
+  if (response.status < 500 || !isSignInCallbackPath({ pathname })) {
+    return { kind: "engine", ...answer };
+  }
 
   logger.error(
     {
@@ -287,10 +296,7 @@ async function landFailedSignInCallback({
     },
     "a sign-in callback failed on the server; the person was sent a generic refusal",
   );
-  return new Response(null, {
-    status: 302,
-    headers: { location: signInFailureLocation({ errorPageUrl, traceId }) },
-  });
+  return { kind: "sign-in-failed", location: signInFailureLocation({ errorPageUrl, traceId }) };
 }
 
 const errorBodySchema = z.object({ code: z.string() });
