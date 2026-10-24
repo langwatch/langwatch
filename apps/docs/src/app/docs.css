@@ -487,6 +487,13 @@ figure > .docs-shot {
   background: color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent);
   box-shadow: inset 2px 0 0 var(--chakra-colors-accent-solid);
 }
+/* The accent tint lowers contrast: tokens on a highlighted line lean further to the text colour. */
+.docs-line[data-highlighted="true"] span {
+  color: color-mix(in srgb, var(--sl) 65%, var(--chakra-colors-fg));
+}
+.dark .docs-line[data-highlighted="true"] span {
+  color: color-mix(in srgb, var(--sd) 75%, var(--chakra-colors-fg));
+}
 [data-numbered="true"] .docs-code code {
   counter-reset: docs-line;
 }
