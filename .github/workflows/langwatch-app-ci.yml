@@ -852,7 +852,7 @@ jobs:
           NX_WORKSPACE_DATA_DIRECTORY: ${{ github.workspace }}/.nx/suites/data
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
-          # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
+          # Each suite gets two vitest workers (patches/vitest@5.0.5.patch), so one
           # at a time left half the cores idle. A heavy suite still runs alone.
           PACKAGE_SUITES_CONCURRENCY: "2"
           # A pull request runs the suites its change reaches; main runs all.

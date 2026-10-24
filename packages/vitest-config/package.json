@@ -50,9 +50,9 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@vitest/browser-playwright": "^5.0.1",
+    "@vitest/browser-playwright": "^5.0.5",
     "playwright": "*",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.5"
   },
   "peerDependenciesMeta": {
     "@vitest/browser-playwright": {
