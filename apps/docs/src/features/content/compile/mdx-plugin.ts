@@ -9,7 +9,12 @@ import type { Plugin } from "vite";
 import { closeDiagrams } from "../../code/compile/diagrams.ts";
 import { rehypeDocsCode } from "../../code/compile/rehype-code.ts";
 import { changelogPath, withReleaseNotes } from "../../releases/compile/releases.ts";
-import { rehypeDocsHeadings, rehypeDocsMedia, rehypeDocsSlugs } from "./rehype-content.ts";
+import {
+  rehypeDocsAccessibility,
+  rehypeDocsHeadings,
+  rehypeDocsMedia,
+  rehypeDocsSlugs,
+} from "./rehype-content.ts";
 import { remarkDocsContent } from "./remark-content.ts";
 import { remarkDocsLinks } from "./remark-links.ts";
 
@@ -27,6 +32,7 @@ export function docsMdxPlugin({ docsRoot }: { docsRoot: string }): Plugin {
     rehypePlugins: [
       rehypeDocsSlugs,
       [rehypeDocsMedia, { docsRoot }],
+      rehypeDocsAccessibility,
       rehypeDocsCode,
       rehypeDocsHeadings,
     ],

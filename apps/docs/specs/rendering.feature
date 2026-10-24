@@ -125,6 +125,12 @@ Feature: Read and navigate the generated documentation
     Then those titles are second-level headings, unless the author set their level
     And the same components after the first second-level heading keep third-level titles
 
+  @unit
+  Scenario: Name each task list checkbox by its item
+    Given an MDX page with a task list
+    When the page is compiled
+    Then each item's checkbox is labelled with the item's text
+
   @integration
   Scenario: Tab panels are named by ids without spaces
     Given authored tabs or a code group whose labels contain spaces

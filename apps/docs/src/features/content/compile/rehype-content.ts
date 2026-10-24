@@ -216,6 +216,29 @@ function isImage({ node }: { node: TreeNode }) {
   );
 }
 
+/** A task list item's checkbox is named by the item's text, as a form control must be. */
+function labelTaskItem({ node }: { node: TreeNode }) {
+  if (node.type !== "element" || node.tagName !== "li") return;
+  const isBox = (child: TreeNode) =>
+    child.tagName === "input" && child.properties?.type === "checkbox";
+  const lead = node.children?.find((child) => child.type === "element");
+  const box = lead?.tagName === "p" ? lead.children?.find(isBox) : node.children?.find(isBox);
+  const label = textOf({ node }).replace(/\s+/g, " ").trim();
+  if (box && label && box.properties?.ariaLabel === undefined)
+    box.properties = { ...box.properties, ariaLabel: label };
+}
+
+/** The markup Markdown writes, given the names and headers assistive technology needs. */
+export function rehypeDocsAccessibility() {
+  return (tree: TreeNode) =>
+    visitTree({
+      node: tree,
+      visitor: (node) => {
+        labelTaskItem({ node });
+      },
+    });
+}
+
 /** Raw media tags and anchors skip the MDX component map; legacy `lw-` markup gets its adapter. */
 export function rehypeDocsMedia({ docsRoot }: { docsRoot: string }) {
   return (tree: TreeNode) => {
