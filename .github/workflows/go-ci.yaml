@@ -1,6 +1,6 @@
-# Always-run workflow with internal path gating + aggregator. See #3223.
-# Branch protection requires `go-ci-complete`. Upstream jobs skip when paths
-# don't match, and `alls-green` reports the final consolidated status.
+# No check of this workflow is required, so a pull request that touches none
+# of its paths starts nothing (specs/ci/path-filters.feature). The internal
+# gate still picks which jobs run when it does start.
 name: go-ci
 
 on:
@@ -11,6 +11,21 @@ on:
   pull_request:
     # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
     types: [opened, synchronize, reopened, ready_for_review]
+    # The union of the `go` and `ciguards` filters below.
+    paths:
+      - '**/*.go'
+      - 'services/**'
+      - 'pkg/**'
+      - 'cmd/**'
+      - 'tools/**'
+      - 'sdks/go/**'
+      - 'infra/clickhouse-serverless/**'
+      - 'packages/handled-error/**'
+      - '*/go.mod'
+      - '*/go.sum'
+      - '.golangci.yml'
+      - '.github/workflows/**'
+      - '.github/pr-filters.yml'
   # Evaluate against the queued merge commit too, so the generated-code drift
   # check can gate the queue rather than only the PR head.
   merge_group:
@@ -347,16 +362,3 @@ jobs:
       - uses: ./.github/actions/prepare-generated-files
       - name: Generated READMEs are current
         run: pnpm check:readmes
-
-  # The single required status check. Every job above is `if:`-gated and so
-  # cannot be required directly — a skipped job never reports, and branch
-  # protection would wait forever. This one always runs and consolidates them.
-  go-ci-complete:
-    needs: [changes, build, test, lint, vet, generated, ci-guards]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
-        with:
-          jobs: ${{ toJSON(needs) }}
-          allowed-skips: build, test, lint, vet, generated, ci-guards

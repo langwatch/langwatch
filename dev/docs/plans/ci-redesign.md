@@ -80,16 +80,17 @@ steps of one job, so one failing step must still fail that job and name itself.
 
 Each step is its own pull request, smallest first, measured before and after.
 
-| #   | Step                            | Change                                                                                           | Expected effect                                                                              |
-| --- | ------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| 1   | Baseline (done)                 | `.github/scripts/ci-wait-report.ts`: wait against work, per workflow and by hour                 | the table above                                                                              |
-| 2   | Release pull request on a timer | release-please every 4 hours + `workflow_dispatch`; on push only when a release PR merged        | about 15 refreshes a day down to about 6 scheduled ones, plus release merges and manual runs |
-| 3   | Drafts run light                | Drafts get lint and typecheck; `ready_for_review` starts the rest                                | most of the ~240 cancelled runs a week                                                       |
-| 4   | One pull request workflow       | `pr.yml` as above; product workflows become `workflow_call` only; quick checks fold into one job | 85 jobs down to about 35 to 45 a push; the bad pushes lose 15 to 25 min                      |
-| 5   | Required checks                 | Add `ci-complete` as required, then remove the ten `*-complete` checks                           | needs a repository admin                                                                     |
-| 6   | Merge queue                     | Turn on the merge queue for main; e2e and the slowest suites run in `merge_group` only           | about 11 min of e2e runner time off each push                                                |
-| 7   | Nightly                         | Take #8877 (one nightly suite) into this branch; it edits the same workflows                     | one place for nightly runs                                                                   |
-| 8   | Dependabot                      | Spread the 23 ecosystems across the week, group updates, take #8639                              | no Monday spike                                                                              |
+| #   | Step                                          | Change                                                                                             | Expected effect                                                                              |
+| --- | --------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 1   | Baseline (done)                               | `.github/scripts/ci-wait-report.ts`: wait against work, per workflow and by hour                   | the table above                                                                              |
+| 2   | Release pull request on a timer (done, #8992) | release-please every 4 hours + `workflow_dispatch`; on push only when a release PR merged          | about 15 refreshes a day down to about 6 scheduled ones, plus release merges and manual runs |
+| 3   | Drafts run light (already in place)           | `detect-changes` sets `heavy=false` on a draft in 12 workflows; `ready_for_review` starts the rest | nothing left to gain here                                                                    |
+| 4a  | Unrequired workflows filter in `on:`          | go-ci and sdk-python-ci gain `on.pull_request.paths` and drop their unrequired `*-complete` jobs   | an unrelated pull request starts neither: 4 jobs fewer a push                                |
+| 4   | One pull request workflow                     | `pr.yml` as above; product workflows become `workflow_call` only; quick checks fold into one job   | 85 jobs down to about 35 to 45 a push; the bad pushes lose 15 to 25 min                      |
+| 5   | Required checks                               | Add `ci-complete` as required, then remove the ten `*-complete` checks                             | needs a repository admin                                                                     |
+| 6   | Merge queue                                   | Turn on the merge queue for main; e2e and the slowest suites run in `merge_group` only             | about 11 min of e2e runner time off each push                                                |
+| 7   | Nightly                                       | Take #8877 (one nightly suite) into this branch; it edits the same workflows                       | one place for nightly runs                                                                   |
+| 8   | Dependabot                                    | Spread the 23 ecosystems across the week, group updates, take #8639                                | no Monday spike                                                                              |
 
 ## Expected result
 
