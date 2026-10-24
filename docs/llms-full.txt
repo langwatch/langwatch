@@ -72455,7 +72455,7 @@ If you encounter issues during an upgrade:
 # FILE: ./self-hosting/usage-report-dictionary.mdx
 
 ---
-title: "Usage report dictionary: every field a self-hosted install sends"
+title: "Usage report dictionary: every field an install sends"
 description: "The fields of the daily usage report, their category, their window, why each is collected, and what is never collected. Generated from the dictionary the install reports from."
 sidebarTitle: Usage report dictionary
 keywords: usage report, telemetry, self-hosted, dictionary, fields, opt out, privacy
