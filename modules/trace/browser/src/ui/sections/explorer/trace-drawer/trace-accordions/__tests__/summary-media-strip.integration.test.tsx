@@ -11,7 +11,7 @@ import {
   SummaryMediaStrip,
 } from "../trace-summary-accordions.tsx";
 
-vi.mock("@langwatch/scenario-client", async (importOriginal) => ({
+vi.mock("@langwatch/scenario-client/lent", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ...(await import("../../../../__tests__/media-part.stand-in.tsx")),
 }));

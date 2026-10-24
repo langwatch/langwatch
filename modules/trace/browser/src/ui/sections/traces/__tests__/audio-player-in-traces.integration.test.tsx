@@ -18,7 +18,7 @@ import { TraceMediaPart } from "../trace-media-part.tsx";
 
 // TraceMediaPart resolves the owning project from context; MediaPart needs a
 // real id for its stored-object existence probe.
-vi.mock("@langwatch/scenario-client", async (importOriginal) => ({
+vi.mock("@langwatch/scenario-client/lent", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ...(await import("../../__tests__/media-part.stand-in.tsx")),
 }));
