@@ -47,10 +47,21 @@ function hasAnyRate(pricing: LLMModelPricing | undefined): boolean {
   return pricedUnits(pricing).length > 0;
 }
 
+/**
+ * OpenRouter prices a router at -1, meaning the rate of whichever model it routes to. Some
+ * routers sit under a vendor prefix (`nvidia/switchyard`), so the marker counts, not the id.
+ */
+function isRouterPricing(pricing: LLMModelPricing | undefined): boolean {
+  return (pricing?.inputCostPerToken ?? 0) < 0 && (pricing?.outputCostPerToken ?? 0) < 0;
+}
+
 /** Catalog entries that would price every request at zero. */
 export function findUnpricedModels(models: Record<string, LLMModelEntry>): string[] {
   return Object.keys(models)
-    .filter((id) => !isPricedElsewhere(id) && !hasAnyRate(models[id]?.pricing))
+    .filter((id) => {
+      const pricing = models[id]?.pricing;
+      return !isPricedElsewhere(id) && !isRouterPricing(pricing) && !hasAnyRate(pricing);
+    })
     .toSorted();
 }
 
