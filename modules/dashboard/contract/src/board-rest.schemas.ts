@@ -19,6 +19,8 @@ const boardResourceSchemaDefinition = z.object({
   description: z.string().nullable(),
   /** Who sees the board; a project credential never reads one set to Only me. */
   scope: dashboardScopeSchema,
+  /** The member who made it; `null` for a board a project credential made. */
+  createdById: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
   platformUrl: z.string(),

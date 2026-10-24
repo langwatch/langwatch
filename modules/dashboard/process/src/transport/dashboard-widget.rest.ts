@@ -56,6 +56,15 @@ const widgetNotFoundResponse: Record<404, RouteResponse> = {
   },
 };
 
+/** The not-found answer of adding a widget to a board, which either id can cause. */
+const widgetOrBoardNotFoundResponse: Record<404, RouteResponse> = {
+  404: {
+    description:
+      "No dashboard widget with this id, or no Dashboards board with this id, in this project. A board made by POST /api/dashboards is an Analytics Reports board and is not found here.",
+    content: { "application/json": { schema: resolver(apiErrorSchema) } },
+  },
+};
+
 /** The widget as the API publishes it. */
 function widgetResource(
   widget: DashboardWidget,
@@ -242,7 +251,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
-      ...widgetNotFoundResponse,
+      ...widgetOrBoardNotFoundResponse,
       200: { description: "The widget was added to the dashboard" },
     },
   })

@@ -74563,11 +74563,29 @@ openapi: "DELETE /api/v1/projects/{id}"
 
 ---
 
+# FILE: ./api-reference/projects/create-a-dashboards-board.mdx
+
+---
+title: "Create a Dashboards board"
+openapi: "POST /api/v1/projects/{projectId}/analytics/boards"
+---
+
+---
+
 # FILE: ./api-reference/projects/create-project.mdx
 
 ---
 title: "Create project"
 openapi: "POST /api/v1/projects"
+---
+
+---
+
+# FILE: ./api-reference/projects/delete-a-dashboards-board.mdx
+
+---
+title: "Delete a Dashboards board"
+openapi: "DELETE /api/v1/projects/{projectId}/analytics/boards/{boardId}"
 ---
 
 ---
@@ -74651,6 +74669,19 @@ Project API keys (`X-Auth-Token`) cannot be used here, because they lack organiz
 | `DELETE` | `/api/v1/projects/{id}`                    | Archive a project                                            |
 | `GET`    | `/api/v1/projects/{id}/api-key`            | Get the project's API key                                    |
 | `POST`   | `/api/v1/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
+
+## Dashboards boards
+
+These routes manage the boards of the Dashboards area in one project. Unlike the routes above, they take the project API key in the `X-Auth-Token` header, not an organization key.
+
+| Method   | Path                                                      | Description                                                              |
+| -------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `GET`    | `/api/v1/projects/{projectId}/analytics/boards`           | List the project's boards, each with its `widgetCount`                   |
+| `GET`    | `/api/v1/projects/{projectId}/analytics/boards/{boardId}` | Get one board                                                            |
+| `POST`   | `/api/v1/projects/{projectId}/analytics/boards`           | Create an empty board from a `name`; answers `201` with the board        |
+| `DELETE` | `/api/v1/projects/{projectId}/analytics/boards/{boardId}` | Delete a board and its widgets; answers with the board's `id` and `name` |
+
+A board in another project answers `404`.
 
 ## Moving a Project to Another Team
 

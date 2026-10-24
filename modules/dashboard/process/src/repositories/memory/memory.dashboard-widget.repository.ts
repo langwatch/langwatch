@@ -11,6 +11,7 @@ import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type {
@@ -24,7 +25,7 @@ import type {
 } from "../dashboard-widget.repository.ts";
 import { MemoryDashboardDatabase } from "./memory.dashboard.database.ts";
 
-/** In-memory parity for widget CRUD; dashboard ownership is enforced by the live transaction. */
+/** In-memory parity for widget CRUD; `createWidget` refuses a board this project does not own. */
 export class MemoryDashboardWidgetRepository implements DashboardWidgetRepository {
   #database: MemoryDashboardDatabase;
 
@@ -61,6 +62,10 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
   }
 
   async createWidget(input: CreateDashboardWidgetInput): Promise<DashboardWidgetRow> {
+    const { projectId, dashboardId } = input;
+    if (dashboardId !== undefined && !this.#ownsBoard({ projectId, dashboardId })) {
+      throw new DashboardNotFoundError(projectId);
+    }
     const rows = this.#rows.filter(
       (row) =>
         row.projectId === input.projectId &&
@@ -161,6 +166,12 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
         updatedAt: nowInstant(),
       });
     }
+  }
+
+  #ownsBoard(input: { projectId: string; dashboardId: string }): boolean {
+    return this.#database.boards.some(
+      (board) => board.id === input.dashboardId && board.projectId === input.projectId,
+    );
   }
 
   #require(input: DashboardWidgetScope): DashboardWidgetRow {

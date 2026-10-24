@@ -16947,6 +16947,243 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault) Vali
 	}
 }
 
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScopeORGANIZATION PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope = "ORGANIZATION"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScopePRIVATE      PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope = "PRIVATE"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScopePROJECT      PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope = "PROJECT"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScopeORGANIZATION:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScopePRIVATE:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScopePROJECT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault.
+const (
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault enum.
+func (e DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault.
+const (
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault enum.
+func (e DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault.
+const (
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault enum.
+func (e DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault.
+const (
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault enum.
+func (e DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault.
+const (
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault enum.
+func (e DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope.
 const (
 	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopeORGANIZATION GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope = "ORGANIZATION"
@@ -24344,22 +24581,22 @@ func (e GetApiV1QuerySchema403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema500JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema500JSONResponseBodyFaultCustomer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPlatform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultProvider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
+	Customer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
+	Platform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
+	PresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
+	Provider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema500JSONResponseBodyFault enum.
 func (e GetApiV1QuerySchema500JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema500JSONResponseBodyFaultCustomer:
+	case Customer:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPlatform:
+	case Platform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform:
+	case PresumedPlatform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultProvider:
+	case Provider:
 		return true
 	default:
 		return false
@@ -26729,16 +26966,16 @@ func (e GetApiSlackConnections200JSONResponseBodyKind) Valid() bool {
 
 // Defines values for GetApiSlackConnections200JSONResponseBodyScopeType.
 const (
-	ORGANIZATION GetApiSlackConnections200JSONResponseBodyScopeType = "ORGANIZATION"
-	PROJECT      GetApiSlackConnections200JSONResponseBodyScopeType = "PROJECT"
+	GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION GetApiSlackConnections200JSONResponseBodyScopeType = "ORGANIZATION"
+	GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT      GetApiSlackConnections200JSONResponseBodyScopeType = "PROJECT"
 )
 
 // Valid indicates whether the value is a known member of the GetApiSlackConnections200JSONResponseBodyScopeType enum.
 func (e GetApiSlackConnections200JSONResponseBodyScopeType) Valid() bool {
 	switch e {
-	case ORGANIZATION:
+	case GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION:
 		return true
-	case PROJECT:
+	case GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT:
 		return true
 	default:
 		return false
@@ -43601,6 +43838,41 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault string
 // GetApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoards.
 type GetApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault string
 
+// PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONBody defines parameters for PostApiV1ProjectsByProjectIdAnalyticsBoards.
+type PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONBody struct {
+	Name string `json:"name"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope defines parameters for PostApiV1ProjectsByProjectIdAnalyticsBoards.
+type PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope string
+
+// PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault defines parameters for PostApiV1ProjectsByProjectIdAnalyticsBoards.
+type PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault string
+
+// PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault defines parameters for PostApiV1ProjectsByProjectIdAnalyticsBoards.
+type PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault string
+
+// PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault defines parameters for PostApiV1ProjectsByProjectIdAnalyticsBoards.
+type PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault string
+
+// PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault defines parameters for PostApiV1ProjectsByProjectIdAnalyticsBoards.
+type PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault string
+
+// DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault defines parameters for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
+type DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault string
+
+// DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault defines parameters for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
+type DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault string
+
+// DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault defines parameters for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
+type DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault string
+
+// DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault defines parameters for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
+type DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault string
+
+// DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault defines parameters for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
+type DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault string
+
 // GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
 type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope string
 
@@ -51919,6 +52191,9 @@ type CreateProjectJSONRequestBody CreateProjectJSONBody
 
 // UpdateProjectJSONRequestBody defines body for UpdateProject for application/json ContentType.
 type UpdateProjectJSONRequestBody UpdateProjectJSONBody
+
+// PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONRequestBody defines body for PostApiV1ProjectsByProjectIdAnalyticsBoards for application/json ContentType.
+type PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONRequestBody PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONBody
 
 // PostApiV1ProjectsByProjectIdAnalyticsChartsJSONRequestBody defines body for PostApiV1ProjectsByProjectIdAnalyticsCharts for application/json ContentType.
 type PostApiV1ProjectsByProjectIdAnalyticsChartsJSONRequestBody PostApiV1ProjectsByProjectIdAnalyticsChartsJSONBody
@@ -113519,6 +113794,14 @@ type ClientInterface interface {
 	// GetApiV1ProjectsByProjectIdAnalyticsBoards request
 	GetApiV1ProjectsByProjectIdAnalyticsBoards(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostApiV1ProjectsByProjectIdAnalyticsBoardsWithBody request with any body
+	PostApiV1ProjectsByProjectIdAnalyticsBoardsWithBody(ctx context.Context, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiV1ProjectsByProjectIdAnalyticsBoards(ctx context.Context, projectId string, body PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId request
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId request
 	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -118465,6 +118748,42 @@ func (c *Client) RegenerateProjectApiKey(ctx context.Context, id string, reqEdit
 
 func (c *Client) GetApiV1ProjectsByProjectIdAnalyticsBoards(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiV1ProjectsByProjectIdAnalyticsBoardsRequest(c.Server, projectId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiV1ProjectsByProjectIdAnalyticsBoardsWithBody(ctx context.Context, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiV1ProjectsByProjectIdAnalyticsBoardsRequestWithBody(c.Server, projectId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiV1ProjectsByProjectIdAnalyticsBoards(ctx context.Context, projectId string, body PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiV1ProjectsByProjectIdAnalyticsBoardsRequest(c.Server, projectId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdRequest(c.Server, projectId, boardId)
 	if err != nil {
 		return nil, err
 	}
@@ -132516,6 +132835,94 @@ func NewGetApiV1ProjectsByProjectIdAnalyticsBoardsRequest(server string, project
 	return req, nil
 }
 
+// NewPostApiV1ProjectsByProjectIdAnalyticsBoardsRequest calls the generic PostApiV1ProjectsByProjectIdAnalyticsBoards builder with application/json body
+func NewPostApiV1ProjectsByProjectIdAnalyticsBoardsRequest(server string, projectId string, body PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiV1ProjectsByProjectIdAnalyticsBoardsRequestWithBody(server, projectId, "application/json", bodyReader)
+}
+
+// NewPostApiV1ProjectsByProjectIdAnalyticsBoardsRequestWithBody generates requests for PostApiV1ProjectsByProjectIdAnalyticsBoards with any type of body
+func NewPostApiV1ProjectsByProjectIdAnalyticsBoardsRequestWithBody(server string, projectId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "projectId", projectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s/analytics/boards", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdRequest generates requests for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId
+func NewDeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdRequest(server string, projectId string, boardId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "projectId", projectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "boardId", boardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s/analytics/boards/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdRequest generates requests for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId
 func NewGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdRequest(server string, projectId string, boardId string) (*http.Request, error) {
 	var err error
@@ -139433,6 +139840,14 @@ type ClientWithResponsesInterface interface {
 
 	// GetApiV1ProjectsByProjectIdAnalyticsBoardsWithResponse request
 	GetApiV1ProjectsByProjectIdAnalyticsBoardsWithResponse(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse, error)
+
+	// PostApiV1ProjectsByProjectIdAnalyticsBoardsWithBodyWithResponse request with any body
+	PostApiV1ProjectsByProjectIdAnalyticsBoardsWithBodyWithResponse(ctx context.Context, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse, error)
+
+	PostApiV1ProjectsByProjectIdAnalyticsBoardsWithResponse(ctx context.Context, projectId string, body PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse, error)
+
+	// DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse request
+	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse, error)
 
 	// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse request
 	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse, error)
@@ -155423,6 +155838,7 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse struct {
 	JSON200      *struct {
 		Data []struct {
 			CreatedAt   string                                                                 `json:"createdAt"`
+			CreatedById *string                                                                `json:"createdById"`
 			Description *string                                                                `json:"description"`
 			Id          string                                                                 `json:"id"`
 			Name        string                                                                 `json:"name"`
@@ -155534,11 +155950,255 @@ func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse) ContentType() string
 	return ""
 }
 
+type PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		CreatedAt   string                                                              `json:"createdAt"`
+		CreatedById *string                                                             `json:"createdById"`
+		Description *string                                                             `json:"description"`
+		Id          string                                                              `json:"id"`
+		Name        string                                                              `json:"name"`
+		PlatformUrl string                                                              `json:"platformUrl"`
+		Scope       PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope `json:"scope"`
+		UpdatedAt   string                                                              `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Code      string                                                               `json:"code"`
+		DocsUrl   *string                                                              `json:"docs_url,omitempty"`
+		Fault     *PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                               `json:"message"`
+		Meta      *map[string]interface{}                                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                       `json:"reasons,omitempty"`
+		Retryable bool                                                                 `json:"retryable"`
+		SpanId    *string                                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                               `json:"code"`
+		DocsUrl   *string                                                              `json:"docs_url,omitempty"`
+		Fault     *PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                               `json:"message"`
+		Meta      *map[string]interface{}                                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                       `json:"reasons,omitempty"`
+		Retryable bool                                                                 `json:"retryable"`
+		SpanId    *string                                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                               `json:"code"`
+		DocsUrl   *string                                                              `json:"docs_url,omitempty"`
+		Fault     *PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                               `json:"message"`
+		Meta      *map[string]interface{}                                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                       `json:"reasons,omitempty"`
+		Retryable bool                                                                 `json:"retryable"`
+		SpanId    *string                                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                               `json:"code"`
+		DocsUrl   *string                                                              `json:"docs_url,omitempty"`
+		Fault     *PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                               `json:"message"`
+		Meta      *map[string]interface{}                                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                       `json:"reasons,omitempty"`
+		Retryable bool                                                                 `json:"retryable"`
+		SpanId    *string                                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	}
+	JSON400 *struct {
+		Code      string                                                                          `json:"code"`
+		DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+		Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                          `json:"message"`
+		Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+		Retryable bool                                                                            `json:"retryable"`
+		SpanId    *string                                                                         `json:"span_id,omitempty"`
+		Tips      *[]string                                                                       `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                          `json:"code"`
+		DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+		Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                          `json:"message"`
+		Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+		Retryable bool                                                                            `json:"retryable"`
+		SpanId    *string                                                                         `json:"span_id,omitempty"`
+		Tips      *[]string                                                                       `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                          `json:"code"`
+		DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+		Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                          `json:"message"`
+		Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+		Retryable bool                                                                            `json:"retryable"`
+		SpanId    *string                                                                         `json:"span_id,omitempty"`
+		Tips      *[]string                                                                       `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                                          `json:"code"`
+		DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+		Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                          `json:"message"`
+		Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+		Retryable bool                                                                            `json:"retryable"`
+		SpanId    *string                                                                         `json:"span_id,omitempty"`
+		Tips      *[]string                                                                       `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                          `json:"code"`
+		DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+		Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                          `json:"message"`
+		Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+		Retryable bool                                                                            `json:"retryable"`
+		SpanId    *string                                                                         `json:"span_id,omitempty"`
+		Tips      *[]string                                                                       `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		CreatedAt   string                                                                      `json:"createdAt"`
+		CreatedById *string                                                                     `json:"createdById"`
 		Description *string                                                                     `json:"description"`
 		Id          string                                                                      `json:"id"`
 		Name        string                                                                      `json:"name"`
@@ -167469,6 +168129,32 @@ func (c *ClientWithResponses) GetApiV1ProjectsByProjectIdAnalyticsBoardsWithResp
 		return nil, err
 	}
 	return ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp)
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsBoardsWithBodyWithResponse request with arbitrary body returning *PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse
+func (c *ClientWithResponses) PostApiV1ProjectsByProjectIdAnalyticsBoardsWithBodyWithResponse(ctx context.Context, projectId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse, error) {
+	rsp, err := c.PostApiV1ProjectsByProjectIdAnalyticsBoardsWithBody(ctx, projectId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiV1ProjectsByProjectIdAnalyticsBoardsWithResponse(ctx context.Context, projectId string, body PostApiV1ProjectsByProjectIdAnalyticsBoardsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse, error) {
+	rsp, err := c.PostApiV1ProjectsByProjectIdAnalyticsBoards(ctx, projectId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp)
+}
+
+// DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse request returning *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse
+func (c *ClientWithResponses) DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse, error) {
+	rsp, err := c.DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId(ctx, projectId, boardId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp)
 }
 
 // GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse request returning *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse
@@ -185756,6 +186442,7 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp *http.Response)
 		var dest struct {
 			Data []struct {
 				CreatedAt   string                                                                 `json:"createdAt"`
+				CreatedById *string                                                                `json:"createdById"`
 				Description *string                                                                `json:"description"`
 				Id          string                                                                 `json:"id"`
 				Name        string                                                                 `json:"name"`
@@ -185875,6 +186562,295 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp *http.Response)
 	return response, nil
 }
 
+// ParsePostApiV1ProjectsByProjectIdAnalyticsBoardsResponse parses an HTTP response from a PostApiV1ProjectsByProjectIdAnalyticsBoardsWithResponse call
+func ParsePostApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp *http.Response) (*PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			CreatedAt   string                                                              `json:"createdAt"`
+			CreatedById *string                                                             `json:"createdById"`
+			Description *string                                                             `json:"description"`
+			Id          string                                                              `json:"id"`
+			Name        string                                                              `json:"name"`
+			PlatformUrl string                                                              `json:"platformUrl"`
+			Scope       PostApiV1ProjectsByProjectIdAnalyticsBoards201JSONResponseBodyScope `json:"scope"`
+			UpdatedAt   string                                                              `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                               `json:"code"`
+			DocsUrl   *string                                                              `json:"docs_url,omitempty"`
+			Fault     *PostApiV1ProjectsByProjectIdAnalyticsBoards400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                               `json:"message"`
+			Meta      *map[string]interface{}                                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                       `json:"reasons,omitempty"`
+			Retryable bool                                                                 `json:"retryable"`
+			SpanId    *string                                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                               `json:"code"`
+			DocsUrl   *string                                                              `json:"docs_url,omitempty"`
+			Fault     *PostApiV1ProjectsByProjectIdAnalyticsBoards401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                               `json:"message"`
+			Meta      *map[string]interface{}                                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                       `json:"reasons,omitempty"`
+			Retryable bool                                                                 `json:"retryable"`
+			SpanId    *string                                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                               `json:"code"`
+			DocsUrl   *string                                                              `json:"docs_url,omitempty"`
+			Fault     *PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                               `json:"message"`
+			Meta      *map[string]interface{}                                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                       `json:"reasons,omitempty"`
+			Retryable bool                                                                 `json:"retryable"`
+			SpanId    *string                                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                               `json:"code"`
+			DocsUrl   *string                                                              `json:"docs_url,omitempty"`
+			Fault     *PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                               `json:"message"`
+			Meta      *map[string]interface{}                                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                       `json:"reasons,omitempty"`
+			Retryable bool                                                                 `json:"retryable"`
+			SpanId    *string                                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse parses an HTTP response from a DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse call
+func ParseDeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.Response) (*DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Id   string `json:"id"`
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                          `json:"code"`
+			DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+			Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                          `json:"message"`
+			Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+			Retryable bool                                                                            `json:"retryable"`
+			SpanId    *string                                                                         `json:"span_id,omitempty"`
+			Tips      *[]string                                                                       `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                          `json:"code"`
+			DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+			Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                          `json:"message"`
+			Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+			Retryable bool                                                                            `json:"retryable"`
+			SpanId    *string                                                                         `json:"span_id,omitempty"`
+			Tips      *[]string                                                                       `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                          `json:"code"`
+			DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+			Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                          `json:"message"`
+			Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+			Retryable bool                                                                            `json:"retryable"`
+			SpanId    *string                                                                         `json:"span_id,omitempty"`
+			Tips      *[]string                                                                       `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                                          `json:"code"`
+			DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+			Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                          `json:"message"`
+			Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+			Retryable bool                                                                            `json:"retryable"`
+			SpanId    *string                                                                         `json:"span_id,omitempty"`
+			Tips      *[]string                                                                       `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                          `json:"code"`
+			DocsUrl   *string                                                                         `json:"docs_url,omitempty"`
+			Fault     *DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                          `json:"message"`
+			Meta      *map[string]interface{}                                                         `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                  `json:"reasons,omitempty"`
+			Retryable bool                                                                            `json:"retryable"`
+			SpanId    *string                                                                         `json:"span_id,omitempty"`
+			Tips      *[]string                                                                       `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse parses an HTTP response from a GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse call
 func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.Response) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -185892,6 +186868,7 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			CreatedAt   string                                                                      `json:"createdAt"`
+			CreatedById *string                                                                     `json:"createdById"`
 			Description *string                                                                     `json:"description"`
 			Id          string                                                                      `json:"id"`
 			Name        string                                                                      `json:"name"`

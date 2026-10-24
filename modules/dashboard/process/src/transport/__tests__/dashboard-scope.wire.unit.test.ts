@@ -351,7 +351,7 @@ describe("board scope at the doors", () => {
         scopeProjects: "dashboard_not_found",
         star: "dashboard_not_found",
         widgets: "dashboard_not_found",
-        addWidget: "dashboard_widget_not_found",
+        addWidget: "dashboard_not_found",
         editWidget: "dashboard_widget_not_found",
         deleteWidget: "dashboard_widget_not_found",
       });

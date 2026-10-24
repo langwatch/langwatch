@@ -14,6 +14,7 @@ import { MemoryDashboardWidgetRepository } from "../../repositories/memory/memor
 import { MemoryDashboardDatabase } from "../../repositories/memory/memory.dashboard.database.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import { MemorySavedViewRepository } from "../../repositories/memory/memory.saved-view.repository.ts";
+import { boardRest } from "../board.rest.ts";
 import { dashboardWidgetRest } from "../dashboard-widget.rest.ts";
 import { dashboardRest } from "../dashboard.rest.ts";
 import { graphRest } from "../graph.rest.ts";
@@ -164,6 +165,32 @@ describe("a Langy key's delete card for a record on its owner's Only me board", 
       });
 
       expect(names).toEqual({ owner: "Spend", other: undefined, nobody: undefined });
+    });
+  });
+
+  describe("when the record is an Only me Dashboards board", () => {
+    /** @scenario "A Langy key's delete card names the key owner's own Only me records" */
+    it("names it for its owner, and for nobody else", async () => {
+      const { app } = appWithDatabase();
+      const board = await app.createBoard({
+        projectId: PROJECT,
+        name: "Private",
+        createdById: OWNER.userId,
+      });
+      await app.setDashboardScope({
+        projectId: PROJECT,
+        dashboardId: board.id,
+        scope: "PRIVATE",
+        viewer: OWNER,
+      });
+
+      const names = await namesFor({
+        app,
+        mark: markOf(boardRest.router(), "board"),
+        id: board.id,
+      });
+
+      expect(names).toEqual({ owner: "Private", other: undefined, nobody: undefined });
     });
   });
 

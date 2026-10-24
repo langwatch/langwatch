@@ -176,7 +176,7 @@ export class DashboardWidgetService {
     input: { projectId: string; dashboardId: string } & Viewed,
   ): Promise<void> {
     const found = await this.#boards.findReadable(input);
-    if (!found) throw new DashboardWidgetNotFoundError();
+    if (!found) throw new DashboardNotFoundError(input.projectId);
     if (found.standing === "guest") throw new DashboardReadOnlyHereError(input.projectId);
   }
 
