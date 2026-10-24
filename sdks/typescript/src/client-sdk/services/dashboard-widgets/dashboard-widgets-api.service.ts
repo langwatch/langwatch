@@ -2,10 +2,10 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { projectInScope } from "@/client-sdk/services/_shared/project-in-scope";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { type InternalConfig } from "@/client-sdk/types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import { scopedProjectId } from "@/internal/credentialContext";
 import type { paths } from "@/internal/generated/openapi/api-client";
 
 /** A dashboard widget, exactly as the REST surface answers it. */
@@ -80,9 +80,8 @@ export class DashboardWidgetsApiService {
     throw new DashboardWidgetsApiError(message, operation, error, status);
   }
 
-  private projectId(operation: string): string {
-    const projectId =
-      this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
+  private async projectId(operation: string): Promise<string> {
+    const projectId = await projectInScope({ configuredProjectId: this.configuredProjectId });
     if (!projectId) {
       throw new DashboardWidgetsApiError(
         "No project is in scope. Pass --project <slug-or-id>, or set LANGWATCH_PROJECT_ID.",
@@ -93,7 +92,7 @@ export class DashboardWidgetsApiService {
   }
 
   async list(): Promise<{ data: DashboardWidget[] }> {
-    const projectId = this.projectId("list dashboard widgets");
+    const projectId = await this.projectId("list dashboard widgets");
     const { data, error, response } = await this.apiClient.GET(
       "/api/v1/projects/{projectId}/analytics/dashboard-widgets",
       { params: { path: { projectId } } },
@@ -103,7 +102,7 @@ export class DashboardWidgetsApiService {
   }
 
   async get(id: string): Promise<DashboardWidget> {
-    const projectId = this.projectId(`get dashboard widget "${id}"`);
+    const projectId = await this.projectId(`get dashboard widget "${id}"`);
     const { data, error, response } = await this.apiClient.GET(
       "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}",
       { params: { path: { projectId, widgetId: id } } },
@@ -116,7 +115,7 @@ export class DashboardWidgetsApiService {
     name: string;
     definition: DashboardWidgetDefinitionInput;
   }): Promise<DashboardWidget> {
-    const projectId = this.projectId("create dashboard widget");
+    const projectId = await this.projectId("create dashboard widget");
     const { data, error, response } = await this.apiClient.POST(
       "/api/v1/projects/{projectId}/analytics/dashboard-widgets",
       {
@@ -141,7 +140,7 @@ export class DashboardWidgetsApiService {
     name?: string;
     definition?: DashboardWidgetDefinitionInput;
   }): Promise<DashboardWidget> {
-    const projectId = this.projectId(`update dashboard widget "${id}"`);
+    const projectId = await this.projectId(`update dashboard widget "${id}"`);
     const { data, error, response } = await this.apiClient.PATCH(
       "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}",
       {
@@ -164,7 +163,7 @@ export class DashboardWidgetsApiService {
 
   /** The Dashboards boards a widget can be added to; an Analytics Reports board is not one. */
   async listBoards(): Promise<{ data: DashboardBoard[] }> {
-    const projectId = this.projectId("list dashboards");
+    const projectId = await this.projectId("list dashboards");
     const { data, error, response } = await this.apiClient.GET(
       "/api/v1/projects/{projectId}/analytics/boards",
       { params: { path: { projectId } } },
@@ -181,7 +180,7 @@ export class DashboardWidgetsApiService {
     id: string;
     dashboardId: string;
   }): Promise<DashboardWidget> {
-    const projectId = this.projectId(`pin dashboard widget "${id}"`);
+    const projectId = await this.projectId(`pin dashboard widget "${id}"`);
     const { data, error, response } = await this.apiClient.POST(
       "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard",
       {
@@ -195,7 +194,7 @@ export class DashboardWidgetsApiService {
 
   /** Deletes a widget. The route answers `204` with no body. */
   async delete(id: string): Promise<void> {
-    const projectId = this.projectId(`delete dashboard widget "${id}"`);
+    const projectId = await this.projectId(`delete dashboard widget "${id}"`);
     const { error, response } = await this.apiClient.DELETE(
       "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}",
       { params: { path: { projectId, widgetId: id } } },

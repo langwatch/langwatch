@@ -40,7 +40,6 @@ describe("the MCP server's committed reference fixture", () => {
     const reference = buildQueryReference({
       protections: EVERYTHING,
       lwqlEnabled: true,
-      database: DATABASE,
       schema: LangWatchQLSchemaService.create().describe({
         database: DATABASE,
         protections: EVERYTHING,

@@ -198,6 +198,21 @@ Feature: CLI cross-project access with the user-scoped login key
       And a warning on stderr says the variable was ignored and why
 
     @unit
+    Scenario: a project key reaches the commands whose route names a project
+      Given LANGWATCH_API_KEY is a project key, which carries its own project
+      And neither --project nor LANGWATCH_PROJECT_ID names a project
+      When the user runs a chart, dashboard-widget or secrets command
+      Then the request names the key's own project, read from the platform
+      And the command does not ask for --project or LANGWATCH_PROJECT_ID
+
+    @unit
+    Scenario: a stale LANGWATCH_PROJECT_ID beside a project key never reaches the route
+      Given LANGWATCH_API_KEY is a project key
+      And LANGWATCH_PROJECT_ID names another project
+      When the user runs a command whose route names a project
+      Then the route names the key's own project, as the warning says
+
+    @unit
     Scenario: every request warns that LANGWATCH_PROJECT_ID was ignored
       Given the CLI daemon serves several commands from one process
       And each of them carries a project key and LANGWATCH_PROJECT_ID

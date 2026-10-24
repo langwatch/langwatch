@@ -2252,9 +2252,16 @@ keywords: sso, single sign-on, identity provider, connectors, scim, provisioning
 ---
 
 <Note>
-  Single sign-on and SCIM provisioning are Enterprise features. A self-hosted
-  deployment also needs an Enterprise license. See [SSO configuration](/self-hosting/configuration/sso)
-  for environment variables and provider settings.
+  Single sign-on and SCIM provisioning are Enterprise features, on LangWatch
+  Cloud and on self-hosted deployments. A self-hosted deployment without an
+  Enterprise license signs people in with email and password only, plus passkeys
+  unless `PASSKEYS_ENABLED=off`: setting
+  `AUTH_PROVIDER` and the identity provider variables is not enough, and the
+  deployment stays in email mode (see [SSO requires a license](/self-hosting/licensing#sso-requires-a-license)).
+
+  With a license, you can configure one identity provider for the whole
+  deployment through environment variables (see [SSO configuration](/self-hosting/configuration/sso)),
+  or per organization in **Settings > Authentication**, as this page describes.
 </Note>
 
 Use **Settings > Authentication** to manage how people sign in and how they
@@ -42775,11 +42782,11 @@ Every verdict is a row in the `judgments` view of [LangWatchQL](/api-reference/q
 
 ```sql
 SELECT
-  t.Attributes['user.id'] AS user,
+  t.Attributes['langwatch.user_id'] AS user,
   sum(j.Passed) AS annoyed,
   count() AS conversations
-FROM analytics.judgments AS j
-JOIN analytics.traces AS t ON t.TraceId = j.TraceId
+FROM judgments AS j
+JOIN traces AS t ON t.TraceId = j.TraceId
 WHERE j.RunId = {run:String}
   AND j.QuestionId = 'annoyed'
   AND j.CreatedAt >= subtractDays(now(), 7)
@@ -42897,7 +42904,7 @@ SELECT
   Attributes['gen_ai.conversation.id'] AS ThreadId,
   OccurredAt,
   eval(llm_readable_trace(TraceId, 8000), 'the customer sounds annoyed') AS q1
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= {start_at:DateTime}
   AND OccurredAt < {end_at:DateTime}
 ORDER BY TraceId
@@ -42911,7 +42918,7 @@ SELECT
   m.ConversationId AS ThreadId,
   max(m.OccurredAt) AS OccurredAt,
   eval(llm_readable_thread(m.ConversationId, 18729), 'the customer sounds annoyed') AS q1
-FROM analytics.trace_metrics AS m
+FROM trace_metrics AS m
 WHERE m.OccurredAt >= {start_at:DateTime}
   AND m.OccurredAt < {end_at:DateTime}
   AND m.ConversationId != ''
@@ -42927,14 +42934,14 @@ SELECT
   SpanId,
   StartTime AS OccurredAt,
   eval(llm_messages_span(TraceId, SpanId), 'the model was asked to do two things at once') AS q1
-FROM analytics.spans
+FROM spans
 WHERE StartTime >= {start_at:DateTime}
   AND StartTime < {end_at:DateTime}
   AND SpanAttributes['langwatch.span.type'] = 'llm'
 ORDER BY TraceId, SpanId
 ```
 
-A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `analytics.traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
+A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
 
 ## What is the token budget per row
 
@@ -43097,7 +43104,7 @@ the offending field and the fields that exist.
 
 ```bash
 langwatch query "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 7)
 GROUP BY day ORDER BY day"
 ```
@@ -43126,12 +43133,14 @@ langwatch query --sql-file export.sql --format jsonl --out train.jsonl
 
 The query endpoint has no cursor of its own, so a result larger than one
 response pages through a predicate you write. Declare the two cursor parameters,
-order by the same two columns, and `--page-by keyset` rebinds them between pages
-without changing a character of your statement.
+order by the same two columns, and alias those columns `after_ts` and `after_id`
+in the `SELECT`: `--page-by keyset` reads the next page's cursor from them and
+rebinds the parameters between pages without changing a character of your
+statement.
 
 ```sql
-SELECT TraceId, OccurredAt, CapturedInput, CapturedOutput
-FROM analytics.traces
+SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
 ORDER BY OccurredAt, TraceId
@@ -59937,7 +59946,7 @@ A chart that should follow the dashboard's period selector declares the reserved
 SELECT
   toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
   count() AS traces
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket
 ORDER BY bucket
@@ -63461,7 +63470,7 @@ technical safeguards map cleanly onto the open-core split:
 - **§164.312(b) Audit controls**: Apache 2.0 event_log @ 49d retention
 - **§164.316(b)(2)(i) 6-year documentation retention**: Enterprise extended retention policies (multi-year windows)
 - **§164.312(c)(1) Integrity**: Enterprise tamper-evidence (post-GA follow-up)
-- **§164.312(d) Authentication**: Apache 2.0 SSO (env-configured) + Personal IDE keys
+- **§164.312(d) Authentication**: Apache 2.0 email and password and passkey sign-in + Personal IDE keys; Enterprise SSO (env-configured or per organization)
 - **§164.312(e) Transmission security**: Apache 2.0 (TLS at gateway + dataplane)
 
 **HIPAA-most-uses**: covered entities with PHI in LLM traces should
@@ -63510,8 +63519,11 @@ free to run and free to modify:
 - **Custom roles via `CustomRolePermissions` JSON** is Enterprise. The
   default 5-role RBAC catalog (ADMIN, MEMBER, EXTERNAL + per-resource
   view/manage actions) is Apache 2.0.
-- **SCIM provisioning** is Enterprise. Apache 2.0 customers can still
-  use SSO (Okta, Auth0, Azure AD, AWS Cognito, OneLogin) for sign-in.
+- **SSO and SCIM provisioning** are Enterprise. An Apache 2.0
+  deployment signs people in with email and password, and passkeys. Setting
+  `AUTH_PROVIDER` and the Okta, Auth0, Azure AD, AWS Cognito or OneLogin
+  variables without a license leaves the deployment in email mode. See
+  [SSO requires a license](/self-hosting/licensing#sso-requires-a-license).
 
 ## Migrating from Apache 2.0 to Enterprise
 
@@ -63525,7 +63537,7 @@ RoleBinding entries, AiToolCatalogEntry rows, is unchanged.
 For the upgrade path:
 
 1. Provision your Enterprise license (contact sales).
-2. Set `LANGWATCH_LICENSE` (or equivalent, see your contract) in your
+2. Set `LANGWATCH_LICENSE_KEY` (or equivalent, see your contract) in your
    self-hosted env.
 3. Restart the control-plane pod, `pnpm dev` (no migration needed).
 4. The previously-gated surfaces become available immediately. Existing
@@ -64032,7 +64044,7 @@ The AI Gateway uses three more secrets, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWA
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
-| `AUTH_PROVIDER` | Deployment-wide sign-in provider. `email` means the deployment issues its own passwords. `NEXTAUTH_PROVIDER` is the deprecated name and still works | `email` |
+| `AUTH_PROVIDER` | Deployment-wide sign-in provider. `email` means the deployment issues its own passwords. `NEXTAUTH_PROVIDER` is the deprecated name and still works. Any other provider needs an [Enterprise license](/self-hosting/licensing#sso-requires-a-license); without one the deployment stays in email mode | `email` |
 | `LOCAL_PASSWORDS_ENABLED` | `on` keeps local passwords available next to a configured identity provider | `off` |
 | `PASSKEYS_ENABLED` | `off` removes passkey sign-in and its routes. Registered passkeys are kept | `on` |
 | `MFA_ENROLLMENT_OPEN` | `on` turns on two-step verification | `off` |
@@ -68427,7 +68439,9 @@ This is deliberate rather than a failure state, so an unlicensed deployment alwa
 - Email sign-up and sign-in stay available.
 - **Forgot password** stays available, so anyone whose account was originally created through an identity provider can recover through their inbox. It can only deliver if outbound email is configured; without it the screen says so rather than claiming a link was sent.
 
-Once a license is present **and the configured identity provider actually starts**, the deployment flips to SSO and the email routes close, so no password account can be minted on a licensed install. If `NEXTAUTH_PROVIDER` names a provider LangWatch does not recognise or one whose credentials are missing, the deployment stays in email mode with the email routes open even though it is licensed, so a typo in a provider name cannot lock everyone out.
+Once a license is present **and the configured identity provider actually starts**, the deployment flips to SSO and the email routes close, so no password account can be minted on a licensed install. `LOCAL_PASSWORDS_ENABLED=on` keeps the email routes open next to the identity provider.
+
+If `AUTH_PROVIDER` (or the older `NEXTAUTH_PROVIDER`) names a provider LangWatch does not recognise or one whose credentials are missing, the deployment stays in email mode with the email routes open even though it is licensed, so a typo in a provider name cannot lock everyone out.
 
 <Warning>
 **Upgrading a deployment that predates this gate, where everyone signs in through SSO.** Before the license gate existed, the SSO environment variables alone were enough, so an unlicensed deployment can have a whole team of identity-provider accounts on it.
@@ -73917,8 +73931,8 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 ```sql
 SELECT
   TraceId,
-  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
-FROM analytics.trace_metrics
+  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?', 0.5) AS refused
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId
 ```
@@ -73989,7 +74003,7 @@ Every judgement is also a row in the `judgments` analytics dataset, so a later q
 
 ```sql
 SELECT j.Label AS verdict, count() AS traces
-FROM analytics.judgments AS j
+FROM judgments AS j
 WHERE j.RunId = {run:String} AND j.CreatedAt >= subtractDays(now(), 7)
 GROUP BY verdict
 ORDER BY traces DESC
@@ -74894,7 +74908,7 @@ A function call has to be an aliased entry in the top level `SELECT` list of a s
 
 ```sql
 SELECT ConversationId, conversation(ConversationId) AS transcript
-FROM analytics.trace_metrics
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 20
@@ -74957,7 +74971,7 @@ Three things can shorten a result, and each one leaves a diagnostic behind:
 
 ```json
 {
-  "sql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript FROM analytics.trace_metrics WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != '' GROUP BY ConversationId ORDER BY ConversationId LIMIT 200"
+  "sql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript FROM trace_metrics WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != '' GROUP BY ConversationId ORDER BY ConversationId LIMIT 200"
 }
 ```
 
@@ -74967,7 +74981,7 @@ Each row carries a conversation identifier and its transcript under roughly eigh
 
 ```json
 {
-  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 1) AND HasError ORDER BY OccurredAt DESC LIMIT 100"
+  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"
 }
 ```
 
@@ -74981,7 +74995,7 @@ An eval function asks a question about a text and answers it per row. The text i
 SELECT
   ConversationId,
   eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed
-FROM analytics.trace_metrics
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
@@ -74993,7 +75007,7 @@ A question about what the agent did reads the agent's work, so it takes `llm_rea
 SELECT
   ConversationId,
   eval(llm_readable_thread(ConversationId, 16000), 'The agent quoted a price without calling get_price') AS unchecked_price
-FROM analytics.trace_metrics
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
@@ -75025,7 +75039,7 @@ SELECT
     'What is the customer asking for',
     ['refund: wants money back', 'bug: reports something broken', 'other: anything else']
   ) AS intent
-FROM analytics.trace_metrics
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100

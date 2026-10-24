@@ -77,9 +77,9 @@ function policyFor(protections: LangWatchQLProtections) {
 }
 
 describe("given the LangWatchQL schema catalog when it is published for a caller", () => {
-  it("names every dataset, qualified with the LangWatchQL database", () => {
+  it("names every dataset bare, as a statement writes it", () => {
     expect(schemaFor(FULLY_PERMITTED).views.map((d) => d.name)).toEqual(
-      LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`),
+      LWQL_VIEW_CATALOG.map((view) => view.name),
     );
   });
 
@@ -124,12 +124,12 @@ describe("given the LangWatchQL schema catalog when it is published for a caller
     const byName = new Map(
       columnsOf(FULLY_PERMITTED).map((column) => [`${column.dataset}.${column.name}`, column]),
     );
-    expect(byName.get("analytics.traces.TotalDurationMs")!.unit).toBe("ms");
-    expect(byName.get("analytics.traces.TotalCost")!.unit).toBe("USD");
-    expect(byName.get("analytics.traces.TotalPromptTokenCount")!.unit).toBe("tokens");
-    expect(byName.get("analytics.spans.Cost")!.unit).toBe("USD");
+    expect(byName.get("traces.TotalDurationMs")!.unit).toBe("ms");
+    expect(byName.get("traces.TotalCost")!.unit).toBe("USD");
+    expect(byName.get("traces.TotalPromptTokenCount")!.unit).toBe("tokens");
+    expect(byName.get("spans.Cost")!.unit).toBe("USD");
     // An identifier measures nothing, and says so.
-    expect(byName.get("analytics.traces.TraceId")!.unit).toBeNull();
+    expect(byName.get("traces.TraceId")!.unit).toBeNull();
   });
 });
 
@@ -153,11 +153,11 @@ describe("given the LangWatchQL schema catalog when a column is withheld from th
     );
     // The three gate kinds, each read off a column the catalog declares it
     // for, so a collapsed boolean could not pass this.
-    expect(byName.get("analytics.traces.CapturedInput")!.gates).toEqual(["input"]);
-    expect(byName.get("analytics.traces.CapturedOutput")!.gates).toEqual(["output"]);
-    expect(byName.get("analytics.traces.TotalCost")!.gates).toEqual(["costs", "cost:view"]);
+    expect(byName.get("traces.CapturedInput")!.gates).toEqual(["input"]);
+    expect(byName.get("traces.CapturedOutput")!.gates).toEqual(["output"]);
+    expect(byName.get("traces.TotalCost")!.gates).toEqual(["costs", "cost:view"]);
     // A column that needs two permissions says both.
-    expect(byName.get("analytics.simulations.MessageContents")!.gates).toEqual(["input", "output"]);
+    expect(byName.get("simulations.MessageContents")!.gates).toEqual(["input", "output"]);
   });
 
   /** @scenario "The schema endpoint names which permission unlocks each gated column" */
@@ -298,25 +298,25 @@ describe("given the LangWatchQL schema catalog when a dataset is outside the cal
   /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
   it("leaves it out of the published schema entirely", () => {
     expect(schemaWith(WITHOUT_CONTENT).views.map((dataset) => dataset.name)).not.toContain(
-      GATED_DATASET_QUALIFIED_NAME,
+      GATED_DATASET.name,
     );
   });
 
   it("publishes it to a caller who holds the permission, so absence is about the permission", () => {
     expect(schemaWith(FULLY_PERMITTED).views.map((dataset) => dataset.name)).toContain(
-      GATED_DATASET_QUALIFIED_NAME,
+      GATED_DATASET.name,
     );
   });
 
   it("keeps every other dataset, rather than hiding the schema", () => {
     expect(schemaWith(WITHOUT_CONTENT).views.map((dataset) => dataset.name)).toEqual(
-      LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`),
+      LWQL_VIEW_CATALOG.map((view) => view.name),
     );
   });
 
   it("names the dataset's permission on each of its columns", () => {
     const dataset = schemaWith(FULLY_PERMITTED).views.find(
-      (candidate) => candidate.name === GATED_DATASET_QUALIFIED_NAME,
+      (candidate) => candidate.name === GATED_DATASET.name,
     )!;
     expect(dataset.columns.map((column) => column.gates)).toEqual([
       ["input"],
@@ -332,7 +332,7 @@ describe("given the LangWatchQL schema catalog when a dataset is outside the cal
    */
   it("publishes a runnable example for the gated dataset", () => {
     const dataset = schemaWith(FULLY_PERMITTED).views.find(
-      (candidate) => candidate.name === GATED_DATASET_QUALIFIED_NAME,
+      (candidate) => candidate.name === GATED_DATASET.name,
     )!;
     const result = validateLangWatchQL({
       sql: dataset.exampleSql,

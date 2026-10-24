@@ -47,8 +47,16 @@ Feature: A query error tells the caller how to fix it
     Scenario: A TABLE_NOT_ALLOWED violation names the views that exist
       Given the LangWatchQL view allowlist the validator enforces
       When a query names a view that is not on the allowlist
-      Then the violation's availableDatasets lists every view the caller may query
-      And availableDatasets is sorted and deduplicated
+      Then the violation's availableViews lists every view the caller may query
+      And availableViews is sorted and deduplicated
+
+    @unit
+    Scenario: A view qualified with another deployment's database is refused with the bare name
+      Given a deployment serving the views from its own database
+      When a query names a view qualified with a different database
+      Then the query is refused with TABLE_NOT_ALLOWED
+      And the message tells the caller to write the bare view name
+      And availableViews lists the views by their bare names
 
     @unit
     Scenario: A GATED_COLUMN violation names the view's columns
