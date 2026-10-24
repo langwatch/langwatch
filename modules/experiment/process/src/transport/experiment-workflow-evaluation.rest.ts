@@ -34,10 +34,12 @@ export const experimentWorkflowEvaluationRest = defineRestRouter(ExperimentApi)
   .withCredential("project")
 
   .post("/:id/evaluate", "postApiWorkflowsByIdEvaluate")
+  .keepsRecords()
   .withSharedPath(WORKFLOW_NAMESPACE)
   .withParams(experimentWorkflowEvaluateParamsSchema)
   .withInput(experimentWorkflowEvaluateSchema)
   .withPermission(["workflows:create", "evaluations:view"])
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withoutAudit("run, not a change")
   .withOutput(experimentWorkflowEvaluationStartedSchema)
   .withDocs({

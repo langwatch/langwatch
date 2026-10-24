@@ -1,13 +1,18 @@
 import { ForgedAuthorizationError } from "@langwatch/authorization";
-import { AuthorizedClickHouse, type QueryRequest } from "@langwatch/clickhouse-client";
+import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
+import {
+  idIndexedClientDouble,
+  type ScriptedStatements,
+} from "@langwatch/clickhouse-client/testing";
 import { createTenantId, SecurityError } from "@langwatch/eventing";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import type { SpanInsertData } from "@langwatch/trace-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { createTestSpan } from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { SpanStorageStore } from "../../../eventing/span-storage.store.ts";
+import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
@@ -404,15 +409,18 @@ class QueryingClickHouse {
   readonly authorized = new AuthorizedClickHouse({
     resolveClient: async (tenantId?: string) => {
       this.resolvedTenants.push(tenantId);
-      return clickHouseQueryClientDouble({
-        query: async (request: QueryRequest) => {
-          if (this.refuseWith) throw this.refuseWith;
-          this.queries.push({
-            query: request.sql,
-            params: request.params ?? {},
-            settings: request.settings,
-          });
-          return { rows: this.rows };
+      return idIndexedClientDouble({
+        indexes: TRACE_ID_INDEXES,
+        driver: {
+          execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
+            if (this.refuseWith) throw this.refuseWith;
+            this.queries.push({
+              query: request.sql,
+              params: request.params ?? {},
+              settings: request.settings,
+            });
+            return { rows: this.rows };
+          }),
         },
       });
     },
@@ -472,9 +480,11 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
 
       expect(clickhouse.queries).toHaveLength(1);
       const [read] = clickhouse.queries;
-      expect(read?.query).toContain("StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})");
-      expect(read?.params.fromMs).toBe(1_700_000_000_000 - 2 * 24 * 60 * 60 * 1000);
-      expect(read?.params.toMs).toBe(1_700_000_000_000 + 2 * 24 * 60 * 60 * 1000);
+      expect(read?.query).toContain(
+        "StartTime >= fromUnixTimestamp64Milli({idBound_fromMs:Int64})",
+      );
+      expect(read?.params.idBound_fromMs).toBe(1_700_000_000_000 - 2 * 24 * 60 * 60 * 1000);
+      expect(read?.params.idBound_toMs).toBe(1_700_000_000_000 + 2 * 24 * 60 * 60 * 1000);
     });
 
     /** @scenario "The referenced span is read back inside its own partition window" */
@@ -521,7 +531,23 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
     });
 
     /** @scenario "The derivation read never asks for the nested columns" */
-    it("keeps the lazy-materialization lock on the single-span fetch", async () => {
+    it("takes the latest version only", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [storedRow()];
+
+      await repo.findNormalizedSpanById({
+        authorization,
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      expect(clickhouse.queries[0]?.query).toContain("ORDER BY UpdatedAt DESC");
+      expect(clickhouse.queries[0]?.query).toContain("LIMIT 1");
+    });
+
+    /** @scenario "A single-span read never defers its columns to the lazy reader" */
+    it("turns lazy materialization off and keeps the memory ceiling", async () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
@@ -533,10 +559,31 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       });
 
       expect(clickhouse.queries[0]?.settings).toMatchObject({
-        query_plan_optimize_lazy_materialization: "1",
+        query_plan_optimize_lazy_materialization: "0",
+        max_memory_usage: expect.any(String),
       });
-      expect(clickhouse.queries[0]?.query).toContain("ORDER BY UpdatedAt DESC");
-      expect(clickhouse.queries[0]?.query).toContain("LIMIT 1");
+    });
+
+    /** @scenario "A single-span read never defers its columns to the lazy reader" */
+    it("reads the span's events with lazy materialization off too", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [];
+
+      await repo.findSpanEvents({
+        authorization,
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      expect(clickhouse.queries.length).toBeGreaterThan(0);
+      for (const read of clickhouse.queries) {
+        expect(read.query).toContain('"Events.Attributes"');
+        expect(read.settings).toMatchObject({
+          query_plan_optimize_lazy_materialization: "0",
+          max_memory_usage: expect.any(String),
+        });
+      }
     });
 
     /** @scenario "The referenced span is read back inside its own partition window" */
@@ -578,7 +625,7 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       expect(foundSpan).toBeNull();
       expect(clickhouse.queries).toHaveLength(1);
       expect(clickhouse.queries[0]?.query).toContain(
-        "StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})",
+        "StartTime >= fromUnixTimestamp64Milli({idBound_fromMs:Int64})",
       );
     });
   });
@@ -635,5 +682,72 @@ describe("SpanStorageClickHouseRepository.findLangwatchSignalsByTraceId", () => 
     expect(signals).toEqual([]);
     expect(clickhouse.queries).toHaveLength(1);
     expect(clickhouse.queries[0]?.query).toContain("StartTime >= fromUnixTimestamp64Milli");
+  });
+});
+
+describe("SpanStorageClickHouseRepository.listSpansPaginated", () => {
+  const SPAN_MS = 1_700_000_000_000;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  /** A source holding one span at SPAN_MS, answering each statement only inside its bound. */
+  function pagedRepository() {
+    const statements: { sql: string; params: Record<string, unknown> }[] = [];
+    const reaches = (params: Record<string, unknown>) => {
+      const from = params.idBound_fromMs ?? params.spanFromMs;
+      const to = params.idBound_toMs ?? params.spanToMs;
+      return (
+        (typeof from !== "number" || from <= SPAN_MS) && (typeof to !== "number" || SPAN_MS <= to)
+      );
+    };
+    const execute = vi.fn<ScriptedStatements["execute"]>(async (request) => {
+      const params = request.params ?? {};
+      statements.push({ sql: request.sql, params });
+      if (request.sql.includes("occurredAtMs")) return { rows: [{ occurredAtMs: SPAN_MS }] };
+      if (request.sql.includes("count(DISTINCT SpanId)")) {
+        if (reaches(params)) return { rows: [{ Total: "1", FromMs: SPAN_MS, ToMs: SPAN_MS }] };
+        // `count()` with no GROUP BY answers one row of zeroes unless HAVING drops it.
+        return { rows: request.sql.includes("HAVING") ? [] : [{ Total: "0" }] };
+      }
+      return { rows: reaches(params) ? [storedRow()] : [] };
+    });
+    const repo = SpanStorageClickHouseRepository.create({
+      resolveClient: new RecordingClickHouse().resolve,
+      clickhouse: new AuthorizedClickHouse({
+        resolveClient: async () =>
+          idIndexedClientDouble({ indexes: TRACE_ID_INDEXES, driver: { execute } }),
+      }),
+    });
+    return { repo, statements };
+  }
+
+  describe("given a hint whose window misses the trace's spans", () => {
+    /** @scenario "a paged span read counts and pages within one bound" */
+    it("answers the true total with the page, both from the one widened bound", async () => {
+      const { repo, statements } = pagedRepository();
+
+      const page = await repo.listSpansPaginated({
+        authorization,
+        traceId: "trace-1",
+        limit: 10,
+        offset: 0,
+        occurredAtMs: SPAN_MS - 30 * DAY_MS,
+      });
+
+      expect(page.total).toBe(1);
+      expect(page.spans).toHaveLength(1);
+      const pageRead = statements.at(-1);
+      expect(pageRead?.params).toMatchObject({ spanFromMs: SPAN_MS, spanToMs: SPAN_MS });
+    });
+  });
+
+  describe("given no time for the trace while its index is not ready", () => {
+    /** @scenario "a paged span read counts and pages within one bound" */
+    it("looks the trace's time up once for both the count and the page", async () => {
+      const { repo, statements } = pagedRepository();
+
+      await repo.listSpansPaginated({ authorization, traceId: "trace-1", limit: 10, offset: 0 });
+
+      expect(statements.filter((each) => each.sql.includes("occurredAtMs"))).toHaveLength(1);
+    });
   });
 });

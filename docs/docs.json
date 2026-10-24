@@ -124,7 +124,8 @@
                   "agent-testing/scenarios",
                   "agent-testing/test-suites",
                   "agent-testing/evaluators",
-                  "agent-testing/run-parameters"
+                  "agent-testing/run-parameters",
+                  "agent-testing/setup-and-teardown-hooks"
                 ]
               },
               {
@@ -569,7 +570,13 @@
               "integration/go/integrations/groq",
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
-              "integration/go/integrations/openrouter",
+              {
+                "group": "OpenRouter",
+                "pages": [
+                  "integration/openrouter-broadcast",
+                  "integration/go/integrations/openrouter"
+                ]
+              },
               {
                 "group": "LiteLLM",
                 "pages": [
@@ -679,6 +686,7 @@
               "ai-gateway/providers/groq",
               "ai-gateway/providers/cerebras",
               "ai-gateway/providers/deepseek",
+              "ai-gateway/providers/doubleword",
               "ai-gateway/providers/voyage",
               "ai-gateway/providers/elevenlabs",
               "ai-gateway/providers/openai-account",
@@ -1740,7 +1748,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1792386659",
+      "source": "/ci/cache/busted/1792866928",
       "destination": "/introduction"
     },
     {

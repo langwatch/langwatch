@@ -652,6 +652,24 @@ describe("langwatch-api", () => {
       expect(calledOptions.headers["X-LangWatch-SDK-Language"]).toBe("typescript");
       expect(calledOptions.headers["X-LangWatch-SDK-Version"]).toMatch(/^\d+\.\d+\.\d+/);
       expect(calledOptions.headers["User-Agent"]).toMatch(/^langwatch-mcp\//);
+      expect(calledOptions.headers["X-LangWatch-MCP-Host"]).toBeUndefined();
+    });
+
+    describe("when the hosted MCP server runs the tool", () => {
+      /** @scenario "The hosted MCP's own API calls are counted with client hosted-mcp" */
+      it("names itself as the hosted MCP", async () => {
+        const { searchTraces } = await import("../langwatch-api.ts");
+        const { getConfig, runWithConfig } = await import("../config.ts");
+        mockJsonResponse({ traces: [] });
+
+        await runWithConfig({ ...getConfig(), hosted: true }, () =>
+          searchTraces({ startDate: 1000, endDate: 2000 }),
+        );
+
+        const [, calledOptions] = mockFetch.mock.calls[0]!;
+        expect(calledOptions.headers["X-LangWatch-MCP-Host"]).toBe("hosted");
+        expect(calledOptions.headers["X-LangWatch-SDK-Name"]).toBe("langwatch-mcp");
+      });
     });
   });
 });

@@ -1,12 +1,38 @@
+import {
+  LEGACY_PROJECT_KEY_LOG_WINDOW_MS,
+  LEGACY_PROJECT_KEY_LOGGER_NAME,
+  LegacyProjectKeyIngestionOnlyError,
+  legacyProjectKeyUseLines,
+  legacyProjectKeyUseSpanAttributes,
+  legacyProjectKeyUseWindowKey,
+  type LegacyProjectKeyUse,
+} from "@langwatch/api-key-contract";
+import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observability";
 import type { ProjectKeyedProbeRequest } from "@langwatch/platform-health-contract";
 import { deriveRunActor } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
+import { trace } from "@opentelemetry/api";
 
 import { canaryAnswer, MAX_CANARY_QUERY_PARAM_LENGTH } from "../rules/scenario-canary.rules.ts";
 import type { ScenarioCanaryService } from "./scenario-canary.service.ts";
 import type { SubsystemProbeOutcome, SubsystemProbeService } from "./subsystem-probe.service.ts";
 
-/** Who a probe's key acts as: its project, and the key and its owner when it is an API key. */
-type ProbeCaller = Readonly<{ projectId: string; userId: string | null; apiKeyId: string | null }>;
+/**
+ * Who a probe's key acts as: its project, and the key and its owner when it is an API key.
+ * `legacyKeyOutsideScope` marks a legacy project key without full access: logged on any probe
+ * but the collector, and refused there once its project is enforced.
+ */
+type ProbeCaller = Readonly<{
+  projectId: string;
+  userId: string | null;
+  apiKeyId: string | null;
+  legacyKeyOutsideScope: Readonly<{ organizationId: string; enforced: boolean }> | null;
+}>;
+
+/** Where legacy key lines go; a test passes its own logger rather than patching the shared one. */
+export type LegacyKeyLogger = Pick<Logger, "info" | "warn">;
+
+const legacyKeyLogger: LegacyKeyLogger = createLogger(LEGACY_PROJECT_KEY_LOGGER_NAME);
 
 /** Resolves a raw token, project key or API key, to its caller as main's TokenResolver did. */
 type ProbeCallerResolver = (
@@ -35,21 +61,27 @@ export class ProjectKeyedProbeService {
   readonly #probes: SubsystemProbeService;
   readonly #resolveCaller: ProbeCallerResolver;
   readonly #scenarioCanary: ScenarioCanaryService;
+  readonly #legacyKeyLogger: LegacyKeyLogger;
+  /** One legacy key line per project and probe per window in this process. */
+  readonly #legacyKeyWindow = createWarnThrottle(LEGACY_PROJECT_KEY_LOG_WINDOW_MS);
 
   private constructor(options: {
     probes: SubsystemProbeService;
     resolveCaller: ProbeCallerResolver;
     scenarioCanary: ScenarioCanaryService;
+    legacyKeyLogger?: LegacyKeyLogger | undefined;
   }) {
     this.#probes = options.probes;
     this.#resolveCaller = options.resolveCaller;
     this.#scenarioCanary = options.scenarioCanary;
+    this.#legacyKeyLogger = options.legacyKeyLogger ?? legacyKeyLogger;
   }
 
   static create(options: {
     probes: SubsystemProbeService;
     resolveCaller: ProbeCallerResolver;
     scenarioCanary: ScenarioCanaryService;
+    legacyKeyLogger?: LegacyKeyLogger | undefined;
   }): ProjectKeyedProbeService {
     return new ProjectKeyedProbeService(options);
   }
@@ -79,11 +111,44 @@ export class ProjectKeyedProbeService {
     });
     if (!caller) return json(401, { message: "Invalid auth token." });
     const { projectId } = caller;
+    // Only the collector canary is ingestion; every other probe reads or runs project data.
+    const outside = caller.legacyKeyOutsideScope;
+    if (outside && request.check !== "collector") {
+      this.#recordOutsideScope({ caller, check: request.check });
+      if (outside.enforced) {
+        const refusal = new LegacyProjectKeyIngestionOnlyError();
+        return json(refusal.httpStatus, { code: refusal.code, message: refusal.message });
+      }
+    }
 
     if (request.check === "scenarios")
       return this.#runScenarioCanary({ caller, requested: request.runPlanId });
 
     return answerOf(await this.#run(request, { authToken, projectId, signal: request.signal }));
+  }
+
+  #recordOutsideScope({ caller, check }: { caller: ProbeCaller; check: string }): void {
+    if (!caller.legacyKeyOutsideScope) return;
+    const use: LegacyProjectKeyUse = {
+      projectId: caller.projectId,
+      organizationId: caller.legacyKeyOutsideScope.organizationId,
+      route: `GET /api/health/${check}`,
+      permission: null,
+      routeScopes: [],
+    };
+    const decision = {
+      outsideScope: true,
+      enforced: caller.legacyKeyOutsideScope.enforced,
+    } as const;
+    trace.getActiveSpan()?.setAttributes(legacyProjectKeyUseSpanAttributes({ use, decision }));
+    const suppressed = this.#legacyKeyWindow.claim({
+      key: legacyProjectKeyUseWindowKey(use),
+      now: nowInstant().epochMilliseconds,
+    });
+    if (suppressed === undefined) return;
+    for (const line of legacyProjectKeyUseLines({ use, decision, suppressed })) {
+      this.#legacyKeyLogger[line.level](line.fields, line.message);
+    }
   }
 
   async #runScenarioCanary({

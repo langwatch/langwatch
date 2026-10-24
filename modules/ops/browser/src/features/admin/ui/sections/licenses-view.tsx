@@ -13,6 +13,7 @@ import { AdminTable } from "./admin-table-shell.tsx";
 import { LicenseDetailDrawer } from "./license-detail-drawer.tsx";
 import { LicenseIssueDrawer } from "./license-issue-drawer.tsx";
 import { LicenseRevokeDialog } from "./license-revoke-dialog.tsx";
+import { SelfHostedNoticesSection } from "./self-hosted-notices-section.tsx";
 
 const PAGE_SIZE = 25;
 
@@ -150,6 +151,8 @@ export default function LicensesView() {
       </AdminTable>
 
       <ActivationCodesSection />
+
+      <SelfHostedNoticesSection />
 
       <LicenseDetailDrawer
         licenseId={openId}

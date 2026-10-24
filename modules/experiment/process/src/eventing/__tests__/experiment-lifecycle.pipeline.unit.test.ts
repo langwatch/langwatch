@@ -1,6 +1,7 @@
 /**
  * A workbench run that ends is recorded on experiment's own pipeline, which peers react to (§9).
  * @see specs/features/customer-io-nurturing-integration.feature
+ * @see modules/experiment/specs/experiment-service.feature
  */
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
@@ -21,18 +22,19 @@ const ran: RecordExperimentRanCommandData = {
 };
 
 describe("the experiment lifecycle pipeline", () => {
+  /** @scenario "An experiment's ran fact is keyed by the run, not its project" */
   it("appends one experiment ran event keyed by the person and the instant", () => {
     const [event, ...rest] = new RecordExperimentRanCommand().handle({
       tenantId: createTenantId("project-1"),
       type: RECORD_EXPERIMENT_RAN_COMMAND_TYPE,
-      aggregateId: "project-1",
+      aggregateId: RecordExperimentRanCommand.getAggregateId(ran),
       data: ran,
     });
 
     expect(rest).toEqual([]);
     expect(event).toMatchObject({
       type: "lw.experiment.ran",
-      aggregateId: "project-1",
+      aggregateId: "user-1:1700000000000",
       idempotencyKey: "project-1:user-1:ran:1700000000000",
       data: ran,
     });

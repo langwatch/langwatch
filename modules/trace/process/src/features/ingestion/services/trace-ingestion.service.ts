@@ -11,7 +11,6 @@ import {
 import { nowInstant } from "@langwatch/time";
 import {
   type PIIRedactionLevel,
-  type RecordSpanCommandData,
   SPAN_BACKFILL_MAX_PAST_DAYS,
   SPAN_MAX_PAST_MS,
   storableSpanTimesOf,
@@ -22,24 +21,26 @@ import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/a
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 
-import type {
-  TraceSpanDedupRepository,
-  UsageRecordRef,
-} from "../../../repositories/trace-span-dedup.repository.ts";
+import type { TraceSpanDedupRepository } from "../../../repositories/trace-span-dedup.repository.ts";
 import {
   codexHelperThreadMarkersOf,
   stampCodexHelperThread,
   type ScopedSpans,
 } from "../../claude-code/rules/codex-helper-thread.rules.ts";
 import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
-import { TraceRequestUsageService } from "./trace-request-usage.service.ts";
+import {
+  type NormalizedSpanInput,
+  type SpanIngestionResult,
+  type SpanIngestionStatus,
+  type TraceIngressCommand,
+  type TraceIngressPayload,
+  TraceSpanCollectionService,
+} from "./trace-span-collection.service.ts";
 
-type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
-
-type SpanIngestionResult = {
-  status: SpanIngestionStatus;
-  error?: string;
-};
+/** A raw span's admission: decided at the door, or admitted for collection. */
+type SpanAdmission =
+  | Readonly<{ result: SpanIngestionResult }>
+  | Readonly<{ ingest: NormalizedSpanInput }>;
 
 type TraceRequestCollectionResult = {
   rejectedSpans: number;
@@ -51,16 +52,6 @@ type TraceRequestCollectionResult = {
   ingestionFailureMessage: string;
   errorMessage: string;
 };
-
-/** The Trace pipeline's one named command handoff. */
-export abstract class TraceIngressCommand {
-  abstract recordSpan(data: RecordSpanCommandData): Promise<void>;
-}
-
-/** Optional edge/blob preparation, composed by the application when enabled. */
-export abstract class TraceIngressPayload {
-  abstract prepare(data: RecordSpanCommandData): Promise<RecordSpanCommandData>;
-}
 
 /**
  * The outcome of every span in one export request. Only `dropped` and
@@ -213,28 +204,19 @@ export class TraceIngestionService {
           scopes: scopedSpansOf(traceRequest),
         });
 
-        for (const resourceSpan of traceRequest.resourceSpans ?? []) {
-          const resource = this.parseResource(resourceSpan?.resource, tenantId);
-
-          for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
-            const scope = this.parseScope(scopeSpan?.scope, tenantId);
-
-            for (const candidate of scopeSpan?.spans ?? []) {
-              tally.record(
-                await this.processSpan({
-                  tenantId,
-                  otelSpan: candidate,
-                  resource,
-                  scope,
-                  piiRedactionLevel,
-                  otelSpanRef,
-                  helperThreads,
-                  maxPastMs,
-                }),
-              );
-            }
-          }
-        }
+        const admissions = this.admitRequestSpans({
+          tenantId,
+          traceRequest,
+          piiRedactionLevel,
+          otelSpanRef,
+          helperThreads,
+          maxPastMs,
+        });
+        // Admitted spans are collected together, so their dedup claims share round trips.
+        const collected = await this.collection.ingestNormalizedSpans(
+          admissions.flatMap((admission) => ("ingest" in admission ? [admission.ingest] : [])),
+        );
+        recordInRequestOrder({ tally, admissions, collected });
 
         tally.describeOn(otelSpanRef);
         this.outcomeMetrics.record(tally.outcomes());
@@ -242,6 +224,48 @@ export class TraceIngestionService {
         return tally.collectionResult();
       },
     );
+  }
+
+  /** Every span of the request admitted or decided at the door, in request order. */
+  private admitRequestSpans({
+    tenantId,
+    traceRequest,
+    piiRedactionLevel,
+    otelSpanRef,
+    helperThreads,
+    maxPastMs,
+  }: {
+    tenantId: string;
+    traceRequest: IExportTraceServiceRequest;
+    piiRedactionLevel: PIIRedactionLevel;
+    otelSpanRef: OtelSpan;
+    helperThreads: Map<string, string>;
+    maxPastMs: number;
+  }): SpanAdmission[] {
+    const admissions: SpanAdmission[] = [];
+    for (const resourceSpan of traceRequest.resourceSpans ?? []) {
+      const resource = this.parseResource(resourceSpan?.resource, tenantId);
+
+      for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+        const scope = this.parseScope(scopeSpan?.scope, tenantId);
+
+        for (const candidate of scopeSpan?.spans ?? []) {
+          admissions.push(
+            this.admitSpan({
+              tenantId,
+              otelSpan: candidate,
+              resource,
+              scope,
+              piiRedactionLevel,
+              otelSpanRef,
+              helperThreads,
+              maxPastMs,
+            }),
+          );
+        }
+      }
+    }
+    return admissions;
   }
 
   /**
@@ -272,18 +296,12 @@ export class TraceIngestionService {
    * OTLP request path and the REST tracked-event path both reach it by name;
    * the work itself belongs to {@link TraceSpanCollectionService}.
    */
-  ingestNormalizedSpan(input: {
-    tenantId: string;
-    span: OtlpSpan;
-    resource: OtlpResource | null;
-    instrumentationScope: OtlpInstrumentationScope | null;
-    piiRedactionLevel: PIIRedactionLevel;
-    otelSpanRef?: OtelSpan;
-  }): Promise<SpanIngestionResult> {
+  ingestNormalizedSpan(input: NormalizedSpanInput): Promise<SpanIngestionResult> {
     return this.collection.ingestNormalizedSpan(input);
   }
 
-  private async processSpan(input: {
+  /** Validates and filters one raw span: a final result, or the normalized span to collect. */
+  private admitSpan(input: {
     tenantId: string;
     otelSpan: unknown;
     resource: OtlpResource | null;
@@ -293,7 +311,7 @@ export class TraceIngestionService {
     /** Codex helper threads by request span id; absent, nothing is stamped. */
     helperThreads?: Map<string, string>;
     maxPastMs: number;
-  }): Promise<SpanIngestionResult> {
+  }): SpanAdmission {
     const spanParseResult = spanSchema.safeParse(input.otelSpan);
     if (!spanParseResult.success) {
       this.logger.warn(
@@ -302,8 +320,10 @@ export class TraceIngestionService {
       );
 
       return {
-        status: "dropped",
-        error: `span validation failed: ${spanParseResult.error.message}`,
+        result: {
+          status: "dropped",
+          error: `span validation failed: ${spanParseResult.error.message}`,
+        },
       };
     }
 
@@ -311,13 +331,16 @@ export class TraceIngestionService {
     // after the append it throws permanently on a retrying lane. One span's problem.
     const decoded = storableSpanTimesOf(spanParseResult.data);
     if ("unstorable" in decoded) {
-      return { status: "dropped", error: unstorableSpanTimeMessage(decoded.unstorable) };
+      return {
+        result: { status: "dropped", error: unstorableSpanTimeMessage(decoded.unstorable) },
+      };
     }
     const { startTimeUnixMs } = decoded.times;
 
     if (startTimeUnixMs < nowInstant().epochMilliseconds - input.maxPastMs) {
       const days = Math.round(input.maxPastMs / DAY_MS);
-      return { status: "dropped", error: `span start time is more than ${days} days in the past` };
+      const error = `span start time is more than ${days} days in the past`;
+      return { result: { status: "dropped", error } };
     }
 
     // The stamp is the admission: it is applied before the filter reads the span.
@@ -335,17 +358,19 @@ export class TraceIngestionService {
         attributeKeys: span.attributes.map((attribute) => attribute.key),
       });
     if (isFilteredCodingAgentSpan) {
-      return { status: "filtered" };
+      return { result: { status: "filtered" } };
     }
 
-    return this.ingestNormalizedSpan({
-      tenantId: input.tenantId,
-      span: this.withHexIds(span),
-      resource: input.resource,
-      instrumentationScope: input.scope,
-      piiRedactionLevel: input.piiRedactionLevel,
-      otelSpanRef: input.otelSpanRef,
-    });
+    return {
+      ingest: {
+        tenantId: input.tenantId,
+        span: this.withHexIds(span),
+        resource: input.resource,
+        instrumentationScope: input.scope,
+        piiRedactionLevel: input.piiRedactionLevel,
+        otelSpanRef: input.otelSpanRef,
+      },
+    };
   }
 
   /**
@@ -369,105 +394,20 @@ export class TraceIngestionService {
   }
 }
 
-/**
- * The span-collection half of ingestion: dedup, payload prep, command
- * handoff. Split from {@link TraceIngestionService} at the worker conversion,
- * since its coding-agent span filter is unreachable from a worker's path.
- */
-class TraceSpanCollectionService {
-  private readonly logger = createLogger("langwatch:trace-processing:span-collection");
-  private readonly usage: TraceRequestUsageService;
-
-  private constructor(
-    private readonly options: {
-      dedup: TraceSpanDedupRepository;
-      commands: TraceIngressCommand;
-      payloads?: TraceIngressPayload;
-    },
-  ) {
-    this.usage = TraceRequestUsageService.create({ dedup: options.dedup });
-  }
-
-  static create(options: {
-    dedup: TraceSpanDedupRepository;
-    commands: TraceIngressCommand;
-    payloads?: TraceIngressPayload;
-  }): TraceSpanCollectionService {
-    return new TraceSpanCollectionService(options);
-  }
-
-  async ingestNormalizedSpan(input: {
-    tenantId: string;
-    span: OtlpSpan;
-    resource: OtlpResource | null;
-    instrumentationScope: OtlpInstrumentationScope | null;
-    piiRedactionLevel: PIIRedactionLevel;
-    otelSpanRef?: OtelSpan;
-  }): Promise<SpanIngestionResult> {
-    let lockAcquired = false;
-    let usageRecord: UsageRecordRef | null = null;
-
-    try {
-      const claim = await this.options.dedup.claimProcessing({
-        tenantId: input.tenantId,
-        traceId: input.span.traceId,
-        spanId: input.span.spanId,
-      });
-      if (claim.outcome === "held") {
-        return { status: "deduped" };
-      }
-
-      lockAcquired = claim.outcome === "acquired";
-
-      const usage = await this.usage.claim(input);
-      usageRecord = usage.acquired;
-
-      const commandData: RecordSpanCommandData = {
-        tenantId: input.tenantId,
-        span: usage.span,
-        resource: input.resource,
-        instrumentationScope: input.instrumentationScope,
-        piiRedactionLevel: input.piiRedactionLevel,
-        occurredAt: nowInstant().epochMilliseconds,
-      };
-      const prepared = this.options.payloads
-        ? await this.options.payloads.prepare(commandData)
-        : commandData;
-
-      await this.options.commands.recordSpan(prepared);
-      await this.options.dedup.confirmProcessed({
-        tenantId: input.tenantId,
-        traceId: input.span.traceId,
-        spanId: input.span.spanId,
-      });
-
-      return { status: "collected" };
-    } catch (error) {
-      if (lockAcquired) {
-        await this.options.dedup.releaseOnFailure({
-          tenantId: input.tenantId,
-          traceId: input.span.traceId,
-          spanId: input.span.spanId,
-        });
-      }
-      if (usageRecord) {
-        await this.usage.release({ record: usageRecord });
-      }
-
-      input.otelSpanRef?.addEvent("span_ingestion_error", {
-        "error.message": error instanceof Error ? error.message : String(error),
-        "tenant.id": input.tenantId,
-      });
-      this.logger.error(
-        { error, tenantId: input.tenantId, traceId: input.span.traceId, spanId: input.span.spanId },
-        "Error dispatching span to the trace processing pipeline",
-      );
-
-      return {
-        status: "failed",
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
+/** Tallies each span's outcome in request order; collected results follow the admitted spans. */
+function recordInRequestOrder({
+  tally,
+  admissions,
+  collected,
+}: {
+  tally: SpanIngestionTally;
+  admissions: readonly SpanAdmission[];
+  collected: readonly SpanIngestionResult[];
+}): void {
+  let next = 0;
+  for (const admission of admissions) {
+    const result = "ingest" in admission ? collected[next++] : admission.result;
+    if (result) tally.record(result);
   }
 }
 

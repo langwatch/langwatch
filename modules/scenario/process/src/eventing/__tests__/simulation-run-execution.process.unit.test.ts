@@ -62,6 +62,10 @@ class UnusedScenarioExecutionService extends ScenarioExecutionService {
   recordCutAtLimit(): Promise<void> {
     throw new Error("recordCutAtLimit unexpectedly called in evolve tests");
   }
+
+  recordHooks(): Promise<void> {
+    throw new Error("recordHooks unexpectedly called in evolve tests");
+  }
 }
 
 /**
@@ -290,6 +294,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.ERROR,
             error: "queued event carries no execution target",
+            outcomeAtMs: 10_000,
           },
         },
       ]);
@@ -350,6 +355,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             scenarioRunId: RUN_ID,
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.CANCELLED,
+            outcomeAtMs: 10_000,
           },
         },
       ]);
@@ -483,6 +489,33 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       );
       expect(executeIntentFor()).not.toHaveProperty("startedByUserId");
       expect(executeIntentFor()).not.toHaveProperty("startedByApiKeyId");
+    });
+  });
+
+  describe("when the queued event records that the run keeps its data", () => {
+    function executeIntentFor(metadata?: Record<string, unknown>) {
+      const evolution = evolveEvent(
+        initialState,
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+          occurredAt: 10_000,
+          data: queuedData(metadata ? { metadata } : {}),
+        }),
+      );
+      return evolution.intents[0]?.payload;
+    }
+
+    /** @scenario "Rerun and keep data skips teardown for that rerun" */
+    it("carries keep data on the execute intent", () => {
+      expect(executeIntentFor({ langwatch: { keepData: true } })).toMatchObject({
+        keepData: true,
+      });
+    });
+
+    it("carries none when the run did not ask to keep its data", () => {
+      expect(executeIntentFor({ langwatch: { targetReferenceId: "agent_1" } })).not.toHaveProperty(
+        "keepData",
+      );
     });
   });
 
@@ -646,6 +679,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             scenarioRunId: RUN_ID,
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.CANCELLED,
+            outcomeAtMs: 15_000,
           },
         },
       ]);
@@ -714,6 +748,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
           scenarioRunId: RUN_ID,
           projectId: PROJECT_ID,
           status: ScenarioRunStatus.CANCELLED,
+          outcomeAtMs: 15_000 + CANCEL_GRACE_MS,
         },
       });
     });
@@ -776,6 +811,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
               projectId: PROJECT_ID,
               status: ScenarioRunStatus.ERROR,
               error: "stalled",
+              outcomeAtMs: 10_000 + STALL_THRESHOLD_MS,
             },
           },
         ]);
@@ -795,6 +831,24 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         expect(evolution.nextWakeAt).toBe(10_000 + STALL_THRESHOLD_MS);
       },
     );
+
+    /** @scenario "A run caught up long after it stalled is finished at its stall time" */
+    it("dates the stalled finish at the stall deadline when the wake runs months late", () => {
+      const state = queuedState({ phase: "running", lastActivityAtMs: 10_000 });
+      const ninetyDaysLate = 10_000 + STALL_THRESHOLD_MS + 90 * 24 * 60 * 60 * 1000;
+
+      const evolution = evolveWake(state, ninetyDaysLate, ninetyDaysLate);
+
+      expect(evolution.intents).toEqual([
+        expect.objectContaining({
+          intentType: "finish",
+          payload: expect.objectContaining({
+            error: "stalled",
+            outcomeAtMs: 10_000 + STALL_THRESHOLD_MS,
+          }),
+        }),
+      ]);
+    });
 
     /** @scenario "A queued run whose execute intent never lands is finished as stalled" */
     it("finishes a run that never left queued, so a lost execute cannot pin it", () => {
@@ -821,6 +875,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.ERROR,
             error: "stalled",
+            outcomeAtMs: 10_000 + STALL_THRESHOLD_MS,
           },
         },
       ]);
@@ -864,6 +919,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.ERROR,
             error: "stalled",
+            outcomeAtMs: 10_000 + STALL_THRESHOLD_MS,
           },
         },
       ]);
@@ -1109,6 +1165,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         secretParameterNames: null,
         startedByUserId: null,
         startedByApiKeyId: null,
+        keepData: false,
         evaluators: null,
         hasOwnEvaluations: false,
       });

@@ -41,6 +41,10 @@ jobs:
     runs-on: ${{ matrix.target.runner }}
     container: ${{ matrix.target.container || null }}
     timeout-minutes: 30
+    # id-token lets the upload step assume the publisher role by OIDC.
+    permissions:
+      contents: read
+      id-token: write
 
     strategy:
       fail-fast: false
@@ -288,8 +292,19 @@ jobs:
           cat "${tarball}.sha256"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
 
-      - name: Configure AWS credentials
-        if: ${{ !inputs.dry_run }}
+      # The publisher role trusts this workflow on main only. Setting the
+      # EMBEDS_AWS_ROLE_ARN repository variable switches the upload to it; the
+      # stored-key step below goes once the role has published a release.
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ !inputs.dry_run && vars.EMBEDS_AWS_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.EMBEDS_AWS_ROLE_ARN }}
+          role-session-name: embedded-binaries-${{ github.run_id }}
+
+      - name: Configure AWS credentials (stored key, until EMBEDS_AWS_ROLE_ARN is set)
+        if: ${{ !inputs.dry_run && vars.EMBEDS_AWS_ROLE_ARN == '' }}
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           aws-region: ${{ env.AWS_REGION }}

@@ -83,6 +83,7 @@ export class CodingAgentPullRequestReadService {
       sessionEvents: CodingAgentSessionEventRepository;
       sessionReads: CodingAgentSessionReadService;
       github: GithubApi;
+      projects: Pick<ProjectApi, "listNamesByIds">;
       clock: CodingAgentClock;
       assignments: CodingAgentPullRequestAssignmentService;
       shares: CodingAgentPullRequestShareService;
@@ -104,12 +105,17 @@ export class CodingAgentPullRequestReadService {
       toMs,
       limit: SESSIONS_LIST_LIMIT,
     });
-    const pullRequests = await this.dependencies.sessionListPullRequests.findForProject({
-      projectId: input.projectId,
-      sessions: rows,
-    });
+    const [pullRequests, projectNames] = await Promise.all([
+      this.dependencies.sessionListPullRequests.findForProject({
+        projectId: input.projectId,
+        sessions: rows,
+      }),
+      this.projectNamesOf(rows),
+    ]);
 
     return rows.map((row) => ({
+      tenantId: row.tenantId,
+      projectName: projectNames.get(row.tenantId) ?? row.tenantId,
       sessionId: row.sessionId,
       title: row.title === "" ? null : row.title,
       agent: row.agent,
@@ -137,6 +143,14 @@ export class CodingAgentPullRequestReadService {
       models: row.models,
       pullRequests: pullRequests.get(sessionListKey(row)) ?? [],
     }));
+  }
+
+  /** One name lookup per page, over the distinct member projects its rows came from. */
+  private async projectNamesOf(rows: { tenantId: string }[]): Promise<Map<string, string>> {
+    const projectIds = [...new Set(rows.map((row) => row.tenantId))];
+    if (projectIds.length === 0) return new Map();
+    const identities = await this.dependencies.projects.listNamesByIds({ projectIds });
+    return new Map(identities.map((identity) => [identity.id, identity.name]));
   }
 
   async getPullRequestUsage(
@@ -177,7 +191,13 @@ export class CodingAgentPullRequestReadService {
           ...this.dependencies.usage.contributorFor(session.tenantId, query.projects),
           agent: session.agent,
           totalTokens: this.dependencies.usage.tokenTotal(session),
-          costUsd: costProjects.has(session.tenantId) ? session.costUsd : null,
+          costUsd: this.dependencies.usage.isSessionPriced({
+            session,
+            costProjects,
+            costUnknown: gathered.costUnknown,
+          })
+            ? session.costUsd
+            : null,
           title: session.title === "" ? null : session.title,
         })),
     });
@@ -197,6 +217,7 @@ export class CodingAgentPullRequestReadService {
     sessions: CodingAgentSessionBranchRecord[];
     rows: CodingAgentUsageRow[];
     modelBreakdown: CodingAgentModelUsage[];
+    costUnknown: ReadonlySet<string>;
   }> {
     const target = await this.dependencies.github.findByNumber({
       organizationId: query.organizationId,
@@ -212,12 +233,12 @@ export class CodingAgentPullRequestReadService {
     }
 
     if (query.permittedProjectIds.length === 0) {
-      return { target, sessions: [], rows: [], modelBreakdown: [] };
+      return { target, sessions: [], rows: [], modelBreakdown: [], costUnknown: new Set() };
     }
 
     const [repositoryOwner, repositoryName] = target.repositoryFullName.split("/");
     if (!repositoryOwner || !repositoryName) {
-      return { target, sessions: [], rows: [], modelBreakdown: [] };
+      return { target, sessions: [], rows: [], modelBreakdown: [], costUnknown: new Set() };
     }
 
     return this.attributedToTarget({ query, target, repositoryOwner, repositoryName });
@@ -239,6 +260,7 @@ export class CodingAgentPullRequestReadService {
     sessions: CodingAgentSessionBranchRecord[];
     rows: CodingAgentUsageRow[];
     modelBreakdown: CodingAgentModelUsage[];
+    costUnknown: ReadonlySet<string>;
   }> {
     const toMs = this.dependencies.clock.nowMs();
     const candidates = await this.dependencies.candidates.findCandidates({
@@ -253,7 +275,7 @@ export class CodingAgentPullRequestReadService {
     // the neighbours to know where this one's era ends, plus the pull requests
     // of every other branch the candidates drove, so a session is attributed
     // here exactly as the personal page attributes it.
-    const [modelTotals, attributable] = await Promise.all([
+    const [eventTotals, attributable] = await Promise.all([
       this.dependencies.sessionEvents.sumTokensByModelPerSession({
         tenantIds: query.permittedProjectIds,
         sessionIds: candidates.sessions.map((session) => session.sessionId),
@@ -276,10 +298,14 @@ export class CodingAgentPullRequestReadService {
       prNumber: target.prNumber,
       repositoryHost: target.repositoryHost,
       repositoryFullName: target.repositoryFullName,
-      modelTotals,
+      modelTotals: this.dependencies.usage.modelTotalsOf({
+        sessions: candidates.sessions,
+        eventTotals,
+      }),
     });
     const attached = attribution.sessions;
     const costProjects = new Set(query.costProjectIds);
+    const costUnknown = this.dependencies.usage.costUnknownSessions(attribution.modelTotals);
     const nonBillableAgents = await this.dependencies.candidates.nonBillableAgents(
       query.organizationId,
       attached.map((session) => session.agent),
@@ -291,6 +317,7 @@ export class CodingAgentPullRequestReadService {
       rows: this.dependencies.usage.groupedRows({
         sessions: attached,
         costProjects,
+        costUnknown,
         nonBillableAgents,
         projects: query.projects,
       }),
@@ -299,6 +326,7 @@ export class CodingAgentPullRequestReadService {
         attribution.modelTotals,
         costProjects,
       ),
+      costUnknown,
     };
   }
 }

@@ -86,6 +86,7 @@ function runOnce({
     checkpoint: { resumeFrom, save: async ({ report: next }) => void saved.push(next) },
     dryRun,
     signal,
+    log: { info: () => undefined, warn: () => undefined },
   });
   return { step, report, saved };
 }

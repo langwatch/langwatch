@@ -309,9 +309,11 @@ function createTracesRest() {
     .withVersion(MANAGEMENT_API_VERSION)
 
     .post("/search", "searchTraces")
+    .keepsRecords()
     .withoutAudit("read sent as a POST")
     .withInput(traceSearchBodySchema)
     .withPermission("traces:view")
+    .withLegacyKeyScope("legacy_project_key_traces_read")
     .withResponse("bytes", { produces: "application/json" })
     .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
@@ -337,6 +339,7 @@ function createTracesRest() {
     .get("/facets", "getTraceFacets")
     .withQuery(traceFacetsQuerySchema)
     .withPermission("traces:view")
+    .withLegacyKeyScope("legacy_project_key_traces_read")
     .withOutput(traceFacetsResponseSchema)
     .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
@@ -370,6 +373,7 @@ function createTracesRest() {
     .get("/:traceId/transcript", "getTraceTranscript")
     .withParams(traceIdParamsSchema)
     .withPermission("traces:view")
+    .withLegacyKeyScope("legacy_project_key_traces_read")
     .withOutput(transcriptRestResponseSchema)
     .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({
@@ -407,6 +411,7 @@ function createTracesRest() {
 
   router = router
     .patch("/:traceId/metadata", "updateTraceMetadata")
+    .keepsRecords()
     .withAudit("traces.changeMetadata")
     .withParams(traceIdParamsSchema)
     .withInput(traceMetadataBodySchema)
@@ -435,6 +440,7 @@ function createTracesRest() {
     .withParams(traceIdParamsSchema)
     .withQuery(traceFormatQuerySchema)
     .withPermission("traces:view")
+    .withLegacyKeyScope("legacy_project_key_traces_read")
     .withOutput(traceDetailResponseSchema)
     .withMiddlewareContext(projectRequestContext, tracesRestCredential)
     .withDocs({

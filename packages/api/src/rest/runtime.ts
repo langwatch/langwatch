@@ -7,7 +7,8 @@ import {
   internalActor,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
-import { createLogger, validationMeta } from "@langwatch/observability";
+import { createLogger, REQUEST_CAUSE_FIELD, validationMeta } from "@langwatch/observability";
+import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
@@ -70,8 +71,15 @@ import {
   type VersionStatus,
 } from "./addressing.ts";
 import {
+  confirmMarkedRequest,
+  type RestConfirmationGate,
+  type RestConfirmationReceipt,
+} from "./confirmation.ts";
+import { doorCredentialOf } from "./credential-census.ts";
+import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
+  recordRouteTemplate,
 } from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
@@ -106,6 +114,7 @@ import {
   documentRoute,
   requiresBody,
 } from "./openapi.ts";
+import { recordRequestPrincipal, requestPrincipalOf } from "./request-principal.ts";
 import {
   bodyLimit,
   cachedRestAnswer,
@@ -113,6 +122,7 @@ import {
   MalformedRequestError,
   loggerMiddleware,
   multipartMiddleware,
+  readRequestBody,
   refusingMalformedBody,
   requestValidationErrorFrom,
   restCacheKey,
@@ -140,10 +150,24 @@ import {
   ENDPOINT_ROUTE,
   isDeclined,
   REQUEST_FAMILY,
+  ROUTE_TEMPLATE,
   withRetryAfter,
 } from "./response.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
+
+/** The logger a failed give-back of confirmation clicks is reported through. */
+const confirmationLogger = createLogger("langwatch:api:confirmation");
+
+/** The default report: both errors under keys the log serialises in full. */
+const loggedConfirmations: RestConfirmationLog = {
+  refundFailed: ({ refundError, routeError }) => {
+    confirmationLogger.warn(
+      { error: refundError, [REQUEST_CAUSE_FIELD]: routeError },
+      "a failed route could not give back its confirmation clicks",
+    );
+  },
+};
 
 // The one REST execution path: authenticate, parse, decide, handle, check answer, respond.
 // The caller is authenticated BEFORE the body is parsed, so a refused credential never learns
@@ -183,7 +207,52 @@ export type RestRuntimeMembers = Readonly<{
   idempotency?: IdempotentRunner;
   /** Where the first call of each deprecated route is recorded. */
   deprecationLog?: RestDeprecationLog;
+  /**
+   * Where a Langy key's confirmation clicks are kept. Absent, a route that removes something
+   * refuses a Langy key outright rather than run unconfirmed.
+   */
+  confirmations?: RestConfirmationGate;
+  /**
+   * Set by the host that serves real doors, each of which records the key it lets in: there a
+   * key door that recorded none is refused on a marked route, gate or no gate. A test's runtime
+   * fakes its identity and records nothing, so it leaves this unset.
+   */
+  servedDoors?: true;
+  /** Told when a failed route could not give back its clicks. Defaults to a warning log. */
+  confirmationLog?: RestConfirmationLog;
 }>;
+
+/** Where a failed give-back of confirmation clicks is reported, beside the route's own fault. */
+export type RestConfirmationLog = Readonly<{
+  refundFailed(input: { refundError: unknown; routeError: unknown }): void;
+}>;
+
+/** Runs the handler; a fault on our side leaves the record in place, so the click is given back. */
+async function refundingOnFault<Result>({
+  receipt,
+  log,
+  run,
+}: {
+  receipt: RestConfirmationReceipt | void;
+  log: RestConfirmationLog;
+  run: () => Promise<Result>;
+}): Promise<Result> {
+  try {
+    return await run();
+  } catch (error) {
+    if (receipt && !isCustomerFault(error)) {
+      await receipt.refund().catch((refundError: unknown) => {
+        log.refundFailed({ refundError, routeError: error });
+      });
+    }
+    throw error;
+  }
+}
+
+/** A refusal the caller caused, which a retry of the same request meets again. */
+function isCustomerFault(error: unknown): boolean {
+  return HandledError.isHandled(error) && error.httpStatus < 500;
+}
 
 /**
  * Told once per process the first time a deprecated route is called, so an
@@ -266,6 +335,7 @@ function mountFamilyRoutes<Api>({
           ports,
           options,
           contexts,
+          template: basePath === "" ? mount.path : mergePath(basePath, mount.path),
           ...mount.context,
         }),
         policy: registryPolicy({ route, options, credential }),
@@ -474,6 +544,8 @@ function assertPortsBound<Api>({
 
     assertDoorQuestions({ address, route, door, credential });
 
+    assertLegacyKeyScopes({ address, route, door, credential });
+
     if (anonymousOnRefusal(route) && !door.identify) {
       throw new Error(
         `REST ${address} answers a refused credential as none, and this runtime ` +
@@ -529,6 +601,38 @@ function assertDoorQuestions({
 /** Whether the route asks its plan before its permission (Q31), at the credential's scope. */
 function planFirst(route: RestTransportRoute<unknown>): boolean {
   return route.entitlement?.before === "permission";
+}
+
+/**
+ * A legacy key scope is told to the project door when it asks the route's permission, so the
+ * route must ask one before the body; a door that lists its scopes refuses a name it lacks.
+ */
+function assertLegacyKeyScopes({
+  address,
+  route,
+  door,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  door: RestIdentity;
+  credential: RestDoorCredential;
+}): void {
+  const scopes = route.legacyKeyScopes;
+  if (!scopes) return;
+
+  if (credential !== "project" || !route.permission || identifiedFirst({ route, credential })) {
+    throw new Error(
+      `REST ${address} names a legacy key scope, which only a project door route that asks ` +
+        "its permission before the body can carry",
+    );
+  }
+  const unknown = door.legacyKeyScopes
+    ? scopes.filter((scope) => !door.legacyKeyScopes?.includes(scope))
+    : [];
+  if (unknown.length > 0) {
+    throw new Error(`REST ${address} names unknown legacy key scopes: ${unknown.join(", ")}`);
+  }
 }
 
 /** Whether the door only identifies the caller, leaving the permission to be asked later. */
@@ -708,6 +812,7 @@ function routeStack<Api>({
   ports,
   options,
   contexts,
+  template,
   version,
   status,
   paramSource = "route",
@@ -718,6 +823,8 @@ function routeStack<Api>({
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
   contexts: ReadonlyMap<string, MiddlewareContextBinding>;
+  /** The full path template this mount answers, which the credential census counts by. */
+  template: string;
   version: string;
   status: VersionStatus;
   paramSource?: "route" | "context";
@@ -733,7 +840,12 @@ function routeStack<Api>({
   const publishable = route.anyMethod !== true && declaration.credential !== "browser";
   const documents = documented && publishable;
   const credential = route.credential ?? declaration.credential;
-  const door = authenticateMiddleware({ route, credential, ports });
+  const door = authenticateMiddleware({
+    route,
+    credential,
+    ports,
+    template: `${route.method.toUpperCase()} ${basePathOf(declaration)}${route.path}`,
+  });
   const refusal = routeRefusal({ route, door: doorOf({ credential, ports }) });
 
   // Ahead of the validators: they read the body to parse it, and a stream
@@ -763,7 +875,7 @@ function routeStack<Api>({
   return [
     ...legacyErrorScopes(route),
     ...(refusal ? [protocolRefusalScope({ route, refusal })] : []),
-    versionContext({ route, family, version, status }),
+    versionContext({ route, family, template, version, status }),
     ...(documents
       ? [
           documentRoute({
@@ -826,13 +938,17 @@ function authenticateMiddleware({
   route,
   credential,
   ports,
+  template,
 }: {
   route: RestTransportRoute<unknown>;
   credential: RestDoorCredential;
   ports: RestRuntimeMembers;
+  /** The route as `METHOD /path/:param`, which the door may log; never the concrete URL. */
+  template: string;
 }): MiddlewareHandler {
   return async (context, next) => {
     if (route.access?.kind !== "public") {
+      recordRouteTemplate(context.req.raw, template);
       const caller = await callerOf({
         route,
         door: doorOf({ credential, ports }),
@@ -849,7 +965,21 @@ function authenticateMiddleware({
         });
       }
 
+      if (caller) {
+        noteRequestCredential(doorCredentialOf({ credential, caller, request: context.req.raw }));
+      }
       callers.set(context, caller);
+      recordRequestPrincipal({
+        context,
+        read: () =>
+          requestPrincipalOf({
+            actor: caller?.actor,
+            key:
+              caller && isKeyDoor(credential)
+                ? recordedKeyOfDoor({ door: credential, request: context.req.raw })
+                : (caller?.key ?? null),
+          }),
+      });
     }
 
     await next();
@@ -911,7 +1041,7 @@ function rawBodyMiddleware(rawBody: RestRawBody): MiddlewareHandler {
       return;
     }
 
-    const bytes = new Uint8Array(await context.req.raw.arrayBuffer());
+    const bytes = new Uint8Array(await readRequestBody(() => context.req.raw.arrayBuffer()));
 
     context.set(ROUTE_RAW_BODY, rawBody.form === "text" ? TEXT.decode(bytes) : bytes);
     await next();
@@ -1008,11 +1138,13 @@ function deprecationLog<Api>({
 function versionContext({
   route,
   family,
+  template,
   version,
   status,
 }: {
   route: RestTransportRoute<unknown>;
   family: string;
+  template: string;
   version: string;
   status: VersionStatus;
 }): MiddlewareHandler {
@@ -1021,6 +1153,7 @@ function versionContext({
 
   return async (context, next) => {
     context.set(ENDPOINT_ROUTE, identity);
+    context.set(ROUTE_TEMPLATE, template);
     context.set(REQUEST_FAMILY, family);
 
     try {
@@ -1366,6 +1499,11 @@ function handlerMiddleware<Api>({
           actor: null,
           scope: null,
           target: null,
+          recordKey: (key) =>
+            recordRequestPrincipal({
+              context,
+              read: () => requestPrincipalOf({ actor: null, key }),
+            }),
         }),
         ...(await resolveContexts({ route, contexts, context, input })),
       );
@@ -1450,22 +1588,40 @@ function handlerMiddleware<Api>({
         credential,
         scope: resolved,
         context,
-        run: async () =>
-          route.handler(
-            handlerArguments({
-              context,
-              route,
-              options,
-              input,
-              actor,
-              scope: handlerScopeOf({ route, credential, caller }),
-              target,
-              authorization,
-              session: sessionOf({ route, credential, caller }),
-              key: keyOf({ route, credential, request: context.req.raw }),
-            }),
-            ...(await resolveContexts({ route, contexts, context, input })),
-          ),
+        run: async () => {
+          // After every permission check and inside the trail, so a refusal is recorded too.
+          const receipt = await confirmMarkedRequest({
+            mark: route.confirmation,
+            gate: ports.confirmations,
+            servedDoors: ports.servedDoors === true,
+            credential,
+            request: context.req.raw,
+            input,
+            scope: resolved,
+            app: options.app,
+          });
+
+          return refundingOnFault({
+            receipt,
+            log: ports.confirmationLog ?? loggedConfirmations,
+            run: async () =>
+              route.handler(
+                handlerArguments({
+                  context,
+                  route,
+                  options,
+                  input,
+                  actor,
+                  scope: handlerScopeOf({ route, credential, caller }),
+                  target,
+                  authorization,
+                  session: sessionOf({ route, credential, caller }),
+                  key: keyOf({ route, credential, request: context.req.raw }),
+                }),
+                ...(await resolveContexts({ route, contexts, context, input })),
+              ),
+          });
+        },
       });
 
       caller.markUsed?.();
@@ -1882,6 +2038,7 @@ function handlerArguments<Api>({
   authorization = null,
   session,
   key,
+  recordKey,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -1893,6 +2050,7 @@ function handlerArguments<Api>({
   authorization?: Authorization | null;
   session?: unknown;
   key?: RestKeyCredential | undefined;
+  recordKey?: ((key: RestKeyCredential) => void) | undefined;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -1914,6 +2072,7 @@ function handlerArguments<Api>({
     response: route.response
       ? producerFor({ kind: route.response.kind, accept: context.req.header("Accept") ?? "" })
       : undefined,
+    ...(recordKey ? { recordKey } : {}),
   };
 }
 
@@ -2157,6 +2316,7 @@ async function callerOf({
     permissions: routePermissions(route),
     ...(route.permissionReach ? { reach: route.permissionReach } : {}),
     ...(route.keyKinds ? { keyKinds: route.keyKinds } : {}),
+    ...(route.legacyKeyScopes ? { legacyKeyScopes: route.legacyKeyScopes } : {}),
   });
 }
 
@@ -2761,6 +2921,7 @@ function dateFallback<Api>({
       ports,
       options,
       contexts,
+      template: mergePath(basePath, route.path || "/"),
       version: declaration.version,
       status: "stable",
       paramSource: "context",
