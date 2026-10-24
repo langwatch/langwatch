@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.6.0](https://github.com/langwatch/langwatch/compare/skills@v1.5.0...skills@v1.6.0) (2026-10-24)
+
+
+### Features
+
+* **coding-agent:** copilot CLI and VS Code sessions become rows ([#8884](https://github.com/langwatch/langwatch/issues/8884)) ([e5c5e8c](https://github.com/langwatch/langwatch/commit/e5c5e8c3eb372ac02eed8ad7e5bd1810fc3c3be1))
+* **dashboard:** move dashboards v2 onto its own tables ([#8707](https://github.com/langwatch/langwatch/issues/8707)) ([7f1f527](https://github.com/langwatch/langwatch/commit/7f1f527f85363fe97cdc93d300b7c469de4463eb))
+* **dashboards,insight:** dashboards and insights v1 ([#8545](https://github.com/langwatch/langwatch/issues/8545)) ([7b5e13d](https://github.com/langwatch/langwatch/commit/7b5e13dd84492d526f1442e3360005ff1ed08613))
+* **governance:** event-only aggregate reconcile; coding-agent-cost skill narrows by TenantId ([#8652](https://github.com/langwatch/langwatch/issues/8652)) ([ad90571](https://github.com/langwatch/langwatch/commit/ad9057171de3543a0cba75b07328ba348a8f2373))
+* **langy:** delete needs a confirmation click ([#7563](https://github.com/langwatch/langwatch/issues/7563)) ([a6ca678](https://github.com/langwatch/langwatch/commit/a6ca678d5dbde52f970df044cd27ae6f9627c450))
+
+
+### Bug Fixes
+
+* dashboards and insights v1 follow-ups ([#8648](https://github.com/langwatch/langwatch/issues/8648)) ([127182a](https://github.com/langwatch/langwatch/commit/127182af50d2716f03ecf9f4092c90cebf89cf56))
+* **langy:** say how old the newest data is when a time-bounded query returns nothing ([#8741](https://github.com/langwatch/langwatch/issues/8741)) ([bc05fd1](https://github.com/langwatch/langwatch/commit/bc05fd1683ef5cf702689118511de232af31e1e1))
+* **langy:** stop guided onboarding from promising work after it stalls ([#8714](https://github.com/langwatch/langwatch/issues/8714)) ([addfd4f](https://github.com/langwatch/langwatch/commit/addfd4fa1f60a9187d443b0e73641248ed7415db))
+
 ## [1.5.0](https://github.com/langwatch/langwatch/compare/skills@v1.4.0...skills@v1.5.0) (2026-09-30)
 
 
