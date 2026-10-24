@@ -31,7 +31,7 @@ import {
 } from "./insight-daily-run.fixture.ts";
 import { PROJECT } from "./insight.fixture.ts";
 
-const { CONFIGURED, TURNED_OFF, REARM_REQUESTED, RUN_STARTED, RUN_SETTLED } =
+const { CONFIGURED, TURNED_OFF, REARM_REQUESTED, RUN_REQUESTED, RUN_STARTED, RUN_SETTLED } =
   INSIGHT_DAILY_RUN_EVENT_TYPES;
 const TEMPLATE: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
 const TWO_FINDINGS = answerWith([
@@ -87,6 +87,37 @@ async function wakeAt(now: number, scope: Scope = {}) {
   return (await installed.intentsOf(scope)).slice(before).map(({ payload }) => payload);
 }
 
+describe("given a member whose daily run on a board is not on", () => {
+  const turnedOff = async () => {
+    await turnOn();
+    await installed.app.turnOffDailyRun({ projectId: PROJECT, userId: MEMBER, board: BOARD });
+  };
+  const runRequestsOf = async () =>
+    (await installed.runEventsOf()).filter((type) => type === RUN_REQUESTED);
+
+  /** @scenario "Run now is refused on a board that is not on" */
+  it.each([
+    ["never decided on", async () => {}],
+    ["turned off", turnedOff],
+  ])(
+    "refuses their Run now on a board %s, while an operator's run is still asked",
+    async (_what, arrange) => {
+      await arrange();
+      const scope = { projectId: PROJECT, userId: MEMBER, board: BOARD };
+
+      await expect(installed.app.runDailyRunNow(scope)).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { formErrors: ["Turn this board's daily insights on before running them now."] },
+      });
+      const refused = await runRequestsOf();
+      await installed.app.requestDailyRun(scope);
+
+      expect(refused).toEqual([]);
+      expect(await runRequestsOf()).toEqual([RUN_REQUESTED]);
+    },
+  );
+});
+
 describe("given a member turned their daily run on for a board", () => {
   beforeEach(async () => {
     await turnOn();
@@ -122,8 +153,10 @@ describe("given a member turned their daily run on for a board", () => {
         filedCount: 2,
         renewedCount: 0,
         conversationId: "conversation-1",
+        runId: expect.any(String),
       },
       offReason: null,
+      runInFlight: null,
     });
   });
 
@@ -137,6 +170,7 @@ describe("given a member turned their daily run on for a board", () => {
       settings: null,
       lastRun: null,
       offReason: null,
+      runInFlight: null,
     });
   });
 
@@ -157,6 +191,7 @@ describe("given a member turned their daily run on for a board", () => {
         settings: { hour: 9, timezone: "UTC", maxInsights: 3 },
         lastRun: null,
         offReason: null,
+        runInFlight: null,
       });
     });
   });

@@ -7,6 +7,7 @@
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import {
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   INSIGHT_RUN_SKIP_REASONS,
   type InsightDailyRunSetting,
   type InsightEntry,
@@ -15,8 +16,9 @@ import { currentTimeZone, format, nowInstant } from "@langwatch/time";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { REQUESTED_RUN_REREAD_DELAYS_MS } from "../../../behavior/use-board-daily-insights.ts";
 import { OFF_REASON_WORDS, SKIP_REASON_WORDS } from "../../../model/daily-run.ts";
 import {
   insightEntry,
@@ -31,9 +33,10 @@ const NOW = nowInstant().epochMilliseconds;
 const READ = "insights.getBoardDailyRun";
 const CONFIGURE = "insights.configureBoardDailyRun";
 const TURN_OFF = "insights.turnOffBoardDailyRun";
+const RUN_NOW = "insights.runBoardDailyRunNow";
 const OFFER = "Turn on daily insights for Checkout health?";
 
-const NOTHING_YET = { settings: null, lastRun: null, offReason: null };
+const NOTHING_YET = { settings: null, lastRun: null, offReason: null, runInFlight: null };
 const UNDECIDED: InsightDailyRunSetting = { state: "undecided", ...NOTHING_YET };
 const DECLINED: InsightDailyRunSetting = { state: "off", ...NOTHING_YET };
 const ON: InsightDailyRunSetting = {
@@ -41,7 +44,19 @@ const ON: InsightDailyRunSetting = {
   settings: { hour: 9, timezone: AMSTERDAM, maxInsights: 3 },
   lastRun: null,
   offReason: null,
+  runInFlight: null,
 };
+const RUNNING: InsightDailyRunSetting = {
+  ...ON,
+  runInFlight: { runId: "request-1", conversationId: "conversation-7", startedAt: NOW },
+};
+/** What the server answers Run now with: the request's id, and when its clock recorded it. */
+function runNowAnswer({ requestedAt = nowInstant().epochMilliseconds } = {}) {
+  return Promise.resolve({ requestId: "request-1", requestedAt });
+}
+
+/** A member who may also ask Langy, which a run is. */
+const ASKER: StubInsightHostOptions = { permissions: ["analytics:view", "langy:create"] };
 
 type LastRun = NonNullable<InsightDailyRunSetting["lastRun"]>;
 
@@ -55,6 +70,7 @@ function ranToday(overrides: Partial<LastRun>): InsightDailyRunSetting {
       filedCount: 0,
       renewedCount: 0,
       conversationId: null,
+      runId: "run-1",
       ...overrides,
     },
   };
@@ -98,7 +114,10 @@ function openBoard({
   host: options = {},
   ...board
 }: {
-  setting?: InsightDailyRunSetting;
+  /** What the read answers; a function answers what holds when the read is asked, or later. */
+  setting?:
+    | InsightDailyRunSetting
+    | (() => InsightDailyRunSetting | Promise<InsightDailyRunSetting>);
   widgets?: number | "loading";
   entries?: InsightEntry[];
   /** How the server answers a write; it accepts unless a test says otherwise. */
@@ -108,23 +127,26 @@ function openBoard({
   id?: string;
 } = {}) {
   const calls: UiProcedureCall[] = [];
-  const { host } = renderWithInsightHost({
+  const { host, readHint } = renderWithInsightHost({
     element: <Board widgets={widgets} {...board} />,
     host: new StubInsightHost(options),
     answer: (call) => {
       calls.push(call);
-      if (call.path === READ) return Promise.resolve(setting);
+      if (call.path === READ) {
+        return Promise.resolve(typeof setting === "function" ? setting() : setting);
+      }
       if (call.path === "insights.getAll") return Promise.resolve(entries);
-      if (call.path === CONFIGURE || call.path === TURN_OFF) return write(call);
+      if ([CONFIGURE, TURN_OFF, RUN_NOW].includes(call.path)) return write(call);
       return Promise.reject(new Error(`No test answer for ${call.path}`));
     },
   });
   const sent = (path: string) => calls.filter((call) => call.path === path).map((c) => c.input);
   return {
     host,
+    readHint,
     calls,
     reads: () => sent(READ),
-    writes: () => [...sent(CONFIGURE), ...sent(TURN_OFF)],
+    writes: () => [...sent(CONFIGURE), ...sent(TURN_OFF), ...sent(RUN_NOW)],
     sent,
     user: userEvent.setup({ pointerEventsCheck: 0 }),
   };
@@ -297,6 +319,7 @@ describe("given a member turned a board's daily run off", () => {
           settings: { hour: 17, timezone: "Asia/Tokyo", maxInsights: 5 },
           lastRun: null,
           offReason: null,
+          runInFlight: null,
         },
       });
       await waitFor(() => expect(quietControl()).toBeInTheDocument());
@@ -484,6 +507,343 @@ describe("given a member turned a board's daily run on", () => {
       const dropdown = await openDropdown(board.user);
 
       expect(dropdown.getByText(line)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a member turned a board's daily run on, and may ask Langy", () => {
+  describe("when they open the dropdown in the board's header", () => {
+    /** @scenario "Run now is in the dropdown of a board that is on" */
+    it("offers Run now", async () => {
+      const board = openBoard({ setting: ON, host: ASKER });
+
+      const dropdown = await openDropdown(board.user);
+
+      expect(dropdown.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+      expect(board.writes()).toEqual([]);
+    });
+
+    it("offers no Run now to a member who may not ask Langy", async () => {
+      const board = openBoard({ setting: ON });
+
+      const dropdown = await openDropdown(board.user);
+
+      expect(dropdown.queryByRole("button", { name: "Run now" })).toBeNull();
+    });
+  });
+
+  describe("when they choose Run now, with no run in flight", () => {
+    /** @scenario "Run now asks for a run and opens Langy on it" */
+    it("asks for a run on the board, and opens Langy on its conversation once it started", async () => {
+      let hasStarted = false;
+      const board = openBoard({
+        setting: () => (hasStarted ? RUNNING : ON),
+        host: ASKER,
+        write: () => runNowAnswer(),
+      });
+      const dropdown = await openDropdown(board.user);
+
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+      await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
+      // The read is asked again once the request is in; it names no run yet, so Langy waits.
+      await waitFor(() => expect(board.reads()).toHaveLength(2));
+      expect(board.host.queries).toEqual([]);
+      hasStarted = true;
+      await board.readHint();
+
+      await waitFor(() =>
+        expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+      );
+      expect(board.sent(RUN_NOW)).toEqual([
+        {
+          projectId: "project-1",
+          board: { kind: "dashboard", id: "board-1", name: "Checkout health" },
+          maxInsights: 3,
+        },
+      ]);
+      expect(board.host.failures).toEqual([]);
+    });
+  });
+
+  describe("when the start's hint reaches the board before the worker stored the run", () => {
+    /** @scenario "Run now opens Langy when the start's hint arrives before its run is stored" */
+    it("reads the board again until the run shows, and opens Langy on it without waiting for its outcome", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let isStored = false;
+        const board = openBoard({
+          setting: () => (isStored ? RUNNING : ON),
+          host: ASKER,
+          write: () => runNowAnswer(),
+        });
+        const dropdown = await openDropdown(board.user);
+        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+        await waitFor(() => expect(board.reads()).toHaveLength(2));
+        const [first, second, third] = REQUESTED_RUN_REREAD_DELAYS_MS;
+
+        await board.readHint();
+        expect(board.reads()).toHaveLength(3);
+        await vi.advanceTimersByTimeAsync(first);
+        await waitFor(() => expect(board.reads()).toHaveLength(4));
+        await vi.advanceTimersByTimeAsync(second);
+        await waitFor(() => expect(board.reads()).toHaveLength(5));
+        expect(board.host.queries).toEqual([]);
+        isStored = true;
+        await vi.advanceTimersByTimeAsync(third);
+
+        await waitFor(() =>
+          expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+        );
+        expect(board.reads()).toHaveLength(6);
+        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
+        expect(board.reads()).toHaveLength(6);
+        expect(board.host.failures).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /** @scenario "Run now opens Langy when the start's hint arrives before its run is stored" */
+    it("reads the board again also when the hint lands while Run now's own read is in flight", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let read = ON;
+        let answerHeldReads: (() => void) | undefined;
+        let held: Promise<void> | undefined;
+        const board = openBoard({
+          setting: () => (held ? held.then(() => read) : read),
+          host: ASKER,
+          write: () => runNowAnswer(),
+        });
+        const dropdown = await openDropdown(board.user);
+        held = new Promise((resolve) => (answerHeldReads = resolve));
+        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+        await waitFor(() => expect(board.reads()).toHaveLength(2));
+
+        // The hint's read takes over the one Run now asked, which is still unanswered.
+        const hint = board.readHint();
+        await waitFor(() => expect(board.reads()).toHaveLength(3));
+        held = undefined;
+        answerHeldReads?.();
+        await hint;
+        const [first, second] = REQUESTED_RUN_REREAD_DELAYS_MS;
+        await vi.advanceTimersByTimeAsync(first);
+        await waitFor(() => expect(board.reads()).toHaveLength(4));
+        read = RUNNING;
+        await vi.advanceTimersByTimeAsync(second);
+
+        await waitFor(() =>
+          expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+        );
+        expect(board.reads()).toHaveLength(5);
+        expect(board.host.failures).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /** @scenario "Run now opens Langy when the start's hint arrives before its run is stored" */
+    it("stops reading the board again after 4 re-reads when the run never shows", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const board = openBoard({
+          setting: ON,
+          host: ASKER,
+          write: () => runNowAnswer(),
+        });
+        const dropdown = await openDropdown(board.user);
+        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+        await waitFor(() => expect(board.reads()).toHaveLength(2));
+
+        await board.readHint();
+        expect(board.reads()).toHaveLength(3);
+        for (const [step, delay] of REQUESTED_RUN_REREAD_DELAYS_MS.entries()) {
+          await vi.advanceTimersByTimeAsync(delay);
+          await waitFor(() => expect(board.reads()).toHaveLength(4 + step));
+        }
+
+        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
+        expect(board.reads()).toHaveLength(7);
+        expect(board.host.queries).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("when a scheduled run settled before they chose Run now, and the board had not read it", () => {
+    /** @scenario "Run now waits for the run it asked for, not one that settled before the click" */
+    it("keeps waiting, and opens Langy on the run it asked for once that starts", async () => {
+      let read = ON;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => {
+          read = ranToday({ runId: "run-scheduled", conversationId: "conversation-6" });
+          return runNowAnswer();
+        },
+      });
+      const dropdown = await openDropdown(board.user);
+
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+      await waitFor(() => expect(board.reads()).toHaveLength(2));
+      const waiting = await openDropdown(board.user);
+      // The scheduled run shows as the last run, and the board still waits for its own.
+      expect(await waiting.findByText(`Ran ${RAN_AT} · nothing new`)).toBeInTheDocument();
+      expect(waiting.getByText("Starting a run.")).toBeInTheDocument();
+      expect(waiting.queryByRole("button", { name: "Run now" })).toBeNull();
+      expect(board.host.queries).toEqual([]);
+      read = { ...ranToday({ runId: "run-scheduled" }), runInFlight: RUNNING.runInFlight };
+      await board.readHint();
+
+      await waitFor(() =>
+        expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+      );
+      expect(board.host.failures).toEqual([]);
+    });
+  });
+
+  describe("when another run starts after the server took Run now, so the request starts none", () => {
+    /** @scenario "Run now follows a run that started after the click" */
+    it("follows that run by the server's time, though the browser's clock is ahead", async () => {
+      let read = ON;
+      // The server's clock is 10 minutes behind the browser's.
+      const requestedAt = nowInstant().epochMilliseconds - 10 * 60_000;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer({ requestedAt }),
+      });
+      const dropdown = await openDropdown(board.user);
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+      await waitFor(() => expect(board.reads()).toHaveLength(2));
+
+      // Another tab's request, or the schedule's wake, holds the run the process starts.
+      const startedAt = requestedAt + 1_000;
+      read = {
+        ...ON,
+        runInFlight: { runId: "request-2", conversationId: "conversation-9", startedAt },
+      };
+      await board.readHint();
+
+      await waitFor(() =>
+        expect(board.host.queries).toEqual([{ langyConversation: "conversation-9" }]),
+      );
+      const following = await openDropdown(board.user);
+      expect(following.getByText("A run is going.")).toBeInTheDocument();
+      expect(following.queryByText("Starting a run.")).toBeNull();
+      expect(board.host.failures).toEqual([]);
+    });
+  });
+
+  describe("when the board's run in flight was lost, and is settled before their run starts", () => {
+    /** @scenario "Run now waits past a lost run settled before its own starts" */
+    it("keeps waiting through the lost run's outcome, then opens Langy on its own run", async () => {
+      let read = ON;
+      const requestedAt = nowInstant().epochMilliseconds;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer({ requestedAt }),
+      });
+      const dropdown = await openDropdown(board.user);
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+      await waitFor(() => expect(board.reads()).toHaveLength(2));
+
+      // The worker records the lost run's timeout, with no conversation, before it starts ours.
+      const lost = ranToday({
+        at: requestedAt + 1_000,
+        outcome: "failed",
+        reason: "timeout",
+        runId: "run-lost",
+      });
+      read = lost;
+      await board.readHint();
+      const waiting = await openDropdown(board.user);
+      expect(waiting.getByText("Starting a run.")).toBeInTheDocument();
+      expect(board.host.queries).toEqual([]);
+
+      read = {
+        ...lost,
+        runInFlight: {
+          runId: "request-1",
+          conversationId: "conversation-7",
+          startedAt: requestedAt + 2_000,
+        },
+      };
+      await board.readHint();
+
+      await waitFor(() =>
+        expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
+      );
+      expect(board.host.failures).toEqual([]);
+    });
+  });
+
+  describe("when the run they asked for shows neither a start nor an outcome", () => {
+    /** @scenario "Run now asks for a run and opens Langy on it" */
+    it("follows it for as long as a run can last, then says it could not be started", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const board = openBoard({
+          setting: ON,
+          host: ASKER,
+          write: () => runNowAnswer(),
+        });
+        const dropdown = await openDropdown(board.user);
+        await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+        await waitFor(() => expect(board.reads()).toHaveLength(2));
+
+        await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
+        expect(board.host.failures).toEqual([]);
+        // Run now's read starts the 4 re-reads a hint starts; no timer asks after them.
+        expect(board.reads()).toHaveLength(2 + REQUESTED_RUN_REREAD_DELAYS_MS.length);
+        await vi.advanceTimersByTimeAsync(60_000);
+
+        await waitFor(() => expect(board.host.failures).toHaveLength(1));
+        expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
+        const again = await openDropdown(board.user);
+        expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+        expect(board.host.queries).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("when a run is in flight and they open the dropdown", () => {
+    /** @scenario "A run in flight is opened, not started again" */
+    it("says a run is going and offers to open it in Langy, not Run now", async () => {
+      const board = openBoard({ setting: RUNNING, host: ASKER });
+
+      const dropdown = await openDropdown(board.user);
+
+      expect(dropdown.getByText("A run is going.")).toBeInTheDocument();
+      expect(dropdown.queryByRole("button", { name: "Run now" })).toBeNull();
+      await board.user.click(dropdown.getByRole("button", { name: "Open in Langy" }));
+
+      expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]);
+      expect(board.writes()).toEqual([]);
+    });
+  });
+
+  describe("when the server refuses Run now", () => {
+    /** @scenario "A refused Run now says so" */
+    it("tells the member the run could not be started, and offers Run now again", async () => {
+      const board = openBoard({
+        setting: ON,
+        host: ASKER,
+        write: () => Promise.reject(new UiProcedureRefusal("insights_not_enabled", 403)),
+      });
+      const dropdown = await openDropdown(board.user);
+
+      await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
+
+      await waitFor(() => expect(board.host.failures).toHaveLength(1));
+      expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
+      const again = await openDropdown(board.user);
+      expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+      expect(board.host.queries).toEqual([]);
     });
   });
 });

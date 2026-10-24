@@ -9228,6 +9228,33 @@
           "documentation": ""
         },
         {
+          "name": "runInFlightId",
+          "columnName": "runInFlightId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The run that started and has not settled, its Langy conversation and when it started.\nNULL when none is in flight."
+        },
+        {
+          "name": "runInFlightConversationId",
+          "columnName": "runInFlightConversationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "runInFlightStartedAt",
+          "columnName": "runInFlightStartedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "createdAt",
           "columnName": "createdAt",
           "type": "Float",

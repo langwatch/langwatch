@@ -838,6 +838,9 @@ export interface LwqlPrismaRows {
     readonly lastRunConversationId: "String?";
     readonly consecutiveSkips: "Int";
     readonly skipStreakSlot: "Float?";
+    readonly runInFlightId: "String?";
+    readonly runInFlightConversationId: "String?";
+    readonly runInFlightStartedAt: "Float?";
     readonly createdAt: "Float";
     readonly updatedAt: "Float";
     readonly occurredAt: "Float";

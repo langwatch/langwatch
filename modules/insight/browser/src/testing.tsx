@@ -96,6 +96,7 @@ export class StubInsightHost extends InsightHostApi {
 /**
  * Renders one element inside the harness and hands back the host it recorded on. `lends` is
  * what a peer lends by token (§10.1), as an installed analytics would; none unless given.
+ * `readHint` stands in for the server's read hints: every read is asked again.
  */
 export function renderWithInsightHost({
   element,
@@ -107,7 +108,7 @@ export function renderWithInsightHost({
   answer: UiProcedureAnswer;
   host?: StubInsightHost;
   lends?: readonly UiLend[];
-}): RenderResult & { host: StubInsightHost } {
+}): RenderResult & { host: StubInsightHost; readHint: () => Promise<void> } {
   const queryClient = createUiQueryClient({ onMutationError: () => void 0 });
   const capabilities = {
     ...createUiHostServicesFromHost({
@@ -129,6 +130,7 @@ export function renderWithInsightHost({
       </DesignSystemProvider>,
     ),
     host,
+    readHint: () => queryClient.invalidateQueries(),
   };
 }
 

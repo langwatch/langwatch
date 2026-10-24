@@ -79,7 +79,9 @@ export class LangyUnattendedTurnService {
       unattended: {
         title: input.title,
         // Counted by the turn once it is claimed, so a replay of the same turn counts nothing.
-        countTurn: () => bounds.assertUnattendedTurnWithinBounds({ projectId: project.id }),
+        countTurn: input.isExemptFromRateLimit
+          ? async () => {}
+          : () => bounds.assertUnattendedTurnWithinBounds({ projectId: project.id }),
       },
     });
   }

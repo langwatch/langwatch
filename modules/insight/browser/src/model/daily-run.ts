@@ -202,3 +202,30 @@ export function shouldOfferDailyInsights({
 /** Said before a person turns a From LangWatch board on: no run can read one yet. */
 export const TEMPLATE_BOARD_NOTE =
   "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";
+
+/**
+ * What a Run now waits for: the run its request named, or another run that started after the
+ * request, or settled after it in Langy. The process drops a request while it holds a run, so that
+ * run is the one to follow; a lost run settles with no conversation, and is not it (ADR-004).
+ */
+export function requestedRunOf({
+  setting,
+  requestId,
+  requestedAt,
+}: {
+  setting: InsightDailyRunSetting;
+  /** What the server answered Run now with. */
+  requestId: string;
+  /** When the server recorded the request, on the clock that stamps a run's start. */
+  requestedAt: number;
+}): { conversationId: string | null } | undefined {
+  const { runInFlight, lastRun } = setting;
+  if (runInFlight && (runInFlight.runId === requestId || runInFlight.startedAt >= requestedAt)) {
+    return { conversationId: runInFlight.conversationId };
+  }
+  const settledInLangy = lastRun?.conversationId != null && lastRun.at >= requestedAt;
+  if (lastRun && (lastRun.runId === requestId || settledInLangy)) {
+    return { conversationId: lastRun.conversationId };
+  }
+  return undefined;
+}
