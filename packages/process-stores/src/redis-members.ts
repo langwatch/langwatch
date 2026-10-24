@@ -71,7 +71,7 @@ export function redisIdempotency(redis: RedisConnection): IdempotencyStore {
  * lifts).
  */
 const COUNT_IN_WINDOW = `
-local used = redis.call('INCR', KEYS[1])
+local used = redis.call('INCRBY', KEYS[1], ARGV[2])
 if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
 return used`;
 
@@ -85,15 +85,19 @@ export function redisRateLimiter(
   window: Readonly<{ requests: number; seconds: number }>,
 ): RateLimiter {
   return {
-    async check(key, limit) {
+    async check(key, limit, cost = 1) {
       const allowance = limit ?? window;
       const counter = `${RATE_LIMIT_PREFIX}${key}`;
-      const used = Number(await redis.eval(COUNT_IN_WINDOW, 1, counter, allowance.seconds));
+      const used = Number(await redis.eval(COUNT_IN_WINDOW, 1, counter, allowance.seconds, cost));
       if (used <= allowance.requests) return { allowed: true };
 
       rateLimitExceeded.inc({ scope: scopeOf(key) });
       const remaining = await redis.ttl(counter);
-      return { allowed: false, retryAfterSeconds: remaining > 0 ? remaining : allowance.seconds };
+      return {
+        allowed: false,
+        used,
+        retryAfterSeconds: remaining > 0 ? remaining : allowance.seconds,
+      };
     },
   };
 }

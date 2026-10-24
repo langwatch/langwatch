@@ -20,7 +20,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
-import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
+import type { AccessActor, Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
 import { retryAfterOf } from "../errors.ts";
 import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
 import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
@@ -30,6 +30,7 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
+import type { ReadBudget } from "../read-budget.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
 import {
   createTrpcRuntimePolicy,
@@ -134,6 +135,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     sessionVersions?: TrpcSessionVersions | undefined;
     /** The plans a procedure declaring an entitlement asks; absent, it is refused at mount. */
     entitlements?: Entitlements | undefined;
+    /** Counts every query and export against the session that made it. */
+    readBudget?: ReadBudget | undefined;
     logger?: Pick<Logger, "warn" | "error"> | undefined;
   }): TrpcHost {
     return new TrpcHost(options);
@@ -363,26 +366,16 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   #members(options: Parameters<typeof TrpcHost.create>[0]): TrpcRuntimeMembers<TrpcRequestContext> {
     return {
       identity: {
-        caller: (ctx) => {
-          const actor = ctx.tryActor?.();
-          const impersonatorId = ctx.session?.user.impersonator?.id;
-
-          return {
-            actor: actor
-              ? {
-                  type: "user" as const,
-                  id: actor.id,
-                  ...(impersonatorId ? { impersonatorId } : {}),
-                }
-              : null,
-            ...(ctx.session ? { browserSession: { id: ctx.session.sessionId ?? null } } : {}),
-          };
-        },
+        caller: (ctx) => ({
+          actor: sessionActorOf(ctx),
+          ...(ctx.session ? { browserSession: { id: ctx.session.sessionId ?? null } } : {}),
+        }),
       },
       authorization: { forRequest: (ctx) => this.#decisionsFor(ctx) },
       denials: DENIALS,
       ...(options.entitlements ? { entitlements: options.entitlements } : {}),
       ...(options.throttle ? { throttle: throttleOf(options.throttle) } : {}),
+      ...(options.readBudget ? { readBudget: trpcReadBudgetOf(options.readBudget) } : {}),
       audit: {
         record: (entry) => this.#record(entry),
         redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),
@@ -572,4 +565,18 @@ function isTrpcRouterDeclaration(
     "members" in value.contract &&
     typeof value.contract.members === "object"
   );
+}
+
+/** The session's person as an actor, naming the operator when one is acting as them. */
+function sessionActorOf(ctx: TrpcRequestContext): AccessActor | null {
+  const actor = ctx.tryActor?.();
+  if (!actor) return null;
+  const impersonatorId = ctx.session?.user.impersonator?.id;
+
+  return { type: "user", id: actor.id, ...(impersonatorId ? { impersonatorId } : {}) };
+}
+
+/** The read budget's view of a tRPC call: the session's person, or the operator acting as them. */
+function trpcReadBudgetOf(budget: ReadBudget) {
+  return { budget, actorOf: sessionActorOf };
 }

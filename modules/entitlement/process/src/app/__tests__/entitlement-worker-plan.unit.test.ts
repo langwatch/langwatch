@@ -55,7 +55,9 @@ function bootOn({ role = "worker", isSaas, billing, licence = unlicensed }: Sour
   const { logger } = createTestLogger();
   return createApp({ role })
     .withModules([entitlementProcessModule])
-    .withConfig({ entitlement: { requestBounds: undefined, isSaas } })
+    .withConfig({
+      entitlement: { requestBounds: undefined, requestBoundsByOrganization: undefined, isSaas },
+    })
     .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
@@ -174,7 +176,13 @@ describe("given the entitlement module installed on the worker role", () => {
       const boot = Promise.resolve().then(() =>
         createApp({ role: "worker" })
           .withModules([entitlementProcessModule])
-          .withConfig({ entitlement: { requestBounds: undefined, isSaas: true } })
+          .withConfig({
+            entitlement: {
+              requestBounds: undefined,
+              requestBoundsByOrganization: undefined,
+              isSaas: true,
+            },
+          })
           .withStores(memoryStores())
           .withObservability((observability) => observability.withLogging(logger))
           .provide({
@@ -198,7 +206,13 @@ describe("given the entitlement module installed on the worker role", () => {
       const asked: string[] = [];
       const runtime = await createApp({ role: "worker" })
         .withModules([entitlementProcessModule])
-        .withConfig({ entitlement: { requestBounds: undefined, isSaas: false } })
+        .withConfig({
+          entitlement: {
+            requestBounds: undefined,
+            requestBoundsByOrganization: undefined,
+            isSaas: false,
+          },
+        })
         .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(createTestLogger().logger))
         .provide({

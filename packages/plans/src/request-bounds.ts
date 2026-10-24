@@ -15,6 +15,9 @@ export const REQUEST_BOUND_UNITS = [
   "seconds",
   "requests-per-minute",
   "requests-per-hour",
+  "requests-per-day",
+  "items-per-hour",
+  "items-per-day",
 ] as const;
 export type RequestBoundUnit = (typeof REQUEST_BOUND_UNITS)[number];
 
@@ -121,6 +124,63 @@ export const requestBounds = [
     free: 6,
     paid: 12,
     enterprise: 24,
+  },
+  {
+    key: "readRequestsPerMinute",
+    description:
+      "Reads per credential per minute, REST and tRPC (specs/security/read-rate-limits.feature).",
+    unit: "requests-per-minute",
+    free: 300,
+    paid: 600,
+    enterprise: 1_200,
+  },
+  {
+    key: "readRowsPerHour",
+    description: "Rows one credential's reads may return per hour.",
+    unit: "items-per-hour",
+    free: 250_000,
+    paid: 500_000,
+    enterprise: 1_000_000,
+  },
+  {
+    key: "readRowsPerDay",
+    description: "Rows one credential's reads may return per day.",
+    unit: "items-per-day",
+    free: 1_000_000,
+    paid: 2_000_000,
+    enterprise: 4_000_000,
+  },
+  {
+    key: "readExportsPerMinute",
+    description: "Exports and downloads per credential per minute.",
+    unit: "requests-per-minute",
+    free: 6,
+    paid: 12,
+    enterprise: 24,
+  },
+  {
+    key: "readExportsPerDay",
+    description: "Exports and downloads per credential per day.",
+    unit: "requests-per-day",
+    free: 100,
+    paid: 200,
+    enterprise: 400,
+  },
+  {
+    key: "impersonationReadsPerMinute",
+    description: "Reads per platform operator per minute while acting as another user.",
+    unit: "requests-per-minute",
+    free: 120,
+    paid: 120,
+    enterprise: 120,
+  },
+  {
+    key: "impersonationRowsPerDay",
+    description: "Rows per platform operator per day while acting as another user.",
+    unit: "items-per-day",
+    free: 50_000,
+    paid: 50_000,
+    enterprise: 50_000,
   },
   {
     key: "promptExecutePerMinute",

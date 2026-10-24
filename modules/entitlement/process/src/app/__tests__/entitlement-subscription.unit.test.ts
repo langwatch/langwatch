@@ -37,7 +37,9 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
 
   return createApp({ role: "api" })
     .withModules([entitlementProcessModule])
-    .withConfig({ entitlement: { requestBounds: undefined, isSaas } })
+    .withConfig({
+      entitlement: { requestBounds: undefined, requestBoundsByOrganization: undefined, isSaas },
+    })
     .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(logger))
     .provide({

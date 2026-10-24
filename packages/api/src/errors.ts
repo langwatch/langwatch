@@ -224,6 +224,23 @@ export class RateLimitedError extends HandledError {
   }
 }
 
+/** A credential spent one of its read or export windows
+ * (specs/security/read-rate-limits.feature). */
+export class ReadRateLimitedError extends HandledError {
+  declare readonly code: "read_rate_limited";
+
+  constructor({ dimension, retryAfterSeconds }: { dimension: string; retryAfterSeconds: number }) {
+    super("read_rate_limited", "Too many reads from this credential just now", {
+      httpStatus: 429,
+      retryable: true,
+      fault: "customer",
+      meta: { dimension, retryAfterMs: retryAfterSeconds * 1000 },
+      ...remediation("read_rate_limited"),
+    });
+    this.name = "ReadRateLimitedError";
+  }
+}
+
 export class EnterprisePlanRequiredError extends HandledError {
   /** `feature` is the capability main names on `meta.feature`. */
   constructor(feature?: string) {

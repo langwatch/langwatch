@@ -57,6 +57,8 @@ import {
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
+import { type ReadBudget, readKindOf, rowsOf } from "../read-budget.ts";
+import { restReadCredential } from "../read-credential.ts";
 import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
 import {
   addressesOf,
@@ -198,6 +200,8 @@ export type RestRuntimeMembers = Readonly<{
   authorization: Readonly<{ forRequest(request: Request): Authorize }>;
   /** The counter behind every route that declared how often one caller may ask. */
   rateLimiter?: RateLimiter;
+  /** Counts every read and export against the credential that made it. */
+  readBudget?: ReadBudget;
   /** The store behind every route that declared how long its answer stands. */
   cache?: ResponseCache;
   denials?: AccessDenial;
@@ -1564,6 +1568,16 @@ function handlerMiddleware<Api>({
     await refuseAggregateWrite({ route, ports, scope: resolved, request: context.req.raw });
 
     await countCall(capabilities);
+    const readCall = readCallOf({
+      route,
+      ports,
+      family,
+      door: credential,
+      actor: decision.actor,
+      scope: resolved,
+      request: context.req.raw,
+    });
+    await admitRead({ ports, readCall });
 
     // After the door, never before it: a caller who may not read this cannot
     // be handed the bytes an entitled one left behind.
@@ -1625,6 +1639,7 @@ function handlerMiddleware<Api>({
       });
 
       caller.markUsed?.();
+      recordRead({ ports, readCall, result });
 
       return answerWith({ context, next, route, result });
     };
@@ -1635,6 +1650,53 @@ function handlerMiddleware<Api>({
 
     return keepAnswer({ ...capabilities, answer });
   };
+}
+
+/** The read a route's call counts as, or null for a write or a door the budget does not count. */
+function readCallOf({
+  route,
+  ports,
+  family,
+  door,
+  actor,
+  scope,
+  request,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimeMembers;
+  family: string;
+  door: RestDoorCredential;
+  actor: Actor | null;
+  scope: AuthzDeclaredScopeId | null;
+  request: Request;
+}) {
+  if (!ports.readBudget) return null;
+  const kind = readKindOf({ operation: route.operation, method: route.method });
+  if (!kind) return null;
+  const credential = restReadCredential({ door, actor, request });
+  if (!credential) return null;
+
+  return { credential, kind, route: `${family}.${route.operation}`, scope } as const;
+}
+
+type ReadCall = ReturnType<typeof readCallOf>;
+
+/** Spends the call's read window before the handler runs; a call the budget skips passes. */
+async function admitRead({ ports, readCall }: { ports: RestRuntimeMembers; readCall: ReadCall }) {
+  if (readCall) await ports.readBudget?.admit(readCall);
+}
+
+/** Counts the rows a read answered, off the response path: a failed count never fails the read. */
+function recordRead({
+  ports,
+  readCall,
+  result,
+}: {
+  ports: RestRuntimeMembers;
+  readCall: ReadCall;
+  result: unknown;
+}) {
+  if (readCall) void ports.readBudget?.record({ ...readCall, rows: rowsOf(result) });
 }
 
 /**

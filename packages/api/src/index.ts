@@ -33,6 +33,7 @@ export {
   PlatformPermissionDeniedError,
   PlatformSurfaceHiddenError,
   RateLimitedError,
+  ReadRateLimitedError,
   retryAfterOf,
   ScopeInputMismatchError,
   setLedgerCurrent,
@@ -104,3 +105,4 @@ export {
   registerRoutePolicy,
   type RegisteredRoute,
 } from "./route-registry.ts";
+export { ReadBudget, type ReadBudgetLimits } from "./read-budget.ts";

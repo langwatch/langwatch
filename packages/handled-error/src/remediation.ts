@@ -834,6 +834,13 @@ const registry = {
       "Read meta.errorCode for the page's own failure reason, re-read the current state, and adjust the payload before retrying",
     ],
   },
+  read_rate_limited: {
+    tips: [
+      "Wait for the number of seconds in the Retry-After header, then send the request again",
+      "Page through results with filters and a date range instead of reading everything at once",
+      "If your integration needs a higher allowance, ask support@langwatch.ai to raise it for your organization",
+    ],
+  },
   langy_rate_limited: {
     tips: ["Wait a few seconds before sending another message"],
   },

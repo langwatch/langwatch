@@ -21,6 +21,9 @@ const TARGET_FILES = new Set([
   "handler-arguments.ts",
   "json-text-field.ts",
   "ports.ts",
+  // The per-credential read budget both transports count reads against.
+  "read-budget.ts",
+  "read-credential.ts",
   "schema.ts",
   "websocket.ts",
   // Raw HTTP and raw socket doors (record section 8).
@@ -83,6 +86,7 @@ const TARGET_FILES = new Set([
   "trpc/host.ts",
   "trpc/infinite-input.ts",
   "trpc/policy.ts",
+  "trpc/read-budget.ts",
   "trpc/runtime.ts",
   "trpc/sse.ts",
   "trpc/throttle.ts",

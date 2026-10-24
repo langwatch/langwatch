@@ -7,6 +7,7 @@ import type {
 } from "@langwatch/authorization";
 
 import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
+import type { ReadBudgetDeps } from "../read-budget.ts";
 import type { RestKeyCredential, RestKeyKind } from "../rest/key-credential.ts";
 import type { SessionVerification } from "./session-reader.ts";
 import type { MiddlewareBinding, TransportPeers } from "./transport-hosts.ts";
@@ -31,6 +32,8 @@ export type ApiDoor = Readonly<{
   entitlements: Entitlements;
   /** Where every declared trail lands, on each transport. */
   audit: Readonly<{ rest: RestAuditSink; trpc: TrpcAuditSink }>;
+  /** The allowances and switch the per-credential read budget asks; absent, reads go uncounted. */
+  readBudget?: Pick<ReadBudgetDeps, "limitsFor" | "enforced">;
 }>;
 
 type ApiDoorBinding = Readonly<{ apiDoor: ApiDoor }>;

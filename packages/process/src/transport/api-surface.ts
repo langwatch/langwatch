@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import {
   BatchingNotSupportedError,
+  ReadBudget,
   type RateLimiter,
   type RawHttpHost,
   SurfaceBlankSecretError,
@@ -98,6 +99,15 @@ class ApiSurface {
         }).run
       : void 0;
     const rateLimiter = stores.redis ? members.read("rateLimiter") : void 0;
+    const readBudget =
+      rateLimiter && door.readBudget
+        ? ReadBudget.create({
+            counter: rateLimiter,
+            limitsFor: door.readBudget.limitsFor,
+            enforced: door.readBudget.enforced,
+            logger: composition.logger,
+          })
+        : void 0;
 
     // The module that shows confirmation cards binds the gate; none bound refuses Langy deletes.
     const confirmations = openConfirmationGate(peers);
@@ -108,6 +118,7 @@ class ApiSurface {
       sessions,
       idempotency,
       rateLimiter,
+      readBudget,
       confirmations,
     });
   }
@@ -125,6 +136,7 @@ class ApiSurface {
     sessions,
     idempotency,
     rateLimiter,
+    readBudget,
     confirmations,
   }: {
     composition: ApiSurfaceComposition;
@@ -132,24 +144,29 @@ class ApiSurface {
     sessions: SessionReader;
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
+    readBudget: ReadBudget | undefined;
     confirmations: RestConfirmationGate | undefined;
   }) {
     this.composition = composition;
     this.door = door;
     this.sessions = sessions;
     if (composition.selection.selected.rest) {
-      this.#rest = this.#restHost({ idempotency, rateLimiter, confirmations });
+      this.#rest = this.#restHost({ idempotency, rateLimiter, readBudget, confirmations });
     }
-    if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(rateLimiter);
+    if (composition.selection.selected.trpc) {
+      this.#trpc = this.#trpcHost({ rateLimiter, readBudget });
+    }
   }
 
   #restHost({
     idempotency,
     rateLimiter,
+    readBudget,
     confirmations,
   }: {
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
+    readBudget: ReadBudget | undefined;
     confirmations: RestConfirmationGate | undefined;
   }): RestHost {
     return RestHost.create({
@@ -161,13 +178,20 @@ class ApiSurface {
       audit: this.door.audit.rest,
       idempotency,
       rateLimiter,
+      readBudget,
       entitlements: this.door.entitlements,
       authz: this.door.authz,
       confirmations,
     });
   }
 
-  #trpcHost(rateLimiter: RateLimiter | undefined): TrpcHost {
+  #trpcHost({
+    rateLimiter,
+    readBudget,
+  }: {
+    rateLimiter: RateLimiter | undefined;
+    readBudget: ReadBudget | undefined;
+  }): TrpcHost {
     return TrpcHost.create({
       sessions: this.sessions,
       authz: this.door.authz,
@@ -178,6 +202,7 @@ class ApiSurface {
       middlewareContext: this.#trpcMiddlewareContext(),
       sessionVersions: this.door.authz,
       entitlements: this.door.entitlements,
+      readBudget,
     });
   }
 

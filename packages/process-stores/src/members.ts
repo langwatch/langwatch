@@ -111,6 +111,8 @@ export interface Cache {
 export interface RateLimitDecision {
   readonly allowed: boolean;
   readonly retryAfterSeconds?: number;
+  /** What the window has spent, this call included, where the store knows it. */
+  readonly used?: number;
 }
 
 /**
@@ -119,7 +121,12 @@ export interface RateLimitDecision {
  * one is the default a caller that names none counts against.
  */
 export interface RateLimiter {
-  check(key: string, limit?: { requests: number; seconds: number }): Promise<RateLimitDecision>;
+  /** `cost` is what one call spends (default 1); 0 reads the window without spending it. */
+  check(
+    key: string,
+    limit?: { requests: number; seconds: number },
+    cost?: number,
+  ): Promise<RateLimitDecision>;
 }
 
 /** Remembers a key for the window in which a repeat must not act twice. */

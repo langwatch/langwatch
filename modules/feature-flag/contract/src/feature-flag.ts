@@ -256,6 +256,14 @@ export const FEATURE_FLAGS = [
     description:
       "Tripwire for ADR-034 Phase 3: when ON alongside release_event_sourced_analytics_read, runs the routed and legacy trace_summaries queries in parallel and logs divergence beyond a small tolerance. Returns the routed result either way.",
   },
+  {
+    key: "release_read_rate_limits_enforced",
+    scope: "SYSTEM",
+    defaultValue: false,
+    family: "Security",
+    description:
+      "Refuses a read or export past its credential's allowance with 429 (spec: specs/security/read-rate-limits.feature). Off = the read budget still counts and logs read_rate_limit_exceeded, and answers the read as usual.",
+  },
   // SYSTEM on purpose despite being a product surface: the Langy rollout is
   // decided solely by the internal flag store — never an env var
   // (envOverridable: false) — so /ops/feature-flags is the one lever.

@@ -91,7 +91,7 @@ describe("given a rate limit with a window's max", () => {
 
       const decision = await limiter.check("user.register:addr:def");
 
-      expect(decision).toEqual({ allowed: false, retryAfterSeconds: 1 });
+      expect(decision).toEqual({ allowed: false, used: 50, retryAfterSeconds: 1 });
       expect(exceededFor("user.register")).toEqual([
         {
           instrument: "rate_limit_exceeded_total",

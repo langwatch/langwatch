@@ -141,6 +141,7 @@ describe("EntitlementModule.requestBound", () => {
           // name the free tier to be observed — exercising the module schema's
           // tier-record arm end to end.
           requestBounds: { tracesPageSizeMax: { free: 3_000 } },
+          requestBoundsByOrganization: undefined,
           isSaas: true,
         },
       })
