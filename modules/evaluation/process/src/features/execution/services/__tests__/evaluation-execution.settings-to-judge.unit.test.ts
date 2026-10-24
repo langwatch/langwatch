@@ -6,6 +6,7 @@ import { describe, expect, it, type Mock, vi } from "vitest";
 import type { EvaluatorModelEnvService } from "../../../evaluators/services/evaluator-model-env.service.ts";
 import type { LangevalsEvaluatorService } from "../../../evaluators/services/langevals-evaluator.service.ts";
 import {
+  EVALUATION_PROJECT_ENV,
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "../evaluation-execution.service.ts";
@@ -128,6 +129,21 @@ describe("EvaluationExecutionService settings reach the judge", () => {
       // Guard first: an empty capture would make the equality below vacuous.
       expect(Object.keys(payload?.settings ?? {})).not.toHaveLength(0);
       expect(payload?.settings).toEqual(USER_SETTINGS);
+    });
+
+    /** @scenario The app names the project on every evaluation it sends */
+    it("names the project in the env it sends, beside the resolved credentials", async () => {
+      const resolveForEvaluator = vi
+        .fn<EvaluatorModelEnvService["resolveForEvaluator"]>()
+        .mockResolvedValue({ OPENAI_API_KEY: "sk-install" });
+      const { service, evaluate } = buildService({ resolveForEvaluator });
+
+      await service.executeForTrace({ ...defaultParams, settings: { ...USER_SETTINGS } });
+
+      expect(evaluate.mock.calls[0]?.[0].env).toEqual({
+        OPENAI_API_KEY: "sk-install",
+        [EVALUATION_PROJECT_ENV]: "proj-1",
+      });
     });
 
     it("reaches the judge at all with this fixture type", async () => {
