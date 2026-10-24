@@ -389,7 +389,7 @@
                 ]
               },
               {
-                "group": "Go",
+                "group": "Go SDK",
                 "icon": "/images/logos/golang.svg",
                 "pages": [
                   "integration/go/guide",

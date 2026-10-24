@@ -13,7 +13,7 @@ Any client that lets you set an OpenAI base URL and an API key works with the ga
 | `POST /v1/chat/completions`  | OpenAI    | `Authorization: Bearer vk-lw-...`        |
 | `POST /v1/messages`          | Anthropic | `X-Api-Key: vk-lw-...`                   |
 
-The virtual key (`vk-lw-...`) is not your LangWatch API key. For the SDKs, see [TypeScript](/ai-gateway/sdks/typescript), [Python](/ai-gateway/sdks/python) and [Go](/ai-gateway/sdks/go).
+The virtual key (`vk-lw-...`) is not your LangWatch API key. For the SDKs, see the [TypeScript SDK](/ai-gateway/sdks/typescript), the [Python SDK](/ai-gateway/sdks/python) and the [Go SDK](/ai-gateway/sdks/go).
 
 ## Chat completions
 
@@ -77,7 +77,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   }'
 ```
 
-The format is `00-<trace id>-<span id>-<flags>`, with a 32-character trace id and a 16-character span id in hexadecimal. In an instrumented application, inject the current context rather than writing the value by hand; see the OpenTelemetry samples in [TypeScript](/ai-gateway/sdks/typescript#link-the-gateway-span-to-your-trace), [Python](/ai-gateway/sdks/python#link-the-gateway-span-to-your-trace) and [Go](/ai-gateway/sdks/go#link-the-gateway-span-to-your-trace).
+The format is `00-<trace id>-<span id>-<flags>`, with a 32-character trace id and a 16-character span id in hexadecimal. In an instrumented application, inject the current context rather than writing the value by hand; see the OpenTelemetry samples in [the TypeScript SDK](/ai-gateway/sdks/typescript#link-the-gateway-span-to-your-trace), [the Python SDK](/ai-gateway/sdks/python#link-the-gateway-span-to-your-trace) and [the Go SDK](/ai-gateway/sdks/go#link-the-gateway-span-to-your-trace).
 
 ## Headers you can send
 

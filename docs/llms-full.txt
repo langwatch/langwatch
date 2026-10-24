@@ -33056,7 +33056,7 @@ This method of integration sends traces from any system capable of making HTTP r
 
 Remember to handle errors and retries as needed. You might need to script additional logic around the `curl` command to handle these cases.
 
-## The same request from Python
+### The same request from Python
 
 ```bash
 pip install requests
@@ -33098,7 +33098,7 @@ response = requests.post(
 response.raise_for_status()
 ```
 
-## Check it worked
+### Check it worked
 
 A successful request returns a `2xx` status. Then open your project in LangWatch: the trace `trace-123` appears in the traces list within a few seconds, with one LLM span holding the input and output you sent. Use a new `trace_id` for each trace you send.
 
@@ -66647,7 +66647,7 @@ To remove the slot, switch managed models off on **Settings, Connect**, or set `
 
 ## The usage report and the license sync
 
-#### Usage report
+### Usage report
 
 | Property | Details |
 | --- | --- |
@@ -66656,7 +66656,7 @@ To remove the slot, switch managed models off on **Settings, Connect**, or set `
 | What it carries | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains |
 | How to stop it | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
 
-#### License sync
+### License sync
 
 | Property | Details |
 | --- | --- |
