@@ -356,10 +356,10 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Then it sets terminationGracePeriodSeconds
     And the value covers the drain budget plus thirty seconds
 
-  # The app had no preStop, so SIGTERM could reach it before every proxy had
-  # dropped its endpoint, and requests still routed to it were refused. Five
-  # seconds proved short: a cloud load balancer still routed new requests to a
-  # pod over 10s after its endpoint went, so the default is fifteen.
+  # Without a preStop, SIGTERM reached the app before every proxy had dropped its
+  # endpoint, and requests still routed to it were refused. The 5s sleep added
+  # for that proved too short: a cloud load balancer still routed new requests to
+  # a pod over 10s after its endpoint went, so the default is fifteen.
 
   @regression @helm-grace-period
   Scenario: The app pod sleeps before SIGTERM so its endpoint removal propagates

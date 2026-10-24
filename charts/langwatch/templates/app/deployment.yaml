@@ -95,7 +95,7 @@ spec:
       {{- $preStop := 0 }}
       {{- if kindIs "invalid" .Values.app.preStopSleepSeconds }}
       {{- /* Unset: 15s, shortened to the room a pinned grace period leaves, so an upgrade never refuses. */}}
-      {{- $preStop = max 0 (min 15 (sub $grace (add $appDrain 25))) }}
+      {{- $preStop = min 15 (sub $grace (add $appDrain 25)) }}
       {{- else }}
       {{- $preStop = .Values.app.preStopSleepSeconds }}
       {{- /* By its string, as langwatch.positiveSeconds does: Helm v3.18.0 hands values.yaml's 5 over as a string. */}}
