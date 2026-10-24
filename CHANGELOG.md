@@ -1,5 +1,57 @@
 # Changelog
 
+## [3.22.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.21.0...langwatch@v3.22.0) (2026-10-24)
+
+
+### Features
+
+* **analytics:** a group project's charts, LangWatchQL and Sessions read its member projects ([#8878](https://github.com/langwatch/langwatch/issues/8878)) ([ec4d539](https://github.com/langwatch/langwatch/commit/ec4d53996bd6527da0d690098047bc19de6452f8))
+* **auth:** force a password reset for a set of users ([#8959](https://github.com/langwatch/langwatch/issues/8959)) ([e408de0](https://github.com/langwatch/langwatch/commit/e408de0fa03840c6683b932c5009454cf55dd52b))
+* **auth:** log which credential and client each API request used ([#9003](https://github.com/langwatch/langwatch/issues/9003)) ([c55dc6e](https://github.com/langwatch/langwatch/commit/c55dc6e6e22aa2a6563b4be7d3e93d7f40c7f23b))
+* **auth:** record each request's credential type and make legacy project keys ingestion-only ([#8962](https://github.com/langwatch/langwatch/issues/8962)) ([ec41367](https://github.com/langwatch/langwatch/commit/ec41367384ebda1e5cbe3d0ed16b1797b9769575))
+* **charts:** let the langyagent chart take over existing agent objects ([#8965](https://github.com/langwatch/langwatch/issues/8965)) ([fa657fa](https://github.com/langwatch/langwatch/commit/fa657fa456f2bce14acfe9e12ad51e751894b62e))
+* **ci:** assume AWS roles by OIDC for embeds publish and the gateway matrix ([#8961](https://github.com/langwatch/langwatch/issues/8961)) ([d8f12d2](https://github.com/langwatch/langwatch/commit/d8f12d2ea2c7da57ebf372320760474a1690127f))
+* **ci:** one nightly suite with a single dashboard ([#8877](https://github.com/langwatch/langwatch/issues/8877)) ([ee88567](https://github.com/langwatch/langwatch/commit/ee88567129459ed24e777fde65eede901195626c))
+* **ci:** publish the langy agent and Lambda images to the artifacts registry ([#8967](https://github.com/langwatch/langwatch/issues/8967)) ([1fa0a2b](https://github.com/langwatch/langwatch/commit/1fa0a2b1a8f66bc58c577503d3107f000caf3225))
+* **coding-agent:** copilot CLI and VS Code sessions become rows ([#8884](https://github.com/langwatch/langwatch/issues/8884)) ([e5c5e8c](https://github.com/langwatch/langwatch/commit/e5c5e8c3eb372ac02eed8ad7e5bd1810fc3c3be1))
+* **design-system:** brand icons for decision model providers and langwatch ([#8957](https://github.com/langwatch/langwatch/issues/8957)) ([f142230](https://github.com/langwatch/langwatch/commit/f142230fe4832cd179eb4c12abc5c9ad26c26514))
+* **model-provider:** instant evals decision model column with own-key decision models ([#8935](https://github.com/langwatch/langwatch/issues/8935)) ([9b022a5](https://github.com/langwatch/langwatch/commit/9b022a535f304bee38bca86530cc901b03731baa))
+* **model-providers:** add Doubleword provider (strict layout) ([#8557](https://github.com/langwatch/langwatch/issues/8557)) ([4304116](https://github.com/langwatch/langwatch/commit/4304116811863d149b2eae9a114516df00778834))
+* **nurturing:** send coding-agent session and app-open signals to Customer.io ([#8917](https://github.com/langwatch/langwatch/issues/8917)) ([d55d670](https://github.com/langwatch/langwatch/commit/d55d670efc5e1ad81b48e7fcf36a1ec30c883323))
+* **ops:** send notices from Cloud to self-hosted installs ([#8949](https://github.com/langwatch/langwatch/issues/8949)) ([d831e82](https://github.com/langwatch/langwatch/commit/d831e82227fe198e41981e01df06760b0ee0b977))
+* **tooling:** pnpm test:changed runs only the tests an edit reaches ([#8945](https://github.com/langwatch/langwatch/issues/8945)) ([c4f357b](https://github.com/langwatch/langwatch/commit/c4f357bb7e06195ed34018e053dfeaea67e93076))
+* **workflow,stores:** accept web-identity credentials as an alternative to static AWS keys ([#8994](https://github.com/langwatch/langwatch/issues/8994)) ([fe9df27](https://github.com/langwatch/langwatch/commit/fe9df27e83f783551052845d7aed6ad8a59c28d5))
+
+
+### Bug Fixes
+
+* **analytics:** read Postgres-backed LangWatchQL dates at the scale Postgres stores them ([#8912](https://github.com/langwatch/langwatch/issues/8912)) ([f5f8086](https://github.com/langwatch/langwatch/commit/f5f80868c96ef1ed3d28695c60b65d2e99531211))
+* **api:** name the credential census file in the api package layout ([#9005](https://github.com/langwatch/langwatch/issues/9005)) ([03ea93a](https://github.com/langwatch/langwatch/commit/03ea93a1d02a44f52ba5a42cf08fbf78c8ef98b5))
+* **automation:** log a customer-fixable settlement refusal once an hour, not per firing ([#8977](https://github.com/langwatch/langwatch/issues/8977)) ([9134f67](https://github.com/langwatch/langwatch/commit/9134f672a5d304acb0d72a31da58afcf21ad51ef))
+* **dashboard:** tighten delete confirmation for Reports dashboards ([#8918](https://github.com/langwatch/langwatch/issues/8918)) ([5dfa85e](https://github.com/langwatch/langwatch/commit/5dfa85e2b62bbb9e6932517c4f633eb3d2ad419e))
+* **governance:** centre the overview again and empty its lists with the design system's line ([#8932](https://github.com/langwatch/langwatch/issues/8932)) ([685c8e7](https://github.com/langwatch/langwatch/commit/685c8e729cb0f443bf44a49f9821f4285eb8c626))
+* **model-provider:** doubleword ids by alias, and routers out of the price audit ([#9034](https://github.com/langwatch/langwatch/issues/9034)) ([d69d3f7](https://github.com/langwatch/langwatch/commit/d69d3f7ed9d72c39a1c4c83c43864eff77310e19))
+* **nlp-lambda:** start the Lambda image from / so the function can boot ([#9018](https://github.com/langwatch/langwatch/issues/9018)) ([3e84e6b](https://github.com/langwatch/langwatch/commit/3e84e6bcbebda1c2370485e650e9e77460356774))
+* **nurturing:** send Customer.io date attributes as Unix seconds ([#8953](https://github.com/langwatch/langwatch/issues/8953)) ([dc318da](https://github.com/langwatch/langwatch/commit/dc318dae60fabe6e8ead62939b3266c3260bbc0b))
+* **security:** close 148 of 150 alerts across the python locks ([#7634](https://github.com/langwatch/langwatch/issues/7634)) ([c0837d1](https://github.com/langwatch/langwatch/commit/c0837d164d28f15ba179fc6f1c1f0516be32cfa3))
+* **security:** close all 52 Go alerts (grpc 1.83.2 in 16 modules, OTel-Go 1.45.0 in the SDK) ([#7931](https://github.com/langwatch/langwatch/issues/7931)) ([691f480](https://github.com/langwatch/langwatch/commit/691f4807bb06db2213898e640b0e4075168062bc))
+* **security:** close the nine alerts raised on 2026-10-22 ([#8982](https://github.com/langwatch/langwatch/issues/8982)) ([7eca2c2](https://github.com/langwatch/langwatch/commit/7eca2c24ccba4b38a1636048ea18801a2fd1d2b1))
+* **security:** raise JS security floors for the root workspace and SDK examples ([#6569](https://github.com/langwatch/langwatch/issues/6569)) ([2adf11f](https://github.com/langwatch/langwatch/commit/2adf11f42e98b42f8508a87e29be33c3264e07f3))
+* **security:** read client address headers only from configured proxies ([#8970](https://github.com/langwatch/langwatch/issues/8970)) ([9ae6ca4](https://github.com/langwatch/langwatch/commit/9ae6ca4f8cf59a0d00a5046b7b273dc18fc5d0d9))
+* **workflow:** never move a studio Lambda to an older image during a rollout ([#9030](https://github.com/langwatch/langwatch/issues/9030)) ([6839a6b](https://github.com/langwatch/langwatch/commit/6839a6b75378cb891895cdde85d054dd5bb1240b))
+
+
+### Miscellaneous
+
+* **deps:** bump aiohttp ([b51e7cb](https://github.com/langwatch/langwatch/commit/b51e7cb7ecf4c4722135d7e0456fd48f1963859c))
+* **deps:** bump aiohttp from 3.14.3 to 3.14.4 in the uv group across 1 directory ([#8941](https://github.com/langwatch/langwatch/issues/8941)) ([b51e7cb](https://github.com/langwatch/langwatch/commit/b51e7cb7ecf4c4722135d7e0456fd48f1963859c))
+* drop tslsp-cli, point agents at rush ts ([#8985](https://github.com/langwatch/langwatch/issues/8985)) ([afb36c1](https://github.com/langwatch/langwatch/commit/afb36c17b9e369120301b9f46ed4954ec2d3231b))
+
+
+### Documentation
+
+* **agent-testing:** add the setup and teardown hooks guide ([#8920](https://github.com/langwatch/langwatch/issues/8920)) ([d3e993c](https://github.com/langwatch/langwatch/commit/d3e993c4b1949cfc1634ff8c3f544d5f7c13c5d5))
+
 ## [3.21.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.20.1...langwatch@v3.21.0) (2026-10-21)
 
 
