@@ -9,6 +9,8 @@ export type NlpLambdaArnEntry = Readonly<{
   arn: string;
   /** The deployment image it was resolved under; a change invalidates it. */
   imageUri: string;
+  /** That image's rollout order, where the fleet names one. */
+  imageOrder?: number | undefined;
   /** The function configuration it was reconciled to; a change invalidates it. */
   configFingerprint: string;
 }>;

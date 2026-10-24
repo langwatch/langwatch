@@ -35,6 +35,8 @@ export type StudioLambdaConfig = Readonly<{
   credentials: NlpLambdaFleetCredentials;
   roleArn: string;
   imageUri: string;
+  /** Where `imageUri` sits in rollout order; absent where the fleet names none. */
+  imageOrder?: number | undefined;
   cacheBucket: string;
   subnetIds: readonly string[];
   securityGroupIds: readonly string[];
@@ -66,6 +68,29 @@ export function clampCodeBlockTimeoutSeconds(rawValue: string | undefined): numb
   }
 
   return Math.min(parsed, maxSeconds);
+}
+
+/** The function tag recording the rollout order of the image a pod last put on it. */
+export const NLP_LAMBDA_IMAGE_ORDER_TAG = "ImageOrder";
+
+/**
+ * Where a pod's image stands against the one a function was last moved to.
+ * `behind` means a newer release owns the function and the pod leaves it alone;
+ * `unordered` (the fleet names no order) keeps converging on the pod's own image.
+ */
+export type StudioLambdaRolloutStanding = "ahead" | "level" | "behind" | "unordered";
+
+export function studioLambdaRolloutStanding(input: {
+  ours: number | undefined;
+  tags: Readonly<Record<string, string>> | undefined;
+}): StudioLambdaRolloutStanding {
+  if (input.ours === undefined) return "unordered";
+  const raw = input.tags?.[NLP_LAMBDA_IMAGE_ORDER_TAG];
+  const recorded = raw !== undefined && /^\d+$/.test(raw) ? Number(raw) : void 0;
+  // A function with no readable order predates ordering, so any ordered pod is ahead of it.
+  if (recorded === undefined || input.ours > recorded) return "ahead";
+
+  return input.ours === recorded ? "level" : "behind";
 }
 
 /**
@@ -121,6 +146,7 @@ export function buildStudioLambdaConfig(input: {
     credentials: fields.credentials,
     roleArn: fields.roleArn,
     imageUri: fields.imageUri,
+    imageOrder: fields.imageOrder,
     cacheBucket: fields.cacheBucket,
     subnetIds: fields.subnetIds,
     securityGroupIds: fields.securityGroupIds,

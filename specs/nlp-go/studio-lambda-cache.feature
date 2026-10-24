@@ -118,3 +118,49 @@ Feature: Per-project NLP Lambda resolution
     Given the UpdateFunctionConfiguration call rejects with an unrelated error
     When getProjectLambdaArn resolves that project
     Then the unrelated error is rethrown
+
+  # Rollout order: during a rollout, pods of the previous release keep serving
+  # next to the new ones. The fleet configuration's image_order grows with each
+  # new image, the function records the order of the image last put on it, and
+  # a pod never moves a function to a lower order.
+
+  @unit
+  Scenario: A pod on an older release leaves a function a newer release moved
+    Given a function tagged with an image order above the pod's own
+    And its image and memory size differ from the pod's configuration
+    When the pod resolves that project
+    Then it answers with the function's ARN
+    And it sends no UpdateFunctionCode, UpdateFunctionConfiguration or TagResource call
+
+  @unit
+  Scenario: A pod on a newer release upgrades an older or untagged function
+    Given a function tagged with a lower image order, or with none
+    When the pod resolves that project
+    Then it tags the function with its own image order before it updates the image
+    And the image is updated to the pod's image
+
+  @unit
+  Scenario: A pod on the same release converges the function as before
+    Given a function tagged with the pod's own image order but another image
+    When the pod resolves that project
+    Then the image is updated to the pod's image without retagging
+
+  @unit
+  Scenario: A fleet that names no image order converges as before
+    Given the fleet configuration names no image_order
+    When the pod resolves a function on another image
+    Then the image is updated to the pod's image
+    And the function is not tagged
+
+  @unit
+  Scenario: A newly created function records the pod's image order
+    Given the fleet configuration names an image_order
+    When the pod creates a project's function
+    Then the function is created with that image order as a tag
+
+  @unit
+  Scenario: A cached ARN from a newer release keeps serving an older pod
+    Given "projectA" has an ARN cached by a pod on a higher image order and another image
+    When a runtime on a lower image order resolves "projectA"
+    Then it returns the cached ARN without calling AWS
+    And it leaves the shared entry in place

@@ -26,6 +26,8 @@ export class NlpLambdaRuntimeService {
     resolver: NlpLambdaArnResolver;
     /** This deployment's engine image. A change invalidates every entry. */
     imageUri: string;
+    /** Where that image sits in rollout order; an entry from a later one still holds. */
+    imageOrder?: number | undefined;
     /** This deployment's function configuration. A change invalidates every entry. */
     configFingerprint: string;
     ttlSeconds?: number;
@@ -41,6 +43,7 @@ export class NlpLambdaRuntimeService {
       cache: NlpLambdaArnCache;
       resolver: NlpLambdaArnResolver;
       imageUri: string;
+      imageOrder?: number | undefined;
       configFingerprint: string;
       ttlSeconds?: number;
       logger?: Pick<Logger, "warn">;
@@ -92,7 +95,17 @@ export class NlpLambdaRuntimeService {
       return null;
     }
 
-    const { imageUri, configFingerprint } = this.options;
+    const { imageUri, imageOrder, configFingerprint } = this.options;
+    // A newer release resolved it, and this pod's resolver would leave the
+    // function as it is: re-resolving only churns the entry every pod shares.
+    if (
+      imageOrder !== undefined &&
+      entry.imageOrder !== undefined &&
+      entry.imageOrder > imageOrder
+    ) {
+      return entry.arn;
+    }
+
     if (entry.imageUri !== imageUri || entry.configFingerprint !== configFingerprint) {
       // Removed rather than left to expire: the stale ARN is the answer every
       // other pod would keep serving for the rest of the window.
@@ -105,9 +118,14 @@ export class NlpLambdaRuntimeService {
   }
 
   private async resolveAndShare(projectId: string): Promise<string> {
-    const { imageUri, configFingerprint } = this.options;
+    const { imageUri, imageOrder, configFingerprint } = this.options;
     const arn = await this.options.resolver.resolve({ projectId, imageUri });
-    const entry: NlpLambdaArnEntry = { arn, imageUri, configFingerprint };
+    const entry: NlpLambdaArnEntry = {
+      arn,
+      imageUri,
+      configFingerprint,
+      ...(imageOrder === undefined ? {} : { imageOrder }),
+    };
     try {
       await this.options.cache.set({
         key: this.keyFor(projectId),
@@ -139,7 +157,7 @@ export class NlpLambdaRuntimeService {
         return null;
       }
 
-      const { arn, imageUri, configFingerprint } = parsed as Record<string, unknown>;
+      const { arn, imageUri, imageOrder, configFingerprint } = parsed as Record<string, unknown>;
       if (typeof arn !== "string" || arn === "") {
         return null;
       }
@@ -153,7 +171,12 @@ export class NlpLambdaRuntimeService {
         return null;
       }
 
-      return { arn, imageUri, configFingerprint };
+      return {
+        arn,
+        imageUri,
+        configFingerprint,
+        ...(typeof imageOrder === "number" ? { imageOrder } : {}),
+      };
     } catch {
       return null;
     }

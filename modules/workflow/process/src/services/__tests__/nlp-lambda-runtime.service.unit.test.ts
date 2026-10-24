@@ -60,12 +60,14 @@ function runtime(options: {
   cache: SharedCache;
   resolver: NlpLambdaArnResolver;
   imageUri?: string;
+  imageOrder?: number;
   configFingerprint?: string;
 }) {
   return NlpLambdaRuntimeService.create({
     cache: options.cache,
     resolver: options.resolver,
     imageUri: options.imageUri ?? IMAGE,
+    imageOrder: options.imageOrder,
     configFingerprint: options.configFingerprint ?? FINGERPRINT,
   });
 }
@@ -387,6 +389,57 @@ describe("the per-project NLP Lambda runtime", () => {
       expect(arn).toBe(ARN);
       expect(account.sent).toEqual([]);
       expect(cache.deleted).toEqual([]);
+    });
+  });
+
+  describe("when pods of two releases share the cache during a rollout", () => {
+    /** @scenario "A cached ARN from a newer release keeps serving an older pod" */
+    it("serves an older pod the newer release's entry without resolving or dropping it", async () => {
+      const cache = new SharedCache();
+      await runtime({
+        cache,
+        resolver: awsResolver().resolver,
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      }).resolveArn(PROJECT);
+      const older = awsResolver();
+
+      const arn = await runtime({
+        cache,
+        resolver: older.resolver,
+        imageUri: IMAGE,
+        imageOrder: 100,
+      }).resolveArn(PROJECT);
+
+      expect(arn).toBe(ARN);
+      expect(older.resolve).not.toHaveBeenCalled();
+      expect(cache.deleted).toEqual([]);
+      expect(JSON.parse(cache.entries.get("lambda_arn:projectA")!.value)).toMatchObject({
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      });
+    });
+
+    /** @scenario "An image change deletes a stale cached ARN before refresh" */
+    it("has a newer pod drop an older release's entry and resolve again", async () => {
+      const cache = new SharedCache();
+      await runtime({
+        cache,
+        resolver: awsResolver().resolver,
+        imageUri: IMAGE,
+        imageOrder: 100,
+      }).resolveArn(PROJECT);
+      const newer = awsResolver();
+
+      await runtime({
+        cache,
+        resolver: newer.resolver,
+        imageUri: NEXT_IMAGE,
+        imageOrder: 200,
+      }).resolveArn(PROJECT);
+
+      expect(newer.resolve).toHaveBeenCalledTimes(1);
+      expect(cache.deleted).toEqual(["lambda_arn:projectA"]);
     });
   });
 });

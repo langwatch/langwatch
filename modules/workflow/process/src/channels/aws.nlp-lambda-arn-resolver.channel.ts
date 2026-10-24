@@ -1,7 +1,8 @@
 /**
  * Finds, creates, or reconciles the Lambda function one project's studio
- * engine runs on, and answers with its ARN — reconciling because
- * `UpdateFunctionCode` touches only the image, not the rest of the config.
+ * engine runs on, and answers with its ARN. A pod never moves a function to an
+ * older release than it runs: during a rollout old and new pods serve together.
+ * @see specs/nlp-go/studio-lambda-cache.feature
  */
 import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { CreateLogGroupCommand, PutRetentionPolicyCommand } from "@aws-sdk/client-cloudwatch-logs";
@@ -9,6 +10,7 @@ import {
   type LambdaClient,
   CreateFunctionCommand,
   GetFunctionCommand,
+  TagResourceCommand,
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
   type FunctionConfiguration,
@@ -17,9 +19,11 @@ import type { Logger } from "@langwatch/observability";
 
 import {
   LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+  NLP_LAMBDA_IMAGE_ORDER_TAG,
   NLP_LAMBDA_MEMORY_SIZE_MB,
   NLP_LAMBDA_NAME_PREFIX,
   buildStudioLambdaEnvironment,
+  studioLambdaRolloutStanding,
   type StudioLambdaConfig,
 } from "../rules/nlp-lambda-config.rules.ts";
 import { type NlpLambdaArnResolver } from "./nlp-lambda.channel.ts";
@@ -107,7 +111,7 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
             SecurityGroupIds: [...config.securityGroupIds],
           },
           Environment: { Variables: buildStudioLambdaEnvironment(config) },
-          Tags: { Project: "langwatch", Type: "optimization-studio" },
+          Tags: { Project: "langwatch", Type: "optimization-studio", ...this.imageOrderTag() },
         }),
       );
     } catch (error) {
@@ -146,7 +150,16 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
     }
   }
 
-  /** Brings an existing function's image, then its configuration, up to date. */
+  private imageOrderTag(): Record<string, string> {
+    const order = this.options.config.imageOrder;
+
+    return order === undefined ? {} : { [NLP_LAMBDA_IMAGE_ORDER_TAG]: String(order) };
+  }
+
+  /**
+   * Brings an existing function's image, then its configuration, up to date,
+   * unless a newer release already moved it: that pod owns both.
+   */
   private async sync(input: {
     functionName: string;
     existing: FunctionConfiguration;
@@ -157,6 +170,25 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
       new GetFunctionCommand({ FunctionName: input.functionName }),
     );
     let current = input.existing;
+
+    const standing = studioLambdaRolloutStanding({ ours: config.imageOrder, tags: details.Tags });
+    if (standing === "behind") {
+      this.options.logger?.info(
+        { projectId: input.projectId, imageOrder: config.imageOrder },
+        "a newer release owns the studio Lambda; leaving its image and configuration",
+      );
+
+      return current;
+    }
+
+    // Recorded before the image moves, so a pod still on the older release
+    // that reads the function mid-update already sees it is behind.
+    if (standing === "ahead") {
+      await this.recordImageOrder({
+        functionArn: details.Configuration?.FunctionArn ?? input.existing.FunctionArn,
+        projectId: input.projectId,
+      });
+    }
 
     const deployedImage = details.Code?.ImageUri;
     if (deployedImage && deployedImage !== config.imageUri) {
@@ -176,6 +208,24 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
     });
 
     return reconciled ?? current;
+  }
+
+  /** A failed tag degrades to converging without the guard, never to a stuck function. */
+  private async recordImageOrder(input: {
+    functionArn: string | undefined;
+    projectId: string;
+  }): Promise<void> {
+    if (!input.functionArn) return;
+    try {
+      await this.options.lambda.send(
+        new TagResourceCommand({ Resource: input.functionArn, Tags: this.imageOrderTag() }),
+      );
+    } catch (error) {
+      this.options.logger?.warn(
+        { projectId: input.projectId, error },
+        "could not record the image order on the studio Lambda",
+      );
+    }
   }
 
   private async updateImage(input: {
