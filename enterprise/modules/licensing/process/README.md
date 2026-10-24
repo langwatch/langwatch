@@ -6,7 +6,7 @@ The server half of [licensing](../README.md). Licences: validating and storing a
 
 ## Installation
 
-`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest).withEventing(licenseSyncEventing).withEventing(licensingCustomerEventing).withDoors(…).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:21`.
+`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostRest, testingLicenseRest).withEventing(licenseSyncEventing).withEventing(licensingCustomerEventing).withDoors(…).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable signed-license capability supplied to process peers.
 
-Peers call these through the token, declared at `../contract/src/licensing.api.ts:77`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/licensing.api.ts:84`; nothing else in this package is public.
 
 #### `resolve`
 
@@ -444,6 +444,54 @@ listSelfHostedInstances(input: { page: number; pageSize: number; search?: string
 getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail>;
 ```
 
+#### `issueTestingLicense`
+
+Testing licences (ADR-180 section 2), signed on LangWatch Cloud alone: one local organization on one instance, for a caller the testing-licence token door verified.
+
+```typescript
+issueTestingLicense(input: { instanceId: string; organizationId: string; lifetimeHours?: number; issuer: TestingLicenseIssuer; }): Promise<IssuedTestingLicense>;
+```
+
+#### `verifyTestingLicenseToken`
+
+The door's check on a testing-licence token: the user it belongs to, or its refusal thrown.
+
+```typescript
+verifyTestingLicenseToken(input: { bearer: string | null }): Promise<TestingLicenseIssuer>;
+```
+
+#### `mintPersonalTestingLicenseToken`
+
+A personal token for the person a CLI sign-in approved; the token is shown once.
+
+```typescript
+mintPersonalTestingLicenseToken(input: { userId: string; }): Promise<{ token: string; expiresAt: string }>;
+```
+
+#### `createTestingLicenseServiceToken`
+
+A named token for CI, acting as the ops manager who made it; the token is shown once.
+
+```typescript
+createTestingLicenseServiceToken(input: { name: string; expiresInDays?: number; operatorId: string; }): Promise<MintedTestingLicenseToken>;
+```
+
+#### `listTestingLicenseTokens`
+
+Every testing-licence token, personal and service, newest first.
+
+```typescript
+listTestingLicenseTokens(input: { page: number; pageSize: number; }): Promise<TestingLicenseTokenPage>;
+```
+
+#### `revokeTestingLicenseToken`
+
+`operatorId` revokes it: an ops manager, or the token's own user signing out.
+
+```typescript
+revokeTestingLicenseToken(input: { id: string; operatorId: string; }): Promise<TestingLicenseTokenView>;
+```
+
 #### `summarizeSelfHostedInstances`
 
 ```typescript
@@ -597,6 +645,59 @@ interface Response {
 }
 ```
 
+### `testingLicenseRest`
+
+|             |                                            |
+| ----------- | ------------------------------------------ |
+| Declared at | `src/transport/testing-license.rest.ts:29` |
+| Base URL    | `/api/licensing`, twin `/api/v1/licensing` |
+| Addressing  | dated                                      |
+| Credential  | testing_license_token                      |
+| Versions    | `2026-08-07`                               |
+
+#### `POST /testing-licenses` · `issueTestingLicense`
+
+Platform permission `ops:manage`. Credential `testing_license_token`. Hidden from the OpenAPI document. Declared at `src/transport/testing-license.rest.ts:34`.
+
+Answers at `/api/licensing/testing-licenses`, `/api/v1/licensing/testing-licenses`; also, undocumented, `/api/licensing/2026-08-07/testing-licenses`, `/api/v1/licensing/2026-08-07/testing-licenses`, `/api/licensing/latest/testing-licenses`, `/api/v1/licensing/latest/testing-licenses`.
+
+```typescript
+// Body: issueTestingLicenseRequestSchema, ../contract/src/testing-license.ts:40
+interface Body {
+  instanceId: string;
+  organizationId: string;
+  lifetimeHours?: number;
+}
+// Response: issuedTestingLicenseSchema, ../contract/src/testing-license.ts:54
+interface Response {
+  licenseKey: string;
+  issuedLicenseId: string;
+  expiresAt: string;
+}
+```
+
+#### `DELETE /testing-licenses/token` · `revokeOwnTestingLicenseToken`
+
+Platform permission `ops:manage`. Credential `testing_license_token`. Hidden from the OpenAPI document. Declared at `src/transport/testing-license.rest.ts:47`.
+
+Answers at `/api/licensing/testing-licenses/token`, `/api/v1/licensing/testing-licenses/token`; also, undocumented, `/api/licensing/2026-08-07/testing-licenses/token`, `/api/v1/licensing/2026-08-07/testing-licenses/token`, `/api/licensing/latest/testing-licenses/token`, `/api/v1/licensing/latest/testing-licenses/token`.
+
+```typescript
+// Response: testingLicenseTokenViewSchema, ../contract/src/testing-license.ts:80
+interface Response {
+  id: string;
+  kind: "personal" | "service";
+  name: string | null;
+  ownerUserId: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  revokedById: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+  status: "active" | "expired" | "revoked";
+}
+```
+
 ## tRPC transport
 
 ### `connect`
@@ -649,6 +750,7 @@ Contract `../contract/src/licensing.trpc.ts:27`, router `src/transport/licensing
 | Procedure                  | Kind     | Gate                                                                                                                                                                                                                                          | Input                            | Output                        |
 | -------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------- |
 | `license.getStatus`        | query    | Permission `organization:view`                                                                                                                                                                                                                | `licenseOrganizationQuerySchema` | `licenseStatusSchema`         |
+| `license.getInstanceId`    | query    | Permission `organization:manage`                                                                                                                                                                                                              | `licenseOrganizationQuerySchema` | inline                        |
 | `license.getSsoGateStatus` | query    | No permission: the single sign-on gate is a property of the deployment, not of a tenant, so there is no scope to check against; it stays behind a session because an anonymous visitor has no business learning that an install is unlicensed | inline                           | `ssoGateStatusSchema`         |
 | `license.upload`           | mutation | Permission `organization:manage`                                                                                                                                                                                                              | `storeLicenseInputSchema`        | `licenseUploadedSchema`       |
 | `license.activate`         | mutation | Permission `organization:manage`                                                                                                                                                                                                              | inline                           | `licenseUploadedSchema`       |
@@ -661,12 +763,19 @@ Contract `../contract/src/licensing.trpc.ts:27`, router `src/transport/licensing
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:244
+type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:257
+
+// license.getInstanceId
+type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:24
+// Output: inline, ../contract/src/licensing.trpc.ts:35
+interface Output {
+  instanceId: string;
+}
 
 // license.getSsoGateStatus
-// Input: inline, ../contract/src/licensing.trpc.ts:36
+// Input: inline, ../contract/src/licensing.trpc.ts:41
 type Input = Record<string, unknown>;
-// Output: ssoGateStatusSchema, ../contract/src/license.ts:283
+// Output: ssoGateStatusSchema, ../contract/src/license.ts:296
 interface Output {
   configuredProvider: string | null;
   licensed: boolean;
@@ -679,19 +788,19 @@ interface Input {
   organizationId: string;
   licenseKey: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:297
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:310
 
 // license.activate
-// Input: inline, ../contract/src/licensing.trpc.ts:45
+// Input: inline, ../contract/src/licensing.trpc.ts:50
 interface Input {
   organizationId: string;
   code: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:297
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:310
 
 // license.remove
 type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:24
-// Output: licenseRemovedSchema, ../contract/src/license.ts:304
+// Output: licenseRemovedSchema, ../contract/src/license.ts:317
 interface Output {
   success: true;
   removed: true;
@@ -760,9 +869,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                             | Environment variable                 | Declared at                              |
 | ------ | -------------------------------- | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`             | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:178`           |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:179`           |
-| secret | `upgradeDiagnosticsSlackWebhook` | `SLACK_CHANNEL_UPGRADE_DIAGNOSTICS`  | `src/app/licensing.app.ts:180`           |
+| secret | `instanceLicenseKey`             | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:185`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:186`           |
+| secret | `upgradeDiagnosticsSlackWebhook` | `SLACK_CHANNEL_UPGRADE_DIAGNOSTICS`  | `src/app/licensing.app.ts:187`           |
 | config | `publicKey`                      | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:46` |
 | config | `connectDisabled`                | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:54` |
 | config | `connectGatewayEndpoint`         | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:61` |

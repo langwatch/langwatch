@@ -71,6 +71,9 @@ export type {
 /** The hosted end of Connect (ADR-156, section 5), on LangWatch Cloud only. */
 export { connectHostRest } from "./transport/connect-host.rest.ts";
 
+/** Testing licences issued to Cloud staff and CI (ADR-180), on LangWatch Cloud only. */
+export { testingLicenseRest } from "./transport/testing-license.rest.ts";
+
 /** Activation codes (ADR-156, section 5). */
 export type {
   ActivationClaim,

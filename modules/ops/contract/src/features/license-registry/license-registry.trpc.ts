@@ -28,6 +28,14 @@ import {
   signedIssuedLicenseSchema,
   updateLicenseTermsInputSchema,
 } from "./license-registry.ts";
+import {
+  createTestingLicenseServiceTokenInputSchema,
+  listTestingLicenseTokensInputSchema,
+  mintedTestingLicenseTokenSchema,
+  revokeTestingLicenseTokenInputSchema,
+  testingLicenseTokenPageSchema,
+  testingLicenseTokenViewSchema,
+} from "./testing-license-token.ts";
 
 export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .query("getAll")
@@ -81,4 +89,16 @@ export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .mutation("revokeActivationCode")
   .withInput(revokeActivationCodeInputSchema)
   .withOutput(activationCodeViewSchema)
+
+  .query("testingLicenseTokens")
+  .withInput(listTestingLicenseTokensInputSchema)
+  .withOutput(testingLicenseTokenPageSchema)
+
+  .mutation("createTestingLicenseServiceToken")
+  .withInput(createTestingLicenseServiceTokenInputSchema)
+  .withOutput(mintedTestingLicenseTokenSchema)
+
+  .mutation("revokeTestingLicenseToken")
+  .withInput(revokeTestingLicenseTokenInputSchema)
+  .withOutput(testingLicenseTokenViewSchema)
   .build();

@@ -27,6 +27,7 @@ import {
   type SeatChangeResult,
   type SignedIssuedLicense,
   type ConnectService,
+  TestingLicenseBindingResetRefusedError,
 } from "@langwatch/enterprise-licensing-contract";
 import { generate } from "@langwatch/ksuid";
 import { ORGANIZATION_KSUID_RESOURCE } from "@langwatch/organization-contract";
@@ -37,8 +38,13 @@ import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
+import { connectedSeatsOf, seatChangesOf } from "../rules/connected-seats.rules.ts";
 import { resolveLicenseTerms } from "../rules/issued-license-row.rules.ts";
-import { issuedLicenseView, statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
+import {
+  isStandardLicenseRow,
+  issuedLicenseView,
+  statusOfIssuedLicense,
+} from "../rules/issued-license.rules.ts";
 import type { ContractBudgets } from "./contract-budget.service.ts";
 import { IssuedLicenseListService } from "./issued-license-list.service.ts";
 import { IssuedLicenseWriterService } from "./issued-license-writer.service.ts";
@@ -110,6 +116,20 @@ export class LicenseRegistryService {
   }
 
   /**
+   * Signs a testing licence for one local organization on one instance (ADR-180 section 3),
+   * bound to that instance from issue. It names no Cloud customer, so it marks none.
+   */
+  async issueTesting(input: {
+    instanceId: string;
+    organizationId: string;
+    expiresAt: Instant;
+    issuedById: string;
+  }): Promise<SignedIssuedLicense> {
+    const { licenseKey, row } = await this.writer.signTesting(input);
+    return { licenseKey, license: this.toView(row) };
+  }
+
+  /**
    * Records a license another flow already signed. Unlinked, it resolves to
    * nothing until an operator links it, and it never marks a self-hosted
    * customer: the mint script licenses a Cloud organization instead.
@@ -146,8 +166,10 @@ export class LicenseRegistryService {
 
     // Same order as `issue`: the row is the last write. A retry after a failure
     // here would otherwise find its own tokenHash taken and be refused as
-    // already registered, with the organization never marked.
-    await this.options.organizations.recordSelfHostedCustomerLicensed(organization);
+    // already registered, with the organization never marked. A testing licence marks none.
+    if (signed.data.kind !== "testing") {
+      await this.options.organizations.recordSelfHostedCustomerLicensed(organization);
+    }
     const row = await this.writer.createRow({
       licenseKey: input.licenseKey,
       organizationId: organization.id,
@@ -213,7 +235,10 @@ export class LicenseRegistryService {
   }): Promise<SeatChangeResult> {
     const current = await this.getRow(input.id);
     this.refuseUnlessActive(current);
-    const raised = current.organizationId !== null && input.maxMembers > current.maxMembers;
+    const raised =
+      isStandardLicenseRow(current) &&
+      current.organizationId !== null &&
+      input.maxMembers > current.maxMembers;
 
     const { licenseKey, row } = await this.writer.signReplacement({
       current,
@@ -233,24 +258,12 @@ export class LicenseRegistryService {
 
   /** Every seat change that raised a linked license, as billing invoices it. */
   async findSeatChanges(input: { organizationId?: string }): Promise<LicenseSeatChange[]> {
-    const rows = await this.options.repository.findAllSeatsRaised(input);
-    return rows.flatMap((row) =>
-      row.organizationId !== null && row.seatsRaisedFrom !== null
-        ? [
-            {
-              licenseRowId: row.id,
-              organizationId: row.organizationId,
-              previousSeats: row.seatsRaisedFrom,
-              seats: row.maxMembers,
-              changedAt: row.issuedAt.toString(),
-            },
-          ]
-        : [],
-    );
+    return seatChangesOf(await this.options.repository.findAllSeatsRaised(input));
   }
 
   async resetInstanceBinding(input: { id: string }): Promise<IssuedLicenseView> {
     const row = await this.getRow(input.id);
+    if (!isStandardLicenseRow(row)) throw new TestingLicenseBindingResetRefusedError();
     const updated = await this.options.repository.update(row.id, {
       instanceId: null,
       instanceBoundAt: null,
@@ -291,7 +304,7 @@ export class LicenseRegistryService {
     const rows = await this.options.repository.findAllByOrganization(organizationId);
     const now = this.options.now();
     const [active] = rows
-      .filter((row) => statusOfIssuedLicense(row, now) === "active")
+      .filter((row) => isStandardLicenseRow(row) && statusOfIssuedLicense(row, now) === "active")
       .toSorted((a, b) => Temporal.Instant.compare(b.expiresAt, a.expiresAt));
     if (!active) throw new IssuedLicenseNotFoundError();
 
@@ -344,7 +357,9 @@ export class LicenseRegistryService {
       organizationId: organization.id,
       ...(moving ? { virtualKeyId: null } : {}),
     });
-    await this.options.organizations.recordSelfHostedCustomerLicensed(organization);
+    if (isStandardLicenseRow(row)) {
+      await this.options.organizations.recordSelfHostedCustomerLicensed(organization);
+    }
     if (moving && row.organizationId) {
       await this.options.contractBudgets.sync({
         organizationId: row.organizationId,
@@ -355,25 +370,10 @@ export class LicenseRegistryService {
     return this.toView(updated);
   }
 
-  /**
-   * Off the active license that runs longest: a reissue leaves both rows active
-   * until the install presents the new one, and summing them counts seats twice.
-   */
+  /** Off the active standard license that runs longest; see `connectedSeatsOf`. */
   async getConnectedSeats(organizationId: string): Promise<ConnectedSeats> {
-    const licenses = await this.options.repository.findAllByOrganization(organizationId);
-    const now = this.options.now();
-    const active = licenses.filter((row) => statusOfIssuedLicense(row, now) === "active");
-    const [current] = active.toSorted((a, b) => Temporal.Instant.compare(b.expiresAt, a.expiresAt));
-    const [lastSyncAt] = active
-      .flatMap((row) => (row.lastSyncAt ? [row.lastSyncAt] : []))
-      .toSorted((a, b) => Temporal.Instant.compare(b, a));
-
-    return {
-      licensed: current?.maxMembers ?? 0,
-      reported: current?.lastSyncAt ? (current.reportedMembers ?? 0) : null,
-      lastSyncAt: lastSyncAt?.toString() ?? null,
-      managedVirtualKeyId: licenses.find((row) => row.virtualKeyId)?.virtualKeyId ?? null,
-    };
+    const rows = await this.options.repository.findAllByOrganization(organizationId);
+    return connectedSeatsOf({ rows, now: this.options.now() });
   }
 
   async getById(input: { id: string }): Promise<IssuedLicenseView> {

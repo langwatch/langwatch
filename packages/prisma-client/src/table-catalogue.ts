@@ -31,6 +31,7 @@ export const prismaTableCatalogue = {
   "IssuedLicense": "IssuedLicense",
   "OrganizationLicense": "OrganizationLicense",
   "ActivationCode": "ActivationCode",
+  "TestingLicenseToken": "TestingLicenseToken",
   "ConnectedBillingAccount": "ConnectedBillingAccount",
   "ConnectedCreditGrant": "ConnectedCreditGrant",
   "ConnectedInvoice": "ConnectedInvoice",
@@ -679,6 +680,8 @@ export const prismaModelFieldCatalogue = {
     "expiresAt",
     "source",
     "issuedById",
+    "kind",
+    "testingOrganizationId",
     "revokedAt",
     "revokedById",
     "revokedReason",
@@ -733,6 +736,18 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "createdAt",
     "updatedAt"
+  ],
+  "TestingLicenseToken": [
+    "id",
+    "tokenHash",
+    "kind",
+    "ownerUserId",
+    "name",
+    "expiresAt",
+    "revokedAt",
+    "revokedById",
+    "lastUsedAt",
+    "createdAt"
   ],
   "ConnectedBillingAccount": [
     "id",
@@ -3163,6 +3178,7 @@ export const prismaRelationCatalogue = {
   },
   "OrganizationLicense": {},
   "ActivationCode": {},
+  "TestingLicenseToken": {},
   "ConnectedBillingAccount": {
     "organization": "Organization"
   },

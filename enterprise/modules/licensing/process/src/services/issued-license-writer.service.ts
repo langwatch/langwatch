@@ -7,6 +7,8 @@ import {
   LicenseAlreadyReissuedError,
   LicenseKeyInvalidError,
   LicenseSigningNotConfiguredError,
+  TestingLicenseBindingMissingError,
+  type GenerateLicenseInput,
   type IssuedLicenseSource,
 } from "@langwatch/enterprise-licensing-contract";
 import { registryHashForToken } from "@langwatch/gateway-contract";
@@ -17,9 +19,18 @@ import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
-import { blankIssuedLicenseRow, replacementColumns } from "../rules/issued-license-row.rules.ts";
-import { isUniqueViolation, violationNames } from "../rules/issued-license.rules.ts";
+import {
+  blankIssuedLicenseRow,
+  replacementColumns,
+  signedLicenseColumns,
+} from "../rules/issued-license-row.rules.ts";
+import {
+  isStandardLicenseRow,
+  isUniqueViolation,
+  violationNames,
+} from "../rules/issued-license.rules.ts";
 import { signedLiteSeats, storedLiteSeats } from "../rules/lite-seats.rules.ts";
+import { TESTING_LICENSE_TERMS } from "../rules/testing-license-issue.rules.ts";
 
 type IssuedLicenseRowDraft = {
   licenseKey: string;
@@ -76,6 +87,8 @@ export class IssuedLicenseWriterService {
       connectServices: current.services,
       privateKey: this.getSigningKey(),
       now: toDate(this.options.now()),
+      // A testing licence is reissued as one, for the same instance and organization.
+      ...testingClaimsOf(current),
     });
 
     try {
@@ -98,6 +111,38 @@ export class IssuedLicenseWriterService {
       if (isUniqueViolation(error)) throw new LicenseAlreadyReissuedError();
       throw error;
     }
+  }
+
+  /** Signs a testing licence bound to one instance from issue (ADR-180 section 3); unlinked. */
+  async signTesting(input: {
+    instanceId: string;
+    organizationId: string;
+    expiresAt: Instant;
+    issuedById: string;
+  }): Promise<{ licenseKey: string; row: IssuedLicenseRecord }> {
+    const privateKey = this.getSigningKey();
+    const { licenseKey } = this.options.generation.generate({
+      organizationId: input.organizationId,
+      organizationName: TESTING_LICENSE_TERMS.organizationName,
+      email: TESTING_LICENSE_TERMS.email,
+      planType: TESTING_LICENSE_TERMS.planType,
+      ...licenseSeats({
+        members: TESTING_LICENSE_TERMS.maxMembers,
+        membersLite: TESTING_LICENSE_TERMS.maxMembersLite,
+      }),
+      expiresAt: toDate(input.expiresAt),
+      connectServices: [],
+      privateKey,
+      now: toDate(this.options.now()),
+      testing: { instanceId: input.instanceId },
+    });
+    const row = await this.createRow({
+      licenseKey,
+      organizationId: null,
+      source: "BACKOFFICE",
+      issuedById: input.issuedById,
+    });
+    return { licenseKey, row };
   }
 
   async createRow(draft: IssuedLicenseRowDraft): Promise<IssuedLicenseRecord> {
@@ -130,6 +175,8 @@ export class IssuedLicenseWriterService {
         source: draft.source,
         issuedById: draft.issuedById,
         ...draft.overrides,
+        // The signed licence decides its kind and binding, whatever a caller passed.
+        ...signedLicenseColumns({ license: signed.data }),
       });
     } catch (error) {
       // Two writes of the same key both pass the read above, and the unique
@@ -147,4 +194,18 @@ export class IssuedLicenseWriterService {
     if (!privateKey || privateKey.trim() === "") throw new LicenseSigningNotConfiguredError();
     return privateKey;
   }
+}
+
+/** A replacement of anything but a standard licence is signed as a testing licence. */
+function testingClaimsOf(
+  current: IssuedLicenseRecord,
+): Pick<GenerateLicenseInput, "organizationId" | "testing"> {
+  if (isStandardLicenseRow(current)) return {};
+  if (!current.instanceId || !current.testingOrganizationId) {
+    throw new TestingLicenseBindingMissingError();
+  }
+  return {
+    organizationId: current.testingOrganizationId,
+    testing: { instanceId: current.instanceId },
+  };
 }

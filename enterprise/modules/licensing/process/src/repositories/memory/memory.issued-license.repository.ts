@@ -106,9 +106,15 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
     return this.matching(query).length;
   }
 
-  private matching({ search, status, emailSuffixes }: IssuedLicenseQuery): IssuedLicenseRecord[] {
+  private matching({
+    search,
+    status,
+    emailSuffixes,
+    includeTesting,
+  }: IssuedLicenseQuery): IssuedLicenseRecord[] {
     const term = search?.trim().toLowerCase();
     return this.all()
+      .filter((row) => includeTesting === true || row.kind === "standard")
       .filter((row) => (term ? matches(row, term) : true))
       .filter((row) => !status || activeAtInstant(row, status.at) === status.active)
       .filter(

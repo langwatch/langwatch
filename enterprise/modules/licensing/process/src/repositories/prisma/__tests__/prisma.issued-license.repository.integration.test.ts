@@ -11,7 +11,7 @@ import {
  */
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
@@ -92,9 +92,57 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
       overageEnabled: false,
       instanceId: null,
       revokedAt: null,
+      kind: "standard",
+      testingOrganizationId: null,
     });
     expect(stored?.tokenHash).toMatch(/^[0-9a-f]{64}$/);
     expect((await repository.findByTokenHash(stored?.tokenHash ?? ""))?.id).toBe(license.id);
+  });
+
+  /** @scenario "A testing license cannot be reset onto another instance or turned standard" */
+  it("stores a testing licence bound to its instance and reissues it as one", async () => {
+    const organization = await prisma.organization.create({
+      data: { name: `ACME Testing ${RUN}`, slug: `--${RUN}-${organizationIds.length}` },
+    });
+    organizationIds.push(organization.id);
+    const { licenseKey } = LicenseGenerationService.create(cryptography).generate({
+      organizationId: "org-local",
+      organizationName: "Developer stack",
+      email: "developer@langwatch.test",
+      planType: "ENTERPRISE",
+      maxMembers: 10,
+      expiresAt: toDate(nowInstant().add({ hours: 24 * 5 })),
+      privateKey: TEST_PRIVATE_KEY,
+      testing: { instanceId: `instance-${RUN}` },
+    });
+    const recorded = await registry.record({
+      licenseKey,
+      source: "SCRIPT",
+      organizationId: organization.id,
+    });
+
+    const reissued = await registry.reissue({
+      id: recorded.id,
+      expiresAt: nowInstant().add({ hours: 24 * 7 }),
+      operatorId: "user_operator",
+    });
+
+    const stored = await prisma.issuedLicense.findUnique({ where: { id: reissued.license.id } });
+    expect(stored).toMatchObject({
+      kind: "testing",
+      instanceId: `instance-${RUN}`,
+      testingOrganizationId: "org-local",
+    });
+    expect((await repository.findById(recorded.id))?.kind).toBe("testing");
+  });
+
+  /** @scenario "Testing licenses never count towards seats or invoices" */
+  it("reads a kind this release does not know as stored, without throwing", async () => {
+    const { license } = await issue("ACME Partner");
+    await prisma.issuedLicense.update({ where: { id: license.id }, data: { kind: "partner" } });
+
+    await expect(repository.findById(license.id)).resolves.toMatchObject({ kind: "partner" });
+    await expect(registry.getById({ id: license.id })).resolves.toMatchObject({ kind: "partner" });
   });
 
   /** @scenario A purchased GROWTH licence is recorded with unlimited lite seats */

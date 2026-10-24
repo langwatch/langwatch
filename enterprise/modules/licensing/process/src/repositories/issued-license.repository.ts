@@ -23,6 +23,13 @@ export interface IssuedLicenseRecord {
   issuedAt: Instant;
   expiresAt: Instant;
   source: IssuedLicenseSource;
+  /**
+   * `standard`, `testing`, or a kind a newer release wrote. Anything but `standard` is
+   * treated as testing: bound from issue, never counted, never turned standard (ADR-180).
+   */
+  kind: string;
+  /** The local organization a testing licence is for; `organizationId` names the customer. */
+  testingOrganizationId: string | null;
   issuedById: string | null;
   revokedAt: Instant | null;
   revokedById: string | null;
@@ -67,6 +74,8 @@ export type IssuedLicenseQuery = {
    * `matching` false, the rest.
    */
   emailSuffixes?: { suffixes: readonly string[]; matching: boolean };
+  /** Rows of any kind but `standard` (ADR-180 testing licences) are left out unless true. */
+  includeTesting?: boolean;
 };
 
 export interface IssuedLicenseRepository {

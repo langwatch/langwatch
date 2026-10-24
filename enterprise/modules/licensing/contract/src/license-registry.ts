@@ -12,6 +12,8 @@ const issuedLicenseFiltersSchemaDefinition = z.object({
   status: z.enum(["active", "inactive"]).optional(),
   /** Customers', or internal: issued to our own domains or a name reserved for testing. */
   audience: z.enum(["customer", "internal"]).optional(),
+  /** Testing licenses (ADR-180) are left out unless asked for. */
+  includeTesting: z.boolean().optional(),
 });
 export type IssuedLicenseFilters = z.infer<typeof issuedLicenseFiltersSchemaDefinition>;
 

@@ -11,6 +11,7 @@ import { MemoryOrganizationLicenseRepository } from "./memory.organization-licen
 import { MemorySelfHostedInstanceRepository } from "./memory.self-hosted-instance.repository.ts";
 import { MemorySelfHostedNoticeRepository } from "./memory.self-hosted-notice.repository.ts";
 import { MemorySignInProviderMountRepository } from "./memory.sign-in-provider-mount.repository.ts";
+import { MemoryTestingLicenseTokenRepository } from "./memory.testing-license-token.repository.ts";
 import { MemoryUpgradeDiagnosticBundleRepository } from "./memory.upgrade-diagnostic-bundle.repository.ts";
 import { MemoryUpgradeDiagnosticRepository } from "./memory.upgrade-diagnostic.repository.ts";
 
@@ -23,6 +24,7 @@ export class MemoryLicensingRepositories {
       organizationLicenses: MemoryOrganizationLicenseRepository.create(),
       issuedLicenses: MemoryIssuedLicenseRepository.create(),
       activationCodes: MemoryActivationCodeRepository.create(),
+      testingLicenseTokens: MemoryTestingLicenseTokenRepository.create(),
       selfHostedInstances: MemorySelfHostedInstanceRepository.create(),
       selfHostedNotices: MemorySelfHostedNoticeRepository.create(),
       connectOrganizations: MemoryConnectOrganizationRepository.create(),

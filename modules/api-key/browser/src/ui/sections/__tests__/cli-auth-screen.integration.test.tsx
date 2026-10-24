@@ -588,3 +588,100 @@ describe("given a brand-new reader with no organization", () => {
     });
   });
 });
+
+describe("given the CLI asked for a testing-license sign-in", () => {
+  const testingLicenseLookup = {
+    outcome: "pending" as const,
+    userCode: "WDJB-MJHT",
+    status: "pending",
+    expiresAt: Date.now() + 600_000,
+    credentialType: "testing_license" as const,
+    management: false,
+  };
+
+  /** @scenario The browser sign-in page says what a testing-license sign-in allows */
+  it("says what is allowed, offers no key choices and sends only the organization", async () => {
+    const user = userEvent.setup();
+    const host = hostFor({ lookup: testingLicenseLookup });
+    renderWithApiKeyHost(<CliAuthScreen />, host);
+    expect(
+      await screen.findByText(/will be able to issue developer testing licenses in your name/),
+    ).toHaveTextContent("for as long as you hold ops permissions on LangWatch Cloud");
+    await confirmCode(user);
+
+    expect(screen.queryByText("What the CLI can access")).toBeNull();
+    expect(screen.queryByTestId("selected-scopes")).toBeNull();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).not.toBeDisabled());
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(host.approvals).toHaveLength(1));
+    expect(host.approvals[0]).toEqual({ userCode: "WDJB-MJHT", organizationId: "org-1" });
+  });
+
+  it("says only people with ops permissions can approve when the approval is refused", async () => {
+    const user = userEvent.setup();
+    const host = hostFor({
+      lookup: testingLicenseLookup,
+      approve: {
+        outcome: "failed",
+        message: "refused",
+        code: "testing_license_requires_ops_manage",
+      },
+    });
+    renderWithApiKeyHost(<CliAuthScreen />, host);
+    await confirmCode(user);
+    await user.click(await screen.findByRole("button", { name: "Approve" }));
+    expect(await screen.findByText("Approval failed")).toBeInTheDocument();
+    expect(screen.getByText(/Only people with ops permissions on LangWatch Cloud/)).toBeVisible();
+  });
+});
+
+describe("given the CLI sent a device label with the sign-in", () => {
+  const lookupFor = ({
+    credentialType,
+    deviceLabel = "haven on alice-mbp",
+  }: {
+    credentialType: "testing_license" | "device_session";
+    deviceLabel?: string | undefined;
+  }) => ({
+    outcome: "pending" as const,
+    userCode: "WDJB-MJHT",
+    status: "pending",
+    expiresAt: Date.now() + 600_000,
+    credentialType,
+    management: false,
+    ...(deviceLabel ? { deviceLabel } : {}),
+  });
+
+  /** @scenario The browser sign-in page names the device that asked */
+  it("names the device in a testing-license sign-in instead of the generic wording", async () => {
+    const host = hostFor({ lookup: lookupFor({ credentialType: "testing_license" }) });
+    renderWithApiKeyHost(<CliAuthScreen />, host);
+
+    expect(
+      await screen.findByText(
+        /haven on alice-mbp will be able to issue developer testing licenses/,
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/the device that showed this code/)).toBeNull();
+  });
+
+  /** @scenario The browser sign-in page names the device that asked */
+  it("names the device for a device-session sign-in too", async () => {
+    const host = hostFor({ lookup: lookupFor({ credentialType: "device_session" }) });
+    renderWithApiKeyHost(<CliAuthScreen />, host);
+
+    expect(await screen.findByText(/Requested by haven on alice-mbp\./)).toBeVisible();
+  });
+
+  /** @scenario The browser sign-in page names the device that asked */
+  it("keeps the generic wording when no label came with the code", async () => {
+    const host = hostFor({
+      lookup: lookupFor({ credentialType: "testing_license", deviceLabel: "" }),
+    });
+    renderWithApiKeyHost(<CliAuthScreen />, host);
+
+    expect(
+      await screen.findByText(/haven on the device that showed this code will be able to issue/),
+    ).toBeVisible();
+  });
+});

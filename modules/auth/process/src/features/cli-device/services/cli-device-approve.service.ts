@@ -15,6 +15,7 @@ import { createLogger } from "@langwatch/observability";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 
 import {
+  TESTING_LICENSE_REFUSED_CODE,
   expired,
   posted,
   isProjectGone,
@@ -155,6 +156,10 @@ async function approve({
     return approveProject({ flow, record, person, organizationId: organization_id, project_id });
   }
 
+  if (record.credential_type === "testing_license") {
+    return approveTestingLicense({ flow, record, person, organizationId: organization_id });
+  }
+
   await assertGovernanceEnabled({ flow, person, organizationId: organization_id });
 
   const management =
@@ -177,6 +182,38 @@ async function approve({
   });
 
   return answer({ ok: true, organization_id });
+}
+
+/**
+ * A testing-licence request is approved only by someone holding `ops:manage` at platform
+ * scope, asked through authz. It stamps the person; the token is minted at `/exchange`.
+ */
+async function approveTestingLicense({
+  flow,
+  record,
+  person,
+  organizationId,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  record: CliDeviceCodeRecord;
+  person: CliBrowserSession;
+  organizationId: string;
+}): Promise<CliDeviceFlowAnswer> {
+  if (!(await flow.holdsOpsManage({ userId: person.id }))) {
+    throw refused(
+      TESTING_LICENSE_REFUSED_CODE,
+      "Testing licenses can only be requested by people with ops permissions on LangWatch Cloud.",
+      403,
+    );
+  }
+
+  await flow.sessions().approveDeviceCode({
+    deviceCode: record.device_code,
+    userId: person.id,
+    organizationId,
+  });
+
+  return answer({ ok: true, organization_id: organizationId });
 }
 
 /**

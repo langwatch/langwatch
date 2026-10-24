@@ -26,26 +26,27 @@ Signing in and staying signed in: the browser session, the signed-out front door
 | Postgres, accessed not claimed | `User`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `process/src/repositories/prisma/prisma.auth-directory.repository.ts:6`             |
 | Stores required                | redis                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `process/src/channels/redis/redis.auth.channels.ts:15`                              |
 | Stores required                | prisma, redis, rateLimiter, encryption                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `process/src/repositories/live/live.auth.repositories.ts:25`                        |
-| Secrets                        | `session` (NEXTAUTH_SECRET), `googleClientSecret` (GOOGLE_CLIENT_SECRET), `githubClientSecret` (GITHUB_CLIENT_SECRET), `gitlabClientSecret` (GITLAB_CLIENT_SECRET), `azureAdClientSecret` (AZURE_AD_CLIENT_SECRET), `auth0ClientSecret` (AUTH0_CLIENT_SECRET), `oktaClientSecret` (OKTA_CLIENT_SECRET), `cognitoClientSecret` (COGNITO_CLIENT_SECRET), `oneLoginClientSecret` (ONELOGIN_CLIENT_SECRET), `oidcClientSecret` (OIDC_CLIENT_SECRET), `internalSlackSignupsWebhook` (SLACK_CHANNEL_SIGNUPS)                                                              | `process/src/app/auth.app.ts:276`                                                   |
+| Secrets                        | `session` (NEXTAUTH_SECRET), `googleClientSecret` (GOOGLE_CLIENT_SECRET), `githubClientSecret` (GITHUB_CLIENT_SECRET), `gitlabClientSecret` (GITLAB_CLIENT_SECRET), `azureAdClientSecret` (AZURE_AD_CLIENT_SECRET), `auth0ClientSecret` (AUTH0_CLIENT_SECRET), `oktaClientSecret` (OKTA_CLIENT_SECRET), `cognitoClientSecret` (COGNITO_CLIENT_SECRET), `oneLoginClientSecret` (ONELOGIN_CLIENT_SECRET), `oidcClientSecret` (OIDC_CLIENT_SECRET), `internalSlackSignupsWebhook` (SLACK_CHANNEL_SIGNUPS)                                                              | `process/src/app/auth.app.ts:279`                                                   |
 | Config                         | `sessionUrl` (NEXTAUTH_URL), `mfaEnrollmentOpen` (MFA_ENROLLMENT_OPEN), `passkeysEnabled` (PASSKEYS_ENABLED), `passkeyHandleSecret` (PASSKEY_HANDLE_SECRET), `trustedIdpOrigins` (SSO_TRUSTED_IDP_ORIGINS), `idpSimulatorUrl` (LANGWATCH_IDPSIM_URL), `localPasswords` (LOCAL_PASSWORDS_ENABLED), `signInProviders` (AUTH_PROVIDER), `socialProviderBases` (GOOGLE_SIGN_IN_BASE), `isSaas` (IS_SAAS), `signUpMode` (SIGN_UP_MODE), `publicBaseUrl` (BASE_HOST), `nodeEnvironment` (NODE_ENV), `cliRefreshTokenTtlSeconds` (LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS) | `contract/src/auth.config.ts:40`                                                    |
 
 Anything else auth needs belongs to another module and is reached through its `*Api`.
 
 ## Peers (static dependencies)
 
-| Name            | Token                 | Module                                        |
-| --------------- | --------------------- | --------------------------------------------- |
-| `apiKeys`       | `ApiKeyApi`           | [api-key](../api-key/README.md)               |
-| `auditLog`      | `AuditLogApi`         | [audit-log](../audit-log/README.md)           |
-| `authz`         | `AuthzApi`            | [authz](../authz/README.md)                   |
-| `entitlements`  | `EntitlementApi`      | [entitlement](../entitlement/README.md)       |
-| `featureFlags`  | `FeatureFlagApi`      | [feature-flag](../feature-flag/README.md)     |
-| `identity`      | `IdentityApi`         | [identity](../identity/README.md)             |
-| `notifications` | `NotificationService` | [notification](../notification/README.md)     |
-| `organizations` | `OrganizationApi`     | [organization](../organization/README.md)     |
-| `projects`      | `ProjectApi`          | [project](../project/README.md)               |
-| `sso`           | `SsoApi`              | [sso](../../enterprise/modules/sso/README.md) |
-| `users`         | `UserApi`             | [user](../user/README.md)                     |
+| Name            | Token                 | Module                                                    |
+| --------------- | --------------------- | --------------------------------------------------------- |
+| `apiKeys`       | `ApiKeyApi`           | [api-key](../api-key/README.md)                           |
+| `auditLog`      | `AuditLogApi`         | [audit-log](../audit-log/README.md)                       |
+| `authz`         | `AuthzApi`            | [authz](../authz/README.md)                               |
+| `entitlements`  | `EntitlementApi`      | [entitlement](../entitlement/README.md)                   |
+| `featureFlags`  | `FeatureFlagApi`      | [feature-flag](../feature-flag/README.md)                 |
+| `identity`      | `IdentityApi`         | [identity](../identity/README.md)                         |
+| `licensing`     | `LicensingApi`        | [licensing](../../enterprise/modules/licensing/README.md) |
+| `notifications` | `NotificationService` | [notification](../notification/README.md)                 |
+| `organizations` | `OrganizationApi`     | [organization](../organization/README.md)                 |
+| `projects`      | `ProjectApi`          | [project](../project/README.md)                           |
+| `sso`           | `SsoApi`              | [sso](../../enterprise/modules/sso/README.md)             |
+| `users`         | `UserApi`             | [user](../user/README.md)                                 |
 
 ## Who depends on auth
 

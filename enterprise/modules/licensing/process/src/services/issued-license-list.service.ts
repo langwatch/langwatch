@@ -27,6 +27,7 @@ export class IssuedLicenseListService {
   async list({
     status,
     audience,
+    includeTesting,
     page,
     pageSize,
     search,
@@ -43,14 +44,15 @@ export class IssuedLicenseListService {
     const statusPart = status ? byStatus(status === "active") : {};
     const audiencePart = audience ? byAudience(audience === "internal") : {};
     const { repository } = this.options;
+    const scope: IssuedLicenseQuery = { search, includeTesting };
     // Each count keeps the other filter, so it says what choosing it would list.
     const [{ rows, total }, active, inactive, customer, internal, all] = await Promise.all([
-      repository.listAll({ page, pageSize, search, ...statusPart, ...audiencePart }),
-      repository.countAll({ search, ...audiencePart, ...byStatus(true) }),
-      repository.countAll({ search, ...audiencePart, ...byStatus(false) }),
-      repository.countAll({ search, ...statusPart, ...byAudience(false) }),
-      repository.countAll({ search, ...statusPart, ...byAudience(true) }),
-      repository.countAll({ search }),
+      repository.listAll({ page, pageSize, ...scope, ...statusPart, ...audiencePart }),
+      repository.countAll({ ...scope, ...audiencePart, ...byStatus(true) }),
+      repository.countAll({ ...scope, ...audiencePart, ...byStatus(false) }),
+      repository.countAll({ ...scope, ...statusPart, ...byAudience(false) }),
+      repository.countAll({ ...scope, ...statusPart, ...byAudience(true) }),
+      repository.countAll(scope),
     ]);
     return { rows, total, counts: { active, inactive, customer, internal, all } };
   }

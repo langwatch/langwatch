@@ -7,7 +7,6 @@ import {
   listActivationCodesInputSchema,
   revokeActivationCodeInputSchema,
   changeLicenseSeatsInputSchema,
-  issuedLicensePageSchema,
   issuedLicenseViewSchema,
   issueLicenseInputSchema,
   licenseIdInputSchema,
@@ -23,6 +22,11 @@ import {
   selfHostedInstanceDetailSchema,
   selfHostedInstanceIdInputSchema,
   selfHostedInstancePageSchema,
+  createTestingLicenseServiceTokenInputSchema,
+  listTestingLicenseTokensInputSchema,
+  mintedTestingLicenseTokenSchema,
+  revokeTestingLicenseTokenInputSchema,
+  testingLicenseTokenViewSchema,
   selfHostedInstanceSummarySchema,
   findUpgradeDiagnosticsInputSchema,
   upgradeDiagnosticsDownloadSchema,
@@ -37,14 +41,20 @@ import {
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
+import {
+  namedIssuedLicensePageSchema,
+  namedIssuedLicenseViewSchema,
+  namedTestingLicenseTokenPageSchema,
+} from "./license-registry.responses.ts";
+
 export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .query("getAll")
   .withInput(listIssuedLicensesInputSchema)
-  .withOutput(issuedLicensePageSchema)
+  .withOutput(namedIssuedLicensePageSchema)
 
   .query("getById")
   .withInput(licenseIdInputSchema)
-  .withOutput(issuedLicenseViewSchema)
+  .withOutput(namedIssuedLicenseViewSchema)
 
   .mutation("issue")
   .withInput(issueLicenseInputSchema)
@@ -89,6 +99,18 @@ export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .mutation("revokeActivationCode")
   .withInput(revokeActivationCodeInputSchema)
   .withOutput(activationCodeViewSchema)
+
+  .query("testingLicenseTokens")
+  .withInput(listTestingLicenseTokensInputSchema)
+  .withOutput(namedTestingLicenseTokenPageSchema)
+
+  .mutation("createTestingLicenseServiceToken")
+  .withInput(createTestingLicenseServiceTokenInputSchema)
+  .withOutput(mintedTestingLicenseTokenSchema)
+
+  .mutation("revokeTestingLicenseToken")
+  .withInput(revokeTestingLicenseTokenInputSchema)
+  .withOutput(testingLicenseTokenViewSchema)
   .build();
 
 /** The registry of self-hosted installs (ADR-156 §10), as the admin console

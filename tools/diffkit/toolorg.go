@@ -16,11 +16,12 @@ import (
 )
 
 // Seeded fixtures the repository's storage-seed writes (apps/tasks). Every
-// haven stack shares one database, so these read on the shared stack.
+// haven stack shares one database, so these read on the shared stack. The seed
+// mints random ids, so the organization and project are found by slug.
 const (
-	SeededProjectKey     = "sk-lw-local-development-key"
-	SeededProjectID      = "local-dev-project"
-	SeededOrganizationID = "local-dev-organization"
+	SeededProjectKey       = "sk-lw-local-development-key"
+	SeededProjectSlug      = "local-dev-project"
+	SeededOrganizationSlug = "local-dev-org"
 	// SeededOrgKey is the fixed local-dev private access token (org key).
 	SeededOrgKey = "sk-lw-LocalDevPrivate1_LocalDevPrivateAccessTokenSecretFixedValue000000" // #nosec G101 -- the public local-dev token every haven stack seeds.
 )
@@ -150,7 +151,7 @@ func (seeder *orgSeeder) provision(ctx context.Context) (ToolOrg, error) {
 		if seeder.options.Progress != nil {
 			seeder.options.Progress("seed: the stack confirms no runtime grant (no worker); falling back to the seeded local-dev org (shared, not separate)")
 		}
-		return seededFallbackOrg(seeder.options.Tool), nil
+		return seeder.seededFallbackOrg(ctx)
 	}
 	if err != nil {
 		return ToolOrg{}, err
@@ -167,13 +168,55 @@ func (seeder *orgSeeder) provision(ctx context.Context) (ToolOrg, error) {
 }
 
 // seededFallbackOrg is the pre-seeded local-dev org's credentials, the only
-// ones usable on a worker-less stack. Separate is false, so the cross-tenant
-// oracle stands down.
-func seededFallbackOrg(tool string) ToolOrg {
-	return ToolOrg{
-		Name: tool, OrgKey: SeededOrgKey, OrgID: SeededOrganizationID, Separate: false,
-		Projects: []ToolProject{{Key: SeededProjectKey, ID: SeededProjectID}},
+// ones usable on a worker-less stack. Its ids are random, so it reads them from
+// the signed-in admin's organization.getAll by slug. Separate is false, so the
+// cross-tenant oracle stands down.
+func (seeder *orgSeeder) seededFallbackOrg(ctx context.Context) (ToolOrg, error) {
+	raw, code, err := seeder.trpcGet(ctx, "organization.getAll", map[string]any{})
+	if err != nil {
+		return ToolOrg{}, fmt.Errorf("seeded fallback org: getAll code %q: %w", code, err)
 	}
+	orgID, projectID, ok := findSeededOrg(raw)
+	if !ok {
+		return ToolOrg{}, fmt.Errorf("seeded fallback org: no organization %q with project %q in getAll", SeededOrganizationSlug, SeededProjectSlug)
+	}
+	return ToolOrg{
+		Name: seeder.options.Tool, OrgKey: SeededOrgKey, OrgID: orgID, Separate: false,
+		Projects: []ToolProject{{Key: SeededProjectKey, ID: projectID}},
+	}, nil
+}
+
+// findSeededOrg picks the seeded organization and project out of getAll's list
+// by their slugs.
+func findSeededOrg(raw any) (orgID, projectID string, ok bool) {
+	list, _ := raw.([]any)
+	for _, entry := range list {
+		org, _ := entry.(map[string]any)
+		if org["slug"] != SeededOrganizationSlug {
+			continue
+		}
+		id, _ := org["id"].(string)
+		if pid, found := seededProjectID(org); found && id != "" {
+			return id, pid, true
+		}
+	}
+	return "", "", false
+}
+
+// seededProjectID finds the seeded project's id across an organization's teams.
+func seededProjectID(org map[string]any) (string, bool) {
+	teams, _ := org["teams"].([]any)
+	for _, teamEntry := range teams {
+		team, _ := teamEntry.(map[string]any)
+		projects, _ := team["projects"].([]any)
+		for _, projectEntry := range projects {
+			project, _ := projectEntry.(map[string]any)
+			if pid, _ := project["id"].(string); pid != "" && project["slug"] == SeededProjectSlug {
+				return pid, true
+			}
+		}
+	}
+	return "", false
 }
 
 // baseOrg runs the sign-up ceremony: a fresh user, whose onboarding creates

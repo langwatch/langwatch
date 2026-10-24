@@ -7,7 +7,6 @@ import type {
   ActivationCodeView,
   IssuedActivationCode,
   IssuedLicenseFilters,
-  IssuedLicensePage,
   IssuedLicenseView,
   LicenseCustomer,
   LicenseTermsInput,
@@ -19,9 +18,17 @@ import type {
   UpgradeDiagnosticsDownload,
   UpgradeDiagnosticsReport,
   SignedIssuedLicense,
+  MintedTestingLicenseToken,
+  TestingLicenseTokenView,
 } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
 import type { OpsOperator } from "@langwatch/ops-contract";
+
+import type {
+  NamedIssuedLicensePage,
+  NamedIssuedLicenseView,
+  NamedTestingLicenseTokenPage,
+} from "./license-registry.responses.ts";
 
 /**
  * The operator views over enterprise subjects (ARCHITECTURE.md section 3): each op admits
@@ -37,8 +44,11 @@ export interface EnterpriseOpsApi {
       search?: string;
       operator: OpsOperator | null;
     } & IssuedLicenseFilters,
-  ): Promise<IssuedLicensePage>;
-  getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<IssuedLicenseView>;
+  ): Promise<NamedIssuedLicensePage>;
+  getIssuedLicense(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<NamedIssuedLicenseView>;
   issueLicense(input: {
     customer: LicenseCustomer;
     email: string;
@@ -160,6 +170,23 @@ export interface EnterpriseOpsApi {
     id: string;
     operator: OpsOperator | null;
   }): Promise<SelfHostedNoticeView>;
+
+  // -- testing-licence tokens (ADR-180 section 2); ops managers only ------------
+
+  listTestingLicenseTokens(input: {
+    page: number;
+    pageSize: number;
+    operator: OpsOperator | null;
+  }): Promise<NamedTestingLicenseTokenPage>;
+  createTestingLicenseServiceToken(input: {
+    name: string;
+    expiresInDays?: number;
+    operator: OpsOperator | null;
+  }): Promise<MintedTestingLicenseToken>;
+  revokeTestingLicenseToken(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<TestingLicenseTokenView>;
 }
 
 export const EnterpriseOpsApi = moduleApi<EnterpriseOpsApi>()("enterprise-ops");

@@ -14,18 +14,18 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The operator views over enterprise subjects (ARCHITECTURE.md section 3): each op admits Cloud admin staff through OpsApi, then forwards to the owner's Api.
 
-Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:30`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:37`; nothing else in this package is public.
 
 #### `listIssuedLicenses`
 
 ```typescript
-listIssuedLicenses(input: { page: number; pageSize: number; search?: string; operator: OpsOperator | null; } & IssuedLicenseFilters): Promise<IssuedLicensePage>;
+listIssuedLicenses(input: { page: number; pageSize: number; search?: string; operator: OpsOperator | null; } & IssuedLicenseFilters): Promise<NamedIssuedLicensePage>;
 ```
 
 #### `getIssuedLicense`
 
 ```typescript
-getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<IssuedLicenseView>;
+getIssuedLicense(input: { id: string; operator: OpsOperator | null; }): Promise<NamedIssuedLicenseView>;
 ```
 
 #### `issueLicense`
@@ -158,6 +158,24 @@ publishSelfHostedNotice(input: { id: string; operator: OpsOperator | null; }): P
 withdrawSelfHostedNotice(input: { id: string; operator: OpsOperator | null; }): Promise<SelfHostedNoticeView>;
 ```
 
+#### `listTestingLicenseTokens`
+
+```typescript
+listTestingLicenseTokens(input: { page: number; pageSize: number; operator: OpsOperator | null; }): Promise<NamedTestingLicenseTokenPage>;
+```
+
+#### `createTestingLicenseServiceToken`
+
+```typescript
+createTestingLicenseServiceToken(input: { name: string; expiresInDays?: number; operator: OpsOperator | null; }): Promise<MintedTestingLicenseToken>;
+```
+
+#### `revokeTestingLicenseToken`
+
+```typescript
+revokeTestingLicenseToken(input: { id: string; operator: OpsOperator | null; }): Promise<TestingLicenseTokenView>;
+```
+
 ## REST transport
 
 None: this module declares no REST family.
@@ -166,65 +184,69 @@ None: this module declares no REST family.
 
 ### `licenseRegistry`
 
-Contract `../contract/src/license-registry.trpc.ts:40`, router `src/transport/license-registry.trpc.ts:23`.
+Contract `../contract/src/license-registry.trpc.ts:50`, router `src/transport/license-registry.trpc.ts:23`.
 
-| Procedure                              | Kind     | Gate                             | Input                                  | Output                       |
-| -------------------------------------- | -------- | -------------------------------- | -------------------------------------- | ---------------------------- |
-| `licenseRegistry.getAll`               | query    | Platform permission `ops:view`   | `listIssuedLicensesInputSchema`        | `issuedLicensePageSchema`    |
-| `licenseRegistry.getById`              | query    | Platform permission `ops:view`   | `licenseIdInputSchema`                 | `issuedLicenseViewSchema`    |
-| `licenseRegistry.issue`                | mutation | Platform permission `ops:manage` | `issueLicenseInputSchema`              | `signedIssuedLicenseSchema`  |
-| `licenseRegistry.registerLegacy`       | mutation | Platform permission `ops:manage` | `registerLegacyLicenseInputSchema`     | `issuedLicenseViewSchema`    |
-| `licenseRegistry.revoke`               | mutation | Platform permission `ops:manage` | `revokeIssuedLicenseInputSchema`       | `issuedLicenseViewSchema`    |
-| `licenseRegistry.reissue`              | mutation | Platform permission `ops:manage` | `reissueLicenseInputSchema`            | `signedIssuedLicenseSchema`  |
-| `licenseRegistry.changeSeats`          | mutation | Platform permission `ops:manage` | `changeLicenseSeatsInputSchema`        | `seatChangeResultSchema`     |
-| `licenseRegistry.resetInstanceBinding` | mutation | Platform permission `ops:manage` | `licenseIdInputSchema`                 | `issuedLicenseViewSchema`    |
-| `licenseRegistry.updateTerms`          | mutation | Platform permission `ops:manage` | `updateLicenseTermsInputSchema`        | `issuedLicenseViewSchema`    |
-| `licenseRegistry.linkToOrganization`   | mutation | Platform permission `ops:manage` | `linkLicenseToOrganizationInputSchema` | `issuedLicenseViewSchema`    |
-| `licenseRegistry.activationCodes`      | query    | Platform permission `ops:view`   | `listActivationCodesInputSchema`       | `activationCodePageSchema`   |
-| `licenseRegistry.issueActivationCode`  | mutation | Platform permission `ops:manage` | `issueActivationCodeInputSchema`       | `issuedActivationCodeSchema` |
-| `licenseRegistry.revokeActivationCode` | mutation | Platform permission `ops:manage` | `revokeActivationCodeInputSchema`      | `activationCodeViewSchema`   |
+| Procedure                                          | Kind     | Gate                             | Input                                         | Output                               |
+| -------------------------------------------------- | -------- | -------------------------------- | --------------------------------------------- | ------------------------------------ |
+| `licenseRegistry.getAll`                           | query    | Platform permission `ops:view`   | `listIssuedLicensesInputSchema`               | `namedIssuedLicensePageSchema`       |
+| `licenseRegistry.getById`                          | query    | Platform permission `ops:view`   | `licenseIdInputSchema`                        | `namedIssuedLicenseViewSchema`       |
+| `licenseRegistry.issue`                            | mutation | Platform permission `ops:manage` | `issueLicenseInputSchema`                     | `signedIssuedLicenseSchema`          |
+| `licenseRegistry.registerLegacy`                   | mutation | Platform permission `ops:manage` | `registerLegacyLicenseInputSchema`            | `issuedLicenseViewSchema`            |
+| `licenseRegistry.revoke`                           | mutation | Platform permission `ops:manage` | `revokeIssuedLicenseInputSchema`              | `issuedLicenseViewSchema`            |
+| `licenseRegistry.reissue`                          | mutation | Platform permission `ops:manage` | `reissueLicenseInputSchema`                   | `signedIssuedLicenseSchema`          |
+| `licenseRegistry.changeSeats`                      | mutation | Platform permission `ops:manage` | `changeLicenseSeatsInputSchema`               | `seatChangeResultSchema`             |
+| `licenseRegistry.resetInstanceBinding`             | mutation | Platform permission `ops:manage` | `licenseIdInputSchema`                        | `issuedLicenseViewSchema`            |
+| `licenseRegistry.updateTerms`                      | mutation | Platform permission `ops:manage` | `updateLicenseTermsInputSchema`               | `issuedLicenseViewSchema`            |
+| `licenseRegistry.linkToOrganization`               | mutation | Platform permission `ops:manage` | `linkLicenseToOrganizationInputSchema`        | `issuedLicenseViewSchema`            |
+| `licenseRegistry.activationCodes`                  | query    | Platform permission `ops:view`   | `listActivationCodesInputSchema`              | `activationCodePageSchema`           |
+| `licenseRegistry.issueActivationCode`              | mutation | Platform permission `ops:manage` | `issueActivationCodeInputSchema`              | `issuedActivationCodeSchema`         |
+| `licenseRegistry.revokeActivationCode`             | mutation | Platform permission `ops:manage` | `revokeActivationCodeInputSchema`             | `activationCodeViewSchema`           |
+| `licenseRegistry.testingLicenseTokens`             | query    | Platform permission `ops:manage` | `listTestingLicenseTokensInputSchema`         | `namedTestingLicenseTokenPageSchema` |
+| `licenseRegistry.createTestingLicenseServiceToken` | mutation | Platform permission `ops:manage` | `createTestingLicenseServiceTokenInputSchema` | `mintedTestingLicenseTokenSchema`    |
+| `licenseRegistry.revokeTestingLicenseToken`        | mutation | Platform permission `ops:manage` | `revokeTestingLicenseTokenInputSchema`        | `testingLicenseTokenViewSchema`      |
 
 ```typescript
 // licenseRegistry.getAll
-// Input: listIssuedLicensesInputSchema, ../../licensing/contract/src/license-registry.ts:28
+// Input: listIssuedLicensesInputSchema, ../../licensing/contract/src/license-registry.ts:30
 interface Input {
   status?: "active" | "inactive";
   audience?: "customer" | "internal";
+  includeTesting?: boolean;
   page?: number;
   pageSize?: number;
   search?: string;
 }
-type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:100
+type Output = z.infer<typeof namedIssuedLicensePageSchema>; // ../contract/src/license-registry.responses.ts:30
 
 // licenseRegistry.getById
-// Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:32
+// Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:34
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof namedIssuedLicenseViewSchema>; // ../contract/src/license-registry.responses.ts:20
 
 // licenseRegistry.issue
-type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:47
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:134
+type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:49
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:138
 
 // licenseRegistry.registerLegacy
-// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:58
+// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:60
 interface Input {
   licenseKey: string;
   organizationId: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:84
 
 // licenseRegistry.revoke
-// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:68
+// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:70
 interface Input {
   id: string;
   reason: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:84
 
 // licenseRegistry.reissue
-// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:82
+// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:84
 interface Input {
   id: string;
   maxMembers?: number;
@@ -232,22 +254,22 @@ interface Input {
   maxMessagesPerMonth?: number;
   expiresAt: string;
 }
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:134
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:138
 
 // licenseRegistry.changeSeats
-// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:92
+// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:94
 interface Input {
   id: string;
   maxMembers: number;
 }
-type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:151
+type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:155
 
 // licenseRegistry.resetInstanceBinding
-type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:32
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:34
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:84
 
 // licenseRegistry.updateTerms
-// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:102
+// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:104
 interface Input {
   id: string;
   services?: ("instant_evals" | "managed_models")[];
@@ -257,15 +279,15 @@ interface Input {
   overageEnabled?: boolean;
   overageMaxUsdCents?: number | null;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:84
 
 // licenseRegistry.linkToOrganization
-// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:112
+// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:114
 interface Input {
   id: string;
   organizationId: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:84
 
 // licenseRegistry.activationCodes
 // Input: listActivationCodesInputSchema, ../../licensing/contract/src/activation-code.ts:68
@@ -298,11 +320,46 @@ interface Input {
   id: string;
 }
 type Output = z.infer<typeof activationCodeViewSchema>; // ../../licensing/contract/src/activation-code.ts:45
+
+// licenseRegistry.testingLicenseTokens
+// Input: listTestingLicenseTokensInputSchema, ../../licensing/contract/src/testing-license.ts:102
+interface Input {
+  page?: number;
+  pageSize?: number;
+}
+type Output = z.infer<typeof namedTestingLicenseTokenPageSchema>; // ../contract/src/license-registry.responses.ts:50
+
+// licenseRegistry.createTestingLicenseServiceToken
+// Input: createTestingLicenseServiceTokenInputSchema, ../../licensing/contract/src/testing-license.ts:113
+interface Input {
+  name: string;
+  expiresInDays?: number;
+}
+type Output = z.infer<typeof mintedTestingLicenseTokenSchema>; // ../../licensing/contract/src/testing-license.ts:127
+
+// licenseRegistry.revokeTestingLicenseToken
+// Input: revokeTestingLicenseTokenInputSchema, ../../licensing/contract/src/testing-license.ts:135
+interface Input {
+  id: string;
+}
+// Output: testingLicenseTokenViewSchema, ../../licensing/contract/src/testing-license.ts:80
+interface Output {
+  id: string;
+  kind: "personal" | "service";
+  name: string | null;
+  ownerUserId: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  revokedById: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+  status: "active" | "expired" | "revoked";
+}
 ```
 
 ### `selfHostedInstances`
 
-Contract `../contract/src/license-registry.trpc.ts:97`, router `src/transport/self-hosted-instance.trpc.ts:14`.
+Contract `../contract/src/license-registry.trpc.ts:119`, router `src/transport/self-hosted-instance.trpc.ts:14`.
 
 | Procedure                                    | Kind     | Gate                             | Input                                | Output                             |
 | -------------------------------------------- | -------- | -------------------------------- | ------------------------------------ | ---------------------------------- |
@@ -325,7 +382,7 @@ interface Input {
 type Output = z.infer<typeof selfHostedInstanceDetailSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:136
 
 // selfHostedInstances.summary
-// Input: inline, ../contract/src/license-registry.trpc.ts:107
+// Input: inline, ../contract/src/license-registry.trpc.ts:129
 type Input = unknown;
 type Output = z.infer<typeof selfHostedInstanceSummarySchema>; // ../../licensing/contract/src/self-hosted-instance.ts:162
 
@@ -334,7 +391,7 @@ type Output = z.infer<typeof selfHostedInstanceSummarySchema>; // ../../licensin
 interface Input {
   instanceRowId: string;
 }
-// Output: inline, ../contract/src/license-registry.trpc.ts:112
+// Output: inline, ../contract/src/license-registry.trpc.ts:134
 type Output = {
   id: string;
   instanceId: string;

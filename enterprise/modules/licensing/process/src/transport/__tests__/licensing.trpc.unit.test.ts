@@ -31,6 +31,7 @@ describe("the license tRPC namespace", () => {
 
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "activate",
+        "getInstanceId",
         "getSsoGateStatus",
         "getStatus",
         "refresh",
@@ -50,6 +51,7 @@ describe("the license tRPC namespace", () => {
 
       expect(kinds).toEqual({
         getStatus: "query",
+        getInstanceId: "query",
         getSsoGateStatus: "query",
         upload: "mutation",
         activate: "mutation",
@@ -73,6 +75,23 @@ describe("the license tRPC namespace", () => {
         await expect(caller.remove({ organizationId: "org-456" })).rejects.toMatchObject({
           code: "FORBIDDEN",
         });
+      });
+    });
+  });
+
+  describe("given an organization admin", () => {
+    /** @scenario "An organization admin reads the instance id a testing license binds to" */
+    it("answers the same instance id on every read, and refuses a caller who may only view", async () => {
+      const { caller } = await mount();
+      const first = await caller.getInstanceId({ organizationId: "org-456" });
+      const again = await caller.getInstanceId({ organizationId: "org-456" });
+      const viewer = (await mount({ permits: (permission) => permission === "organization:view" }))
+        .caller;
+
+      expect(first.instanceId).not.toBe("");
+      expect(again).toEqual(first);
+      await expect(viewer.getInstanceId({ organizationId: "org-456" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
       });
     });
   });

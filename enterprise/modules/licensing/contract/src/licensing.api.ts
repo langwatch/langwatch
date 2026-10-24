@@ -66,6 +66,13 @@ import type {
   UpdateSelfHostedNoticeInput,
 } from "./self-hosted-notice.ts";
 import type {
+  IssuedTestingLicense,
+  MintedTestingLicenseToken,
+  TestingLicenseIssuer,
+  TestingLicenseTokenPage,
+  TestingLicenseTokenView,
+} from "./testing-license.ts";
+import type {
   UpgradeDiagnosticsAvailability,
   UpgradeDiagnosticsDownload,
   UpgradeDiagnosticsReceipt,
@@ -302,6 +309,39 @@ export interface LicensingApi {
     } & SelfHostedInstanceFilters,
   ): Promise<SelfHostedInstancePage>;
   getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail>;
+
+  /**
+   * Testing licences (ADR-180 section 2), signed on LangWatch Cloud alone: one local
+   * organization on one instance, for a caller the testing-licence token door verified.
+   */
+  issueTestingLicense(input: {
+    instanceId: string;
+    organizationId: string;
+    lifetimeHours?: number;
+    issuer: TestingLicenseIssuer;
+  }): Promise<IssuedTestingLicense>;
+  /** The door's check on a testing-licence token: the user it belongs to, or its refusal thrown. */
+  verifyTestingLicenseToken(input: { bearer: string | null }): Promise<TestingLicenseIssuer>;
+  /** A personal token for the person a CLI sign-in approved; the token is shown once. */
+  mintPersonalTestingLicenseToken(input: {
+    userId: string;
+  }): Promise<{ token: string; expiresAt: string }>;
+  /** A named token for CI, acting as the ops manager who made it; the token is shown once. */
+  createTestingLicenseServiceToken(input: {
+    name: string;
+    expiresInDays?: number;
+    operatorId: string;
+  }): Promise<MintedTestingLicenseToken>;
+  /** Every testing-licence token, personal and service, newest first. */
+  listTestingLicenseTokens(input: {
+    page: number;
+    pageSize: number;
+  }): Promise<TestingLicenseTokenPage>;
+  /** `operatorId` revokes it: an ops manager, or the token's own user signing out. */
+  revokeTestingLicenseToken(input: {
+    id: string;
+    operatorId: string;
+  }): Promise<TestingLicenseTokenView>;
   summarizeSelfHostedInstances(): Promise<SelfHostedInstanceSummary>;
 
   /**

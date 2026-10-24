@@ -57,6 +57,7 @@ export type RestIdentities = Readonly<
       | "cli_token"
       | "otlp_ingest"
       | "licence_token"
+      | "testing_license_token"
     >,
     RestIdentity
   >

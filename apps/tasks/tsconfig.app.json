@@ -19,6 +19,9 @@
       "path": "../../modules/user/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/user/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/upgrade/tsconfig.build.json"
     },
     {
@@ -100,6 +103,9 @@
       "path": "../../modules/organization/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/ops/process/tsconfig.build.json"
     },
     {
@@ -130,6 +136,9 @@
       "path": "../../modules/langy/process/tsconfig.build.json"
     },
     {
+      "path": "../../packages/ksuid/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/instant-eval/process/tsconfig.build.json"
     },
     {
@@ -155,9 +164,6 @@
     },
     {
       "path": "../../modules/experiment/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/eventing/tsconfig.build.json"
     },
     {
       "path": "../../modules/evaluator/process/tsconfig.build.json"
@@ -275,6 +281,9 @@
     },
     {
       "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/eventing/tsconfig.build.json"
     }
   ]
 }
