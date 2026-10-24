@@ -20,6 +20,7 @@ import { type ReactNode, useMemo } from "react";
 import {
   InsightHostApi,
   InsightHostProvider,
+  insightsReleased,
   type InsightFailureNotice,
   type InsightHostProject,
   type InsightSuccessNotice,
@@ -100,8 +101,12 @@ class CapabilityInsightHost extends InsightHostApi {
 export default function InsightHostMount({ children }: { children?: ReactNode }) {
   const { session, route, navigation, feedback } = useUiHostServices();
   const langy = useLentOperations(LangyAskToken);
-  // Read as a primitive: the flags service hands a new object on every render.
-  const enabled = useUiFlags().flag(FrontendFlags.release_insights);
+  // Read as primitives: the flags service hands a new object on every render.
+  const flags = useUiFlags();
+  const enabled = insightsReleased({
+    insights: flags.flag(FrontendFlags.release_insights),
+    dashboards: flags.flag(FrontendFlags.release_dashboards),
+  });
   const scopeProject = session.snapshot().scope.project;
   const projectId = scopeProject?.id;
   const projectSlug = scopeProject?.slug;

@@ -298,7 +298,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Opens the Insights inbox (/[project]/insights): each person's own saved insights for the project, which only they read, in Inbox, Stale and Archived folders, the sidebar entry with its unread count, the topbar bell, and 'Save as insight' under a Langy answer (spec: modules/insight/specs/insight-inbox.feature). Default off; while off the page answers not-found, the chrome shows nothing and every insights procedure refuses with insights_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights.",
+      "Opens the Insights inbox (/[project]/insights): each person's own saved insights for the project, which only they read, in Inbox, Stale and Archived folders, the entry in the Dashboards side menu with its unread count, and the topbar bell (spec: modules/insight/specs/insight-inbox.feature). The page lives in the Dashboards product, so it also needs release_dashboards; while either is off the page answers not-found and the chrome shows nothing. While this flag is off every insights procedure refuses with insights_not_enabled. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights,release_dashboards.",
   },
   {
     key: "release_ui_comparison_leaderboard_enabled",
