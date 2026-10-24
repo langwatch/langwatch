@@ -123,6 +123,9 @@
                 "pages": [
                   "agent-testing/scenarios",
                   "agent-testing/test-suites",
+                  "agent-testing/designing-a-suite",
+                  "agent-testing/check-the-world",
+                  "agent-testing/build-a-scenario-suite",
                   "agent-testing/evaluators",
                   "agent-testing/run-parameters",
                   "agent-testing/setup-and-teardown-hooks"

@@ -32,6 +32,7 @@ Each run records the values it used, so every result shows which plan it tested.
 
 - **Plans and tiers.** One cancellation scenario, run for `free` and run for `enterprise`.
 - **Test accounts and fixtures.** Point the run at seeded data with `--param fixture=order-1042`. The agent under test answers from that account, and the criteria can name its facts.
+- **The facts of the case.** A tier, a count and an amount, read by the simulated user, the agent and the judge alike. The agent can build the data from them on the first turn. See [Check the world, not the words](/agent-testing/check-the-world).
 - **Regions, tenants and languages.** The same conversation against `eu-central` and `us-east`, or against two tenants of your product.
 - **Values your agent's API needs.** An HTTP target puts `{{ params.NAME }}` in its URL or request body, so your endpoint receives the value on every request.
 

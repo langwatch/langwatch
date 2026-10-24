@@ -1,0 +1,204 @@
+---
+title: Check the World, Not the Words
+sidebarTitle: Check the world
+keywords: langwatch, agent testing, state of world, side effects, seed data, test data, fixtures, run parameters, connected agent, tool span, evaluator, exact match, refund, booking
+description: Test an agent that changes data by what changed, not by what it says it did. Parameters describe the case, the first turn builds it, and a state_of_world span shows the judge the result.
+---
+
+This page covers checking state: parameters as the case, seeding the world and checking a value without the judge. For which cases to write, see [Test Suite Design](/agent-testing/designing-a-suite). For organising and running the suite, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite).
+
+## Why the reply is not enough
+
+An agent that changes data, such as a refund, a booking or a dashboard edit, replies "Done, I refunded 49.95". That reply passes a criterion even when the refund went wrong, ran twice, or never happened.
+
+A tool call span shows what the agent tried. It does not show what happened. To test the result, the test has to see the data after the agent acted.
+
+This page shows two levels. Both work with a [connected agent](/agent-testing/connect-your-agent) today, with no extra setup on the platform.
+
+| Level | Who writes it | What it adds |
+|---|---|---|
+| **1. Parameters are the case** | The person who writes the scenario | The case is stated once, as readable facts, and the simulated user, the agent and the judge all read the same values. |
+| **2. Seed the world, report its state** | The developer who connects the agent | The agent builds the case on the first turn and reports the resulting data in a span, so the judge checks the data, not the reply. |
+
+## Level 1: parameters are the case
+
+Declare the facts of the case as [run parameters](/agent-testing/run-parameters) on the scenario, and read them in the situation and the criteria as `{{ params.NAME }}`.
+
+```text title="Situation"
+A {{ params.customer_tier }} member was charged {{ params.charges }} times for one order, {{ params.amount }} each. They want the extra charge back.
+```
+
+```text title="Criteria"
+Refunds exactly {{ params.amount }}, once
+The original charge is untouched
+Tells the customer when the money arrives
+```
+
+With the defaults `customer_tier = plus`, `charges = 2` and `amount = 49.95`, the run renders the situation as "A plus member was charged 2 times for one order, 49.95 each" and the first criterion as "Refunds exactly 49.95, once". The simulated user acts on these values, and the judge scores against the same values. The criteria assume one duplicate charge (`charges = 2`). A case with more charges needs its own criteria.
+
+The connected agent declares the same names as keyword arguments, so it receives the values too:
+
+```python
+@langwatch.connect_agent(name="support-agent")
+async def support_agent(
+    messages: list[dict],
+    *,
+    customer_tier: str = "plus",
+    charges: int = 2,
+    amount: float = 49.95,
+):
+    ...
+```
+
+Write parameters as readable facts about the case: a tier, a count, an amount. Do not use a fixture id or a database dump. The person who reads the run should understand the case from the parameter values alone.
+
+## Level 2: seed the world, report its state
+
+The agent builds the data for the case on the first turn, and reports the state of that data in a span after every turn.
+
+1. On the first turn, `session` is `None`.
+2. Build the data from the parameters. Scope it to the `thread_id`, and flag it as test data.
+3. Write a function decorated with `@langwatch.span(name="state_of_world", type="tool")`. It returns a few flat facts about the data.
+4. Call it once after the setup, and once after each turn.
+5. Return the session, so the next turn finds the same data.
+
+The name `state_of_world` is only an example: any span name works, and the platform gives it no special meaning, so the evaluator mapping uses the name you choose.
+
+```python
+import langwatch
+
+from my_app import payments, SupportAgent
+
+
+@langwatch.span(name="state_of_world", type="tool")
+def state_of_world(thread_id: str, charge_id: str) -> dict:
+    refunds = payments.refunds(namespace=thread_id)
+    return {
+        "refund_count": len(refunds),
+        "refund_total": round(sum(r.amount for r in refunds), 2),
+        "original_charge_status": payments.charge_status(charge_id),
+    }
+
+
+@langwatch.connect_agent(name="support-agent")
+async def support_agent(
+    messages: list[dict],
+    thread_id: str,
+    session: dict | None = None,
+    *,
+    customer_tier: str = "plus",
+    charges: int = 2,
+    amount: float = 49.95,
+):
+    if session is None:  # first turn: build the data for this conversation
+        customer = payments.find_customer(namespace=thread_id) or payments.create_customer(
+            tier=customer_tier, namespace=thread_id, test=True
+        )
+        existing = [c.id for c in payments.charges(customer.id)]
+        charge_ids = existing + [payments.charge(customer.id, amount) for _ in range(charges - len(existing))]
+        session = {"customer_id": customer.id, "charge_id": charge_ids[0]}
+        state_of_world(thread_id, session["charge_id"])  # before
+
+    reply = await SupportAgent(customer_id=session["customer_id"]).run(messages)
+
+    state_of_world(thread_id, session["charge_id"])  # after this turn
+    return langwatch.AgentReply(reply, session=session)
+```
+
+Seeding is keyed by `thread_id`, so a retried first turn reuses the data and completes a partial seed.
+
+`payments` stands for your own test back end. The session value is limited to 64 kilobytes, so keep ids in it, not the data.
+
+### What the judge reads
+
+The span is a tool span inside the agent's trace, so the judge reads it with the other spans before its verdict. See [Linking your traces](/agent-testing/linking-your-traces). In a run of the scenario above, the trace held these spans in this order:
+
+| Span | Output |
+|---|---|
+| `state_of_world` (before) | `{"refund_count": 0, "refund_total": 0, "original_charge_status": "captured"}` |
+| `list_charges` | Two captured charges of 49.95 |
+| `refund_charge` | The second charge, 49.95, approved |
+| `state_of_world` (after) | `{"refund_count": 1, "refund_total": 49.95, "original_charge_status": "captured"}` |
+
+The trace tree can list the second `state_of_world` above `invoke_agent`. The timing bar shows the true order.
+
+The judge cited the span in its reasoning (shortened):
+
+```text
+The final state_of_world shows refund_count: 1 and refund_total: 49.95, demonstrating a
+single refund of exactly 49.95. The original charge remains captured in the traces and
+state_of_world, indicating it was left untouched.
+```
+
+### Check a value without the judge
+
+For an exact check, compare one fact. Add a second tool span that returns only that number:
+
+```python
+@langwatch.span(name="refund_total", type="tool")
+def refund_total(thread_id: str) -> float:
+    return round(sum(r.amount for r in payments.refunds(namespace=thread_id)), 2)
+```
+
+Call it after the turn, next to `state_of_world`. Then attach an Exact Match evaluator to the [test suite](/agent-testing/evaluators):
+
+1. Run the scenario once first. The tool calls picker lists every span name the project has seen, not only tool spans. A span name shows only after a run has produced it, so `refund_total` is not there before that.
+2. Map `output` to source **Trace**, tool call `refund_total`, `output`.
+3. Set `expected_output` to the literal `49.95`. Type `49.95`, then click **Use "49.95" as value**.
+
+The run plan editor lists no tool names. On a run plan, set this mapping through the [run plans API](/api-reference/run-plans/create-run).
+
+When you attach the evaluator, `output` defaults to the agent's last message. Change it to the tool call, or the check compares the wrong text.
+
+Exact Match compares two numbers as numbers, so `49.95` and `49.950` both pass. In the API, the attachment is:
+
+```json
+{
+  "evaluators": [
+    {
+      "id": "attachment_abc123",
+      "evaluatorId": "evaluator_abc123",
+      "required": true,
+      "mappings": {
+        "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "refund_total", "output"] },
+        "expected_output": { "type": "value", "value": "49.95" }
+      }
+    }
+  ]
+}
+```
+
+Set this mapping by hand. The platform never infers a tool call mapping. The last `refund_total` call wins, by start time. That is the value after the last turn.
+
+Compare one fact, not the whole `state_of_world` object. One fact is safer.
+
+## Caveats
+
+- **Keep the facts short and flat.** The judge reads a digest of the trace. A large trace becomes a structure-only tree that the judge has to expand, and a repeated long string is shown once. A few scalar facts read the same at any trace size.
+- **Clean up after the run.** Declare a teardown hook to remove the data a run made, as [Build a scenario suite](/agent-testing/build-a-scenario-suite#isolate-scenarios-with-setup-and-teardown-hooks) shows. The hook gets the scenario state, not the session or thread id, so return the seeded ids as state with `AgentReply(..., state={...})`, or seed in a setup hook. A teardown does not run if the agent process dies, so also delete test data older than a few hours on a schedule, found by the test flag.
+- **Seed in development or staging only.** Never seed test data in production.
+- **Self-hosted: run langevals.** Exact Match runs in langevals. If langevals is not running, the evaluator errors, and a required one fails the run.
+- **Background work is not covered.** The span reports the state when the function returns. Work that continues after the call, such as a queued job, is not in it.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Run parameters" icon="sliders" href="/agent-testing/run-parameters">
+    Declare the values a run supplies
+  </Card>
+  <Card title="Linking your traces" icon="diagram-project" href="/agent-testing/linking-your-traces">
+    What the judge reads from your agent's spans
+  </Card>
+  <Card title="Evaluators" icon="check" href="/agent-testing/evaluators">
+    Attach a check that runs after every scenario run
+  </Card>
+  <Card title="Test Suite Design" icon="table" href="/agent-testing/designing-a-suite">
+    Which cases to write and when a suite is complete
+  </Card>
+  <Card title="Build a Scenario Suite" icon="layer-group" href="/agent-testing/build-a-scenario-suite">
+    Organise, run and maintain the suite
+  </Card>
+  <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
+    Sessions, environments and the options reference
+  </Card>
+</CardGroup>

@@ -72,7 +72,9 @@ The evaluators attached to a suite run after every scenario run and report besid
 
 ## Test suites and labels
 
-A test suite is the group you run before a release. A label is a tag on a scenario, and a scenario can have any number of them. A run plan can scope by labels across every test suite, for example every scenario labelled `smoke`, so use labels for a cut that crosses the test suites and a test suite for the group that ships together.
+A test suite groups the scenarios of one agent or one area, with the fields and evaluators they share, and a scenario belongs to exactly one test suite, the **Default** one when none is chosen.
+
+A label is a tag on a scenario, and a scenario can have any number of them. A run plan can scope by labels across every test suite, for example every scenario labelled `smoke`, so use labels for a cut that crosses the test suites. See [How to organise scenarios](/agent-testing/build-a-scenario-suite#how-to-organise-scenarios).
 
 ## From Code
 
