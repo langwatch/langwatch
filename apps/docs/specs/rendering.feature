@@ -117,3 +117,9 @@ Feature: Read and navigate the generated documentation
     When the page is rendered
     Then each step title is a heading of that level, or plain text for "p"
     And steps without a size keep third-level titles
+
+  @integration
+  Scenario: Tab panels are named by ids without spaces
+    Given authored tabs or a code group whose labels contain spaces
+    When the page is rendered
+    Then each tab's aria-controls names exactly one panel id

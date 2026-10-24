@@ -9,7 +9,7 @@ import { CodeBar, CodeFrame } from "../../code/ui/code-block.tsx";
 import { CodeBody, CopyAction, sourceFromProps } from "../../code/ui/code-parts.tsx";
 import type { CodeSource } from "../../code/ui/code-parts.tsx";
 import { codeFilename, languageName, preferenceGroupFor } from "../../code/ui/languages.ts";
-import { readingTabList, readingTabTrigger } from "./tabs.tsx";
+import { readingTabList, readingTabTrigger, tabValue } from "./tabs.tsx";
 
 type Item = { label: string; source?: CodeSource; content?: ReactNode };
 
@@ -59,15 +59,11 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
     <CodeFrame>
       <Tabs.Root
         data-docs-preference={group ?? void 0}
-        value={active}
+        value={active === undefined ? void 0 : tabValue({ label: active })}
         onValueChange={({ value }) => {
-          if (group) {
-            const selected = items.find((item) => item.label === value);
-            writePreference({
-              key: group,
-              value: selected ? choiceOf(selected) : value,
-            });
-          } else setLocal(value);
+          const selected = items.find((item) => tabValue({ label: item.label }) === value);
+          if (group) writePreference({ key: group, value: selected ? choiceOf(selected) : value });
+          else setLocal(selected?.label ?? value);
         }}
         variant="line"
         colorPalette="accent"
@@ -102,7 +98,7 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
             {items.map((item, index) => (
               <Tabs.Trigger
                 key={item.label}
-                value={item.label}
+                value={tabValue({ label: item.label })}
                 data-docs-language={choiceOf(item)}
                 data-docs-family={families[index] ?? void 0}
                 css={{ ...readingTabTrigger, minHeight: "44px" }}
@@ -115,7 +111,7 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
         {items.map((item) => (
           <Tabs.Content
             key={item.label}
-            value={item.label}
+            value={tabValue({ label: item.label })}
             padding="0"
             data-docs-panel=""
             data-code-title={item.source ? codeFilename(item.source) : item.label}

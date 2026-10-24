@@ -67,6 +67,14 @@ const FRAMED_LIST = {
   },
 } satisfies SystemStyleObject;
 
+/**
+ * A tab's value without whitespace: Ark builds the panel id from it and `aria-controls` is a
+ * list of ids, so "Claude Code" would name two panels that do not exist.
+ */
+export function tabValue({ label }: { label: string }) {
+  return label.trim().replace(/\s+/g, "-");
+}
+
 type TabProps = { title?: string; children?: ReactNode };
 
 /** A `Tabs` child: it only carries its title and content to the parent. */
@@ -91,10 +99,12 @@ export function Tabs({ children }: { children?: ReactNode }) {
   return (
     <ChakraTabs.Root
       data-docs-preference={group ?? void 0}
-      value={active}
-      onValueChange={({ value }) =>
-        group ? writePreference({ key: group, value }) : setLocal(value)
-      }
+      value={active === undefined ? void 0 : tabValue({ label: active })}
+      onValueChange={({ value }) => {
+        const label = labels.find((candidate) => tabValue({ label: candidate }) === value) ?? value;
+        if (group) writePreference({ key: group, value: label });
+        else setLocal(label);
+      }}
       variant="line"
       colorPalette="accent"
       minWidth="0"
@@ -110,7 +120,7 @@ export function Tabs({ children }: { children?: ReactNode }) {
         {tabs.map((tab, index) => (
           <ChakraTabs.Trigger
             key={tab.label}
-            value={tab.label}
+            value={tabValue({ label: tab.label })}
             data-docs-family={families[index] ?? void 0}
             css={readingTabTrigger}
           >
@@ -132,7 +142,7 @@ export function Tabs({ children }: { children?: ReactNode }) {
       {tabs.map((tab) => (
         <ChakraTabs.Content
           key={tab.label}
-          value={tab.label}
+          value={tabValue({ label: tab.label })}
           paddingX={{ base: "4", sm: "5" }}
           paddingTop="4"
           paddingBottom={{ base: "4", sm: "5" }}
