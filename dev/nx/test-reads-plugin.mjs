@@ -18,6 +18,7 @@ export const reads = {
     "docs/self-hosting/connect.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
     "docs/self-hosting/data-and-telemetry.mdx",
+    "docs/workflows/overview.mdx",
   ],
   "@langwatch/agent-process": [
     "modules/agent/**/*",

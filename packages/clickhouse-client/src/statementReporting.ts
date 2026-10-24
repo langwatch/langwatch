@@ -4,6 +4,11 @@
  * so a catch-site throw from a counter or log sink never masks the real error.
  */
 
+import { createHash } from "node:crypto";
+
+import { createWarnThrottle, type WarnThrottle } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
 import { QUERY_CAUSE_FIELD, quietly, RETRY_CAUSE_FIELD } from "./resilience.ts";
 import type { RetryAttemptNotice } from "./retry.ts";
 import {
@@ -82,7 +87,106 @@ const NOOP_METRICS: StatementMetrics = {
   incrementCount: () => undefined,
 };
 
+/** How long a cold-scan warning for one query shape stays quiet after it is logged. */
+const COLD_SCAN_WARN_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * Replaces each string literal with `?` and drops comments outside quoted identifiers, in one
+ * linear pass (a backtracking regex is quadratic), so no quote or comment swallows later SQL.
+ */
+function withoutLiteralsOrComments(query: string): string {
+  let out = "";
+  let i = 0;
+  while (i < query.length) {
+    const skipped = skipLiteralOrComment({ query, i });
+    if (skipped === null) {
+      out += query[i];
+      i++;
+    } else {
+      out += skipped.replacement;
+      i = skipped.next;
+    }
+  }
+
+  return out;
+}
+
+/** What a literal or comment starting at `i` becomes, and where the SQL resumes; null if none. */
+function skipLiteralOrComment({
+  query,
+  i,
+}: {
+  query: string;
+  i: number;
+}): { replacement: string; next: number } | null {
+  const ch = query[i];
+  if (ch === "'") return { replacement: "?", next: endOfQuoted({ query, i: i + 1, quote: "'" }) };
+  if (ch === "$") return heredocAt({ query, i });
+  if (ch === '"' || ch === "`") {
+    const next = endOfQuoted({ query, i: i + 1, quote: ch });
+    return { replacement: query.slice(i, next), next };
+  }
+  const pair = query.slice(i, i + 2);
+  if (pair === "--") {
+    const end = query.indexOf("\n", i);
+    return { replacement: "", next: end === -1 ? query.length : end };
+  }
+  if (pair === "/*") {
+    const end = query.indexOf("*/", i + 2);
+    return { replacement: " ", next: end === -1 ? query.length : end + 2 };
+  }
+
+  return null;
+}
+
+/** The opening tag of a ClickHouse heredoc string literal, `$$` or `$tag$`. */
+const HEREDOC_TAG = /\$[A-Za-z_]\w*\$|\$\$/y;
+
+/** A heredoc literal starting at `i`, read whole so a `--` inside it is no comment; else null. */
+function heredocAt({
+  query,
+  i,
+}: {
+  query: string;
+  i: number;
+}): { replacement: string; next: number } | null {
+  HEREDOC_TAG.lastIndex = i;
+  const tag = HEREDOC_TAG.exec(query)?.[0];
+  if (tag === undefined) return null;
+  const end = query.indexOf(tag, i + tag.length);
+
+  return { replacement: "?", next: end === -1 ? query.length : end + tag.length };
+}
+
+/** The index just past the `quote` closing a run starting at `i`; a doubled quote stays in. */
+function endOfQuoted({ query, i, quote }: { query: string; i: number; quote: string }): number {
+  let at = i;
+  while (at < query.length) {
+    if (query[at] === "\\") at += 2;
+    else if (query[at] !== quote) at += 1;
+    else if (query[at + 1] === quote) at += 2;
+    else return at + 1;
+  }
+
+  return at;
+}
+
+/**
+ * A query with its literals and layout removed, hashed, so the same statement run for another
+ * tenant, time window or limit is one key. The warning is about the statement's form.
+ */
+function queryShapeOf(rawQuery: string): string {
+  const shape = withoutLiteralsOrComments(rawQuery)
+    .replace(/\b\d+(?:\.\d+)?\b/g, "?")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return createHash("sha256").update(shape).digest("base64url");
+}
+
 export interface StatementReporterOptions {
+  /** Epoch milliseconds; injectable so a test steps the cold-scan quiet window. */
+  now?: (() => number) | undefined;
   cluster?: string | undefined;
   metrics?: StatementMetrics | undefined;
   noticeLogger?: StatementLogSink | undefined;
@@ -99,8 +203,12 @@ export class StatementReporter {
   /** Raw on purpose: a failure here is worth a line on the notice sink. */
   private readonly outcomeLogger: StatementLogSink;
   private readonly detectColdScan: (rawQuery: string) => string | null;
+  private readonly now: () => number;
+  /** One cold-scan warning per query shape per interval; per reporter, so tests stay apart. */
+  private readonly coldScanThrottle: WarnThrottle = createWarnThrottle(COLD_SCAN_WARN_INTERVAL_MS);
 
   constructor({
+    now = () => nowInstant().epochMilliseconds,
     cluster = "shared",
     metrics = NOOP_METRICS,
     noticeLogger = NOOP_SINK,
@@ -112,6 +220,17 @@ export class StatementReporter {
     this.noticeLogger = guardedLogSink(noticeLogger);
     this.outcomeLogger = outcomeLogger;
     this.detectColdScan = detectColdScan;
+    this.now = now;
+  }
+
+  /** Null while the shape is quiet; otherwise how many warnings it held back since the last. */
+  private claimColdScanWarning(rawQuery: string): { suppressedSincePrevious: number } | null {
+    const suppressed = this.coldScanThrottle.claim({
+      key: queryShapeOf(rawQuery),
+      now: this.now(),
+    });
+
+    return suppressed === undefined ? null : { suppressedSincePrevious: suppressed };
   }
 
   /** Count one finished statement. */
@@ -207,7 +326,10 @@ export class StatementReporter {
           ? this.detectColdScan(extractRawQuery(params))
           : null;
 
-      if (coldScanTable !== null) {
+      const coldScanClaim =
+        coldScanTable !== null ? this.claimColdScanWarning(extractRawQuery(params)) : null;
+
+      if (coldScanTable !== null && coldScanClaim !== null) {
         this.outcomeLogger.warn(
           {
             source: "clickhouse",
@@ -219,6 +341,7 @@ export class StatementReporter {
             query: extractQueryPreview(params),
             coldScan: true,
             coldScanTable,
+            suppressedSincePrevious: coldScanClaim.suppressedSincePrevious,
           },
           `ClickHouse cold-scan ${operation}: cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`,
         );

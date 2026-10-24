@@ -960,13 +960,13 @@ describe("SystemMigrationRunnerService held tenants", () => {
   });
 
   describe("when the hold is logged", () => {
-    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
+    /** @scenario "A first hold is logged at info and a hold that persists at debug" */
     it("logs a first hold at info, since the next pass re-proves it", () => {
       expect(heldNoticeLevel({ existing: undefined })).toBe("info");
     });
 
-    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
-    it("logs a tenant still held from an earlier pass at warn", () => {
+    /** @scenario "A first hold is logged at info and a hold that persists at debug" */
+    it("logs a tenant still held from an earlier pass at debug", () => {
       const held: TenantMigrationRecord = {
         migrationName: "m1",
         tenantId: "org_acme",
@@ -976,7 +976,7 @@ describe("SystemMigrationRunnerService held tenants", () => {
         heldSince: nowInstant(),
       };
 
-      expect(heldNoticeLevel({ existing: held })).toBe("warn");
+      expect(heldNoticeLevel({ existing: held })).toBe("debug");
     });
 
     /** @scenario "A tenant still waiting on a person is logged at info, not warn" */

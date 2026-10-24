@@ -14843,7 +14843,7 @@ export interface operations {
                      * @enum {string}
                      */
                     format?: "digest" | "json";
-                    /** @description When true, fetches full span data for each trace. Useful for bulk export. Default false. */
+                    /** @description When true, fetches full span data for each trace. Useful for bulk export. Default false. A page with spans holds at most 100 traces, whatever `pageSize` asks for. When a response carries a `scrollId`, send it to fetch the next page. */
                     includeSpans?: boolean;
                     llmMode?: boolean;
                     /**

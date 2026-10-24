@@ -894,6 +894,7 @@ export const APP_ERROR_CODES = [
   "workflow_not_a_copy",
   "workflow_not_found",
   "workflow_optimization_removed",
+  "workflow_result_too_large",
   "workflow_version_not_found",
   "workflow_version_required",
 ] as const;
