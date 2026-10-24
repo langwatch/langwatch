@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import { canonicalUrl, sitePath } from "../../../lib/site-path.ts";
 import {
   breadcrumbTrail,
+  headDescription,
   headSettings,
+  MIN_DESCRIPTION_LENGTH,
   pageDescription,
   pageHead,
   trimDescription,
@@ -140,6 +142,28 @@ describe("when a page has no authored description", () => {
       "Authored",
     );
     expect(pageDescription({ title: "Guide", operation: null })).toBe("");
+  });
+});
+
+describe("when an API operation's description is too short for a search snippet", () => {
+  /** @scenario "Lengthen a short API description with its endpoint" */
+  it("follows the description with the method and path", () => {
+    const operation = {
+      method: "DELETE",
+      path: "/api/groups/{id}",
+      description: "Delete a group.",
+    };
+    const description = headDescription({ title: "Delete group", operation });
+    expect(description).toBe(
+      "Delete a group with DELETE /api/groups/{id} in the LangWatch REST API.",
+    );
+    expect(description.length).toBeGreaterThanOrEqual(MIN_DESCRIPTION_LENGTH);
+    expect(
+      headDescription({ title: "Delete group", description: "Delete a group", operation }),
+    ).toBe(description);
+    expect(headDescription({ title: "Guide", description: "Short", operation: null })).toBe(
+      "Short",
+    );
   });
 });
 

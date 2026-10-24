@@ -62,6 +62,12 @@ function escapeAttribute(text: string) {
     .replaceAll('"', "&quot;");
 }
 
+/** Longest meta description a search result shows without cutting it off itself. */
+export const MAX_DESCRIPTION_LENGTH = 160;
+/** Shortest meta description a search engine keeps instead of writing its own snippet. */
+export const MIN_DESCRIPTION_LENGTH = 50;
+const MIN_SENTENCE_LENGTH = MIN_DESCRIPTION_LENGTH;
+
 /** The authored description, else the operation's, else one naming the endpoint. */
 export function pageDescription({
   title,
@@ -80,9 +86,16 @@ export function pageDescription({
   );
 }
 
-/** Longest meta description a search result shows without cutting it off itself. */
-export const MAX_DESCRIPTION_LENGTH = 160;
-const MIN_SENTENCE_LENGTH = 50;
+/**
+ * The page description for the meta tags: on an API page, one too short for a search snippet
+ * ("Delete a group") is followed by the endpoint it describes.
+ */
+export function headDescription(page: Parameters<typeof pageDescription>[0]) {
+  const text = pageDescription(page);
+  const { operation } = page;
+  if (!operation || text.length >= MIN_DESCRIPTION_LENGTH) return text;
+  return `${text.replace(/\.$/, "")} with ${operation.method} ${operation.path} in the LangWatch REST API.`;
+}
 
 /** The suffix Mintlify gives every page title, kept so the migration does not change titles. */
 export const TITLE_SUFFIX = " - LangWatch";

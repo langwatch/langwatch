@@ -24,6 +24,13 @@ Feature: Actionable documentation and restrained reading surfaces
     Given an API page whose page and operation both lack a description
     When its head is rendered
     Then the description names the page, its method and path
+
+  @unit
+  Scenario: Lengthen a short API description with its endpoint
+    Given an API page whose description, or its operation's, is under 50 characters
+    When its head is rendered
+    Then that description is followed by its method and path
+    And the description is long enough for a search engine to show it
   @e2e
   Scenario: Copy a supported coding-agent command on any page
     Given any documentation page
