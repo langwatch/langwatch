@@ -28,6 +28,7 @@ import {
   LOCAL_TOOL_NAMES,
   createLocalWorkspaceExtension,
 } from "./tools/local-workspace.js";
+import { MCP_SETUP_TOOL_NAME, createMcpSetupExtension } from "./tools/mcp-setup.js";
 import {
   NOTIFY_TOOL_NAME,
   OFFER_NOTIFICATIONS_TOOL_NAME,
@@ -57,6 +58,7 @@ export const ENABLED_TOOLS = [
   CODE_ACCESS_TOOL_NAME,
   NOTIFY_TOOL_NAME,
   OFFER_NOTIFICATIONS_TOOL_NAME,
+  MCP_SETUP_TOOL_NAME,
   ...LOCAL_TOOL_NAMES,
 ] as const;
 
@@ -171,6 +173,7 @@ export async function createLangySession({
       }),
       createSecretSnippetExtension(),
       createNotifyExtension({ ledger: notifyLedgerFromEntries(sessionManager.getEntries()) }),
+      createMcpSetupExtension(),
       // Registers `bash` in place of pi's built-in: the extension's tool wins
       // the name in the session's registry.
       createLocalWorkspaceExtension({ turnContext, sandboxCwd: home }),
