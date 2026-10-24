@@ -4,7 +4,7 @@
   "sdks/go": "1.0.0",
   "sdks/typescript": "1.20.0",
   "sdks/python": "1.4.0",
-  "mcp/typescript": "2.2.0",
+  "mcp/typescript": "2.3.0",
   "packages/ksuid": "2.0.2",
   "packages/ksuid-python": "1.0.1",
   "services/langevals": "3.1.0",
