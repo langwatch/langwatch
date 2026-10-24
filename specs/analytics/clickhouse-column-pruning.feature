@@ -80,6 +80,13 @@ Feature: ClickHouse Analytics Column Pruning
     Then the stored_spans source includes the Events.Name column
     And the stored_spans source does not include SpanAttributes
 
+  @unit
+  Scenario: The feedbacks stored_spans source keeps only spans carrying the vote event
+    When the feedbacks query is built
+    Then the stored_spans source keeps only spans whose event names include the vote event
+    And the predicate sits inside the stored_spans source rather than after the events are expanded
+    And the stored_spans source and the outer filter name the same event
+
   # ---------------------------------------------------------------------------
   # Query correctness after pruning
   # ---------------------------------------------------------------------------
