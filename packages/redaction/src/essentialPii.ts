@@ -1,4 +1,6 @@
+import type { CountryCode } from "libphonenumber-js";
 import { findPhoneNumbersInText } from "libphonenumber-js";
+import { findPhoneNumbersInText as findPhoneNumbersInTextStrict } from "libphonenumber-js/max";
 
 import { isBitcoinAddress } from "./bitcoinAddress.ts";
 import { isIdentifierShapedValue, MAX_IDENTIFIER_LENGTH } from "./identifierHoldout.ts";
@@ -500,6 +502,274 @@ function collectRecognizerSpans({
  */
 const ENOUGH_DIGITS_FOR_A_NUMBER = /\d(?:[^0-9A-Za-z]{0,4}\d){5}/;
 
+/**
+ * Regions tried for national-format numbers, which the US pass misreads. Europe first, then
+ * the large English and Portuguese markets; order only decides which region claims a span.
+ * `trunkZero`: the region writes every national number with a leading `0`.
+ */
+interface NationalRegion {
+  region: CountryCode;
+  trunkZero: boolean;
+}
+
+const NATIONAL_FORMAT_REGIONS: readonly NationalRegion[] = [
+  { region: "GB", trunkZero: true },
+  { region: "NL", trunkZero: true },
+  { region: "DE", trunkZero: true },
+  { region: "FR", trunkZero: true },
+  { region: "BE", trunkZero: true },
+  { region: "IE", trunkZero: true },
+  { region: "AT", trunkZero: true },
+  { region: "CH", trunkZero: true },
+  { region: "AU", trunkZero: true },
+  { region: "ES", trunkZero: false },
+  { region: "PT", trunkZero: false },
+  { region: "IT", trunkZero: false },
+  { region: "IN", trunkZero: false },
+  { region: "BR", trunkZero: false },
+];
+
+const TRUNK_ZERO_REGIONS = NATIONAL_FORMAT_REGIONS.filter(({ trunkZero }) => trunkZero);
+const NO_TRUNK_REGIONS = NATIONAL_FORMAT_REGIONS.filter(({ trunkZero }) => !trunkZero);
+
+/**
+ * A digit run with phone separators, at most 26 characters. It never starts glued to a word,
+ * `+` or `#`, inside a dotted, dashed or timed number (`2026-09-30`, `12:34:05`) or after a
+ * path or id separator (`v/012`, `ab-012`).
+ */
+const NATIONAL_CANDIDATE = /(?<![\w+#]|\d[-./:,]|[A-Za-z_][-/])\(?\d[\d ()./-]{5,24}\d/g;
+const TRUNK_ZERO_GROUP = /(?:^|[^\d.,])0[1-9]/;
+const LEADS_WITH_TRUNK_ZERO = /^\(?0[1-9]/;
+const LEADS_WITH_AREA_CODE = /^(?:\(?0[1-9]|\(\d{1,5}\))/;
+const SPACED_GROUPS = /\d[ ()/-]+\d/;
+const DOT = /\./g;
+const CONTAINS_DATE = /\d{1,2}([./-])\d{1,2}\1\d{4}|\d{4}([./-])\d{1,2}\2\d{1,2}/;
+const NATIONAL_DIGIT_FLOOR = 7;
+/** The shortest mobile in the regions without a trunk zero (nine digits, ES and PT). */
+const SHORTEST_NO_TRUNK_MOBILE = 9;
+const LONGEST_UNGROUPED_NUMBER = 12;
+const MOBILE_TYPES: ReadonlySet<string> = new Set(["MOBILE", "FIXED_LINE_OR_MOBILE"]);
+/** Shapes trace text holds that parse as numbers: a code ending `-7`, a decimal, a column gap. */
+const NOT_A_PHONE_SHAPE = /\D\d$| {3,}|\. |^[^.]*\.\d{1,2}$|^0\d{3}\.\d{3}\.\d{3}$|^\d{5}-\d{3}$/;
+/** A word that says a phone number follows, in the major languages, or `T:` / `M:` right before. */
+const PHONE_CUE =
+  /(?:\b(?:tel|phone|fone|mobile?|mobiel|m[oó]vil|celular|cell|cellulare|whats ?app|telefo(?:on|n|no|ne)|t[eé]l[eé]phone|telem[oó]vel|handy|gsm|portable|fax|sms|call|ring|bel(?:len)?|ligue|llam[ae]|chiama|anruf\w*|appel\w*)|(?:^|[^A-Za-z])[MT]\s?[.:])/i;
+const PHONE_CUE_WINDOW = 40;
+/** A country code with or without check digits and a bank code: a grouped IBAN or a VAT number. */
+const IBAN_OR_VAT_PREFIX = /\b[A-Z]{2}(?:\d{2} ?(?:[A-Z0-9]{4} ?){0,2})? ?$/;
+const GLUED_AFTER = /^(?:[A-Za-z0-9]|[.,]\d)/;
+
+/** Digit groups split by spaces, dashes, slashes or brackets, or by two dots or more. */
+function isGrouped(raw: string): boolean {
+  return SPACED_GROUPS.test(raw) || (raw.match(DOT)?.length ?? 0) >= 2;
+}
+
+/** Whether a raw match can be a national-format number at all, whatever its type. */
+function isNationalShape(raw: string): boolean {
+  if (raw.includes("+") || raw.startsWith("00")) return false;
+  if (CONTAINS_DATE.test(raw) || NOT_A_PHONE_SHAPE.test(raw)) return false;
+  return isGrouped(raw) || !hasDigitCount(raw, LONGEST_UNGROUPED_NUMBER + 1);
+}
+
+/**
+ * Whether a number parsed in `trunkZero`'s region is written the way that region writes
+ * phones: a trunk-zero region needs its leading `0`; elsewhere a mobile needs an area code in
+ * front, or digit groups and a phone word nearby; a landline needs an area code and groups.
+ */
+function isNationalFormatPhone({
+  raw,
+  type,
+  trunkZero,
+  cued,
+}: {
+  raw: string;
+  type: string | undefined;
+  trunkZero: boolean;
+  cued: () => boolean;
+}): boolean {
+  if (!isNationalShape(raw)) return false;
+  if (trunkZero && !LEADS_WITH_TRUNK_ZERO.test(raw)) return false;
+  const leadsWithAreaCode = LEADS_WITH_AREA_CODE.test(raw);
+  if (type !== undefined && MOBILE_TYPES.has(type)) {
+    return leadsWithAreaCode || (isGrouped(raw) && cued());
+  }
+  return type === "FIXED_LINE" && leadsWithAreaCode && isGrouped(raw);
+}
+
+/** Whether a phone word sits in the few characters before `start`. */
+function hasPhoneCue(text: string, start: number): boolean {
+  return PHONE_CUE.test(text.slice(Math.max(0, start - PHONE_CUE_WINDOW), start));
+}
+
+/**
+ * Whether the text around a national-format match shows it is part of something else: glued
+ * to a letter, a digit or a decimal after it, or the digits of a grouped IBAN or a VAT number.
+ */
+function isPartOfLongerValue(text: string, span: Span): boolean {
+  if (GLUED_AFTER.test(text.slice(span.end, span.end + 2))) return true;
+  return IBAN_OR_VAT_PREFIX.test(text.slice(Math.max(0, span.start - 12), span.start));
+}
+
+/** Counts digits in `candidate`, stopping as soon as it reaches `floor`. */
+function hasDigitCount(candidate: string, floor: number): boolean {
+  let digits = 0;
+  for (let i = 0; i < candidate.length && digits < floor; i++) {
+    const code = candidate.charCodeAt(i);
+    if (code >= 48 && code <= 57) digits++;
+  }
+  return digits >= floor;
+}
+
+/**
+ * The regions worth parsing one window in. A number a trunk-zero region accepts starts with
+ * `0`, and one the others accept is grouped or bracketed, so a window holding neither shape
+ * gets no regions and never reaches the parser.
+ */
+function regionsForCandidate({
+  candidate,
+  cued,
+}: {
+  candidate: string;
+  cued: () => boolean;
+}): readonly NationalRegion[] {
+  if (CONTAINS_DATE.test(candidate)) return [];
+  const trunkGroup = TRUNK_ZERO_GROUP.test(candidate);
+  const groupedOrBracketed =
+    hasDigitCount(candidate, SHORTEST_NO_TRUNK_MOBILE) &&
+    (candidate.includes("(") || (isGrouped(candidate) && (trunkGroup || cued())));
+  if (trunkGroup && groupedOrBracketed) return NATIONAL_FORMAT_REGIONS;
+  if (trunkGroup) return TRUNK_ZERO_REGIONS;
+  if (groupedOrBracketed) return NO_TRUNK_REGIONS;
+  return [];
+}
+
+/**
+ * The national-format numbers one candidate window holds, as spans of `text`. Regions are
+ * tried in order until one claims the whole window, so a number costs a few parses at most.
+ */
+function nationalSpansInCandidate({
+  text,
+  candidate,
+  offset,
+}: {
+  text: string;
+  candidate: string;
+  offset: number;
+}): Span[] {
+  const spans: Span[] = [];
+  const cued = () => hasPhoneCue(text, offset);
+  for (const { region, trunkZero } of regionsForCandidate({ candidate, cued })) {
+    for (const phone of findPhoneNumbersInTextStrict(candidate, { defaultCountry: region })) {
+      const raw = candidate.slice(phone.startsAt, phone.endsAt);
+      const type = phone.number.getType();
+      if (!isNationalFormatPhone({ raw, type, trunkZero, cued })) continue;
+      const span: Span = {
+        start: offset + phone.startsAt,
+        end: offset + phone.endsAt,
+        entity: "PHONE_NUMBER",
+      };
+      if (isPartOfLongerValue(text, span) || insideIdentifierToken(text, span)) continue;
+      spans.push(span);
+    }
+    if (spans.some((span) => span.start === offset && span.end === offset + candidate.length)) {
+      break;
+    }
+  }
+  return spans;
+}
+
+/**
+ * The parts of the window [start, end) that no span in `found` covers, scanning `found`
+ * from `from` (spans in order). A window the US pass claimed in part keeps its remainder.
+ */
+function uncoveredParts({
+  start,
+  end,
+  found,
+  from,
+}: {
+  start: number;
+  end: number;
+  found: readonly Span[];
+  from: number;
+}): { start: number; end: number }[] {
+  const parts: { start: number; end: number }[] = [];
+  let cursor = start;
+  for (let i = from; i < found.length && found[i]!.start < end; i++) {
+    if (found[i]!.start > cursor) parts.push({ start: cursor, end: found[i]!.start });
+    cursor = Math.max(cursor, found[i]!.end);
+  }
+  if (cursor < end) parts.push({ start: cursor, end });
+  return parts;
+}
+
+/** One uncovered part of a candidate window, parsed when it holds enough digits. */
+function collectNationalSpansInPart({
+  text,
+  part,
+  excepted,
+  spans,
+}: {
+  text: string;
+  part: { start: number; end: number };
+  excepted: (span: Span) => boolean;
+  spans: Span[];
+}): void {
+  const candidate = text.slice(part.start, part.end);
+  if (!hasDigitCount(candidate, NATIONAL_DIGIT_FLOOR)) return;
+  for (const span of nationalSpansInCandidate({ text, candidate, offset: part.start })) {
+    if (!excepted(span)) spans.push(span);
+  }
+}
+
+/**
+ * National-format pass over the digit windows, minus what the US pass already found
+ * (`found`, in order), each part parsed only in the regions {@link regionsForCandidate} keeps.
+ */
+function collectNationalFormatPhoneSpans({
+  text,
+  excepted,
+  found,
+  spans,
+}: {
+  text: string;
+  excepted: (span: Span) => boolean;
+  found: readonly Span[];
+  spans: Span[];
+}): void {
+  let next = 0;
+  for (const match of text.matchAll(NATIONAL_CANDIDATE)) {
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    while (next < found.length && found[next]!.end <= start) next++;
+    for (const part of uncoveredParts({ start, end, found, from: next })) {
+      collectNationalSpansInPart({ text, part, excepted, spans });
+    }
+  }
+}
+
+/** International numbers (`+31 ...`, `011 ...`) and US numbers written without a country code. */
+function collectInternationalOrUsPhoneSpans({
+  text,
+  excepted,
+  spans,
+}: {
+  text: string;
+  excepted: (span: Span) => boolean;
+  spans: Span[];
+}): void {
+  for (const phone of findPhoneNumbersInText(text, { defaultCountry: "US" })) {
+    const span: Span = {
+      start: phone.startsAt,
+      end: phone.endsAt,
+      entity: "PHONE_NUMBER",
+    };
+    if (insideIdentifierToken(text, span)) continue;
+    if (excepted(span)) continue;
+    spans.push(span);
+  }
+}
+
 function collectPhoneSpans({
   text,
   allowed,
@@ -516,18 +786,8 @@ function collectPhoneSpans({
   if (!ENOUGH_DIGITS_FOR_A_NUMBER.test(text)) return [];
   const spans: Span[] = [];
   try {
-    for (const phone of findPhoneNumbersInText(text, {
-      defaultCountry: "US",
-    })) {
-      const span: Span = {
-        start: phone.startsAt,
-        end: phone.endsAt,
-        entity: "PHONE_NUMBER",
-      };
-      if (insideIdentifierToken(text, span)) continue;
-      if (excepted(span)) continue;
-      spans.push(span);
-    }
+    collectInternationalOrUsPhoneSpans({ text, excepted, spans });
+    collectNationalFormatPhoneSpans({ text, excepted, found: [...spans], spans });
   } catch {
     // Defensive: never let phone parsing break ingestion. Whatever the
     // detector produced before it gave up is still a real answer.
