@@ -1,0 +1,724 @@
+[
+  {
+    "entry": {
+      "expected_output": "What is the capital of France?",
+      "output": "What is the capital of France?"
+    },
+    "name": "identical text defaults",
+    "result": {
+      "cost": null,
+      "details": "what is the capital of france == what is the capital of france",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "What is the capital of the Netherlands?",
+      "output": "What is the capital of France?"
+    },
+    "name": "different text defaults",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"what is the capital of france\"\n\nTo be exactly equal to:\n\t\"what is the capital of the netherlands\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "hello world",
+      "output": "Hello World"
+    },
+    "name": "case sensitive true mismatch",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"Hello World\"\n\nTo be exactly equal to:\n\t\"hello world\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "case_sensitive": true
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "Hello World",
+      "output": "Hello World"
+    },
+    "name": "case sensitive true match",
+    "result": {
+      "cost": null,
+      "details": "Hello World == Hello World",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "case_sensitive": true
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "hello world",
+      "output": "Hello World"
+    },
+    "name": "case sensitive false match",
+    "result": {
+      "cost": null,
+      "details": "hello world == hello world",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "case_sensitive": false
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "Hello World",
+      "output": "  Hello World  "
+    },
+    "name": "trim whitespace true",
+    "result": {
+      "cost": null,
+      "details": "hello world == hello world",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "trim_whitespace": true
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "Hello World",
+      "output": "  Hello World  "
+    },
+    "name": "trim whitespace false",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"  hello world  \"\n\nTo be exactly equal to:\n\t\"hello world\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "trim_whitespace": false
+    }
+  },
+  {
+    "entry": {
+      "expected_output": " a ",
+      "output": " a "
+    },
+    "name": "trim false and punctuation false keeps spaces",
+    "result": {
+      "cost": null,
+      "details": " a  ==  a ",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "remove_punctuation": false,
+      "trim_whitespace": false
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "Hello World",
+      "output": "Hello, World!"
+    },
+    "name": "remove punctuation true",
+    "result": {
+      "cost": null,
+      "details": "hello world == hello world",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "remove_punctuation": true
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "Hello World",
+      "output": "Hello, World!"
+    },
+    "name": "remove punctuation false",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"hello, world!\"\n\nTo be exactly equal to:\n\t\"hello world\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "remove_punctuation": false
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "Hello, World!",
+      "output": "Hello, World!"
+    },
+    "name": "all transforms off, equal",
+    "result": {
+      "cost": null,
+      "details": "Hello, World! == Hello, World!",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "case_sensitive": true,
+      "remove_punctuation": false,
+      "trim_whitespace": false
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "hello, world!",
+      "output": "Hello, World!"
+    },
+    "name": "all transforms off, differ",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"Hello, World!\"\n\nTo be exactly equal to:\n\t\"hello, world!\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "case_sensitive": true,
+      "remove_punctuation": false,
+      "trim_whitespace": false
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "Hello World",
+      "output": "  Hello, World!  "
+    },
+    "name": "combined settings pass",
+    "result": {
+      "cost": null,
+      "details": "Hello World == Hello World",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "case_sensitive": true,
+      "remove_punctuation": true,
+      "trim_whitespace": true
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "",
+      "output": ""
+    },
+    "name": "both empty",
+    "result": {
+      "cost": null,
+      "details": " == ",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "abc",
+      "output": ""
+    },
+    "name": "output empty expected not",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"\"\n\nTo be exactly equal to:\n\t\"abc\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "",
+      "output": "   "
+    },
+    "name": "whitespace only vs empty",
+    "result": {
+      "cost": null,
+      "details": " == ",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "",
+      "output": "   "
+    },
+    "name": "whitespace only vs empty, no trim",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"   \"\n\nTo be exactly equal to:\n\t\"\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "trim_whitespace": false
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "",
+      "output": "?!.,"
+    },
+    "name": "punctuation only vs empty",
+    "result": {
+      "cost": null,
+      "details": " == ",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "42",
+      "output": "42"
+    },
+    "name": "numeric equal ints",
+    "result": {
+      "cost": null,
+      "details": "42 == 42",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "42",
+      "output": "42.0"
+    },
+    "name": "numeric float vs int",
+    "result": {
+      "cost": null,
+      "details": "42.0 == 42",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "2",
+      "output": "1"
+    },
+    "name": "numeric different",
+    "result": {
+      "cost": null,
+      "details": "Expected 1 to be equal to 2",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "1000",
+      "output": "1e3"
+    },
+    "name": "numeric exponent",
+    "result": {
+      "cost": null,
+      "details": "1e3 == 1000",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "nan",
+      "output": "nan"
+    },
+    "name": "numeric nan strings",
+    "result": {
+      "cost": null,
+      "details": "Expected nan to be equal to nan",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "Infinity",
+      "output": "inf"
+    },
+    "name": "numeric inf strings",
+    "result": {
+      "cost": null,
+      "details": "inf == Infinity",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "5",
+      "output": " 5 "
+    },
+    "name": "numeric with whitespace",
+    "result": {
+      "cost": null,
+      "details": " 5  == 5",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "1",
+      "output": "true"
+    },
+    "name": "loose bool true vs 1",
+    "result": {
+      "cost": null,
+      "details": "true == 1",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "0",
+      "output": "false"
+    },
+    "name": "loose bool false vs 0",
+    "result": {
+      "cost": null,
+      "details": "false == 0",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "false",
+      "output": "true"
+    },
+    "name": "loose bool true vs false",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"true\"\n\nTo be exactly equal to:\n\t\"false\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "true",
+      "output": "true"
+    },
+    "name": "loose bool true vs true",
+    "result": {
+      "cost": null,
+      "details": "true == true",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "True",
+      "output": "true"
+    },
+    "name": "loose bool vs text",
+    "result": {
+      "cost": null,
+      "details": "true == true",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "5",
+      "output": "\"5\""
+    },
+    "name": "json quoted number vs number",
+    "result": {
+      "cost": null,
+      "details": "\"5\" == 5",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "[1,2]",
+      "output": "[1,2]"
+    },
+    "name": "json array not loose equal",
+    "result": {
+      "cost": null,
+      "details": "12 == 12",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "{\"a\": 1}",
+      "output": "{\"a\": 1}"
+    },
+    "name": "json object equal text",
+    "result": {
+      "cost": null,
+      "details": "a 1 == a 1",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "null",
+      "output": "null"
+    },
+    "name": "json null vs text",
+    "result": {
+      "cost": null,
+      "details": "null == null",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "你好世界",
+      "output": "你好，世界！"
+    },
+    "name": "unicode CJK equal",
+    "result": {
+      "cost": null,
+      "details": "你好世界 == 你好世界",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "école",
+      "output": "ÉCOLE"
+    },
+    "name": "unicode accents case fold",
+    "result": {
+      "cost": null,
+      "details": "école == école",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "great ",
+      "output": "great 👍"
+    },
+    "name": "emoji stripped by punctuation removal",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"great \"\n\nTo be exactly equal to:\n\t\"great\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "great 👍",
+      "output": "great 👍"
+    },
+    "name": "emoji kept without punctuation removal",
+    "result": {
+      "cost": null,
+      "details": "great 👍 == great 👍",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "remove_punctuation": false,
+      "trim_whitespace": false
+    }
+  },
+  {
+    "entry": {
+      "expected_output": "שלום עולם",
+      "output": "שלום, עולם!"
+    },
+    "name": "RTL text equal",
+    "result": {
+      "cost": null,
+      "details": "שלום עולם == שלום עולם",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "line one\nline two",
+      "output": "line one\nline two"
+    },
+    "name": "multi-line equal",
+    "result": {
+      "cost": null,
+      "details": "line one\nline two == line one\nline two",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "line one\nline 2",
+      "output": "line one\nline two"
+    },
+    "name": "multi-line differ details",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"line one\nline two\"\n\nTo be exactly equal to:\n\t\"line one\nline 2\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "a b",
+      "output": "a\tb"
+    },
+    "name": "tab vs space is whitespace-equal not text-equal",
+    "result": {
+      "cost": null,
+      "details": "Expected:\n\t\"a\tb\"\n\nTo be exactly equal to:\n\t\"a b\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat",
+      "output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+    },
+    "name": "long text equal",
+    "result": {
+      "cost": null,
+      "details": "lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat == lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat",
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  }
+]

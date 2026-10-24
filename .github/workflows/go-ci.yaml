@@ -198,6 +198,8 @@ jobs:
           uv venv "$RUNNER_TEMP/codeblock-venv"
           uv pip install --python "$RUNNER_TEMP/codeblock-venv" requests ./sdks/python
           echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
+      # lingua/language_detection replays langevals over the generated models.
+      - run: make lingua-models
       - run: go test -count=1 -race $GO_PKGS
       - run: go test -count=1 -tags dev ./cmd/service/...
       # Memory ceilings skip under -race (it multiplies memory and time), so
@@ -347,6 +349,10 @@ jobs:
       - uses: ./.github/actions/prepare-generated-files
       - name: Generated READMEs are current
         run: pnpm check:readmes
+      - name: The evaluator catalogue is current
+        run: |
+          (cd services && go generate ./nlpgo/modules/evaluators/transport/catalogue)
+          git diff --exit-code -- modules/evaluator/contract/src/evaluators.generated.ts
 
   # The single required status check. Every job above is `if:`-gated and so
   # cannot be required directly — a skipped job never reports, and branch

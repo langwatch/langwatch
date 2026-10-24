@@ -1,0 +1,27 @@
+[
+  {
+    "name": "default_references",
+    "entry": {
+      "input": "I love this product"
+    },
+    "settings": {}
+  },
+  {
+    "name": "custom_references",
+    "entry": {
+      "input": "The delivery was late again"
+    },
+    "settings": {
+      "positive_reference": "Great service",
+      "negative_reference": "Terrible service",
+      "normalization_factor": 0.5
+    }
+  },
+  {
+    "name": "no_input_skipped",
+    "entry": {
+      "input": ""
+    },
+    "settings": {}
+  }
+]

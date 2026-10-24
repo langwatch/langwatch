@@ -7,6 +7,7 @@ import {
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import type { Named } from "@langwatch/module";
+import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 const positiveInteger = z.coerce.number().int().positive();
@@ -25,6 +26,29 @@ const byteBudget = (fallback: number) =>
       const parsed = Number(raw ?? "");
       return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : fallback;
     });
+
+/** Which runtime answers an evaluator: langevals, Go, or langevals with Go shadowing. */
+export const evaluatorRuntimeEngineSchema = z.enum(["python", "go", "shadow"]);
+
+export type EvaluatorRuntimeEngine = z.infer<typeof evaluatorRuntimeEngineSchema>;
+
+/** `langevals/exact_match=go,ragas/faithfulness=shadow`: one engine per evaluator type. */
+const engineOverridesSchema = z
+  .string()
+  .optional()
+  .transform((raw) =>
+    Object.fromEntries(
+      (raw ?? "")
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .map((entry) => {
+          const [evaluatorType = "", engine = ""] = entry.split("=").map((part) => part.trim());
+          return [evaluatorType, engine];
+        }),
+    ),
+  )
+  .pipe(z.record(z.string().min(1), evaluatorRuntimeEngineSchema));
 
 /**
  * Where this deployment's langevals answers. Evaluation owns the leaf; data-privacy holds the same
@@ -67,9 +91,48 @@ export const evaluationConfig = Config.define((c) => ({
     positiveInteger.max(120).default(120),
   ),
   foldCacheTtlSeconds,
+  evaluatorRuntime: {
+    /** nlpgo's base URL plus `/go/evaluators`. */
+    endpoint: c.env("EVALUATOR_RUNTIME_ENDPOINT", z.string().optional()),
+    engine: c.env("EVALUATOR_RUNTIME_ENGINE", evaluatorRuntimeEngineSchema.default("python")),
+    engineOverrides: c.env("EVALUATOR_RUNTIME_ENGINE_OVERRIDES", engineOverridesSchema),
+  },
 }));
 
 export type EvaluationServerConfig = ConfigOf<typeof evaluationConfig>;
+
+export const evaluationSecrets = {
+  /** The bearer the Go evaluator runtime checks on every call. */
+  nlpgoInternal: Secret.load("NLPGO_INTERNAL_SECRET", { optional: true }),
+} as const;
+
+/**
+ * Refuses a Go or shadow engine, by default or for one evaluator, without the
+ * runtime's address and its shared secret. The secret arrives resolved.
+ */
+export function assertEvaluatorRuntimeConfig({
+  config,
+  internalSecret,
+}: {
+  config: EvaluationServerConfig;
+  internalSecret: string | undefined;
+}): void {
+  const { endpoint, engine, engineOverrides } = config.evaluatorRuntime;
+  const engines = [engine, ...Object.values(engineOverrides)];
+  if (engines.every((each) => each === "python")) return;
+
+  const missing = [
+    ...(endpoint?.trim() ? [] : ["EVALUATOR_RUNTIME_ENDPOINT"]),
+    ...(internalSecret?.trim() ? [] : ["NLPGO_INTERNAL_SECRET"]),
+  ];
+  if (missing.length === 0) return;
+
+  throw new Error(
+    `An evaluator is routed to the Go evaluator runtime, but ${missing.join(" and ")} ` +
+      `${missing.length > 1 ? "are" : "is"} not set. Set ${missing.length > 1 ? "them" : "it"}, ` +
+      "or route every evaluator back to python.",
+  );
+}
 
 /** All a browser learns: whether this deployment can run an evaluator at all. */
 const evaluationWebConfigSchemaDefinition = z.strictObject({ langevals: z.boolean() });
@@ -83,5 +146,7 @@ export type EvaluationWebConfig = z.infer<typeof evaluationWebConfigSchema>;
 
 export const evaluationBrowserConfig = defineBrowserConfig({
   schema: evaluationWebConfigSchema,
-  project: (config: EvaluationServerConfig) => ({ langevals: Boolean(config.langevalsEndpoint) }),
+  project: (config: EvaluationServerConfig) => ({
+    langevals: Boolean(config.langevalsEndpoint || config.evaluatorRuntime.endpoint),
+  }),
 });

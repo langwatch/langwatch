@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
@@ -52,24 +52,24 @@ var httpURLRe = regexp.MustCompile("https?://[^\\s<>\"'`]+")
 // takes a copy from withMaxBytes.
 type attachmentFetcher struct {
 	client   *http.Client
-	ssrf     httpblock.SSRFOptions
+	ssrf     ssrf.Options
 	maxBytes int64
 }
 
-func newAttachmentFetcher(ssrf httpblock.SSRFOptions) *attachmentFetcher {
+func newAttachmentFetcher(policy ssrf.Options) *attachmentFetcher {
 	// Clone the default transport so standard settings (notably
 	// Proxy: http.ProxyFromEnvironment) are inherited, then only override the
 	// dialer to re-apply the SSRF policy at dial time — the same construction the
 	// HTTP block uses, so attachment fetches work in restricted-egress
 	// deployments that require an outbound proxy.
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.DialContext = httpblock.SafeDialer(ssrf)
+	transport.DialContext = ssrf.SafeDialer(policy)
 	return &attachmentFetcher{
 		client: &http.Client{
 			Timeout:   defaultAttachmentTimeout,
 			Transport: transport,
 		},
-		ssrf:     ssrf,
+		ssrf:     policy,
 		maxBytes: app.DefaultMaxAttachmentBytes,
 	}
 }
@@ -93,7 +93,7 @@ type fetchedAttachment struct {
 // fetch retrieves rawURL under the SSRF, timeout, and size guards. It returns a
 // *NodeError describing a user-facing failure when the URL cannot be fetched.
 func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedAttachment, *NodeError) {
-	if err := httpblock.CheckURL(rawURL, f.ssrf); err != nil {
+	if err := ssrf.CheckURL(rawURL, f.ssrf); err != nil {
 		return nil, attachmentError(rawURL, "is blocked for security (it resolves to a private or metadata address)", 0)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
@@ -102,7 +102,7 @@ func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedA
 	}
 	resp, err := f.client.Do(req)
 	if err != nil {
-		if errors.Is(err, httpblock.ErrSSRFBlocked) {
+		if errors.Is(err, ssrf.ErrBlocked) {
 			return nil, attachmentError(rawURL, "is blocked for security (it resolves to a private or metadata address)", 0)
 		}
 		return nil, attachmentError(rawURL, "could not be reached", 0)

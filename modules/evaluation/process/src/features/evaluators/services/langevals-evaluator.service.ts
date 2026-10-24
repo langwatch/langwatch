@@ -1,7 +1,10 @@
 import { convertTo } from "@langwatch/dataset-contract";
 import {
+  EvaluationBusyError,
   EvaluatorExecutionError,
   EvaluatorInputTooLargeError,
+  EvaluatorNotFoundError,
+  type EvaluatorRuntimeEngine,
 } from "@langwatch/evaluation-contract";
 import {
   AVAILABLE_EVALUATORS,
@@ -10,13 +13,22 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
+import { HandledError } from "@langwatch/handled-error";
+import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
+import { z } from "zod";
 
 import {
   type LangevalsChannel,
   type LangevalsPayloadStaging,
   PayloadTooLargeError,
 } from "../../../channels/langevals.channel.ts";
+import {
+  engineForEvaluator,
+  handledCodeForRuntimeRefusal,
+  isSameVerdict,
+} from "../../../rules/evaluator-runtime-engine.rules.ts";
 import { toLangevalsContexts } from "../../../rules/langevals-contexts.rules.ts";
 import type { EvaluationExecutionMetricsService } from "../../execution/services/evaluation-execution-metrics.service.ts";
 
@@ -66,14 +78,136 @@ function throwFetchFailure({
   throw error;
 }
 
+type EvaluationTelemetry = Pick<EvaluationExecutionMetricsService, "record">;
+
+/** herr's body, as the Go evaluator runtime refuses a call. */
+const runtimeRefusalSchema = z.object({
+  error: z.object({
+    code: z.string(),
+    meta: z.object({ retryAfterMs: z.number().optional() }).loose().optional(),
+  }),
+});
+
+/** The handled error a Go runtime refusal becomes, recorded and logged without its body. */
+async function runtimeRefusal({
+  response,
+  evaluatorType,
+  telemetry,
+  durationMs,
+}: {
+  response: Response;
+  evaluatorType: string;
+  telemetry: EvaluationTelemetry | undefined;
+  durationMs: number;
+}): Promise<Error> {
+  const refusal = runtimeRefusalSchema.safeParse(await response.json().catch(() => undefined));
+  const code = refusal.success ? refusal.data.error.code : undefined;
+  const retryAfterMs = refusal.success ? refusal.data.error.meta?.retryAfterMs : undefined;
+  const handledCode = handledCodeForRuntimeRefusal({ code });
+  logger.warn(
+    { evaluatorType, httpStatus: response.status, code },
+    "Evaluator runtime refused the call",
+  );
+  telemetry?.record({
+    evaluatorType,
+    status: handledCode === "evaluator_input_too_large" ? "skipped" : "error",
+    durationMs,
+  });
+
+  switch (handledCode) {
+    case "evaluator_not_found":
+      return new EvaluatorNotFoundError(evaluatorType);
+    case "evaluator_config_error":
+      return new EvaluatorConfigError("The evaluator's settings were refused", {
+        meta: { evaluatorType },
+      });
+    case "evaluator_input_too_large":
+      return new EvaluatorInputTooLargeError({ meta: { evaluatorType } });
+    case "evaluation_busy":
+      return new EvaluationBusyError({ evaluatorType, retryAfterMs });
+    case "evaluator_execution_error":
+      return new EvaluatorExecutionError("The evaluator runtime refused the call", {
+        meta: {
+          evaluatorType,
+          runtimeCode: code ?? "unknown",
+          ...(response.status === 503 ? { retryAfterMs: NOT_UP_YET_RETRY_AFTER_MS } : {}),
+        },
+        ...(response.status === 503 ? NOT_UP_YET : {}),
+      });
+  }
+}
+
+/** The error a non-retried refusal becomes: Go's herr code, or langevals' status and body. */
+async function refusedCall({
+  response,
+  engine,
+  evaluatorType,
+  telemetry,
+  durationMs,
+}: {
+  response: Response;
+  engine: "python" | "go";
+  evaluatorType: string;
+  telemetry: EvaluationTelemetry | undefined;
+  durationMs: number;
+}): Promise<Error> {
+  if (engine === "go") return runtimeRefusal({ response, evaluatorType, telemetry, durationMs });
+
+  let statusText = response.statusText;
+  try {
+    statusText = JSON.stringify(await response.json(), undefined, 2);
+  } catch {
+    // The status text remains the meaningful response summary.
+  }
+
+  if (response.status === 413) {
+    telemetry?.record({ evaluatorType, status: "skipped", durationMs });
+    return new EvaluatorInputTooLargeError({
+      meta: { evaluatorType, httpStatus: response.status },
+    });
+  }
+
+  telemetry?.record({ evaluatorType, status: "error", durationMs });
+  return new EvaluatorExecutionError(`${response.status} ${statusText}`, {
+    meta: {
+      evaluatorType,
+      httpStatus: response.status,
+      ...(response.status === 503 ? { retryAfterMs: NOT_UP_YET_RETRY_AFTER_MS } : {}),
+    },
+    ...(response.status === 503 ? NOT_UP_YET : {}),
+  });
+}
+
+/**
+ * Where the Go evaluator runtime answers, which evaluators it answers, its bearer, and the
+ * engine hop's shared secret that nlpgo asks on every /go route.
+ */
+export type EvaluatorRuntimeRouting = Readonly<{
+  endpoint: string | undefined;
+  engine: EvaluatorRuntimeEngine;
+  engineOverrides: Readonly<Record<string, EvaluatorRuntimeEngine>>;
+  internalSecret: string | undefined;
+  nlpInternalSecret: string | undefined;
+}>;
+
 /**
  * What the transport needs from the deployment: where the evaluator service
  * lives, how long a call may take and how many times a 5xx is retried.
+ * Absent `evaluatorRuntime` answers every evaluator from langevals.
  */
 type LangevalsRuntimeConfig = Readonly<{
   endpoint: string | undefined;
   maxRetries: number;
   timeoutMs: number;
+  evaluatorRuntime?: EvaluatorRuntimeRouting | undefined;
+}>;
+
+/** One call's destination: the URL, its headers and which engine answers. */
+type EvaluatorTarget = Readonly<{
+  engine: "python" | "go";
+  url: string;
+  headers: Readonly<Record<string, string>>;
+  telemetry: EvaluationTelemetry | undefined;
 }>;
 
 interface LangevalsEvaluatorInput {
@@ -102,15 +236,110 @@ export class LangevalsEvaluatorService {
   }
 
   async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
-    return this.evaluateWithRetry(params, this.config.maxRetries);
+    const routing = this.config.evaluatorRuntime;
+    const engine = routing
+      ? engineForEvaluator({
+          evaluatorType: params.evaluatorType,
+          engine: routing.engine,
+          engineOverrides: routing.engineOverrides,
+        })
+      : "python";
+    const retriesLeft = this.config.maxRetries;
+
+    if (engine === "go") {
+      return this.evaluateWithRetry({ params, target: this.goTarget(params), retriesLeft });
+    }
+
+    // As the null channel answers: a Go-only deployment composes a live channel.
+    if (!this.config.endpoint)
+      return { status: "skipped", details: "Langevals client not available" };
+
+    const python = this.evaluateWithRetry({
+      params,
+      target: this.pythonTarget(params),
+      retriesLeft,
+    });
+    if (engine === "shadow") void this.shadow({ params, python });
+    return python;
   }
 
-  private async evaluateWithRetry(
-    params: LangevalsEvaluateParams,
-    retriesLeft: number,
-  ): Promise<SingleEvaluationResult> {
-    const { evaluatorType, data, settings, env, idempotencyKey, signal } = params;
-    const url = `${this.config.endpoint}/${evaluatorType}/evaluate`;
+  private pythonTarget(params: LangevalsEvaluateParams): EvaluatorTarget {
+    return {
+      engine: "python",
+      url: `${this.config.endpoint}/${params.evaluatorType}/evaluate`,
+      headers: params.idempotencyKey ? { "Idempotency-Key": params.idempotencyKey } : {},
+      telemetry: this.telemetry,
+    };
+  }
+
+  /** No `X-LangWatch-Trace-Token` yet: minting one is a pending decision. */
+  private goTarget(params: LangevalsEvaluateParams): EvaluatorTarget {
+    return {
+      engine: "go",
+      url: `${this.config.evaluatorRuntime?.endpoint}/${params.evaluatorType}/evaluate`,
+      headers: {
+        Authorization: `Bearer ${this.config.evaluatorRuntime?.internalSecret ?? ""}`,
+        ...nlpInternalSecretHeaders({ secret: this.config.evaluatorRuntime?.nlpInternalSecret }),
+        "X-LangWatch-Project-Id": params.projectId,
+        ...(params.idempotencyKey ? { "Idempotency-Key": params.idempotencyKey } : {}),
+      },
+      telemetry: this.telemetry,
+    };
+  }
+
+  /**
+   * Calls Go beside the Python answer and logs the pair: statuses, scores and
+   * whether the verdicts agree, never entry text. No retry and no telemetry,
+   * so the shadow neither slows nor skews the live path.
+   */
+  private async shadow({
+    params,
+    python,
+  }: {
+    params: LangevalsEvaluateParams;
+    python: Promise<SingleEvaluationResult>;
+  }): Promise<void> {
+    const target = { ...this.goTarget(params), telemetry: undefined };
+    const [pythonOutcome, goOutcome] = await Promise.allSettled([
+      python,
+      this.evaluateWithRetry({ params, target, retriesLeft: 0 }),
+    ]);
+    const described = (outcome: PromiseSettledResult<SingleEvaluationResult>) =>
+      outcome.status === "fulfilled"
+        ? {
+            status: outcome.value.status,
+            score: outcome.value.status === "processed" ? outcome.value.score : undefined,
+          }
+        : {
+            status: "failed",
+            code: outcome.reason instanceof HandledError ? outcome.reason.code : "unhandled",
+          };
+
+    logger.info(
+      {
+        evaluatorType: params.evaluatorType,
+        python: described(pythonOutcome),
+        go: described(goOutcome),
+        equal:
+          pythonOutcome.status === "fulfilled" &&
+          goOutcome.status === "fulfilled" &&
+          isSameVerdict({ python: pythonOutcome.value, go: goOutcome.value }),
+      },
+      "evaluator runtime shadow comparison",
+    );
+  }
+
+  private async evaluateWithRetry({
+    params,
+    target,
+    retriesLeft,
+  }: {
+    params: LangevalsEvaluateParams;
+    target: EvaluatorTarget;
+    retriesLeft: number;
+  }): Promise<SingleEvaluationResult> {
+    const { evaluatorType, data, settings, env, signal } = params;
+    const { url, telemetry } = target;
     const startTime = performance.now();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
@@ -121,7 +350,7 @@ export class LangevalsEvaluatorService {
         url,
         kind: "evaluation",
         staging: this.staging,
-        headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
+        headers: target.headers,
         signal: withCallerSignal({ own: controller.signal, caller: signal }),
         body: evaluationBody({ evaluatorType, data, settings, env }),
       });
@@ -132,7 +361,7 @@ export class LangevalsEvaluatorService {
         timeoutMs: this.config.timeoutMs,
         evaluatorType,
         onTooLarge: () =>
-          this.telemetry?.record({
+          telemetry?.record({
             evaluatorType,
             status: "skipped",
             durationMs: performance.now() - startTime,
@@ -145,10 +374,16 @@ export class LangevalsEvaluatorService {
     if (!response.ok) {
       if (response.status >= 500 && retriesLeft > 0 && !signal?.aborted) {
         await new Promise((resolve) => setTimeout(resolve, 100));
-        return this.evaluateWithRetry(params, retriesLeft - 1);
+        return this.evaluateWithRetry({ params, target, retriesLeft: retriesLeft - 1 });
       }
 
-      return this.throwHttpFailure({ response, evaluatorType, startTime });
+      throw await refusedCall({
+        response,
+        engine: target.engine,
+        evaluatorType,
+        telemetry,
+        durationMs: performance.now() - startTime,
+      });
     }
 
     const duration = performance.now() - startTime;
@@ -156,7 +391,7 @@ export class LangevalsEvaluatorService {
     try {
       results = batchEvaluationResultSchema.parse(await response.json());
     } catch (error) {
-      this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
+      telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
       throw new EvaluatorExecutionError("Unexpected response: invalid results", {
         meta: { evaluatorType },
         ...(error instanceof Error ? { reasons: [error] } : {}),
@@ -165,49 +400,14 @@ export class LangevalsEvaluatorService {
 
     const result = results[0];
     if (!result) {
-      this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
+      telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
       throw new EvaluatorExecutionError("Unexpected response: empty results", {
         meta: { evaluatorType },
       });
     }
 
-    this.telemetry?.record({ evaluatorType, status: result.status, durationMs: duration });
+    telemetry?.record({ evaluatorType, status: result.status, durationMs: duration });
     return result;
-  }
-
-  private async throwHttpFailure({
-    response,
-    evaluatorType,
-    startTime,
-  }: {
-    response: Response;
-    evaluatorType: string;
-    startTime: number;
-  }): Promise<never> {
-    const duration = performance.now() - startTime;
-    let statusText = response.statusText;
-    try {
-      statusText = JSON.stringify(await response.json(), undefined, 2);
-    } catch {
-      // The status text remains the meaningful response summary.
-    }
-
-    if (response.status === 413) {
-      this.telemetry?.record({ evaluatorType, status: "skipped", durationMs: duration });
-      throw new EvaluatorInputTooLargeError({
-        meta: { evaluatorType, httpStatus: response.status },
-      });
-    }
-
-    this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
-    throw new EvaluatorExecutionError(`${response.status} ${statusText}`, {
-      meta: {
-        evaluatorType,
-        httpStatus: response.status,
-        ...(response.status === 503 ? { retryAfterMs: NOT_UP_YET_RETRY_AFTER_MS } : {}),
-      },
-      ...(response.status === 503 ? NOT_UP_YET : {}),
-    });
   }
 }
 
@@ -270,6 +470,8 @@ function withCallerSignal({
 }
 
 export type LangevalsEvaluateParams = Readonly<{
+  /** The tenant the Go evaluator runtime is told it evaluates for. */
+  projectId: string;
   evaluatorType: string;
   data: Record<string, unknown>;
   settings: Record<string, unknown>;
