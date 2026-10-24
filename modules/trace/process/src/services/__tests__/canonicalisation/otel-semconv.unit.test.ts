@@ -176,6 +176,64 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       });
     });
 
+    describe("when the span carries gen_ai.client.operation.time_to_first_chunk", () => {
+      /** @scenario "AI SDK 7's time to first chunk becomes the time to first token" */
+      it("canonicalises the AI SDK 7 key to gen_ai.server.time_to_first_token", () => {
+        const result = canonicalisation.canonicalizeSpanAttributes({
+          spanAttributes: {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.client.operation.time_to_first_chunk": 0.65,
+          },
+          events: [],
+          span: clientSpan,
+        });
+
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBeCloseTo(650, 5);
+        expect(result.attributes["gen_ai.client.operation.time_to_first_chunk"]).toBeUndefined();
+      });
+    });
+
+    describe("when both time-to-first-chunk keys carry valid values", () => {
+      /** @scenario "AI SDK 7's time to first chunk becomes the time to first token" */
+      it("prefers gen_ai.response.time_to_first_chunk over the client key", () => {
+        const result = canonicalisation.canonicalizeSpanAttributes({
+          spanAttributes: {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": 0.65,
+            "gen_ai.client.operation.time_to_first_chunk": 0.2,
+          },
+          events: [],
+          span: clientSpan,
+        });
+
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBeCloseTo(650, 5);
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBeUndefined();
+        expect(result.attributes["gen_ai.client.operation.time_to_first_chunk"]).toBe(0.2);
+      });
+    });
+
+    describe("when gen_ai.response.time_to_first_chunk is negative and the client key is valid", () => {
+      /** @scenario "AI SDK 7's time to first chunk becomes the time to first token" */
+      it("falls back to gen_ai.client.operation.time_to_first_chunk", () => {
+        const result = canonicalisation.canonicalizeSpanAttributes({
+          spanAttributes: {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": -1,
+            "gen_ai.client.operation.time_to_first_chunk": 0.2,
+          },
+          events: [],
+          span: clientSpan,
+        });
+
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBeCloseTo(200, 5);
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(-1);
+        expect(result.attributes["gen_ai.client.operation.time_to_first_chunk"]).toBeUndefined();
+      });
+    });
+
     describe("when an existing time_to_first_token is already present", () => {
       it("does not overwrite it with the chunk-derived value", () => {
         const result = canonicalisation.canonicalizeSpanAttributes({
