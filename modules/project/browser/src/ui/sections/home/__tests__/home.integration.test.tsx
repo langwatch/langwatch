@@ -29,7 +29,7 @@ vi.mock("../../../../behavior/home-api.ts", () => ({
     },
   },
 }));
-vi.mock("@langwatch/organization-client", async (importOriginal) => ({
+vi.mock("@langwatch/organization-client/lent", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   PendingJoinRequests: () => null,
 }));

@@ -23,7 +23,7 @@ vi.mock("../components/use-project-reach.ts", () => ({
 vi.mock("../../../../behavior/home-api.ts", () => ({
   homeApi: { plan: { getActivePlan: { useQuery: () => ({ data: { free: false } }) } } },
 }));
-vi.mock("@langwatch/organization-client", async (importOriginal) => ({
+vi.mock("@langwatch/organization-client/lent", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   PendingJoinRequests: () => null,
 }));

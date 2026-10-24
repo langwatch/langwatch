@@ -189,10 +189,14 @@ vi.mock("@langwatch/prompt-client", async (importOriginal) => ({
   ),
 }));
 
+vi.mock("@langwatch/scenario-client/lent", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ParameterLineField: () => null,
+}));
+
 vi.mock("@langwatch/scenario-client", async (importOriginal) => {
   return {
     ...(await importOriginal<object>()),
-    ParameterLineField: () => null,
     scenarioClient: {
       scenarios: {
         testAgentTurn: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },

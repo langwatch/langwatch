@@ -9,7 +9,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 const turns: unknown[] = [];
 
-vi.mock("@langwatch/scenario-client", async (importOriginal) => {
+vi.mock("@langwatch/scenario-client/lent", async (importOriginal) => {
   const { createElement } = await import("react");
   return {
     ...(await importOriginal<object>()),
@@ -23,6 +23,12 @@ vi.mock("@langwatch/scenario-client", async (importOriginal) => {
         value: props.value,
         onChange: (event: { target: { value: string } }) => props.onChange(event.target.value),
       }),
+  };
+});
+
+vi.mock("@langwatch/scenario-client", async (importOriginal) => {
+  return {
+    ...(await importOriginal<object>()),
     scenarioClient: {
       scenarios: {
         testAgentTurn: {

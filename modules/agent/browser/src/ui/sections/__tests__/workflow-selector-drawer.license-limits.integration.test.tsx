@@ -65,7 +65,7 @@ vi.mock("@langwatch/trace-client", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   SetupWithAgentButton: () => null,
 }));
-vi.mock("@langwatch/scenario-client", async (importOriginal) => ({
+vi.mock("@langwatch/scenario-client/lent", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ParameterLineField: () => null,
 }));

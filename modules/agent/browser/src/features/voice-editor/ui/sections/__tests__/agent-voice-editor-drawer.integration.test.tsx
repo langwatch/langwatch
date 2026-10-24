@@ -15,7 +15,7 @@ vi.mock(
   "@langwatch/browser-host/drawer",
   async () => (await import("./voice-editor-doubles.test-helpers.tsx")).drawerDouble,
 );
-vi.mock("@langwatch/scenario-client", async (importOriginal) => ({
+vi.mock("@langwatch/scenario-client/lent", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ...(await import("./voice-editor-doubles.test-helpers.tsx")).talkPanelDouble,
 }));

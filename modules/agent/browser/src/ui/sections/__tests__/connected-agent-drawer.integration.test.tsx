@@ -11,11 +11,15 @@ import type { ConnectedAgentBrowser } from "../../../model/agent-client.ts";
 
 const turns: unknown[] = [];
 
+vi.mock("@langwatch/scenario-client/lent", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ParameterLineField: () => null,
+}));
+
 vi.mock("@langwatch/scenario-client", async (importOriginal) => {
   const { useState } = await import("react");
   return {
     ...(await importOriginal<object>()),
-    ParameterLineField: () => null,
     scenarioClient: {
       scenarios: {
         testAgentTurn: {
