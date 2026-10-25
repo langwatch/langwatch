@@ -1,4 +1,4 @@
-export function Google({ size = 18 }: { size?: number }) {
+export function Google({ size }: { size: number }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size}>
       <path

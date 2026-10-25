@@ -6,15 +6,21 @@ import type { ReactNode } from "react";
 import { Google } from "./google-icon.tsx";
 
 /**
+ * Edge of a provider mark, in px. The box and the svg inside it both take it:
+ * WebKit draws a size-less svg flex child at 0x0.
+ */
+export const BRAND_MARK_SIZE = 18;
+
+/**
  * The mark on a method's button. A recognized provider gets its own — what
  * someone scanning the screen looks for. Everything else gets the same
  * neutral key: a guessed logo is worse than none.
  */
 const BRAND_ICONS: Record<string, ReactNode> = {
-  google: <Google />,
-  github: <GitHub size={18} />,
-  "azure-ad": <Microsoft />,
-  microsoft: <Microsoft />,
+  google: <Google size={BRAND_MARK_SIZE} />,
+  github: <GitHub size={BRAND_MARK_SIZE} />,
+  "azure-ad": <Microsoft size={BRAND_MARK_SIZE} />,
+  microsoft: <Microsoft size={BRAND_MARK_SIZE} />,
 };
 
 export function SignInMethodIcon({ method }: { method: SignInMethod }) {
@@ -25,7 +31,12 @@ export function SignInMethodIcon({ method }: { method: SignInMethod }) {
   if (!brand) return <KeyRound size={18} />;
 
   return (
-    <Box width="18px" height="18px" display="flex" alignItems="center">
+    <Box
+      boxSize={`${BRAND_MARK_SIZE}px`}
+      display="flex"
+      alignItems="center"
+      data-testid="sign-in-method-mark"
+    >
       {brand}
     </Box>
   );
@@ -44,7 +55,7 @@ export function GitHub({ size = 32 }: { size?: number }) {
   );
 }
 
-export function Microsoft({ size = 18 }: { size?: number }) {
+export function Microsoft({ size }: { size: number }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
