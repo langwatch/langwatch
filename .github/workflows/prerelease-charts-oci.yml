@@ -51,6 +51,8 @@ jobs:
     # trust signal for these prereleases, so it must not be forgeable by
     # anyone who can click Run workflow.
     if: github.ref == 'refs/heads/main'
+    env:
+      AWS_REGION: eu-central-1
     permissions:
       contents: read
       # Required to push OCI artifacts to ghcr.io.
@@ -227,7 +229,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
-          aws-region: eu-central-1
+          aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
           role-session-name: prerelease-charts-oci-${{ github.run_id }}
 
@@ -242,8 +244,8 @@ jobs:
           set -euo pipefail
           ACCOUNT_ID="$(printf '%s' "${ROLE_ARN}" | cut -d: -f5)"
           echo "::add-mask::${ACCOUNT_ID}"
-          registry="${ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com"
-          aws ecr get-login-password --region eu-central-1 \
+          registry="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          aws ecr get-login-password --region "${AWS_REGION}" \
             | helm registry login "$registry" --username AWS --password-stdin
 
           for chart_name in $ECR_CHARTS; do
@@ -254,9 +256,20 @@ jobs:
               echo "::error::expected one packaged ${chart_name} chart, found ${#packages[@]}"
               exit 1
             fi
-            push_log="$(helm push "${packages[0]}" "oci://${registry}/langwatch-charts" 2>&1)"
+            # Print helm's output before testing its status: under `set -e` a
+            # failing `push_log="$(...)"` would exit with the registry's error
+            # unseen.
+            if ! push_log="$(helm push "${packages[0]}" "oci://${registry}/langwatch-charts" 2>&1)"; then
+              echo "$push_log"
+              echo "::error::helm could not push ${chart_name} to the artifacts registry"
+              exit 1
+            fi
             echo "$push_log"
             digest="$(printf '%s' "$push_log" | awk '$1=="Digest:"{print $2; exit}')"
+            if ! printf '%s' "$digest" | grep -qE '^sha256:[0-9a-f]{64}$'; then
+              echo "::error::unexpected digest '${digest}' for ${chart_name}; the deploy pins this value"
+              exit 1
+            fi
             version="$(basename "${packages[0]}" .tgz)"; version="${version#"${chart_name}"-}"
             echo "- ECR \`langwatch-charts/${chart_name}:${version}\` \`${digest}\`" >> "$GITHUB_STEP_SUMMARY"
           done
