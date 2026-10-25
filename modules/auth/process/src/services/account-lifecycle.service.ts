@@ -5,6 +5,7 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import {
   UserAccountAccessDeniedError,
+  UserPlatformOperatorEmailLockedError,
   type UpdateUserEmailInput,
   type UserApi,
   type UserCaller,
@@ -64,9 +65,16 @@ export class AccountLifecycleService {
     await this.deactivate({ id: userId, actor: { type: "user", id: caller.operatorId } });
   }
 
-  /** Sessions cache the address (invite accept compares it), so a real change ends them all. */
+  /**
+   * Sessions cache the address (invite accept compares it), so a real change ends them all. An
+   * operator's address never really changes: the staff rule was checked against it at the grant.
+   */
   async changeEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
     const before = await this.users.findById({ id: input.id });
+    const changes = (before?.email ?? "").toLowerCase() !== input.email.trim().toLowerCase();
+    if (changes && (await this.users.isOperator({ userId: input.id }))) {
+      throw new UserPlatformOperatorEmailLockedError(input.id);
+    }
     const updated = await this.users.updateEmail(input);
     if ((before?.email ?? "").toLowerCase() !== (updated.email ?? "").toLowerCase()) {
       await this.credentials.revokeAllBrowserSessions({ userId: input.id });

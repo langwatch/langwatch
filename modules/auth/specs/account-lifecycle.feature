@@ -93,6 +93,14 @@ Feature: Account changes that end credentials
       Then no browser session is revoked
 
     @unit
+    Scenario: A platform operator's address does not change while they hold the role
+      Given an account that holds the platform-operator role
+      When auth changes its address to a different one
+      Then it is refused with code user_platform_operator_email_locked
+      And the address is not written
+      And no browser session is revoked
+
+    @unit
     Scenario: An address change for an unknown account revokes nothing
       When auth changes the address of an account that does not exist
       Then it is refused with code user_not_found

@@ -19,6 +19,7 @@ import {
 } from "./join-request-emails.tsx";
 import { licenseEmailTemplate } from "./license-email.tsx";
 import { organizationMfaRequirementEmailTemplate } from "./organization-mfa-requirement-email.tsx";
+import { platformOperatorChangeEmailTemplate } from "./platform-operator-change-email.tsx";
 import type { MailTemplate } from "./registry.ts";
 import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
 import { signUpVerificationEmailTemplate } from "./sign-up-verification-email.tsx";
@@ -51,6 +52,7 @@ export const mailTemplates: readonly MailTemplate[] = [
   organizationMfaRequirementEmailTemplate,
   licenseEmailTemplate,
   upgradeAlertEmailTemplate,
+  platformOperatorChangeEmailTemplate,
   connectedStatementEmailTemplate,
   budgetIncreaseRequestEmailTemplate,
   usageLimitEmailTemplate,

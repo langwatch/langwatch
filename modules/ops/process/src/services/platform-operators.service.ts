@@ -1,5 +1,7 @@
 import type { LedgerActor } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { MailRender, PlatformOperatorChangeEmailProps } from "@langwatch/mail";
+import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   OpsImpersonatedOperatorRefusedError,
@@ -51,6 +53,16 @@ type PlatformOperatorSeedRecorder = Readonly<{
   }): Promise<void>;
 }>;
 
+/** Where every operator is told of a grant or a revoke, and what the mail calls this install. */
+export type PlatformOperatorChangeNotice = Readonly<{
+  mail: Pick<NotificationApi, "sendEmail">;
+  renderer: Pick<MailRender, "renderPlatformOperatorChange">;
+  installation: string;
+  operatorsUrl: string;
+}>;
+
+const TASK_ACTOR_NAME = "The grant-platform-operator task";
+
 type PlatformOperatorsServiceOptions = Readonly<{
   authz: Pick<
     AuthzApi,
@@ -60,6 +72,7 @@ type PlatformOperatorsServiceOptions = Readonly<{
   organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "findAdministrators">;
   /** `cloud` is the seed's own: a deployment LangWatch runs. */
   deployment: Readonly<{ cloud: boolean; isLocalDevelopment: boolean }>;
+  notice: PlatformOperatorChangeNotice;
 }>;
 
 /**
@@ -102,12 +115,21 @@ export class PlatformOperatorsService {
   }): Promise<OpsPlatformOperator> {
     const granter = signedInOperator(operator);
     const user = await this.#eligibleUserOf(email);
+    const alreadyHeld = await this.#holds(user.id);
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "user", id: granter.id },
       actor: { type: "user", id: granter.id },
       source: "grants-service",
     });
+    if (!alreadyHeld) {
+      await this.#tellOperators({
+        change: "granted",
+        grantId: held.grantId,
+        subject: user,
+        actorName: nameOf(granter),
+      });
+    }
     return { ...held, name: user.name, email: user.email };
   }
 
@@ -119,22 +141,38 @@ export class PlatformOperatorsService {
     operator: OpsOperator | null;
   }): Promise<void> {
     const revoker = signedInOperator(operator);
+    const target = (await this.options.authz.listPlatformOperators()).find(
+      (holder) => holder.grantId === grantId,
+    );
     await this.options.authz.revokePlatformOperator({
       grantId,
       caller: { type: "user", id: revoker.id },
       actor: { type: "user", id: revoker.id },
     });
+    const subject = target ? await this.options.users.findById({ id: target.userId }) : null;
+    if (subject) {
+      await this.#tellOperators({ change: "revoked", grantId, subject, actorName: nameOf(revoker) });
+    }
   }
 
   /** The recovery task: lockout on self-hosted, staff at the cloud cutover. */
   async grantAsSystem({ email }: { email: string }): Promise<OpsPlatformOperator> {
     const user = await this.#eligibleUserOf(email);
+    const alreadyHeld = await this.#holds(user.id);
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "system" },
       actor: PLATFORM_OPERATOR_TASK_ACTOR,
       source: "grants-service",
     });
+    if (!alreadyHeld) {
+      await this.#tellOperators({
+        change: "granted",
+        grantId: held.grantId,
+        subject: user,
+        actorName: TASK_ACTOR_NAME,
+      });
+    }
     return { ...held, name: user.name, email: user.email };
   }
 
@@ -299,6 +337,61 @@ export class PlatformOperatorsService {
       .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id;
   }
 
+  async #holds(userId: string): Promise<boolean> {
+    return (await this.options.authz.listPlatformOperators()).some(
+      (holder) => holder.userId === userId,
+    );
+  }
+
+  /**
+   * Tells every holder, and the person whose role changed, so a grant nobody expected is seen
+   * by someone who can revoke it. The change already stands: a failed send is logged, not thrown.
+   */
+  async #tellOperators({
+    change,
+    grantId,
+    subject,
+    actorName,
+  }: {
+    change: PlatformOperatorChangeEmailProps["change"];
+    grantId: string;
+    subject: UserProfile;
+    actorName: string;
+  }): Promise<void> {
+    const { mail, renderer, installation, operatorsUrl } = this.options.notice;
+    try {
+      const { subject: title, html } = await renderer.renderPlatformOperatorChange({
+        installation,
+        change,
+        subjectName: subject.name ?? subject.email ?? subject.id,
+        subjectEmail: subject.email,
+        actorName,
+        operatorsUrl,
+      });
+      const holders = await this.list();
+      const recipients = new Set(
+        [...holders.map((holder) => holder.email), subject.email].flatMap((email) =>
+          email ? [email.toLowerCase()] : [],
+        ),
+      );
+      await Promise.all(
+        [...recipients].map((to) =>
+          mail.sendEmail({
+            to,
+            subject: title,
+            html,
+            idempotencyKey: `platform-operator-${change}:${grantId}:${to}`,
+          }),
+        ),
+      );
+    } catch (error) {
+      logger.error(
+        { error, change, userId: subject.id },
+        "the platform operators were not told of a role change",
+      );
+    }
+  }
+
   /**
    * Who the page and the task may grant: an active account with a verified address, since
    * whoever registered an unclaimed one first would operate; where grants are staff-only, staff.
@@ -323,6 +416,11 @@ function waiting(reason: string): PlatformOperatorSeedOutcome {
 function nobody(reason: string): PlatformOperatorSeedOutcome {
   logger.warn({ reason }, `no platform operator was seeded; ${RECOVERY_HINT}`);
   return { via: "none", userIds: [], reason };
+}
+
+/** How the mail names whoever changed the role: their name, else their address. */
+function nameOf(operator: OpsOperator): string {
+  return operator.name ?? operator.email ?? "Another platform operator";
 }
 
 /** Grant and revoke need a real signed-in session: an impersonation never changes who operates. */

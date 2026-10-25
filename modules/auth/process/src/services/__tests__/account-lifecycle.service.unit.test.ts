@@ -183,6 +183,24 @@ describe("AccountLifecycleService", () => {
       expect(steps).toEqual([["user.updateEmail", "user-1", "ADA@example.com"]]);
     });
 
+    /** @scenario "A platform operator's address does not change while they hold the role" */
+    it("refuses an operator's new address, and writes and revokes nothing", async () => {
+      const { steps, service } = setup({ operators: ["user-1"] });
+
+      await expect(
+        service.changeEmail({ id: "user-1", email: "ada@customer.example" }),
+      ).rejects.toMatchObject({ code: "user_platform_operator_email_locked" });
+      expect(steps).toEqual([]);
+    });
+
+    it("lets an operator's address change only its letter case", async () => {
+      const { steps, service } = setup({ operators: ["user-1"] });
+
+      await service.changeEmail({ id: "user-1", email: "ADA@example.com" });
+
+      expect(steps).toEqual([["user.updateEmail", "user-1", "ADA@example.com"]]);
+    });
+
     /** @scenario "An address change for an unknown account revokes nothing" */
     it("refuses with user_not_found and revokes nothing", async () => {
       const { steps, service } = setup({ stored: null });

@@ -929,6 +929,14 @@ export class OpsModule implements OpsApi {
         cloud: config.isSaas || cloudOps,
         isLocalDevelopment: config.nodeEnvironment === "development",
       },
+      notice: {
+        mail: dependencies.notifications,
+        renderer: ReactEmailMailRenderer.create(),
+        installation: URL.canParse(config.publicBaseUrl ?? "")
+          ? new URL(config.publicBaseUrl ?? "").host
+          : "this installation",
+        operatorsUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/operators`,
+      },
     });
     const app = OpsModule.fromInfrastructure({
       infrastructure,
