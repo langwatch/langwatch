@@ -233,6 +233,11 @@ jobs:
           role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
           role-session-name: prerelease-charts-oci-${{ github.run_id }}
 
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
       - name: Push the langyagent chart to ECR
         env:
           ROLE_ARN: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
@@ -248,28 +253,5 @@ jobs:
           aws ecr get-login-password --region "${AWS_REGION}" \
             | helm registry login "$registry" --username AWS --password-stdin
 
-          for chart_name in $ECR_CHARTS; do
-            shopt -s nullglob
-            packages=(.oci-packages/"${chart_name}"-*.tgz)
-            shopt -u nullglob
-            if [ "${#packages[@]}" -ne 1 ]; then
-              echo "::error::expected one packaged ${chart_name} chart, found ${#packages[@]}"
-              exit 1
-            fi
-            # Print helm's output before testing its status: under `set -e` a
-            # failing `push_log="$(...)"` would exit with the registry's error
-            # unseen.
-            if ! push_log="$(helm push "${packages[0]}" "oci://${registry}/langwatch-charts" 2>&1)"; then
-              echo "$push_log"
-              echo "::error::helm could not push ${chart_name} to the artifacts registry"
-              exit 1
-            fi
-            echo "$push_log"
-            digest="$(printf '%s' "$push_log" | awk '$1=="Digest:"{print $2; exit}')"
-            if ! printf '%s' "$digest" | grep -qE '^sha256:[0-9a-f]{64}$'; then
-              echo "::error::unexpected digest '${digest}' for ${chart_name}; the deploy pins this value"
-              exit 1
-            fi
-            version="$(basename "${packages[0]}" .tgz)"; version="${version#"${chart_name}"-}"
-            echo "- ECR \`langwatch-charts/${chart_name}:${version}\` \`${digest}\`" >> "$GITHUB_STEP_SUMMARY"
-          done
+          # shellcheck disable=SC2086 # ECR_CHARTS is a space-separated list
+          go run ./cmd/chartpush -registry "$registry" $ECR_CHARTS

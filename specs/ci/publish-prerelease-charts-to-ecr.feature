@@ -4,13 +4,16 @@ Feature: Publish the prerelease charts LangWatch Cloud deploys to the artifacts 
   So that a deploy pulls both its image and its chart from one registry with one credential
 
   # These scenarios describe the ECR steps of
-  # .github/workflows/prerelease-charts-oci.yml. They call helm and the
-  # registry, which no test suite here can run, so they are @unimplemented and
-  # are proved by the first run on main. Self-hosters are unaffected: they
+  # .github/workflows/prerelease-charts-oci.yml. The push is
+  # `go run ./cmd/chartpush` (logic in tools/chartpush), bound by
+  # tools/chartpush/chartpush_test.go against a stub helm.
+  # That nothing signs the ECR copy is the workflow's own shape, which no test
+  # suite can run: it is @unimplemented and proved by the first run on main.
+  # Self-hosters are unaffected: they
   # install the tagged releases from the public Helm repo, and every prerelease
   # is still published and signed on GHCR.
 
-  @unimplemented
+  @unit
   Scenario: A merge to main publishes the langyagent prerelease chart to ECR
     Given a merge to main changes a chart
     When prerelease-charts-oci runs for that commit
@@ -25,13 +28,13 @@ Feature: Publish the prerelease charts LangWatch Cloud deploys to the artifacts 
     Then no signature names the artifacts registry, so its address stays out of the public transparency log
     And the GHCR copy of the same version is signed and verified
 
-  @unimplemented
+  @unit
   Scenario: A missing or ambiguous chart package fails the run
     Given the packaging step produced no langwatch-langyagent package, or more than one
     When prerelease-charts-oci pushes to the artifacts registry
     Then it fails, naming the chart and how many packages it found
 
-  @unimplemented
+  @unit
   Scenario: A rejected push fails the run with the registry's reason
     Given the artifacts registry refuses the push
     When prerelease-charts-oci pushes the langyagent chart
