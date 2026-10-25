@@ -52,17 +52,16 @@ function answerWith(body: unknown) {
   );
 }
 
-function answerStatus(status: number, body = "failed") {
+function answerStatus(status: number, body: string) {
   const fetchMock = vi.fn(() => Promise.resolve(new Response(body, { status })));
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
 
 function failFetchWith(error: Error) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(() => Promise.reject(error)),
-  );
+  const fetchMock = vi.fn(() => Promise.reject(error));
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 afterEach(() => {
@@ -168,12 +167,9 @@ describe("LangevalsEvaluatorService", () => {
     describe("when our own call to it times out", () => {
       /** @scenario "An evaluator service that timed out is recorded as an error and not called again" */
       it("calls it once and fails not retryable, saying the evaluator timed out", async () => {
-        const fetchMock = vi.fn(() =>
-          Promise.reject(
-            Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
-          ),
+        const fetchMock = failFetchWith(
+          Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
         );
-        vi.stubGlobal("fetch", fetchMock);
 
         const error = await evaluationFailure({ maxRetries: 3 });
 

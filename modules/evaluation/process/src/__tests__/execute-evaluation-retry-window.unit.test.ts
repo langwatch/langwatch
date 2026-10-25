@@ -31,6 +31,7 @@ describe("an evaluation whose evaluator service is not up", () => {
     /**
      * @scenario "An evaluator called before the evaluator service is up is retried, not recorded as a failure"
      * @scenario "Each failed attempt records an attempt event with its number, error and next try"
+     * @scenario "An evaluator service that is briefly unavailable is called again a bounded number of times"
      */
     it("records attempt 1 and sends attempt 2 after five seconds, from the same first try", async () => {
       const deps = buildExecutionDeps({ executionError: notUpYet() });
