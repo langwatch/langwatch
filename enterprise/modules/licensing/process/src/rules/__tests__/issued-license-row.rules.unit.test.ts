@@ -67,6 +67,8 @@ describe("blankIssuedLicenseRow", () => {
       reportedMembersLite: null,
       virtualKeyId: null,
       seatsRaisedFrom: null,
+      kind: "standard",
+      testingOrganizationId: null,
     });
   });
 });

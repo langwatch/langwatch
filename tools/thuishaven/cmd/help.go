@@ -49,6 +49,8 @@ EXAMPLES
     haven db seed demo           # reseed in place, dropping nothing
     haven pr 4913 --throwaway    # a PR in a sandbox that quitting destroys
     haven down --destroy --yes   # stop the stack and drop its databases
+    haven login                  # once per machine: sign in to Cloud for testing licenses
+    haven up --testing-license   # also ask Cloud for this stack's testing license
 
 MORE
     haven help <command>         # what it does, and every flag it takes (haven help sim mail)
@@ -254,6 +256,15 @@ var envHelpText = `Environment variables.
                                  memory judge (INSTANT_EVAL_CLASSIFIER=memory); modular
                                  checkouts only, from the next haven up. Default 0.
     (also LANGWATCH_HAVEN_CH_MEMORY_MB and HAVEN_REDIS_MAXMEMORY_MB, above.)
+
+  Testing licenses (read from the process environment only)
+    HAVEN_CLOUD_URL=<url>        LangWatch Cloud's address for haven login and
+                                 testing licenses (default https://app.langwatch.ai;
+                                 http only to this machine).
+    LANGWATCH_TESTING_LICENSE_TOKEN=<token>
+                                 A service token for CI, used before the stored
+                                 sign-in. Never printed. Nothing contacts Cloud
+                                 unless up --testing-license or haven license asks.
 
   Containers, langy and observability
     HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + container-tier obs run on

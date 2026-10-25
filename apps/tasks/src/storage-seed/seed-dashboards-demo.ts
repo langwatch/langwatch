@@ -17,7 +17,6 @@ import { ensureVirtualKey, sendSpend, spendRecordsFor } from "./dashboards-demo-
 import { DemoHttp } from "./dashboards-demo-http.ts";
 import { findDemoMember, seedDashboardsDemoIdentity } from "./dashboards-demo-identity.ts";
 import {
-  DASHBOARDS_DEMO_ORGANIZATION,
   DASHBOARDS_DEMO_PROJECTS,
   type DashboardsDemoAgent,
   type DashboardsDemoProject,
@@ -38,6 +37,11 @@ import {
   demoTracesPerDay,
   type DemoTurn,
 } from "./dashboards-demo-traffic.ts";
+import {
+  LOCAL_DEV_ADMIN_LOCAL_PART,
+  resolveSeedEmailDomain,
+  seedEmailAddress,
+} from "./seed-identity.ts";
 
 const logger = createLogger("langwatch:tasks:dashboards-demo-seed");
 
@@ -74,6 +78,8 @@ export interface DashboardsDemoRun {
   now: number;
   todayStart: number;
   gatewaySecret: string | undefined;
+  /** The demo organization the identity step found or created. */
+  organizationId: string;
 }
 
 export async function seedDashboardsDemo({
@@ -92,9 +98,13 @@ export async function seedDashboardsDemo({
   if (!database) throw new Error("This task needs DATABASE_URL");
   const prisma = database.client;
 
-  const member = await findDemoMember({ prisma, email: userEmail });
+  const adminEmail = seedEmailAddress({
+    localPart: LOCAL_DEV_ADMIN_LOCAL_PART,
+    domainOverride: resolveSeedEmailDomain({ environment }),
+  });
+  const member = await findDemoMember({ prisma, email: userEmail, adminEmail });
   // The grants are authz commands, so the tasks app boots to send them, as the storage seed does.
-  await withTasksApp({
+  const { organizationId } = await withTasksApp({
     use: (app) =>
       seedDashboardsDemoIdentity({ prisma, authz: app.service(AuthzApi), userId: member.id }),
   });
@@ -120,6 +130,7 @@ export async function seedDashboardsDemo({
       now,
       todayStart: Math.floor(now / DAY_MS) * DAY_MS,
       gatewaySecret,
+      organizationId,
     },
     langyMirror: {
       projectId: await chain.fetch("LANGY_MIRROR_PROJECT_ID"),
@@ -247,6 +258,7 @@ async function seedProject({
           project,
           agent,
           turns,
+          organizationId: run.organizationId,
           secret: spendSecret,
           held: heldSpend,
         })
@@ -462,6 +474,7 @@ async function sendGatewaySpend({
   project,
   agent,
   turns,
+  organizationId,
   secret,
   held,
 }: {
@@ -469,6 +482,7 @@ async function sendGatewaySpend({
   project: DashboardsDemoProject;
   agent: DashboardsDemoAgent;
   turns: readonly DemoTurn[];
+  organizationId: string;
   /** The secret the gateway signs its spend drain with. */
   secret: string;
   held: ReadonlySet<string>;
@@ -477,7 +491,7 @@ async function sendGatewaySpend({
   const records = spendRecordsFor({
     turns,
     projectId: project.id,
-    organizationId: DASHBOARDS_DEMO_ORGANIZATION.id,
+    organizationId,
     virtualKeyId: key.id,
     held,
   });

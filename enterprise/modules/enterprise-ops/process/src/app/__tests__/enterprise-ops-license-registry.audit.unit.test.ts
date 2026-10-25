@@ -18,6 +18,7 @@ import { testPeer } from "@langwatch/process/testing";
  * @see specs/self-hosting/connected-services/license-registry.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { enterpriseOpsProcessModule } from "../../enterprise-ops.module.ts";
@@ -52,6 +53,8 @@ const license: IssuedLicenseView = {
   issuedAt: "2026-09-01T00:00:00.000Z",
   expiresAt: "2027-09-01T00:00:00.000Z",
   source: "BACKOFFICE",
+  kind: "standard",
+  testingOrganizationId: null,
   issuedById: "user_olive",
   revokedAt: null,
   revokedById: null,
@@ -118,6 +121,10 @@ async function build(registry: Partial<Registry> = {}) {
       testPeer({ token: OpsApi, instance: ops }),
       testPeer({ token: LicensingApi, instance: licensing }),
       testPeer({ token: AuditLogApi, instance: auditLog }),
+      testPeer({
+        token: UserApi,
+        instance: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      }),
     ],
   });
   const app = runtime.service(EnterpriseOpsApi);
@@ -175,7 +182,14 @@ describe("the Cloud admin license registry", () => {
         expect.objectContaining({
           userId: "user_olive",
           action: "licenseRegistry.getAll",
-          args: { page: 0, pageSize: 25, hasSearch: true, status: "active", audience: "all" },
+          args: {
+            page: 0,
+            pageSize: 25,
+            hasSearch: true,
+            status: "active",
+            audience: "all",
+            includeTesting: false,
+          },
           targetKind: "issuedLicense",
         }),
       ]);

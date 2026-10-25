@@ -25,7 +25,12 @@ const issuedLicenseViewSchemaDefinition = z.object({
   issuedAt: z.string(),
   expiresAt: z.string(),
   source: issuedLicenseSourceSchema,
+  /** `standard`, `testing` (ADR-180) or a kind a newer release wrote, shown as stored. */
+  kind: z.string(),
+  testingOrganizationId: z.string().nullable(),
   issuedById: z.string().nullable(),
+  /** The issuer's name; null when that person is gone, absent where a read names nobody. */
+  issuedByName: z.string().nullable().optional(),
   revokedAt: z.string().nullable(),
   revokedById: z.string().nullable(),
   revokedReason: z.string().nullable(),
@@ -78,6 +83,8 @@ const listIssuedLicensesInputSchemaDefinition = z.object({
   status: z.enum(["active", "inactive"]).optional(),
   /** Absent lists both: customers' licenses, or internal test ones. */
   audience: z.enum(["customer", "internal"]).optional(),
+  /** Testing licenses (ADR-180) are left out unless asked for. */
+  includeTesting: z.boolean().optional(),
 });
 export interface ListIssuedLicensesInputSchema extends Named<
   typeof listIssuedLicensesInputSchemaDefinition

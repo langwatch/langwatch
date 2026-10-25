@@ -26,10 +26,12 @@ type flagSpec struct {
 	long       string // "--follow"
 	short      string // "-f" or "" — a short means ONE thing across the CLI
 	takesValue bool
-	isSwitch   bool   // bare means on; "--flag=false" turns it off (a default-on switch)
-	value      string // help placeholder for the value, e.g. "<dur>"
-	summary    string
-	hidden     bool // internal (pr's --launch): accepted, absent from help
+	// optionalValue lets a value flag stand bare: the value is read only from --flag=value.
+	optionalValue bool
+	isSwitch      bool   // bare means on; "--flag=false" turns it off (a default-on switch)
+	value         string // help placeholder for the value, e.g. "<dur>"
+	summary       string
+	hidden        bool // internal (pr's --launch): accepted, absent from help
 }
 
 // commandSpec is one entry of the CLI surface.
@@ -140,7 +142,7 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 				inv.flags[f.long] = embedded
 				continue
 			}
-			if f.takesValue {
+			if f.takesValue && !f.optionalValue {
 				if i+1 >= len(rest) {
 					return inv, fmt.Errorf("haven %s: %s needs a value %s", spec.display(), f.long, f.value)
 				}
@@ -248,8 +250,12 @@ var baseTable = []commandSpec{
 			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 			{long: "--no-seed", summary: "skip the auto-seed of an empty stack (HAVEN_AUTO_SEED=0 does too)"},
 			{long: "--no-mail", summary: "the app sees no mail provider, even one .env names (HAVEN_NO_MAIL=1 does too); not sticky"},
+			{long: "--testing-license", takesValue: true, optionalValue: true, value: "<dur>", summary: "once up, ask LangWatch Cloud for this stack's testing license (needs `haven login`); =<dur> sets its length, e.g. =36h or =5d. Without it nothing contacts Cloud"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
+			if err := licenseAskedAtUp(inv); err != nil {
+				return err
+			}
 			if inv.has("--no-seed") {
 				disableAutoSeed()
 			}
@@ -307,6 +313,7 @@ var baseTable = []commandSpec{
 			if err := d.orch.Up(ctx, d.params, d.opts); err != nil {
 				return err
 			}
+			defer testingLicenseAfterUp(ctx, d, inv)()
 			return followAsOwner(ctx, d)
 		},
 	},
@@ -1002,7 +1009,10 @@ func helpFlagLabel(f flagSpec) string {
 	if f.short != "" {
 		label = f.short + "/" + f.long
 	}
-	if f.takesValue {
+	switch {
+	case f.optionalValue:
+		label += "[=" + f.value + "]"
+	case f.takesValue:
 		label += " " + f.value
 	}
 	return label

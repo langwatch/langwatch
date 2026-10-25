@@ -33,6 +33,7 @@ import {
 } from "../../behavior/use-device-code-lookup.ts";
 import {
   CLI_LEAD_SOURCE,
+  TESTING_LICENSE_REFUSED_CODE,
   useApiKeyHost,
   type ApiKeyHostApi,
   type ApiKeyOrganization,
@@ -73,6 +74,10 @@ function userCodeOf(reading: ApiKeyRouteReading): string {
   return reading.query.user_code ?? "";
 }
 
+function deviceLabelOf(lookup: DeviceCodeLookupState): string | undefined {
+  return lookup.kind === "ready" ? lookup.deviceLabel : undefined;
+}
+
 function expiryTextFor(lookup: DeviceCodeLookupState): string | null {
   if (lookup.kind !== "ready") return null;
   const seconds = Math.max(
@@ -83,18 +88,53 @@ function expiryTextFor(lookup: DeviceCodeLookupState): string | null {
   return minutes > 0 ? `Expires in ~${minutes} min` : `Expires in ${seconds}s`;
 }
 
+const UNNAMED_DEVICE = "haven on the device that showed this code";
+
+function testingLicenseExplanation({ deviceLabel }: { deviceLabel: string | undefined }): string {
+  return `${deviceLabel ?? UNNAMED_DEVICE} will be able to issue developer testing licenses in your name, for as long as you hold ops permissions on LangWatch Cloud.`;
+}
+
+function subTitleFor({ credentialType }: { credentialType: CliCredentialType }): string {
+  if (credentialType === "project_api_key") return "The CLI is requesting a project SDK API key";
+  if (credentialType === "testing_license") {
+    return "Allows developer testing licenses to be issued in your name";
+  }
+  return "Signs in this device for AI-tool wrappers and governance commands";
+}
+
+function introFor({
+  credentialType,
+  deviceLabel,
+}: {
+  credentialType: CliCredentialType;
+  deviceLabel: string | undefined;
+}): string {
+  if (credentialType === "testing_license") return testingLicenseExplanation({ deviceLabel });
+  const requestedBy = deviceLabel ? ` Requested by ${deviceLabel}.` : "";
+  if (credentialType === "project_api_key") {
+    return `Pick a project, its API key flows back to your terminal automatically, with no copy-paste.${requestedBy}`;
+  }
+  return `Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands.${requestedBy}`;
+}
+
+const TESTING_LICENSE_REFUSED_MESSAGE =
+  "Only people with ops permissions on LangWatch Cloud can approve this. Ask someone who has them, or deny this request and sign in without a testing license.";
+
 /** A project login names its project; a device session carries its scopes and permissions. */
 function approvalSelection({
+  isTestingLicense,
   requiresProject,
   selectedProjectId,
   selectedScopes,
   permissions,
 }: {
+  isTestingLicense: boolean;
   requiresProject: boolean;
   selectedProjectId: string | null;
   selectedScopes: ScopeTriadEntry[];
   permissions: string[];
 }): Pick<CliDeviceApproval, "projectId" | "keySelection"> {
+  if (isTestingLicense) return {};
   if (requiresProject) return selectedProjectId ? { projectId: selectedProjectId } : {};
   return {
     keySelection: {
@@ -122,7 +162,13 @@ async function approveDeviceLogin({
   projectName: string | undefined;
 }): Promise<ActionState> {
   const result = await host.approveDeviceCode(approval);
-  if (result.outcome === "failed") return { kind: "error", message: result.message };
+  if (result.outcome === "failed") {
+    const isRefusal = result.code === TESTING_LICENSE_REFUSED_CODE;
+    return {
+      kind: "error",
+      message: isRefusal ? TESTING_LICENSE_REFUSED_MESSAGE : result.message,
+    };
+  }
   return {
     kind: "success",
     organizationId: approval.organizationId,
@@ -195,6 +241,7 @@ function useCliAuthRedirects({
  */
 function isApprovalIncomplete({
   selectedOrgId,
+  isTestingLicense,
   requiresProject,
   selectedProjectId,
   isLoadingBindings,
@@ -204,6 +251,7 @@ function isApprovalIncomplete({
   isManagementBlocked,
 }: {
   selectedOrgId: string | null;
+  isTestingLicense: boolean;
   requiresProject: boolean;
   selectedProjectId: string | null;
   isLoadingBindings: boolean;
@@ -213,6 +261,7 @@ function isApprovalIncomplete({
   isManagementBlocked: boolean;
 }): boolean {
   if (!selectedOrgId) return true;
+  if (isTestingLicense) return false;
   if (requiresProject) return !selectedProjectId;
   return (
     isLoadingBindings ||
@@ -320,8 +369,10 @@ export default function CliAuthScreen() {
   const credentialType: CliCredentialType =
     lookup.kind === "ready" ? lookup.credentialType : "device_session";
   const requiresProject = credentialType === "project_api_key";
+  const isTestingLicense = credentialType === "testing_license";
   // `langwatch login --management` asked for management access on the key.
-  const requestsManagement = lookup.kind === "ready" && !requiresProject && lookup.management;
+  const choosesKeyAccess = credentialType === "device_session";
+  const requestsManagement = lookup.kind === "ready" && choosesKeyAccess && lookup.management;
 
   // The user's own role bindings in the picked org: the ceiling the CLI key
   // can never exceed. Drives the scope defaults and which permission rows
@@ -354,6 +405,7 @@ export default function CliAuthScreen() {
 
   const isSelectionIncomplete = isApprovalIncomplete({
     selectedOrgId,
+    isTestingLicense,
     requiresProject,
     selectedProjectId,
     isLoadingBindings: myBindings.isLoading,
@@ -382,6 +434,7 @@ export default function CliAuthScreen() {
           userCode,
           organizationId: selectedOrgId,
           ...approvalSelection({
+            isTestingLicense,
             requiresProject,
             selectedProjectId,
             selectedScopes: keyScopes.selectedScopes,
@@ -408,11 +461,7 @@ export default function CliAuthScreen() {
   return (
     <CliAuthContainer
       title={requiresProject ? "Connect a project to the CLI" : "Authorize the LangWatch CLI"}
-      subTitle={
-        requiresProject
-          ? "The CLI is requesting a project SDK API key"
-          : "Signs in this device for AI-tool wrappers and governance commands"
-      }
+      subTitle={subTitleFor({ credentialType })}
     >
       <VStack align="stretch" gap={6}>
         <LookupStatus userCode={userCode} lookup={lookup} />
@@ -420,7 +469,8 @@ export default function CliAuthScreen() {
         {isApprovalReady && !isCodeConfirmed && (
           <CodeConfirmation
             userCode={userCode}
-            requiresProject={requiresProject}
+            credentialType={credentialType}
+            deviceLabel={deviceLabelOf(lookup)}
             expiryText={expiryTextFor(lookup)}
             isSubmitting={isSubmitting}
             onConfirm={() => setConfirmedUserCode(userCode)}
@@ -448,7 +498,7 @@ export default function CliAuthScreen() {
               />
             )}
 
-            {!requiresProject && (
+            {choosesKeyAccess && (
               <>
                 <CliKeyScopesField
                   organizationId={selectedOrgId}
@@ -473,7 +523,7 @@ export default function CliAuthScreen() {
               </>
             )}
 
-            {myBindings.isError && (
+            {myBindings.isError && choosesKeyAccess && (
               <StatusCard palette="red" icon={TriangleAlert} title="Couldn't read your access">
                 The key can only carry the access you hold, so it can't be approved until that
                 loads. Reload and try again.
@@ -561,14 +611,16 @@ function LookupStatus({ userCode, lookup }: { userCode: string; lookup: DeviceCo
 /** Step one, the phishing check: the code shown here must match the terminal's. */
 function CodeConfirmation({
   userCode,
-  requiresProject,
+  credentialType,
+  deviceLabel,
   expiryText,
   isSubmitting,
   onConfirm,
   onDeny,
 }: {
   userCode: string;
-  requiresProject: boolean;
+  credentialType: CliCredentialType;
+  deviceLabel: string | undefined;
   expiryText: string | null;
   isSubmitting: boolean;
   onConfirm: () => void;
@@ -577,9 +629,7 @@ function CodeConfirmation({
   return (
     <>
       <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-        {requiresProject
-          ? "Pick a project, its API key flows back to your terminal automatically, with no copy-paste."
-          : "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
+        {introFor({ credentialType, deviceLabel })}
       </Text>
       <Box
         bg="bg.subtle"
@@ -896,6 +946,14 @@ function ActionOutcome({ action }: { action: ActionState }) {
     );
   }
   if (action.kind !== "success") return null;
+  if (action.credentialType === "testing_license") {
+    return (
+      <StatusCard palette="green" icon={CheckCircle2} title="Testing licenses approved">
+        haven can now issue developer testing licenses in your name. You can close this tab and
+        return to your terminal.
+      </StatusCard>
+    );
+  }
   if (action.credentialType === "project_api_key") {
     return (
       <StatusCard palette="green" icon={CheckCircle2} title="API key approved">

@@ -195,7 +195,7 @@ func retiredError(old []string, now []string) error {
 // one stack, and so refuses --stack.
 func isMachineWide(name string) bool {
 	switch name {
-	case "machine", "self", "defaults", "hub":
+	case "machine", "self", "defaults", "hub", "login", "logout":
 		return true
 	}
 	return false

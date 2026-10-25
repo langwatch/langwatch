@@ -1363,6 +1363,11 @@ model IssuedLicense {
   /// The operator who issued or registered it. Null for the purchase flow and the script.
   issuedById String?
 
+  /// `standard` or `testing` (ADR-180). A testing licence is bound to `instanceId` when issued.
+  kind                  String  @default("standard")
+  /// The local organization a testing licence is for; `organizationId` names the customer.
+  testingOrganizationId String?
+
   revokedAt     DateTime?
   revokedById   String?
   revokedReason String?
@@ -1483,6 +1488,29 @@ model ActivationCode {
 
   @@index([organizationId])
   @@index([expiresAt])
+}
+
+/// A token that can do one thing: ask Cloud for a testing licence (ADR-180 section 2).
+/// Every token, personal or service, acts as the person who made it, whose ops permission
+/// is asked on every use (ADR-180 section 2). Only its hash is stored.
+model TestingLicenseToken {
+  id          String    @id
+  /// SHA-256 of the token. Looked up on every testing licence asked for.
+  tokenHash   String    @unique
+  /// `personal` or `service`.
+  kind        String
+  /// The person who made the token and whom it acts as (ADR-180 section 2).
+  ownerUserId String
+  /// A service token's name, such as "GitHub Actions". Null on a personal token.
+  name        String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  revokedById String?
+  /// When the token last issued a testing licence.
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([ownerUserId])
 }
 
 /// How a connected customer is invoiced (ADR-139, section 7): one payment

@@ -71,6 +71,10 @@ const licenseDataSchemaDefinition = z.object({
   // Signed by a haven dev stack's own key; a release build refuses it whatever key
   // signed it (specs/licensing/license-signing-key.feature). Last for the same reason.
   devStack: z.literal(true).optional(),
+  // A testing licence (ADR-180 section 3): bound to one instance and the signed organization.
+  // Last for the same reason; an older verifier strips both, so its signature check refuses it.
+  kind: z.literal("testing").optional(),
+  instanceId: z.string().optional(),
 });
 export interface LicenseDataSchema extends Named<typeof licenseDataSchemaDefinition> {}
 export const licenseDataSchema: LicenseDataSchema = licenseDataSchemaDefinition;
@@ -92,7 +96,14 @@ const platformLicenseInspectionSchemaDefinition = z.discriminatedUnion("valid", 
     source: z.enum(["instance", "organization"]),
     organizationId: z.string().optional(),
     valid: z.literal(false),
-    reason: z.enum(["invalid_format", "invalid_signature", "organization_mismatch"]),
+    reason: z.enum([
+      "invalid_format",
+      "invalid_signature",
+      "organization_mismatch",
+      "instance_mismatch",
+      "instance_override",
+      "expired",
+    ]),
   }),
   z.object({
     source: z.enum(["instance", "organization"]),
@@ -112,6 +123,8 @@ export const platformLicenseInspectionSchema: PlatformLicenseInspectionSchema =
 const platformLicenseAccessSchemaDefinition = z.object({
   allowed: z.boolean(),
   inspections: z.array(platformLicenseInspectionSchema),
+  /** ISO 8601. Set when a testing licence permits: the allow ends then (ADR-180 section 4). */
+  allowedUntil: z.string().optional(),
 });
 export interface PlatformLicenseAccessSchema extends Named<
   typeof platformLicenseAccessSchemaDefinition

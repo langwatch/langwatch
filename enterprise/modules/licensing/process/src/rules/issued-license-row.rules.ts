@@ -1,7 +1,9 @@
 import {
   LicenseOverageMaxRequiresOverageError,
+  type LicenseData,
   type LicenseTermsInput,
 } from "@langwatch/enterprise-licensing-contract";
+import { Temporal } from "@langwatch/time";
 
 import type {
   IssuedLicenseDraft,
@@ -27,6 +29,24 @@ export function replacementColumns({
     overageMaxUsdCents: current.overageMaxUsdCents,
     instanceId: current.instanceId,
     instanceBoundAt: current.instanceBoundAt,
+  };
+}
+
+/**
+ * The columns a signed licence fixes on its own row. A testing licence is bound to its
+ * instance from issue, never by whichever install presents it first (ADR-180 section 3).
+ */
+export function signedLicenseColumns({
+  license,
+}: {
+  license: Pick<LicenseData, "kind" | "instanceId" | "organizationId" | "issuedAt">;
+}): Partial<IssuedLicenseRecord> {
+  if (license.kind !== "testing") return { kind: "standard", testingOrganizationId: null };
+  return {
+    kind: "testing",
+    testingOrganizationId: license.organizationId ?? null,
+    instanceId: license.instanceId ?? null,
+    instanceBoundAt: Temporal.Instant.from(license.issuedAt),
   };
 }
 
@@ -68,6 +88,8 @@ export function blankIssuedLicenseRow(): Omit<
     reportedMembersLite: null,
     virtualKeyId: null,
     seatsRaisedFrom: null,
+    kind: "standard",
+    testingOrganizationId: null,
   };
 }
 

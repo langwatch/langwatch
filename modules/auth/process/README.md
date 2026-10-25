@@ -528,7 +528,7 @@ Public: the device flow authenticates the caller inside its own handlers (the CL
 Answers at `/api/auth/cli/lookup`, `/api/v1/auth/cli/lookup`.
 
 ```typescript
-// Query: lookupQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:78
+// Query: lookupQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:82
 interface Query {
   user_code?: string;
 }
@@ -579,7 +579,7 @@ Public: the device flow authenticates the caller inside its own handlers (the CL
 Answers at `/api/auth/cli/device-approval`, `/api/v1/auth/cli/device-approval`.
 
 ```typescript
-// Query: deviceApprovalQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:86
+// Query: deviceApprovalQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:90
 interface Query {
   device_code: string;
 }
@@ -924,7 +924,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:276`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:279`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -934,7 +934,7 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:279`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:282`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:43`                  |

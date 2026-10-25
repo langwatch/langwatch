@@ -245,9 +245,11 @@ function whereOf({
   search,
   status,
   emailSuffixes,
+  includeTesting,
 }: IssuedLicenseQuery): Prisma.IssuedLicenseWhereInput {
   const term = search?.trim();
   const parts: Prisma.IssuedLicenseWhereInput[] = [];
+  if (includeTesting !== true) parts.push({ kind: "standard" });
   if (term) {
     parts.push({
       OR: [

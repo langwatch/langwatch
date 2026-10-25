@@ -59,6 +59,11 @@ import {
   type LicenseSeatChange,
   type SeatChangeResult,
   type SignedIssuedLicense,
+  type IssuedTestingLicense,
+  type MintedTestingLicenseToken,
+  type TestingLicenseIssuer,
+  type TestingLicenseTokenPage,
+  type TestingLicenseTokenView,
   type StoreLicenseResult,
   type UpgradeDiagnosticsAvailability,
   type UpgradeDiagnosticsDownload,
@@ -136,6 +141,8 @@ import type { SelfHostedLeadsInfrastructure } from "../services/self-hosted-crm.
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
 import { SelfHostedNoticeService } from "../services/self-hosted-notice.service.ts";
 import { SsoGateStatusService } from "../services/sso-gate-status.service.ts";
+import { TestingLicenseIssueService } from "../services/testing-license-issue.service.ts";
+import { TestingLicenseTokenService } from "../services/testing-license-token.service.ts";
 import { UpgradeDiagnosticsSenderService } from "../services/upgrade-diagnostics-sender.service.ts";
 import { UpgradeDiagnosticsService } from "../services/upgrade-diagnostics.service.ts";
 
@@ -198,6 +205,8 @@ export class LicensingModule implements LicensingApiContract {
   readonly #signingKey: string | undefined;
   readonly #domainClaims: DomainClaimAuthorityService;
   readonly #ssoGate: SsoGateStatusService;
+  readonly #testingTokens: TestingLicenseTokenService;
+  readonly #testingIssue: TestingLicenseIssueService;
   readonly #diagnostics: UpgradeDiagnosticsService;
   readonly #diagnosticsSender: UpgradeDiagnosticsSenderService;
   readonly #notices: SelfHostedNoticeService;
@@ -231,12 +240,14 @@ export class LicensingModule implements LicensingApiContract {
     domainClaims,
     customerFacts,
     signInProviderMounts,
+    testing,
     diagnostics,
     notices,
   }: {
     diagnostics: UpgradeDiagnosticsService;
     notices: SelfHostedNoticeService;
     signInProviderMounts: SignInProviderMountRepository;
+    testing: Readonly<{ tokens: TestingLicenseTokenService; issue: TestingLicenseIssueService }>;
     customerFacts: LicensingCustomerFactsService;
     generation: LicenseGenerationService;
     domainClaims: DomainClaimAuthorityService;
@@ -264,6 +275,8 @@ export class LicensingModule implements LicensingApiContract {
     this.#identity = install.identity;
     this.#customerFacts = customerFacts;
     this.#refresh = install.refresh;
+    this.#testingTokens = testing.tokens;
+    this.#testingIssue = testing.issue;
     this.#diagnosticsSender = install.diagnosticsSender;
     this.#diagnostics = diagnostics;
     this.#notices = notices;
@@ -339,19 +352,29 @@ export class LicensingModule implements LicensingApiContract {
       cryptography,
       logger,
     });
-    const service = LicenseService.create({
-      repository,
-      cryptography,
-      logger,
-      configuration: LicenseServiceConfiguration.create(),
-      instanceLicenseKey: signedInstanceKey,
-    });
     const connectInfrastructure = connectInstallOver({
       repositories,
       config,
       cryptography,
       version: releaseVersionOf(config),
       instanceLicenseKey: signedInstanceKey,
+    });
+    // Built before the licence service: a testing licence is checked against it (ADR-180).
+    const identity = InstanceIdentityService.create({
+      repository: connectInfrastructure.identity,
+      newInstanceId: connectInfrastructure.newInstanceId,
+      ...(connectInfrastructure.instanceIdOverride
+        ? { instanceIdOverride: connectInfrastructure.instanceIdOverride }
+        : {}),
+    });
+    const service = LicenseService.create({
+      repository,
+      cryptography,
+      logger,
+      configuration: LicenseServiceConfiguration.create(),
+      instanceLicenseKey: signedInstanceKey,
+      instanceId: () => identity.getInstanceId(),
+      instanceIdOverridden: Boolean(config.connectInstanceId),
     });
     const app = new LicensingModule({
       customerFacts,
@@ -364,6 +387,7 @@ export class LicensingModule implements LicensingApiContract {
       registry: registryParts,
       install: connectInstallParts({
         infrastructure: connectInfrastructure,
+        identity,
         customerFacts,
         cryptography,
         seats: repository,
@@ -380,6 +404,7 @@ export class LicensingModule implements LicensingApiContract {
         organizations: repositories.connectOrganizations,
       }),
       signInProviderMounts: repositories.signInProviderMounts,
+      testing: testingParts({ repositories, registry: registryParts.registry }),
       diagnostics: upgradeDiagnosticsOver({
         repositories,
         baseUrl: config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
@@ -794,6 +819,48 @@ export class LicensingModule implements LicensingApiContract {
     return this.#activation.answer(input);
   }
 
+  /** Testing licences (ADR-180 section 2); signing refuses where no key is set. */
+  issueTestingLicense(input: {
+    instanceId: string;
+    organizationId: string;
+    lifetimeHours?: number;
+    issuer: TestingLicenseIssuer;
+  }): Promise<IssuedTestingLicense> {
+    return this.#testingIssue.issue(input);
+  }
+
+  verifyTestingLicenseToken(input: { bearer: string | null }): Promise<TestingLicenseIssuer> {
+    return this.#testingTokens.verify(input);
+  }
+
+  mintPersonalTestingLicenseToken(input: {
+    userId: string;
+  }): Promise<{ token: string; expiresAt: string }> {
+    return this.#testingTokens.mintPersonal(input);
+  }
+
+  createTestingLicenseServiceToken(input: {
+    name: string;
+    expiresInDays?: number;
+    operatorId: string;
+  }): Promise<MintedTestingLicenseToken> {
+    return this.#testingTokens.createService(input);
+  }
+
+  listTestingLicenseTokens(input: {
+    page: number;
+    pageSize: number;
+  }): Promise<TestingLicenseTokenPage> {
+    return this.#testingTokens.list(input);
+  }
+
+  revokeTestingLicenseToken(input: {
+    id: string;
+    operatorId: string;
+  }): Promise<TestingLicenseTokenView> {
+    return this.#testingTokens.revoke(input);
+  }
+
   recordUsageReport(input: IncomingUsageReport): Promise<SelfHostedSignal[]> {
     return this.#instances.recordReport(input);
   }
@@ -918,6 +985,22 @@ function upgradeDiagnosticsOver({
 
 /** A redemption at start gives up well before the transport's own timeout. */
 const BOOT_REDEMPTION_TIMEOUT_MS = 15_000;
+
+/** The testing-licence tokens and the issue they authorise, over this module's own table. */
+function testingParts({
+  repositories,
+  registry,
+}: {
+  repositories: Pick<LicensingRepositories, "testingLicenseTokens">;
+  registry: LicenseRegistryService;
+}): Readonly<{ tokens: TestingLicenseTokenService; issue: TestingLicenseIssueService }> {
+  const now = () => nowInstant();
+  const tokens = TestingLicenseTokenService.create({
+    repository: repositories.testingLicenseTokens,
+    now,
+  });
+  return { tokens, issue: TestingLicenseIssueService.create({ registry, tokens, now }) };
+}
 
 /** What the registry and the hosted routes resolve to together. */
 type LicenseRegistryParts = Readonly<{
@@ -1148,6 +1231,7 @@ function connectInstallOver({
 
 function connectInstallParts({
   infrastructure,
+  identity,
   customerFacts,
   cryptography,
   seats,
@@ -1157,6 +1241,7 @@ function connectInstallParts({
   logger,
 }: {
   infrastructure: ConnectInstallInfrastructure;
+  identity: InstanceIdentityService;
   customerFacts: LicensingCustomerFactsService;
   cryptography: LicenseCryptography;
   seats: LicenseStorage;
@@ -1166,13 +1251,6 @@ function connectInstallParts({
   publicKey: string | undefined;
   logger?: LicenseLogger;
 }): ConnectInstallParts {
-  const identity = InstanceIdentityService.create({
-    repository: infrastructure.identity,
-    newInstanceId: infrastructure.newInstanceId,
-    ...(infrastructure.instanceIdOverride
-      ? { instanceIdOverride: infrastructure.instanceIdOverride }
-      : {}),
-  });
   const install = ConnectInstallService.create({
     organizations: infrastructure.organizations,
     facts: customerFacts,

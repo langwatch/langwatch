@@ -12,6 +12,7 @@ import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { enterpriseOpsProcessModule } from "../../enterprise-ops.module.ts";
@@ -62,6 +63,10 @@ async function build() {
       testPeer({ token: OpsApi, instance: ops }),
       testPeer({ token: LicensingApi, instance: licensing }),
       testPeer({ token: AuditLogApi, instance: auditLog }),
+      testPeer({
+        token: UserApi,
+        instance: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      }),
     ],
   });
   return { app: runtime.service(EnterpriseOpsApi), entries, asked };

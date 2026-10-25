@@ -112,12 +112,15 @@
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
-      "ignoredDependencies": ["@langwatch/enterprise-licensing-contract", "@langwatch/test-harness"]
+      "ignoredDependencies": ["@langwatch/test-harness"]
     }
   }
 }

@@ -431,6 +431,18 @@ Feature: Transport declaration split
     Then the module's own refusal answers with its code and status, before the body is read
 
   @integration
+  Scenario: The testing licence token door asks the token's user for the platform grant on every call
+    Given a route behind the testing licence token door declares ops:manage at the platform (ADR-180 section 2)
+    When a personal or service token is presented whose maker holds ops:manage at the platform
+    Then the platform question is asked of that person on this call, and the handler runs as them
+    When that person no longer holds it
+    Then the next call is refused 403 permission_denied before the body is read, and the handler never runs
+    When the door hands no user for a token it verified
+    Then the call is refused 403 permission_denied and the handler never runs
+    And a bearer the module refuses answers with the module's own code, and nothing runs
+    And a route behind that door that declares no platform permission is refused at mount, naming it
+
+  @integration
   Scenario: A route naming a credential nobody bound refuses the boot
     Given a family whose routes answer behind a module-bound credential (Alex, 2026-10-10, TYPED-DOORS)
     And neither the module nor the host binds a door for it

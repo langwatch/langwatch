@@ -13,6 +13,7 @@ import { PrismaOrganizationLicenseRepository } from "./prisma.organization-licen
 import { PrismaSelfHostedInstanceRepository } from "./prisma.self-hosted-instance.repository.ts";
 import { PrismaSelfHostedNoticeRepository } from "./prisma.self-hosted-notice.repository.ts";
 import { PrismaSignInProviderMountRepository } from "./prisma.sign-in-provider-mount.repository.ts";
+import { PrismaTestingLicenseTokenRepository } from "./prisma.testing-license-token.repository.ts";
 import { PrismaUpgradeDiagnosticRepository } from "./prisma.upgrade-diagnostic.repository.ts";
 
 /** Licensing's Postgres rows; a reissued license waits sealed through the deployment's cipher. */
@@ -28,6 +29,7 @@ export class PostgresLicensingRepositories {
       organizationLicenses: PrismaOrganizationLicenseRepository.create(prisma),
       issuedLicenses: PrismaIssuedLicenseRepository.create(prisma, encryption),
       activationCodes: PrismaActivationCodeRepository.create(prisma),
+      testingLicenseTokens: PrismaTestingLicenseTokenRepository.create(prisma),
       selfHostedInstances: PrismaSelfHostedInstanceRepository.create(prisma),
       selfHostedNotices: PrismaSelfHostedNoticeRepository.create(prisma),
       connectOrganizations: PrismaConnectOrganizationRepository.create(prisma),

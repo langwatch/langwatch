@@ -18,10 +18,10 @@ import {
   type SeedGrant,
 } from "../seed-authz.ts";
 
-const organizationId = "local-dev-organization";
-const teamId = "local-dev-team";
-const projectId = "local-dev-project";
-const userId = "local-dev-admin-user";
+const organizationId = "organization-under-test";
+const teamId = "team-under-test";
+const projectId = "project-under-test";
+const userId = "user-under-test";
 const privateKeyId = "private-key";
 const publicKeyId = "public-key";
 const publicRoleId = "local-dev-public-ingestion-role";

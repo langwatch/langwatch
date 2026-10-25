@@ -281,9 +281,6 @@ export async function startStack(options: StartStackOptions): Promise<RunningSta
 }
 
 export type SeededProject = Readonly<{
-  organizationId: string;
-  teamId: string;
-  projectId: string;
   projectSlug: string;
   /** The project's own ingestion key, the one an SDK reads from the environment. */
   apiKey: string;
@@ -311,20 +308,63 @@ function seedConstant(source: string, name: string, file: string = SEED_FILE): s
  */
 export function seededProject(): SeededProject {
   const source = readFileSync(SEED_FILE, "utf8");
+  const identity = readFileSync(SEED_IDENTITY_FILE, "utf8");
   return {
-    organizationId: seedConstant(source, "ORG_ID"),
-    teamId: seedConstant(source, "TEAM_ID"),
-    projectId: seedConstant(source, "PROJECT_ID"),
     projectSlug: seedConstant(source, "PROJECT_SLUG"),
     apiKey: seedConstant(source, "DEFAULT_INGESTION_KEY"),
     organizationApiKey: seededOrganizationToken(source),
-    adminEmail: `${seedConstant(source, "ADMIN_LOCAL_PART")}@${seedConstant(
-      readFileSync(SEED_IDENTITY_FILE, "utf8"),
+    adminEmail: `${seedConstant(identity, "LOCAL_DEV_ADMIN_LOCAL_PART", SEED_IDENTITY_FILE)}@${seedConstant(
+      identity,
       "DEFAULT_SEED_EMAIL_DOMAIN",
       SEED_IDENTITY_FILE,
     )}`,
     adminPassword: seedConstant(source, "ADMIN_PASSWORD"),
   };
+}
+
+/**
+ * The seeded project's id, which the seed mints at random (ADR-180): found by its slug through
+ * `GET /api/projects` with the seeded organization token, as haven finds it.
+ */
+export async function seededProjectId({
+  apiUrl,
+  project,
+}: {
+  apiUrl: string;
+  project: SeededProject;
+}): Promise<string> {
+  for (let page = 1; ; page++) {
+    const response = await fetch(`${apiUrl}/projects?page=${page}&limit=${PROJECT_PAGE_LIMIT}`, {
+      headers: { authorization: `Bearer ${project.organizationApiKey}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) throw new Error(`GET /api/projects answered ${response.status}`);
+    const { projects, total } = projectPageOf(await response.json());
+    const found = projects.find((each) => each.slug === project.projectSlug);
+    if (found) return found.id;
+    if (projects.length === 0 || page * PROJECT_PAGE_LIMIT >= total) {
+      throw new Error(`no project ${project.projectSlug} in GET /api/projects`);
+    }
+  }
+}
+
+/** The most projects one `GET /api/projects` page may hold. */
+const PROJECT_PAGE_LIMIT = 1000;
+
+/** The ids, slugs and total count out of one `GET /api/projects` page. */
+function projectPageOf(body: unknown): { projects: { id: string; slug: string }[]; total: number } {
+  if (typeof body !== "object" || body === null) return { projects: [], total: 0 };
+  const data: unknown[] = "data" in body && Array.isArray(body.data) ? body.data : [];
+  const pagination = "pagination" in body ? body.pagination : undefined;
+  const total =
+    typeof pagination === "object" &&
+    pagination !== null &&
+    "total" in pagination &&
+    typeof pagination.total === "number"
+      ? pagination.total
+      : 0;
+  const projects = data.flatMap(projectOf);
+  return { projects, total };
 }
 
 /**
@@ -343,4 +383,12 @@ function seededOrganizationToken(seedSource: string): string {
   const lookupId = seedConstant(seedSource, "PRIVATE_TOKEN_LOOKUP_ID");
   const secret = seedConstant(seedSource, "PRIVATE_TOKEN_SECRET");
   return `${prefix}${lookupId}_${secret}`;
+}
+
+/** One project row of the page, or none when the row is not shaped like one. */
+function projectOf(each: unknown): { id: string; slug: string }[] {
+  if (typeof each !== "object" || each === null) return [];
+  const id = "id" in each ? each.id : undefined;
+  const slug = "slug" in each ? each.slug : undefined;
+  return typeof id === "string" && typeof slug === "string" ? [{ id, slug }] : [];
 }

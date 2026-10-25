@@ -108,6 +108,40 @@ describe("SsoGateService", () => {
     );
   });
 
+  /** @scenario "An expired testing license grants nothing, without a restart" */
+  it("reads a testing licence's allow again once it ends, instead of keeping it for the process", async () => {
+    inspectPlatformAccess.mockResolvedValue({
+      ...validAccess(),
+      allowedUntil: new Date(now + 60_000).toISOString(),
+    });
+    const gate = create();
+    expect(await gate.platformAllowed()).toBe(true);
+    expect(await gate.resolveProvider()).toBe("auth0");
+    expect(inspectPlatformAccess).toHaveBeenCalledTimes(1);
+
+    inspectPlatformAccess.mockResolvedValue({
+      allowed: false,
+      inspections: [
+        { source: "organization", organizationId: "org_1", valid: false, reason: "expired" },
+      ],
+    });
+    now += 60_000;
+
+    // The sign-in door refuses SSO initiation and callbacks per request when this answers false.
+    expect(await gate.platformAllowed()).toBe(false);
+    expect(await gate.resolveProvider()).toBe("email");
+    expect(inspectPlatformAccess).toHaveBeenCalledTimes(2);
+  });
+
+  /** @scenario "An expired testing license grants nothing, without a restart" */
+  it("treats a testing licence allow whose end time cannot be read as expired", async () => {
+    inspectPlatformAccess.mockResolvedValue({ ...validAccess(), allowedUntil: "not-a-time" });
+    const gate = create();
+
+    expect(await gate.platformAllowed()).toBe(false);
+    expect(await gate.resolveProvider()).toBe("email");
+  });
+
   /** @scenario "A signed license enables a mounted provider" */
   it("resolves the configured provider once the licensing service reports genuine access", async () => {
     inspectPlatformAccess.mockResolvedValue(validAccess());

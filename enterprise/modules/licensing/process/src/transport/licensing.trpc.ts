@@ -16,6 +16,10 @@ export const licenseTrpcTransport: TrpcRouterDeclaration<LicensingApi, typeof li
     .withPermission("organization:view")
     .handle(({ app, input }) => app.getLicenseStatus(input.organizationId))
 
+    .procedure("getInstanceId")
+    .withPermission("organization:manage")
+    .handle(async ({ app }) => ({ instanceId: await app.getInstanceId() }))
+
     .procedure("getSsoGateStatus")
     .noPermission({ reason: SSO_GATE_IS_DEPLOYMENT_WIDE })
     .handle(({ app }) => app.getSsoGateStatus())

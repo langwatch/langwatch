@@ -42,6 +42,8 @@ function licenseFor(overrides: Partial<IssuedLicenseRecord> = {}): IssuedLicense
     reportedMembersLite: null,
     virtualKeyId: null,
     seatsRaisedFrom: null,
+    kind: "standard",
+    testingOrganizationId: null,
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,

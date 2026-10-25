@@ -15,6 +15,7 @@ import { createTestLogger } from "@langwatch/test-harness";
  * @vitest-environment node
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { enterpriseOpsProcessModule } from "../../enterprise-ops.module.ts";
@@ -51,6 +52,7 @@ function boot({
       licensing: createApiFixture<LicensingApi>({
         listSelfHostedInstances: () => Promise.resolve({ instances: [], total: 3 }),
       }),
+      user: createApiFixture<UserApi>({ getProfiles: () => Promise.resolve([]) }),
       "audit-log": createApiFixture<AuditLogApi>({
         record: (entry) => {
           audited.push(entry);

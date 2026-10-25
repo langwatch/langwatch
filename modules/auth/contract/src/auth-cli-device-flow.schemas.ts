@@ -1,19 +1,6 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-const deviceCodeRequestSchemaDefinition = z.object({
-  scopes: z.array(z.string()).optional(),
-  credential_type: z.enum(["device_session", "project_api_key"]).default("device_session"),
-  /**
-   * `langwatch login --management`: the CLI key should also carry the
-   * management permissions a CLI login key leaves out by default, limited to
-   * the ones the approving person holds.
-   */
-  management: z.boolean().default(false),
-});
-export interface DeviceCodeRequestSchema extends Named<typeof deviceCodeRequestSchemaDefinition> {}
-export const deviceCodeRequestSchema: DeviceCodeRequestSchema = deviceCodeRequestSchemaDefinition;
-
 const clientInfoSchemaDefinition = z
   .object({
     device_label: z.string().max(128).optional(),
@@ -24,6 +11,23 @@ const clientInfoSchemaDefinition = z
   .optional();
 export interface ClientInfoSchema extends Named<typeof clientInfoSchemaDefinition> {}
 export const clientInfoSchema: ClientInfoSchema = clientInfoSchemaDefinition;
+
+const deviceCodeRequestSchemaDefinition = z.object({
+  scopes: z.array(z.string()).optional(),
+  credential_type: z
+    .enum(["device_session", "project_api_key", "testing_license"])
+    .default("device_session"),
+  /**
+   * `langwatch login --management`: the CLI key should also carry the
+   * management permissions a CLI login key leaves out by default, limited to
+   * the ones the approving person holds.
+   */
+  management: z.boolean().default(false),
+  /** Who is asking, so the browser page can name the device. Display text only. */
+  client_info: clientInfoSchema,
+});
+export interface DeviceCodeRequestSchema extends Named<typeof deviceCodeRequestSchemaDefinition> {}
+export const deviceCodeRequestSchema: DeviceCodeRequestSchema = deviceCodeRequestSchemaDefinition;
 
 const exchangeRequestSchemaDefinition = z.object({
   device_code: z.string().min(1),

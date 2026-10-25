@@ -109,3 +109,31 @@ export class LicenseOverageMaxRequiresOverageError extends HandledError {
     this.name = "LicenseOverageMaxRequiresOverageError";
   }
 }
+
+/** A testing licence stays on the instance it was approved for; a new instance needs approval. */
+export class TestingLicenseBindingResetRefusedError extends HandledError {
+  declare readonly code: "testing_license_binding_reset_refused";
+
+  constructor() {
+    super(
+      "testing_license_binding_reset_refused",
+      "A testing license cannot be moved to another instance",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "TestingLicenseBindingResetRefusedError";
+  }
+}
+
+/** A testing or unknown-kind row without the instance or organization it is for: unreissuable. */
+export class TestingLicenseBindingMissingError extends HandledError {
+  declare readonly code: "testing_license_binding_missing";
+
+  constructor() {
+    super(
+      "testing_license_binding_missing",
+      "This license names no instance or organization, so it cannot be reissued",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "TestingLicenseBindingMissingError";
+  }
+}

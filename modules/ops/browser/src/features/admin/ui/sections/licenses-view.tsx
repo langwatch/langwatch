@@ -1,5 +1,6 @@
 import { HStack, Text } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { Switch } from "@langwatch/design-system/switch";
 import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -14,6 +15,7 @@ import { LicenseDetailDrawer } from "./license-detail-drawer.tsx";
 import { LicenseIssueDrawer } from "./license-issue-drawer.tsx";
 import { LicenseRevokeDialog } from "./license-revoke-dialog.tsx";
 import { SelfHostedNoticesSection } from "./self-hosted-notices-section.tsx";
+import { TestingLicenseTokensSection } from "./testing-license-tokens-section.tsx";
 
 const PAGE_SIZE = 25;
 
@@ -30,6 +32,7 @@ export default function LicensesView() {
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 300);
   const [page, setPage] = useState(1);
+  const [includeTesting, setIncludeTesting] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState<License | null>(null);
@@ -46,6 +49,7 @@ export default function LicensesView() {
       search: debouncedSearch || undefined,
       status: status === "all" ? undefined : status,
       audience: audience === "all" ? undefined : audience,
+      includeTesting,
     },
     // Keeps the counts on screen while a new filter loads, so the controls don't jump.
     { placeholderData: keepPreviousData },
@@ -117,6 +121,15 @@ export default function LicensesView() {
                 },
               ]}
             />
+            <Switch
+              checked={includeTesting}
+              onCheckedChange={({ checked }) => {
+                setIncludeTesting(checked === true);
+                setPage(1);
+              }}
+            >
+              Show testing licenses
+            </Switch>
           </HStack>
         }
         isLoading={list.isLoading}
@@ -153,6 +166,8 @@ export default function LicensesView() {
       <ActivationCodesSection />
 
       <SelfHostedNoticesSection />
+
+      <TestingLicenseTokensSection />
 
       <LicenseDetailDrawer
         licenseId={openId}

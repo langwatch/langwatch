@@ -11,13 +11,22 @@ export const APP_BASE =
  * files create a fresh organization per run) points every helper at it with
  * `useProject`, and every reader takes the current value off this object.
  */
+let projectId = process.env.LANGY_PROJECT_ID;
+
 export const CONFIG = {
-  PROJECT_ID: process.env.LANGY_PROJECT_ID ?? "local-dev-project",
-  PROJECT_SLUG:
-    process.env.LANGY_PROJECT_SLUG ??
-    process.env.LANGY_PROJECT_ID ??
-    process.env.LANGY_PROJECT_ID ??
-    "local-dev-project",
+  /** The seed mints random ids, so there is no default: set LANGY_PROJECT_ID or call useProject. */
+  get PROJECT_ID(): string {
+    if (!projectId) {
+      throw new Error(
+        "LANGY_PROJECT_ID is not set: the seeded project has a random id, read it from the project's settings",
+      );
+    }
+    return projectId;
+  },
+  set PROJECT_ID(value: string) {
+    projectId = value;
+  },
+  PROJECT_SLUG: process.env.LANGY_PROJECT_SLUG ?? "local-dev-project",
   ADMIN_EMAIL: process.env.LANGY_ADMIN_EMAIL ?? "admin@mail.langwatch.localhost",
   ADMIN_PASSWORD: process.env.LANGY_ADMIN_PASSWORD ?? "LocalHavenAdmin!2026",
 };

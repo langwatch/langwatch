@@ -8,6 +8,7 @@ import type { OrganizationLicenseRepository } from "./organization-license.repos
 import type { SelfHostedInstanceRepository } from "./self-hosted-instance.repository.ts";
 import type { SelfHostedNoticeRepository } from "./self-hosted-notice.repository.ts";
 import type { SignInProviderMountRepository } from "./sign-in-provider-mount.repository.ts";
+import type { TestingLicenseTokenRepository } from "./testing-license-token.repository.ts";
 import type { UpgradeDiagnosticBundleRepository } from "./upgrade-diagnostic-bundle.repository.ts";
 import type { UpgradeDiagnosticRepository } from "./upgrade-diagnostic.repository.ts";
 
@@ -19,6 +20,8 @@ export interface LicensingRepositories {
   readonly organizationLicenses: OrganizationLicenseRepository;
   readonly issuedLicenses: IssuedLicenseRepository;
   readonly activationCodes: ActivationCodeRepository;
+  /** The tokens that can only ask for a testing licence (ADR-180). */
+  readonly testingLicenseTokens: TestingLicenseTokenRepository;
   readonly selfHostedInstances: SelfHostedInstanceRepository;
   /** Cloud's notices to self-hosted installs, sent in the usage report reply. */
   readonly selfHostedNotices: SelfHostedNoticeRepository;

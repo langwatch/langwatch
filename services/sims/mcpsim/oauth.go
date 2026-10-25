@@ -231,7 +231,11 @@ func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 // connectOAuth is the oauth-connect run.
 func (s *Server) connectOAuth(ctx context.Context, rn *run, req ConnectRequest) error {
-	a := &oauthAttempt{s: s, rn: rn, req: req, persona: personas[req.Client], projectID: firstOf(req.ProjectID, s.cfg.ProjectID), pk: newPKCE()}
+	projectID, err := s.approvedProjectID(ctx, req)
+	if err != nil {
+		return err
+	}
+	a := &oauthAttempt{s: s, rn: rn, req: req, persona: personas[req.Client], projectID: projectID, pk: newPKCE()}
 	if err := a.discover(ctx); err != nil {
 		return err
 	}
@@ -255,7 +259,7 @@ func (a *oauthAttempt) obtainCode(ctx context.Context) (string, error) {
 		return a.awaitBrowser(ctx)
 	}
 	if a.projectID == "" {
-		return "", errors.New("auto approval needs a project id (projectId, or MCPSIM_PROJECT_ID)")
+		return "", errors.New("auto approval needs a project id (projectId, MCPSIM_PROJECT_ID or MCPSIM_PROJECT_SLUG)")
 	}
 	// The configured session only ever goes to the configured endpoint.
 	cookie := a.req.Cookie
@@ -324,4 +328,45 @@ func (a *oauthAttempt) callbackCode(res callbackResult, waited time.Duration) (s
 		return "", fmt.Errorf("the approval came back refused: %s", firstOf(res.err, "no code"))
 	}
 	return res.code, nil
+}
+
+// approvedProjectID is the project an approval grants: the request's, the configured id, or the
+// configured slug looked up through GET /api/projects (seeded ids are random, ADR-180).
+func (s *Server) approvedProjectID(ctx context.Context, req ConnectRequest) (string, error) {
+	if id := firstOf(req.ProjectID, s.cfg.ProjectID); id != "" || s.cfg.ProjectSlug == "" {
+		return id, nil
+	}
+	if s.cfg.AccessToken == "" || s.cfg.Endpoint == "" {
+		return "", fmt.Errorf("project %q has no id and no access token to look it up", s.cfg.ProjectSlug)
+	}
+	return s.projectIDBySlug(ctx)
+}
+
+// projectIDBySlug looks the configured project slug up through GET /api/projects.
+func (s *Server) projectIDBySlug(ctx context.Context) (string, error) {
+	call, err := http.NewRequestWithContext(ctx, http.MethodGet, s.cfg.Endpoint+"/api/projects?limit=1000", nil)
+	if err != nil {
+		return "", err
+	}
+	call.Header.Set("Authorization", "Bearer "+s.cfg.AccessToken)
+	res, err := s.http.Do(call)
+	if err != nil {
+		return "", fmt.Errorf("looking up project %q: %w", s.cfg.ProjectSlug, err)
+	}
+	defer res.Body.Close()
+	var page struct {
+		Data []struct{ ID, Slug string }
+	}
+	if res.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("looking up project %q: GET /api/projects answered %d", s.cfg.ProjectSlug, res.StatusCode)
+	}
+	if err := json.NewDecoder(res.Body).Decode(&page); err != nil {
+		return "", fmt.Errorf("looking up project %q: %w", s.cfg.ProjectSlug, err)
+	}
+	for _, p := range page.Data {
+		if p.Slug == s.cfg.ProjectSlug {
+			return p.ID, nil
+		}
+	}
+	return "", fmt.Errorf("no project %q in GET /api/projects", s.cfg.ProjectSlug)
 }

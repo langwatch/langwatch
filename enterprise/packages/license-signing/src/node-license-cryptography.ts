@@ -118,7 +118,7 @@ export class NodeLicenseCryptographyService implements LicenseCryptography {
       const decoded = Buffer.from(licenseKey, "base64").toString("utf-8");
       const parsed = JSON.parse(decoded) as unknown;
       const result = SignedLicenseSchema.safeParse(parsed);
-      return result.success ? result.data : null;
+      return result.success && isBindingComplete(result.data.data) ? result.data : null;
     } catch {
       return null;
     }
@@ -228,6 +228,12 @@ export class NodeLicenseCryptographyService implements LicenseCryptography {
     });
     return `${LICENSE_TOKEN_PREFIX}${sha256Hex(canonical)}`;
   }
+}
+
+/** A testing licence names its instance and organization; no other licence names an instance. */
+function isBindingComplete(data: LicenseData): boolean {
+  if (data.kind !== "testing") return data.instanceId === undefined;
+  return Boolean(data.instanceId) && Boolean(data.organizationId);
 }
 
 function sha256Hex(value: string): string {

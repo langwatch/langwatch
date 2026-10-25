@@ -33,6 +33,14 @@ export function statusOfIssuedLicense(
   return "active";
 }
 
+/**
+ * Only a standard licence counts towards seats, invoices, contract totals or onboarding, and
+ * only it may be rebound. A testing licence, or a kind this release does not know, may not.
+ */
+export function isStandardLicenseRow(row: Pick<IssuedLicenseRecord, "kind">): boolean {
+  return row.kind === "standard";
+}
+
 /** The derived status, the held license dropped, and every instant on the wire. */
 export function issuedLicenseView({
   row,

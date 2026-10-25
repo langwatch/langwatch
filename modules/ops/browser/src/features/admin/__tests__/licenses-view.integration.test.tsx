@@ -43,6 +43,9 @@ vi.mock("../ui/sections/activation-codes-section.tsx", () => ({
 vi.mock("../ui/sections/self-hosted-notices-section.tsx", () => ({
   SelfHostedNoticesSection: () => null,
 }));
+vi.mock("../ui/sections/testing-license-tokens-section.tsx", () => ({
+  TestingLicenseTokensSection: () => null,
+}));
 vi.mock("../ui/sections/license-detail-drawer.tsx", () => ({ LicenseDetailDrawer: () => null }));
 vi.mock("../ui/sections/license-issue-drawer.tsx", () => ({ LicenseIssueDrawer: () => null }));
 vi.mock("../ui/sections/license-revoke-dialog.tsx", () => ({ LicenseRevokeDialog: () => null }));

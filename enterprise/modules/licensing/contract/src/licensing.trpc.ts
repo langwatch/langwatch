@@ -29,6 +29,11 @@ export const licenseTrpc = defineTrpcContract("license")
   .withInput(licenseOrganizationQuerySchema)
   .withOutput(licenseStatusSchema)
 
+  // The id a testing license is bound to (ADR-180), minted on first read if none exists yet.
+  .query("getInstanceId")
+  .withInput(licenseOrganizationQuerySchema)
+  .withOutput(z.object({ instanceId: z.string() }))
+
   // Why a deployment configured for single sign-on is not using it. The public
   // environment cannot answer it: it reports "email" for an unlicensed
   // deployment, a misconfigured one and one that never wanted federation alike.

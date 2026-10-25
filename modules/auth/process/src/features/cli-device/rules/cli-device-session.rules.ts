@@ -46,7 +46,7 @@ type CliDeviceCodeStatus = "pending" | "approved" | "denied" | "expired";
 /**
  * What the CLI is asking the browser to mint on approval.
  */
-export type CliCredentialType = "device_session" | "project_api_key";
+export type CliCredentialType = "device_session" | "project_api_key" | "testing_license";
 
 /**
  * Device metadata captured at `/exchange` so a person can recognise "Bob's MacBook Pro" in
@@ -78,6 +78,8 @@ export interface CliDeviceCodeRecord {
    * Absent on records minted before the field, which read as not asked.
    */
   management?: boolean;
+  /** What the CLI said about its device when it asked; display text, never trusted. */
+  client_info?: CliClientInfo;
   /** Set after browser-side approval. */
   user_id?: string;
   organization_id?: string;

@@ -24,7 +24,7 @@ root `.env`.
    - a stored licence that is valid (signature and expiry) under the boot
      public key is kept, so a re-seed never clobbers one someone activated;
    - otherwise, with the private key set, it signs an Enterprise licence bound
-     to `local-dev-organization`. A private key that does not pair with the
+     to the seeded organization's random id (found by its slug, `local-dev-org`). A private key that does not pair with the
      boot public key stores no licence and logs one line saying so;
    - otherwise the licensing test suite's fixture, when it is valid (CI boots
      with the test public key, see `.github/workflows/e2e-ci.yml`);
@@ -81,7 +81,7 @@ removed for that reason, and `LOCAL_DEV_ENTERPRISE_LICENSE_KEY` with it.
 - `LANGWATCH_LICENSE_PRIVATE_KEY` is the trust root for every stack that
   trusts the matching public key. Never commit it, log it or screenshot it.
 - The production signing key never belongs on a dev machine.
-- A seeded licence is bound to `local-dev-organization`; it activates on no
-  other organization.
+- A seeded licence is bound to the seeded organization's random id, which
+  differs on every database; it activates on no other organization.
 - `LANGWATCH_LICENSE_PUBLIC_KEY` is itself an override: whoever sets it on a
   deployment decides which licences that deployment accepts.

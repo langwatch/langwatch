@@ -163,6 +163,7 @@ export type Credential =
   | "cli_token"
   | "otlp_ingest"
   | "licence_token"
+  | "testing_license_token"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -716,6 +717,7 @@ export function securityRequirement(credential: Credential): readonly Record<str
     case "public":
       return [];
     case "licence_token":
+    case "testing_license_token":
     case "browser":
       throw new Error(
         `a "${credential}" route has no security scheme an API client can satisfy, ` +
