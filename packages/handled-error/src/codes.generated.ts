@@ -205,6 +205,13 @@ export const goErrorCodes = {
    */
   evaluation_payload_too_large: { service: "nlpgo", httpStatus: 413 },
   /**
+   * ErrResultsUnencodable — is a batch whose results JSON cannot carry: a 500,
+   * never a 200 with an empty body.
+   *
+   * @source services/nlpgo/modules/evaluators/transport/rpc/http.go
+   */
+  evaluation_results_unencodable: { service: "nlpgo" },
+  /**
    * ErrEvaluatorNotFound
    *
    * @source services/nlpgo/modules/evaluators/contract/errors.go
