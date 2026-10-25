@@ -5,10 +5,12 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
+  assertEvaluatorRuntimeConfig,
   deriveEvaluatorId,
   EvaluationApi,
   evaluationBrowserConfig,
   evaluationConfig,
+  evaluationSecrets,
   isAzureEvaluatorType,
   type CustomEvaluator,
   type EvaluationServerConfig,
@@ -44,7 +46,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import { openAiApiKey, Secret } from "@langwatch/secrets";
+import { nlpInternalSecret, openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -274,6 +276,8 @@ export class EvaluationModule implements EvaluationApiContract {
   static readonly secrets = {
     openAi: openAiApiKey,
     azureContentSafety: Secret.load("AZURE_CONTENT_SAFETY_KEY", { optional: true }),
+    nlpgoInternal: evaluationSecrets.nlpgoInternal,
+    nlpInternal: nlpInternalSecret,
   } as const;
 
   readonly #service: EvaluationService;
@@ -380,13 +384,30 @@ export class EvaluationModule implements EvaluationApiContract {
       ),
     );
 
-    return EvaluationModule.withEnvironment(setup, environment);
+    return secrets.into(EvaluationModule.secrets.nlpgoInternal, (internalSecret) =>
+      secrets.into(EvaluationModule.secrets.nlpInternal, (nlpInternalSecret) => {
+        assertEvaluatorRuntimeConfig({ config: setup.config, internalSecret });
+        return EvaluationModule.withEnvironment({
+          setup,
+          environment,
+          internalSecret,
+          nlpInternalSecret,
+        });
+      }),
+    );
   }
 
-  private static withEnvironment(
-    { dependencies, repositories, config, channels }: EvaluationSetup,
-    environment: EvaluatorEnvironmentService,
-  ): EvaluationModule {
+  private static withEnvironment({
+    setup: { dependencies, repositories, config, channels },
+    environment,
+    internalSecret,
+    nlpInternalSecret,
+  }: {
+    setup: EvaluationSetup;
+    environment: EvaluatorEnvironmentService;
+    internalSecret: string | undefined;
+    nlpInternalSecret: string | undefined;
+  }): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
     const lifecycle = EvaluationLifecycleService.create({
       retention: {
@@ -428,6 +449,7 @@ export class EvaluationModule implements EvaluationApiContract {
           endpoint: config.langevalsEndpoint,
           maxRetries: LANGEVALS_MAX_RETRIES,
           timeoutMs: LANGEVALS_TIMEOUT_MS,
+          evaluatorRuntime: { ...config.evaluatorRuntime, internalSecret, nlpInternalSecret },
         },
         telemetry,
       }),

@@ -63,6 +63,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
+  NLPGO_INTERNAL_SECRET env entry, shared by the app, the workers and the nlp
+  pods so the caller's Bearer token and the service's check read one Secret
+  key. Defaults to the app Secret (which materialises the key); set
+  langwatch_nlp.evaluatorRuntime.secrets.existingSecretName to point elsewhere. Renders
+  nothing unless langwatch_nlp.evaluatorRuntime.enabled.
+*/}}
+{{- define "langwatch.nlpInternalSecretEnv" -}}
+{{- if (.Values.langwatch_nlp.evaluatorRuntime).enabled -}}
+{{- $nlpSecrets := .Values.langwatch_nlp.evaluatorRuntime.secrets | default dict -}}
+- name: NLPGO_INTERNAL_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ $nlpSecrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+      key: {{ $nlpSecrets.internalSecretKey | default "NLPGO_INTERNAL_SECRET" }}
+{{- end -}}
+{{- end -}}
+
+{{/*
   LW_GATEWAY_BASE_URL and LW_GATEWAY_INTERNAL_URL env entries for the pods that
   talk to the gateway from inside the cluster (the app and the workers, which
   both resolve Langy's credentials). Renders nothing when there is no gateway.
@@ -560,6 +578,38 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- $appPort := ((.Values.app.service) | default dict).port | default 5560 }}
   {{- if and (not $gwBaseUrl) (ne (int $appPort) 5560) }}
     {{- $errors = append $errors (printf "app.service.port is %v, but the gateway works out where the control plane is on its own and can only assume the default port 5560. It would dial http://%s-app:5560 and get nothing, and the install would come up healthy while refusing every request that carries a virtual key. Set gateway.controlPlane.baseUrl to http://%s-app:%v." $appPort .Release.Name .Release.Name $appPort) }}
+  {{- end }}
+{{- end }}
+
+{{/* Go evaluator runtime: when the chart does not write NLPGO_INTERNAL_SECRET
+     itself, a Secret that is readable but lacks the key is reported (lookup is
+     empty on template/dry-run, so this never fires there). */}}
+{{- if (.Values.langwatch_nlp.evaluatorRuntime).enabled }}
+  {{- $nlpSecrets := .Values.langwatch_nlp.evaluatorRuntime.secrets | default dict }}
+  {{- $nlpSecretName := $nlpSecrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+  {{- $nlpKey := $nlpSecrets.internalSecretKey | default "NLPGO_INTERNAL_SECRET" }}
+  {{- $nlpChartWritesIt := and .Values.autogen.enabled (empty .Values.secrets.existingSecret) (eq $nlpSecretName (include "langwatch.appSecretName" .)) }}
+  {{- if not $nlpChartWritesIt }}
+    {{- $nlpFound := lookup "v1" "Secret" .Release.Namespace $nlpSecretName }}
+    {{- if and $nlpFound (not (hasKey ($nlpFound.data | default dict) $nlpKey)) }}
+      {{- $errors = append $errors (printf "langwatch_nlp.evaluatorRuntime.enabled is true but Secret %q has no key %q. Add it (kubectl -n %s create secret generic ... --from-literal=%s=$(openssl rand -hex 32)), point langwatch_nlp.evaluatorRuntime.secrets.existingSecretName at the Secret that holds it, or let the chart generate it with autogen.enabled=true." $nlpSecretName $nlpKey .Release.Namespace $nlpKey) }}
+    {{- end }}
+  {{- end }}
+  {{/* The same collision the NLP and Langy keys are refused for below: a key the
+       app Secret already holds would be written twice, and one credential would
+       silently become another. */}}
+  {{- if eq $nlpSecretName (include "langwatch.appSecretName" .) }}
+    {{- $runtimeReserved := list "credentialsEncryptionKey" "nextAuthSecret" "virtualKeyPepper" (include "langwatch.nlpInternalSecretKey" .) }}
+    {{- if (.Values.gateway).chartManaged }}
+      {{- $runtimeReserved = concat $runtimeReserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
+    {{- end }}
+    {{- $runtimeLangy := (index .Values "langyagent") | default dict }}
+    {{- if $runtimeLangy.chartManaged }}
+      {{- $runtimeReserved = append $runtimeReserved (($runtimeLangy.secrets | default dict).internalSecretKey | default "LANGY_INTERNAL_SECRET") }}
+    {{- end }}
+    {{- if has $nlpKey $runtimeReserved }}
+      {{- $errors = append $errors (printf "langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey is %q, which is already a key of the app Secret %q. The evaluator runtime's credential would overwrite that one. Pick a distinct key name (the default is NLPGO_INTERNAL_SECRET), or point langwatch_nlp.evaluatorRuntime.secrets.existingSecretName at a separate Secret." $nlpKey $nlpSecretName) }}
+    {{- end }}
   {{- end }}
 {{- end }}
 
@@ -2013,6 +2063,7 @@ here, once, by name, so both consuming templates agree.
      gets except API_PORT, LANGWATCH_ENDPOINT and the telemetry name (Alex,
      2026-09-30). tests/env-contract.mjs asserts the parity. */}}
 {{- define "langwatch.processEnv" }}
+{{- include "langwatch.nlpInternalSecretEnv" . }}
 {{- with .Values.app.trustedProxyAddresses }}
 - name: TRUSTED_PROXY_ADDRESSES
   value: {{ . | quote }}

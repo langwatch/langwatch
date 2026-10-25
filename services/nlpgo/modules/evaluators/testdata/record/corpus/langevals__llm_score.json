@@ -1,0 +1,47 @@
+[
+  {
+    "name": "high_score",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "final_score": 0.9
+      }
+    }
+  },
+  {
+    "name": "low_score",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Lyon."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "final_score": 0.1
+      }
+    }
+  },
+  {
+    "name": "image_input",
+    "entry": {
+      "input": "https://example.com/images/eiffel-tower.png",
+      "output": "An image of the Eiffel tower."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "final_score": 0.7
+      }
+    }
+  }
+]

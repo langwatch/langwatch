@@ -1,0 +1,248 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "Comment of a user who is extremely dissatisfied",
+          "model": "text-embedding-3-small"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                0.5058823529411764,
+                -0.2784313725490196,
+                -0.984313725490196,
+                -0.44313725490196076,
+                -0.984313725490196,
+                -0.08235294117647059,
+                0.7333333333333333,
+                0.8901960784313725
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-3-small",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 12,
+            "total_tokens": 12
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "Comment of a very happy and satisfied user",
+          "model": "text-embedding-3-small"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                0.6784313725490196,
+                -0.2784313725490196,
+                0.5686274509803921,
+                0.403921568627451,
+                -0.37254901960784315,
+                0.9529411764705882,
+                -0.8274509803921568,
+                -0.2549019607843137
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-3-small",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 11,
+            "total_tokens": 11
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "I love this product",
+          "model": "text-embedding-3-small"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                0.027450980392156862,
+                1.0,
+                0.011764705882352941,
+                -0.5843137254901961,
+                -0.1607843137254902,
+                0.13725490196078433,
+                0.8666666666666667,
+                -0.16862745098039217
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-3-small",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 5,
+            "total_tokens": 5
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "I love this product"
+    },
+    "env": {},
+    "name": "default_references",
+    "result": {
+      "cost": null,
+      "details": "Sentiment: negative (score: -1.00)",
+      "label": "negative",
+      "passed": null,
+      "score": -1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "calls": [
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "Great service",
+          "model": "text-embedding-3-small"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                0.4588235294117647,
+                0.5058823529411764,
+                0.07450980392156863,
+                0.2549019607843137,
+                0.36470588235294116,
+                -0.23921568627450981,
+                0.796078431372549,
+                0.8666666666666667
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-3-small",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 4,
+            "total_tokens": 4
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "Terrible service",
+          "model": "text-embedding-3-small"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.24705882352941178,
+                0.6862745098039216,
+                0.15294117647058825,
+                0.7176470588235294,
+                -0.3411764705882353,
+                -0.8745098039215686,
+                -0.7176470588235294,
+                -0.30196078431372547
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-3-small",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 5,
+            "total_tokens": 5
+          }
+        }
+      },
+      {
+        "kind": "embedding",
+        "request": {
+          "encoding_format": "float",
+          "input": "The delivery was late again",
+          "model": "text-embedding-3-small"
+        },
+        "response": {
+          "data": [
+            {
+              "embedding": [
+                -0.050980392156862744,
+                0.7176470588235294,
+                0.17647058823529413,
+                0.6549019607843137,
+                0.9058823529411765,
+                0.44313725490196076,
+                -0.5450980392156862,
+                -0.984313725490196
+              ],
+              "index": 0,
+              "object": "embedding"
+            }
+          ],
+          "model": "text-embedding-3-small",
+          "object": "list",
+          "usage": {
+            "prompt_tokens": 7,
+            "total_tokens": 7
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "The delivery was late again"
+    },
+    "env": {},
+    "name": "custom_references",
+    "result": {
+      "cost": null,
+      "details": "Sentiment: negative (score: -1.00)",
+      "label": "negative",
+      "passed": null,
+      "score": -1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "negative_reference": "Terrible service",
+      "normalization_factor": 0.5,
+      "positive_reference": "Great service"
+    }
+  },
+  {
+    "calls": [],
+    "entry": {
+      "input": ""
+    },
+    "env": {},
+    "name": "no_input_skipped",
+    "result": {
+      "cost": null,
+      "details": "No input text to evaluate",
+      "status": "skipped"
+    },
+    "settings": {}
+  }
+]

@@ -145,12 +145,21 @@ linters:
       - std-error-handling
 
     paths:
+      # lingua-go upstream files, kept as released; our load/mmap/models/genmodels files are linted.
+      - services/third_party/lingua-go/(serialization|internal)/
+      - services/third_party/lingua-go/(alphabet|builder|confidence|constant|detector|doc|isocode|isocode639_1_string|isocode639_3_string|language|language_string|model|ngram|result)\.go$
       - node_modules
       - \.claude
       - \.worktrees
       - dist
 
     rules:
+      # ragas 0.4.3 spells its SQL-equivalence JSON keys "explaination"; the Go port must match.
+      - path: services/nlpgo/modules/evaluators/
+        linters:
+          - misspell
+        text: "(?i)explaination"
+
       # Tests: relax rules that trade readability for strictness.
       #
       # funlen/gocognit are excluded because a table-driven test is one long
@@ -251,6 +260,8 @@ formatters:
   exclusions:
     paths:
       - vendor
+      - services/third_party/lingua-go/(serialization|internal)/
+      - services/third_party/lingua-go/(alphabet|builder|confidence|constant|detector|doc|isocode|isocode639_1_string|isocode639_3_string|language|language_string|model|ngram|result)\.go$
       - node_modules
       - \.claude
       - \.worktrees

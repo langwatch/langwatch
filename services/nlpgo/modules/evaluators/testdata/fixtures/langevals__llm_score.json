@@ -1,0 +1,330 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied. Always output a valid json for the function call",
+              "role": "system"
+            },
+            {
+              "content": "# Input\nWhat is the capital of France?\n\n# Output\nParis is the capital of France.\n\n# Task\nYou are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "evaluation"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the evaluation: a short reasoning first, then the final score.",
+                "name": "evaluation",
+                "parameters": {
+                  "properties": {
+                    "final_score": {
+                      "description": "your final score for the task",
+                      "type": "number"
+                    },
+                    "reasoning": {
+                      "description": "use this field to break down the task and explain your reasoning in multiple sub-scores, using it to combine into a final score",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "final_score"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"final_score\": 0.9}",
+                      "name": "evaluation"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 144,
+            "total_tokens": 154
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "env": {},
+    "name": "high_score",
+    "result": {
+      "cost": {
+        "amount": 2.76e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": null,
+      "passed": null,
+      "score": 0.9,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied. Always output a valid json for the function call",
+              "role": "system"
+            },
+            {
+              "content": "# Input\nWhat is the capital of France?\n\n# Output\nLyon.\n\n# Task\nYou are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "evaluation"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the evaluation: a short reasoning first, then the final score.",
+                "name": "evaluation",
+                "parameters": {
+                  "properties": {
+                    "final_score": {
+                      "description": "your final score for the task",
+                      "type": "number"
+                    },
+                    "reasoning": {
+                      "description": "use this field to break down the task and explain your reasoning in multiple sub-scores, using it to combine into a final score",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "final_score"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"final_score\": 0.1}",
+                      "name": "evaluation"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 137,
+            "total_tokens": 147
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Lyon."
+    },
+    "env": {},
+    "name": "low_score",
+    "result": {
+      "cost": {
+        "amount": 2.6549999999999998e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": null,
+      "passed": null,
+      "score": 0.1,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied. Always output a valid json for the function call",
+              "role": "system"
+            },
+            {
+              "content": [
+                {
+                  "text": "# Input",
+                  "type": "text"
+                },
+                {
+                  "image_url": {
+                    "url": "https://example.com/images/eiffel-tower.png"
+                  },
+                  "type": "image_url"
+                },
+                {
+                  "text": "# Output\nAn image of the Eiffel tower.",
+                  "type": "text"
+                },
+                {
+                  "text": "# Task\nYou are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied",
+                  "type": "text"
+                }
+              ],
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "evaluation"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the evaluation: a short reasoning first, then the final score.",
+                "name": "evaluation",
+                "parameters": {
+                  "properties": {
+                    "final_score": {
+                      "description": "your final score for the task",
+                      "type": "number"
+                    },
+                    "reasoning": {
+                      "description": "use this field to break down the task and explain your reasoning in multiple sub-scores, using it to combine into a final score",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "final_score"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"final_score\": 0.7}",
+                      "name": "evaluation"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 178,
+            "total_tokens": 188
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "https://example.com/images/eiffel-tower.png",
+      "output": "An image of the Eiffel tower."
+    },
+    "env": {},
+    "name": "image_input",
+    "result": {
+      "cost": {
+        "amount": 3.2699999999999995e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": null,
+      "passed": null,
+      "score": 0.7,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "name": "first_category",
+    "entry": {
+      "input": "Hi there!",
+      "output": "Hello! How can I help?"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "categories": [
+        {
+          "name": "greeting",
+          "description": "The message is a greeting"
+        },
+        {
+          "name": "question",
+          "description": "The message asks a question"
+        }
+      ]
+    }
+  },
+  {
+    "name": "second_category",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "categories": [
+        {
+          "name": "greeting",
+          "description": "The message is a greeting"
+        },
+        {
+          "name": "question",
+          "description": "The message asks a question"
+        }
+      ]
+    },
+    "script": {
+      "values": {
+        "label": "question"
+      }
+    }
+  }
+]

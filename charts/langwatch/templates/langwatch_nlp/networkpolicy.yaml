@@ -1,0 +1,36 @@
+{{- if and .Values.langwatch_nlp.enabled .Values.langwatch_nlp.networkPolicy.enabled }}
+# Ingress to the nlp pods (which serve /go/evaluators) is limited to this
+# release's app and workers pods, plus networkPolicy.extraIngressFrom.
+# Egress is not restricted: nlpgo calls the app and model providers.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-langwatch-nlp
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Release.Name }}-app
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Release.Name }}-workers
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- with .Values.langwatch_nlp.networkPolicy.extraIngressFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.langwatch_nlp.service.port }}
+{{- end }}

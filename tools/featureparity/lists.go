@@ -235,6 +235,7 @@ var (
 		"specs/home/voice-agents-home-banner.feature",
 		"specs/identity/one-decision-per-write.feature",
 		"specs/identity/org-admin-identity-surface.feature",
+		"specs/data-privacy/pii-analyser-choice.feature",
 		"specs/langy/langy-agent-service-conventions.feature",
 		"specs/langy/langy-baseline.feature",
 		"specs/langy/langy-command-bar-activation.feature",

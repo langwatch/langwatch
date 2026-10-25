@@ -1,0 +1,260 @@
+[
+  {
+    "name": "person",
+    "entry": {
+      "output": "My name is John Smith and I work here."
+    },
+    "settings": {
+      "entities": {
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "ip_address": false,
+        "location": false,
+        "person": true,
+        "phone_number": false,
+        "medical_license": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false,
+        "uk_nhs": false,
+        "sg_nric_fin": false,
+        "au_abn": false,
+        "au_acn": false,
+        "au_tfn": false,
+        "au_medicare": false,
+        "in_pan": false,
+        "in_aadhaar": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "in_passport": false
+      }
+    }
+  },
+  {
+    "name": "location",
+    "entry": {
+      "output": "I live in Paris, France."
+    },
+    "settings": {
+      "entities": {
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "ip_address": false,
+        "location": true,
+        "person": false,
+        "phone_number": false,
+        "medical_license": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false,
+        "uk_nhs": false,
+        "sg_nric_fin": false,
+        "au_abn": false,
+        "au_acn": false,
+        "au_tfn": false,
+        "au_medicare": false,
+        "in_pan": false,
+        "in_aadhaar": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "in_passport": false
+      }
+    }
+  },
+  {
+    "name": "person and location",
+    "entry": {
+      "output": "Angela Merkel visited Berlin last week."
+    },
+    "settings": {
+      "entities": {
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "ip_address": false,
+        "location": true,
+        "person": true,
+        "phone_number": false,
+        "medical_license": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false,
+        "uk_nhs": false,
+        "sg_nric_fin": false,
+        "au_abn": false,
+        "au_acn": false,
+        "au_tfn": false,
+        "au_medicare": false,
+        "in_pan": false,
+        "in_aadhaar": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "in_passport": false
+      }
+    }
+  },
+  {
+    "name": "person with email",
+    "entry": {
+      "output": "Contact Maria Garcia at maria@example.com"
+    },
+    "settings": {
+      "entities": {
+        "credit_card": false,
+        "crypto": false,
+        "email_address": true,
+        "iban_code": false,
+        "ip_address": false,
+        "location": false,
+        "person": true,
+        "phone_number": false,
+        "medical_license": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false,
+        "uk_nhs": false,
+        "sg_nric_fin": false,
+        "au_abn": false,
+        "au_acn": false,
+        "au_tfn": false,
+        "au_medicare": false,
+        "in_pan": false,
+        "in_aadhaar": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "in_passport": false
+      }
+    }
+  },
+  {
+    "name": "location with phone",
+    "entry": {
+      "output": "Our office in London can be reached on +44 20 7031 3000."
+    },
+    "settings": {
+      "entities": {
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "ip_address": false,
+        "location": true,
+        "person": false,
+        "phone_number": true,
+        "medical_license": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false,
+        "uk_nhs": false,
+        "sg_nric_fin": false,
+        "au_abn": false,
+        "au_acn": false,
+        "au_tfn": false,
+        "au_medicare": false,
+        "in_pan": false,
+        "in_aadhaar": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "in_passport": false
+      }
+    }
+  },
+  {
+    "name": "no person",
+    "entry": {
+      "output": "The quick brown fox jumps over the lazy dog."
+    },
+    "settings": {
+      "entities": {
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "ip_address": false,
+        "location": true,
+        "person": true,
+        "phone_number": false,
+        "medical_license": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false,
+        "uk_nhs": false,
+        "sg_nric_fin": false,
+        "au_abn": false,
+        "au_acn": false,
+        "au_tfn": false,
+        "au_medicare": false,
+        "in_pan": false,
+        "in_aadhaar": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "in_passport": false
+      }
+    }
+  },
+  {
+    "name": "person below threshold",
+    "entry": {
+      "output": "Jordan said hi"
+    },
+    "settings": {
+      "entities": {
+        "credit_card": false,
+        "crypto": false,
+        "email_address": false,
+        "iban_code": false,
+        "ip_address": false,
+        "location": false,
+        "person": true,
+        "phone_number": false,
+        "medical_license": false,
+        "us_bank_number": false,
+        "us_driver_license": false,
+        "us_itin": false,
+        "us_passport": false,
+        "us_ssn": false,
+        "uk_nhs": false,
+        "sg_nric_fin": false,
+        "au_abn": false,
+        "au_acn": false,
+        "au_tfn": false,
+        "au_medicare": false,
+        "in_pan": false,
+        "in_aadhaar": false,
+        "in_vehicle_registration": false,
+        "in_voter": false,
+        "in_passport": false
+      },
+      "min_threshold": 0.9
+    }
+  },
+  {
+    "name": "person and location defaults",
+    "entry": {
+      "output": "Barack Obama was born in Hawaii."
+    },
+    "settings": {
+      "entities": {
+        "person": true,
+        "location": true
+      }
+    }
+  }
+]

@@ -137,6 +137,27 @@ func (o *Orchestrator) mailEnv(st domain.Stack) []string {
 	return env
 }
 
+// linguaModelsEnv points nlpgo at the generated language models, so
+// +go-evaluators serves lingua/language_detection (plan D16).
+func linguaModelsEnv(repoRoot string) string {
+	return "NLPGO_LINGUA_MODELS=" + filepath.Join(repoRoot, "services", "third_party", "lingua-go", "models.bin")
+}
+
+// modelPricingEnv points nlpgo at the app's model catalogue, which LLM
+// evaluator costs are priced from (the variable langevals reads too).
+func modelPricingEnv(repoRoot string) string {
+	return "LANGWATCH_MODEL_PRICING_DIR=" + filepath.Join(repoRoot, "modules", "model-provider", "contract", "src", "catalog")
+}
+
+// withLinguaModels generates the models once (make skips an existing
+// models.bin) before the Go lane starts, only when +go-evaluators is on.
+func withLinguaModels(repoRoot string, goEvaluators bool, shell string) string {
+	if !goEvaluators {
+		return shell
+	}
+	return fmt.Sprintf("make -C %q lingua-models && %s", repoRoot, shell)
+}
+
 // planChildren turns a resolved stack into the supervised process set, layering
 // the overlay env (hostname URLs + ports) onto each child and giving each Go
 // service its SERVER_ADDR.
@@ -344,7 +365,7 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 	} else if len(goServices) > 0 {
 		out = append(out, Child{
 			Name: GoLane, Dir: p.opts.RepoRoot, Color: palette[2], LogPath: p.logPath(GoLane),
-			Shell: p.goCombinedShell(GoLane, goServices),
+			Shell: withLinguaModels(p.opts.RepoRoot, p.opts.Selection.GoEvaluators, p.goCombinedShell(GoLane, goServices)),
 			Env:   goEnv,
 		})
 	}
@@ -383,6 +404,9 @@ func (p *childPlan) goServices() ([]string, []string) {
 	if p.opts.Selection.NLP {
 		services = append(services, "nlpgo")
 		env = append(env, fmt.Sprintf("%s=:%d", NLPAddrEnv, p.port("nlp")))
+	}
+	if p.opts.Selection.GoEvaluators {
+		env = append(env, linguaModelsEnv(p.opts.RepoRoot), modelPricingEnv(p.opts.RepoRoot))
 	}
 	return services, env
 }

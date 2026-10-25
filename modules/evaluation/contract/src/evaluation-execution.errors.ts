@@ -96,3 +96,24 @@ export class EvaluatorNotFoundError extends NotFoundError {
     this.name = "EvaluatorNotFoundError";
   }
 }
+
+/**
+ * The Go evaluator runtime's fair share for this project stayed full; retry
+ * after `retryAfterMs`.
+ */
+export class EvaluationBusyError extends HandledError {
+  declare readonly code: "evaluation_busy";
+
+  constructor(input: { evaluatorType: string; retryAfterMs: number | undefined }) {
+    super("evaluation_busy", "The evaluator runtime is busy for this project; try again shortly", {
+      httpStatus: 429,
+      fault: "platform",
+      retryable: true,
+      meta: {
+        evaluatorType: input.evaluatorType,
+        ...(input.retryAfterMs === undefined ? {} : { retryAfterMs: input.retryAfterMs }),
+      },
+    });
+    this.name = "EvaluationBusyError";
+  }
+}

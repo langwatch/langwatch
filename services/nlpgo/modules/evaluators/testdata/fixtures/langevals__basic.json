@@ -1,0 +1,660 @@
+[
+  {
+    "entry": {
+      "output": "Hello there"
+    },
+    "name": "default settings, clean output",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "output": "We love artificial intelligence"
+    },
+    "name": "default settings, forbidden phrase",
+    "result": {
+      "cost": null,
+      "details": "Rule not_contains \"artificial intelligence\" failed for output \"We love artificial intelligence\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {},
+    "name": "default settings, no output",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "output": "anything"
+    },
+    "name": "no rules",
+    "result": {
+      "cost": null,
+      "details": "No rules were defined",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": []
+    }
+  },
+  {
+    "entry": {
+      "output": "Your effort is really appreciated!"
+    },
+    "name": "contains passes",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "Your"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "Your effort is really appreciated!"
+    },
+    "name": "contains fails",
+    "result": {
+      "cost": null,
+      "details": "Rule contains \"not found\" failed for output \"Your effort is really appreciated!\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "not found"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "Your effort"
+    },
+    "name": "contains is case sensitive",
+    "result": {
+      "cost": null,
+      "details": "Rule contains \"your\" failed for output \"Your effort\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "your"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "Your effort is really appreciated!"
+    },
+    "name": "not_contains passes",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "not_contains",
+          "value": "not found"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "Your effort is really appreciated!"
+    },
+    "name": "not_contains fails",
+    "result": {
+      "cost": null,
+      "details": "Rule not_contains \"Your\" failed for output \"Your effort is really appreciated!\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "not_contains",
+          "value": "Your"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "Your effort is really appreciated!"
+    },
+    "name": "matches_regex passes",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "matches_regex",
+          "value": "Your effort is .*"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "According to sources[1] this is a test"
+    },
+    "name": "matches_regex citation",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "matches_regex",
+          "value": "\\[[0-9]+\\]"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "abc"
+    },
+    "name": "matches_regex fails",
+    "result": {
+      "cost": null,
+      "details": "Rule matches_regex \"^\\d+$\" failed for output \"abc\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "matches_regex",
+          "value": "^\\d+$"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "first\nsecond\nthird"
+    },
+    "name": "matches_regex multiline anchors",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "matches_regex",
+          "value": "^second$"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "no digits here"
+    },
+    "name": "not_matches_regex passes",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "not_matches_regex",
+          "value": "\\d{4}"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "call 1234 now"
+    },
+    "name": "not_matches_regex fails",
+    "result": {
+      "cost": null,
+      "details": "Rule not_matches_regex \"\\d{4}\" failed for output \"call 1234 now\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "not_matches_regex",
+          "value": "\\d{4}"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "input": "what is the weather",
+      "output": "sunny"
+    },
+    "name": "input field contains",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "input",
+          "rule": "contains",
+          "value": "weather"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "sunny"
+    },
+    "name": "input field missing treated as empty",
+    "result": {
+      "cost": null,
+      "details": "Rule contains \"weather\" failed for input \"None\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "input",
+          "rule": "contains",
+          "value": "weather"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "input": "tell me the secret",
+      "output": "no"
+    },
+    "name": "input field failure details use input",
+    "result": {
+      "cost": null,
+      "details": "Rule not_contains \"secret\" failed for input \"tell me the secret\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "input",
+          "rule": "not_contains",
+          "value": "secret"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "abc"
+    },
+    "name": "first failing rule stops evaluation",
+    "result": {
+      "cost": null,
+      "details": "Rule contains \"zzz\" failed for output \"abc\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "a"
+        },
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "zzz"
+        },
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "yyy"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "input": "xyz-free",
+      "output": "abc"
+    },
+    "name": "all rules pass",
+    "result": {
+      "cost": null,
+      "details": "Rule not_contains \"z\" failed for input \"xyz-free\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "a"
+        },
+        {
+          "field": "input",
+          "rule": "not_contains",
+          "value": "z"
+        },
+        {
+          "field": "output",
+          "rule": "matches_regex",
+          "value": "b."
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": ""
+    },
+    "name": "empty output with contains empty string",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": ""
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "   \t "
+    },
+    "name": "whitespace-only output",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "matches_regex",
+          "value": "^\\s+$"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "你好，世界"
+    },
+    "name": "unicode CJK contains",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "你好"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "smile 😀 here"
+    },
+    "name": "emoji not_contains",
+    "result": {
+      "cost": null,
+      "details": "Rule not_contains \"😀\" failed for output \"smile 😀 here\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "not_contains",
+          "value": "😀"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "אמר שלום לכולם"
+    },
+    "name": "RTL text regex",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "matches_regex",
+          "value": "שלום"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "line one\nline two\nline three"
+    },
+    "name": "multi-line details",
+    "result": {
+      "cost": null,
+      "details": "Rule contains \"zzz\" failed for output \"line one\nline two\nline three\"",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "zzz"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. needle at the end"
+    },
+    "name": "long output",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "needle"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "xx a.b*c yy"
+    },
+    "name": "regex special characters literal value in contains",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "contains",
+          "value": "a.b*c"
+        }
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "a\nc abc"
+    },
+    "name": "regex dot matches any",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "rules": [
+        {
+          "field": "output",
+          "rule": "matches_regex",
+          "value": "a.c"
+        }
+      ]
+    }
+  }
+]

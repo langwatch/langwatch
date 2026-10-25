@@ -1262,6 +1262,29 @@ langwatch_nlp:
     requests: { cpu: 250m, memory: 256Mi }
     limits: { cpu: 1, memory: 1Gi }
 
+  # Go evaluator runtime (/go/evaluators). Python langevals stays the
+  # production path; nlpgo only mounts the Go runtime when its secret is set.
+  ## @param langwatch_nlp.evaluatorRuntime.enabled [default: false] Wire NLPGO_INTERNAL_SECRET into the app, workers and nlp pods.
+  # Shared Bearer secret between the app, the workers and the nlp pods
+  # (NLPGO_INTERNAL_SECRET). Defaults to the app Secret, which generates it
+  # when autogen.enabled; add the key yourself when you bring your own Secret.
+  ## @param langwatch_nlp.evaluatorRuntime.secrets.existingSecretName [string, default: the app Secret] Secret carrying NLPGO_INTERNAL_SECRET.
+  ## @param langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey [string, default: NLPGO_INTERNAL_SECRET] Key inside that Secret.
+  evaluatorRuntime:
+    enabled: false
+    secrets:
+      existingSecretName: ""
+      internalSecretKey: NLPGO_INTERNAL_SECRET
+
+  # NetworkPolicy: only the app and workers pods may reach the nlp pods on the
+  # service port (second guard behind the Bearer secret). Egress is left open
+  # because nlpgo calls model providers. Off by default, like the gateway.
+  ## @param langwatch_nlp.networkPolicy.enabled [default: false] Render a NetworkPolicy restricting ingress to the nlp pods.
+  ## @param langwatch_nlp.networkPolicy.extraIngressFrom [array] Extra NetworkPolicy `from` entries allowed to reach nlp (for example another namespace's pods).
+  networkPolicy:
+    enabled: false
+    extraIngressFrom: []
+
   # Connection to the main LangWatch application
   ## @extra langwatch_nlp.upstreams Upstream to app (callbacks, etc.).
   ## @param langwatch_nlp.upstreams.langwatch.scheme [string, default: http] Scheme to app.

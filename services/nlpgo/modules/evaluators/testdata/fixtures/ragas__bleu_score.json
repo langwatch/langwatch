@@ -1,0 +1,498 @@
+[
+  {
+    "entry": {
+      "expected_output": "the quick brown fox jumps over the lazy dog",
+      "output": "the quick brown fox jumps over the lazy dog"
+    },
+    "name": "identical short",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0000000000000004,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "hello",
+      "output": "hello"
+    },
+    "name": "identical one word",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "one two three four",
+      "output": "alpha beta gamma delta"
+    },
+    "name": "disjoint",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the quick brown cat sleeps",
+      "output": "the quick brown fox jumps"
+    },
+    "name": "partial overlap half",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.39763536438352515,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the quick brown fox leaps over the lazy dog",
+      "output": "the quick brown fox jumps over the lazy dog"
+    },
+    "name": "partial overlap high",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.5969491792019644,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the quick brown fox jumps over the lazy dog",
+      "output": "the quick brown fox"
+    },
+    "name": "output is prefix of reference",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.2865047968601902,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the quick brown fox",
+      "output": "the quick brown fox jumps over the lazy dog"
+    },
+    "name": "reference is prefix of output",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.29847458960098217,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the quick brown fox jumps over the lazy dog",
+      "output": "dog lazy the over jumps fox brown quick the"
+    },
+    "name": "word order swapped",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0825791079503452,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the quick brown fox",
+      "output": "The Quick Brown Fox"
+    },
+    "name": "case differs",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "Hello world",
+      "output": "Hello, world!"
+    },
+    "name": "punctuation differs",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.1899589214128981,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the quick brown fox",
+      "output": ""
+    },
+    "name": "empty output",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "",
+      "output": "the quick brown fox"
+    },
+    "name": "empty reference",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "",
+      "output": ""
+    },
+    "name": "both empty",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the quick brown fox",
+      "output": "    "
+    },
+    "name": "whitespace-only output",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "  ",
+      "output": " \n\t"
+    },
+    "name": "whitespace-only both",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the quick brown fox",
+      "output": "the   quick  brown fox"
+    },
+    "name": "extra whitespace inside",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0000000000000004,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "line one\nline two\nline three",
+      "output": "line one\nline two\nline three"
+    },
+    "name": "multi-line identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0000000000000004,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "line one\nline 2\nline three",
+      "output": "line one\nline two\nline three"
+    },
+    "name": "multi-line partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.3799178428257963,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "我喜欢吃苹果和香蕉",
+      "output": "我喜欢吃苹果和香蕉"
+    },
+    "name": "CJK identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "我喜欢吃橙子和香蕉",
+      "output": "我喜欢吃苹果和香蕉"
+    },
+    "name": "CJK partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "我 喜欢 吃 香蕉",
+      "output": "我 喜欢 吃 苹果"
+    },
+    "name": "CJK with spaces",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.5946035575013604,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "great job 👍 well done 🎉",
+      "output": "great job 👍 well done 🎉"
+    },
+    "name": "emoji identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0000000000000004,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "great job 👎 well done 🎉",
+      "output": "great job 👍 well done 🎉"
+    },
+    "name": "emoji partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.3799178428257963,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "שלום עולם זה טקסט בדיקה קצר",
+      "output": "שלום עולם זה טקסט בדיקה קצר"
+    },
+    "name": "RTL identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0000000000000004,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "שלום עולם זה טקסט אחר קצר",
+      "output": "שלום עולם זה טקסט בדיקה קצר"
+    },
+    "name": "RTL partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.537284965911771,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "the cat is on the mat",
+      "output": "the the the the the the the"
+    },
+    "name": "repeated words",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.07809849842300637,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "dog",
+      "output": "cat"
+    },
+    "name": "single word mismatch",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "The dog had bit the man.",
+      "output": "The dog bit the man."
+    },
+    "name": "sacrebleu doc example",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 0.5115078115793242,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "price is $1,234.56 (approx.)",
+      "output": "price is $1,234.56 (approx.)"
+    },
+    "name": "numbers and symbols",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0000000000000004,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+      "output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
+    },
+    "name": "long identical",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0000000000000004,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "expected_output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Ut enim ad minim veniam quis nostrud.",
+      "output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+    },
+    "name": "long partial",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": null,
+      "score": 1.0000000000000004,
+      "status": "processed"
+    },
+    "settings": {}
+  }
+]

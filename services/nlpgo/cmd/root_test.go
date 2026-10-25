@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo"
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
 // TestResolveLangWatchBaseURL_FallsBackToLangwatchEndpoint pins the
@@ -221,7 +221,7 @@ func TestNewCodeExecutor_NegativeTimeoutDoesNotExpireImmediately(t *testing.T) {
 // knob to the executor that enforces it.
 // @scenario "The HTTP block ceiling comes from NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS"
 func TestNewHTTPExecutor_AppliesConfiguredCeiling(t *testing.T) {
-	exec := newHTTPExecutor(nlpgo.EngineConfig{HTTPBlockTimeoutSeconds: 300}, httpblock.SSRFOptions{})
+	exec := newHTTPExecutor(nlpgo.EngineConfig{HTTPBlockTimeoutSeconds: 300}, ssrf.Options{})
 	if got, want := exec.DefaultTimeout(), 5*time.Minute; got != want {
 		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS=300)", got, want)
 	}
@@ -252,7 +252,7 @@ func assertTwelveMinuteCeilings(t *testing.T, cfg nlpgo.EngineConfig) {
 	t.Helper()
 	const want = 12 * time.Minute
 
-	if got := newHTTPExecutor(cfg, httpblock.SSRFOptions{}).DefaultTimeout(); got != want {
+	if got := newHTTPExecutor(cfg, ssrf.Options{}).DefaultTimeout(); got != want {
 		t.Errorf("http DefaultTimeout() = %v; want %v", got, want)
 	}
 	if got := newAgentWorkflowRunner(cfg).DefaultTimeout(); got != want {

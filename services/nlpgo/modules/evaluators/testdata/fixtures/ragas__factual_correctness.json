@@ -1,0 +1,496 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your task is to judge the faithfulness of a series of statements based on a given context. For each statement you must return verdict as 1 if the statement can be directly inferred based on the context or 0 if the statement can not be directly inferred based on the context.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"$defs\": {\"StatementFaithfulnessAnswer\": {\"properties\": {\"statement\": {\"description\": \"the original statement, word-by-word\", \"title\": \"Statement\", \"type\": \"string\"}, \"reason\": {\"description\": \"the reason of the verdict\", \"title\": \"Reason\", \"type\": \"string\"}, \"verdict\": {\"description\": \"the verdict(0/1) of the faithfulness.\", \"title\": \"Verdict\", \"type\": \"integer\"}}, \"required\": [\"statement\", \"reason\", \"verdict\"], \"title\": \"StatementFaithfulnessAnswer\", \"type\": \"object\"}}, \"properties\": {\"statements\": {\"items\": {\"$ref\": \"#/$defs/StatementFaithfulnessAnswer\"}, \"title\": \"Statements\", \"type\": \"array\"}}, \"required\": [\"statements\"], \"title\": \"NLIStatementOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"context\": \"John is a student at XYZ University. He is pursuing a degree in Computer Science. He is enrolled in several courses this semester, including Data Structures, Algorithms, and Database Management. John is a diligent student and spends a significant amount of time studying and completing assignments. He often stays late in the library to work on his projects.\",\n    \"statements\": [\n        \"John is majoring in Biology.\",\n        \"John is taking a course on Artificial Intelligence.\",\n        \"John is a dedicated student.\",\n        \"John has a part-time job.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"John is majoring in Biology.\",\n            \"reason\": \"John's major is explicitly mentioned as Computer Science. There is no information suggesting he is majoring in Biology.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is taking a course on Artificial Intelligence.\",\n            \"reason\": \"The context mentions the courses John is currently enrolled in, and Artificial Intelligence is not mentioned. Therefore, it cannot be deduced that John is taking a course on AI.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is a dedicated student.\",\n            \"reason\": \"The context states that he spends a significant amount of time studying and completing assignments. Additionally, it mentions that he often stays late in the library to work on his projects, which implies dedication.\",\n            \"verdict\": 1\n        },\n        {\n            \"statement\": \"John has a part-time job.\",\n            \"reason\": \"There is no information given in the context about John having a part-time job.\",\n            \"verdict\": 0\n        }\n    ]\n}\n\nExample 2\nInput: {\n    \"context\": \"Photosynthesis is a process used by plants, algae, and certain bacteria to convert light energy into chemical energy.\",\n    \"statements\": [\n        \"Albert Einstein was a genius.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"Albert Einstein was a genius.\",\n            \"reason\": \"The context and statement are unrelated\",\n            \"verdict\": 0\n        }\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"context\": \"Paris is the capital of France.\",\n    \"statements\": [\n        \"Scripted claims.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"statements\": [{\"statement\": \"Scripted statement.\", \"reason\": \"Scripted reason.\", \"verdict\": 1}]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 966,
+            "total_tokens": 976
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your task is to judge the faithfulness of a series of statements based on a given context. For each statement you must return verdict as 1 if the statement can be directly inferred based on the context or 0 if the statement can not be directly inferred based on the context.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"$defs\": {\"StatementFaithfulnessAnswer\": {\"properties\": {\"statement\": {\"description\": \"the original statement, word-by-word\", \"title\": \"Statement\", \"type\": \"string\"}, \"reason\": {\"description\": \"the reason of the verdict\", \"title\": \"Reason\", \"type\": \"string\"}, \"verdict\": {\"description\": \"the verdict(0/1) of the faithfulness.\", \"title\": \"Verdict\", \"type\": \"integer\"}}, \"required\": [\"statement\", \"reason\", \"verdict\"], \"title\": \"StatementFaithfulnessAnswer\", \"type\": \"object\"}}, \"properties\": {\"statements\": {\"items\": {\"$ref\": \"#/$defs/StatementFaithfulnessAnswer\"}, \"title\": \"Statements\", \"type\": \"array\"}}, \"required\": [\"statements\"], \"title\": \"NLIStatementOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"context\": \"John is a student at XYZ University. He is pursuing a degree in Computer Science. He is enrolled in several courses this semester, including Data Structures, Algorithms, and Database Management. John is a diligent student and spends a significant amount of time studying and completing assignments. He often stays late in the library to work on his projects.\",\n    \"statements\": [\n        \"John is majoring in Biology.\",\n        \"John is taking a course on Artificial Intelligence.\",\n        \"John is a dedicated student.\",\n        \"John has a part-time job.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"John is majoring in Biology.\",\n            \"reason\": \"John's major is explicitly mentioned as Computer Science. There is no information suggesting he is majoring in Biology.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is taking a course on Artificial Intelligence.\",\n            \"reason\": \"The context mentions the courses John is currently enrolled in, and Artificial Intelligence is not mentioned. Therefore, it cannot be deduced that John is taking a course on AI.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is a dedicated student.\",\n            \"reason\": \"The context states that he spends a significant amount of time studying and completing assignments. Additionally, it mentions that he often stays late in the library to work on his projects, which implies dedication.\",\n            \"verdict\": 1\n        },\n        {\n            \"statement\": \"John has a part-time job.\",\n            \"reason\": \"There is no information given in the context about John having a part-time job.\",\n            \"verdict\": 0\n        }\n    ]\n}\n\nExample 2\nInput: {\n    \"context\": \"Photosynthesis is a process used by plants, algae, and certain bacteria to convert light energy into chemical energy.\",\n    \"statements\": [\n        \"Albert Einstein was a genius.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"Albert Einstein was a genius.\",\n            \"reason\": \"The context and statement are unrelated\",\n            \"verdict\": 0\n        }\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"context\": \"The capital of France is Paris.\",\n    \"statements\": [\n        \"Scripted claims.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"statements\": [{\"statement\": \"Scripted statement.\", \"reason\": \"Scripted reason.\", \"verdict\": 1}]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 966,
+            "total_tokens": 976
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    \nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"claims\": {\"items\": {\"type\": \"string\"}, \"title\": \"Decomposed Claims\", \"type\": \"array\"}}, \"required\": [\"claims\"], \"title\": \"ClaimDecompositionOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Charles Babbage was a French mathematician, philosopher, and food critic.\"\n}\nOutput: {\n    \"claims\": [\n        \"Charles Babbage was a mathematician and philosopher.\"\n    ]\n}\n\nExample 2\nInput: {\n    \"response\": \"Albert Einstein was a German theoretical physicist. He developed the theory of relativity and also contributed to the development of quantum mechanics.\"\n}\nOutput: {\n    \"claims\": [\n        \"Albert Einstein was a German physicist.\",\n        \"Albert Einstein developed relativity and contributed to quantum mechanics.\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"Paris is the capital of France.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"claims\": [\"Scripted claims.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 377,
+            "total_tokens": 387
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    \nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"claims\": {\"items\": {\"type\": \"string\"}, \"title\": \"Decomposed Claims\", \"type\": \"array\"}}, \"required\": [\"claims\"], \"title\": \"ClaimDecompositionOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Charles Babbage was a French mathematician, philosopher, and food critic.\"\n}\nOutput: {\n    \"claims\": [\n        \"Charles Babbage was a mathematician and philosopher.\"\n    ]\n}\n\nExample 2\nInput: {\n    \"response\": \"Albert Einstein was a German theoretical physicist. He developed the theory of relativity and also contributed to the development of quantum mechanics.\"\n}\nOutput: {\n    \"claims\": [\n        \"Albert Einstein was a German physicist.\",\n        \"Albert Einstein developed relativity and contributed to quantum mechanics.\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"The capital of France is Paris.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"claims\": [\"Scripted claims.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 377,
+            "total_tokens": 387
+          }
+        }
+      }
+    ],
+    "entry": {
+      "expected_output": "The capital of France is Paris.",
+      "output": "Paris is the capital of France."
+    },
+    "env": {},
+    "name": "correct",
+    "result": {
+      "cost": {
+        "amount": 0.00042689999999999997,
+        "currency": "USD"
+      },
+      "details": "# Precision\nPremise: The capital of France is Paris.\nHypothesis list:\n- \"Scripted claims.\": True\n\n# Recall\nPremise: Paris is the capital of France.\nHypothesis list:\n- \"Scripted claims.\": True\n",
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your task is to judge the faithfulness of a series of statements based on a given context. For each statement you must return verdict as 1 if the statement can be directly inferred based on the context or 0 if the statement can not be directly inferred based on the context.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"$defs\": {\"StatementFaithfulnessAnswer\": {\"properties\": {\"statement\": {\"description\": \"the original statement, word-by-word\", \"title\": \"Statement\", \"type\": \"string\"}, \"reason\": {\"description\": \"the reason of the verdict\", \"title\": \"Reason\", \"type\": \"string\"}, \"verdict\": {\"description\": \"the verdict(0/1) of the faithfulness.\", \"title\": \"Verdict\", \"type\": \"integer\"}}, \"required\": [\"statement\", \"reason\", \"verdict\"], \"title\": \"StatementFaithfulnessAnswer\", \"type\": \"object\"}}, \"properties\": {\"statements\": {\"items\": {\"$ref\": \"#/$defs/StatementFaithfulnessAnswer\"}, \"title\": \"Statements\", \"type\": \"array\"}}, \"required\": [\"statements\"], \"title\": \"NLIStatementOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"context\": \"John is a student at XYZ University. He is pursuing a degree in Computer Science. He is enrolled in several courses this semester, including Data Structures, Algorithms, and Database Management. John is a diligent student and spends a significant amount of time studying and completing assignments. He often stays late in the library to work on his projects.\",\n    \"statements\": [\n        \"John is majoring in Biology.\",\n        \"John is taking a course on Artificial Intelligence.\",\n        \"John is a dedicated student.\",\n        \"John has a part-time job.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"John is majoring in Biology.\",\n            \"reason\": \"John's major is explicitly mentioned as Computer Science. There is no information suggesting he is majoring in Biology.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is taking a course on Artificial Intelligence.\",\n            \"reason\": \"The context mentions the courses John is currently enrolled in, and Artificial Intelligence is not mentioned. Therefore, it cannot be deduced that John is taking a course on AI.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is a dedicated student.\",\n            \"reason\": \"The context states that he spends a significant amount of time studying and completing assignments. Additionally, it mentions that he often stays late in the library to work on his projects, which implies dedication.\",\n            \"verdict\": 1\n        },\n        {\n            \"statement\": \"John has a part-time job.\",\n            \"reason\": \"There is no information given in the context about John having a part-time job.\",\n            \"verdict\": 0\n        }\n    ]\n}\n\nExample 2\nInput: {\n    \"context\": \"Photosynthesis is a process used by plants, algae, and certain bacteria to convert light energy into chemical energy.\",\n    \"statements\": [\n        \"Albert Einstein was a genius.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"Albert Einstein was a genius.\",\n            \"reason\": \"The context and statement are unrelated\",\n            \"verdict\": 0\n        }\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"context\": \"Lyon is the capital of France.\",\n    \"statements\": [\n        \"Scripted claims.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"statements\": [{\"statement\": \"Scripted statement.\", \"reason\": \"Scripted reason.\", \"verdict\": 0}]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 966,
+            "total_tokens": 976
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your task is to judge the faithfulness of a series of statements based on a given context. For each statement you must return verdict as 1 if the statement can be directly inferred based on the context or 0 if the statement can not be directly inferred based on the context.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"$defs\": {\"StatementFaithfulnessAnswer\": {\"properties\": {\"statement\": {\"description\": \"the original statement, word-by-word\", \"title\": \"Statement\", \"type\": \"string\"}, \"reason\": {\"description\": \"the reason of the verdict\", \"title\": \"Reason\", \"type\": \"string\"}, \"verdict\": {\"description\": \"the verdict(0/1) of the faithfulness.\", \"title\": \"Verdict\", \"type\": \"integer\"}}, \"required\": [\"statement\", \"reason\", \"verdict\"], \"title\": \"StatementFaithfulnessAnswer\", \"type\": \"object\"}}, \"properties\": {\"statements\": {\"items\": {\"$ref\": \"#/$defs/StatementFaithfulnessAnswer\"}, \"title\": \"Statements\", \"type\": \"array\"}}, \"required\": [\"statements\"], \"title\": \"NLIStatementOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"context\": \"John is a student at XYZ University. He is pursuing a degree in Computer Science. He is enrolled in several courses this semester, including Data Structures, Algorithms, and Database Management. John is a diligent student and spends a significant amount of time studying and completing assignments. He often stays late in the library to work on his projects.\",\n    \"statements\": [\n        \"John is majoring in Biology.\",\n        \"John is taking a course on Artificial Intelligence.\",\n        \"John is a dedicated student.\",\n        \"John has a part-time job.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"John is majoring in Biology.\",\n            \"reason\": \"John's major is explicitly mentioned as Computer Science. There is no information suggesting he is majoring in Biology.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is taking a course on Artificial Intelligence.\",\n            \"reason\": \"The context mentions the courses John is currently enrolled in, and Artificial Intelligence is not mentioned. Therefore, it cannot be deduced that John is taking a course on AI.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is a dedicated student.\",\n            \"reason\": \"The context states that he spends a significant amount of time studying and completing assignments. Additionally, it mentions that he often stays late in the library to work on his projects, which implies dedication.\",\n            \"verdict\": 1\n        },\n        {\n            \"statement\": \"John has a part-time job.\",\n            \"reason\": \"There is no information given in the context about John having a part-time job.\",\n            \"verdict\": 0\n        }\n    ]\n}\n\nExample 2\nInput: {\n    \"context\": \"Photosynthesis is a process used by plants, algae, and certain bacteria to convert light energy into chemical energy.\",\n    \"statements\": [\n        \"Albert Einstein was a genius.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"Albert Einstein was a genius.\",\n            \"reason\": \"The context and statement are unrelated\",\n            \"verdict\": 0\n        }\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"context\": \"The capital of France is Paris.\",\n    \"statements\": [\n        \"Scripted claims.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"statements\": [{\"statement\": \"Scripted statement.\", \"reason\": \"Scripted reason.\", \"verdict\": 0}]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 966,
+            "total_tokens": 976
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    \nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"claims\": {\"items\": {\"type\": \"string\"}, \"title\": \"Decomposed Claims\", \"type\": \"array\"}}, \"required\": [\"claims\"], \"title\": \"ClaimDecompositionOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Charles Babbage was a French mathematician, philosopher, and food critic.\"\n}\nOutput: {\n    \"claims\": [\n        \"Charles Babbage was a mathematician and philosopher.\"\n    ]\n}\n\nExample 2\nInput: {\n    \"response\": \"Albert Einstein was a German theoretical physicist. He developed the theory of relativity and also contributed to the development of quantum mechanics.\"\n}\nOutput: {\n    \"claims\": [\n        \"Albert Einstein was a German physicist.\",\n        \"Albert Einstein developed relativity and contributed to quantum mechanics.\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"Lyon is the capital of France.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"claims\": [\"Scripted claims.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 377,
+            "total_tokens": 387
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    \nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"claims\": {\"items\": {\"type\": \"string\"}, \"title\": \"Decomposed Claims\", \"type\": \"array\"}}, \"required\": [\"claims\"], \"title\": \"ClaimDecompositionOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Charles Babbage was a French mathematician, philosopher, and food critic.\"\n}\nOutput: {\n    \"claims\": [\n        \"Charles Babbage was a mathematician and philosopher.\"\n    ]\n}\n\nExample 2\nInput: {\n    \"response\": \"Albert Einstein was a German theoretical physicist. He developed the theory of relativity and also contributed to the development of quantum mechanics.\"\n}\nOutput: {\n    \"claims\": [\n        \"Albert Einstein was a German physicist.\",\n        \"Albert Einstein developed relativity and contributed to quantum mechanics.\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"The capital of France is Paris.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"claims\": [\"Scripted claims.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 377,
+            "total_tokens": 387
+          }
+        }
+      }
+    ],
+    "entry": {
+      "expected_output": "The capital of France is Paris.",
+      "output": "Lyon is the capital of France."
+    },
+    "env": {},
+    "name": "incorrect",
+    "result": {
+      "cost": {
+        "amount": 0.00042689999999999997,
+        "currency": "USD"
+      },
+      "details": "# Precision\nPremise: The capital of France is Paris.\nHypothesis list:\n- \"Scripted claims.\": False\n\n# Recall\nPremise: Lyon is the capital of France.\nHypothesis list:\n- \"Scripted claims.\": False\n",
+      "label": null,
+      "passed": null,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your task is to judge the faithfulness of a series of statements based on a given context. For each statement you must return verdict as 1 if the statement can be directly inferred based on the context or 0 if the statement can not be directly inferred based on the context.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"$defs\": {\"StatementFaithfulnessAnswer\": {\"properties\": {\"statement\": {\"description\": \"the original statement, word-by-word\", \"title\": \"Statement\", \"type\": \"string\"}, \"reason\": {\"description\": \"the reason of the verdict\", \"title\": \"Reason\", \"type\": \"string\"}, \"verdict\": {\"description\": \"the verdict(0/1) of the faithfulness.\", \"title\": \"Verdict\", \"type\": \"integer\"}}, \"required\": [\"statement\", \"reason\", \"verdict\"], \"title\": \"StatementFaithfulnessAnswer\", \"type\": \"object\"}}, \"properties\": {\"statements\": {\"items\": {\"$ref\": \"#/$defs/StatementFaithfulnessAnswer\"}, \"title\": \"Statements\", \"type\": \"array\"}}, \"required\": [\"statements\"], \"title\": \"NLIStatementOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"context\": \"John is a student at XYZ University. He is pursuing a degree in Computer Science. He is enrolled in several courses this semester, including Data Structures, Algorithms, and Database Management. John is a diligent student and spends a significant amount of time studying and completing assignments. He often stays late in the library to work on his projects.\",\n    \"statements\": [\n        \"John is majoring in Biology.\",\n        \"John is taking a course on Artificial Intelligence.\",\n        \"John is a dedicated student.\",\n        \"John has a part-time job.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"John is majoring in Biology.\",\n            \"reason\": \"John's major is explicitly mentioned as Computer Science. There is no information suggesting he is majoring in Biology.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is taking a course on Artificial Intelligence.\",\n            \"reason\": \"The context mentions the courses John is currently enrolled in, and Artificial Intelligence is not mentioned. Therefore, it cannot be deduced that John is taking a course on AI.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is a dedicated student.\",\n            \"reason\": \"The context states that he spends a significant amount of time studying and completing assignments. Additionally, it mentions that he often stays late in the library to work on his projects, which implies dedication.\",\n            \"verdict\": 1\n        },\n        {\n            \"statement\": \"John has a part-time job.\",\n            \"reason\": \"There is no information given in the context about John having a part-time job.\",\n            \"verdict\": 0\n        }\n    ]\n}\n\nExample 2\nInput: {\n    \"context\": \"Photosynthesis is a process used by plants, algae, and certain bacteria to convert light energy into chemical energy.\",\n    \"statements\": [\n        \"Albert Einstein was a genius.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"Albert Einstein was a genius.\",\n            \"reason\": \"The context and statement are unrelated\",\n            \"verdict\": 0\n        }\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"context\": \"Paris is the capital of France.\",\n    \"statements\": [\n        \"Scripted claims.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"statements\": [{\"statement\": \"Scripted statement.\", \"reason\": \"Scripted reason.\", \"verdict\": 1}]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 966,
+            "total_tokens": 976
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your task is to judge the faithfulness of a series of statements based on a given context. For each statement you must return verdict as 1 if the statement can be directly inferred based on the context or 0 if the statement can not be directly inferred based on the context.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"$defs\": {\"StatementFaithfulnessAnswer\": {\"properties\": {\"statement\": {\"description\": \"the original statement, word-by-word\", \"title\": \"Statement\", \"type\": \"string\"}, \"reason\": {\"description\": \"the reason of the verdict\", \"title\": \"Reason\", \"type\": \"string\"}, \"verdict\": {\"description\": \"the verdict(0/1) of the faithfulness.\", \"title\": \"Verdict\", \"type\": \"integer\"}}, \"required\": [\"statement\", \"reason\", \"verdict\"], \"title\": \"StatementFaithfulnessAnswer\", \"type\": \"object\"}}, \"properties\": {\"statements\": {\"items\": {\"$ref\": \"#/$defs/StatementFaithfulnessAnswer\"}, \"title\": \"Statements\", \"type\": \"array\"}}, \"required\": [\"statements\"], \"title\": \"NLIStatementOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"context\": \"John is a student at XYZ University. He is pursuing a degree in Computer Science. He is enrolled in several courses this semester, including Data Structures, Algorithms, and Database Management. John is a diligent student and spends a significant amount of time studying and completing assignments. He often stays late in the library to work on his projects.\",\n    \"statements\": [\n        \"John is majoring in Biology.\",\n        \"John is taking a course on Artificial Intelligence.\",\n        \"John is a dedicated student.\",\n        \"John has a part-time job.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"John is majoring in Biology.\",\n            \"reason\": \"John's major is explicitly mentioned as Computer Science. There is no information suggesting he is majoring in Biology.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is taking a course on Artificial Intelligence.\",\n            \"reason\": \"The context mentions the courses John is currently enrolled in, and Artificial Intelligence is not mentioned. Therefore, it cannot be deduced that John is taking a course on AI.\",\n            \"verdict\": 0\n        },\n        {\n            \"statement\": \"John is a dedicated student.\",\n            \"reason\": \"The context states that he spends a significant amount of time studying and completing assignments. Additionally, it mentions that he often stays late in the library to work on his projects, which implies dedication.\",\n            \"verdict\": 1\n        },\n        {\n            \"statement\": \"John has a part-time job.\",\n            \"reason\": \"There is no information given in the context about John having a part-time job.\",\n            \"verdict\": 0\n        }\n    ]\n}\n\nExample 2\nInput: {\n    \"context\": \"Photosynthesis is a process used by plants, algae, and certain bacteria to convert light energy into chemical energy.\",\n    \"statements\": [\n        \"Albert Einstein was a genius.\"\n    ]\n}\nOutput: {\n    \"statements\": [\n        {\n            \"statement\": \"Albert Einstein was a genius.\",\n            \"reason\": \"The context and statement are unrelated\",\n            \"verdict\": 0\n        }\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"context\": \"The capital of France is Paris.\",\n    \"statements\": [\n        \"Scripted claims.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"statements\": [{\"statement\": \"Scripted statement.\", \"reason\": \"Scripted reason.\", \"verdict\": 1}]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 966,
+            "total_tokens": 976
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    \nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"claims\": {\"items\": {\"type\": \"string\"}, \"title\": \"Decomposed Claims\", \"type\": \"array\"}}, \"required\": [\"claims\"], \"title\": \"ClaimDecompositionOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Charles Babbage was a French mathematician, philosopher, and food critic.\"\n}\nOutput: {\n    \"claims\": [\n        \"Charles Babbage was a mathematician.\",\n        \"Charles Babbage was a philosopher.\"\n    ]\n}\n\nExample 2\nInput: {\n    \"response\": \"Albert Einstein was a German theoretical physicist. He developed the theory of relativity and also contributed to the development of quantum mechanics.\"\n}\nOutput: {\n    \"claims\": [\n        \"Albert Einstein was a German theoretical physicist.\",\n        \"Albert Einstein developed the theory of relativity.\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"Paris is the capital of France.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"claims\": [\"Scripted claims.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 383,
+            "total_tokens": 393
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "\n    Decompose and break down each of the input sentences into one or more standalone statements. Each statement should be a standalone claim that can be independently verified.\n    Follow the level of atomicity and coverage as shown in the examples.\n    \nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"claims\": {\"items\": {\"type\": \"string\"}, \"title\": \"Decomposed Claims\", \"type\": \"array\"}}, \"required\": [\"claims\"], \"title\": \"ClaimDecompositionOutput\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"response\": \"Charles Babbage was a French mathematician, philosopher, and food critic.\"\n}\nOutput: {\n    \"claims\": [\n        \"Charles Babbage was a mathematician.\",\n        \"Charles Babbage was a philosopher.\"\n    ]\n}\n\nExample 2\nInput: {\n    \"response\": \"Albert Einstein was a German theoretical physicist. He developed the theory of relativity and also contributed to the development of quantum mechanics.\"\n}\nOutput: {\n    \"claims\": [\n        \"Albert Einstein was a German theoretical physicist.\",\n        \"Albert Einstein developed the theory of relativity.\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"response\": \"The capital of France is Paris.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"claims\": [\"Scripted claims.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 383,
+            "total_tokens": 393
+          }
+        }
+      }
+    ],
+    "entry": {
+      "expected_output": "The capital of France is Paris.",
+      "output": "Paris is the capital of France."
+    },
+    "env": {},
+    "name": "recall_mode_high_atomicity",
+    "result": {
+      "cost": {
+        "amount": 0.00042869999999999996,
+        "currency": "USD"
+      },
+      "details": "# Precision\nPremise: The capital of France is Paris.\nHypothesis list:\n- \"Scripted claims.\": True\n\n# Recall\nPremise: Paris is the capital of France.\nHypothesis list:\n- \"Scripted claims.\": True\n",
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "atomicity": "high",
+      "mode": "recall",
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]

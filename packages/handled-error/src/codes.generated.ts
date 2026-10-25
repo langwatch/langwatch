@@ -193,6 +193,36 @@ export const goErrorCodes = {
    */
   end_user_required: { service: "aigateway", httpStatus: 400 },
   /**
+   * ErrBusy
+   *
+   * @source services/nlpgo/modules/evaluators/contract/errors.go
+   */
+  evaluation_busy: { service: "nlpgo", httpStatus: 429 },
+  /**
+   * ErrPayloadTooLarge
+   *
+   * @source services/nlpgo/modules/evaluators/contract/errors.go
+   */
+  evaluation_payload_too_large: { service: "nlpgo", httpStatus: 413 },
+  /**
+   * ErrResultsUnencodable — is a batch whose results JSON cannot carry.
+   *
+   * @source services/nlpgo/modules/evaluators/contract/errors.go
+   */
+  evaluation_results_unencodable: { service: "nlpgo", httpStatus: 500 },
+  /**
+   * ErrEvaluatorNotFound
+   *
+   * @source services/nlpgo/modules/evaluators/contract/errors.go
+   */
+  evaluator_not_found: { service: "nlpgo", httpStatus: 404 },
+  /**
+   * ErrEvaluatorSettingsInvalid
+   *
+   * @source services/nlpgo/modules/evaluators/contract/errors.go
+   */
+  evaluator_settings_invalid: { service: "nlpgo", httpStatus: 400 },
+  /**
    * ErrGatewayUnavailable — signals the AI Gateway returned an error or is
    * unreachable.
    *
@@ -511,14 +541,33 @@ export const goErrorCodes = {
    */
   ssrf_blocked: { service: "nlpgo", httpStatus: 400 },
   /**
+   * ErrTenantMissing
+   *
+   * @source services/nlpgo/modules/evaluators/contract/errors.go
+   */
+  tenant_missing: { service: "nlpgo", httpStatus: 400 },
+  /**
+   * ErrTopicClusteringFailed
+   *
+   * @source services/nlpgo/modules/evaluators/contract/topic_clustering.go
+   */
+  topic_clustering_failed: { service: "nlpgo", httpStatus: 500 },
+  /**
+   * ErrTopicClusteringTooFewTraces
+   *
+   * @source services/nlpgo/modules/evaluators/contract/topic_clustering.go
+   */
+  topic_clustering_too_few_traces: { service: "nlpgo", httpStatus: 422 },
+  /**
    * ErrUnauthorized — signals a missing or invalid internal bearer secret on
    * /chat. The manager binds the cluster service surface, so this is the wall
    * against any pod that can route to it.
    *
-   * Also declared by nlpgo (ErrUnauthorized).
+   * Also declared by nlpgo (ErrUnauthorized), nlpgo (ErrUnauthorized).
    *
    * @source services/langyagent/domain/errors.go
    * @source services/nlpgo/domain/errors.go
+   * @source services/nlpgo/modules/evaluators/contract/errors.go
    */
   unauthorized: { service: "langyagent", httpStatus: 401 },
   /**

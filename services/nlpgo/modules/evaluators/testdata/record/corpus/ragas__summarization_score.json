@@ -1,0 +1,40 @@
+[
+  {
+    "name": "answers_yes",
+    "entry": {
+      "output": "Paris is France's capital, on the Seine.",
+      "contexts": [
+        "Paris is the capital and largest city of France. It lies on the Seine."
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "answers": [
+          "1"
+        ]
+      }
+    }
+  },
+  {
+    "name": "answers_no",
+    "entry": {
+      "output": "Lyon is nice.",
+      "contexts": [
+        "Paris is the capital and largest city of France. It lies on the Seine."
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "answers": [
+          "0"
+        ]
+      }
+    }
+  }
+]

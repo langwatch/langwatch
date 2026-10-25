@@ -285,4 +285,6 @@ export const EVALUATION_TEST_CONFIG: EvaluationServerConfig = {
   enablePresidio: undefined,
   enableLingua: undefined,
   evaluatorRetryWindowMinutes: 120,
+
+  evaluatorRuntime: { endpoint: undefined, engine: "python", engineOverrides: {} },
 };
