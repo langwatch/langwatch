@@ -1,4 +1,5 @@
 import {
+  EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_ATTEMPT_FAILED_EVENT_TYPE,
   EVALUATION_ATTEMPT_FAILED_EVENT_VERSION_LATEST,
   evaluationAttemptFailedEventDataSchema,
@@ -7,6 +8,7 @@ import {
   type ExecuteEvaluationCommandData,
   deriveVerdictPassed,
   deriveVerdictScore,
+  evaluationReportedEventDataSchema,
 } from "@langwatch/evaluation-contract";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
@@ -22,10 +24,14 @@ import {
   type EvaluationReportedEventService,
   type EvaluationReportedResult,
 } from "../../../services/evaluation-reported-event.service.ts";
+import type { MonitorErrorRateService } from "../../monitors/services/monitor-error-rate.service.ts";
 import type { PreparedEvaluation } from "./evaluation-execution-preparation.service.ts";
 import type { EvaluationExecutionReceiptService } from "./evaluation-execution-receipt.service.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
+
+/** What the monitor's error rate reads off the reported event. */
+const reportedOutcomeSchema = evaluationReportedEventDataSchema.pick({ status: true, error: true });
 
 /** The next attempt of an evaluation whose evaluator service was not up. */
 type PlannedRetry = { attempt: number; delayMs: number; nextAttemptAt: number };
@@ -45,6 +51,8 @@ export class EvaluationExecutionOutcomeService {
     reportedEvents: EvaluationReportedEventService;
     retries: Pick<EvaluationCommandDispatcherService, "retryEvaluation">;
     retryWindowMs: number;
+    /** Counts the settled run toward its monitor's error rate; absent where nothing counts. */
+    monitorErrorRates?: Pick<MonitorErrorRateService, "observe">;
   }): EvaluationExecutionOutcomeService {
     return new EvaluationExecutionOutcomeService(input);
   }
@@ -55,10 +63,20 @@ export class EvaluationExecutionOutcomeService {
       reportedEvents: EvaluationReportedEventService;
       retries: Pick<EvaluationCommandDispatcherService, "retryEvaluation">;
       retryWindowMs: number;
+      monitorErrorRates?: Pick<MonitorErrorRateService, "observe">;
     },
   ) {}
 
   async execute(
+    data: ExecuteEvaluationCommandData,
+    prepared: PreparedEvaluation,
+  ): Promise<EvaluationProcessingEvent[]> {
+    const events = await this.settle(data, prepared);
+    await this.observeMonitorRun({ data, prepared, events });
+    return events;
+  }
+
+  private async settle(
     data: ExecuteEvaluationCommandData,
     prepared: PreparedEvaluation,
   ): Promise<EvaluationProcessingEvent[]> {
@@ -67,6 +85,30 @@ export class EvaluationExecutionOutcomeService {
     } catch (error) {
       return this.handleFailure(data, error);
     }
+  }
+
+  /** The reported outcome counts toward the monitor's error rate; a retry reports none yet. */
+  private async observeMonitorRun({
+    data,
+    prepared,
+    events,
+  }: {
+    data: ExecuteEvaluationCommandData;
+    prepared: PreparedEvaluation;
+    events: EvaluationProcessingEvent[];
+  }): Promise<void> {
+    const reported = events.find((event) => event.type === EVALUATION_REPORTED_EVENT_TYPE);
+    if (!reported || !this.deps.monitorErrorRates) return;
+    const { status, error } = reportedOutcomeSchema.parse(reported.data);
+    await this.deps.monitorErrorRates.observe({
+      projectId: data.tenantId,
+      monitorId: prepared.monitor.id,
+      monitorRevision: prepared.monitor.updatedAt.getTime(),
+      executionMode: prepared.monitor.executionMode,
+      isGuardrail: !!data.isGuardrail,
+      outcome: status,
+      error,
+    });
   }
 
   private async executePrepared(

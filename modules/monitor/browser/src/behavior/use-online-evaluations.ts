@@ -62,6 +62,7 @@ export function useOnlineEvaluations({
       name: monitor.name,
       checkType: monitor.checkType,
       enabled: monitor.enabled,
+      autoPausedReason: monitor.enabled ? null : (monitor.autoPausedReason ?? null),
       executionMode: monitor.executionMode,
       performance: performanceByMonitor.get(monitor.id),
       hasPerformanceError: performance.isError,
