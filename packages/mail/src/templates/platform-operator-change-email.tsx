@@ -15,7 +15,8 @@ export const platformOperatorChangeEmailProps = z.object({
   subjectEmail: z.string().nullable(),
   /** Who made the change: an operator's name, or the recovery task run from a shell. */
   actorName: z.string().min(1),
-  operatorsUrl: z.string().min(1),
+  /** The Operators page, absolute; null when the install has no public address to link to. */
+  operatorsUrl: z.url().nullable(),
 });
 
 export type PlatformOperatorChangeEmailProps = z.infer<typeof platformOperatorChangeEmailProps>;
@@ -25,10 +26,12 @@ const headingOf = ({ change, subjectName }: PlatformOperatorChangeEmailProps): s
     ? `${subjectName} is now a platform operator`
     : `${subjectName} is no longer a platform operator`;
 
+/** The subject line: whose role changed, and on which installation. */
 export const platformOperatorChangeEmailSubject = (
   props: PlatformOperatorChangeEmailProps,
 ): string => `${headingOf(props)} on ${props.installation}`;
 
+/** The notice body: who changed whose role, and what to do if nobody expected it. */
 export const PlatformOperatorChangeEmail = (props: PlatformOperatorChangeEmailProps) => {
   const { change, subjectName, subjectEmail, actorName, installation, operatorsUrl } = props;
   const verb = change === "granted" ? "gave" : "removed";
@@ -50,7 +53,7 @@ export const PlatformOperatorChangeEmail = (props: PlatformOperatorChangeEmailPr
           ? "Platform operators can see and change every organization on this installation. If you did not expect this, revoke the role on the Operators page now."
           : "If you did not expect this, check the Operators page to see who still holds the role."}
       </Muted>
-      <PrimaryButton href={operatorsUrl}>Open Operators</PrimaryButton>
+      {operatorsUrl ? <PrimaryButton href={operatorsUrl}>Open Operators</PrimaryButton> : null}
       <Muted>Every platform operator gets this email when the role is given or removed.</Muted>
     </EmailLayout>
   );
@@ -92,6 +95,7 @@ export const platformOperatorChangeEmailTemplate = defineTemplate({
   },
 });
 
+/** Renders the notice for ops, which sends it to each operator itself. */
 export const renderPlatformOperatorChangeEmail = async (
   props: PlatformOperatorChangeEmailProps,
 ): Promise<{ subject: string; html: string }> => {

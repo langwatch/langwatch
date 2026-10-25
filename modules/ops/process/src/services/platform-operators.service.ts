@@ -58,7 +58,8 @@ export type PlatformOperatorChangeNotice = Readonly<{
   mail: Pick<NotificationApi, "sendEmail">;
   renderer: Pick<MailRender, "renderPlatformOperatorChange">;
   installation: string;
-  operatorsUrl: string;
+  /** Absolute; null when the install has no public address, and the mail then links nothing. */
+  operatorsUrl: string | null;
 }>;
 
 const TASK_ACTOR_NAME = "The grant-platform-operator task";
@@ -149,7 +150,13 @@ export class PlatformOperatorsService {
       caller: { type: "user", id: revoker.id },
       actor: { type: "user", id: revoker.id },
     });
-    const subject = target ? await this.options.users.findById({ id: target.userId }) : null;
+    // The revoke already stands: a failed lookup only costs the notice, as a failed send does.
+    const subject = target
+      ? await this.options.users.findById({ id: target.userId }).catch((error: unknown) => {
+          logger.error({ error, grantId }, "the platform operators were not told of a revoke");
+          return null;
+        })
+      : null;
     if (subject) {
       await this.#tellOperators({
         change: "revoked",

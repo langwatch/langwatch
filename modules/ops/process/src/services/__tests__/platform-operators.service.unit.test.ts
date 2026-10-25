@@ -9,8 +9,11 @@ import {
   type AuthzGrantPlatformOperatorInput,
   type PlatformOperator,
 } from "@langwatch/authz-contract";
+import type { MailRender } from "@langwatch/mail";
+import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import type * as observabilityModule from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -62,6 +65,7 @@ function world({
   administrators = [],
   deployment = SELF_HOSTED,
   mailFails = false,
+  lookupFails = false,
 }: {
   holders?: PlatformOperator[];
   users?: UserProfile[];
@@ -69,6 +73,7 @@ function world({
   administrators?: string[];
   deployment?: { cloud: boolean; isLocalDevelopment: boolean };
   mailFails?: boolean;
+  lookupFails?: boolean;
 } = {}) {
   const granted: AuthzGrantPlatformOperatorInput[] = [];
   const authz: Pick<
@@ -95,7 +100,10 @@ function world({
     },
     findByEmail: async ({ email }) =>
       users.find((candidate) => candidate.email === email.toLowerCase()) ?? null,
-    findById: async ({ id }) => users.find((candidate) => candidate.id === id) ?? null,
+    findById: async ({ id }) => {
+      if (lookupFails) throw new Error("user directory unavailable");
+      return users.find((candidate) => candidate.id === id) ?? null;
+    },
   };
   const organizationDirectory: Pick<
     OrganizationApi,
@@ -118,18 +126,18 @@ function world({
     organizations: organizationDirectory,
     deployment,
     notice: {
-      mail: {
+      mail: createApiFixture<Pick<NotificationApi, "sendEmail">>({
         sendEmail: async ({ to, subject, idempotencyKey }) => {
           if (mailFails) throw new Error("mail gateway unavailable");
           for (const address of [to].flat()) told.push({ to: address, subject, idempotencyKey });
         },
-      },
-      renderer: {
+      }),
+      renderer: createApiFixture<Pick<MailRender, "renderPlatformOperatorChange">>({
         renderPlatformOperatorChange: async ({ change, subjectName, actorName }) => ({
           subject: `${subjectName} ${change} by ${actorName}`,
           html: "",
         }),
-      },
+      }),
       installation: "langwatch.acme.example",
       operatorsUrl: "https://langwatch.acme.example/ops/operators",
     },
@@ -552,6 +560,18 @@ describe("PlatformOperatorsService", () => {
         userId: "bo",
       });
       expect(granted).toHaveLength(1);
+    });
+
+    /** @scenario "A notice that cannot be sent leaves the change standing" */
+    it("answers a revoke that went through even when its notice cannot be prepared", async () => {
+      const { service, authz } = world({
+        holders: [holder("ana"), holder("bo")],
+        users: [user("ana"), user("bo")],
+        lookupFails: true,
+      });
+
+      await expect(service.revoke({ grantId: "grant_bo", operator })).resolves.toBeUndefined();
+      expect(authz.revokePlatformOperator).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario "An impersonated session cannot change who operates" */

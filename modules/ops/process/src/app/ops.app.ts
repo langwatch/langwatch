@@ -292,6 +292,7 @@ import { UpgradeDiagnosticsService } from "#features/upgrades/services/upgrade-d
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
+import { installationOf } from "#rules/installation-name.rules";
 import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.rules";
 import { OPS_OPERATOR_DOOR } from "#rules/ops-intake-refusal.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
@@ -932,10 +933,10 @@ export class OpsModule implements OpsApi {
       notice: {
         mail: dependencies.notifications,
         renderer: ReactEmailMailRenderer.create(),
-        installation: URL.canParse(config.publicBaseUrl ?? "")
-          ? new URL(config.publicBaseUrl ?? "").host
-          : "this installation",
-        operatorsUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/operators`,
+        installation: installationOf(config.publicBaseUrl),
+        operatorsUrl: URL.canParse(config.publicBaseUrl ?? "")
+          ? new URL("/ops/operators", config.publicBaseUrl).toString()
+          : null,
       },
     });
     const app = OpsModule.fromInfrastructure({

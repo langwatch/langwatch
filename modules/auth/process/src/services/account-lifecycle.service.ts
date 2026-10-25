@@ -76,9 +76,7 @@ export class AccountLifecycleService {
       throw new UserPlatformOperatorEmailLockedError(input.id);
     }
     const updated = await this.users.updateEmail(input);
-    if ((before?.email ?? "").toLowerCase() !== (updated.email ?? "").toLowerCase()) {
-      await this.credentials.revokeAllBrowserSessions({ userId: input.id });
-    }
+    if (changes) await this.credentials.revokeAllBrowserSessions({ userId: input.id });
 
     return updated;
   }

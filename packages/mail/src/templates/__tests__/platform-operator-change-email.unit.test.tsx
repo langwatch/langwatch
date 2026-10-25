@@ -42,4 +42,17 @@ describe("renderPlatformOperatorChangeEmail", () => {
       );
     });
   });
+
+  describe("when the installation has no public address", () => {
+    it("links nothing rather than a relative address", async () => {
+      const { html } = await renderPlatformOperatorChangeEmail({
+        ...BASE,
+        change: "granted",
+        operatorsUrl: null,
+      });
+
+      expect(html).not.toContain("Open Operators");
+      expect(html).not.toContain('href="/ops/operators"');
+    });
+  });
 });
