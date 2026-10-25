@@ -292,7 +292,7 @@ import { UpgradeDiagnosticsService } from "#features/upgrades/services/upgrade-d
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
-import { installationOf } from "#rules/installation-name.rules";
+import { installationOf, installationPageOf } from "#rules/installation-name.rules";
 import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.rules";
 import { OPS_OPERATOR_DOOR } from "#rules/ops-intake-refusal.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
@@ -922,6 +922,10 @@ export class OpsModule implements OpsApi {
       },
       automaticDisabled: config.upgradeDiagnosticsAutoSendDisabled,
     });
+    const operatorsPage = installationPageOf({
+      baseUrl: config.publicBaseUrl,
+      path: "/ops/operators",
+    });
     const platformOperators = PlatformOperatorsService.create({
       authz: dependencies.authz,
       users: dependencies.users,
@@ -934,9 +938,7 @@ export class OpsModule implements OpsApi {
         mail: dependencies.notifications,
         renderer: ReactEmailMailRenderer.create(),
         installation: installationOf(config.publicBaseUrl),
-        operatorsUrl: URL.canParse(config.publicBaseUrl ?? "")
-          ? new URL("/ops/operators", config.publicBaseUrl).toString()
-          : null,
+        operatorsUrl: operatorsPage.kind === "web" ? operatorsPage.url.toString() : null,
       },
     });
     const app = OpsModule.fromInfrastructure({
