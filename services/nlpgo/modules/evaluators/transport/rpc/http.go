@@ -34,10 +34,6 @@ type HandlerDeps struct {
 	Logger *zap.Logger
 }
 
-// ErrResultsUnencodable is a batch whose results JSON cannot carry: a 500,
-// never a 200 with an empty body.
-const ErrResultsUnencodable herr.Code = "evaluation_results_unencodable"
-
 // evaluateBody is langevals' request body.
 type evaluateBody struct {
 	Data     []contract.Entry  `json:"data"`
@@ -101,7 +97,7 @@ func (route evaluateRoute) writeResults(w http.ResponseWriter, r *http.Request, 
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(results); err != nil {
 		route.logger.Error("evaluators_results_unencodable", zap.String("evaluator", r.PathValue("family")+"/"+r.PathValue("evaluator")), zap.String("error_type", fmt.Sprintf("%T", err)))
-		herr.WriteHTTP(w, herr.New(r.Context(), ErrResultsUnencodable, herr.M{"message": "the evaluation results could not be encoded"}))
+		herr.WriteHTTP(w, herr.New(r.Context(), contract.ErrResultsUnencodable, herr.M{"message": "the evaluation results could not be encoded"}))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
