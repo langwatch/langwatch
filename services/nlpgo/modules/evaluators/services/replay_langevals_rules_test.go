@@ -13,6 +13,7 @@ import (
 
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/rules"
+	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/services"
 )
 
 // @scenario "The rule-based langevals evaluators answer as langevals answered"
@@ -43,14 +44,58 @@ func TestReplayLangevalsRulesAnswerWhatLangevalsAnswered(t *testing.T) {
 	})
 }
 
+// shortOfParity are the recorded python and sql cases Go answers unlike
+// langevals; a change here is a parity change to review.
+var shortOfParity = []string{}
+
+// grammarGaps are valid Python 3 and sqlglot SQL that Go's parsers refuse,
+// absent from the recording: why the modes stay off parity.
+var grammarGaps = map[string]string{
+	"python": "name = 'x'\nprint(f\"{name}\")\n",
+	"sql":    "WITH x AS (SELECT 1 AS a) SELECT a FROM x",
+}
+
 // @scenario "A valid_format mode short of parity is reported, not hidden"
 func TestReplayValidFormatReportsModesShortOfParity(t *testing.T) {
-	h := newHarness(t, contract.DefaultConfig(), 0)
+	var differ []string
 	for _, c := range validFormatCases(t, false) {
-		got := evaluateValidFormat(t, h, c)
+		settings, err := rules.ParseValidFormatSettings(settingsOrEmpty(c.Settings))
+		require.NoError(t, err)
+		got, err := services.ScoreValidFormatPastTheParityGate(context.Background(), settings, services.EntryRun{Entry: c.Entry})
+		require.NoError(t, err)
 		if !sameVerdict(&c, got) {
-			t.Logf("valid_format short of parity: %q", c.Name)
+			differ = append(differ, c.Name)
 		}
+	}
+	assert.ElementsMatch(t, shortOfParity, differ)
+	for format, source := range grammarGaps {
+		verdict := rules.ValidFormat(source, rules.ValidFormatSettings{Format: format})
+		assert.False(t, verdict.Passed, "%s now parses %q: re-measure parity", format, source)
+	}
+}
+
+// @scenario "A valid_format mode short of parity is refused so langevals answers it"
+func TestValidFormatShortOfParityIsRefused(t *testing.T) {
+	prepare := services.BuiltinEvaluators()["langevals/valid_format"].Prepare
+	h := newHarness(t, contract.DefaultConfig(), 0)
+	for _, format := range []string{"python", "sql"} {
+		settings := json.RawMessage(`{"format":"` + format + `"}`)
+		_, err := prepare(settings)
+		require.ErrorIs(t, err, contract.ErrEvaluatorNotFound, format)
+
+		output := "SELECT 1"
+		results, err := h.service.Evaluate(context.Background(), contract.EvaluateRequest{
+			Tenant:    contract.Tenant{ProjectID: "project_replay"},
+			Evaluator: "langevals/valid_format",
+			Entries:   []contract.Entry{{Output: &output}},
+			Settings:  settings,
+		})
+		require.Error(t, err, format)
+		assert.Nil(t, results, "no verdict is answered for %s", format)
+	}
+	for _, format := range []string{"json", "markdown"} {
+		_, err := prepare(json.RawMessage(`{"format":"` + format + `"}`))
+		require.NoError(t, err, format)
 	}
 }
 

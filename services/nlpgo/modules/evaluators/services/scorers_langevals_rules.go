@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/rules"
 )
@@ -14,8 +15,21 @@ func langevalsRulesPrepares() map[string]func(json.RawMessage) (Score, error) {
 	return map[string]func(json.RawMessage) (Score, error){
 		"langevals/basic":                WithSettings(rules.ParseCustomBasicSettings, scoreBasic),
 		"langevals/competitor_blocklist": WithSettings(rules.ParseCompetitorBlocklistSettings, scoreCompetitorBlocklist),
-		"langevals/valid_format":         WithSettings(rules.ParseValidFormatSettings, scoreValidFormat),
+		"langevals/valid_format":         WithSettings(parseValidFormatAtParity, scoreValidFormat),
 	}
+}
+
+// parseValidFormatAtParity refuses a format short of parity as an unported
+// evaluator, so the caller keeps it on langevals (plan D15).
+func parseValidFormatAtParity(raw json.RawMessage) (rules.ValidFormatSettings, error) {
+	settings, err := rules.ParseValidFormatSettings(raw)
+	if err == nil && !rules.FormatAtParity(settings.Format) {
+		return settings, herr.New(context.Background(), contract.ErrEvaluatorNotFound, herr.M{
+			"message":   "valid_format " + settings.Format + " is not ported to Go",
+			"evaluator": "langevals/valid_format",
+		})
+	}
+	return settings, err
 }
 
 func scoreBasic(_ context.Context, settings rules.CustomBasicSettings, in EntryRun) (contract.Result, error) {

@@ -30,6 +30,8 @@ const (
 	namingRetryWait          = 12 * time.Second
 	namingTasksInFlight      = 8
 	emptyEmbeddingInput      = "<empty>"
+	clusteringJobsPerPod     = 2 // plan §5.4
+	clusteringBusyWait       = 5 * time.Second
 )
 
 // TopicClusteringDeps are the clustering service's collaborators. NewID,
@@ -43,11 +45,16 @@ type TopicClusteringDeps struct {
 	NewID           func(prefix string) string
 	NewRand         func() *rand.Rand
 	Sleep           func(ctx context.Context, d time.Duration) error
+	// MaxJobs caps clusterings in flight on this pod; a call past it waits up
+	// to BusyWait, then answers evaluation_busy. Zero is 2 jobs and 5 s.
+	MaxJobs  int
+	BusyWait time.Duration
 }
 
 // TopicClusteringService clusters traces into named topics and subtopics.
 type TopicClusteringService struct {
 	deps TopicClusteringDeps
+	jobs *slots
 }
 
 // NewTopicClusteringService builds the service.
@@ -67,7 +74,13 @@ func NewTopicClusteringService(deps TopicClusteringDeps) *TopicClusteringService
 	if deps.Sleep == nil {
 		deps.Sleep = sleep
 	}
-	return &TopicClusteringService{deps: deps}
+	if deps.MaxJobs == 0 {
+		deps.MaxJobs = clusteringJobsPerPod
+	}
+	if deps.BusyWait == 0 {
+		deps.BusyWait = clusteringBusyWait
+	}
+	return &TopicClusteringService{deps: deps, jobs: newSlots(deps.MaxJobs, deps.BusyWait, "too many topic clusterings in flight")}
 }
 
 // samplingRand seeds the source that picks and shuffles naming samples.
@@ -79,19 +92,26 @@ func samplingRand() *rand.Rand {
 
 // ClusterTopics runs one batch or incremental clustering.
 func (s *TopicClusteringService) ClusterTopics(ctx context.Context, req contract.TopicClusteringRequest) (contract.TopicClusteringResult, error) {
+	release, err := s.jobs.acquire(ctx)
+	if err != nil {
+		return contract.TopicClusteringResult{}, err
+	}
+	defer release()
 	ctx, cancel := context.WithTimeout(ctx, s.deps.Deadline)
 	defer cancel()
 	run := &clusteringRun{deps: s.deps, req: req, rng: s.deps.NewRand()}
 	var out rules.ClusteringResponse
-	var err error
-	switch req.Mode {
-	case contract.ClusteringBatch:
-		out, err = run.batch(ctx)
-	case contract.ClusteringIncremental:
-		out, err = run.incremental(ctx)
-	default:
-		err = fmt.Errorf("unknown clustering mode %q", req.Mode)
-	}
+	err = recovered(func() (err error) {
+		switch req.Mode {
+		case contract.ClusteringBatch:
+			out, err = run.batch(ctx)
+		case contract.ClusteringIncremental:
+			out, err = run.incremental(ctx)
+		default:
+			err = fmt.Errorf("unknown clustering mode %q", req.Mode)
+		}
+		return err
+	})()
 	if err != nil {
 		return contract.TopicClusteringResult{}, s.failure(ctx, req, err)
 	}
@@ -114,8 +134,26 @@ func (s *TopicClusteringService) failure(ctx context.Context, req contract.Topic
 		zap.String("project_id", req.Tenant.ProjectID),
 		zap.String("mode", string(req.Mode)),
 		zap.Bool("deadline_exceeded", errors.Is(err, context.DeadlineExceeded)),
+		zap.Bool("panicked", errors.Is(err, errClusteringPanicked)),
 	)
 	return herr.New(ctx, contract.ErrTopicClusteringFailed, herr.M{"message": "topic clustering failed"}, err)
+}
+
+// errClusteringPanicked stands in for a recovered panic, whose value may
+// quote trace content.
+var errClusteringPanicked = errors.New("topic clustering panicked")
+
+// recovered runs fn, turning a panic into errClusteringPanicked. Every
+// goroutine the run starts goes through it: an unrecovered panic kills the pod.
+func recovered(fn func() error) func() error {
+	return func() (err error) {
+		defer func() {
+			if recover() != nil {
+				err = errClusteringPanicked
+			}
+		}()
+		return fn()
+	}
 }
 
 type clusteringRun struct {
@@ -269,15 +307,15 @@ func (r *clusteringRun) embed(ctx context.Context, texts []string) ([][]float64,
 	group.SetLimit(embeddingBatchesInFlight)
 	for b := range costs {
 		start, end := b*embeddingBatchSize, min((b+1)*embeddingBatchSize, len(inputs))
-		group.Go(func() error {
+		group.Go(recovered(func() error {
 			got, cost, err := r.embedCall(groupCtx, inputs[start:end])
 			copy(vectors[start:end], got)
 			costs[b] = cost
 			return err
-		})
+		}))
 	}
 	if err := group.Wait(); err != nil {
-		if errors.Is(err, channels.ErrProviderNotConfigured) || ctx.Err() != nil {
+		if errors.Is(err, channels.ErrProviderNotConfigured) || errors.Is(err, errClusteringPanicked) || ctx.Err() != nil {
 			return nil, 0, err
 		}
 		return r.embedEach(ctx, inputs)
@@ -299,7 +337,9 @@ func (r *clusteringRun) embedEach(ctx context.Context, inputs []string) ([][]flo
 	failures := &embedFailures{}
 	for start := 0; start < len(inputs); start += embeddingBatchSize {
 		end := min(start+embeddingBatchSize, len(inputs))
-		r.embedChunk(ctx, inputs[start:end], results[start:end])
+		if err := r.embedChunk(ctx, inputs[start:end], results[start:end]); err != nil {
+			return nil, 0, err
+		}
 		if err := failures.count(ctx, results[start:end]); err != nil {
 			return nil, 0, err
 		}
@@ -315,17 +355,18 @@ func (r *clusteringRun) embedEach(ctx context.Context, inputs []string) ([][]flo
 	return vectors, sum(costs), nil
 }
 
-func (r *clusteringRun) embedChunk(ctx context.Context, inputs []string, results []embedded) {
+// embedChunk records each text's outcome; only a panic is returned.
+func (r *clusteringRun) embedChunk(ctx context.Context, inputs []string, results []embedded) error {
 	var group errgroup.Group
 	group.SetLimit(embeddingFallbackWorkers)
 	for i := range inputs {
-		group.Go(func() error {
+		group.Go(recovered(func() error {
 			got, cost, err := r.embedCall(ctx, inputs[i:i+1])
 			results[i] = embedded{vector: got[0], cost: cost, err: err}
 			return nil
-		})
+		}))
 	}
-	_ = group.Wait()
+	return group.Wait()
 }
 
 // embedFailures counts per-text failures in input order.
@@ -403,16 +444,16 @@ func (r *clusteringRun) nameAll(ctx context.Context, job namingJob) ([]*string, 
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(namingTasksInFlight)
 	if !job.standIn {
-		group.Go(func() (err error) {
+		group.Go(recovered(func() (err error) {
 			topicNames, costs[0], err = r.nameTask(groupCtx, topicExamples, job.existing)
 			return err
-		})
+		}))
 	}
 	for i := range job.hierarchy {
-		group.Go(func() (err error) {
+		group.Go(recovered(func() (err error) {
 			subtopicNames[i], costs[i+1], err = r.nameTask(groupCtx, subtopicExamples[i], job.existing)
 			return err
-		})
+		}))
 	}
 	if err := group.Wait(); err != nil {
 		return nil, nil, err

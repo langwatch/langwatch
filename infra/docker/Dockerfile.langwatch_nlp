@@ -73,11 +73,14 @@ FROM gcr.io/distroless/python3-debian12:nonroot AS runtime
 COPY --from=go-build /out/service /usr/local/bin/service
 COPY --from=go-build /out/lingua-models.bin /usr/local/share/langwatch/lingua-models.bin
 COPY --from=sandbox-build /pylibs /opt/sandbox-libs
+# The app's model catalogue LLM evaluator costs are priced from, as langevals does.
+COPY modules/model-provider/contract/src/catalog/model-catalog.json modules/model-provider/contract/src/catalog/model-catalog.overlay.json /usr/local/share/langwatch/model-pricing/
 
 # nlpgo binds this port; compose + the helm chart dial http://langwatch_nlp:5561.
 ENV SERVER_ADDR=:5561
 # The language models nlpgo maps for lingua/language_detection.
 ENV NLPGO_LINGUA_MODELS=/usr/local/share/langwatch/lingua-models.bin
+ENV LANGWATCH_MODEL_PRICING_DIR=/usr/local/share/langwatch/model-pricing
 # Code-block sandbox: the interpreter and its curated libraries. PYTHONPATH is
 # only consulted when the executor spawns python3 for a code-block node.
 ENV SANDBOX_PYTHON=/usr/bin/python3.11

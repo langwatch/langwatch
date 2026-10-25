@@ -22,11 +22,32 @@ describe("engineForEvaluator", () => {
   it("runs every other evaluator on the default engine", () => {
     expect(
       engineForEvaluator({
-        evaluatorType: "ragas/faithfulness",
+        evaluatorType: "ragas/bleu_score",
         engine: "shadow",
         engineOverrides: { [evaluatorType]: "go" },
       }),
     ).toBe("shadow");
+  });
+
+  /** @scenario "A shadow default engine shadows only the evaluators that make no model call" */
+  it("keeps an evaluator that makes a model call on python under a shadow default", () => {
+    const route = (type: string) =>
+      engineForEvaluator({ evaluatorType: type, engine: "shadow", engineOverrides: {} });
+
+    expect(route(evaluatorType)).toBe("shadow");
+    expect(route("ragas/faithfulness")).toBe("python");
+    expect(route("langevals/sentiment")).toBe("python");
+    expect(route("openai/moderation")).toBe("python");
+  });
+
+  it("never shadows an evaluator that makes a model call, even by override", () => {
+    expect(
+      engineForEvaluator({
+        evaluatorType: "langevals/llm_boolean",
+        engine: "python",
+        engineOverrides: { "langevals/llm_boolean": "shadow" },
+      }),
+    ).toBe("python");
   });
 });
 

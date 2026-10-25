@@ -32,6 +32,8 @@ const (
 	globexTraceID = "a1b2c3d4e5f60718293a4b5c6d7e8f90"
 	callerSpanID  = "00f067aa0ba902b7"
 	droppedMetric = "langwatch.nlpgo.evaluators.customer_trace.spans_dropped"
+	// otlpIngestPath is where LangWatch's ingest takes OTLP traces.
+	otlpIngestPath = "/api/otel/v1/traces"
 )
 
 func traceparent(traceID string) string { return "00-" + traceID + "-" + callerSpanID + "-01" }
@@ -43,6 +45,7 @@ type receivedSpan struct {
 
 // otlpReceiver stands in for LangWatch's OTLP ingest, which decides the
 // project from the token: spans are filed under the X-Auth-Token they came with.
+// Like the ingest, it answers 404 off otlpIngestPath.
 type otlpReceiver struct {
 	srv     *httptest.Server
 	mu      sync.Mutex
@@ -54,6 +57,10 @@ func newOTLPReceiver(t *testing.T) *otlpReceiver {
 	t.Helper()
 	rx := &otlpReceiver{byToken: map[string][]receivedSpan{}}
 	rx.srv = httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		if r.URL.Path != otlpIngestPath {
+			nethttp.NotFound(w, r)
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			nethttp.Error(w, "read body", nethttp.StatusBadRequest)

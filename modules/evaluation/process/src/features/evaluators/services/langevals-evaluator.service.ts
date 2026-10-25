@@ -11,6 +11,7 @@ import {
   batchEvaluationResultSchema,
   type BatchEvaluationResult,
   type EvaluatorTypes,
+  findEvaluatorDefinitions,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -80,6 +81,13 @@ function throwFetchFailure({
   throw error;
 }
 
+/** A built-in the Go runtime answered `evaluator_not_found` for, as `runtimeRefusal` builds it. */
+function isUnservedByRuntime(error: unknown): boolean {
+  return (
+    error instanceof EvaluatorExecutionError && error.meta?.runtimeCode === "evaluator_not_found"
+  );
+}
+
 type EvaluationTelemetry = Pick<EvaluationExecutionMetricsService, "record">;
 
 /** herr's body, as the Go evaluator runtime refuses a call. */
@@ -118,7 +126,13 @@ async function runtimeRefusal({
 
   switch (handledCode) {
     case "evaluator_not_found":
-      return new EvaluatorNotFoundError(evaluatorType);
+      if (findEvaluatorDefinitions(evaluatorType).length === 0) {
+        return new EvaluatorNotFoundError(evaluatorType);
+      }
+      // A built-in routed to Go before Go ports it is our routing fault, never a customer skip.
+      return new EvaluatorExecutionError("The evaluator runtime does not serve this evaluator", {
+        meta: { evaluatorType, runtimeCode: "evaluator_not_found" },
+      });
     case "evaluator_config_error":
       return new EvaluatorConfigError("The evaluator's settings were refused", {
         meta: { evaluatorType },
@@ -250,7 +264,25 @@ export class LangevalsEvaluatorService {
     const retriesLeft = this.config.maxRetries;
 
     if (engine === "go") {
-      return this.evaluateWithRetry({ params, target: this.goTarget(params), retriesLeft });
+      try {
+        return await this.evaluateWithRetry({ params, target: this.goTarget(params), retriesLeft });
+      } catch (error) {
+        // Go refuses what it does not serve (a valid_format mode short of parity): langevals
+        // answers it.
+        if (!isUnservedByRuntime(error)) throw error;
+        if (!this.config.endpoint) {
+          logger.error(
+            { evaluatorType: params.evaluatorType },
+            "Evaluator is routed to the Go runtime, which does not serve it",
+          );
+          throw error;
+        }
+        logger.warn(
+          { evaluatorType: params.evaluatorType },
+          "Go runtime does not serve this call; langevals answers it",
+        );
+        return this.evaluateWithRetry({ params, target: this.pythonTarget(params), retriesLeft });
+      }
     }
 
     // As the null channel answers: a Go-only deployment composes a live channel.
@@ -291,9 +323,9 @@ export class LangevalsEvaluatorService {
   }
 
   /**
-   * Calls Go beside the Python answer and logs the pair: statuses, scores and
-   * whether the verdicts agree, never entry text. No retry and no telemetry,
-   * so the shadow neither slows nor skews the live path.
+   * Calls Go beside the Python answer and logs the pair: statuses, scores and whether the
+   * verdicts agree, never entry text. No retry, no telemetry and no provider credentials;
+   * the shadow header has Go admit it outside the project's live share.
    */
   private async shadow({
     params,
@@ -302,10 +334,15 @@ export class LangevalsEvaluatorService {
     params: LangevalsEvaluateParams;
     python: Promise<SingleEvaluationResult>;
   }): Promise<void> {
-    const target = { ...this.goTarget(params), telemetry: undefined };
+    const live = this.goTarget(params);
+    const target = {
+      ...live,
+      headers: { ...live.headers, "X-LangWatch-Shadow": "1" },
+      telemetry: undefined,
+    };
     const [pythonOutcome, goOutcome] = await Promise.allSettled([
       python,
-      this.evaluateWithRetry({ params, target, retriesLeft: 0 }),
+      this.evaluateWithRetry({ params: { ...params, env: {} }, target, retriesLeft: 0 }),
     ]);
     const described = (outcome: PromiseSettledResult<SingleEvaluationResult>) =>
       outcome.status === "fulfilled"

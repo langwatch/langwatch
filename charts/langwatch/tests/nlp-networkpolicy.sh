@@ -68,5 +68,19 @@ printf '%s' "$on" | doc Secret langwatch-app-secrets | grep -q 'NLPGO_INTERNAL_S
 ov=$(render --set langwatch_nlp.evaluatorRuntime.enabled=true --set langwatch_nlp.evaluatorRuntime.secrets.existingSecretName=mine --set langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey=K)
 [ "$(printf '%s' "$ov" | grep -c 'name: mine')" -ge 3 ] && ok override || fail override "override not on all three pods"
 
+# --- a key the app Secret already holds is refused, naming the value ---
+for reserved in nextAuthSecret credentialsEncryptionKey virtualKeyPepper LANGWATCH_NLP_INTERNAL_SECRET LANGY_INTERNAL_SECRET; do
+  clash=$(render --set langwatch_nlp.evaluatorRuntime.enabled=true \
+    --set langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey="$reserved" || true)
+  printf '%s' "$clash" | grep -q "langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey is \"$reserved\"" \
+    && ok "reserved-$reserved" || fail "reserved-$reserved" "a clash with $reserved rendered"
+done
+# A separate Secret may name its key freely.
+elsewhere=$(render --set langwatch_nlp.evaluatorRuntime.enabled=true \
+  --set langwatch_nlp.evaluatorRuntime.secrets.existingSecretName=mine \
+  --set langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey=nextAuthSecret || true)
+printf '%s' "$elsewhere" | grep -q 'evaluatorRuntime.secrets.internalSecretKey is' \
+  && fail reserved-elsewhere "a key in a separate Secret was refused" || ok reserved-elsewhere
+
 [ "$failures" -eq 0 ] || { echo "$failures failure(s)" >&2; exit 1; }
 echo "all passed"

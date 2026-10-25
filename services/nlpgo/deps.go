@@ -160,13 +160,21 @@ func NewEvaluatorsHandler(ctx context.Context, opts EvaluatorsOptions) (http.Han
 			return nil, nil, fmt.Errorf("evaluators: %w", err)
 		}
 	}
+	var pricing *gateway.Pricing // nil prices nothing, said once at boot
+	if cfg.ModelPricingDir == "" {
+		deps.Logger.Warn("evaluator costs are unpriced: " + gateway.PricingDirEnv + " is not set")
+	} else if pricing, err = gateway.LoadPricing(cfg.ModelPricingDir, deps.Logger.Named("evaluators")); err != nil {
+		return nil, nil, fmt.Errorf("evaluators: %w", err)
+	} else if pricing.Len() == 0 {
+		deps.Logger.Warn("evaluator costs are unpriced: no model catalogue found", zap.String("dir", cfg.ModelPricingDir))
+	}
 	var piiAnalyzer channels.PIIAnalyzer // a nil *PIIAnalyzer must not become a non-nil interface
 	if cfg.PIIAnalyzerURL != "" {
 		piiAnalyzer = evalhttp.NewPIIAnalyzer(evalhttp.PIIAnalyzerOptions{BaseURL: cfg.PIIAnalyzerURL, Key: cfg.PIIAnalyzerKey})
 	}
 	module := evaluators.New(evaluators.Deps{
 		Config:        cfg.Evaluators,
-		LLM:           gateway.New(gateway.Options{Dispatcher: disp, Logger: deps.Logger}),
+		LLM:           gateway.New(gateway.Options{Dispatcher: disp, Pricing: pricing, Logger: deps.Logger}),
 		CustomerTrace: customerTrace,
 		Vendor:        evalhttp.NewVendor(evalhttp.VendorOptions{Egress: opts.Egress}),
 		PIIAnalyzer:   piiAnalyzer,
@@ -177,6 +185,7 @@ func NewEvaluatorsHandler(ctx context.Context, opts EvaluatorsOptions) (http.Han
 		API:            module,
 		InternalSecret: cfg.EvaluatorsInternalSecret,
 		MaxBodyBytes:   cfg.Evaluators.MaxBodyBytes,
+		Logger:         deps.Logger.Named("evaluators"),
 	})
 	shutdown := func(ctx context.Context) error {
 		return errors.Join(customerTrace.Shutdown(ctx), opsProvider.Shutdown(ctx))

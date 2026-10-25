@@ -65,6 +65,7 @@ describe("evaluation server configuration", () => {
       expect(resolve({}).langevalsEndpoint).toBeUndefined();
     });
 
+    /** @scenario "With nothing set every evaluator runs on Python" */
     it("routes every evaluator to python", () => {
       expect(resolve({}).evaluatorRuntime).toEqual({
         endpoint: undefined,
@@ -77,13 +78,46 @@ describe("evaluation server configuration", () => {
   describe("given per-evaluator engine overrides", () => {
     it("reads one engine per evaluator type", () => {
       const config = resolve({
-        EVALUATOR_RUNTIME_ENGINE_OVERRIDES: "langevals/exact_match=go, ragas/faithfulness=shadow",
+        EVALUATOR_RUNTIME_ENGINE_OVERRIDES: "ragas/faithfulness=go, langevals/exact_match=shadow",
       });
 
       expect(config.evaluatorRuntime.engineOverrides).toEqual({
-        "langevals/exact_match": "go",
-        "ragas/faithfulness": "shadow",
+        "ragas/faithfulness": "go",
+        "langevals/exact_match": "shadow",
       });
+    });
+
+    /** @scenario "An evaluator that makes a model call cannot be put in shadow mode" */
+    it("refuses shadow for an evaluator that makes a model call, naming it", () => {
+      for (const evaluatorType of [
+        "ragas/faithfulness",
+        "langevals/similarity",
+        "azure/jailbreak",
+      ]) {
+        expect(() =>
+          resolve({ EVALUATOR_RUNTIME_ENGINE_OVERRIDES: `${evaluatorType}=shadow` }),
+        ).toThrow(new RegExp(`${evaluatorType}.*makes a model call`));
+      }
+    });
+
+    /** @scenario "An override for an evaluator the catalogue does not know is refused" */
+    it("refuses routing an evaluator the catalogue does not know to Go, naming it", () => {
+      expect(() =>
+        resolve({ EVALUATOR_RUNTIME_ENGINE_OVERRIDES: "langevals/not_a_real_one=go" }),
+      ).toThrow(/langevals\/not_a_real_one/);
+    });
+
+    /** @scenario "An override written with more than one engine is refused" */
+    it("refuses an entry with more than one engine, naming it", () => {
+      expect(() =>
+        resolve({ EVALUATOR_RUNTIME_ENGINE_OVERRIDES: "langevals/exact_match=go=shadow" }),
+      ).toThrow(/langevals\/exact_match=go=shadow/);
+    });
+
+    it("accepts a shadow default engine, which the router narrows per evaluator", () => {
+      expect(resolve({ EVALUATOR_RUNTIME_ENGINE: "shadow" }).evaluatorRuntime.engine).toBe(
+        "shadow",
+      );
     });
 
     it("refuses an engine it does not know", () => {

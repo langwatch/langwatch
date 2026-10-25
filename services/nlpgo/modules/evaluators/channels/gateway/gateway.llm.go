@@ -27,11 +27,14 @@ const (
 // Options builds the channel.
 type Options struct {
 	Dispatcher *dispatcher.Dispatcher
-	Logger     *zap.Logger
+	// Pricing prices each call; nil reports every call unpriced.
+	Pricing *Pricing
+	Logger  *zap.Logger
 }
 
 type llm struct {
 	dispatcher *dispatcher.Dispatcher
+	pricing    *Pricing
 	logger     *zap.Logger
 }
 
@@ -41,12 +44,12 @@ func New(opts Options) channels.LLMChannel {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	return &llm{dispatcher: opts.Dispatcher, logger: logger}
+	return &llm{dispatcher: opts.Dispatcher, pricing: opts.Pricing, logger: logger}
 }
 
 // Complete runs one chat completion with the tenant's X_LITELLM_* params.
 func (l *llm) Complete(ctx context.Context, req channels.CompletionRequest) (channels.CompletionResponse, error) {
-	call, err := buildCompletion(req)
+	call, target, err := completionCall(req)
 	if err != nil {
 		return channels.CompletionResponse{}, err
 	}
@@ -58,7 +61,7 @@ func (l *llm) Complete(ctx context.Context, req channels.CompletionRequest) (cha
 	if err != nil {
 		return channels.CompletionResponse{}, err
 	}
-	out.CostUSD = costUSD(resp.Usage)
+	out.CostUSD = l.pricing.Cost(target.pricingKeys(), resp.Usage)
 	out.RequestBody = call.Body
 	out.ResponseBody = resp.Body
 	return out, nil
@@ -66,7 +69,7 @@ func (l *llm) Complete(ctx context.Context, req channels.CompletionRequest) (cha
 
 // Embed embeds the inputs with the tenant's X_LITELLM_EMBEDDINGS_* params.
 func (l *llm) Embed(ctx context.Context, req channels.EmbeddingRequest) (channels.EmbeddingResponse, error) {
-	call, err := buildEmbedding(req)
+	call, target, err := embeddingCall(req)
 	if err != nil {
 		return channels.EmbeddingResponse{}, err
 	}
@@ -78,7 +81,7 @@ func (l *llm) Embed(ctx context.Context, req channels.EmbeddingRequest) (channel
 	if err != nil {
 		return channels.EmbeddingResponse{}, err
 	}
-	out.CostUSD = costUSD(resp.Usage)
+	out.CostUSD = l.pricing.Cost(target.pricingKeys(), resp.Usage)
 	return out, nil
 }
 
@@ -100,13 +103,18 @@ func (l *llm) dispatch(ctx context.Context, call dispatcher.Request) (*domain.Re
 	return resp, nil
 }
 
-// buildCompletion mirrors llmexecutor.buildGatewayRequest for the evaluator's
-// narrower request; env params override the evaluator's own, as in Python.
 func buildCompletion(req channels.CompletionRequest) (dispatcher.Request, error) {
+	call, _, err := completionCall(req)
+	return call, err
+}
+
+// completionCall mirrors llmexecutor.buildGatewayRequest for the evaluator's
+// narrower request; env params override the evaluator's own, as in Python.
+func completionCall(req channels.CompletionRequest) (dispatcher.Request, target, error) {
 	params := envParams(req.Tenant.Env, completionPrefix)
 	target, err := resolveTarget(modelOf(params, req.Model), params)
 	if err != nil {
-		return dispatcher.Request{}, err
+		return dispatcher.Request{}, target, err
 	}
 	body := map[string]any{"model": target.bare, "messages": req.Messages}
 	if len(req.Tools) > 0 {
@@ -133,12 +141,18 @@ func buildCompletion(req channels.CompletionRequest) (dispatcher.Request, error)
 	litellmparams.ApplyReasoningOverrides(target.translated, body)
 	litellmparams.ClampAnthropicTemperature(target.provider, body)
 	dropClaudeTopP(target.translated, body)
-	return target.request(domain.RequestTypeChat, body)
+	call, err := target.request(domain.RequestTypeChat, body)
+	return call, target, err
 }
 
-// buildEmbedding follows patch_litellm_embedding_params: the provider's
-// named env keys first, X_LITELLM_EMBEDDINGS_* over them.
 func buildEmbedding(req channels.EmbeddingRequest) (dispatcher.Request, error) {
+	call, _, err := embeddingCall(req)
+	return call, err
+}
+
+// embeddingCall follows patch_litellm_embedding_params: the provider's
+// named env keys first, X_LITELLM_EMBEDDINGS_* over them.
+func embeddingCall(req channels.EmbeddingRequest) (dispatcher.Request, target, error) {
 	model := req.Model
 	if deployment := req.Tenant.Env["AZURE_EMBEDDINGS_DEPLOYMENT_NAME"]; deployment != "" {
 		model = "azure/" + deployment
@@ -149,13 +163,15 @@ func buildEmbedding(req channels.EmbeddingRequest) (dispatcher.Request, error) {
 	}
 	target, err := resolveTarget(modelOf(params, model), params)
 	if err != nil {
-		return dispatcher.Request{}, err
+		return dispatcher.Request{}, target, err
 	}
-	return target.request(domain.RequestTypeEmbeddings, map[string]any{"model": target.bare, "input": req.Inputs})
+	call, err := target.request(domain.RequestTypeEmbeddings, map[string]any{"model": target.bare, "input": req.Inputs})
+	return call, target, err
 }
 
 type target struct {
 	provider   string
+	name       string
 	translated string
 	bare       string
 	credential domain.Credential
@@ -178,7 +194,17 @@ func resolveTarget(model string, params map[string]any) (target, error) {
 		return target{}, fmt.Errorf("%w: %s", channels.ErrProviderNotConfigured, provider)
 	}
 	credential = domain.WithDeploymentSelfMap(credential, bare)
-	return target{provider: provider, translated: translated, bare: bare, credential: credential}, nil
+	return target{provider: provider, name: name, translated: translated, bare: bare, credential: credential}, nil
+}
+
+// pricingKeys are the catalogue ids of the model called: the translated id
+// the catalogue keys first, then the id as the tenant wrote it.
+func (t target) pricingKeys() []string {
+	keys := []string{t.provider + "/" + t.bare}
+	if original := t.provider + "/" + t.name; original != keys[0] {
+		keys = append(keys, original)
+	}
+	return keys
 }
 
 func (t target) request(kind domain.RequestType, body map[string]any) (dispatcher.Request, error) {
@@ -303,15 +329,6 @@ func dropClaudeTopP(model string, body map[string]any) {
 	}
 }
 
-// costUSD reports the gateway's price when it set one; nil means unpriced.
-func costUSD(usage domain.Usage) *float64 {
-	if usage.CostMicroUSD <= 0 {
-		return nil
-	}
-	cost := float64(usage.CostMicroUSD) / 1_000_000
-	return &cost
-}
-
 type openAIUsage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
@@ -360,17 +377,36 @@ type embeddingResponse struct {
 	Usage openAIUsage `json:"usage"`
 }
 
+// parseEmbedding answers one vector per input, in input order. A missing,
+// repeated, empty or out-of-range slot, or vectors of unequal length, fail the
+// call: a partial answer would score as NaN or index past a vector.
 func parseEmbedding(body []byte, inputs int) (channels.EmbeddingResponse, error) {
 	var parsed embeddingResponse
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return channels.EmbeddingResponse{}, fmt.Errorf("decode embeddings: %w", err)
 	}
 	vectors := make([][]float64, inputs)
+	width := 0
+	if len(parsed.Data) > 0 {
+		width = len(parsed.Data[0].Embedding)
+	}
 	for _, item := range parsed.Data {
-		if item.Index < 0 || item.Index >= inputs {
+		switch {
+		case item.Index < 0 || item.Index >= inputs:
 			return channels.EmbeddingResponse{}, fmt.Errorf("embedding index %d out of range", item.Index)
+		case vectors[item.Index] != nil:
+			return channels.EmbeddingResponse{}, fmt.Errorf("embedding index %d answered twice", item.Index)
+		case len(item.Embedding) == 0:
+			return channels.EmbeddingResponse{}, fmt.Errorf("embedding index %d is empty", item.Index)
+		case len(item.Embedding) != width:
+			return channels.EmbeddingResponse{}, fmt.Errorf("embedding index %d has %d dimensions, not %d", item.Index, len(item.Embedding), width)
 		}
 		vectors[item.Index] = item.Embedding
+	}
+	for i, vector := range vectors {
+		if vector == nil {
+			return channels.EmbeddingResponse{}, fmt.Errorf("embeddings answered no vector for input %d of %d", i, inputs)
+		}
 	}
 	return channels.EmbeddingResponse{Vectors: vectors, Usage: channels.Usage(parsed.Usage)}, nil
 }

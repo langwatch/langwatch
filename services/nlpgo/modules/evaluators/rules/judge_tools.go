@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -172,20 +173,23 @@ func JudgeBoolean(value any) (verdict, ok bool) {
 	return false, false
 }
 
-// JudgeFloat is Python's float() over a decoded argument.
+// JudgeFloat is Python's float() over a decoded argument, except that NaN
+// and infinities are refused: no result may carry them onto the wire.
 func JudgeFloat(value any) (float64, bool) {
 	switch v := value.(type) {
 	case json.Number:
 		f, err := v.Float64()
-		return f, err == nil
+		return f, err == nil && isFinite(f)
 	case string:
 		f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
-		return f, err == nil
+		return f, err == nil && isFinite(f)
 	case bool:
 		return boolFloat(v), true
 	}
 	return 0, false
 }
+
+func isFinite(f float64) bool { return !math.IsNaN(f) && !math.IsInf(f, 0) }
 
 func boolFloat(value bool) float64 {
 	if value {

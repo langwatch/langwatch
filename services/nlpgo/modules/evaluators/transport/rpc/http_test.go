@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
@@ -119,6 +122,59 @@ func TestAnAuthorizedRequestReachesTheRuntimeWithLangevalsWire(t *testing.T) {
 	assert.NotEmpty(t, req.Trace.Traceparent)
 	require.Len(t, req.Entries, 1)
 	assert.Equal(t, "a", *req.Entries[0].Output)
+}
+
+func TestOnlyACallCarryingTheShadowHeaderIsAShadowCall(t *testing.T) {
+	for header, shadow := range map[string]bool{"": false, "1": true, "true": true, "0": false} {
+		api := &recordingAPI{}
+		handler := evalrpc.NewHandler(evalrpc.HandlerDeps{API: api, InternalSecret: secret, MaxBodyBytes: 1 << 20})
+		req := httptest.NewRequest(http.MethodPost, "/go/evaluators/langevals/exact_match/evaluate", strings.NewReader(validBody))
+		req.Header.Set("Authorization", "Bearer "+secret)
+		req.Header.Set(evalrpc.HeaderProjectID, "acme")
+		if header != "" {
+			req.Header.Set(evalrpc.HeaderShadow, header)
+		}
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Equal(t, 1, api.calls())
+		assert.Equal(t, shadow, api.requests[0].Shadow, "header %q", header)
+	}
+}
+
+// nonFiniteAPI answers a score JSON cannot carry, after a well-formed result.
+type nonFiniteAPI struct{ recordingAPI }
+
+func (a *nonFiniteAPI) Evaluate(context.Context, contract.EvaluateRequest) ([]contract.Result, error) {
+	fine, nan := 1.0, math.NaN()
+	details := "secret entry text"
+	return []contract.Result{
+		{Status: contract.StatusProcessed, Score: &fine},
+		{Status: contract.StatusProcessed, Score: &nan, Details: &details},
+	}, nil
+}
+
+// @scenario "A batch whose results cannot be encoded answers a server error, not an empty success"
+func TestABatchWhoseResultsCannotBeEncodedAnswersAServerError(t *testing.T) {
+	core, logs := observer.New(zap.DebugLevel)
+	handler := evalrpc.NewHandler(evalrpc.HandlerDeps{API: &nonFiniteAPI{}, InternalSecret: secret, MaxBodyBytes: 1 << 20, Logger: zap.New(core)})
+	req := httptest.NewRequest(http.MethodPost, "/go/evaluators/langevals/exact_match/evaluate", strings.NewReader(validBody))
+	req.Header.Set("Authorization", "Bearer "+secret)
+	req.Header.Set(evalrpc.HeaderProjectID, "acme")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.Equal(t, string(evalrpc.ErrResultsUnencodable), errorCode(t, rec))
+	require.Equal(t, 1, logs.FilterMessage("evaluators_results_unencodable").Len())
+	for _, entry := range logs.All() {
+		for _, field := range entry.Context {
+			assert.NotContains(t, field.String, "secret entry text")
+		}
+	}
 }
 
 // ClusterTopics is not scripted; the clustering routes have their own tests.

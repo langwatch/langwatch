@@ -45,6 +45,9 @@ type EvaluateRequest struct {
 	Entries   []Entry
 	Settings  json.RawMessage
 	Trace     TraceRequest
+	// Shadow marks a comparison call the app makes beside Python's answer. It
+	// runs from its own small budget, never the project's live share.
+	Shadow bool
 }
 
 // Status is a result's outcome, as langevals names it.

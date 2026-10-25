@@ -1,13 +1,22 @@
 package rules
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
 )
+
+func analyze(t *testing.T, p *PIIPatterns, text string, entities []contract.EntityType) []PIIMatch {
+	t.Helper()
+	matches, err := p.Analyze(context.Background(), text, entities)
+	require.NoError(t, err)
+	return matches
+}
 
 func findingScores(matches []PIIMatch) []float64 {
 	scores := make([]float64, len(matches))
@@ -21,13 +30,13 @@ func findingScores(matches []PIIMatch) []float64 {
 func TestPIIContextWordsRaiseScores(t *testing.T) {
 	p := NewPIIPatterns()
 	ip := []contract.EntityType{"IP_ADDRESS"}
-	assert.Equal(t, []float64{0.6}, findingScores(p.Analyze("See 10.1.2.3 now", ip)))
-	assert.Equal(t, []float64{0.95}, findingScores(p.Analyze("The server ip is 10.1.2.3", ip)), "base plus 0.35")
+	assert.Equal(t, []float64{0.6}, findingScores(analyze(t, p, "See 10.1.2.3 now", ip)))
+	assert.Equal(t, []float64{0.95}, findingScores(analyze(t, p, "The server ip is 10.1.2.3", ip)), "base plus 0.35")
 	license := []contract.EntityType{"US_DRIVER_LICENSE"}
-	assert.Equal(t, []float64{0.4}, findingScores(p.Analyze("My driver license number is 12345678 ok", license)), "floored at 0.4")
+	assert.Equal(t, []float64{0.4}, findingScores(analyze(t, p, "My driver license number is 12345678 ok", license)), "floored at 0.4")
 	phone := []contract.EntityType{"PHONE_NUMBER"}
-	assert.Equal(t, []float64{0.4}, findingScores(p.Analyze("phone alpha beta gamma delta epsilon zeta +1 650-253-0000", phone)), "outside the window")
-	assert.Equal(t, []float64{0.75}, findingScores(p.Analyze("phone alpha beta gamma delta +1 650-253-0000", phone)), "inside the window, the match token counting as one")
+	assert.Equal(t, []float64{0.4}, findingScores(analyze(t, p, "phone alpha beta gamma delta epsilon zeta +1 650-253-0000", phone)), "outside the window")
+	assert.Equal(t, []float64{0.75}, findingScores(analyze(t, p, "phone alpha beta gamma delta +1 650-253-0000", phone)), "inside the window, the match token counting as one")
 }
 
 // @scenario "A checksum failure is not a finding"
@@ -46,8 +55,8 @@ func TestPIIChecksumFailureIsNotAFinding(t *testing.T) {
 		{"EMAIL_ADDRESS", "john@example.com", "john@example.invalidtld"},
 	} {
 		entities := []contract.EntityType{c.entity}
-		assert.Equal(t, []float64{1}, findingScores(p.Analyze("value "+c.valid+" end", entities)), c.valid)
-		assert.Empty(t, p.Analyze("value "+c.wrong+" end", entities), c.wrong)
+		assert.Equal(t, []float64{1}, findingScores(analyze(t, p, "value "+c.valid+" end", entities)), c.valid)
+		assert.Empty(t, analyze(t, p, "value "+c.wrong+" end", entities), c.wrong)
 	}
 }
 

@@ -1,7 +1,14 @@
-import type { EvaluatorRuntimeEngine } from "@langwatch/evaluation-contract";
+import {
+  evaluatorMakesModelCall,
+  type EvaluatorRuntimeEngine,
+} from "@langwatch/evaluation-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 
-/** An evaluator type's own override wins; everything else runs on the default engine. */
+/**
+ * An evaluator type's own override wins; everything else runs on the default engine.
+ * Shadow narrows to python for an evaluator that makes a model call: a second call would
+ * spend the customer's provider key twice.
+ */
 export function engineForEvaluator({
   evaluatorType,
   engine,
@@ -11,7 +18,9 @@ export function engineForEvaluator({
   engine: EvaluatorRuntimeEngine;
   engineOverrides: Readonly<Record<string, EvaluatorRuntimeEngine>>;
 }): EvaluatorRuntimeEngine {
-  return engineOverrides[evaluatorType] ?? engine;
+  const chosen = engineOverrides[evaluatorType] ?? engine;
+  if (chosen === "shadow" && evaluatorMakesModelCall({ evaluatorType })) return "python";
+  return chosen;
 }
 
 /**

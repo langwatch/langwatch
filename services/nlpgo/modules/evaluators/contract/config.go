@@ -10,6 +10,9 @@ type Config struct {
 	BusyWaitSeconds       int   `env:"BUSY_WAIT_SECONDS"`
 	DeadlineSeconds       int   `env:"DEADLINE_SECONDS"`
 	MaxBodyBytes          int64 `env:"MAX_BODY_BYTES"`
+	// ShadowMaxInFlight caps shadow calls across the pod; a full budget
+	// refuses at once, so shadow traffic never waits for or delays live work.
+	ShadowMaxInFlight int `env:"SHADOW_MAX_IN_FLIGHT"`
 }
 
 // DefaultConfig is the module's defaults (plan §5.4, §5.5, D12). The deadline
@@ -21,6 +24,7 @@ func DefaultConfig() Config {
 		BusyWaitSeconds:       10,
 		DeadlineSeconds:       270,
 		MaxBodyBytes:          16 << 20,
+		ShadowMaxInFlight:     4,
 	}
 }
 

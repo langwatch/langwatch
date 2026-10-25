@@ -25,22 +25,35 @@ func scoreRagasBLEU(_ context.Context, _ rules.NoSettings, in EntryRun) (contrac
 	return scored(rules.BLEU(*in.Entry.Output, *in.Entry.ExpectedOutput), ""), nil
 }
 
-func scoreRagasROUGE(_ context.Context, settings rules.RagasROUGEScoreSettings, in EntryRun) (contract.Result, error) {
-	return scored(rules.ROUGE(*in.Entry.ExpectedOutput, *in.Entry.Output, settings), ""), nil
+func scoreRagasROUGE(ctx context.Context, settings rules.RagasROUGEScoreSettings, in EntryRun) (contract.Result, error) {
+	score, err := rules.ROUGE(ctx, rules.ROUGETexts{Reference: *in.Entry.ExpectedOutput, Response: *in.Entry.Output}, settings)
+	return comparisonResult(score, "", err)
 }
 
-type contextMetric func(retrieved, expected []string, measure string) (float64, string)
+type contextMetric func(ctx context.Context, retrieved, expected []string, measure string) (float64, string, error)
 
 // contextScorer scores one of the context metrics over the entry's contexts
 // (retrieved) and expected_contexts.
 func contextScorer(metric contextMetric) func(context.Context, rules.RagasContextDistanceSettings, EntryRun) (contract.Result, error) {
-	return func(_ context.Context, settings rules.RagasContextDistanceSettings, in EntryRun) (contract.Result, error) {
+	return func(ctx context.Context, settings rules.RagasContextDistanceSettings, in EntryRun) (contract.Result, error) {
 		var retrieved, expected []string
 		if json.Unmarshal(in.Entry.Contexts, &retrieved) != nil || json.Unmarshal(in.Entry.ExpectedContexts, &expected) != nil {
 			return contract.Result{}, errors.New("contexts and expected_contexts must be lists of strings")
 		}
-		return scored(metric(retrieved, expected, settings.DistanceMeasure)), nil
+		return comparisonResult(metric(ctx, retrieved, expected, settings.DistanceMeasure))
 	}
+}
+
+// comparisonResult is a scored result, a ValidationError entry for texts too
+// long to compare, or the error (the deadline's included) that ended it.
+func comparisonResult(score float64, details string, err error) (contract.Result, error) {
+	switch {
+	case errors.Is(err, rules.ErrComparisonTooLarge):
+		return errorResult("ValidationError", err.Error()), nil
+	case err != nil:
+		return contract.Result{}, err
+	}
+	return scored(score, details), nil
 }
 
 // scored is a processed result; empty details are none.

@@ -5,9 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,7 +24,9 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels"
+	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/gateway"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/memory"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/rules"
@@ -41,6 +48,15 @@ type harness struct {
 
 func newHarness(t *testing.T, cfg contract.Config, judgeCalls int) harness {
 	t.Helper()
+	llm := memory.NewLLM()
+	h := newHarnessOver(t, cfg, judgeCalls, llm)
+	h.llm = llm
+	return h
+}
+
+// newHarnessOver runs the service over the given LLM channel.
+func newHarnessOver(t *testing.T, cfg contract.Config, judgeCalls int, llm channels.LLMChannel) harness {
+	t.Helper()
 	spans := tracetest.NewInMemoryExporter()
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(spans))
 	t.Cleanup(func() { _ = provider.Shutdown(context.Background()) })
@@ -48,10 +64,10 @@ func newHarness(t *testing.T, cfg contract.Config, judgeCalls int) harness {
 
 	evaluators := services.BuiltinEvaluators()
 	evaluators[judgeSlug] = judgeEvaluator(judgeCalls)
-	h := harness{llm: memory.NewLLM(), trace: memory.NewCustomerTrace(), spans: spans, logs: logs}
+	h := harness{trace: memory.NewCustomerTrace(), spans: spans, logs: logs}
 	h.service = services.NewEvaluationService(services.EvaluationDeps{
 		Config:        cfg,
-		LLM:           h.llm,
+		LLM:           llm,
 		CustomerTrace: h.trace,
 		OpsTracer:     provider.Tracer("test"),
 		Logger:        zap.New(core),
@@ -292,28 +308,56 @@ func TestAProjectOverItsLimitWaitsThenIsToldWhenToRetry(t *testing.T) {
 
 // @scenario "A provider failure after a model call is an entry error, not a server error"
 func TestAProviderFailureAfterAModelCallIsAnEntryError(t *testing.T) {
-	h := newHarness(t, testConfig(), 2)
-	var calls int
-	var mu sync.Mutex
-	h.llm.ScriptComplete(func(ctx context.Context, req channels.CompletionRequest) (channels.CompletionResponse, error) {
-		mu.Lock()
-		calls++
-		n := calls
-		mu.Unlock()
-		if n == 1 {
-			return answer(0.002)(ctx, req)
+	var calls atomic.Int32
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if calls.Add(1) > 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"provider refused the call"}}`))
+			return
 		}
-		return channels.CompletionResponse{}, errors.New("provider answered 503")
-	})
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-1","object":"chat.completion","created":1,"model":"gpt-4o-mini",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"yes"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":1000,"completion_tokens":200,"total_tokens":1200}}`))
+	}))
+	t.Cleanup(provider.Close)
+	catalogue := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(catalogue, "model-catalog.json"), []byte(
+		`{"models":{"openai/gpt-4o-mini":{"mode":"chat","pricing":{"inputCostPerToken":0.000001,"outputCostPerToken":0.000004}}}}`), 0o600))
+	pricing, err := gateway.LoadPricing(catalogue, zap.NewNop())
+	require.NoError(t, err)
+	disp, err := dispatcher.New(t.Context(), dispatcher.Options{})
+	require.NoError(t, err)
+	t.Cleanup(disp.Close)
+	h := newHarnessOver(t, testConfig(), 2, gateway.New(gateway.Options{Dispatcher: disp, Pricing: pricing}))
+	acme := tenant("acme")
+	acme.Env["X_LITELLM_api_base"] = provider.URL + "/v1"
 
-	results, err := h.service.Evaluate(t.Context(), judgeRequest(tenant("acme"), "hi"))
+	results, err := h.service.Evaluate(t.Context(), judgeRequest(acme, "hi"))
 
 	require.NoError(t, err)
 	require.Len(t, results, 1)
+	assert.Equal(t, int32(2), calls.Load())
 	assert.Equal(t, contract.StatusError, results[0].Status)
-	require.NotNil(t, results[0].Cost)
+	require.NotNil(t, results[0].Cost, "the first call's cost, priced from the catalogue")
 	assert.Equal(t, "USD", results[0].Cost.Currency)
-	assert.InDelta(t, 0.002, results[0].Cost.Amount, 1e-12)
+	assert.InDelta(t, 1000*0.000001+200*0.000004, results[0].Cost.Amount, 1e-15)
+}
+
+// @scenario "A valid_format mode short of parity is refused so langevals answers it"
+func TestAValidFormatModeShortOfParityAnswersEvaluatorNotFound(t *testing.T) {
+	h := newHarness(t, testConfig(), 0)
+	output := "print(1)"
+
+	_, err := h.service.Evaluate(t.Context(), contract.EvaluateRequest{
+		Tenant:    tenant("acme"),
+		Evaluator: "langevals/valid_format",
+		Entries:   []contract.Entry{{Output: &output}},
+		Settings:  json.RawMessage(`{"format":"python"}`),
+	})
+
+	require.ErrorIs(t, err, contract.ErrEvaluatorNotFound)
+	assert.NotErrorIs(t, err, contract.ErrEvaluatorSettingsInvalid)
 }
 
 // @scenario "The runtime finishes before the application gives up"

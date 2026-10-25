@@ -63,6 +63,9 @@ type Config struct {
 	// LinguaModelsPath is the language models file (`make lingua-models`); the nlp
 	// image ships it. Empty leaves lingua/language_detection on langevals.
 	LinguaModelsPath string `env:"NLPGO_LINGUA_MODELS"`
+	// ModelPricingDir holds the app's model catalogue the evaluator runtime
+	// prices LLM calls from; langevals reads the same name. Empty leaves costs unpriced.
+	ModelPricingDir string `env:"LANGWATCH_MODEL_PRICING_DIR"`
 }
 
 // EngineConfig surfaces engine knobs (timeouts, code-block sandbox).

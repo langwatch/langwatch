@@ -62,7 +62,11 @@ func vectorsOf(traces []EmbeddedTrace) [][]float64 {
 // labels in ascending order, dropping clusters with fewer than 5 distinct
 // inputs or a p95 over maximumP95 (a NaN ceiling drops nothing).
 func FlatClusters(traces []EmbeddedTrace, distance, maximumP95 float64) ([]Cluster, error) {
-	z, err := WardLinkage(len(traces), Pdist(vectorsOf(traces)))
+	dist, err := Pdist(vectorsOf(traces))
+	if err != nil {
+		return nil, err
+	}
+	z, err := WardLinkage(len(traces), dist)
 	if err != nil {
 		return nil, err
 	}

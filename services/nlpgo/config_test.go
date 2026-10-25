@@ -143,3 +143,15 @@ func TestEvaluatorsConfigDefaultsAndEnvironmentNames(t *testing.T) {
 		t.Error("EvaluatorsInternalSecret was not read from NLPGO_INTERNAL_SECRET")
 	}
 }
+
+func TestModelPricingDirReadsTheNameLangevalsReads(t *testing.T) {
+	t.Setenv("LANGWATCH_MODEL_PRICING_DIR", "/srv/model-pricing")
+
+	cfg, err := LoadConfig(t.Context())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.ModelPricingDir != "/srv/model-pricing" {
+		t.Errorf("ModelPricingDir = %q, want it from LANGWATCH_MODEL_PRICING_DIR", cfg.ModelPricingDir)
+	}
+}
