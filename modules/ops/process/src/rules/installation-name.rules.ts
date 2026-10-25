@@ -2,7 +2,7 @@
 export type InstallationAddress = { kind: "web"; url: URL } | { kind: "none" };
 
 /** Reads the install's public address; a bare host or another scheme is not a web address. */
-export function addressOf(url: string | null | undefined): InstallationAddress {
+function addressOf(url: string | null | undefined): InstallationAddress {
   if (!url || !URL.canParse(url)) return { kind: "none" };
   const parsed = new URL(url);
   return parsed.protocol === "http:" || parsed.protocol === "https:"
