@@ -598,7 +598,7 @@ Apple M1 Max (arm64, as the Lambdas), the same recorded fixture inputs on both s
 
 Every langevals call over HTTP, so every Lambda call, waits at least 100 ms in a sleep:
 `evaluate_batch` resets `_tqdm_disabled_once` and `_disable_tqdm` then sleeps 0.1 s
-(`langevals_core/base_evaluator.py:442-453`). That sleep is most of the gap.
+(`langevals_core/base_evaluator.py:442-453`). That sleep is most of the gap; it is removed in the same change (`specs/evaluators/langevals-no-fixed-delay.feature`), so the langevals column below was measured before it.
 
 |                                                                                  | Go                                                 | langevals                                               |
 | -------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
