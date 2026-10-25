@@ -65,8 +65,14 @@ Feature: Doubleword model provider
   Scenario: The catalog sync prices a Doubleword model from its realtime tariff
     Given Doubleword lists a model with a batch tariff and a realtime tariff
     When the model-registry sync maps it
-    Then the catalog entry is "doubleword/<model name>" with the realtime price
+    Then the catalog entry is "doubleword/<alias>" with the realtime price
     And a model with no active realtime tariff is left out
+
+  @unit
+  Scenario: The catalog id is the alias the inference API takes, not the model label
+    Given Doubleword lists a model named "DeepSeek V4.1 Flash 1017" with the alias "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+    When the model-registry sync maps it
+    Then the catalog entry is "doubleword/deepseek-ai/DeepSeek-V4.1-Flash-1017"
 
   @unit
   Scenario: The catalog sync keeps the Doubleword models when it cannot read the list

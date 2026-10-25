@@ -68,6 +68,20 @@ describe("findUnpricedModels", () => {
     expect(isPricedElsewhere("openai/gpt-4o-transcribe")).toBe(false);
   });
 
+  it("allows a router under a vendor prefix, which OpenRouter prices at -1", () => {
+    const models = {
+      "nvidia/switchyard": model("nvidia/switchyard", {
+        inputCostPerToken: -1,
+        outputCostPerToken: -1,
+      }),
+      "typesafe/jev-router": model("typesafe/jev-router", {
+        inputCostPerToken: -1,
+        outputCostPerToken: -1,
+      }),
+    };
+    expect(findUnpricedModels(models)).toEqual([]);
+  });
+
   it("counts a cache-only rate as priced", () => {
     const models = {
       "anthropic/cached": model("anthropic/cached", { inputCacheReadPerToken: 5e-8 }),

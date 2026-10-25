@@ -38,6 +38,8 @@ const logger = createLogger("langwatch:langevals-http-client");
 const NOT_UP_YET = { httpStatus: 503, retryable: true } as const;
 /** What a synchronous caller is told to wait (`Retry-After`) before asking again. */
 const NOT_UP_YET_RETRY_AFTER_MS = 5_000;
+/** The evaluator service, or the gateway in front of it, gave up waiting: never retried. */
+const TIMED_OUT_STATUS = 504;
 
 function throwFetchFailure({
   error,
@@ -168,7 +170,8 @@ async function refusedCall({
   }
 
   telemetry?.record({ evaluatorType, status: "error", durationMs });
-  return new EvaluatorExecutionError(`${response.status} ${statusText}`, {
+  const timedOut = response.status === TIMED_OUT_STATUS ? "Evaluator timed out: " : "";
+  return new EvaluatorExecutionError(`${timedOut}${response.status} ${statusText}`, {
     meta: {
       evaluatorType,
       httpStatus: response.status,
@@ -192,7 +195,7 @@ export type EvaluatorRuntimeRouting = Readonly<{
 
 /**
  * What the transport needs from the deployment: where the evaluator service
- * lives, how long a call may take and how many times a 5xx is retried.
+ * lives, how long a call may take and how many times a 5xx other than a 504 is retried.
  * Absent `evaluatorRuntime` answers every evaluator from langevals.
  */
 type LangevalsRuntimeConfig = Readonly<{
@@ -372,7 +375,8 @@ export class LangevalsEvaluatorService {
     }
 
     if (!response.ok) {
-      if (response.status >= 500 && retriesLeft > 0 && !signal?.aborted) {
+      const transient = response.status >= 500 && response.status !== TIMED_OUT_STATUS;
+      if (transient && retriesLeft > 0 && !signal?.aborted) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         return this.evaluateWithRetry({ params, target, retriesLeft: retriesLeft - 1 });
       }
