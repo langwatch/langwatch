@@ -168,7 +168,7 @@ func TestABatchWhoseResultsCannotBeEncodedAnswersAServerError(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-	assert.Equal(t, string(evalrpc.ErrResultsUnencodable), errorCode(t, rec))
+	assert.Equal(t, string(contract.ErrResultsUnencodable), errorCode(t, rec))
 	require.Equal(t, 1, logs.FilterMessage("evaluators_results_unencodable").Len())
 	for _, entry := range logs.All() {
 		for _, field := range entry.Context {

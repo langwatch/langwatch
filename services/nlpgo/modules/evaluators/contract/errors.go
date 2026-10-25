@@ -15,6 +15,8 @@ const (
 	ErrEvaluatorSettingsInvalid herr.Code = "evaluator_settings_invalid"
 	ErrPayloadTooLarge          herr.Code = "evaluation_payload_too_large"
 	ErrBusy                     herr.Code = "evaluation_busy"
+	// ErrResultsUnencodable is a batch whose results JSON cannot carry.
+	ErrResultsUnencodable herr.Code = "evaluation_results_unencodable"
 )
 
 // RegisterStatuses maps the codes to HTTP statuses. Idempotent; call once at
@@ -26,4 +28,5 @@ func RegisterStatuses() {
 	herr.RegisterStatus(ErrEvaluatorSettingsInvalid, http.StatusBadRequest)
 	herr.RegisterStatus(ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(ErrBusy, http.StatusTooManyRequests)
+	herr.RegisterStatus(ErrResultsUnencodable, http.StatusInternalServerError)
 }
