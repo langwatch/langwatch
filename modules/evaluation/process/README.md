@@ -372,13 +372,14 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `evaluation_lifecycle` (aggregate `evaluation_lifecycle`)
 
-Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:42`. Events: `evaluationRanEventSchema`, `evaluationLifecycleCompletedEventSchema`.
+Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:49`. Events: `evaluationRanEventSchema`, `evaluationLifecycleCompletedEventSchema`, `evaluationMonitorErrorRateExceededEventSchema`.
 
 | Kind      | Name                                 | Handles | Declared at                                        |
 | --------- | ------------------------------------ | ------- | -------------------------------------------------- |
-| command   | `recordEvaluationRan`                | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:47` |
-| command   | `recordEvaluationLifecycleCompleted` | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:48` |
-| retention | `≈ retention`                        | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:49` |
+| command   | `recordEvaluationRan`                | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:58` |
+| command   | `recordEvaluationLifecycleCompleted` | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:59` |
+| command   | `recordMonitorErrorRateExceeded`     | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:60` |
+| retention | `≈ retention`                        | –       | `src/eventing/evaluation-lifecycle.pipeline.ts:61` |
 
 ### Pipeline `evaluation_processing` (aggregate `evaluation`)
 
@@ -404,8 +405,8 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:150`. Eve
 
 | Kind   | Leaf                             | Environment variable                       | Declared at                               |
 | ------ | -------------------------------- | ------------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:275`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:276`           |
+| secret | `openAi`                         | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:276`           |
+| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:277`           |
 | config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                       | `../contract/src/evaluation.config.ts:43` |
 | config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`        | `../contract/src/evaluation.config.ts:44` |
 | config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`            | `../contract/src/evaluation.config.ts:45` |
