@@ -1,3 +1,4 @@
+import type { PlatformOperatorChangeEmailProps } from "./templates/platform-operator-change-email.tsx";
 import type { TriggerDigestMail } from "./templates/trigger-digest-email.tsx";
 import type { UpgradeAlertEmailProps } from "./templates/upgrade-alert-email.tsx";
 
@@ -26,5 +27,10 @@ export abstract class MailRender {
   /** What went wrong with an upgrade, sent to each of the installation's platform operators. */
   abstract renderUpgradeAlert(
     input: UpgradeAlertEmailProps,
+  ): Promise<{ subject: string; html: string }>;
+
+  /** Someone was given or lost the platform-operator role, sent to every operator. */
+  abstract renderPlatformOperatorChange(
+    input: PlatformOperatorChangeEmailProps,
   ): Promise<{ subject: string; html: string }>;
 }

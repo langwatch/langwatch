@@ -292,6 +292,7 @@ import { UpgradeDiagnosticsService } from "#features/upgrades/services/upgrade-d
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
+import { installationOf, installationPageOf } from "#rules/installation-name.rules";
 import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.rules";
 import { OPS_OPERATOR_DOOR } from "#rules/ops-intake-refusal.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
@@ -326,6 +327,7 @@ import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metri
 import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
+import { grantsAreStaffOnly } from "../rules/platform-operator-staff.rules.ts";
 import { MOVED_TO_OWNERS } from "../rules/system-migration-support.rules.ts";
 import {
   type AdminAccess,
@@ -921,6 +923,10 @@ export class OpsModule implements OpsApi {
       },
       automaticDisabled: config.upgradeDiagnosticsAutoSendDisabled,
     });
+    const operatorsPage = installationPageOf({
+      baseUrl: config.publicBaseUrl,
+      path: "/ops/operators",
+    });
     const platformOperators = PlatformOperatorsService.create({
       authz: dependencies.authz,
       users: dependencies.users,
@@ -928,6 +934,12 @@ export class OpsModule implements OpsApi {
       deployment: {
         cloud: config.isSaas || cloudOps,
         isLocalDevelopment: config.nodeEnvironment === "development",
+      },
+      notice: {
+        mail: dependencies.notifications,
+        renderer: ReactEmailMailRenderer.create(),
+        installation: installationOf(config.publicBaseUrl),
+        operatorsUrl: operatorsPage.kind === "web" ? operatorsPage.url.toString() : null,
       },
     });
     const app = OpsModule.fromInfrastructure({
@@ -2471,6 +2483,10 @@ function buildOpsInfrastructure(input: {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       return OpsOperations.create({
         authz: dependencies.authz,
+        operatorAddressesFixed: grantsAreStaffOnly({
+          cloud: config.isSaas || input.cloudOps,
+          isLocalDevelopment: config.nodeEnvironment === "development",
+        }),
         repositories,
         // Where an organization's connection decides its sign-in, editing
         // the legacy `ssoDomain`/`ssoProvider` strings changes nothing a
@@ -2583,6 +2599,8 @@ function organizationSsoRouting(identity: OpsAppDependencies["identity"]): Organ
 
 interface OpsOperationsOptions {
   authz: AdminAccessServiceOptions["authz"];
+  /** Where only staff may operate, the Back office never changes an operator's address. */
+  operatorAddressesFixed: boolean;
   /** The stores the operations read and edit, as the registry built them. */
   repositories: Pick<
     OpsRepositories,
@@ -2642,6 +2660,7 @@ export class OpsOperations {
         projects: this.options.scheduler.projects,
         shares: this.options.shares,
         ssoRouting: this.options.ssoRouting,
+        operatorAddressesFixed: this.options.operatorAddressesFixed,
       }),
       blobStore: BlobStoreService.create(repositories.blobStore),
       impersonation: ImpersonationService.create({

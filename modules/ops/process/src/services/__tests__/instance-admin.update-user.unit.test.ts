@@ -140,8 +140,9 @@ describe("InstanceAdminService user writes past the user module", () => {
 });
 
 describe("InstanceAdminService writes on an operator's account", () => {
-  function serviceOverOperator(log: unknown[]) {
+  function serviceOverOperator(log: unknown[], { operatorAddressesFixed = true } = {}) {
     return InstanceAdminService.create({
+      operatorAddressesFixed,
       operators: {
         isAdmin: async ({ id }) => {
           log.push(["operators.isAdmin", id]);
@@ -150,7 +151,10 @@ describe("InstanceAdminService writes on an operator's account", () => {
       },
       accounts: {
         deactivateUser: () => Promise.reject(new Error("unreached")),
-        changeUserEmail: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: async ({ id, email }) => {
+          log.push(["accounts.changeUserEmail", id, email]);
+          return { ...adminOperator, id, email };
+        },
       },
       repository: new RecordingRepository(log),
       users: new TestUserApi({ reactivate: () => Promise.reject(new Error("unreached")) }),
@@ -192,6 +196,60 @@ describe("InstanceAdminService writes on an operator's account", () => {
       }),
     ).rejects.toMatchObject({ code: "validation_error" });
     expect(log).toEqual([]);
+  });
+
+  describe("when operating is not kept to staff", () => {
+    const ownEmail = (data: Record<string, unknown>, actorId = "operator-1") => ({
+      resource: "user" as const,
+      method: "update" as const,
+      params: { id: "operator-1", data },
+      actorId,
+      req: { headers: {} },
+    });
+
+    /** @scenario "Where operating is not kept to staff, an operator changes their own address" */
+    it("changes an operator's own email through auth", async () => {
+      const log: unknown[] = [];
+
+      await serviceOverOperator(log, { operatorAddressesFixed: false }).execute(
+        ownEmail({ email: "Me@Elsewhere.example" }),
+      );
+
+      expect(log).toContainEqual([
+        "accounts.changeUserEmail",
+        "operator-1",
+        "me@elsewhere.example",
+      ]);
+    });
+
+    /** @scenario "Where operating is not kept to staff, an operator changes their own address" */
+    it.each<[string, Record<string, unknown>, string]>([
+      [
+        "another edit to their own account",
+        { email: "me@elsewhere.example", name: "N" },
+        "operator-1",
+      ],
+      ["another operator's email", { email: "them@elsewhere.example" }, "olive"],
+    ])("still refuses %s", async (_label, data, actorId) => {
+      const log: unknown[] = [];
+
+      await expect(
+        serviceOverOperator(log, { operatorAddressesFixed: false }).execute(
+          ownEmail(data, actorId),
+        ),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      expect(log).toEqual([["operators.isAdmin", "operator-1"]]);
+    });
+
+    /** @scenario "Where operating is not kept to staff, an operator changes their own address" */
+    it("refuses an operator's own email change on the hosted service", async () => {
+      const log: unknown[] = [];
+
+      await expect(
+        serviceOverOperator(log).execute(ownEmail({ email: "me@elsewhere.example" })),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      expect(log).toEqual([["operators.isAdmin", "operator-1"]]);
+    });
   });
 
   /** @scenario "The Back office does not edit an operator's account" */

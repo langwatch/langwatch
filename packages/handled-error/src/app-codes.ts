@@ -864,6 +864,7 @@ export const APP_ERROR_CODES = [
   "usage_report_failed",
   "user_last_platform_operator",
   "user_not_in_organization",
+  "user_platform_operator_email_locked",
   "user_to_impersonate_not_found",
   "user_token_required",
   "validation_error",

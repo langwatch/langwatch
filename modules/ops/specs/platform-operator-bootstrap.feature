@@ -214,6 +214,25 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     Then the refusal is platform_operator_last_holder
 
   @unit @operators-page
+  Scenario: Every operator is told when someone is given the role
+    Given two operators hold the role
+    When one of them grants it to another existing user, from the page or the recovery task
+    Then every holder and the new operator get an email naming who granted it
+    And granting an account that already holds the role tells nobody
+
+  @unit @operators-page
+  Scenario: Every operator is told when someone loses the role
+    Given two operators hold the role
+    When one of them revokes the other
+    Then the remaining holder and the person who lost the role get an email naming who revoked it
+
+  @unit @operators-page
+  Scenario: A notice that cannot be sent leaves the change standing
+    Given the notice cannot be prepared or sent
+    When an operator grants or revokes the role
+    Then the grant or the revoke stands
+
+  @unit @operators-page
   Scenario: The page refuses an account whose address was never verified
     Given a signed-in operator
     When they grant the role to an address whose account never verified it
