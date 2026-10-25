@@ -11350,12 +11350,18 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../../../packages/mail
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:../../notification/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -11365,9 +11371,15 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract

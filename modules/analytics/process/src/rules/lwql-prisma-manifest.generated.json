@@ -7593,6 +7593,24 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        },
+        {
+          "name": "autoPausedAt",
+          "columnName": "autoPausedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "autoPausedReason",
+          "columnName": "autoPausedReason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
         }
       ]
     },

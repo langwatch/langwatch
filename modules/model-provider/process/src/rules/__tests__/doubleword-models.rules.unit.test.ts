@@ -169,6 +169,21 @@ describe("mapDoublewordModel", () => {
   });
 });
 
+describe("mapDoublewordModel with a label as its name", () => {
+  /** @scenario The catalog id is the alias the inference API takes, not the model label */
+  it("takes the alias as the id, which is what the inference API calls", () => {
+    const labelled: DoublewordModel = {
+      ...FLASH,
+      model_name: "DeepSeek V4.1 Flash 1017",
+      alias: "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+      display_name: "DeepSeek V4.1 Flash 1017",
+    };
+    expect(mapDoublewordModel({ model: labelled, now: NOW })?.id).toBe(
+      "doubleword/deepseek-ai/DeepSeek-V4.1-Flash-1017",
+    );
+  });
+});
+
 describe("mapDoublewordModels", () => {
   it("skips excluded ids so overlay corrections win", () => {
     const entries = mapDoublewordModels({

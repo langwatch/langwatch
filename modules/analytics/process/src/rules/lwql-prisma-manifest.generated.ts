@@ -667,6 +667,8 @@ export interface LwqlPrismaRows {
     readonly threadIdleTimeout: "Int?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+    readonly autoPausedAt: "DateTime?";
+    readonly autoPausedReason: "String?";
   };
   readonly Cost: {
     readonly id: "String";

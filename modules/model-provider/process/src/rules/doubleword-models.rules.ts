@@ -3,9 +3,9 @@ import { type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 /**
- * Doubleword models and prices. The catalog id is `doubleword/<model_name>` with the case kept,
- * because the API matches the name exactly. The price is the active realtime tariff: a
- * batch-only model is left out. Cache prices are multipliers of the input rate.
+ * Doubleword models and prices. The catalog id is `doubleword/<alias>` with the case kept, because
+ * the inference API takes the alias as the model, exactly. The price is the active realtime
+ * tariff: a batch-only model is left out. Cache prices are multipliers of the input rate.
  */
 
 const DOUBLEWORD_PROVIDER = "doubleword";
@@ -29,6 +29,7 @@ const doublewordCachePricingSchema = z.object({
 /** The subset of a Doubleword admin model this mapper reads, parsed where the body enters. */
 export const doublewordModelSchema = z.object({
   model_name: z.string(),
+  alias: z.string().nullish(),
   display_name: z.string().nullish(),
   description: z.string().nullish(),
   model_type: z.string(),
@@ -127,6 +128,11 @@ function modalityOf({
   return supportsImageInput ? "text+image->text" : "text->text";
 }
 
+/** The id the gateway calls the model by: the alias, or the name when the alias is missing. */
+function catalogIdOf(model: DoublewordModel): string {
+  return `${DOUBLEWORD_PROVIDER}/${model.alias || model.model_name}`;
+}
+
 /** Whether the tariff carries a usable rate: an input rate, and an output rate unless it embeds. */
 function isPriced({
   tariff,
@@ -164,7 +170,7 @@ export function mapDoublewordModel({
     : CHAT_PARAMETERS;
 
   return {
-    id: `${DOUBLEWORD_PROVIDER}/${model.model_name}`,
+    id: catalogIdOf(model),
     name: `Doubleword: ${model.display_name || model.model_name}`,
     provider: DOUBLEWORD_PROVIDER,
     pricing: mapPricing(tariff, model.cache_pricing),
@@ -221,7 +227,7 @@ export function resolveDoublewordEntries({
     const mappedIds = new Set(mapped.map((entry) => entry.id));
     const unpricedKept = (fetched ?? [])
       .filter((model) => pickRealtimeTariff({ model, now }))
-      .map((model) => previousModels[`${DOUBLEWORD_PROVIDER}/${model.model_name}`])
+      .map((model) => previousModels[catalogIdOf(model)])
       .filter(
         (entry): entry is LLMModelEntry =>
           entry !== undefined && !mappedIds.has(entry.id) && !excludeIds.has(entry.id),
