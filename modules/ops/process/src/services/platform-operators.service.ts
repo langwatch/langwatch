@@ -151,7 +151,12 @@ export class PlatformOperatorsService {
     });
     const subject = target ? await this.options.users.findById({ id: target.userId }) : null;
     if (subject) {
-      await this.#tellOperators({ change: "revoked", grantId, subject, actorName: nameOf(revoker) });
+      await this.#tellOperators({
+        change: "revoked",
+        grantId,
+        subject,
+        actorName: nameOf(revoker),
+      });
     }
   }
 
