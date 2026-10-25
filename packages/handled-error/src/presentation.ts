@@ -6128,6 +6128,10 @@ const presentations = {
     title: "That's too much text for this evaluator",
     describe: () => "Shorten the input and try again.",
   },
+  evaluation_results_unencodable: {
+    title: "The evaluator's results could not be returned",
+    describe: () => "Run the evaluation again. If it keeps failing, contact support.",
+  },
   topic_clustering_failed: {
     title: "Topics couldn't be worked out this time",
     describe: () => "Topic clustering runs again on its next schedule.",
