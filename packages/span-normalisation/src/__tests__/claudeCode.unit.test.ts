@@ -20,6 +20,7 @@ describe("ClaudeCodeCanonicaliserService.applyLog", () => {
   // attributes here. The only claude_code event this extractor lifts is
   // user_prompt.
 
+  /** @scenario "A Claude Code turn is filed under its session by its prompt record" */
   it("lifts the user-typed prompt onto langwatch.input from a user_prompt event", () => {
     // claude-code 2.x only emits the `prompt` attribute when
     // OTEL_LOG_USER_PROMPTS=1 is in the env. The langwatch wrapper
@@ -34,9 +35,23 @@ describe("ClaudeCodeCanonicaliserService.applyLog", () => {
 
     expect(ctx.out).toEqual({
       "langwatch.input": "Reply EXACTLY this token and nothing else: PONG-X",
+      "gen_ai.conversation.id": "sess_user_prompt",
       "langwatch.thread.id": "sess_user_prompt",
     });
     expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/user_prompt");
+  });
+
+  /** @scenario "A Claude Code turn is filed under its session by its prompt record" */
+  it("files the trace under no conversation when the record names no session", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "user_prompt",
+      prompt: "hi",
+    });
+
+    ClaudeCodeCanonicaliserService.create().applyLog(ctx);
+
+    expect(ctx.out["gen_ai.conversation.id"]).toBeUndefined();
+    expect(ctx.out["langwatch.thread.id"]).toBeUndefined();
   });
 
   it("does NOT overwrite a thread.id already set by an earlier event", () => {
