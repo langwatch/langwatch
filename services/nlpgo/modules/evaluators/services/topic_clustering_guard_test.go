@@ -15,13 +15,19 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/services"
 )
 
+type callKey struct{}
+
 // @scenario "A pod runs at most two clusterings at once and tells a third when to retry"
 func TestAPodRunsAtMostTwoClusteringsAtOnce(t *testing.T) {
 	hold := make(chan struct{})
 	entered := make(chan struct{}, 64)
 	llm := scriptedLLM(nil)
+	var seen sync.Map
 	llm.ScriptEmbed(func(ctx context.Context, req channels.EmbeddingRequest) (channels.EmbeddingResponse, error) {
-		entered <- struct{}{}
+		// A clustering may embed several batches at once; signal each call only once.
+		if _, again := seen.LoadOrStore(ctx.Value(callKey{}), true); !again {
+			entered <- struct{}{}
+		}
 		select {
 		case <-hold:
 			return embedByText(ctx, req)
@@ -33,8 +39,9 @@ func TestAPodRunsAtMostTwoClusteringsAtOnce(t *testing.T) {
 	var running sync.WaitGroup
 	defer running.Wait()
 	defer close(hold)
-	for range 2 {
-		running.Go(func() { _, _ = svc.ClusterTopics(context.Background(), oneTopic()) })
+	for call := range 2 {
+		ctx := context.WithValue(context.Background(), callKey{}, call)
+		running.Go(func() { _, _ = svc.ClusterTopics(ctx, oneTopic()) })
 		<-entered
 	}
 
