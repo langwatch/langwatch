@@ -17,6 +17,7 @@ import {
   type BoardHealthAct,
   boardHealthCards,
   type BrokenWidget,
+  CHECK_PERIOD_DAYS,
   classifyStatementFailure,
   decideBoardHealthActs,
   type HealthStatement,
@@ -33,8 +34,6 @@ import type { InsightDailyRunMetricsService } from "./insight-daily-run-metrics.
 
 const logger = createLogger("langwatch:insight:board-health");
 
-/** The board's default range, which the owner chose for the check. */
-const CHECK_PERIOD_DAYS = 30;
 /** The board's "auto" step for 30 days. */
 const CHECK_GRANULARITY_SECONDS = 86_400;
 /** No statement starts after this; with Langy's 10 minutes the run stays inside its lease. */

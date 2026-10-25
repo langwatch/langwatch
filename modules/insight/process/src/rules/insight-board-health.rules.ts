@@ -4,7 +4,7 @@
  * @see modules/insight/adrs/005-board-health-check.md
  */
 
-import { HandledError, isTransientRefusal } from "@langwatch/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { type InsightEntry, insightExpiresAt, type InsightTone } from "@langwatch/insight-contract";
 
 /** Every card the check files starts its key with this; Langy's keys hold no colon. */
@@ -18,6 +18,9 @@ export const BOARD_HEALTH_TOPIC = "health";
 
 /** The most cards one run files or renews for one board; the rest share the last card. */
 export const MAX_BOARD_HEALTH_CARDS = 5;
+
+/** The board's default range, which the owner chose for the check. */
+export const CHECK_PERIOD_DAYS = 30;
 
 /** Widget names one card for the rest lists before it counts the others. */
 const MAX_NAMES_IN_REST_CARD = 20;
@@ -96,7 +99,7 @@ export function classifyStatementFailure(error: unknown): StatementFailure {
   if (code === "lwql_parameter_missing") return { kind: "unchecked" };
   if (PLATFORM_LIMIT_CODES.has(code)) return { kind: "platform", code };
   const isPersons = error.fault === "customer" && error.httpStatus < 500;
-  if (!isPersons || isTransientRefusal(error)) return { kind: "platform", code };
+  if (!isPersons) return { kind: "platform", code };
   return { kind: "error", code, message: error.message };
 }
 
@@ -210,7 +213,7 @@ function widgetCard({ widget, reason, failure }: BrokenWidget): BoardHealthCard 
       key,
       title: `"${name}" shows no data`,
       body: [
-        "None of this widget's queries returned data over the last 30 days.",
+        `None of this widget's queries returned data over the last ${CHECK_PERIOD_DAYS} days.`,
         "What it reads may have stopped arriving, or it may read a field nothing sends.",
       ].join(" "),
       tone: "watch",
@@ -223,7 +226,7 @@ function widgetCard({ widget, reason, failure }: BrokenWidget): BoardHealthCard 
     key,
     title: `"${name}" fails to load`,
     body: [
-      `This widget's query was refused with \`${code}\` over the last 30 days.`,
+      `This widget's query was refused with \`${code}\` over the last ${CHECK_PERIOD_DAYS} days.`,
       ...(message.length > 0 ? [`It said: ${message}`] : []),
       "Open the widget to see the error and fix its query.",
     ].join("\n\n"),
@@ -242,7 +245,7 @@ function restCard({ boardId, rest }: { boardId: string; rest: readonly BrokenWid
     // A renewal keeps the title, so only the body, which it renews, carries the count.
     title: "More widgets on this board need a look",
     body: [
-      `These ${rest.length} widgets failed to load or showed no data over the last 30 days:`,
+      `These ${rest.length} widgets failed to load or showed no data over the last ${CHECK_PERIOD_DAYS} days:`,
       [...named.map(line), ...(others > 0 ? [`- and ${others} more`] : [])].join("\n"),
     ].join("\n\n"),
     tone: rest.some(({ reason }) => reason === "error") ? "bad" : "watch",
