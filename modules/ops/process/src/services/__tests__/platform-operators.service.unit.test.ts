@@ -569,9 +569,11 @@ describe("PlatformOperatorsService", () => {
         users: [user("ana"), user("bo")],
         lookupFails: true,
       });
+      warn.mockClear();
 
       await expect(service.revoke({ grantId: "grant_bo", operator })).resolves.toBeUndefined();
       expect(authz.revokePlatformOperator).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it("tells nobody, and says so, when the revoked holder is no longer active", async () => {

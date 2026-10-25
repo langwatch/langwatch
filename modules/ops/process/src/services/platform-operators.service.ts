@@ -151,12 +151,13 @@ export class PlatformOperatorsService {
       actor: { type: "user", id: revoker.id },
     });
     // The revoke already stands: a failed lookup only costs the notice, as a failed send does.
-    const subject = target
-      ? await this.options.users.findById({ id: target.userId }).catch((error: unknown) => {
-          logger.error({ error, grantId }, "the platform operators were not told of a revoke");
-          return null;
-        })
-      : null;
+    let subject: UserProfile | null = null;
+    try {
+      subject = target ? await this.options.users.findById({ id: target.userId }) : null;
+    } catch (error) {
+      logger.error({ error, grantId }, "the platform operators were not told of a revoke");
+      return;
+    }
     if (!subject) {
       logger.warn(
         { grantId },
