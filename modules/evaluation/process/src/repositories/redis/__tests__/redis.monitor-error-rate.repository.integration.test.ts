@@ -28,7 +28,8 @@ describe.skipIf(!redisUrl)("the monitor error-rate counts over Redis", () => {
 
   afterAll(async () => {
     const base = `evaluation:monitor_error_rate:{${KEY.projectId}:${KEY.monitorId}:${KEY.monitorRevision}}`;
-    await redis?.del(`${base}:counts`, `${base}:messages`, `${base}:reported`);
+    const messageKeys = await redis?.keys(`${base}:messages:*`);
+    await redis?.del(`${base}:counts`, `${base}:reported`, ...(messageKeys ?? []));
     await redis?.quit();
   });
 
@@ -57,7 +58,10 @@ describe.skipIf(!redisUrl)("the monitor error-rate counts over Redis", () => {
       const counts = await workerA.record({ ...KEY, outcome: "processed", now: NOW + 120_000 });
 
       expect(counts).toEqual({ runs: 51, errors: 45 });
-      expect(await workerB.findTopErrors(KEY)).toEqual(["Evaluator timed out", "Rate limited"]);
+      expect(await workerB.findTopErrors({ ...KEY, now: NOW + 120_000 })).toEqual([
+        "Evaluator timed out",
+        "Rate limited",
+      ]);
       expect(await workerA.claimReport(KEY)).toBe(true);
       expect(await workerB.claimReport(KEY)).toBe(false);
 
@@ -67,14 +71,34 @@ describe.skipIf(!redisUrl)("the monitor error-rate counts over Redis", () => {
   });
 
   describe("when a bucket is older than the hour", () => {
-    it("leaves it out of the counts", async () => {
+    it("leaves it out of the counts and of the top errors", async () => {
       const repository = RedisMonitorErrorRateRepository.create({ redis });
       const later = NOW + 2 * 60 * 60 * 1000;
 
-      expect(await repository.record({ ...KEY, outcome: "error", now: later })).toEqual({
-        runs: 1,
-        errors: 1,
-      });
+      expect(
+        await repository.record({
+          ...KEY,
+          outcome: "error",
+          errorMessage: "Bad gateway",
+          now: later,
+        }),
+      ).toEqual({ runs: 1, errors: 1 });
+      expect(await repository.findTopErrors({ ...KEY, now: later })).toEqual(["Bad gateway"]);
+    });
+  });
+
+  describe("when a revision keeps receiving runs for hours", () => {
+    it("drops the buckets that left the window, so the hash stays bounded", async () => {
+      const repository = RedisMonitorErrorRateRepository.create({ redis });
+      const key = { ...KEY, monitorId: "monitor-busy" };
+      const fiveMinutes = 5 * 60 * 1000;
+      for (let step = 0; step < 6 * 12; step++) {
+        await repository.record({ ...key, outcome: "error", now: NOW + step * fiveMinutes });
+      }
+
+      const base = `evaluation:monitor_error_rate:{${key.projectId}:${key.monitorId}:${key.monitorRevision}}`;
+      expect(await redis.hlen(`${base}:counts`)).toBeLessThanOrEqual(2 * 12);
+      await redis.del(`${base}:counts`);
     });
   });
 });

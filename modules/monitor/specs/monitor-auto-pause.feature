@@ -22,7 +22,13 @@ Feature: A monitor whose evaluations mostly fail pauses itself
     Given an enabled on-message monitor at revision R in a project whose organization has two active admins
     When the same error rate fact is delivered twice
     Then each admin is sent one email naming the monitor, the failure rate, the most common error and a link to the monitor
-    And both deliveries of the same email share one idempotency key
+    And the second delivery sends no email
+
+  @unit
+  Scenario: A failed email leaves the monitor paused
+    Given an enabled on-message monitor at revision R whose admins cannot be emailed
+    When evaluation reports that its error rate was exceeded at revision R
+    Then the monitor is paused and the failure is logged, not retried
 
   @unit
   Scenario: Re-enabling a paused monitor clears the reason

@@ -96,7 +96,10 @@ function factEvent({ id = "event-1" }: { id?: string } = {}): Event {
   };
 }
 
-function autoPauseLane({ seed = [monitorRow()] }: { seed?: MonitorWithEvaluator[] } = {}) {
+function autoPauseLane({
+  seed = [monitorRow()],
+  failSends = false,
+}: { seed?: MonitorWithEvaluator[]; failSends?: boolean } = {}) {
   const repository = MemoryMonitorRepository.create({ seed });
   const sent: SendEmailCommand[] = [];
   const app = createMonitorTestApp({
@@ -116,7 +119,10 @@ function autoPauseLane({ seed = [monitorRow()] }: { seed?: MonitorWithEvaluator[
       ],
     }),
     notifications: createApiFixture<NotificationService>({
-      sendEmail: async (input) => void sent.push(input),
+      sendEmail: async (input) => {
+        if (failSends) throw new Error("smtp refused");
+        sent.push(input);
+      },
     }),
   });
   const pipeline = app.autoPausePipeline();
@@ -170,23 +176,42 @@ describe("monitor's auto-pause peer lane", () => {
 
   describe("when the same fact is delivered twice", () => {
     /** @scenario "The organization's admins are emailed once" */
-    it("emails each active admin one message, keyed alike on both deliveries", async () => {
+    it("emails each active admin one message in total", async () => {
       const { definition, sent } = autoPauseLane();
 
       await definition.handle(factEvent(), CONTEXT);
-      const first = [...sent];
       await definition.handle(factEvent({ id: "redelivered" }), CONTEXT);
 
-      expect(first.map(({ to }) => to)).toEqual(["ada@acme.example", "grace@acme.example"]);
-      expect(first[0]?.subject).toBe("Online evaluation paused: Answer relevancy");
-      expect(first[0]?.html).toContain("95%");
-      expect(first[0]?.html).toContain("Evaluator timed out");
-      expect(first[0]?.html).toContain(
+      expect(sent.map(({ to }) => to)).toEqual(["ada@acme.example", "grace@acme.example"]);
+      expect(sent[0]?.subject).toBe("Online evaluation paused: Answer relevancy");
+      expect(sent[0]?.html).toContain("95%");
+      expect(sent[0]?.html).toContain("Evaluator timed out");
+      expect(sent[0]?.html).toContain(
         "https://app.langwatch.test/support-agent/online-evaluations?drawer.open=onlineEvaluation&amp;drawer.monitorId=monitor-1",
       );
-      expect(new Set(sent.map(({ idempotencyKey }) => idempotencyKey))).toEqual(
-        new Set(first.map(({ idempotencyKey }) => idempotencyKey)),
+    });
+
+    /** @scenario "The organization's admins are emailed once" */
+    it("queues one job for both deliveries", () => {
+      const { definition } = autoPauseLane();
+      const deduplication = definition.options?.deduplication;
+      if (!deduplication || deduplication === "aggregate") throw new Error("no deduplication id");
+
+      expect(deduplication.makeId(factEvent())).toBe(
+        deduplication.makeId(factEvent({ id: "redelivered" })),
       );
+    });
+  });
+
+  describe("when sending an email fails", () => {
+    /** @scenario "A failed email leaves the monitor paused" */
+    it("keeps the monitor paused and does not throw", async () => {
+      const { definition, repository } = autoPauseLane({ failSends: true });
+
+      await definition.handle(factEvent(), CONTEXT);
+
+      const monitor = await repository.findById({ id: "monitor-1", projectId: "project-1" });
+      expect(monitor?.enabled).toBe(false);
     });
   });
 

@@ -10,7 +10,7 @@ import type {
 type RevisionState = {
   runs: Map<number, number>;
   errors: Map<number, number>;
-  messages: Map<string, number>;
+  messages: Map<number, Map<string, number>>;
   reported: boolean;
 };
 
@@ -43,7 +43,9 @@ export class MemoryMonitorErrorRateRepository implements MonitorErrorRateReposit
     if (input.outcome === "error") {
       state.errors.set(newest, (state.errors.get(newest) ?? 0) + 1);
       if (input.errorMessage) {
-        state.messages.set(input.errorMessage, (state.messages.get(input.errorMessage) ?? 0) + 1);
+        const tallies = state.messages.get(newest) ?? new Map<string, number>();
+        tallies.set(input.errorMessage, (tallies.get(input.errorMessage) ?? 0) + 1);
+        state.messages.set(newest, tallies);
       }
     }
     const sum = (counts: Map<number, number>) =>
@@ -51,10 +53,15 @@ export class MemoryMonitorErrorRateRepository implements MonitorErrorRateReposit
     return { runs: sum(state.runs), errors: sum(state.errors) };
   }
 
-  async findTopErrors(input: MonitorRevisionKey): Promise<string[]> {
-    return [...this.#state(input).messages]
-      .toSorted(([, left], [, right]) => right - left)
-      .map(([message]) => message);
+  async findTopErrors(input: MonitorRevisionKey & { now: number }): Promise<string[]> {
+    const state = this.#state(input);
+    const totals = new Map<string, number>();
+    for (const bucket of monitorErrorRateBuckets(input.now)) {
+      for (const [message, count] of state.messages.get(bucket) ?? []) {
+        totals.set(message, (totals.get(message) ?? 0) + count);
+      }
+    }
+    return [...totals].toSorted(([, left], [, right]) => right - left).map(([message]) => message);
   }
 
   async claimReport(input: MonitorRevisionKey): Promise<boolean> {

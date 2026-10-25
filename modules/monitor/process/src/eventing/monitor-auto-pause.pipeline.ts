@@ -34,10 +34,17 @@ export function buildMonitorAutoPausePipeline({
       aggregate: defineAggregate({ type: "global" }),
     })
       .withEvents([])
-      // The pause is guarded by the monitor's revision and the emails by an idempotency key.
+      // A conditional update on the revision pauses; only the delivery that applied it emails.
       .withPeerSubscriber("monitorErrorRateExceeded", {
         eventType: EVALUATION_MONITOR_ERROR_RATE_EXCEEDED_EVENT_TYPE,
         data: evaluationMonitorErrorRateExceededEventDataSchema,
+        options: {
+          deduplication: {
+            makeId: (event) =>
+              `monitor-error-rate-exceeded:${event.tenantId}:${String(event.aggregateId)}`,
+            ttlMs: 60 * 60 * 1000,
+          },
+        },
         handle: (fact) => autoPause.pauseFailing(fact),
       })
       .build()

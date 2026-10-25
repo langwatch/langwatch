@@ -58,7 +58,14 @@ Feature: Evaluation tells when a monitor's runs are mostly errors
     Given an error message holding an API key, a bearer token and a URL with a password
     When it is shortened for the fact
     Then the key, the token and the password are replaced with "[redacted]"
-    And the message is at most 200 characters long
+    And the message is at most 160 characters long
+
+  @unit
+  Scenario: The reported error message is one short readable line
+    Given an error whose message is a JSON error dump or spans several lines
+    When it is shortened for the fact
+    Then the fact carries the JSON error's message field, or else the first line, on one line
+    And never the raw JSON
 
   @integration
   Scenario: The window counts are shared through Redis

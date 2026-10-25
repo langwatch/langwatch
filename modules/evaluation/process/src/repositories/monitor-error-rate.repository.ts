@@ -22,8 +22,8 @@ export interface MonitorErrorRateRepository {
       now: number;
     },
   ): Promise<MonitorErrorRateCounts>;
-  /** This revision's error messages, the most counted first; empty when none errored. */
-  findTopErrors(input: MonitorRevisionKey): Promise<string[]>;
+  /** The window's error messages at `now`, the most counted first; empty when none errored. */
+  findTopErrors(input: MonitorRevisionKey & { now: number }): Promise<string[]>;
   /** Claims the single report of this revision: true for the first caller only. */
   claimReport(input: MonitorRevisionKey): Promise<boolean>;
   /** Gives the claim back when the report could not be recorded. */

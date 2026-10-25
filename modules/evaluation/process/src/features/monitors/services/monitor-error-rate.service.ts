@@ -82,7 +82,7 @@ export class MonitorErrorRateService {
     if (!(await this.deps.counts.claimReport(key))) return;
 
     try {
-      const [topError = null] = await this.deps.counts.findTopErrors(key);
+      const [topError = null] = await this.deps.counts.findTopErrors({ ...key, now });
       logger.warn(
         { ...key, ...counts, topError },
         "most of a monitor's recent evaluations errored; recording it so the monitor pauses",

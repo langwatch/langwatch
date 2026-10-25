@@ -15,21 +15,55 @@ describe("normalizeMonitorErrorMessage", () => {
     /** @scenario "The reported error message carries no secret" */
     it("redacts each of them", () => {
       const message = normalizeMonitorErrorMessage(
-        "401 from https://acme:hunter2@llm.acme.example/v1 with Authorization: Bearer abc.def-123 and api_key=sk-proj-AbCdEf1234567890",
+        "401 from https://acme:hunter2@llm.acme.example/v1 with Authorization: Bearer abc.def-123 and api_key=sk-test-aaaaaaaaaaaaaaaa",
       );
 
       expect(message).not.toContain("hunter2");
       expect(message).not.toContain("abc.def-123");
-      expect(message).not.toContain("sk-proj-AbCdEf1234567890");
+      expect(message).not.toContain("sk-test-aaaaaaaaaaaaaaaa");
       expect(message).toContain("[redacted]");
     });
 
     /** @scenario "The reported error message carries no secret" */
-    it("keeps the message at most 200 characters long", () => {
+    it("keeps the message at most 160 characters long", () => {
       const message = normalizeMonitorErrorMessage(`Evaluator failed: ${"a reason ".repeat(80)}`);
 
       expect(message.length).toBeLessThanOrEqual(MONITOR_ERROR_MESSAGE_MAX_LENGTH);
       expect(message.endsWith("...")).toBe(true);
+    });
+  });
+
+  describe("when the message is a JSON issue list", () => {
+    /** @scenario "The reported error message is one short readable line" */
+    it("carries the first issue's message, never the raw JSON", () => {
+      const raw = JSON.stringify(
+        [{ code: "invalid_union", path: ["mapping", "input"], message: "Invalid input" }],
+        null,
+        2,
+      );
+
+      expect(normalizeMonitorErrorMessage(raw)).toBe("Invalid input");
+      expect(normalizeMonitorErrorMessage(`Mapping refused: ${raw}`)).toBe(
+        "Mapping refused: Invalid input",
+      );
+    });
+
+    /** @scenario "The reported error message is one short readable line" */
+    it("names an error object that carries no message instead of dumping it", () => {
+      expect(normalizeMonitorErrorMessage('{"code":"invalid_value","values":["a","b"]}')).toBe(
+        "Evaluator returned an error object",
+      );
+    });
+  });
+
+  describe("when the message spans several lines", () => {
+    /** @scenario "The reported error message is one short readable line" */
+    it("keeps the first non-empty line", () => {
+      expect(
+        normalizeMonitorErrorMessage(
+          "\nConnection reset by peer\n    at Socket.onclose (net.js:1)",
+        ),
+      ).toBe("Connection reset by peer");
     });
   });
 

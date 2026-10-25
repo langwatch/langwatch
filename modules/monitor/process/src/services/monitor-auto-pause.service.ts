@@ -35,26 +35,24 @@ export class MonitorAutoPauseService {
 
   private constructor(private readonly deps: MonitorAutoPauseDeps) {}
 
-  /** Idempotent: a redelivered fact pauses nothing new and sends the same emails again. */
+  /**
+   * Idempotent: only the delivery whose conditional update paused the monitor emails, so a
+   * redelivered fact sends nothing. Email is best effort: a failed send is logged, not retried.
+   */
   async pauseFailing(fact: EvaluationMonitorErrorRateExceededEventData): Promise<void> {
     const { repository } = this.deps;
     const key = { id: fact.monitorId, projectId: fact.projectId };
     const monitor = await repository.findById(key);
-    if (!monitor) return;
+    if (!monitor?.enabled || monitor.updatedAt.getTime() !== fact.monitorRevision) return;
 
-    const applied =
-      monitor.enabled && monitor.updatedAt.getTime() === fact.monitorRevision
-        ? await repository.autoPause({
-            ...key,
-            revision: fromDate(monitor.updatedAt),
-            pausedAt: nowInstant(),
-            reason: monitorAutoPauseReason(fact),
-          })
-        : false;
-    const current = applied ? await repository.findById(key) : monitor;
-    // Paused by itself after this fact was recorded, and not switched back on since.
-    const pausedAt = current?.autoPausedAt?.getTime() ?? 0;
-    if (!current || current.enabled || pausedAt < fact.occurredAt) return;
+    const pausedAt = nowInstant();
+    const applied = await repository.autoPause({
+      ...key,
+      revision: fromDate(monitor.updatedAt),
+      pausedAt,
+      reason: monitorAutoPauseReason(fact),
+    });
+    if (!applied) return;
 
     logger.warn(
       {
@@ -65,7 +63,14 @@ export class MonitorAutoPauseService {
       },
       "paused a monitor whose evaluations mostly errored",
     );
-    await this.notifyAdmins({ monitor: current, pausedAt, fact });
+    try {
+      await this.notifyAdmins({ monitor, pausedAt: pausedAt.epochMilliseconds, fact });
+    } catch (error) {
+      logger.error(
+        { error, projectId: fact.projectId, monitorId: fact.monitorId },
+        "a monitor paused itself, but its admins could not be emailed",
+      );
+    }
   }
 
   private async notifyAdmins({
@@ -106,7 +111,7 @@ export class MonitorAutoPauseService {
       topError: fact.topError,
       monitorUrl: platformUrl({ projectSlug: project.slug, path: monitorDrawerPath(monitor.id) }),
     });
-    await Promise.all(
+    const sends = await Promise.allSettled(
       recipients.map((to) =>
         mail.sendEmail({
           to,
@@ -116,5 +121,12 @@ export class MonitorAutoPauseService {
         }),
       ),
     );
+    const failed = sends.filter((send) => send.status === "rejected").length;
+    if (failed > 0) {
+      logger.error(
+        { projectId: fact.projectId, monitorId: fact.monitorId, failed },
+        "some admins were not emailed about a monitor that paused itself",
+      );
+    }
   }
 }

@@ -1,5 +1,4 @@
 import {
-  EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_ATTEMPT_FAILED_EVENT_TYPE,
   EVALUATION_ATTEMPT_FAILED_EVENT_VERSION_LATEST,
   evaluationAttemptFailedEventDataSchema,
@@ -8,7 +7,7 @@ import {
   type ExecuteEvaluationCommandData,
   deriveVerdictPassed,
   deriveVerdictScore,
-  evaluationReportedEventDataSchema,
+  isEvaluationReportedEvent,
 } from "@langwatch/evaluation-contract";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
@@ -29,9 +28,6 @@ import type { PreparedEvaluation } from "./evaluation-execution-preparation.serv
 import type { EvaluationExecutionReceiptService } from "./evaluation-execution-receipt.service.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
-
-/** What the monitor's error rate reads off the reported event. */
-const reportedOutcomeSchema = evaluationReportedEventDataSchema.pick({ status: true, error: true });
 
 /** The next attempt of an evaluation whose evaluator service was not up. */
 type PlannedRetry = { attempt: number; delayMs: number; nextAttemptAt: number };
@@ -97,9 +93,9 @@ export class EvaluationExecutionOutcomeService {
     prepared: PreparedEvaluation;
     events: EvaluationProcessingEvent[];
   }): Promise<void> {
-    const reported = events.find((event) => event.type === EVALUATION_REPORTED_EVENT_TYPE);
+    const reported = events.find(isEvaluationReportedEvent);
     if (!reported || !this.deps.monitorErrorRates) return;
-    const { status, error } = reportedOutcomeSchema.parse(reported.data);
+    const { status, error } = reported.data;
     await this.deps.monitorErrorRates.observe({
       projectId: data.tenantId,
       monitorId: prepared.monitor.id,

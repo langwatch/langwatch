@@ -11,7 +11,7 @@ const MONITOR_ERROR_RATE_MINIMUM_RUNS = 50;
 /** The share of settled runs that must be errors. */
 const MONITOR_ERROR_RATE_THRESHOLD = 0.9;
 /** The longest error message the fact carries. */
-export const MONITOR_ERROR_MESSAGE_MAX_LENGTH = 200;
+export const MONITOR_ERROR_MESSAGE_MAX_LENGTH = 160;
 
 export type MonitorRunOutcome = "processed" | "error" | "skipped";
 
@@ -51,12 +51,46 @@ const REDACTIONS: readonly [RegExp, string][] = [
   [/\b[\w-]{40,}\b/g, "[redacted]"],
 ];
 
+const NO_JSON = Symbol("no-json");
+
+/** Parsed JSON when the text is a JSON object or array, else NO_JSON. */
+function parsedJson(text: string): unknown {
+  if (!/^[[{]/.test(text)) return NO_JSON;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return NO_JSON;
+  }
+}
+
+/** The `message` of a JSON error, or of the first entry of a JSON issue list, else "". */
+function jsonMessage(parsed: unknown): string {
+  const first: unknown = Array.isArray(parsed) ? parsed[0] : parsed;
+  if (typeof first !== "object" || first === null || !("message" in first)) return "";
+  return typeof first.message === "string" ? first.message.trim() : "";
+}
+
+/** One readable line: a JSON error's message (keeping any prefix), else the first line. */
+function readableLine(message: string): string {
+  const trimmed = message.trim();
+  const jsonStart = trimmed.search(/[[{]/);
+  if (jsonStart >= 0) {
+    const parsed = parsedJson(trimmed.slice(jsonStart));
+    if (parsed !== NO_JSON) {
+      const prefix = trimmed.slice(0, jsonStart).trim();
+      const inner = jsonMessage(parsed) || "Evaluator returned an error object";
+      return prefix ? `${prefix} ${inner}` : inner;
+    }
+  }
+  return trimmed.split(/\r?\n/).find((line) => line.trim()) ?? trimmed;
+}
+
 /**
- * An error message safe to count and to email: secrets redacted, ids and numbers folded so
- * the same failure reads as one message, whitespace collapsed, at most 200 characters.
+ * An error message safe to count and to email: one readable line, secrets redacted, ids and
+ * numbers folded so the same failure reads as one message, at most 160 characters.
  */
 export function normalizeMonitorErrorMessage(message: string): string {
-  let normalized = message;
+  let normalized = readableLine(message);
   for (const [pattern, replacement] of REDACTIONS) {
     normalized = normalized.replace(pattern, replacement);
   }
