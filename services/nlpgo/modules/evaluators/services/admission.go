@@ -68,3 +68,43 @@ func (a *admission) busy(ctx context.Context) error {
 		"retryAfterMs": a.wait.Milliseconds(),
 	}).WithRetryable(true)
 }
+
+// slots is a fixed pool of jobs in flight, apart from the fair share: shadow
+// evaluations and topic clusterings. A full pool waits up to wait (zero
+// refuses at once), then answers busy with message.
+type slots struct {
+	free    chan struct{}
+	wait    time.Duration
+	message string
+}
+
+func newSlots(capacity int, wait time.Duration, message string) *slots {
+	return &slots{free: make(chan struct{}, max(capacity, 0)), wait: wait, message: message}
+}
+
+func (s *slots) acquire(ctx context.Context) (release func(), err error) {
+	select {
+	case s.free <- struct{}{}:
+		return sync.OnceFunc(func() { <-s.free }), nil
+	default:
+	}
+	if s.wait <= 0 || cap(s.free) == 0 {
+		return nil, s.busy(ctx)
+	}
+	timer := time.NewTimer(s.wait)
+	defer timer.Stop()
+	select {
+	case s.free <- struct{}{}:
+		return sync.OnceFunc(func() { <-s.free }), nil
+	case <-timer.C:
+	case <-ctx.Done():
+	}
+	return nil, s.busy(ctx)
+}
+
+func (s *slots) busy(ctx context.Context) error {
+	return herr.NewLight(ctx, contract.ErrBusy, herr.M{
+		"message":      s.message,
+		"retryAfterMs": max(s.wait, time.Second).Milliseconds(),
+	}).WithRetryable(true)
+}

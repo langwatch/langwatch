@@ -24,10 +24,11 @@ func (ic InlineCredentials) Credential() (domain.Credential, error) {
 		return vertexCred(ic.VertexAI), nil
 	case "gemini":
 		return apiKeyCred(domain.ProviderGemini, ic.Gemini), nil
-	case "xai", "groq", "cerebras", "deepseek":
-		// Plain api-key providers share the Generic slot. DeepSeek routes
-		// through the gateway's openai-compat (vLLM) path with its public
-		// endpoint as the default base URL; the rest are Bifrost-native.
+	case "xai", "groq", "cerebras", "deepseek", "doubleword":
+		// Plain api-key providers share the Generic slot. DeepSeek and
+		// Doubleword route through the gateway's openai-compat (vLLM) path
+		// with their public endpoint as the default base URL; the rest are
+		// Bifrost-native.
 		return apiKeyCred(domain.ProviderID(ic.Provider), ic.Generic), nil
 	case "custom":
 		// Custom routes through Bifrost's openai-compat adapter — same

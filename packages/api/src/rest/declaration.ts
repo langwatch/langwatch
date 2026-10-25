@@ -596,6 +596,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly mintsCredential?: AuthzPermission;
   /** Present exactly when the route is refused on an aggregate though its permission is exempt. */
   readonly refusedOnAggregate?: true;
+  /** Present exactly when operator flags open the route to a legacy project key. */
+  readonly legacyKeyScopes?: readonly [string, ...string[]];
   /** Present exactly when the route's create is replayable under a caller key. */
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
@@ -680,6 +682,7 @@ type RouteState = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   refusedOnAggregate?: true;
+  legacyKeyScopes?: readonly [string, ...string[]];
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
@@ -1101,6 +1104,23 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
       path: this.path,
       operation: this.operation,
       state: { ...this.state, refusedOnAggregate: true },
+    });
+  }
+
+  /**
+   * The operator flags that open this route to a legacy project key whose project they list,
+   * on top of ingestion and full access. Project door only, on a route that asks a permission.
+   */
+  withLegacyKeyScope(...scopes: readonly [string, ...string[]]): RouteBuilder<Api, S> {
+    if (this.state.legacyKeyScopes)
+      throw new Error("REST route already declared withLegacyKeyScope()");
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, legacyKeyScopes: scopes },
     });
   }
 
@@ -1878,6 +1898,7 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.refusedOnAggregate ? { refusedOnAggregate: state.refusedOnAggregate } : {}),
+    ...(state.legacyKeyScopes ? { legacyKeyScopes: state.legacyKeyScopes } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),

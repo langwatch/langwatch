@@ -118,6 +118,17 @@ func TestLinkageRefusesTooFewOrNonFinite(t *testing.T) {
 	assert.InDelta(t, 0.3, rules.Percentile95([]float64{0.3}), 0)
 }
 
+// A vector shorter than the others panics the distance loop in a goroutine,
+// where no HTTP recoverer reaches: it must come back as an error.
+func TestPdistTurnsAGoroutinePanicIntoAnError(t *testing.T) {
+	_, err := rules.Pdist([][]float64{{1, 2, 3}, {1}, {4, 5, 6}})
+	require.ErrorIs(t, err, rules.ErrPairwiseDistanceFailed)
+	dist, err := rules.Pdist([][]float64{{0, 0}, {3, 4}})
+	require.NoError(t, err)
+	require.Len(t, dist, 1)
+	assert.InDelta(t, 5.0, dist[0], 1e-15)
+}
+
 // @scenario "The naming prompts match Python byte for byte"
 func TestNamingPromptsMatchPython(t *testing.T) {
 	type call struct {

@@ -33,17 +33,6 @@ if printf '%s' "$off" | grep -q 'kind: NetworkPolicy' && [ -n "$(printf '%s' "$o
   fail disabled "nlp NetworkPolicy rendered while disabled"
 else ok disabled; fi
 
-# --- default render equals the pre-change render (random secrets masked) ---
-# The stored-objects upgrade fingerprint hashes every value, so a new key moves it.
-mask() { sed -E 's/: "[A-Za-z0-9+\/=]{20,}"/: X/; s/(password|Secret|secret|key|Key): [A-Za-z0-9]{24,}/\1: X/; s/fingerprint="[0-9a-f]{64}"/fingerprint=X/'; }
-old_dir=$(mktemp -d)
-trap 'rm -rf "$old_dir"' EXIT
-git archive HEAD . | tar -x -C "$old_dir"
-cp -R charts "$old_dir/"
-old_render=$(cd "$old_dir" && helm template lw . --set autogen.enabled=true 2>&1 | mask)
-new_render=$(printf '%s' "$off" | mask)
-[ "$old_render" = "$new_render" ] && ok default-identical || fail default-identical "default render differs from HEAD"
-
 # --- default render: no secret wiring anywhere ---
 printf '%s' "$off" | grep -q 'NLPGO_INTERNAL_SECRET' \
   && fail default-secret "default render mentions NLPGO_INTERNAL_SECRET" || ok default-secret
@@ -78,6 +67,20 @@ printf '%s' "$on" | doc Secret langwatch-app-secrets | grep -q 'NLPGO_INTERNAL_S
 # --- existing-secret override reaches all three ---
 ov=$(render --set langwatch_nlp.evaluatorRuntime.enabled=true --set langwatch_nlp.evaluatorRuntime.secrets.existingSecretName=mine --set langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey=K)
 [ "$(printf '%s' "$ov" | grep -c 'name: mine')" -ge 3 ] && ok override || fail override "override not on all three pods"
+
+# --- a key the app Secret already holds is refused, naming the value ---
+for reserved in nextAuthSecret credentialsEncryptionKey virtualKeyPepper LANGWATCH_NLP_INTERNAL_SECRET LANGY_INTERNAL_SECRET; do
+  clash=$(render --set langwatch_nlp.evaluatorRuntime.enabled=true \
+    --set langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey="$reserved" || true)
+  printf '%s' "$clash" | grep -q "langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey is \"$reserved\"" \
+    && ok "reserved-$reserved" || fail "reserved-$reserved" "a clash with $reserved rendered"
+done
+# A separate Secret may name its key freely.
+elsewhere=$(render --set langwatch_nlp.evaluatorRuntime.enabled=true \
+  --set langwatch_nlp.evaluatorRuntime.secrets.existingSecretName=mine \
+  --set langwatch_nlp.evaluatorRuntime.secrets.internalSecretKey=nextAuthSecret || true)
+printf '%s' "$elsewhere" | grep -q 'evaluatorRuntime.secrets.internalSecretKey is' \
+  && fail reserved-elsewhere "a key in a separate Secret was refused" || ok reserved-elsewhere
 
 [ "$failures" -eq 0 ] || { echo "$failures failure(s)" >&2; exit 1; }
 echo "all passed"

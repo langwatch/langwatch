@@ -375,6 +375,10 @@ jobs:
           # so blank it here.
           LANGWATCH_API_KEY: ""
           LANGWATCH_NLP_SERVICE: http://localhost:5561
+          # The suites call prompts, datasets and evaluations with the seeded
+          # legacy project key, which off the full-access flag may only ingest
+          # (modules/auth/specs/legacy-project-key-scope.feature).
+          LEGACY_PROJECT_KEY_FULL_ACCESS: "1"
         run: |
           # Capture every process's output: background-process stdout is lost
           # once this step ends, which has already hidden one real regression

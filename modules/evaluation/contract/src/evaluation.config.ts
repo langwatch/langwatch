@@ -6,6 +6,7 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { Named } from "@langwatch/module";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
@@ -32,23 +33,66 @@ export const evaluatorRuntimeEngineSchema = z.enum(["python", "go", "shadow"]);
 
 export type EvaluatorRuntimeEngine = z.infer<typeof evaluatorRuntimeEngineSchema>;
 
-/** `langevals/exact_match=go,ragas/faithfulness=shadow`: one engine per evaluator type. */
+/**
+ * Whether an evaluator spends a provider key: a model or embeddings setting, or provider
+ * variables of its own. Such an evaluator is never shadowed (evaluator-runtime-shadow.feature).
+ * A type the catalogue does not know counts as one.
+ */
+export function evaluatorMakesModelCall({ evaluatorType }: { evaluatorType: string }): boolean {
+  const [definition] = findEvaluatorDefinitions(evaluatorType);
+  if (!definition) return true;
+  const settings = Object.keys(definition.settings);
+  return (
+    settings.includes("model") ||
+    settings.includes("embeddings_model") ||
+    definition.envVars.length > 0
+  );
+}
+
+/** `langevals/exact_match=go,ragas/bleu_score=shadow`: one engine per evaluator type. */
 const engineOverridesSchema = z
   .string()
   .optional()
-  .transform((raw) =>
+  .transform((raw, ctx) =>
     Object.fromEntries(
       (raw ?? "")
         .split(",")
         .map((entry) => entry.trim())
         .filter(Boolean)
         .map((entry) => {
-          const [evaluatorType = "", engine = ""] = entry.split("=").map((part) => part.trim());
+          const parts = entry.split("=").map((part) => part.trim());
+          if (parts.length !== 2) {
+            ctx.addIssue({
+              code: "custom",
+              message: `"${entry}" must name one evaluator type and one engine, as type=engine`,
+            });
+          }
+          const [evaluatorType = "", engine = ""] = parts;
           return [evaluatorType, engine];
         }),
     ),
   )
-  .pipe(z.record(z.string().min(1), evaluatorRuntimeEngineSchema));
+  .pipe(z.record(z.string().min(1), evaluatorRuntimeEngineSchema))
+  .superRefine((overrides, ctx) => {
+    for (const [evaluatorType, engine] of Object.entries(overrides)) {
+      if (engine === "python") continue;
+      if (findEvaluatorDefinitions(evaluatorType).length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: [evaluatorType],
+          message: `${evaluatorType} is not an evaluator type the catalogue knows`,
+        });
+      } else if (engine === "shadow" && evaluatorMakesModelCall({ evaluatorType })) {
+        ctx.addIssue({
+          code: "custom",
+          path: [evaluatorType],
+          message:
+            `${evaluatorType} makes a model call, so shadowing it would spend the customer's ` +
+            "provider key twice; route it to python or go",
+        });
+      }
+    }
+  });
 
 /**
  * Where this deployment's langevals answers. Evaluation owns the leaf; data-privacy holds the same
@@ -94,6 +138,7 @@ export const evaluationConfig = Config.define((c) => ({
   evaluatorRuntime: {
     /** nlpgo's base URL plus `/go/evaluators`. */
     endpoint: c.env("EVALUATOR_RUNTIME_ENDPOINT", z.string().optional()),
+    /** `shadow` shadows only the evaluators that make no model call; the rest stay on python. */
     engine: c.env("EVALUATOR_RUNTIME_ENGINE", evaluatorRuntimeEngineSchema.default("python")),
     engineOverrides: c.env("EVALUATOR_RUNTIME_ENGINE_OVERRIDES", engineOverridesSchema),
   },

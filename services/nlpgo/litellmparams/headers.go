@@ -74,7 +74,7 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 	switch provider {
 	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
 		domain.ProviderXAI, domain.ProviderGroq, domain.ProviderCerebras,
-		domain.ProviderDeepSeek:
+		domain.ProviderDeepSeek, domain.ProviderDoubleword:
 		apiKeyFromHeaders(h, &cred)
 	case domain.ProviderAzure:
 		azureFromHeaders(h, &cred)
@@ -198,6 +198,8 @@ func providerForPrefix(prefix string) (domain.ProviderID, bool) {
 		return domain.ProviderCerebras, true
 	case "deepseek":
 		return domain.ProviderDeepSeek, true
+	case "doubleword":
+		return domain.ProviderDoubleword, true
 	}
 	return "", false
 }

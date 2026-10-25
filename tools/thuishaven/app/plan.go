@@ -161,6 +161,12 @@ func wasmRuntimeEnv(repoRoot string) []string {
 	return env
 }
 
+// modelPricingEnv points nlpgo at the app's model catalogue, which LLM
+// evaluator costs are priced from (the variable langevals reads too).
+func modelPricingEnv(repoRoot string) string {
+	return "LANGWATCH_MODEL_PRICING_DIR=" + filepath.Join(repoRoot, "modules", "model-provider", "contract", "src", "catalog")
+}
+
 // withLinguaModels generates the models once (make skips an existing
 // models.bin) before the Go lane starts, only when +go-evaluators is on.
 func withLinguaModels(repoRoot string, goEvaluators bool, shell string) string {
@@ -419,7 +425,7 @@ func (p *childPlan) goServices() ([]string, []string) {
 		env = append(env, wasmRuntimeEnv(p.opts.RepoRoot)...)
 	}
 	if p.opts.Selection.GoEvaluators {
-		env = append(env, linguaModelsEnv(p.opts.RepoRoot))
+		env = append(env, linguaModelsEnv(p.opts.RepoRoot), modelPricingEnv(p.opts.RepoRoot))
 	}
 	return services, env
 }

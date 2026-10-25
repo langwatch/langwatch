@@ -6,12 +6,16 @@ import (
 	"runtime"
 	"slices"
 	"sync"
+	"sync/atomic"
 )
 
 // Linkage errors, as scipy raises them.
 var (
 	ErrTooFewObservations = errors.New("linkage needs at least 2 observations")
 	ErrNonFiniteDistance  = errors.New("the condensed distance matrix must contain only finite values")
+	// ErrPairwiseDistanceFailed is a pdist goroutine that panicked, such as
+	// on vectors of different lengths; the panic value is not kept.
+	ErrPairwiseDistanceFailed = errors.New("pairwise distances could not be computed")
 )
 
 // Merge is one row of scipy's linkage matrix Z.
@@ -31,7 +35,8 @@ func condensed(n, i, j int) int {
 
 // Pdist is scipy's pdist(X, "euclidean"): each pair summed in index order.
 // Rows are spread over goroutines; every pair is still summed the same way.
-func Pdist(vectors [][]float64) []float64 {
+// A goroutine's panic is ErrPairwiseDistanceFailed, never the process's.
+func Pdist(vectors [][]float64) ([]float64, error) {
 	n := len(vectors)
 	out := make([]float64, n*(n-1)/2)
 	rows := make(chan int, n)
@@ -40,15 +45,24 @@ func Pdist(vectors [][]float64) []float64 {
 	}
 	close(rows)
 	var wg sync.WaitGroup
+	var panicked atomic.Bool
 	for range runtime.GOMAXPROCS(0) {
 		wg.Go(func() {
+			defer func() {
+				if recover() != nil {
+					panicked.Store(true)
+				}
+			}()
 			for i := range rows {
 				pdistRow(vectors, i, out)
 			}
 		})
 	}
 	wg.Wait()
-	return out
+	if panicked.Load() {
+		return nil, ErrPairwiseDistanceFailed
+	}
+	return out, nil
 }
 
 // pdistRow fills row i of the condensed matrix, four pairs per pass.

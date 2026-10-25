@@ -45,3 +45,10 @@ Feature: The Go evaluator runtime detects PII as Presidio did
     Given findings that overlap, nest or sit a space apart
     When the text is anonymised
     Then each surviving span reads <ENTITY_TYPE>, resolved as Presidio's anonymizer does
+
+  @unit
+  Scenario: Text at the PII length limit full of numbers is analyzed in seconds
+    Given an entry near the 524288 character limit made of numbers many recognizers match
+    When the patterns analyze it
+    Then the findings are deduplicated as Presidio's remove_duplicates does
+    And the analysis takes seconds, not minutes, and stops between recognizers at the deadline

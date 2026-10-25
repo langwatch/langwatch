@@ -139,8 +139,8 @@ export class TraceIngestCredentialService {
     const resolved = await this.#apiKeys.findResolvedToken(credentials);
     if (!resolved) throw new ProjectInvalidCredentialsError();
 
-    // A legacy project key has no per-permission ceiling: project keys predate
-    // RBAC and carry full project access by design.
+    // A legacy project key is ingestion-only, which is all this door asks of it
+    // (modules/auth/specs/legacy-project-key-scope.feature).
     if (resolved.type === "apiKey") {
       const allowed = await this.#authz.hasApiKeyPermission({
         apiKeyId: resolved.apiKeyId,

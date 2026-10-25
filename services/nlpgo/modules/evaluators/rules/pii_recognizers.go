@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"context"
+	"math"
 	"slices"
 	"sort"
 	"time"
@@ -92,13 +94,17 @@ func (p *PIIPatterns) Covers() []contract.EntityType {
 }
 
 // Analyze is AnalyzerEngine.analyze over the pattern recognizers: each
-// recognizer's findings, context enhancement, then remove_duplicates.
-func (p *PIIPatterns) Analyze(text string, entities []contract.EntityType) []PIIMatch {
+// recognizer's findings, context enhancement, then remove_duplicates. It
+// answers ctx's error when ctx ends between recognizers.
+func (p *PIIPatterns) Analyze(ctx context.Context, text string, entities []contract.EntityType) ([]PIIMatch, error) {
 	runes := []rune(text)
 	var results []PIIMatch
 	for _, r := range p.recognizers {
 		if !slices.Contains(entities, r.entity) {
 			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 		var found []PIIMatch
 		if r.entity == "PHONE_NUMBER" {
@@ -109,9 +115,9 @@ func (p *PIIPatterns) Analyze(text string, entities []contract.EntityType) []PII
 		results = append(results, removeDuplicates(found)...)
 	}
 	if len(results) == 0 {
-		return nil
+		return nil, nil
 	}
-	return removeDuplicates(p.enhanceWithContext(runes, results))
+	return removeDuplicates(p.enhanceWithContext(runes, results)), nil
 }
 
 // analyzePatterns is PatternRecognizer.__analyze_patterns (IbanRecognizer's
@@ -199,26 +205,73 @@ func (p *PIIPatterns) patternScore(entity contract.EntityType, matched string, s
 // removeDuplicates is EntityRecognizer.remove_duplicates: equal findings
 // collapse, then a finding inside a higher-ranked one of its type is dropped.
 func removeDuplicates(results []PIIMatch) []PIIMatch {
+	seen := make(map[contract.PIIFinding]struct{}, len(results))
 	unique := make([]PIIMatch, 0, len(results))
 	for _, r := range results {
-		if !slices.ContainsFunc(unique, func(u PIIMatch) bool { return u.PIIFinding == r.PIIFinding }) {
+		if _, duplicate := seen[r.PIIFinding]; !duplicate {
+			seen[r.PIIFinding] = struct{}{}
 			unique = append(unique, r)
 		}
 	}
 	sort.SliceStable(unique, func(i, j int) bool { return rankBefore(unique[i].PIIFinding, unique[j].PIIFinding) })
+	spans := newKeptSpans(unique)
 	var kept []PIIMatch
 	for _, r := range unique {
-		if r.Score == 0 {
+		if r.Score == 0 || spans.contain(r.PIIFinding) {
 			continue
 		}
-		contained := slices.ContainsFunc(kept, func(k PIIMatch) bool {
-			return r.Start >= k.Start && r.End <= k.End && r.EntityType == k.EntityType
-		})
-		if !contained {
-			kept = append(kept, r)
-		}
+		spans.keep(r.PIIFinding)
+		kept = append(kept, r)
 	}
 	return kept
+}
+
+// keptSpans answers "does a kept finding of this type contain this one" in
+// O(log n): per type, a Fenwick tree of the largest kept end over starts.
+type keptSpans map[contract.EntityType]*spanIndex
+
+type spanIndex struct {
+	starts []int // sorted, distinct
+	maxEnd []int // 1-based Fenwick tree of prefix maxima
+}
+
+func newKeptSpans(findings []PIIMatch) keptSpans {
+	spans := keptSpans{}
+	for _, f := range findings {
+		index := spans[f.EntityType]
+		if index == nil {
+			index = &spanIndex{}
+			spans[f.EntityType] = index
+		}
+		index.starts = append(index.starts, f.Start)
+	}
+	for _, index := range spans {
+		slices.Sort(index.starts)
+		index.starts = slices.Compact(index.starts)
+		index.maxEnd = make([]int, len(index.starts)+1)
+		for i := range index.maxEnd {
+			index.maxEnd[i] = math.MinInt
+		}
+	}
+	return spans
+}
+
+// contain says a kept finding of f's type starts at or before f and ends at
+// or after it.
+func (s keptSpans) contain(f contract.PIIFinding) bool {
+	index := s[f.EntityType]
+	best := math.MinInt
+	for i := sort.SearchInts(index.starts, f.Start+1); i > 0; i -= i & -i {
+		best = max(best, index.maxEnd[i])
+	}
+	return best >= f.End
+}
+
+func (s keptSpans) keep(f contract.PIIFinding) {
+	index := s[f.EntityType]
+	for i := sort.SearchInts(index.starts, f.Start) + 1; i < len(index.maxEnd); i += i & -i {
+		index.maxEnd[i] = max(index.maxEnd[i], f.End)
+	}
 }
 
 // rankBefore is remove_duplicates' sort key (-score, start, -length). Ties

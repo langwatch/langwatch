@@ -121,6 +121,13 @@ Feature: Evaluators run in the Go evaluator runtime
     Then the evaluation reaches a verdict
 
   @unit
+  Scenario: An incomplete embeddings answer fails the entry instead of scoring it
+    Given the embeddings model answers with a vector missing, repeated, empty or of the wrong length
+    When "acme" runs an embeddings evaluator
+    Then the model call fails
+    And no score is computed from the partial answer
+
+  @unit
   Scenario: The runtime finishes before the application gives up
     Given a judge model that never answers
     When "acme" runs an LLM-judge evaluator
@@ -136,6 +143,7 @@ Feature: Evaluators run in the Go evaluator runtime
     Given "acme"'s evaluation request continues a trace
     When "acme" runs an LLM-judge evaluator
     Then "acme"'s project receives an evaluation span with one child span per model call
+    And the spans are sent to LangWatch's trace ingest address
     And those child spans carry the judge's input and output messages
     And no span from that evaluation reaches "globex"'s project
 
@@ -165,6 +173,13 @@ Feature: Evaluators run in the Go evaluator runtime
     When "acme" runs an LLM-judge evaluator on it
     Then LangWatch's own evaluation span carries the evaluator, model, provider, tokens, cost and status
     And the marker string appears in no span or log line of LangWatch's own telemetry
+
+  @unit
+  Scenario: An LLM evaluator's cost is priced from the model catalogue
+    Given the judge model has a price in LangWatch's model catalogue
+    When "acme" runs an LLM-judge evaluator
+    Then the result's cost is the call's input, output and cached tokens at the catalogue's prices
+    And a model with no catalogue price reports no cost rather than a guess
 
   @unit
   Scenario: A failed trace export does not fail the evaluation

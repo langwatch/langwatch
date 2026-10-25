@@ -189,6 +189,19 @@ Feature: Topic clustering runs in Go with the Python results
     When it is posted
     Then the answer is 422 topic_clustering_too_few_traces
 
+  @unit
+  Scenario: A pod runs at most two clusterings at once and tells a third when to retry
+    Given two clusterings are running on the pod
+    When a third clustering arrives and no slot frees within the short wait
+    Then it answers evaluation_busy with a retry delay
+
+  @unit
+  Scenario: A crash inside a clustering answers topic_clustering_failed and the pod keeps serving
+    Given a step of the clustering crashes while embedding or naming
+    When clustering runs
+    Then the clustering answers topic_clustering_failed
+    And the next clustering is served
+
   @integration
   Scenario: Clustering past its deadline stops provider calls and answers an error
     Given a provider that does not answer before the clustering deadline

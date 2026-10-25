@@ -14,14 +14,49 @@ Feature: Evaluators ported to the Go runtime answer as langevals answered
   @unit
   Scenario: A valid_format mode short of parity is reported, not hidden
     Given langevals' recorded valid_format answers for python and sql
-    When the Go runtime evaluates them
-    Then the cases that differ are listed by name in the test output
+    When the Go parsers evaluate them past the parity gate
+    Then the cases that differ are exactly the checked-in list of known differences
+    And valid Python 3 and SQL that the Go parsers refuse are still refused, or the parity must be measured again
+
+  @unit
+  Scenario: A valid_format mode short of parity is refused so langevals answers it
+    Given valid_format runs on Go only for json and markdown
+    When a request asks valid_format for python or sql
+    Then the Go runtime refuses it as an evaluator it does not have
+    And no verdict is answered for any entry
 
   @unit
   Scenario: The ragas text metrics score as langevals scored
     Given langevals' recorded answers for bleu, rouge and the non-LLM context metrics
     When the Go runtime evaluates the same entries with the same settings
     Then every score matches within 1e-9
+
+  @unit
+  Scenario: A context or ROUGE comparison too large to finish is refused as an entry error
+    Given contexts or a ROUGE-L reference and response long enough to need more than 100 million comparisons
+    When the entry is evaluated
+    Then the entry is a ValidationError saying the texts are too long to compare
+    And no comparison is started
+
+  @unit
+  Scenario: A context or ROUGE comparison stops at the evaluation deadline
+    Given a context or ROUGE-L comparison under the size limit
+    When the evaluation deadline passes while it runs
+    Then the comparison stops and the entry is a deadline error
+
+  @unit
+  Scenario: A judge answering a score that is not a finite number is an entry error
+    Given a judge model answers a score or confidence of "NaN" or "Infinity"
+    When its answer is read
+    Then the value is not accepted as a number
+    And only that entry is an error, the rest of the batch answers as normal
+
+  @unit
+  Scenario: A batch whose results cannot be encoded answers a server error, not an empty success
+    Given an evaluation whose results JSON cannot carry
+    When the runtime answers the request
+    Then the answer is a server error with its own error code
+    And the failure is logged without any entry content
 
   @unit
   Scenario: Language detection answers as langevals answered, including Indic scripts and mixed Korean and English

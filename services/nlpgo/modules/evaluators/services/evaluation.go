@@ -85,6 +85,7 @@ type EvaluationService struct {
 	logger     *zap.Logger
 	evaluators map[string]Evaluator
 	admission  *admission
+	shadow     *slots
 }
 
 // NewEvaluationService builds the service.
@@ -106,7 +107,16 @@ func NewEvaluationService(deps EvaluationDeps) *EvaluationService {
 			Global:     deps.Config.MaxInFlight,
 			PerProject: deps.Config.MaxInFlightPerProject,
 		}, deps.Config.BusyWait()),
+		shadow: newSlots(deps.Config.ShadowMaxInFlight, 0, "too many shadow evaluations in flight"),
 	}
+}
+
+// admit takes a live call's fair share, or a shadow call's separate budget.
+func (s *EvaluationService) admit(ctx context.Context, req contract.EvaluateRequest) (func(), error) {
+	if req.Shadow {
+		return s.shadow.acquire(ctx)
+	}
+	return s.admission.acquire(ctx, req.Tenant.ProjectID)
 }
 
 // Evaluate answers one result per entry, in order (contract.EvaluatorRuntimeAPI).
@@ -136,6 +146,9 @@ func (s *EvaluationService) Evaluate(ctx context.Context, req contract.EvaluateR
 	span.SetAttributes(attribute.String("langwatch.evaluator.type", slug))
 	// Parsed once here; the error is not attached: settings may quote tenant prompts.
 	score, parseErr := evaluator.Prepare(req.Settings)
+	if herr.IsCode(parseErr, contract.ErrEvaluatorNotFound) {
+		return nil, parseErr // a mode short of parity: the app falls back to langevals
+	}
 	if parseErr != nil {
 		return nil, herr.New(ctx, contract.ErrEvaluatorSettingsInvalid, herr.M{
 			"message":   "evaluator settings invalid",
@@ -148,7 +161,7 @@ func (s *EvaluationService) Evaluate(ctx context.Context, req contract.EvaluateR
 		ctx, cancel = context.WithTimeout(ctx, deadline)
 		defer cancel()
 	}
-	release, err := s.admission.acquire(ctx, req.Tenant.ProjectID)
+	release, err := s.admit(ctx, req)
 	if err != nil {
 		return nil, err
 	}

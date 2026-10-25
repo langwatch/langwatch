@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -26,7 +27,8 @@ const customerTraceMetricPrefix = "langwatch.nlpgo.evaluators"
 
 // CustomerTraceOptions configures NewCustomerTrace.
 type CustomerTraceOptions struct {
-	// Endpoint is the LangWatch OTLP base URL. Empty exports nothing.
+	// Endpoint is the LangWatch base URL (LANGWATCH_ENDPOINT); spans go to its
+	// /api/otel/v1/traces ingest. Empty exports nothing.
 	Endpoint string
 	Logger   *zap.Logger
 	// MeterProvider reads the drop and export counters; nil uses the global one.
@@ -50,13 +52,15 @@ func NewCustomerTrace(ctx context.Context, opts CustomerTraceOptions) (*Customer
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	c := &CustomerTrace{endpoint: opts.Endpoint, logger: logger}
+	c := &CustomerTrace{logger: logger}
 	if opts.Endpoint == "" {
 		return c, nil
 	}
 	if err := customertracebridge.ValidateEndpoint(opts.Endpoint); err != nil {
 		return nil, fmt.Errorf("customer trace endpoint: %w", err)
 	}
+	// The bridge appends /v1/traces, as for the gateway's BaseURL + "/api/otel".
+	c.endpoint = strings.TrimRight(opts.Endpoint, "/") + "/api/otel"
 	c.registry = customertracebridge.NewRegistry()
 	emitter, err := customertracebridge.NewEmitter(ctx, customertracebridge.EmitterOptions{
 		Registry: c.registry,

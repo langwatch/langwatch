@@ -1161,6 +1161,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ProjectName: { source: "name" },
       ProjectSlug: { source: "slug" },
       apiKey: "omit", // secret
+      legacyApiKeyLastUsedAt: "omit", // operator column for retiring legacy keys
       lwqlKey: "omit", // secret
       TeamId: { source: "teamId" },
       Language: { source: "language", content: "output" },

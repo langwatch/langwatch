@@ -435,22 +435,14 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
 
 _original_tqdm_init = tqdm.__init__
 _original_tqdm_notebook_init = tqdm_notebook.__init__
-_tqdm_disabled_once = False
 
 
 # Hack to disable tqdm output from Ragas and other libraries and use the one from langevals instead
 def _disable_tqdm():
-    global _tqdm_disabled_once
-    if not _tqdm_disabled_once:
-        time.sleep(0.1)
-        _tqdm_disabled_once = True
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)  # type: ignore
     tqdm_notebook.__init__ = partialmethod(tqdm_notebook.__init__, disable=True)  # type: ignore
 
 
 def _restore_tqdm():
-    global _tqdm_disabled_once
-    _tqdm_disabled_once = False
-
     tqdm.__init__ = _original_tqdm_init
     tqdm_notebook.__init__ = _original_tqdm_notebook_init

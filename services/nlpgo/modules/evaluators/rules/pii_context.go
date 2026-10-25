@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -65,14 +66,14 @@ func (p *PIIPatterns) isKeyword(lemma string) bool {
 }
 
 // matchTokenIndex is _find_index_of_match_token: the first token ending
-// after the finding's start.
+// after the finding's start. Tokens are non-empty and in text order, so
+// their ends ascend and a binary search finds it.
 func matchTokenIndex(tokens []piiToken, start int) int {
-	for i, t := range tokens {
-		if t.start == start || start < t.start+len(t.text) {
-			return i
-		}
+	i := sort.Search(len(tokens), func(i int) bool { return start < tokens[i].start+len(tokens[i].text) })
+	if i == len(tokens) {
+		return -1
 	}
-	return -1
+	return i
 }
 
 // surroundingLemmas are the keyword lemmas from the match token back until

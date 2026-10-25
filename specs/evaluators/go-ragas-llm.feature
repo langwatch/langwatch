@@ -45,3 +45,37 @@ Feature: The Go evaluator runtime runs the ragas LLM metrics as ragas 0.4.3 did
     Given a ragas LLM metric that scores an entry, and one that fails
     When their logs and LangWatch's own spans are read
     Then neither carries the entry's content or the prompts
+
+  # Moved from the retired ragas-go-parity.feature: behaviours no scenario above binds yet.
+
+  @unit @unimplemented
+  Scenario Outline: A ragas string metric reproduces the recorded scores exactly
+    Given the recorded cases for "<evaluator>"
+    When the Go evaluator scores them
+    Then every score is within 1e-9 of langevals'
+
+    Examples:
+      | evaluator               |
+      | ragas/bleu_score        |
+      | ragas/rouge_score       |
+      | ragas/context_precision |
+      | ragas/context_recall    |
+      | ragas/context_f1        |
+
+  @integration @unimplemented
+  Scenario: A live ragas run stays within the spread langevals showed on the same sample
+    Given the sample for a ragas LLM metric and the spread of three langevals runs on it
+    When the Go evaluator scores the sample against the real judge model
+    Then its mean score differs from langevals' mean by no more than that spread
+
+  @unit @unimplemented
+  Scenario: A ragas score that is not a number is reported as an error, not sent as NaN
+    Given a context recall judgement that yields no countable verdicts
+    When the Go context recall evaluator runs
+    Then the entry's result is an error naming the empty judgement
+
+  @unit @unimplemented
+  Scenario: Response context precision judges against the expected output when both are given
+    Given an entry with both an output and an expected output
+    When the Go response context precision evaluator runs
+    Then the contexts are judged against the expected output

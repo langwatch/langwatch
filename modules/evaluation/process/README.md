@@ -249,7 +249,7 @@ interface Params {
 }
 // Body: inline, src/transport/evaluations-legacy.rest.ts:189
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:192
+// Response: inline, src/transport/evaluations-legacy.rest.ts:193
 type Response = unknown;
 ```
 
@@ -257,7 +257,7 @@ type Response = unknown;
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:216`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:217`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
@@ -267,9 +267,9 @@ interface Params {
   evaluator: string;
   subpath: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:224
+// Body: inline, src/transport/evaluations-legacy.rest.ts:225
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:227
+// Response: inline, src/transport/evaluations-legacy.rest.ts:229
 type Response = unknown;
 ```
 
@@ -277,15 +277,15 @@ type Response = unknown;
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:251`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:253`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:17
-// Body: inline, src/transport/evaluations-legacy.rest.ts:255
+// Body: inline, src/transport/evaluations-legacy.rest.ts:257
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:258
+// Response: inline, src/transport/evaluations-legacy.rest.ts:261
 type Response = unknown;
 ```
 
@@ -402,26 +402,26 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:150`. Eve
 
 ## Configuration
 
-| Kind   | Leaf                               | Environment variable                       | Declared at                               |
-| ------ | ---------------------------------- | ------------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                           | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:277`           |
-| secret | `azureContentSafety`               | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:278`           |
-| secret | `nlpgoInternal`                    | `NLPGO_INTERNAL_SECRET`                    | `src/app/evaluation.app.ts:279`           |
-| secret | `nlpInternal`                      | `LANGWATCH_NLP_INTERNAL_SECRET`            | `src/app/evaluation.app.ts:280`           |
-| config | `langevalsEndpoint`                | `LANGEVALS_ENDPOINT`                       | `../contract/src/evaluation.config.ts:67` |
-| config | `stagingThresholdBytes`            | `LANGEVALS_STAGING_THRESHOLD_BYTES`        | `../contract/src/evaluation.config.ts:68` |
-| config | `stagingTtlSeconds`                | `LANGEVALS_STAGING_TTL_SECONDS`            | `../contract/src/evaluation.config.ts:69` |
-| config | `evaluationMaxPayloadBytes`        | `EVAL_MAX_PAYLOAD_BYTES`                   | `../contract/src/evaluation.config.ts:70` |
-| config | `topicClusteringMaxPayloadBytes`   | `TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES`       | `../contract/src/evaluation.config.ts:71` |
-| config | `inputsInlineMaxBytes`             | `LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES`   | `../contract/src/evaluation.config.ts:75` |
-| config | `inputsHardCeilingBytes`           | `LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES` | `../contract/src/evaluation.config.ts:79` |
-| config | `azureContentSafetyEndpoint`       | `AZURE_CONTENT_SAFETY_ENDPOINT`            | `../contract/src/evaluation.config.ts:83` |
-| config | `enablePresidio`                   | `LANGWATCH_ENABLE_PRESIDIO`                | `../contract/src/evaluation.config.ts:84` |
-| config | `enableLingua`                     | `LANGWATCH_ENABLE_LINGUA`                  | `../contract/src/evaluation.config.ts:85` |
-| config | `evaluatorRetryWindowMinutes`      | `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | `../contract/src/evaluation.config.ts:89` |
-| config | `foldCacheTtlSeconds`              | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`         | `../contract/src/evaluation.config.ts:93` |
-| config | `evaluatorRuntime.endpoint`        | `EVALUATOR_RUNTIME_ENDPOINT`               | `../contract/src/evaluation.config.ts:96` |
-| config | `evaluatorRuntime.engine`          | `EVALUATOR_RUNTIME_ENGINE`                 | `../contract/src/evaluation.config.ts:97` |
-| config | `evaluatorRuntime.engineOverrides` | `EVALUATOR_RUNTIME_ENGINE_OVERRIDES`       | `../contract/src/evaluation.config.ts:98` |
+| Kind   | Leaf                               | Environment variable                       | Declared at                                |
+| ------ | ---------------------------------- | ------------------------------------------ | ------------------------------------------ |
+| secret | `openAi`                           | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:277`            |
+| secret | `azureContentSafety`               | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:278`            |
+| secret | `nlpgoInternal`                    | `NLPGO_INTERNAL_SECRET`                    | `src/app/evaluation.app.ts:279`            |
+| secret | `nlpInternal`                      | `LANGWATCH_NLP_INTERNAL_SECRET`            | `src/app/evaluation.app.ts:280`            |
+| config | `langevalsEndpoint`                | `LANGEVALS_ENDPOINT`                       | `../contract/src/evaluation.config.ts:111` |
+| config | `stagingThresholdBytes`            | `LANGEVALS_STAGING_THRESHOLD_BYTES`        | `../contract/src/evaluation.config.ts:112` |
+| config | `stagingTtlSeconds`                | `LANGEVALS_STAGING_TTL_SECONDS`            | `../contract/src/evaluation.config.ts:113` |
+| config | `evaluationMaxPayloadBytes`        | `EVAL_MAX_PAYLOAD_BYTES`                   | `../contract/src/evaluation.config.ts:114` |
+| config | `topicClusteringMaxPayloadBytes`   | `TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES`       | `../contract/src/evaluation.config.ts:115` |
+| config | `inputsInlineMaxBytes`             | `LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES`   | `../contract/src/evaluation.config.ts:119` |
+| config | `inputsHardCeilingBytes`           | `LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES` | `../contract/src/evaluation.config.ts:123` |
+| config | `azureContentSafetyEndpoint`       | `AZURE_CONTENT_SAFETY_ENDPOINT`            | `../contract/src/evaluation.config.ts:127` |
+| config | `enablePresidio`                   | `LANGWATCH_ENABLE_PRESIDIO`                | `../contract/src/evaluation.config.ts:128` |
+| config | `enableLingua`                     | `LANGWATCH_ENABLE_LINGUA`                  | `../contract/src/evaluation.config.ts:129` |
+| config | `evaluatorRetryWindowMinutes`      | `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | `../contract/src/evaluation.config.ts:133` |
+| config | `foldCacheTtlSeconds`              | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`         | `../contract/src/evaluation.config.ts:137` |
+| config | `evaluatorRuntime.endpoint`        | `EVALUATOR_RUNTIME_ENDPOINT`               | `../contract/src/evaluation.config.ts:140` |
+| config | `evaluatorRuntime.engine`          | `EVALUATOR_RUNTIME_ENGINE`                 | `../contract/src/evaluation.config.ts:142` |
+| config | `evaluatorRuntime.engineOverrides` | `EVALUATOR_RUNTIME_ENGINE_OVERRIDES`       | `../contract/src/evaluation.config.ts:143` |
 
 <!-- readme:generated:end -->

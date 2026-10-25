@@ -9,8 +9,8 @@ Companions:
 
 - Ragas source of truth: `dev/docs/plans/langevals-go/ragas-0.4.3-reference.md`, rendered by
   running ragas 0.4.3, covering all 13 `ragas/*` evaluators.
-- Specs: `specs/evaluators/go-evaluator-runtime.feature`, `specs/evaluators/ragas-go-parity.feature`,
-  `specs/data-privacy/pii-analyser-choice.feature`.
+- Specs: `specs/evaluators/go-evaluator-runtime.feature`, `specs/evaluators/go-ragas-llm.feature`,
+  `specs/evaluators/evaluator-runtime-shadow.feature`, `specs/data-privacy/pii-analyser-choice.feature`.
 
 ## 1. Review findings
 
@@ -167,12 +167,21 @@ cost accrued so far (§5.5).
   `LANGWATCH_NLP_SERVICE` (finding 25).
 - **Per-evaluator engine switch** in `LangevalsChannel`: `python | go | shadow`, keyed by
   evaluator type, default `python`. Rollback is flipping one entry back. It lives until step 7.
-- **Shadow mode**: the channel calls both, answers with Python, and logs the pair: exact
-  comparison for deterministic evaluators, score-distribution comparison for LLM ones. The
-  shadow call carries no project key, so it traces nothing and is not billed twice.
+- **Shadow mode**: the channel calls both, answers with Python, and logs the exact comparison.
+  Shadow is only for evaluators that make no model call (no `model` or `embeddings_model`
+  setting and no provider variables in the catalogue): a second LLM call would spend the
+  customer's provider key twice. Config refuses a `shadow` override for any other evaluator; a
+  `shadow` default engine shadows the no-model ones and keeps the rest on python. The shadow
+  call carries no `env` and no project key, so it can spend nothing and traces nothing, and
+  `X-LangWatch-Shadow: 1` has Go admit it from a separate budget, outside the project's live
+  share. A failing shadow call changes nothing the customer sees.
+- **Unported evaluators**: Go's `evaluator_not_found` for a built-in type is a platform
+  execution error logged at error level, never a customer skip; config refuses routing a type
+  the catalogue does not know to `go` or `shadow`.
 - **Dashboards per engine**: errors, skips, latency, cost, score distribution per evaluator.
-- **Promotion rule**: an evaluator moves to `go` after its replay parity passes and a week of
-  shadow shows no drift beyond the live tolerance.
+- **Promotion rule**: a no-model evaluator moves to `go` after its replay parity passes and a
+  week of shadow shows no drift; an LLM evaluator moves after replay parity and the live-spread
+  check (`go-ragas-llm.feature`), never through shadow.
 - **Self-hosters**: `LANGEVALS_ENDPOINT` keeps working until the last evaluator flips; the chart
   stops shipping the langevals pod in the release after that, with an upgrade note.
 
@@ -350,7 +359,7 @@ Python library's model data.
 - Size: Python is 1,428 lines; Go ~1,280 lines of code plus ~1,130 of tests and fixtures.
 - Parity: exact cluster membership and heights within 1e-12 (arm64 fused multiply-add rules out
   bit identity). Naming prompts are shuffled unseeded in Python, so naming parity is the call
-  plan plus a shadow run, not replay.
+  plan plus a live comparison run, not replay or shadow.
 - Decided (Alex, 2026-09-30): the three Python incremental defects (a never-created parent id for
   new subtopics, null ids at 100 or fewer unassigned, duplicated traces) are fixed in Go, not
   ported; embeddings are priced through the gateway's pricing behind a switch that starts off; an
@@ -465,10 +474,11 @@ context_recall, context_f1, lingua, sentiment, similarity, openai/moderation, az
 
 **Phase 3: langevals judges**
 Judge loop with the `litellm_patch.py` behaviours; multimodal and tool-call inputs; the rebinding
-of the `langevals-*` specs; flips each judge after replay parity and a shadow week.
+of the `langevals-*` specs; flips each judge after replay parity and the live-spread check.
 
 **Phase 4: ragas LLM metrics**
-Ragas loop, rendering, repair, tokeniser; the eight LLM metrics; flips after replay and shadow.
+Ragas loop, rendering, repair, tokeniser; the eight LLM metrics; flips after replay and the
+live-spread check.
 
 **Phase 5: clustering**
 Supersede the ruling; Ward, assignment, incremental, naming; the clustering Deployment and staging
@@ -598,7 +608,7 @@ Apple M1 Max (arm64, as the Lambdas), the same recorded fixture inputs on both s
 
 Every langevals call over HTTP, so every Lambda call, waits at least 100 ms in a sleep:
 `evaluate_batch` resets `_tqdm_disabled_once` and `_disable_tqdm` then sleeps 0.1 s
-(`langevals_core/base_evaluator.py:442-453`). That sleep is most of the gap.
+(`langevals_core/base_evaluator.py:442-453`). That sleep is most of the gap; it is removed in the same change (`specs/evaluators/langevals-no-fixed-delay.feature`), so the langevals column below was measured before it.
 
 |                                                                                  | Go                                                 | langevals                                               |
 | -------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |

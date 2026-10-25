@@ -15,6 +15,7 @@ import (
 
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/memory"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
+	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/rules"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/services"
 	lingua "github.com/langwatch/langwatch/services/third_party/lingua-go"
 )
@@ -99,14 +100,29 @@ func benchRequests(b *testing.B, slug, file string) []contract.EvaluateRequest {
 	var cases []fixtureCase
 	require.NoError(b, json.Unmarshal(raw, &cases))
 	require.NotEmpty(b, cases)
-	requests := make([]contract.EvaluateRequest, len(cases))
+	requests := make([]contract.EvaluateRequest, 0, len(cases))
 	for i := range cases {
-		requests[i] = contract.EvaluateRequest{
+		if !servedOnGo(cases[i].Settings) {
+			continue
+		}
+		requests = append(requests, contract.EvaluateRequest{
 			Tenant:    contract.Tenant{ProjectID: "project_bench"},
 			Evaluator: slug,
 			Entries:   []contract.Entry{cases[i].Entry},
 			Settings:  settingsOrEmpty(cases[i].Settings),
-		}
+		})
 	}
+	require.NotEmpty(b, requests)
 	return requests
+}
+
+// servedOnGo drops valid_format modes short of parity, which Go refuses.
+func servedOnGo(settings json.RawMessage) bool {
+	var format struct {
+		Format string `json:"format"`
+	}
+	if json.Unmarshal(settings, &format) != nil || format.Format == "" {
+		return true
+	}
+	return rules.FormatAtParity(format.Format)
 }

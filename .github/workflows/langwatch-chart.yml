@@ -226,6 +226,13 @@ jobs:
         if: "!cancelled()"
         run: ./tests/redis-valkey.sh
 
+      # An install taking existing agent objects over in place needs the
+      # chart to render their selector, which can never change on a live
+      # Deployment. The default presets never set these values.
+      - name: "assert the langyagent takeover values render"
+        if: "!cancelled()"
+        run: ./tests/langyagent-takeover.sh
+
       # Static on purpose, and helm being installed here changes nothing.
       # Every `lookup` in the render step runs against no cluster and so
       # returns empty, which is exactly what a lookup the installer is
@@ -255,6 +262,12 @@ jobs:
       - name: "assert every nlpgo caller gets the same code-block ceiling"
         if: "!cancelled()"
         run: ./tests/nlpgo-timeout-guard.sh
+
+      # The nlp NetworkPolicy and the shared NLPGO_INTERNAL_SECRET are off by
+      # default; enabled, the app, workers and nlp pods must read one Secret key.
+      - name: "assert the nlp NetworkPolicy and shared internal secret"
+        if: "!cancelled()"
+        run: ./tests/nlp-networkpolicy.sh
 
       # Workers drain in-flight queue jobs and their ClickHouse writes on
       # SIGTERM. Too short a grace period turns that drain into a SIGKILL,

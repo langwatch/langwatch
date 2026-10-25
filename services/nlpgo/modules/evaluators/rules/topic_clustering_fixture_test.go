@@ -133,7 +133,9 @@ func linkageOf(t *testing.T, c linkageCase) ([]rules.EmbeddedTrace, []rules.Merg
 	for i, tr := range traces {
 		vectors[i] = tr.Vector
 	}
-	z, err := rules.WardLinkage(len(vectors), rules.Pdist(vectors))
+	dist, err := rules.Pdist(vectors)
+	require.NoError(t, err)
+	z, err := rules.WardLinkage(len(vectors), dist)
 	require.NoError(t, err)
 	return traces, z
 }
@@ -250,7 +252,11 @@ func BenchmarkWardLinkage2000(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		z, err := rules.WardLinkage(len(vectors), rules.Pdist(vectors))
+		dist, err := rules.Pdist(vectors)
+		if err != nil {
+			b.Fatal(err)
+		}
+		z, err := rules.WardLinkage(len(vectors), dist)
 		if err != nil || len(z) != 1999 {
 			b.Fatal(err)
 		}

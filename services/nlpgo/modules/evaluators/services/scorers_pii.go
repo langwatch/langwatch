@@ -52,7 +52,11 @@ func (s piiScorer) score(ctx context.Context, settings rules.PresidioPIIDetectio
 	if failure != nil {
 		return *failure, nil
 	}
-	matches := rules.AboveThreshold(rules.MergePIIMatches(s.patterns.Analyze(content.Text, requested), model), settings.MinThreshold)
+	patterns, err := s.patterns.Analyze(ctx, content.Text, requested)
+	if err != nil {
+		return contract.Result{}, err
+	}
+	matches := rules.AboveThreshold(rules.MergePIIMatches(patterns, model), settings.MinThreshold)
 	return piiVerdict(content, matches)
 }
 
