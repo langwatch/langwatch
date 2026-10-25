@@ -213,3 +213,50 @@ jobs:
 
             echo "- \`${registry}/${chart_name}:${version}\`" >> "$GITHUB_STEP_SUMMARY"
           done
+
+      # LangWatch Cloud deploys langy-agent from this chart, and pulls it from
+      # the same private ECR registry as the langy-agent image, so the deploy
+      # needs no GitHub credential. Self-hosters keep installing the tagged
+      # releases from the public Helm repo, and anyone can still pull these
+      # prereleases from GHCR.
+      #
+      # Same exact .tgz the loop above pushed to GHCR. Not signed: a keyless
+      # signature puts the reference in the public transparency log, and this
+      # registry's host is kept out of the public record (see
+      # publish-docker-ecr.yml). The deploy pins the digest instead.
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: eu-central-1
+          role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+          role-session-name: prerelease-charts-oci-${{ github.run_id }}
+
+      - name: Push the langyagent chart to ECR
+        env:
+          ROLE_ARN: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+          # Charts whose prereleases LangWatch Cloud deploys. Each needs an ECR
+          # repository named langwatch-charts/<chart name> in the artifacts
+          # account that the OIDC role may push to.
+          ECR_CHARTS: langwatch-langyagent
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(printf '%s' "${ROLE_ARN}" | cut -d: -f5)"
+          echo "::add-mask::${ACCOUNT_ID}"
+          registry="${ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com"
+          aws ecr get-login-password --region eu-central-1 \
+            | helm registry login "$registry" --username AWS --password-stdin
+
+          for chart_name in $ECR_CHARTS; do
+            shopt -s nullglob
+            packages=(.oci-packages/"${chart_name}"-*.tgz)
+            shopt -u nullglob
+            if [ "${#packages[@]}" -ne 1 ]; then
+              echo "::error::expected one packaged ${chart_name} chart, found ${#packages[@]}"
+              exit 1
+            fi
+            push_log="$(helm push "${packages[0]}" "oci://${registry}/langwatch-charts" 2>&1)"
+            echo "$push_log"
+            digest="$(printf '%s' "$push_log" | awk '$1=="Digest:"{print $2; exit}')"
+            version="$(basename "${packages[0]}" .tgz)"; version="${version#"${chart_name}"-}"
+            echo "- ECR \`langwatch-charts/${chart_name}:${version}\` \`${digest}\`" >> "$GITHUB_STEP_SUMMARY"
+          done
