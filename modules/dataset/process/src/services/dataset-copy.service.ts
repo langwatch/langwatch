@@ -59,6 +59,7 @@ export class DatasetCopyService {
       });
     }
 
+    const nextId = this.#orderedIds();
     if (isSingleFileDataset(source) && options.singleFile) {
       const entries = await options.singleFile.findAllEntries({ dataset: source });
       for (let start = 0; start < entries.length; start += COPY_BATCH_ROWS) {
@@ -67,7 +68,7 @@ export class DatasetCopyService {
           projectId: parsed.targetProjectId,
           entries: entries
             .slice(start, start + COPY_BATCH_ROWS)
-            .map((entry) => ({ id: this.deps.generateId(), ...entry })),
+            .map((entry) => ({ id: nextId(), ...entry })),
         });
       }
 
@@ -88,7 +89,7 @@ export class DatasetCopyService {
         await options.records.createMany({
           datasetId: target.id,
           projectId: parsed.targetProjectId,
-          entries: batch.map((record) => ({ id: this.deps.generateId(), ...record.entry })),
+          entries: batch.map((record) => ({ id: nextId(), ...record.entry })),
         });
       }
       copied = batch.length;
@@ -96,5 +97,16 @@ export class DatasetCopyService {
     }
 
     return target;
+  }
+
+  /**
+   * Ids that sort in source order: a batch shares one `createdAt`, so reads order it by id, and
+   * ids minted in the same second sort at random. One base and a padded index sort the same way
+   * under any collation.
+   */
+  #orderedIds(): () => string {
+    const base = this.deps.generateId();
+    let index = 0;
+    return () => `${base}-${String(index++).padStart(10, "0")}`;
   }
 }

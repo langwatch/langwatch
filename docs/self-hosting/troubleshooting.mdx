@@ -202,6 +202,19 @@ kubectl -n langwatch logs sts/langwatch-clickhouse --tail=50 | grep -i s3
 
 Ensure the service account has S3 access (IRSA) or static credentials are configured correctly.
 
+### ClickHouse restarts with `NAMED_COLLECTION_ALREADY_EXISTS`
+
+With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Before you upgrade, list the collections and drop any whose `source` is `SQL`:
+
+```bash
+kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+  "SELECT name, source FROM system.named_collections WHERE name LIKE 'lwql_postgres%'"
+kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+  "DROP NAMED COLLECTION lwql_postgres_langwatch"
+```
+
+Upgrades need no collection created by hand: the upgrade binds the LangWatchQL tables to a collection the server already holds.
+
 ## PostgreSQL Issues
 
 ### The app refuses to start: the installation is behind

@@ -44,13 +44,14 @@ export function lwqlAccessModelDefinitionFromSource(
     names,
     passwordSha256Hex: createHash("sha256").update(request.connection.password).digest("hex"),
     namedCollection: {
-      collection: selfProvisioning.namedCollection({ names }),
+      collection: selfProvisioning.namedCollection({ names, mode: "rendered" }),
       host: request.endpoint.host,
       port: request.endpoint.port,
       database: request.endpoint.database,
       user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
       password: request.postgresReaderPassword,
     },
+    namedCollectionAliases: selfProvisioning.renderedCollectionAliases({ names }),
     sourceDatabase: names.database,
   });
 }
