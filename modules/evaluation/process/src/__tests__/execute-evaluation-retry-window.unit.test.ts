@@ -139,3 +139,28 @@ describe("an evaluation whose evaluator service is not up", () => {
     });
   });
 });
+
+describe("an evaluation whose evaluator service timed out", () => {
+  describe("when the attempt fails with the timeout", () => {
+    /** @scenario "An evaluator service that timed out is recorded as an error and not called again" */
+    it("is recorded as an error with the timeout message and sends no further attempt", async () => {
+      const timedOut = new EvaluatorExecutionError("Evaluator timed out: 504 Gateway Timeout", {
+        meta: { evaluatorType: "custom/test", httpStatus: 504 },
+      });
+      const deps = buildExecutionDeps({ executionError: timedOut });
+
+      const events = await EvaluationExecutionIntentService.create(deps).handle(issuedAgo(60_000));
+
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: "lw.evaluation.reported",
+          data: expect.objectContaining({
+            status: "error",
+            error: "Evaluator timed out: 504 Gateway Timeout",
+          }),
+        }),
+      );
+      expect(deps.retries.retryEvaluation).not.toHaveBeenCalled();
+    });
+  });
+});
