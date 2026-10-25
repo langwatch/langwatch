@@ -125,8 +125,8 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
     names = { ...harness.names, database: harness.factDatabase };
     collection = selfProvisioning.namedCollection({ names });
     // The SQL stand-in for the collection the config store mounts; the containers share a bridge.
+    await harness.dropNamedCollection(collection);
     await harness.applyAsAdmin([
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
       `CREATE NAMED COLLECTION ${collection} AS host = '${postgres.container.getIpAddress("bridge")}', ` +
         `port = 5432, database = '${postgres.container.getDatabase()}', ` +
         `user = '${postgres.readerRole}', password = '${postgres.readerPassword}'`,
@@ -135,7 +135,7 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
   }, 600_000);
 
   afterAll(async () => {
-    await harness?.applyAsAdmin([`DROP NAMED COLLECTION IF EXISTS ${collection}`]);
+    await harness?.dropNamedCollection(collection);
     await Promise.all([harness?.stop(), postgres?.stop()]);
   });
 
@@ -170,7 +170,7 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       expect(await engineTables()).toEqual(ENGINE_TABLES.toSorted());
       const before = await answers();
 
-      await harness.applyAsAdmin([`DROP NAMED COLLECTION ${collection}`]);
+      await harness.dropNamedCollection(collection);
       await expect(
         convergeLwqlAccessModel({ database: noPostgres, plan: plan(), failOnError: true }),
       ).rejects.toMatchObject({ code: "669" });

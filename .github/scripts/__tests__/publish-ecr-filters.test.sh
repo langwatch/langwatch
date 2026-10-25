@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Unit test for the path filters of publish-docker-ecr.yml
 #
-# Every image there builds with the repository root as its context, so
-# .dockerignore decides what each build can see. A filter that omits it lets a
-# .dockerignore change re-tag the previous image instead of rebuilding it.
+# An image builds with the repository root as its context unless its build-table
+# row names one, so the .dockerignore at that context decides what the build can
+# see. A filter that omits it lets a .dockerignore change re-tag the previous
+# image instead of rebuilding it.
 #
 # Spec: specs/ci/publish-ecr-images.feature
 
@@ -32,11 +33,16 @@ if [ -z "$filters" ]; then
   exit 1
 fi
 
-# The build contexts, checked rather than assumed.
-if grep -E '^ *context: ' "$WORKFLOW" | grep -vqE 'context: \.$'; then
-  echo "FAIL: a build context other than the repository root; revisit this test"
+# The build contexts, checked rather than assumed: the root, or the matrix row's.
+if grep -E '^ *context: ' "$WORKFLOW" \
+    | grep -vqE "context: (\.|\\\$\{\{ matrix\.context \|\| '\.' \}\})\$"; then
+  echo "FAIL: a build context other than the repository root or the matrix row's; revisit this test"
   exit 1
 fi
+
+# "<image> <context>" for each build-table row that names its own context.
+CONTEXTS="$(grep -oE '"image":"[a-z0-9-]+".*"context":"[^"]+"' "$WORKFLOW" \
+  | sed -E 's/^"image":"([a-z0-9-]+)".*"context":"([^"]+)"$/\1 \2/')"
 
 # Read once: piping `patterns` into `grep -q` under pipefail would SIGPIPE awk
 # whenever grep matched early, failing a valid filter.
@@ -44,9 +50,12 @@ ALL_PATTERNS="$(patterns)"
 
 # @scenario "A .dockerignore change rebuilds every image"
 test_every_filter_rebuilds_on_a_dockerignore_change() {
-  local filter
+  local filter ignore context
   for filter in $filters; do
-    if grep -qxF "$filter '.dockerignore'" <<<"$ALL_PATTERNS"; then
+    ignore=".dockerignore"
+    context="$(awk -v f="$filter" '$1 == f { print $2 }' <<<"$CONTEXTS")"
+    [ -n "$context" ] && ignore="$context/.dockerignore"
+    if grep -qxF "$filter '$ignore'" <<<"$ALL_PATTERNS"; then
       echo "PASS: $filter rebuilds on a .dockerignore change"
       PASS=$((PASS + 1))
     else

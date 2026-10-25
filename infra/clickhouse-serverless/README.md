@@ -23,6 +23,60 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | —            | Static credentials (or use `USE_ENVIRONMENT_CREDENTIALS=true` for IRSA)                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `CH_REPLICATED`                   | `false`      | Enable Keeper-coordinated ReplicatedMergeTree replication (requires keeper + data node env vars). Keeper replicates table data only — the LangWatchQL access model (users, profiles, row policies) is never stored in Keeper: on chart-managed ClickHouse it is delivered to every pod as rendered `users.d`/`config.d` files, and on bring-your-own ClickHouse the app provisions it via SQL; see [ADR-159](../../dev/docs/adr/159-the-app-owns-the-lwql-access-model.md) |
 
+Settings with a fixed default rather than one computed from CPU + RAM:
+
+| Variable                                       | Default       | Description                                                                                                                           |
+| ---------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLICKHOUSE_CLUSTER_SECRET_FILE`               | —             | File holding the `remote_servers` cluster secret (replicated mode). Read by `ch-config` only with `CLICKHOUSE_CLUSTER_SECRET_ENABLED` |
+| `CLICKHOUSE_CLUSTER_SECRET_ENABLED`            | `false`       | Recommended. Applies the cluster secret; see [Cluster secret](#cluster-secret) before turning it on                                   |
+| `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`         | —             | File holding the interserver HTTP password. When set, `interserver_http_credentials` is rendered                                      |
+| `CLICKHOUSE_INTERSERVER_USER`                  | `interserver` | Interserver HTTP user, used only with `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`                                                          |
+| `DEFAULT_USER_ACCESS_MANAGEMENT`               | `true`        | `false` leaves the `default` user without `access_management` and `named_collection_control` from `ch-config`                         |
+| `LOG_TO_FILE`                                  | `true`        | `false` removes the server's file loggers, so it logs to the console only                                                             |
+| `MERGE_MAX_BLOCK_SIZE_BYTES`                   | `0`           | `merge_tree.merge_max_block_size_bytes`; `0` leaves the ClickHouse default                                                            |
+| `MAX_CONCURRENT_SELECT_QUERIES`                | `0`           | SELECTs' own admission cap inside `max_concurrent_queries`; `0` means none                                                            |
+| `NETWORK_COMPRESSION_METHOD`                   | —             | Default profile `network_compression_method`; unset leaves the ClickHouse default. `zstd` suits replicated clusters                   |
+| `NETWORK_ZSTD_COMPRESSION_LEVEL`               | —             | Default profile `network_zstd_compression_level`; unset leaves the ClickHouse default                                                 |
+| `CANCEL_HTTP_READONLY_QUERIES_ON_CLIENT_CLOSE` | —             | Default profile; `1` stops a read whose HTTP client has gone (recommended), unset leaves the ClickHouse default (`0`)                 |
+
+The `NUMBER_OF_FREE_ENTRIES_IN_POOL_TO_*` thresholds are derived from the
+effective `background_pool_size`, including a `BACKGROUND_POOL_SIZE` override;
+each one set explicitly wins.
+
+### Cluster secret
+
+Without `CLICKHOUSE_CLUSTER_SECRET_ENABLED`, `remote_servers` renders exactly as
+earlier images did: a `from_file` attribute ClickHouse does not substitute, so
+the cluster runs with no secret, and an empty or missing secret file fails
+nothing. A replicated server logs a warning at every boot until it is on.
+
+With it on, `ch-config` reads `CLICKHOUSE_CLUSTER_SECRET_FILE` (empty or missing
+refuses to start) and renders the value, so distributed queries carry the
+initiating user instead of logging in as `default` with no password. A pod
+with the secret and one without cannot run distributed queries against each
+other, so turn it on in one of two ways:
+
+- restart every replica at once: set it (Helm: `auth.clusterSecretEnabled=true`),
+  let the rollout start, then delete the remaining old pods together
+  (`kubectl delete pod -l app.kubernetes.io/name=<release fullname>`, which spares
+  the Keeper pods), or
+- roll as usual and accept that cross-replica queries fail until the last pod
+  has restarted. Replicated inserts and part fetches are unaffected.
+
+### Initialisation scripts and `CLICKHOUSE_DB`
+
+`ch-config` owns the `default` user, so the entrypoint sets
+`CLICKHOUSE_SKIP_USER_SETUP=1` and the official entrypoint never rewrites it.
+When the official entrypoint initialises (container args are server flags such
+as `--listen_host=...`, not the default `clickhouse-server` command) and
+`/docker-entrypoint-initdb.d` holds files or `CLICKHOUSE_DB` is set, it receives
+the password from `CLICKHOUSE_PASSWORD` or `CLICKHOUSE_PASSWORD_FILE`, so its
+client can log in. `CLICKHOUSE_PASSWORD_FILE` is always unset before it runs.
+
+`ch-config` only writes, and removes when disabled, the files it renders itself.
+Any other file in `config.d/` or `users.d/` (for example a Kubernetes `subPath`
+mount) is left alone, so a deployment can layer its own settings on top.
+
 All other parameters (memory limits, pool sizes, merge settings, logging, network) are computed from CPU + RAM. See `internal/config/config.go` for the full list of overridable env vars.
 
 For Kubernetes deployment with the [Helm chart](../../charts/clickhouse-serverless/), most of this is handled automatically via `values.yaml`.
@@ -49,7 +103,8 @@ per-query tenant capability rides on, and `access-control.yaml` sets
 `access_control_improvements.settings_constraints_replace_previous` to `true`
 (without it, ClickHouse rejects the `<database>_profile` settings profile's
 `CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). The image also
-grants its `default` user `access_management` + `named_collection_control` — the
+grants its `default` user `access_management` + `named_collection_control`
+(unless `DEFAULT_USER_ACCESS_MANAGEMENT=false`) — the
 right to create users, profiles, row policies and named collections through SQL,
 which **only `sql` mode uses**; rendered delivery runs no access DDL. See
 `internal/render/access.go`.
@@ -65,7 +120,6 @@ From 3 inputs (CPU, RAM, replicated), the Go binary derives ~40 parameters:
 | Background pool    | max(2, CPU/2)            |
 | Concurrent queries | min(CPU*25, 200)         |
 | Merge parts limit  | 5 / 8 / 15 (by CPU tier) |
-| S3 cache           | RAM * 25%                |
 
 Pods with 4 GiB of RAM or less also get an explicit memory budget, because
 ClickHouse otherwise lets each cache grow to half of RAM. Larger pods keep the

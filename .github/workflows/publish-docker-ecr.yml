@@ -311,6 +311,16 @@ jobs:
               - '*/go.sum'
               - '.dockerignore'
               - '.github/workflows/publish-docker-ecr.yml'
+            # Its own build context, so the paths are relative to that directory.
+            langwatch-clickhouse-serverless:
+              - 'infra/clickhouse-serverless/Dockerfile'
+              - 'infra/clickhouse-serverless/.dockerignore'
+              - 'infra/clickhouse-serverless/go.mod'
+              - 'infra/clickhouse-serverless/go.sum'
+              - 'infra/clickhouse-serverless/cmd/**'
+              - 'infra/clickhouse-serverless/internal/**'
+              - 'infra/clickhouse-serverless/scripts/**'
+              - '.github/workflows/publish-docker-ecr.yml'
 
       - name: Select the images to build
         id: select
@@ -323,6 +333,7 @@ jobs:
           LANGWATCH_NLP_LAMBDA: ${{ steps.filter.outputs.langwatch-nlp-lambda }}
           LANGWATCH_LANGY_AGENT: ${{ steps.filter.outputs.langwatch-langy-agent }}
           LANGWATCH_EVAL: ${{ steps.filter.outputs.langwatch-eval }}
+          LANGWATCH_CLICKHOUSE_SERVERLESS: ${{ steps.filter.outputs.langwatch-clickhouse-serverless }}
         run: |
           set -euo pipefail
 
@@ -335,13 +346,17 @@ jobs:
           # Runner labels mirror publish-docker-app.yml: the app's build needs
           # the 32GB larger runner for the pnpm/vite bundle, everything else
           # fits on the standard hosted arm runner.
+          #
+          # `context` defaults to the repository root; clickhouse-serverless is
+          # a self-contained build under its own directory.
           ALL=$(cat <<'JSON'
           [
             {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"arm64-runner-32gb"},
             {"image":"langwatch-nlp-service", "dockerfile":"infra/docker/Dockerfile.langwatch_nlp","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-langevals",   "dockerfile":"infra/docker/Dockerfile.langevals",    "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
             {"image":"langwatch-gateway",     "dockerfile":"infra/docker/Dockerfile.go_service",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
-            {"image":"langwatch-langy-agent", "dockerfile":"infra/docker/Dockerfile.langyagent",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
+            {"image":"langwatch-langy-agent", "dockerfile":"infra/docker/Dockerfile.langyagent",   "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
+            {"image":"langwatch-clickhouse-serverless","dockerfile":"infra/clickhouse-serverless/Dockerfile","context":"infra/clickhouse-serverless","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}
           ]
           JSON
           )
@@ -372,13 +387,15 @@ jobs:
               --arg nlplambda "${LANGWATCH_NLP_LAMBDA}" \
               --arg langy "${LANGWATCH_LANGY_AGENT}" \
               --arg eval "${LANGWATCH_EVAL}" \
+              --arg clickhouse "${LANGWATCH_CLICKHOUSE_SERVERLESS}" \
               --argjson lambdas "${LAMBDAS}" \
               '[{"langwatch-app": $app,
                  "langwatch-nlp-service": $nlp,
                  "langwatch-langevals": $evals,
                  "langwatch-gateway": $gateway,
                  "langwatch-langy-agent": $langy,
-                 "langwatch-nlp-lambda": $nlplambda}
+                 "langwatch-nlp-lambda": $nlplambda,
+                 "langwatch-clickhouse-serverless": $clickhouse}
                 | to_entries[] | select(.value == "true") | .key]
                + (if $eval == "true"
                   then [$lambdas[] | select(.evaluator != "") | .image]
@@ -459,7 +476,7 @@ jobs:
       - name: Build and push ${{ matrix.image }} (${{ matrix.arch }})
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
-          context: .
+          context: ${{ matrix.context || '.' }}
           file: ${{ matrix.dockerfile }}
           push: true
           platforms: ${{ matrix.platform }}
@@ -788,7 +805,7 @@ jobs:
           }
 
           FAILED=()
-          for IMAGE in langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway langwatch-langy-agent \
+          for IMAGE in langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway langwatch-langy-agent langwatch-clickhouse-serverless \
               langwatch-nlp-lambda langwatch-eval-azure langwatch-eval-langevals langwatch-eval-lingua \
               langwatch-eval-openai langwatch-eval-presidio langwatch-eval-ragas langwatch-eval-topic_clustering; do
             echo "::group::${IMAGE}"

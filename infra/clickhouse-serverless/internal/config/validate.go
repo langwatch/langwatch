@@ -23,6 +23,14 @@ func (i *Input) Validate() error {
 		}
 	}
 
+	if i.InterserverPasswordFile != "" && strings.TrimSpace(i.InterserverUser) == "" {
+		errs = append(errs, "CLICKHOUSE_INTERSERVER_USER must not be empty when CLICKHOUSE_INTERSERVER_PASSWORD_FILE is set")
+	}
+
+	if i.ClusterSecretEnabled && strings.TrimSpace(i.ClusterSecretFile) == "" {
+		errs = append(errs, "CLICKHOUSE_CLUSTER_SECRET_FILE is required when CLICKHOUSE_CLUSTER_SECRET_ENABLED=true")
+	}
+
 	// Conditional: replicated fields required when CH_REPLICATED=true
 	if i.Replicated {
 		if err := validateReplicated(i); err != nil {
