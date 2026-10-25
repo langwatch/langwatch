@@ -6,7 +6,10 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { BRAND_MARK_SIZE, SignInMethodIcon } from "../sign-in-method-icon.tsx";
+import { SignInMethodIcon } from "../sign-in-method-icon.tsx";
+
+/** The button's mark box, in px: 18 wide and 18 tall. */
+const MARK_BOX = "18";
 
 afterEach(() => cleanup());
 
@@ -20,10 +23,13 @@ describe("given the sign-in screen offers a social provider", () => {
           <SignInMethodIcon method={{ id, kind: "federated", connectionId: null }} />,
         );
 
-        const svg = screen.getByTestId("sign-in-method-mark").querySelector("svg");
+        const box = screen.getByTestId("sign-in-method-mark");
+        expect(getComputedStyle(box).width).toBe(`${MARK_BOX}px`);
+        expect(getComputedStyle(box).height).toBe(`${MARK_BOX}px`);
+        const svg = box.querySelector("svg");
         expect(svg).not.toBeNull();
-        expect(svg).toHaveAttribute("width", String(BRAND_MARK_SIZE));
-        expect(svg).toHaveAttribute("height", String(BRAND_MARK_SIZE));
+        expect(svg).toHaveAttribute("width", MARK_BOX);
+        expect(svg).toHaveAttribute("height", MARK_BOX);
       },
     );
   });

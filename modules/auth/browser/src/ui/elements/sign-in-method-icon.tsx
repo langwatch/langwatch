@@ -42,7 +42,7 @@ export function SignInMethodIcon({ method }: { method: SignInMethod }) {
   );
 }
 
-export function GitHub({ size = 32 }: { size?: number }) {
+export function GitHub({ size }: { size: number }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 98 96" width={size} height={size}>
       <path
