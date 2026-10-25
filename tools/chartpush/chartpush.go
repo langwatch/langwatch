@@ -76,7 +76,7 @@ func pushOne(ctx context.Context, opts Options, chart string) (Result, error) {
 		digest = m[1]
 	}
 	if !wellFormedDigest.MatchString(digest) {
-		return Result{}, fmt.Errorf("unexpected digest %q for %s; the deploy pins this value", digest, chart)
+		return Result{}, fmt.Errorf("unexpected digest %q for %s; the deploy pins this value\n%s", digest, chart, output)
 	}
 	version := strings.TrimPrefix(strings.TrimSuffix(filepath.Base(pkg), ".tgz"), chart+"-")
 	return Result{Chart: chart, Version: version, Digest: digest, Output: output}, nil
