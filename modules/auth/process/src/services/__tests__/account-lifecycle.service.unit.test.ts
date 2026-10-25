@@ -38,7 +38,9 @@ function setup({
   refuse,
   failFact = false,
   stored = profile(),
+  operatorAddressesFixed = true,
 }: {
+  operatorAddressesFixed?: boolean;
   operators?: string[];
   refuse?: Error;
   failFact?: boolean;
@@ -73,7 +75,10 @@ function setup({
     },
   });
 
-  return { steps, service: AccountLifecycleService.create({ users, credentials }) };
+  return {
+    steps,
+    service: AccountLifecycleService.create({ users, credentials, operatorAddressesFixed }),
+  };
 }
 
 const SYSTEM = { type: "system", id: null } as const;
@@ -191,6 +196,18 @@ describe("AccountLifecycleService", () => {
         service.changeEmail({ id: "user-1", email: "ada@customer.example" }),
       ).rejects.toMatchObject({ code: "user_platform_operator_email_locked" });
       expect(steps).toEqual([]);
+    });
+
+    /** @scenario "Where operating is not kept to staff, an operator's address can change" */
+    it("stores an operator's new address where operator addresses are not fixed", async () => {
+      const { steps, service } = setup({ operators: ["user-1"], operatorAddressesFixed: false });
+
+      await service.changeEmail({ id: "user-1", email: "ada@customer.example" });
+
+      expect(steps).toEqual([
+        ["user.updateEmail", "user-1", "ada@customer.example"],
+        ["auth.revokeAllBrowserSessions", "user-1"],
+      ]);
     });
 
     it("lets an operator's address change only its letter case", async () => {

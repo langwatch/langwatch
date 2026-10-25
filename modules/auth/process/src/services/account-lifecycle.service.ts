@@ -24,16 +24,20 @@ export class AccountLifecycleService {
   private constructor(
     private readonly users: AccountWrites,
     private readonly credentials: CredentialRevokes,
+    private readonly operatorAddressesFixed: boolean,
   ) {}
 
   static create({
     users,
     credentials,
+    operatorAddressesFixed = true,
   }: {
     users: AccountWrites;
     credentials: CredentialRevokes;
+    /** Where only staff may operate (the hosted service), an operator's address is fixed. */
+    operatorAddressesFixed?: boolean;
   }): AccountLifecycleService {
-    return new AccountLifecycleService(users, credentials);
+    return new AccountLifecycleService(users, credentials, operatorAddressesFixed);
   }
 
   /** Write, revoke, fact: a refused write revokes nothing; a failed fact leaves access ended. */
@@ -66,13 +70,17 @@ export class AccountLifecycleService {
   }
 
   /**
-   * Sessions cache the address (invite accept compares it), so a real change ends them all. An
-   * operator's address never really changes: the staff rule was checked against it at the grant.
+   * Sessions cache the address (invite accept compares it), so a real change ends them all. Where
+   * only staff operate, an operator's address never changes: the grant checked it against the rule.
    */
   async changeEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
     const before = await this.users.findById({ id: input.id });
     const changes = (before?.email ?? "").toLowerCase() !== input.email.trim().toLowerCase();
-    if (changes && (await this.users.isOperator({ userId: input.id }))) {
+    if (
+      changes &&
+      this.operatorAddressesFixed &&
+      (await this.users.isOperator({ userId: input.id }))
+    ) {
       throw new UserPlatformOperatorEmailLockedError(input.id);
     }
     const updated = await this.users.updateEmail(input);

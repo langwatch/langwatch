@@ -327,6 +327,7 @@ import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metri
 import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
+import { grantsAreStaffOnly } from "../rules/platform-operator-staff.rules.ts";
 import { MOVED_TO_OWNERS } from "../rules/system-migration-support.rules.ts";
 import {
   type AdminAccess,
@@ -2482,6 +2483,10 @@ function buildOpsInfrastructure(input: {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       return OpsOperations.create({
         authz: dependencies.authz,
+        operatorAddressesFixed: grantsAreStaffOnly({
+          cloud: config.isSaas || input.cloudOps,
+          isLocalDevelopment: config.nodeEnvironment === "development",
+        }),
         repositories,
         // Where an organization's connection decides its sign-in, editing
         // the legacy `ssoDomain`/`ssoProvider` strings changes nothing a
@@ -2594,6 +2599,8 @@ function organizationSsoRouting(identity: OpsAppDependencies["identity"]): Organ
 
 interface OpsOperationsOptions {
   authz: AdminAccessServiceOptions["authz"];
+  /** Where only staff may operate, the Back office never changes an operator's address. */
+  operatorAddressesFixed: boolean;
   /** The stores the operations read and edit, as the registry built them. */
   repositories: Pick<
     OpsRepositories,
@@ -2653,6 +2660,7 @@ export class OpsOperations {
         projects: this.options.scheduler.projects,
         shares: this.options.shares,
         ssoRouting: this.options.ssoRouting,
+        operatorAddressesFixed: this.options.operatorAddressesFixed,
       }),
       blobStore: BlobStoreService.create(repositories.blobStore),
       impersonation: ImpersonationService.create({
