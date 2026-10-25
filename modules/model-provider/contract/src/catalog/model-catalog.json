@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-10-24T19:33:47.733Z",
-  "modelCount": 531,
+  "updatedAt": "2026-10-25T09:40:06.463Z",
+  "modelCount": 532,
   "models": {
     "moonshotai/kimi-k3.1-pro": {
       "id": "moonshotai/kimi-k3.1-pro",
@@ -3174,9 +3174,9 @@
       "name": "Tencent: Hy4 preview",
       "provider": "tencent",
       "pricing": {
-        "inputCostPerToken": 7.506e-7,
-        "outputCostPerToken": 0.0000022509,
-        "inputCacheReadPerToken": 3.78e-8
+        "inputCostPerToken": 8.34e-7,
+        "outputCostPerToken": 0.000002501,
+        "inputCacheReadPerToken": 4.2e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 64000,
@@ -3218,8 +3218,8 @@
       "name": "Z.ai: GLM Flash Latest",
       "provider": "~z-ai",
       "pricing": {
-        "inputCostPerToken": 5.07e-8,
-        "outputCostPerToken": 7.02e-8,
+        "inputCostPerToken": 5.13e-8,
+        "outputCostPerToken": 7.01e-8,
         "inputCacheReadPerToken": 3e-8
       },
       "contextLength": 1048576,
@@ -3517,9 +3517,9 @@
       "name": "Z.ai: GLM Latest",
       "provider": "~z-ai",
       "pricing": {
-        "inputCostPerToken": 7.5e-8,
-        "outputCostPerToken": 0.000004295,
-        "inputCacheReadPerToken": 7.5e-8
+        "inputCostPerToken": 7.03e-8,
+        "outputCostPerToken": 0.0000043843,
+        "inputCacheReadPerToken": 7.03e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 131072,
@@ -3590,9 +3590,9 @@
       "name": "Z.ai: GLM 5.3",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 9.08e-8,
-        "outputCostPerToken": 0.00000161,
-        "inputCacheReadPerToken": 8.97e-8
+        "inputCostPerToken": 7.9e-8,
+        "outputCostPerToken": 0.0000014,
+        "inputCacheReadPerToken": 7.8e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -4003,6 +4003,49 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "liquid/lfm-2.5-2.6b": {
+      "id": "liquid/lfm-2.5-2.6b",
+      "name": "LiquidAI: LFM2.5-2.6B",
+      "provider": "liquid",
+      "pricing": {
+        "inputCostPerToken": 3.5e-7,
+        "outputCostPerToken": 5e-7,
+        "inputCacheReadPerToken": 4e-8
+      },
+      "contextLength": 128000,
+      "maxCompletionTokens": 8192,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logprobs",
+        "max_completion_tokens",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 0.1
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "LFM2.5-2.6B is a compact reasoning model from Liquid AI. It is suited for agent workflows, data extraction, RAG, and long-context processing. Liquid advises against using it for agentic coding or...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "nvidia/nemotron-3.5-lightning": {
       "id": "nvidia/nemotron-3.5-lightning",
       "name": "NVIDIA: Nemotron 3.5 Lightning",
@@ -4193,8 +4236,8 @@
       "provider": "~deepseek",
       "pricing": {
         "inputCostPerToken": 4.22e-8,
-        "outputCostPerToken": 1.763e-7,
-        "inputCacheReadPerToken": 2.7e-8
+        "outputCostPerToken": 1.694e-7,
+        "inputCacheReadPerToken": 2.8e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -4236,12 +4279,12 @@
       "name": "DeepSeek: DeepSeek V4 Flash 0731",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 4.444e-8,
-        "outputCostPerToken": 1.3332e-7,
-        "inputCacheReadPerToken": 1.414e-9
+        "inputCostPerToken": 4.22e-8,
+        "outputCostPerToken": 1.694e-7,
+        "inputCacheReadPerToken": 2.8e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -5537,9 +5580,9 @@
       "name": "Tencent: Hy3",
       "provider": "tencent",
       "pricing": {
-        "inputCostPerToken": 8.25e-8,
-        "outputCostPerToken": 3.3e-7,
-        "inputCacheReadPerToken": 2.0625e-8
+        "inputCostPerToken": 1.32e-7,
+        "outputCostPerToken": 5.28e-7,
+        "inputCacheReadPerToken": 3.3e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 128000,
@@ -7024,9 +7067,9 @@
       "name": "MoonshotAI: Kimi Latest",
       "provider": "~moonshotai",
       "pricing": {
-        "inputCostPerToken": 1.9e-7,
-        "outputCostPerToken": 0.00000894,
-        "inputCacheReadPerToken": 1.9e-7
+        "inputCostPerToken": 1.5e-7,
+        "outputCostPerToken": 0.000016,
+        "inputCacheReadPerToken": 1.4e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -10810,7 +10853,7 @@
       "pricing": {
         "inputCostPerToken": 3e-7,
         "outputCostPerToken": 9e-7,
-        "inputCacheReadPerToken": 5.5e-8
+        "inputCacheReadPerToken": 5e-8
       },
       "contextLength": 131072,
       "maxCompletionTokens": 32768,
@@ -16151,11 +16194,11 @@
       "name": "Meta: Llama 3.2 3B Instruct",
       "provider": "meta-llama",
       "pricing": {
-        "inputCostPerToken": 5.09e-8,
-        "outputCostPerToken": 3.35e-7
+        "inputCostPerToken": 5e-8,
+        "outputCostPerToken": 3.3e-7
       },
       "contextLength": 131072,
-      "maxCompletionTokens": 72000,
+      "maxCompletionTokens": 117964,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
