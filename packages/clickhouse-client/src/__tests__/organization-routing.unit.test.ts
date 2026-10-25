@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
 import { ClickHouseConnection, ClickHouseNotConfiguredError } from "../connection.ts";
-import { routingDriver } from "../routingDriver.ts";
+import { BUFFERED_READ_MAX_RESULT_BYTES, routingDriver } from "../routingDriver.ts";
 import { createTenantRouter, parseRoutingTable } from "../tenancy.ts";
 import { TenantGuard } from "../tenantGuard.ts";
 
@@ -63,6 +63,10 @@ describe("organization routing", () => {
       expect(isolated.query).toHaveBeenCalledWith({
         query: sql,
         query_params: { organizationId: "org-private" },
+        clickhouse_settings: {
+          max_result_bytes: String(BUFFERED_READ_MAX_RESULT_BYTES),
+          result_overflow_mode: "throw",
+        },
         format: "JSONEachRow",
       });
     } finally {

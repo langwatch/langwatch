@@ -128,3 +128,66 @@ Feature: A read that cannot be pruned must still be bounded
     And the batched retry fits under the cap
     When the retry runs
     Then every requested trace is returned
+
+  # ---------------------------------------------------------------------------
+  # The result ceiling
+  #
+  # ClickHouse's per-query memory cap protects ClickHouse, not us. A read that
+  # stays under it while streaming can still send a result this process cannot
+  # hold: on 2026-10-23 one trace-list page asked for the full spans of 25
+  # traces, ClickHouse streamed them, and two app pods went from about 1.5 GiB
+  # to 4.6 and 5.9 GiB in a minute and were killed, taking every request and
+  # in-process job on them. A read that buffers its whole result is refused by
+  # ClickHouse once the result passes a size, so the failure is one request,
+  # not the pod.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: A read that buffers its whole result is refused by ClickHouse past a result size
+    Given a read that buffers its whole result
+    And it does not name its own result limit
+    When it is sent to ClickHouse
+    Then ClickHouse is told to refuse a result larger than the default limit
+    And to fail the read rather than return part of it
+
+  @unit
+  Scenario: A read that names its own result limit keeps it
+    Given a read that buffers its whole result and names its own result limit
+    When it is sent to ClickHouse
+    Then ClickHouse applies the read's own limit
+    And a read that limits only its rows is still refused past the default size
+
+  # `break` asks ClickHouse for a partial result on overflow. A default ceiling under it would
+  # truncate the read silently, so a read that chose `break` keeps exactly the limits it named.
+  @unit
+  Scenario: A read that asks for a partial result on overflow keeps only its own limits
+    Given a read that buffers its whole result and asks for a partial result on overflow
+    When it is sent to ClickHouse
+    Then no default size limit is added to it
+
+  @unit
+  Scenario: A read that streams its result batch by batch is not capped by size
+    Given a read that streams its result
+    When it is sent to ClickHouse
+    Then no result size limit is added, because only one batch is held at a time
+
+  @unit @regression
+  Scenario: A joined trace read whose result is too large retries in batches
+    Given a joined trace read that ClickHouse refuses because its result is too large
+    When the read is handled
+    Then it is retried in batches under the span budget, as a memory refusal is
+
+  @unit @regression
+  Scenario: A batch refused for its result size is split until it fits
+    Given the batched retry of a joined trace read
+    And one batch is refused because its result is too large
+    When the retry continues
+    Then that batch is split into smaller batches and read again
+    And every requested trace is returned when the smaller batches fit
+
+  @unit
+  Scenario: A single trace too large to hold is refused naming the size limit
+    Given the batched retry of a joined trace read
+    And one trace alone is refused because its result is too large
+    When the retry reaches it
+    Then the read fails naming the result size limit, not the span budget
