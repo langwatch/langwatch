@@ -1,4 +1,5 @@
-import { Box } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import type { Component, Field } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
@@ -6,6 +7,14 @@ import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import {
+  CODE_LANGUAGES,
+  type CodeLanguage,
+  codeLanguageFrom,
+  codeLanguageOf,
+} from "../../../model/code-language.ts";
+import { codeEditorLanguage } from "../../../model/code/code-editor-language.ts";
+import { switchCodeLanguage } from "../../../model/code/code-templates.ts";
 import {
   applyMappingChange,
   buildAvailableSources,
@@ -19,6 +28,11 @@ import type {
   WorkflowVariable,
   WorkflowPanelFieldMapping,
 } from "./workflow-properties-panel-props.ts";
+
+const LANGUAGE_ITEMS = CODE_LANGUAGES.map((language) => ({
+  value: language,
+  label: codeEditorLanguage({ language }).label,
+}));
 
 const CODE_OUTPUT_TYPES: Field["type"][] = ["str", "float", "bool", "dict", "list", "image"];
 
@@ -54,6 +68,7 @@ export function CodePropertiesPanel({
   // Get code from parameters
   const codeParam = node.data.parameters?.find((p) => p.identifier === "code" && p.type === "code");
   const code = (codeParam?.value as string) ?? "";
+  const language = codeLanguageOf({ parameters: node.data.parameters });
 
   // Memoised so the editor contract and the field rows see stable arrays.
   const inputs: WorkflowVariable[] = useMemo(
@@ -119,6 +134,21 @@ export function CodePropertiesPanel({
     [node.id, setNodeParameter],
   );
 
+  const handleLanguageChange = (to: CodeLanguage) => {
+    if (to === language) return;
+    setNode({
+      id: node.id,
+      data: {
+        parameters: switchCodeLanguage({
+          parameters: node.data.parameters ?? [],
+          inputs,
+          outputs,
+          to,
+        }),
+      },
+    });
+  };
+
   // Handle inputs change (preserves field.value for existing inputs)
   const handleInputsChange = useCallback(
     (newVariables: WorkflowVariable[]) => {
@@ -161,14 +191,36 @@ export function CodePropertiesPanel({
 
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={4}>
+      <HStack width="full" justify="space-between">
+        <Text textStyle="sm" color="fg.muted">
+          Language
+        </Text>
+        <SegmentedControl
+          size="xs"
+          value={language}
+          onValueChange={({ value }) => {
+            if (value) handleLanguageChange(codeLanguageFrom({ value }));
+          }}
+          items={LANGUAGE_ITEMS}
+          data-testid="code-language-picker"
+        />
+      </HStack>
+
       {/* Code Editor */}
       <CodeBlockEditor
         code={code}
         onChange={handleCodeChange}
-        language="python"
+        language={language}
         inputs={inputs}
         outputs={outputs}
         viewStateKey={`code-node:${node.id}`}
+        langySubject={{
+          nodeId: node.id,
+          nodeName: node.data.name ?? node.id,
+          ...(node.data.execution_state?.status === "error" && node.data.execution_state.error
+            ? { lastError: node.data.execution_state.error }
+            : {}),
+        }}
       />
 
       {/* Inputs using VariablesSection */}

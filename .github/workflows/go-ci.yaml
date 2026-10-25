@@ -198,9 +198,17 @@ jobs:
           uv venv "$RUNNER_TEMP/codeblock-venv"
           uv pip install --python "$RUNNER_TEMP/codeblock-venv" requests ./sdks/python
           echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
+      # The wasm code-block runtimes' interpreters; their tests fail without them in CI.
+      - name: Fetch the code-block wasm runtimes
+        run: |
+          services/nlpgo/scripts/fetch-python-wasm.sh
+          services/nlpgo/scripts/fetch-quickjs-wasm.sh
+          services/nlpgo/scripts/build-tsstrip-wasm.sh
       # lingua/language_detection replays langevals over the generated models.
       - run: make lingua-models
       - run: go test -count=1 -race $GO_PKGS
+      # The whole code-block suite again, on the wasm runtime.
+      - run: NLPGO_CODEBLOCK_TEST_RUNTIME=wasm go test -count=1 ./services/nlpgo/app/engine/blocks/codeblock/
       - run: go test -count=1 -tags dev ./cmd/service/...
       # Memory ceilings skip under -race (it multiplies memory and time), so
       # they run here in a plain build.
@@ -293,6 +301,8 @@ jobs:
       contents: read
       actions: write
     timeout-minutes: 15
+    env:
+      CODEBLOCK_PKG: github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -319,7 +329,10 @@ jobs:
         run: |
           pkgs=$(go work edit -json | jq -r '.Use[].DiskPath | select(. != "./sdks/go" and . != "./infra/clickhouse-serverless") | . + "/..."' | tr '\n' ' ')
           echo "GO_PKGS=$pkgs" >> "$GITHUB_ENV"
-      - run: go vet $GO_PKGS
+      # The code block's wasm filesystem implements wazero's sys.File, whose
+      # Seek returns sys.Errno, not error; stdmethods can only be off for it.
+      - run: go vet $(go list $GO_PKGS | grep -vx "$CODEBLOCK_PKG")
+      - run: go vet -stdmethods=false "$CODEBLOCK_PKG"
       - run: go vet -tags dev ./cmd/service/...
 
   # packages/handled-error/src/codes.generated.ts mirrors the services' herr

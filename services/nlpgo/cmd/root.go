@@ -80,7 +80,7 @@ func Run(ctx context.Context, opts Options) error {
 	)
 
 	httpExec := newHTTPExecutor(cfg.Engine, ssrfOpts)
-	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	codeExec, err := newCodeExecutor(cfg.Engine, ssrfOpts, os.Getenv)
 	if err != nil {
 		return err
 	}
@@ -196,14 +196,33 @@ func newEngine(cfg *nlpgo.Config, parts engineParts) *engine.Engine {
 	})
 }
 
+// codeBlockEgress is the HTTP block's policy with private and loopback
+// addresses refused unless the operator allows them for code blocks. The HTTP
+// block's allow-listed hosts skip the address checks, so code never inherits them.
+func codeBlockEgress(egress ssrf.Options, allowLocal bool) ssrf.Options {
+	egress.AllowLocal = allowLocal
+	egress.AllowedHosts = nil
+	return egress
+}
+
 // newCodeExecutor builds the code-block executor from the operator-facing
 // engine config. Extracted from Root so the wiring itself — which operator
 // knob reaches which executor option — is reachable from a test without
 // standing up the whole service.
 //
 // `getenv` is injected so tests don't need to mutate process env.
-func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (*codeblock.Executor, error) {
+func newCodeExecutor(engineCfg nlpgo.EngineConfig, egress ssrf.Options, getenv func(string) string) (*codeblock.Executor, error) {
 	return codeblock.New(codeblock.Options{
+		Runtime:                 engineCfg.CodeBlockRuntime,
+		PythonWasmHome:          engineCfg.PythonWasmHome,
+		WasmMemoryMiB:           engineCfg.CodeBlockMemoryMiB,
+		WasmCompilationCacheDir: engineCfg.WasmCompilationCacheDir,
+		QuickJSWasm:             engineCfg.QuickJSWasm,
+		TypeScriptWasm:          engineCfg.TypeScriptWasm,
+		WasmTotalMemoryMiB:      engineCfg.CodeBlockTotalMemoryMiB,
+		// A wasm run reaches the network only through the engine, under the
+		// HTTP block's policy, but never a private address unless allowed.
+		Egress: codeBlockEgress(egress, engineCfg.CodeBlockAllowLocalEgress),
 		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
 		// The instance a code node's LangWatch SDK calls. It is the same URL
 		// the evaluator blocks call back on, and it is injected only next to

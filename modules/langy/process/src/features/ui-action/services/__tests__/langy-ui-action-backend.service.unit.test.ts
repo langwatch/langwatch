@@ -96,6 +96,23 @@ beforeEach(() => {
 const service = () => LangyUiActionBackendService.create({ backend });
 
 describe("LangyUiActionBackendService", () => {
+  describe("when a kind with no backend mode reaches the fallback", () => {
+    /** @scenario "With the code editor closed a studio.code action fails cleanly" */
+    it("refuses with langy_ui_no_browser and touches no saved document", async () => {
+      await expect(
+        service().run({
+          ...CALLER,
+          kind: "studio.code.propose",
+          definition: definition({ requiredPermission: "workflows:manage" }),
+          payload: { code: "x = 1", summary: "Sets x", readToken: "read-1" },
+          experimentSlug: "my-exp",
+        }),
+      ).rejects.toMatchObject({ code: "langy_ui_no_browser" });
+      expect(backend.saves).toEqual([]);
+      expect(backend.runs).toEqual([]);
+    });
+  });
+
   describe("when the dispatch names no experiment", () => {
     /** @scenario A backend fallback without the experiment named is refused */
     it("refuses with langy_ui_experiment_required", async () => {

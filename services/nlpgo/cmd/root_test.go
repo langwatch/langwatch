@@ -144,7 +144,7 @@ func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
 	exec, err := newCodeExecutor(nlpgo.EngineConfig{
 		SandboxPython:           nlpgo.DefaultSandboxPython,
 		CodeBlockTimeoutSeconds: 300,
-	}, getenv)
+	}, ssrf.Options{}, getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestNewCodeExecutor_UnsetTimeoutKeepsTheTenMinuteDefault(t *testing.T) {
 
 	exec, err := newCodeExecutor(nlpgo.EngineConfig{
 		SandboxPython: nlpgo.DefaultSandboxPython,
-	}, getenv)
+	}, ssrf.Options{}, getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestNewCodeExecutor_NegativeTimeoutDoesNotExpireImmediately(t *testing.T) {
 	exec, err := newCodeExecutor(nlpgo.EngineConfig{
 		SandboxPython:           nlpgo.DefaultSandboxPython,
 		CodeBlockTimeoutSeconds: -30,
-	}, getenv)
+	}, ssrf.Options{}, getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
@@ -303,12 +303,40 @@ func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	exec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	exec, err := newCodeExecutor(cfg.Engine, ssrf.Options{}, os.Getenv)
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
 
 	if got, want := exec.DefaultTimeout(), 7*time.Second; got != want {
 		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS=7)", got, want)
+	}
+}
+
+// @scenario "code blocks reach private addresses only when the operator allows it"
+func TestCodeBlockEgress_RefusesLocalUnlessAllowed(t *testing.T) {
+	shared := ssrf.Options{AllowLocal: true, AllowedHosts: []string{"169.254.169.254"}, StrictPublicOnly: true}
+
+	refused := codeBlockEgress(shared, false)
+	if refused.AllowLocal {
+		t.Fatal("code blocks inherited the HTTP block's permission to reach private addresses")
+	}
+	if !refused.StrictPublicOnly {
+		t.Fatalf("the rest of the shared policy was not kept: %+v", refused)
+	}
+}
+
+// @scenario "code blocks do not inherit the HTTP block's allow-listed hosts"
+func TestCodeBlockEgress_DropsAllowListedHosts(t *testing.T) {
+	shared := ssrf.Options{AllowedHosts: []string{"169.254.169.254"}}
+	egress := codeBlockEgress(shared, true)
+	if len(egress.AllowedHosts) != 0 {
+		t.Fatalf("code blocks inherited allow-listed hosts, which skip the address checks: %v", egress.AllowedHosts)
+	}
+	if err := ssrf.CheckURL("http://169.254.169.254/latest/meta-data/", egress); err == nil {
+		t.Fatal("a code block could reach the metadata address through the HTTP block's allow-list")
+	}
+	if !codeBlockEgress(shared, true).AllowLocal {
+		t.Fatal("the operator's explicit allowance was ignored")
 	}
 }

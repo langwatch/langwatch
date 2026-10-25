@@ -1,6 +1,7 @@
 import {
   LangyUiExperimentRequiredError,
   LangyUiHandlerFailedError,
+  LangyUiNoBrowserError,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -142,6 +143,11 @@ export class LangyUiActionBackendService {
     // rather than a write, and it needs no experiment named.
     if (this.explorer.isExplorerKind(kind)) {
       return this.explorer.run({ projectSlug, kind, payload });
+    }
+
+    // A kind with no backend mode, such as the Studio code editor's, runs on an open page only.
+    if (definition.backend === undefined) {
+      throw new LangyUiNoBrowserError(kind);
     }
 
     if (!experimentSlug) {

@@ -145,6 +145,7 @@ require (
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/emersion/go-smtp v0.25.0
+	github.com/evanw/esbuild v0.28.2
 	github.com/go-chi/chi/v5 v5.2.4
 	github.com/go-python/gpython v0.2.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -163,6 +164,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.12.1
+	github.com/tetratelabs/wazero v1.12.0
 	github.com/tidwall/gjson v1.19.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2

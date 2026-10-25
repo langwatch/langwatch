@@ -44,9 +44,12 @@ def execute():
         os.chmod(runner, 0o600)
     except OSError:
         pass
-    with open(runner, "w") as handle:
-        handle.write("import sys, json\n")
-        handle.write("json.dump({'outputs': {'sum': 'POISONED'}}, open(sys.argv[1], 'w'))\n")
+    try:
+        with open(runner, "w") as handle:
+            handle.write("import sys, json\n")
+            handle.write("json.dump({'outputs': {'sum': 'POISONED'}}, open(sys.argv[1], 'w'))\n")
+    except OSError:
+        pass  # the wasm runtime mounts the runner read-only
     return {"ok": True}
 `,
 		DeclaredOutputs: []string{"ok"},
@@ -84,8 +87,11 @@ def execute():
         os.chmod(path, 0o600)
     except OSError:
         pass
-    with open(path, "w") as handle:
-        handle.write("MARKER = 'poisoned'\n")
+    try:
+        with open(path, "w") as handle:
+            handle.write("MARKER = 'poisoned'\n")
+    except OSError:
+        pass  # the wasm runtime mounts the runner read-only
     return {"ok": True}
 `,
 		DeclaredOutputs: []string{"ok"},
@@ -111,6 +117,7 @@ def execute():
 // @scenario "each execution gets its own temporary directory, removed afterwards"
 func TestCodeBlock_EachExecutionGetsItsOwnDirectory(t *testing.T) {
 	requirePython(t)
+	skipOnWasm(t, "it reads the run directory's host path; wasm_test.go covers the guest's view")
 	exe := newExec(t)
 
 	// Report the directory the runner was materialized into, and drop a file
@@ -240,6 +247,7 @@ func TestCodeBlock_DevRunnerOverrideIsReadOnceAndNotReread(t *testing.T) {
 // @scenario "each execution gets its own temporary directory, removed afterwards"
 func TestCodeBlock_RunDirectoryIsRemovedEvenWhenUserCodeLocksASubdirectory(t *testing.T) {
 	requirePython(t)
+	skipOnWasm(t, "it reads the run directory's host path; wasm_test.go covers the guest's view")
 	requireUnprivileged(t)
 	exe := newExec(t)
 
@@ -293,4 +301,33 @@ func requireUnprivileged(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root: uid 0 ignores the directory permissions this test turns on")
 	}
+}
+
+// skipOnWasm skips a test about the subprocess runtime's host-side mechanics
+// when the suite runs on the wasm runtime (NLPGO_CODEBLOCK_TEST_RUNTIME=wasm).
+func skipOnWasm(t *testing.T, why string) {
+	t.Helper()
+	if os.Getenv("NLPGO_CODEBLOCK_TEST_RUNTIME") == codeblock.RuntimeWasm {
+		t.Skip("subprocess-only: " + why)
+	}
+}
+
+// @scenario "the engine does not follow a link left in place of the result file"
+func TestRunnerIsolation_ResultFileLinkIsNotFollowed(t *testing.T) {
+	requirePython(t)
+	skipOnWasm(t, "a wasm run's result never touches the host disk")
+	start := time.Now()
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code: `
+import os, sys
+
+def execute():
+    os.symlink("/dev/zero", sys.argv[1])
+    return {"ok": True}
+`,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error, "a result read through a link was accepted")
+	assert.Equal(t, codeblock.RunnerErrorType, res.Error.Type)
+	assert.Less(t, time.Since(start), 10*time.Second, "the engine read through the link")
 }

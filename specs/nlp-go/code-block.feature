@@ -78,6 +78,16 @@ Feature: Code block — execute user Python with isolated subprocess and structu
   # a code it had never heard of and no copy to show for it.
   Rule: Exceptions are surfaced as structured errors with the traceback
 
+    @unit
+    Scenario: customer code cannot report an error the engine reserves
+      # "Timeout" and "RunnerError" are the engine's own error types; the engine
+      # decides those from the run's outcome, never from what the code reports.
+      Given a code node that throws an error it named "Timeout"
+      When the executor runs the request
+      Then the error type is "UserTimeout"
+      And the run is not reported as timed out
+      And an error whose name is not a string, whose fields throw when read, or that is a hostile Proxy, is still reported as the code's own error
+
     @integration
     Scenario: ZeroDivisionError aborts the node and the workflow with the traceback intact
       Given a code node whose body computes 1/0
@@ -200,6 +210,404 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the executor runs the request twice
       Then the second execution does not see the file the first one wrote
       And no execution directory is left behind once the executor is done
+
+  Rule: A code block on the wasm runtime is contained, whatever it tries
+
+    # The author of a code block is an untrusted tenant on a shared engine.
+    # These scenarios pin what such code cannot reach or exhaust, in both
+    # languages, so a regression fails here rather than in production.
+
+    @unit
+    Scenario: on the wasm runtime, a code block cannot leave its run directory
+      Given a host file outside the run's directory
+      And a code node that tries "..", relative traversal, a symlink, a directory symlink and a hard link to reach it
+      When the executor runs the request
+      Then no attempt returns the file's content
+
+    @unit
+    Scenario: on the wasm runtime, a symlink a run leaves behind cannot reach the host
+      Given a code node that links a host path into its own directory and reads it
+      When the executor runs the request
+      Then the link is refused or resolves inside the guest, never to the host file
+
+    @unit
+    Scenario: the host bridge refuses malformed, unknown and excessive calls
+      Given a code node that writes a malformed host call, an unknown operation, and more requests than a run may make
+      When the executor runs the request
+      Then the malformed and unknown calls get a protocol error
+      And the requests past the per-run budget are refused while the earlier ones succeed
+
+    @unit
+    Scenario: the host bridge refuses an oversized call without exhausting the engine
+      Given a code node that sends a request larger than the host call size limit
+      When the executor runs the request
+      Then the call is refused with a limit error and the run continues
+
+    @unit
+    Scenario: on the wasm runtime, a redirect cannot reach a refused address
+      Given a permitted host that redirects to the cloud metadata address
+      When a Python and a JavaScript code node each request it
+      Then both get a "not permitted" error and the metadata address is never reached
+
+    @unit
+    Scenario: encoded, loopback, private and non-HTTP destinations are refused
+      Given a code node that requests the metadata address as IPv4-mapped IPv6, decimal and octal
+      And it requests the engine's own port, IPv6 loopback, a private address, a file URL and a gopher URL
+      When the executor runs the request under the default egress policy
+      Then every request is refused and no host file is read
+
+    @unit
+    Scenario: a JavaScript code block is held to its memory ceiling
+      Given an executor with a small memory ceiling
+      And a JavaScript code node that allocates without end
+      When the executor runs the request
+      Then the run fails on its own, not as a timeout
+      And the executor runs the next request normally
+
+    @unit
+    Scenario: a JavaScript code block that recurses without end fails on its own
+      Given a JavaScript code node that recurses without a base case
+      When the executor runs the request
+      Then the run fails with an error that is not a timeout
+
+    @unit
+    Scenario: a JavaScript code block cannot see another run's state
+      Given eight JavaScript runs in parallel, each with its own secret
+      And each run marks a global and a file in its directory
+      When they run
+      Then no run sees another run's global, file or secret
+
+    @unit
+    Scenario: an oversized result is refused instead of read into the engine
+      Given a code node that returns an output larger than the result size limit
+      When the executor runs the request
+      Then the run fails with a runner error naming the limit and no outputs
+
+  Rule: A wasm run's files, host calls and memory are bounded
+
+    @unit
+    Scenario: a request's size is known before it is encoded
+      # Escaping can grow a string sixfold, so the engine measures the encoded
+      # request by walking its values and refuses it before allocating it.
+      Given a code node whose input is 4 MiB of "<" characters
+      When the executor runs the request on the wasm runtime
+      Then it is refused for exceeding the 16 MiB limit
+      And the engine never allocated the encoded request
+      And the measure counts the request's own keys, byte strings as base64, and values that encode themselves
+      And an encoded request over the limit is refused even if the measure let it through
+      And a deadline that passes while the request is measured or encoded is reported as a timeout
+
+    # /work is held in engine memory with no links, so no path a guest builds
+    # resolves on the host; host calls and concurrent runs have budgets too.
+
+    @unit
+    Scenario: on the wasm runtime, a relative link cannot climb out of the run directory
+      Given a code node that links "..", "../../.." and "." inside its run directory
+      When the executor runs the request
+      Then every link is refused
+
+    @unit
+    Scenario: on the wasm runtime, a run's files are held to a size, count and open-file budget
+      Given a code node that writes 200 MiB, creates 10000 files and opens 1000 handles
+      When the executor runs the request
+      Then each attempt is stopped at the run's budget
+      And the next run starts with an empty /work
+
+    @unit
+    Scenario: a run that keeps making failing host calls is stopped
+      Given a JavaScript code node that writes unknown host calls without end
+      When the executor runs the request
+      Then the run is stopped well before its deadline with an error naming failing host calls
+
+    @unit
+    Scenario: a run that ignores the host's replies is stopped, not buffered
+      Given a host that answers with large bodies
+      And a JavaScript code node that requests it repeatedly without reading the replies
+      When the executor runs the request
+      Then the run is stopped with an error naming the unread replies
+
+    @unit
+    Scenario: concurrent wasm runs share a memory budget
+      Given an executor whose total memory budget fits one run
+      When three runs start together
+      Then they run one after another
+      And a run cancelled while it waits for room reports that the engine is at capacity
+
+    @unit
+    Scenario: the engine does not follow a link left in place of the result file
+      Given a subprocess code node that replaces its result file with a link to an endless device
+      When the executor runs the request
+      Then the run fails promptly with a runner error and the device is never read
+
+    @unit
+    Scenario: code blocks reach private addresses only when the operator allows it
+      Given the HTTP block is allowed to reach private addresses
+      When the code-block executor is built without NLPGO_ENGINE_CODE_BLOCK_ALLOW_LOCAL_EGRESS
+      Then code blocks are refused private and loopback addresses
+      And the rest of the egress policy is kept
+      And setting the variable allows them
+
+    @unit
+    Scenario: code blocks do not inherit the HTTP block's allow-listed hosts
+      Given the HTTP block allow-lists the cloud metadata address
+      When the code-block egress policy is built
+      Then the allow-list is empty
+      And the metadata address is still refused
+
+    @unit
+    Scenario: a run's files are charged for the memory they hold
+      Given a run that writes one byte into each of many files
+      When the run creates files past the byte budget's worth of storage units
+      Then the next write is refused although few bytes were written
+      And truncating or deleting a file returns its storage to the budget
+
+    @unit
+    Scenario: a deleted file still open keeps its storage until the last handle closes
+      Given a run that opens a file, deletes it and keeps writing to the handle
+      When the handle is closed
+      Then the file's storage is returned to the budget only then
+
+    @unit
+    Scenario: a run's file offsets cannot overflow the engine
+      Given a run that seeks, writes and truncates at offsets near the largest integer
+      When the executor runs the request
+      Then each call is refused with an error and the engine keeps running
+
+    @unit
+    Scenario: a run's file names are bounded
+      Given a run that creates a file whose name is longer than 255 bytes
+      When the executor runs the request
+      Then the create is refused as a name too long
+
+    @unit
+    Scenario: oversized host calls count towards the failed-call limit
+      Given a JavaScript code node that writes host calls past the frame size limit without end
+      When the executor runs the request
+      Then the run is stopped with an error naming failing host calls
+
+    @unit
+    Scenario: an engine whose memory budget cannot admit one run refuses to start
+      Given a total wasm memory budget smaller than one run's footprint
+      When the executor is built
+      Then building it fails with an error naming both sizes
+
+    @unit
+    Scenario: a run's request is charged to the memory budget and capped
+      Given a code node whose code and inputs exceed 16 MiB
+      When the executor runs the request
+      Then the run is refused before it starts with an error naming the limit
+
+    @unit
+    Scenario: a run's open files count against one budget across every mount
+      Given a JavaScript code node that opens the read-only runner file 20000 times
+      When the executor runs the request
+      Then the opens stop at the run's handle budget
+      And files open on /work and on the read-only mounts share that budget
+
+    @unit
+    Scenario: listing a large directory pages through it without holding a copy
+      Given a run directory with many entries
+      When the code node lists it a page at a time and deletes an entry mid-listing
+      Then each remaining entry is listed once, in name order
+
+    @unit
+    Scenario: a request's DNS lookups end with the request
+      Given a code block's request whose dial runs on a context detached from the request
+      When the request ends
+      Then the dial and its DNS lookups are cancelled
+
+    @unit
+    Scenario: a result with too many values is refused before it is decoded
+      Given a JavaScript code node that returns 200000 values or 500 levels of nesting
+      When the executor runs the request
+      Then the run fails with a runner error naming the limit and no outputs
+
+    @unit
+    Scenario: a run that times out waiting for room is reported as a timeout
+      Given an executor whose memory budget is held by another run
+      When a run's deadline passes while it waits for room
+      Then it is reported as timed out
+
+    @unit
+    Scenario: an engine error reaches the user without the guest's stack trace
+      Given a JavaScript code node that exhausts its memory
+      When the executor runs the request
+      Then the error message is one line and names no wasm stack trace
+
+  Rule: JavaScript code blocks run on QuickJS inside the engine
+
+    # A code node whose `language` parameter is "javascript" runs on QuickJS
+    # compiled to WASI, in the same wasm runtime and host bridge as Python on
+    # wasm, whichever runtime Python uses (ADR-183). User code is an ES module
+    # whose default export, or `execute` export, takes the inputs as one object.
+
+    @unit
+    Scenario: a JavaScript code block returns its outputs
+      Given a code node in JavaScript exporting a function, an async function, an execute function or a class
+      When the executor runs the request with inputs
+      Then the returned object becomes the node's outputs
+
+    @unit
+    Scenario: a JavaScript code block that throws reports the error
+      Given a JavaScript code node that throws a RangeError
+      When the executor runs the request
+      Then the error carries "RangeError" as its type, the message, and a stack naming the code block's line
+
+    @unit
+    Scenario: a JavaScript code block missing a declared output fails
+      Given a JavaScript code node that does not return a declared output
+      When the executor runs the request
+      Then the error message names the missing output
+
+    @unit
+    Scenario: a JavaScript code block reads secrets and params
+      Given a JavaScript code node that reads secrets.TOKEN, params.LIMIT and an unknown secret, and logs
+      When the executor runs the request
+      Then the configured values arrive, the unknown secret throws a ReferenceError
+      And console.log reaches stdout and console.error reaches stderr
+
+    @unit
+    Scenario: a JavaScript code block calls fetch on a permitted host
+      Given a JavaScript code node that calls fetch with headers and a body
+      When the executor runs the request
+      Then the requests reach the host and the response's status, headers and JSON body are readable
+
+    @unit
+    Scenario: a JavaScript code block's requests follow the deployment's egress policy
+      Given a JavaScript code node that fetches metadata and loopback addresses
+      When the executor runs the request under the default egress policy
+      Then every request fails with a "not permitted" error and none reaches its destination
+
+    @unit
+    Scenario: a JavaScript code block has no host access
+      Given a JavaScript code node that reads the environment and host files, and writes to the runner mount
+      When the executor runs the request
+      Then it sees only HOME and TMPDIR, reads no host file, cannot change the runner and has no os.exec
+
+    @unit
+    Scenario: a JavaScript code block is stopped at its deadline
+      Given a JavaScript code node that loops forever, or waits on a long timer
+      When the executor runs the request with a short timeout
+      Then the run ends as a timeout close to its deadline
+
+    @unit
+    Scenario: a deployment without QuickJS refuses JavaScript code blocks
+      Given an executor built without NLPGO_ENGINE_QUICKJS_WASM
+      When it is asked to run a JavaScript code node
+      Then it returns an error saying JavaScript is not available
+
+    @unit
+    Scenario: a deployment without tsstrip refuses TypeScript code blocks
+      Given an executor built with QuickJS but without NLPGO_ENGINE_TYPESCRIPT_WASM
+      When it is asked to run a TypeScript code node
+      Then the result is a RunnerError saying TypeScript is not available
+
+  Rule: TypeScript code blocks run as JavaScript with their types erased
+    # A code node whose `language` is "typescript" has its types erased by
+    # esbuild in the engine, then runs on QuickJS like JavaScript. Types are
+    # never checked at run time; the Studio editor checks them as you write.
+
+    @unit
+    Scenario: a TypeScript code block runs with its types erased
+      Given a TypeScript code node using interfaces, type aliases, an enum and casts
+      When the executor runs the request with inputs
+      Then the returned object becomes the node's outputs
+
+    @unit
+    Scenario: a TypeScript code block with a type error still runs
+      Given a TypeScript code node that assigns a number to a string
+      When the executor runs the request
+      Then it runs and returns its outputs
+
+    @unit
+    Scenario: a TypeScript code block that does not parse reports the line
+      Given a TypeScript code node with a syntax error on line 2
+      When the executor runs the request
+      Then the error type is "SyntaxError"
+      And the traceback names code-block.ts at line 2
+
+    @unit
+    Scenario: a TypeScript code block that throws points at the line it was written on
+      Given a TypeScript code node whose throw is on line 7, below lines erasing drops
+      When the executor runs the request
+      Then the traceback names code-block.ts at line 7, not the erased JavaScript
+
+    @unit
+    Scenario: a TypeScript code block's size is bounded before it is parsed
+      # Its input is bounded, and parsed only once the run is admitted to the memory budget.
+      Given a TypeScript code node over 64 KB
+      When the executor runs the request
+      Then it is refused as a RunnerError saying TypeScript is limited to 64 KB
+      And the most deeply nested code that fits the limit is refused as a SyntaxError without stopping the engine
+
+    @unit
+    Scenario: a TypeScript code block's types are erased inside the sandbox, within the run's deadline
+      # esbuild's parser takes quadratic time on chains of "<", so it runs as
+      # tsstrip.wasm under the run's deadline and memory cap, never on the host.
+      Given a TypeScript code node whose expression chains thousands of "<" comparisons
+      When the executor runs the request with a 2 second timeout
+      Then the run is reported as timed out within seconds of its deadline
+      And a TypeScript code node nested too deeply to parse is refused as a SyntaxError
+
+    @unit
+    Scenario: a TypeScript traceback is remapped only up to a bounded length
+      # The guest writes the traceback, so the engine rewrites at most 64 KB of it.
+      Given a TypeScript code block whose error carries a traceback of many megabytes
+      When the engine points the traceback back at the TypeScript lines
+      Then it rewrites at most the first 64 KB and drops the rest
+
+  Rule: The wasm runtime runs each execution in its own WebAssembly instance
+
+    # NLPGO_ENGINE_CODE_BLOCK_RUNTIME=wasm runs user code in a WASI CPython
+    # inside the engine (ADR-183). Every execution is a fresh instance with
+    # its own memory; the stdlib and runner are read-only mounts and /work is
+    # the execution's own. The whole suite above also runs on this runtime.
+
+    @unit
+    Scenario: on the wasm runtime, a code block cannot start a process or a thread
+      Given the code executor runs on the wasm runtime
+      And a code node whose body tries to fork, spawn a process and start a thread
+      When the executor runs the request
+      Then none of the attempts starts anything
+
+    @unit
+    Scenario: on the wasm runtime, user code sees no engine environment and no process table
+      Given the code executor runs on the wasm runtime
+      And the engine's environment holds a credential
+      When a code node reads its environment and /proc
+      Then the credential is not in its environment
+      And no process environment is readable through /proc
+
+    @unit
+    Scenario: on the wasm runtime, the runner and its libraries are read-only
+      Given the code executor runs on the wasm runtime
+      When a code node tries to rewrite the runner, the dspy stand-in or the HTTP stand-ins
+      Then every write is refused
+
+    @unit
+    Scenario: on the wasm runtime, outbound requests follow the deployment's egress policy
+      Given the code executor runs on the wasm runtime with the default egress policy
+      When a code node requests a private address and a cloud metadata endpoint
+      Then each request is refused as not permitted
+
+    @unit
+    Scenario: on the wasm runtime, requests and httpx reach a permitted host
+      Given the code executor runs on the wasm runtime
+      And an HTTP server the egress policy permits
+      When a code node calls it through requests, a requests Session, httpx.Client and httpx.AsyncClient
+      Then every call reaches the server with its method, query and headers
+
+    @unit
+    Scenario: on the wasm runtime, a run is stopped at its deadline
+      Given the code executor runs on the wasm runtime
+      When a code node sleeps or loops past its timeout
+      Then the result is marked timed out within moments of the deadline
+
+    @unit
+    Scenario: on the wasm runtime, a run is held to its memory ceiling
+      Given the code executor runs on the wasm runtime with a 128 MiB ceiling
+      When a code node allocates 512 MiB
+      Then the node fails with MemoryError
 
   Rule: Container packages a stable Python toolchain for user code
 

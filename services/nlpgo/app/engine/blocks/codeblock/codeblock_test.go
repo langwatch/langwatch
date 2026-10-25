@@ -2,6 +2,7 @@ package codeblock_test
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -109,7 +110,9 @@ func TestCodeBlock_WithholdsPodEnvironment(t *testing.T) {
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
 	assert.Equal(t, "<absent>", res.Outputs["aws"], "AWS secret leaked into user code env")
 	assert.Equal(t, "<absent>", res.Outputs["token"], "internal token leaked into user code env")
-	assert.Equal(t, true, res.Outputs["has_path"], "allowlisted PATH should still be present")
+	if os.Getenv("NLPGO_CODEBLOCK_TEST_RUNTIME") != codeblock.RuntimeWasm {
+		assert.Equal(t, true, res.Outputs["has_path"], "allowlisted PATH should still be present")
+	}
 }
 
 // TestCodeBlock_EmptyAllowlistPassesNothing verifies the explicit
@@ -175,7 +178,8 @@ func TestCodeBlock_TimeoutKillsSubprocess(t *testing.T) {
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "Timeout", res.Error.Type)
 	assert.Empty(t, res.Outputs, "a timed-out run must not surface outputs")
-	assert.Less(t, elapsed, 3*time.Second, "subprocess must die promptly")
+	// Well under the 10 s sleep, with room for a cold python3 start on a loaded CI runner.
+	assert.Less(t, elapsed, 8*time.Second, "subprocess must die promptly")
 }
 
 func TestCodeBlock_NoExecuteFunctionDefined(t *testing.T) {

@@ -28,6 +28,9 @@ const UI_APPLICATION = /^apps\/ui\/src\//;
 const DEV_RUNTIME_ENTRY = /^tools\/dev-runtime\/src\/app\.entrypoint\.ts$/;
 // The tasks entry loads every module only for a module task, so migrations stay fast.
 const TASKS_ENTRY = /^apps\/tasks\/src\/main\.ts$/;
+// The code-block runner runs inside QuickJS and imports the user's module, which exists
+// only once a run writes it; pinned by services/nlpgo/.../codeblock/javascript_test.go.
+const CODE_BLOCK_RUNNER = /^services\/nlpgo\/app\/engine\/blocks\/codeblock\/runner\.mjs$/;
 
 function isExempt(workspacePath) {
   return (
@@ -40,7 +43,8 @@ function isExempt(workspacePath) {
     WEB_PACKAGE_ENTRY.test(workspacePath) ||
     UI_APPLICATION.test(workspacePath) ||
     DEV_RUNTIME_ENTRY.test(workspacePath) ||
-    TASKS_ENTRY.test(workspacePath)
+    TASKS_ENTRY.test(workspacePath) ||
+    CODE_BLOCK_RUNNER.test(workspacePath)
   );
 }
 

@@ -1,11 +1,13 @@
 /** @vitest-environment jsdom */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Component, End, Entry } from "@langwatch/workflow-contract";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import type * as reactModule from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { codeTemplate } from "../../model/code/code-templates.ts";
 import { CodePropertiesPanel } from "../../ui/sections/properties/workflow-code-properties-panel.tsx";
 import { EndPropertiesPanel } from "../../ui/sections/properties/workflow-end-properties-panel.tsx";
 import { EntryPointPropertiesPanel } from "../../ui/sections/properties/workflow-entry-point-properties-panel.tsx";
@@ -38,9 +40,10 @@ const variables = ({ variables, title, onChange }: WorkflowVariablesProps) => (
   </div>
 );
 const outputs = ({ title }: WorkflowOutputsProps) => <span>{title}</span>;
-const codeEditor = ({ code, onChange }: WorkflowCodeEditorProps) => (
+const codeEditor = ({ code, onChange, language }: WorkflowCodeEditorProps) => (
   <textarea
     data-testid="code-editor"
+    data-language={language}
     value={code}
     onChange={(event) => onChange(event.target.value)}
   />
@@ -103,6 +106,82 @@ describe("Workflow property panels", () => {
       type: "code",
       value: "new",
     });
+  });
+
+  /**
+   * @scenario "A JavaScript node opens in the JavaScript editor"
+   */
+  it("opens a JavaScript code node in the JavaScript editor", () => {
+    const node: Node<Component> = {
+      id: "code",
+      type: "code",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "Code",
+        parameters: [
+          { identifier: "language", type: "str", value: "javascript" },
+          { identifier: "code", type: "code", value: "export default () => ({})" },
+        ],
+      },
+    };
+    _useWorkflowStore.setState({ nodes: [node] });
+    renderPanel(<CodePropertiesPanel {...common} node={node} />);
+    expect(screen.getByTestId("code-editor").dataset.language).toBe("javascript");
+  });
+
+  /**
+   * @scenario "A node without a language opens in the Python editor with no migration"
+   */
+  it("opens a code node without a language in the Python editor", () => {
+    const node: Node<Component> = {
+      id: "code",
+      type: "code",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "Code",
+        parameters: [{ identifier: "code", type: "code", value: "class Code:\n    pass\n" }],
+      },
+    };
+    _useWorkflowStore.setState({ nodes: [node] });
+    renderPanel(<CodePropertiesPanel {...common} node={node} />);
+    expect(screen.getByTestId("code-editor").dataset.language).toBe("python");
+  });
+
+  /**
+   * @scenario "The code node's panel offers JavaScript, TypeScript and Python"
+   */
+  it("offers the three languages and switches an untouched node to TypeScript", async () => {
+    const node: Node<Component> = {
+      id: "code",
+      type: "code",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "Code",
+        inputs: [{ identifier: "question", type: "str" }],
+        outputs: [{ identifier: "answer", type: "str" }],
+        parameters: [
+          { identifier: "language", type: "str", value: "javascript" },
+          {
+            identifier: "code",
+            type: "code",
+            value: codeTemplate({ language: "javascript", input: "question", output: "answer" }),
+          },
+        ],
+      },
+    };
+    _useWorkflowStore.setState({ nodes: [node] });
+    renderPanel(<CodePropertiesPanel {...common} node={node} />);
+
+    const picker = screen.getByTestId("code-language-picker");
+    expect(within(picker).getByText("JavaScript")).toBeTruthy();
+    expect(within(picker).getByText("Python")).toBeTruthy();
+    await userEvent.click(within(picker).getByRole("radio", { name: "TypeScript" }));
+
+    const parameters = _useWorkflowStore.getState().nodes[0]?.data.parameters ?? [];
+    expect(parameters.find((p) => p.identifier === "language")?.value).toBe("typescript");
+    expect(parameters.find((p) => p.identifier === "code")?.value).toBe(
+      codeTemplate({ language: "typescript", input: "question", output: "answer" }),
+    );
   });
 
   it("shows entry dataset controls and links to the end node", () => {

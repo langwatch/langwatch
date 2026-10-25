@@ -10,6 +10,7 @@ import {
   IMPORT_MEMBER_PREFIX,
   IMPORT_MODULE_PREFIX,
   INSERT_AS_SNIPPET,
+  PARAMS_DOC,
   scanImports,
 } from "./python-provider.shared.ts";
 import {
@@ -175,6 +176,21 @@ function secretsHandleSuggestions({
   ];
 }
 
+/** `params` holds the run's parameters; names are set per run, so only the handle completes. */
+function paramsHandleSuggestions({ monaco, range }: SuggestContext): languages.CompletionItem[] {
+  return [
+    {
+      label: "params",
+      kind: monaco.languages.CompletionItemKind.Variable,
+      detail: "SimpleNamespace",
+      documentation: { value: PARAMS_DOC },
+      insertText: "params",
+      range,
+      sortText: "0_params",
+    },
+  ];
+}
+
 /** Output keys when the user is mid-dict-literal or returning a dict. */
 function outputKeySuggestions({
   monaco,
@@ -202,7 +218,7 @@ function outputKeySuggestions({
   });
 }
 
-/** Builtins, keywords, imported modules, node inputs and the `secrets` handle. */
+/** Builtins, keywords, imported modules, node inputs and the `secrets` and `params` handles. */
 function defaultSuggestions(context: SuggestContext): Suggestions {
   const { monaco, contractRef, model, range } = context;
   const imports = scanImports(model.getValue());
@@ -235,6 +251,7 @@ function defaultSuggestions(context: SuggestContext): Suggestions {
         sortText: `0_input_${field.identifier}`,
       })),
       ...secretsHandleSuggestions(context),
+      ...paramsHandleSuggestions(context),
       ...outputKeySuggestions(context),
     ],
   };

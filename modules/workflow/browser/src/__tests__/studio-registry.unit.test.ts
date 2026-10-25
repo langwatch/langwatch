@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { codeLanguageOf } from "../model/code-language.ts";
 import { MODULES } from "../model/studio-registry.ts";
 
 describe("Optimization Studio Registry", () => {
@@ -62,50 +63,41 @@ describe("Optimization Studio Registry", () => {
       });
     });
 
-    it("has code parameter with input parameter in function signature", () => {
-      expect(code.parameters).toBeDefined();
-      const codeParam = code.parameters?.find((p) => p.identifier === "code");
+    const codeValue = () => code.parameters?.find((p) => p.identifier === "code")?.value as string;
 
-      expect(codeParam).toBeDefined();
-      // Inputs default to None so an unconnected handle does not raise a
-      // missing-argument error at run time.
-      expect(codeParam?.value).toContain("def __call__(self, input: str = None)");
+    /**
+     * @scenario "A new code node is JavaScript"
+     */
+    it("defaults a new code node to JavaScript", () => {
+      const language = code.parameters?.find((p) => p.identifier === "language");
+
+      expect(language).toEqual({ identifier: "language", type: "str", value: "javascript" });
+      expect(codeLanguageOf({ parameters: code.parameters })).toBe("javascript");
     });
 
-    it("has code parameter returning output key", () => {
-      expect(code.parameters).toBeDefined();
-      const codeParam = code.parameters?.find((p) => p.identifier === "code");
-
-      expect(codeParam).toBeDefined();
-      expect(codeParam?.value).toContain('return {"output":');
+    /**
+     * @scenario "The JavaScript template destructures the input and returns the output"
+     */
+    it("ships a default export that destructures the input and returns the output", () => {
+      expect(codeValue()).toContain("export default async function ({ input })");
+      expect(codeValue()).toContain('return { output: "Hello world!" };');
     });
 
-    // Owner directive: the default code-block template must have NO
-    // dspy reference whatsoever. The fake-dspy stub still resolves
-    // `import dspy` for legacy customer workflows, but new
-    // drag-and-drop templates ship as plain Python so future code-block
-    // surface stays dspy-free as we move the lambda image off dspy.
-    it("default template ships without any dspy reference", () => {
-      const codeParam = code.parameters?.find((p) => p.identifier === "code");
-      const value = codeParam?.value as string;
-
-      expect(value).not.toContain("import dspy");
-      expect(value).not.toContain("dspy.Module");
-      expect(value).not.toContain("(dspy.");
+    /**
+     * @scenario "The JavaScript template is typed through JSDoc"
+     */
+    it("types the entrypoint with the editor's Inputs and Outputs through JSDoc", () => {
+      expect(codeValue()).toContain("@param {Inputs} inputs");
+      expect(codeValue()).toContain("@returns {Promise<Outputs>}");
     });
 
-    it("default template uses a plain Python class with __call__", () => {
-      const codeParam = code.parameters?.find((p) => p.identifier === "code");
-      const value = codeParam?.value as string;
-
-      // Plain class shape: `class Code:` (no parens), entrypoint via
-      // Python's idiomatic `__call__` protocol — not torch/dspy's
-      // `forward` convention. The runner resolves classes that define
-      // `__call__` on the class itself; legacy customer code using
-      // `forward` or dspy.Module still resolves via fallback rules.
-      expect(value).toMatch(/^class\s+\w+\s*:/m);
-      expect(value).toContain("def __call__(self");
-      expect(value).not.toContain("def forward");
+    /**
+     * @scenario "The JavaScript template contains no Python"
+     */
+    it("ships no Python in the JavaScript template", () => {
+      expect(codeValue()).not.toMatch(/^class\s+\w+/m);
+      expect(codeValue()).not.toContain("def __call__");
+      expect(codeValue()).not.toContain("dspy");
     });
   });
 

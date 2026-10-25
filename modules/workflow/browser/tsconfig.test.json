@@ -21,6 +21,7 @@
     "src/**/__bench__/**/*.ts",
     "src/**/testing.ts",
     "src/model/assets.d.ts",
+    "src/model/code/monaco-ts-services.d.ts",
     "src/**/__tests__/**/*.tsx",
     "src/**/__mocks__/**/*.tsx",
     "src/**/tests/**/*.tsx",

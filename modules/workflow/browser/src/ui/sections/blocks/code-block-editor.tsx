@@ -3,6 +3,7 @@ import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Edit2 } from "lucide-react";
 import { useState } from "react";
 
+import type { CodeBlockLangySubject } from "../../../model/code/code-block-langy.ts";
 import { CodeEditorModal } from "../optimization_studio/code/workflow-code-editor.transport.tsx";
 
 export interface CodeBlockField {
@@ -44,6 +45,8 @@ export type CodeBlockEditorProps = {
    * a per-instance random id if omitted, meaning state is not preserved.
    */
   viewStateKey?: string;
+  /** The code node being edited, which is what Langy may be asked about in the editor. */
+  langySubject?: CodeBlockLangySubject;
 };
 
 /**
@@ -59,6 +62,7 @@ export function CodeBlockEditor({
   inputs,
   outputs,
   viewStateKey,
+  langySubject,
 }: CodeBlockEditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -116,7 +120,7 @@ export function CodeBlockEditor({
       <CodePreview
         code={code}
         language={language}
-        filename={`code.${language === "python" ? "py" : language}`}
+        filename={previewFileName({ language })}
         maxHeight="200px"
         lineNumbers
         compact
@@ -129,11 +133,23 @@ export function CodeBlockEditor({
           setCode={onChange}
           open={isModalOpen}
           onClose={handleClose}
+          language={language}
           inputs={inputs}
           outputs={outputs}
           viewStateKey={viewStateKey}
+          langySubject={langySubject}
         />
       )}
     </Box>
   );
+}
+
+const PREVIEW_EXTENSIONS: Record<string, string> = {
+  python: "py",
+  javascript: "mjs",
+  typescript: "ts",
+};
+
+function previewFileName({ language }: { language: string }) {
+  return `code.${PREVIEW_EXTENSIONS[language] ?? language}`;
 }

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { rewriteCodeSignature } from "../code-signature.ts";
+import { rewriteCodeSignature, rewriteJavaScriptSignature } from "../code-signature.ts";
 
 describe("rewriteCodeSignature", () => {
   describe("given inputs to sync", () => {
@@ -69,6 +69,74 @@ describe("rewriteCodeSignature", () => {
         const code = "def __call__(self, output: str):\n  return {}";
         expect(rewriteCodeSignature(code, [])).toBe(code);
       });
+    });
+  });
+});
+
+describe("rewriteJavaScriptSignature", () => {
+  const template = `export default async function ({ input }) {\n  return { output: input };\n}\n`;
+
+  describe("given a default export that destructures its inputs", () => {
+    describe("when an input is added", () => {
+      /**
+       * @scenario "Adding an input rewrites the JavaScript destructured parameter"
+       */
+      it("adds it to the destructured parameter", () => {
+        const next = rewriteJavaScriptSignature({
+          code: template,
+          inputs: [{ identifier: "input" }, { identifier: "context" }],
+        });
+        expect(next).toContain("export default async function ({ input, context }) {");
+      });
+    });
+
+    describe("when an input is renamed", () => {
+      /**
+       * @scenario "Renaming an input rewrites the JavaScript destructured parameter"
+       */
+      it("replaces the old name with the new one", () => {
+        const next = rewriteJavaScriptSignature({
+          code: template,
+          inputs: [{ identifier: "question" }],
+        });
+        expect(next).toContain("export default async function ({ question }) {");
+      });
+    });
+
+    describe("when entries carry defaults or a rest element", () => {
+      /**
+       * @scenario "Defaults and a rest element survive an input sync"
+       */
+      it("keeps the surviving entries' text and the rest element last", () => {
+        const next = rewriteJavaScriptSignature({
+          code: `export default function ({ input = [1, 2], gone, ...rest }) {}`,
+          inputs: [{ identifier: "input" }, { identifier: "extra" }],
+        });
+        expect(next).toBe(`export default function ({ input = [1, 2], extra, ...rest }) {}`);
+      });
+    });
+  });
+
+  describe("given an execute export", () => {
+    /**
+     * @scenario "A named execute export is rewritten"
+     */
+    it("rewrites its destructured parameter", () => {
+      const next = rewriteJavaScriptSignature({
+        code: `export async function execute({ a }) {}`,
+        inputs: [{ identifier: "a" }, { identifier: "b" }],
+      });
+      expect(next).toBe(`export async function execute({ a, b }) {}`);
+    });
+  });
+
+  describe("given an entrypoint that takes the inputs object whole", () => {
+    /**
+     * @scenario "An entrypoint taking the inputs object whole is left alone"
+     */
+    it("leaves the code unchanged", () => {
+      const code = `export default function (inputs) {\n  return { output: inputs.input };\n}`;
+      expect(rewriteJavaScriptSignature({ code, inputs: [{ identifier: "context" }] })).toBe(code);
     });
   });
 });
