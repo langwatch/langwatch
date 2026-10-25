@@ -228,9 +228,9 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
 
   @unit @operators-page
   Scenario: A notice that cannot be sent leaves the change standing
-    Given the mail cannot be sent
-    When an operator grants the role
-    Then the grant stands
+    Given the notice cannot be prepared or sent
+    When an operator grants or revokes the role
+    Then the grant or the revoke stands
 
   @unit @operators-page
   Scenario: The page refuses an account whose address was never verified

@@ -574,6 +574,20 @@ describe("PlatformOperatorsService", () => {
       expect(authz.revokePlatformOperator).toHaveBeenCalledTimes(1);
     });
 
+    it("tells nobody, and says so, when the revoked holder is no longer active", async () => {
+      const { service, told, authz } = world({
+        holders: [holder("ana")],
+        users: [user("ana")],
+      });
+      warn.mockClear();
+
+      await service.revoke({ grantId: "grant_gone", operator });
+
+      expect(authz.revokePlatformOperator).toHaveBeenCalledTimes(1);
+      expect(told).toEqual([]);
+      expect(warn).toHaveBeenCalledWith({ grantId: "grant_gone" }, expect.any(String));
+    });
+
     /** @scenario "An impersonated session cannot change who operates" */
     it("refuses grant and revoke from an impersonated session", async () => {
       const { service, granted, authz } = world({ users: [user("ana"), user("bo")] });

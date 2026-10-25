@@ -157,14 +157,14 @@ export class PlatformOperatorsService {
           return null;
         })
       : null;
-    if (subject) {
-      await this.#tellOperators({
-        change: "revoked",
-        grantId,
-        subject,
-        actorName: nameOf(revoker),
-      });
+    if (!subject) {
+      logger.warn(
+        { grantId },
+        "the platform operators were not told of a revoke of an inactive holder",
+      );
+      return;
     }
+    await this.#tellOperators({ change: "revoked", grantId, subject, actorName: nameOf(revoker) });
   }
 
   /** The recovery task: lockout on self-hosted, staff at the cloud cutover. */
