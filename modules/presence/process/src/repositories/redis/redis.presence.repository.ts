@@ -1,28 +1,50 @@
 import { presenceSessionSchema, type PresenceSession } from "@langwatch/presence-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type Redis from "ioredis";
-import type { Cluster } from "ioredis";
+import { nowInstant } from "@langwatch/time";
 
 import { PresenceRepository } from "../presence.repository.ts";
 
 const KEY_PREFIX = "presence:v1";
 
+/**
+ * Sessions live at `presence:v1:<projectId>:<sessionId>`; each project also keeps
+ * a sorted set of its session ids scored by expiry, so listing a project reads
+ * that set instead of scanning the whole keyspace.
+ */
 export class RedisPresenceRepository extends PresenceRepository {
-  private constructor(private readonly redis: RedisConnection) {
+  private constructor(
+    private readonly redis: RedisConnection,
+    private readonly now: () => number,
+  ) {
     super();
   }
 
-  static create(redis: RedisConnection): RedisPresenceRepository {
-    return new RedisPresenceRepository(redis);
+  static create(
+    redis: RedisConnection,
+    options: { now?: () => number } = {},
+  ): RedisPresenceRepository {
+    return new RedisPresenceRepository(
+      redis,
+      options.now ?? (() => nowInstant().epochMilliseconds),
+    );
   }
 
   async upsert(session: PresenceSession, ttlSeconds: number): Promise<void> {
-    await this.redis.set(
-      this.sessionKey(session.projectId, session.sessionId),
-      JSON.stringify(session),
-      "EX",
-      ttlSeconds,
-    );
+    const indexKey = this.indexKey(session.projectId);
+    // One transaction, so the index never gains an entry without its expiry.
+    await this.redis
+      .multi()
+      .set(
+        this.sessionKey(session.projectId, session.sessionId),
+        JSON.stringify(session),
+        "EX",
+        ttlSeconds,
+      )
+      .zadd(indexKey, this.now() + ttlSeconds * 1_000, session.sessionId)
+      // Every session shares the service TTL, so the latest heartbeat always
+      // carries the furthest deadline and the index dies with its last session.
+      .expire(indexKey, ttlSeconds)
+      .exec();
   }
 
   async remove({
@@ -32,7 +54,11 @@ export class RedisPresenceRepository extends PresenceRepository {
     projectId: string;
     sessionId: string;
   }): Promise<boolean> {
-    return (await this.redis.del(this.sessionKey(projectId, sessionId))) > 0;
+    const [deleted] = await Promise.all([
+      this.redis.del(this.sessionKey(projectId, sessionId)),
+      this.redis.zrem(this.indexKey(projectId), sessionId),
+    ]);
+    return deleted > 0;
   }
 
   async findSession({
@@ -47,9 +73,16 @@ export class RedisPresenceRepository extends PresenceRepository {
   }
 
   async findByProject(projectId: string): Promise<PresenceSession[]> {
-    const keys = await this.scanProjectKeys(projectId);
-    if (keys.length === 0) return [];
-    const values = await this.redis.mget(...keys);
+    const indexKey = this.indexKey(projectId);
+    const now = this.now();
+    const [, sessionIds] = await Promise.all([
+      this.redis.zremrangebyscore(indexKey, "-inf", now),
+      this.redis.zrangebyscore(indexKey, `(${now}`, "+inf"),
+    ]);
+    if (sessionIds.length === 0) return [];
+    const values = await this.redis.mget(
+      ...sessionIds.map((sessionId) => this.sessionKey(projectId, sessionId)),
+    );
     return values.flatMap((raw) => {
       const session = raw ? this.parse(raw) : undefined;
       return session ? [session] : [];
@@ -65,36 +98,12 @@ export class RedisPresenceRepository extends PresenceRepository {
     }
   }
 
-  private async scanProjectKeys(projectId: string): Promise<string[]> {
-    const pattern = `${KEY_PREFIX}:${projectId}:*`;
-    if (this.isCluster(this.redis)) {
-      const seen = new Set<string>();
-      await Promise.all(
-        this.redis.nodes("master").map(async (node) => {
-          for (const key of await scanNode(node, pattern)) seen.add(key);
-        }),
-      );
-      return [...seen];
-    }
-    return scanNode(this.redis, pattern);
-  }
-
-  private isCluster(client: RedisConnection): client is Cluster {
-    return typeof (client as Cluster).nodes === "function";
-  }
-
   private sessionKey(projectId: string, sessionId: string): string {
     return `${KEY_PREFIX}:${projectId}:${sessionId}`;
   }
-}
 
-async function scanNode(node: { scan: Redis["scan"] }, pattern: string): Promise<string[]> {
-  const keys: string[] = [];
-  let cursor = "0";
-  do {
-    const [nextCursor, batch] = await node.scan(cursor, "MATCH", pattern, "COUNT", 256);
-    cursor = nextCursor;
-    keys.push(...batch);
-  } while (cursor !== "0");
-  return keys;
+  /** Outside the `<projectId>:*` namespace so it never collides with a session key. */
+  private indexKey(projectId: string): string {
+    return `${KEY_PREFIX}:index:${projectId}`;
+  }
 }
