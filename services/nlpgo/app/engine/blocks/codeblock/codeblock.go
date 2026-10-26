@@ -226,6 +226,7 @@ func New(opts Options) (*Executor, error) {
 	}
 	scratchRoot, err := newScratchRoot()
 	if err != nil {
+		channel.close()
 		return nil, err
 	}
 	return &Executor{

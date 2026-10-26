@@ -391,6 +391,9 @@ def execute():
     name = os.environ.get("NLPGO_CODE_BLOCK_CHANNEL", "")
     child = subprocess.run([sys.executable, "-c", _ASK, name],
                            capture_output=True, text=True, timeout=30)
+    if child.returncode != 0:
+        raise RuntimeError("the probe did not finish: rc=%d stderr=%s"
+                           % (child.returncode, child.stderr))
     return {
         "channel": name,
         "from_interpreter": _ask(name) if name else "<no channel>",
@@ -428,6 +431,33 @@ func TestCodeBlock_ThePayloadChannelAnswersNobodyElse(t *testing.T) {
 		assert.True(t, answer == "" || strings.HasPrefix(answer, "refused:"),
 			"%s was answered with %q instead of nothing", asker, answer)
 	}
+}
+
+func TestCodeBlock_ABootThatFailsAfterwardsLeavesNoChannelBehind(t *testing.T) {
+	requireUnprivileged(t)
+
+	// The channel is bound before the scratch root is created, so a boot that
+	// fails on an unwritable TMPDIR has one open. Nothing would ever answer on
+	// it, and nothing would close it either, so New gives it up on the way out.
+	locked := t.TempDir()
+	require.NoError(t, os.Chmod(locked, 0o400))
+	t.Setenv("TMPDIR", locked)
+
+	before := boundChannels(t)
+	_, err := codeblock.New(codeblock.Options{})
+	require.Error(t, err, "an unwritable TMPDIR has to fail the boot")
+	assert.Equal(t, before, boundChannels(t),
+		"the boot left a payload channel bound that nothing can answer on")
+}
+
+// boundChannels counts the payload channel sockets this process holds. They
+// are in the abstract namespace, where the kernel lists them by name with a
+// leading @.
+func boundChannels(t *testing.T) int {
+	t.Helper()
+	listed, err := os.ReadFile("/proc/net/unix")
+	require.NoError(t, err)
+	return strings.Count(string(listed), "@nlpgo-codeblock-")
 }
 
 // waitForSpooledPid reads the pid out of the spool file once the execution

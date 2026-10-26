@@ -73,6 +73,16 @@ func (c *payloadChannel) channelEnv() []string {
 // reason that passes, descriptors running out being the likely one, and giving
 // up on it would leave every later execution waiting for a payload that never
 // arrives, so only a closed listener ends this.
+// close gives up the socket, which also ends the accept loop. Only a boot
+// that fails after the channel is bound needs it: an executor that was built
+// answers for as long as the process does.
+func (c *payloadChannel) close() {
+	if c == nil {
+		return
+	}
+	_ = c.listener.Close()
+}
+
 func (c *payloadChannel) serve() {
 	for {
 		conn, err := c.listener.AcceptUnix()

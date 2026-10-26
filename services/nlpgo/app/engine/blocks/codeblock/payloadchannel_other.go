@@ -10,3 +10,5 @@ type payloadChannel struct{}
 func newPayloadChannel() (*payloadChannel, error) { return nil, nil }
 
 func (c *payloadChannel) channelEnv() []string { return nil }
+
+func (c *payloadChannel) close() {}
