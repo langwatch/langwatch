@@ -86,6 +86,14 @@ Feature: Endpoint capabilities - rate limiting, response caching, deprecation
     Then the answer carries no deprecation header
     And the published document does not mark the operation deprecated
     And a module that provides no value for that context is refused at mount
+    And a context read from the body or a header is refused at mount, naming why
+
+  @integration
+  Scenario: A family whose door reads the body first asks its deprecation the same way
+    Given a family deprecated when a declared context answers true, behind a door that verifies the raw body
+    When a caller whose body the door accepts calls it
+    Then the answer carries the deprecation headers
+    And the handler is given the exact bytes sent
 
   @integration
   Scenario: A deprecation that cannot be decided fails open

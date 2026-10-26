@@ -592,12 +592,18 @@ describe("when a marked route declares a context that refuses", () => {
     .build()
     .router();
 
-  async function callGated({ released }: { released: boolean }) {
+  async function callGated({
+    released,
+    gate = gateFor([]),
+  }: {
+    released: boolean;
+    gate?: RestConfirmationGate;
+  }) {
     const response = await createRestRuntime({
       authorization: authorizationPort,
       identity: door,
       audit: { record: async () => {} },
-      confirmations: gateFor([]),
+      confirmations: gate,
       servedDoors: true,
     })
       .mount(gatedRouter, {
@@ -630,6 +636,49 @@ describe("when a marked route declares a context that refuses", () => {
 
     expect(answer).toMatchObject({ status: 409, body: { code: "langy_confirmation_required" } });
     expect(asked).toHaveLength(1);
+  });
+
+  /** A store of granted clicks: confirming spends one, a refund puts it back. */
+  function clickStore(granted: readonly string[]) {
+    const held = new Set(granted);
+    const gate: RestConfirmationGate = {
+      confirm: async ({ targets, resource, action }) => {
+        if (!targets.every((target) => held.has(target.id))) {
+          throw new ConfirmationRequiredError({ message: "Click first.", resource, action });
+        }
+        for (const target of targets) held.delete(target.id);
+        return {
+          refund: async () => {
+            refunded += 1;
+            for (const target of targets) held.add(target.id);
+          },
+        };
+      },
+    };
+    return { gate, held };
+  }
+
+  /** @scenario "A retry after the click keeps the click when the route refuses before it runs" */
+  it("keeps a granted click when the context refuses the retry", async () => {
+    const store = clickStore(["ev-1"]);
+
+    const answer = await callGated({ released: false, gate: store.gate });
+
+    expect(answer).toMatchObject({ status: 404, body: { code: "records_not_released" } });
+    expect({ held: [...store.held], refunded, ran }).toEqual({
+      held: ["ev-1"],
+      refunded: 0,
+      ran: [],
+    });
+  });
+
+  it("spends the click once the context resolves", async () => {
+    const store = clickStore(["ev-1"]);
+
+    const answer = await callGated({ released: true, gate: store.gate });
+
+    expect(answer.status).toBe(200);
+    expect({ held: [...store.held], ran }).toEqual({ held: [], ran: ["remove"] });
   });
 });
 

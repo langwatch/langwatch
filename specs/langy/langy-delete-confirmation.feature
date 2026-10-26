@@ -89,6 +89,14 @@ Feature: Removing something with Langy needs a confirmation click
     Then the route's own refusal is the answer
     And no card is shown and no item name is read
 
+  @integration
+  Scenario: A retry after the click keeps the click when the route refuses before it runs
+    Given Langy's key already holds a click for the item
+    And the delete route is not there for the key's project, as a feature switched off
+    When Langy retries the delete
+    Then the route's own refusal is the answer
+    And the click is still held, neither spent nor given back
+
   @unit
   Scenario: The card reads the item through the path the delete acts on
     Given an item reached through a parent named in the path

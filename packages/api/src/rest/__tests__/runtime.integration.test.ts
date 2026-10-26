@@ -744,6 +744,17 @@ describe("a family deprecated only for some callers", () => {
         link: response.headers.get("Link"),
       })),
     ).toEqual(failures.map(() => ({ status: 200, deprecation: null, link: null })));
+    expect(logsFor("langwatch:api:deprecation")).toEqual(
+      failures.map(() =>
+        expect.objectContaining({
+          level: "warn",
+          fields: expect.objectContaining({
+            operation: "getSometimesLegacyReport",
+            context: "supersededFor",
+          }),
+        }),
+      ),
+    );
   });
 
   /** @scenario "A family deprecated only for some callers asks per request" */
@@ -760,6 +771,103 @@ describe("a family deprecated only for some callers", () => {
   /** @scenario "A family deprecated only for some callers asks per request" */
   it("is refused at mount when its module provides no value for the context", () => {
     expect(() => sometimesLegacyApp({})).toThrow(/deprecated when "supersededFor"/);
+  });
+
+  /** @scenario "A family deprecated only for some callers asks per request" */
+  it.each([
+    ["input", defineMiddlewareContext("supersededForBody", z.boolean(), { source: "input" })],
+    ["headers", { name: "supersededForHeader", schema: z.boolean(), source: "headers" } as const],
+  ])("is refused at mount when its context reads the request's %s", (source, when) => {
+    const family = defineRestRouter(ReportApi)
+      .withNamespace("input-legacy")
+      .withVersion(VERSION)
+      .withDeprecated({ successor: "/api/v1/reports", when })
+      .get("/:id", "getInputLegacyReport")
+      .withParams(z.object({ id: z.string() }))
+      .withPermission("annotations:view")
+      .withOutput(z.object({ id: z.string() }))
+      .handle(async ({ app, input }) => app.read({ id: input.id }))
+      .build();
+
+    const runtime = createRestRuntime({
+      authorization: authorizationPort,
+      identity: { authenticate: () => ({ actor: null, scope: { tier: "project", id: "p-1" } }) },
+    });
+
+    expect(() =>
+      runtime.mount(family.router(), {
+        app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
+        credential: "project",
+        middlewareContext: [bindMiddlewareContext(when, () => true)],
+        onError: createErrorHandler(),
+      }),
+    ).toThrow(`"${when.name}" says so, which reads the request's ${source}`);
+  });
+});
+
+const SIGNATURE = "the-signature";
+
+const signedSometimesLegacy = defineRestRouter(ReportApi)
+  .withNamespace("signed-legacy")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .withDeprecated({ successor: "/api/v1/reports", when: supersededFor })
+  .post("/:id", "recordSignedLegacyReport")
+  .keepsRecords()
+  .withParams(z.object({ id: z.string() }))
+  .withRawBody("text", { mediaType: "application/json" })
+  .withAccess(anyAuthenticated({ reason: "the body's signature is the whole gate" }))
+  .withOutput(z.object({ id: z.string(), raw: z.string() }))
+  .withoutAudit("test route")
+  .handle(async ({ input, raw }) => ({ id: input.id, raw }))
+  .build();
+
+/** A signed door: it admits a request only once it has read the body it verifies. */
+function signedSometimesLegacyApp(): Hono {
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "p-1" } }),
+      identify: ({ request, rawBody }: { request: Request; rawBody?: unknown }) => {
+        if (typeof rawBody !== "string" || request.headers.get("X-Signature") !== SIGNATURE) {
+          throw new ProjectInvalidCredentialsError();
+        }
+
+        return { actor: null, scope: { tier: "project", id: "p-1" } };
+      },
+    },
+  });
+
+  return runtime.mount(signedSometimesLegacy.router(), {
+    app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
+    credential: "project",
+    middlewareContext: [bindMiddlewareContext(supersededFor, () => true)],
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a family deprecated per request behind a door that reads the body first", () => {
+  /** @scenario "A family whose door reads the body first asks its deprecation the same way" */
+  it("carries the headers and hands the handler the exact bytes", async () => {
+    const exact = '{ "a" :  1 }';
+
+    const response = await signedSometimesLegacyApp().request("/api/v1/signed-legacy/report-1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Signature": SIGNATURE },
+      body: exact,
+    });
+
+    expect({
+      status: response.status,
+      deprecation: response.headers.get("Deprecation"),
+      link: response.headers.get("Link"),
+      body: await response.json(),
+    }).toEqual({
+      status: 200,
+      deprecation: "true",
+      link: '</api/v1/reports>; rel="successor-version"',
+      body: { id: "report-1", raw: exact },
+    });
   });
 });
 

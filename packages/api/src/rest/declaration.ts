@@ -198,8 +198,9 @@ export type RestDeprecation = Readonly<{
   readonly successor: string;
   readonly notice?: string;
   /**
-   * Deprecated only for a request this context answers true for, read after the door; such a
-   * family is not published as deprecated. Declared on a whole family only.
+   * Deprecated only for a request this context answers true for, read after the door from the
+   * credential alone; such a family is not published as deprecated. Whole family only. A context
+   * that throws, even a refusal on purpose, cannot decide: a warning is logged, no headers sent.
    */
   readonly when?: MiddlewareContext<string, z.ZodBoolean>;
 }>;

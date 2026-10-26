@@ -801,6 +801,15 @@ function contextBindings<Api>({
 
   const when = declaration.deprecated?.when;
 
+  // Asked right after the door, before any input is parsed; a header context has no binding.
+  if (when?.source) {
+    throw new Error(
+      `REST family "${declaration.namespace}" is deprecated when "${when.name}" says so, which ` +
+        `reads the request's ${when.source}; a deprecation is asked before either is read, so ` +
+        "its context must read the credential alone",
+    );
+  }
+
   if (when && !bound.has(when.name)) {
     throw new Error(
       `REST family "${declaration.namespace}" is deprecated when "${when.name}" says so, ` +
@@ -2578,9 +2587,9 @@ function requireAuthorize(door: RestIdentity): NonNullable<RestIdentity["authori
 }
 
 /**
- * The declared middleware context, in declaration order, each parsed by the schema that
- * declared it. Resolved after the access decision, so a refused request never
- * asks the process for anything.
+ * The declared middleware context, in declaration order, each parsed by its schema. Resolved
+ * after the access decision, so a refused request asks the process for nothing; the exception is
+ * a family's deprecation `when`, asked after the door, before the permission (ADR 003 §4).
  */
 async function resolveContexts({
   route,
