@@ -15,7 +15,7 @@ Feature: Per-credential read and export rate limits
   #   ingestion_key      an ingestion template key, by key id
   #   langy_session_key  a Langy session key, by key id
   #   session            a signed-in browser session, by person and organization
-  #   impersonation      a platform operator acting as somebody, by the operator and organization
+  #   impersonation      a platform operator acting as somebody, by the operator across organizations
   #
   # A person can belong to several organizations, and each organization's allowance
   # is its own, so a person's budget is counted per organization the call names.

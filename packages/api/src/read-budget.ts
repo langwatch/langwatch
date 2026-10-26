@@ -285,12 +285,11 @@ function rowWindows(credential: ReadCredential, limits: ReadBudgetLimits): reado
   ];
 }
 
-/** Credentials keyed by a person, who can belong to several organizations. */
-const PERSON_CREDENTIALS: ReadonlySet<ReadCredentialType> = new Set([
-  "session",
-  "access_token",
-  "impersonation",
-]);
+/**
+ * Credentials keyed by a person, who can belong to several organizations. Not
+ * impersonation: its bounds are per platform operator, one window across tenants.
+ */
+const PERSON_CREDENTIALS: ReadonlySet<ReadCredentialType> = new Set(["session", "access_token"]);
 
 /**
  * A person's window is per organization, as its allowance is: one person in two

@@ -50,7 +50,7 @@ listOrganizationSpend(input: ListOrganizationSpendInput): Promise<ProjectSpendRo
 
 #### `requestBound`
 
-The numeric ceiling one request dimension answers under the organization's active plan (enterprise for ENTERPRISE/OPEN_SOURCE, free for FREE/LAUNCH, paid otherwise). `LANGWATCH_REQUEST_BOUNDS` overrides win over tier values.
+The ceiling one request dimension answers under the organization's active plan (enterprise for ENTERPRISE/OPEN_SOURCE, free for FREE/LAUNCH, paid otherwise). Precedence: this organization's `LANGWATCH_REQUEST_BOUNDS_BY_ORGANIZATION`, `LANGWATCH_REQUEST_BOUNDS`, tier.
 
 ```typescript
 requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number>;

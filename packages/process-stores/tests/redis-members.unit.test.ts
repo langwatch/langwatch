@@ -14,16 +14,14 @@ function memoryRedis() {
 
   const redis = {
     eval: async (
-      script: string,
+      _script: string,
       _keys: number,
       key: string,
       seconds: number,
       cost: number | string,
     ) => {
       commands.push("eval");
-      // Spends the cost only when the script increments by its second argument.
-      const step = script.includes("'INCRBY', KEYS[1], ARGV[2]") ? Number(cost) : 1;
-      const used = (counters.get(key) ?? 0) + step;
+      const used = (counters.get(key) ?? 0) + Number(cost);
       counters.set(key, used);
       if (!expiries.has(key)) expiries.set(key, seconds);
 

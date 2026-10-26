@@ -266,7 +266,7 @@ describe("ReadBudget", () => {
 
       await budget.admit(readBy(OPERATOR));
 
-      expect(counter.used.get("read-budget:impersonation:operator-1:org-1:reads-minute")).toBe(1);
+      expect(counter.used.get("read-budget:impersonation:operator-1:reads-minute")).toBe(1);
       expect(counter.used.has("read-budget:session:user-1:org-1:reads-minute")).toBe(false);
       expect(lines.find((line) => line.fields.event === "impersonated_read")?.fields).toMatchObject(
         { impersonatorId: "operator-1", subjectUserId: "user-1", route: "traces.searchTraces" },
@@ -279,7 +279,7 @@ describe("ReadBudget", () => {
 
       await budget.record({ ...readBy(OPERATOR), rows: LIMITS.impersonationRowsPerDay + 1 });
 
-      expect(counter.used.has("read-budget:impersonation:operator-1:org-1:rows-hour")).toBe(false);
+      expect(counter.used.has("read-budget:impersonation:operator-1:rows-hour")).toBe(false);
       expect(exceeded().map((line) => line.fields)).toEqual([
         expect.objectContaining({
           dimension: "rows_per_day",
