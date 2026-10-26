@@ -1,10 +1,10 @@
-import { setTimeout as sleep } from "node:timers/promises";
-
 /**
  * A ClickHouse endpoint on the *shipped* migrations, not a hand DDL transcription, so tests read
  * the schema production actually deploys. One endpoint name is shared across every suite here --
  * migrations are slow and tenant ids keep rows apart -- and the run is memoised per URL/process.
  */
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { type ClickHouseClient, ClickHouseError, createClient } from "@clickhouse/client";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import {
@@ -284,7 +284,7 @@ const QUIET_POLL_MS = 1_000;
 
 /**
  * Waits until the endpoint's database runs no merge or mutation and `tables` hold no outdated
- * part, then releases caches. The server limit counts whole-process RSS, so a seed or a capped
+ * part. The server limit counts whole-process RSS, so a seed or a capped
  * query must not share it with background work or unloaded-but-still-held parts.
  */
 export async function waitForQuietMigratedServer({
@@ -318,9 +318,8 @@ export async function waitForQuietMigratedServer({
       })
     ).json<{ busy: string }>();
     quietPolls = Number(row?.busy) === 0 ? quietPolls + 1 : 0;
-    await sleep(QUIET_POLL_MS);
+    if (quietPolls < QUIET_POLLS) await sleep(QUIET_POLL_MS);
   }
-  await releaseMigratedCaches(client);
 }
 
 /** A server built without JIT or jemalloc has no such cache to release, which is not a failure. */

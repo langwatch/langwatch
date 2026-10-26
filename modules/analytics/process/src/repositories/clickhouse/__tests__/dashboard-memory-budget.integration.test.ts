@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   deleteMigratedTenantRows,
+  releaseMigratedCaches,
   startMigratedClickHouse,
   waitForQuietMigratedServer,
 } from "../../../__tests__/migrated-clickhouse.harness.ts";
@@ -212,6 +213,7 @@ describe("dashboard panels under a memory cap", () => {
     }
     // A reused server may still be deleting an earlier run's rows.
     await waitForQuietMigratedServer({ client: ch, tables: SEED_WRITTEN_TABLES });
+    await releaseMigratedCaches(ch);
 
     // Trace t occurs t * 60d / N before `end`, so the traces fill both
     // windows evenly. Even traces get a second, newer version.
@@ -281,6 +283,7 @@ describe("dashboard panels under a memory cap", () => {
     });
     // The panels read merged parts on a server running nothing else.
     await waitForQuietMigratedServer({ client: ch, tables: SEED_WRITTEN_TABLES });
+    await releaseMigratedCaches(ch);
 
     // Ground truth straight from the seed, without any dedup machinery: the
     // second version of a trace keeps its OccurredAt. Each figure is a grouped
@@ -332,6 +335,7 @@ describe("dashboard panels under a memory cap", () => {
       await deleteMigratedTenantRows({ client: ch, tenantId: TENANT_ID, tables: SEEDED_TABLES });
       // The deletes finish, and their rewritten parts unload, before the next suite starts.
       await waitForQuietMigratedServer({ client: ch, tables: SEED_WRITTEN_TABLES });
+      await releaseMigratedCaches(ch);
     } finally {
       // Reset even when the cleanup fails, so no later suite inherits the seed's table settings.
       for (const table of SEEDED_TABLES) {
