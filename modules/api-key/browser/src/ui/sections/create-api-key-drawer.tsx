@@ -27,6 +27,7 @@ import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import {
   earliestCustomExpiration,
+  EXPIRATION_NEVER,
   EXPIRATION_OPTIONS,
   EXPIRATION_UNCHOSEN,
   type CreateApiKeyInput,
@@ -374,6 +375,7 @@ export function CreateApiKeyDrawer({
   organizationName,
   currentTeamId,
   currentProjectId,
+  prefill,
   onClose,
   onCreate,
 }: {
@@ -386,6 +388,8 @@ export function CreateApiKeyDrawer({
   organizationName: string | undefined;
   currentTeamId?: string;
   currentProjectId?: string;
+  /** The key the form opens filled with, such as a legacy key's replacement; no expiry. */
+  prefill?: CreateApiKeyInput;
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
 }) {
@@ -458,16 +462,15 @@ export function CreateApiKeyDrawer({
 
   const resetForm = () => {
     setAttempted(false);
-    setName("");
-    setDescription("");
-    setExpirationPreset(EXPIRATION_UNCHOSEN);
+    setName(prefill?.name ?? "");
+    setDescription(prefill?.description ?? "");
+    setExpirationPreset(prefill ? EXPIRATION_NEVER : EXPIRATION_UNCHOSEN);
     setCustomDate("");
-    setSelectedScopes(
-      currentProjectId ? [{ scopeType: "PROJECT", scopeId: currentProjectId }] : [],
-    );
+    const scopeId = prefill?.scopeId ?? currentProjectId;
+    setSelectedScopes(scopeId ? [{ scopeType: "PROJECT", scopeId }] : []);
     setPermissionMode("all");
     setCategorySelections({});
-    setKeyType("personal");
+    setKeyType(prefill?.keyType ?? "personal");
     setSelectedUserId(currentUserId);
   };
 

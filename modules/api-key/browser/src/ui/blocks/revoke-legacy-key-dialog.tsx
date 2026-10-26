@@ -9,7 +9,7 @@ const ACCESS_PROBLEM = {
 
 /**
  * Revoking the legacy project key swaps it for an API key on the same project,
- * so the reader is told up front that a new key is coming and the old one dies.
+ * so the reader is told up front that the old one dies and they create the new key.
  */
 export function RevokeLegacyKeyDialog({
   open,
@@ -45,9 +45,9 @@ export function RevokeLegacyKeyDialog({
       }}
     >
       <Text>
-        The legacy key stops working within seconds. We create a new API key for{" "}
-        {projectName ?? "this project"} and show it to you once. Put it wherever the legacy key was
-        used.
+        The legacy key stops working within seconds. Next you create a new API key for{" "}
+        {projectName ?? "this project"}, which we show to you once. Put it wherever the legacy key
+        was used.
       </Text>
     </Dialog>
   );

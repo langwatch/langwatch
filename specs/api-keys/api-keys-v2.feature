@@ -142,7 +142,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     Scenario: Revoking the legacy key says an API key takes its place
       Given "ada" chose Revoke on the legacy key row of project "alpha"
       Then a dialog "Revoke the legacy project key?" says the key stops working within seconds
-      And it says a new API key for project "alpha" is created and shown once
+      And it says they next create a new API key for project "alpha", shown once
 
     @integration
     Scenario: Revoke waits until the reader's roles are known
@@ -157,41 +157,48 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the dialog's Revoke is unavailable and says their access could not be checked
 
     @integration
-    Scenario: Revoking the legacy key swaps it for an API key
+    Scenario: Confirming the legacy key revoke revokes it and opens the create drawer filled in
       Given "ada" chose Revoke on the legacy key row of project "alpha"
       When they confirm
-      Then an API key "Project API Key" is created with full access to project "alpha" and no expiry
-      And its token is shown once
-      And the legacy key of project "alpha" is revoked
+      Then the legacy key of project "alpha" is revoked
       And a toast says "Legacy project key revoked"
       And the legacy key row and the banner are gone
+      And the create drawer opens with the name "Project API Key", full access to project "alpha" and no expiry
+      And no API key is created yet
 
     @integration
-    Scenario: A failed create leaves the legacy key working
+    Scenario: Revoking the legacy key swaps it for an API key
       Given "ada" confirmed Revoke on the legacy key row of project "alpha"
-      When the new API key cannot be created
-      Then the legacy key of project "alpha" is not revoked
-      And an error says the key could not be created
+      When they create the key from the drawer
+      Then a service API key "Project API Key" is created with full access to project "alpha" and no expiry
+      And its token is shown once
 
     @integration
-    Scenario: A failed revoke after the swap still shows the new key
+    Scenario: A failed revoke keeps the legacy key and opens no drawer
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      When they confirm and the revoke fails
+      Then an error says the legacy key could not be revoked
+      And the legacy key row stays and no drawer opens
+
+    @integration
+    Scenario: A failed create after the revoke keeps the drawer open
       Given "ada" confirmed Revoke on the legacy key row of project "alpha"
-      When the new API key is created but the revoke fails
-      Then the new token is still shown once
-      And an error says the legacy key still works and can be revoked again from its row
+      When the new API key cannot be created from the drawer
+      Then an error says the key could not be created
+      And the drawer stays open so they can try again
 
     @integration
     Scenario: A project admin's swap gets a personal key with their role
       Given "pat" administers the team that owns project "alpha" but not the organization
-      When "pat" confirms Revoke on the legacy key row of project "alpha"
-      Then a personal API key with the Admin role on project "alpha" is created
-      And the legacy key of project "alpha" is revoked
+      When "pat" confirms Revoke on the legacy key row of project "alpha" and creates the key from the drawer
+      Then the legacy key of project "alpha" is revoked
+      And a personal API key with the Admin role on project "alpha" is created
 
     @integration
     Scenario: A swap whose new key could not send traces keeps the legacy key
       Given a reader who can manage project "alpha" holds no role on it that sends traces
       When they confirm Revoke on the legacy key row of project "alpha"
-      Then no API key is created
+      Then the create drawer does not open and no API key is created
       And the legacy key of project "alpha" is not revoked
       And an error says their role cannot create a key that sends traces
 
