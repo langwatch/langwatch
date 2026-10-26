@@ -69,8 +69,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   // that return this same project-scoped list gate on experiments:view.
   .get("/", "getApiExperiments")
   .withQuery(listExperimentsQuerySchema)
-  .withPermission("experiments:view")
-  .withLegacyKeyScope("legacy_project_key_experiments")
+  .withPermission("experiments:view", { legacyKey: "legacy_project_key_experiments" })
   .withOutput(experimentsListResponseSchema)
   .withDocs({
     tags: EXPERIMENT_TAGS,
@@ -112,8 +111,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   // carries both and a caller reaching for `id` is not making a mistake.
   .get("/:slug", "getApiExperimentsBySlug")
   .withParams(slugParamsSchema)
-  .withPermission("experiments:view")
-  .withLegacyKeyScope("legacy_project_key_experiments")
+  .withPermission("experiments:view", { legacyKey: "legacy_project_key_experiments" })
   .withOutput(experimentSummarySchema)
   .withDocs({
     tags: EXPERIMENT_TAGS,
@@ -140,8 +138,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   .post("/", "postApiExperiments")
   .keepsRecords()
   .withInput(createExperimentBodySchema)
-  .withPermission("experiments:create")
-  .withLegacyKeyScope("legacy_project_key_experiments")
+  .withPermission("experiments:create", { legacyKey: "legacy_project_key_experiments" })
   .withAudit("experiments.saveExperiment")
   .withOutput(createExperimentResponseSchema)
   .withDocs({

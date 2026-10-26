@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { authorizationPort } from "../../__tests__/api-double.ts";
-import { anyAuthenticated } from "../../access/access.ts";
+import { permissionBy } from "../../access/input-permission.ts";
 import {
   KeyKindRefusedError,
   OrganizationInvalidCredentialsError,
@@ -568,14 +568,14 @@ describe("a route that names legacy key scopes", () => {
       return { actor: null, scope: { tier: "project", id: "project-1" } };
     },
     identify: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
+    authorize: () => ({ permitted: true, organizationRole: null }),
     legacyKeyScopes: ["scope_a", "scope_b"],
   };
 
   /** @scenario "A route tells the project door the legacy key scopes it names" */
   it("tells the door the scopes it names and refuses misplaced or unknown ones at mount", async () => {
     const router = base()
-      .withPermission("scenarios:manage")
-      .withLegacyKeyScope("scope_a", "scope_b")
+      .withPermission("scenarios:manage", { legacyKey: ["scope_a", "scope_b"] })
       .withOutput(z.object({ ran: z.boolean() }))
       .withoutAudit("test route")
       .handle(() => ({ ran: true }))
@@ -592,8 +592,7 @@ describe("a route that names legacy key scopes", () => {
     expect(told.at(-1)).toEqual(["scope_a", "scope_b"]);
 
     const unknown = base()
-      .withPermission("scenarios:manage")
-      .withLegacyKeyScope("scope_c")
+      .withPermission("scenarios:manage", { legacyKey: "scope_c" })
       .withOutput(z.object({ ran: z.boolean() }))
       .withoutAudit("test route")
       .handle(() => ({ ran: true }))
@@ -601,15 +600,39 @@ describe("a route that names legacy key scopes", () => {
       .router();
     expect(() => mount(unknown, door)).toThrow(/unknown legacy key scopes: scope_c/);
 
-    const identifiedOnly = base()
-      .withAccess(anyAuthenticated({ reason: "a test route that only identifies the caller" }))
-      .withLegacyKeyScope("scope_a")
+    const otherDoor = base()
+      .withCredential("organization")
+      .withPermission("scenarios:manage", { legacyKey: "scope_a" })
       .withOutput(z.object({ ran: z.boolean() }))
       .withoutAudit("test route")
       .handle(() => ({ ran: true }))
       .build()
       .router();
-    expect(() => mount(identifiedOnly, door)).toThrow(/names a legacy key scope/);
+    expect(() =>
+      createRestRuntime({
+        authorization: authorizationPort,
+        identity: door,
+        doors: { project: door, organization: door },
+      }).mount(otherDoor, { app: () => doorsApp, onError: createErrorHandler() }),
+    ).toThrow(/names a legacy key scope/);
+  });
+
+  /** @scenario "A route tells the project door the legacy key scopes it names" */
+  it("leaves a route whose input chooses its permission nowhere to name a flag", () => {
+    const chosen = base()
+      .withInput(z.object({ kind: z.enum(["a"]) }))
+      .withPermission(
+        permissionBy({ field: "kind", map: { a: "scenarios:manage" } }),
+        // @ts-expect-error the input chooses the permission after the body, too late for a scope
+        { legacyKey: "scope_a" },
+      )
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+
+    expect(() => mount(chosen, door)).toThrow(/names a legacy key scope/);
   });
 });
 

@@ -3,10 +3,9 @@ Feature: Legacy project keys are ingestion-only, enforced per project
   not an API key. It can send traces, logs, metrics and tracked events, which ask
   `traces:create`. Beyond that it passes the routes that name a scope flag listing
   its project, one flag per usage (`LEGACY_PROJECT_KEY_SCOPE_FLAGS` in the api-key
-  contract; a route names its flags with `withLegacyKeyScope`): prompts read, prompts
-  write, traces read, annotations read, scenarios, evaluations, experiments and connected
-  agents. A flag
-  opens routes, not permissions: a route that asks the same permission without naming
+  contract; a route names its flags as the `legacyKey` of its `withPermission`):
+  prompts read, prompts write, traces read, annotations read, scenarios, evaluations,
+  experiments and connected agents. A flag opens routes, not permissions: a route that asks the same permission without naming
   the flag is outside the key's scopes. A project on the `legacy_project_key_full_access`
   flag keeps full access and writes no legacy key log line.
 

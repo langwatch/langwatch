@@ -145,7 +145,7 @@ export class ApiRestCredentialsService {
     permissions: readonly AuthzPermission[];
     /** The key kinds the route admits (E7): refused once the key resolves, before permission. */
     keyKinds?: readonly RestKeyKind[];
-    /** The scope flags that open the route to a legacy project key (`withLegacyKeyScope`). */
+    /** The flags that open the route to a legacy project key (`withPermission`'s `legacyKey`). */
     legacyKeyScopes?: readonly string[];
   }): Promise<ApiProjectCredential> {
     const credential = await this.#resolveProjectCredential({
