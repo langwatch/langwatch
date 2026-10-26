@@ -1176,7 +1176,7 @@ function conditionalDeprecation<Api>({
   const log = deprecationLog({ route, family, deprecated, ports });
 
   return async (context, next) => {
-    const applies = await resolveBoundContext({
+    const applies = await deprecationApplies({
       route: route as RestTransportRoute<unknown>,
       declared: deprecated.when,
       contexts,
@@ -1193,6 +1193,31 @@ function conditionalDeprecation<Api>({
       await log(context, next);
     });
   };
+}
+
+/** The logger a deprecation that could not be decided is reported through. */
+const deprecationLogger = createLogger("langwatch:api:deprecation");
+
+/**
+ * A deprecation is a warning, never a gate: when its context cannot be resolved the route
+ * answers as if it were not deprecated, so a flag or database fault cannot take it down.
+ */
+async function deprecationApplies(input: {
+  route: RestTransportRoute<unknown>;
+  declared: MiddlewareContext;
+  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
+  context: Context;
+}): Promise<unknown> {
+  try {
+    return await resolveBoundContext(input);
+  } catch (error) {
+    deprecationLogger.warn(
+      { error, operation: input.route.operation, context: input.declared.name },
+      "deprecation context failed to resolve; answering without deprecation headers",
+    );
+
+    return false;
+  }
 }
 
 /**

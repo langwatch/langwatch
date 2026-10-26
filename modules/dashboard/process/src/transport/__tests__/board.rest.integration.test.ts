@@ -35,7 +35,7 @@ const CODE = "export default () => null;";
 async function projectWithBothBoards({
   actor = API_KEY,
   released = true,
-}: { actor?: Actor; released?: boolean } = {}) {
+}: { actor?: Actor; released?: boolean | "unreadable" } = {}) {
   const caller = { actor, scope: { tier: "project" as const, id: PROJECT } };
   const app = createDashboardTestApp({ publicBaseUrl: BASE });
   const reports = await app.create({ projectId: PROJECT, name: "Reports" });
@@ -61,7 +61,9 @@ async function projectWithBothBoards({
       middlewareContext: [
         bindMiddlewareContext(dashboardWidgetUrl, () => `${BASE}/dashboards`),
         bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
-        bindMiddlewareContext(dashboardsReleased, () => released),
+        bindMiddlewareContext(dashboardsReleased, () =>
+          released === "unreadable" ? Promise.reject(new Error("flag service down")) : released,
+        ),
         bindMiddlewareContext(boardWidgetCaller, () => ({
           platformUrl: `${BASE}/dashboards`,
           source: { kind: "api" as const },
@@ -487,6 +489,22 @@ describe("given the routes /api/v1/boards supersedes", () => {
    */
   it("answers as before with no Deprecation or Link header while Dashboards is off", async () => {
     const { reports, send } = await projectWithBothBoards({ released: false });
+
+    const answers = await Promise.all(SUPERSEDED.map(([door, path]) => send(door, path)));
+
+    expect(
+      answers.map((answer) => ({
+        status: answer.status,
+        deprecation: answer.headers.get("Deprecation"),
+        link: answer.headers.get("Link"),
+      })),
+    ).toEqual(SUPERSEDED.map(() => ({ status: 200, deprecation: null, link: null })));
+    expect(ids(answers[0]?.json)).toEqual([reports.id]);
+  });
+
+  /** @scenario "The dashboards API keeps answering when the rollout flag cannot be read" */
+  it("answers as before with no Deprecation or Link header when the flag cannot be read", async () => {
+    const { reports, send } = await projectWithBothBoards({ released: "unreadable" });
 
     const answers = await Promise.all(SUPERSEDED.map(([door, path]) => send(door, path)));
 

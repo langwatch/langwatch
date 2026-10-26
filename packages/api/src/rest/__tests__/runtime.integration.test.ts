@@ -653,7 +653,13 @@ const sometimesLegacy = defineRestRouter(ReportApi)
   .handle(async ({ app, input }) => app.read({ id: input.id }))
   .build();
 
-function sometimesLegacyApp({ superseded }: { superseded?: boolean }): Hono {
+function sometimesLegacyApp({
+  superseded,
+  resolves = () => superseded as boolean,
+}: {
+  superseded?: boolean;
+  resolves?: () => boolean | Promise<boolean>;
+}): Hono {
   const runtime = createRestRuntime({
     authorization: authorizationPort,
     identity: { authenticate: () => ({ actor: null, scope: { tier: "project", id: "p-1" } }) },
@@ -663,7 +669,7 @@ function sometimesLegacyApp({ superseded }: { superseded?: boolean }): Hono {
     app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
     credential: "project",
     middlewareContext:
-      superseded === undefined ? [] : [bindMiddlewareContext(supersededFor, () => superseded)],
+      superseded === undefined ? [] : [bindMiddlewareContext(supersededFor, resolves)],
     onError: createErrorHandler(),
   });
 }
@@ -712,6 +718,32 @@ describe("a family deprecated only for some callers", () => {
       deprecation: response.headers.get("Deprecation"),
       link: response.headers.get("Link"),
     }).toEqual({ status: 200, deprecation: null, link: null });
+  });
+
+  /** @scenario "A deprecation that cannot be decided fails open" */
+  it("answers without headers when its context throws or rejects", async () => {
+    const failures = [
+      () => {
+        throw new Error("flag service down");
+      },
+      () => Promise.reject(new Error("database blip")),
+    ];
+
+    const responses = await Promise.all(
+      failures.map(async (resolves) =>
+        sometimesLegacyApp({ superseded: true, resolves }).request(
+          "/api/sometimes-legacy/report-1",
+        ),
+      ),
+    );
+
+    expect(
+      responses.map((response) => ({
+        status: response.status,
+        deprecation: response.headers.get("Deprecation"),
+        link: response.headers.get("Link"),
+      })),
+    ).toEqual(failures.map(() => ({ status: 200, deprecation: null, link: null })));
   });
 
   /** @scenario "A family deprecated only for some callers asks per request" */
