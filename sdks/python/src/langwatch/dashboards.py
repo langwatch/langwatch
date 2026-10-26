@@ -7,6 +7,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
+import warnings
 from typing import Any, Dict
 
 import httpx
@@ -19,8 +20,26 @@ from langwatch.state import get_instance
 from langwatch.utils.exceptions import extract_api_error_detail
 
 
+_DEPRECATION_WARNED = False
+
+DASHBOARDS_DEPRECATION_MESSAGE = (
+    "/api/v1/dashboards is deprecated for this project: Dashboards boards are at "
+    "/api/v1/boards. Use langwatch.boards (or `langwatch boards` in the CLI)."
+)
+
+
+def _warn_if_deprecated(response: httpx.Response) -> None:
+    """Warn once per process when the server marks this API deprecated; it keeps working."""
+    global _DEPRECATION_WARNED
+    if _DEPRECATION_WARNED or response.headers.get("Deprecation") is None:
+        return
+    _DEPRECATION_WARNED = True
+    warnings.warn(DASHBOARDS_DEPRECATION_MESSAGE, FutureWarning, stacklevel=4)
+
+
 def _raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
     """Map HTTP error status codes to appropriate exceptions."""
+    _warn_if_deprecated(response)
     if response.is_success:
         return
 
