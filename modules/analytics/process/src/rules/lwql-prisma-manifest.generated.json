@@ -19259,6 +19259,15 @@
           "documentation": "True for a key LangWatch minted for itself (a run, the gateway's trace\nexport, a Langy session). Hides it from listings, refuses customer edits\nand revokes, and lets an ownerless run key act as the system. Never set\nby a customer create; rows before the column stay false."
         },
         {
+          "name": "createdByBrowserSessionId",
+          "columnName": "createdByBrowserSessionId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The browser session that minted a docs session key (ADR-185), so signing\nout of that session revokes it. NULL for every other key. Unindexed:\nsign-out filters by the indexed `userId` first."
+        },
+        {
           "name": "createdAt",
           "columnName": "createdAt",
           "type": "DateTime",

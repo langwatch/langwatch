@@ -1759,6 +1759,7 @@ export interface LwqlPrismaRows {
     readonly ingestionTemplateId: "String?";
     readonly createdByDeviceLabel: "String?";
     readonly isSystemManaged: "Boolean";
+    readonly createdByBrowserSessionId: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
