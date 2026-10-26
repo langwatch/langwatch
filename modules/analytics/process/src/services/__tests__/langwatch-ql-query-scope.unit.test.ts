@@ -14,6 +14,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { LangWatchQLQueryScopeService } from "../langwatch-ql-query-scope.service.ts";
+import { project } from "./project.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 const KEY = {
@@ -40,40 +41,6 @@ const INPUT_HIDDEN_FROM_THE_PUBLIC: ResolvedDataPrivacy = {
     },
   },
 };
-
-function project(id: string, overrides: Partial<Project> = {}): Project {
-  return {
-    id,
-    name: id,
-    slug: id,
-    apiKey: `legacy-${id}`,
-    lwqlKey: `lwql-${id}`,
-    teamId: `team-${id}`,
-    language: "en",
-    framework: "other",
-    kind: "application",
-    firstMessage: false,
-    integrated: false,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    archivedAt: null,
-    isPersonal: false,
-    ownerUserId: null,
-    personalFeatures: {},
-    departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-    ...overrides,
-  };
-}
 
 /**
  * An organization of projects, the key's grants per project and permission, and each project's

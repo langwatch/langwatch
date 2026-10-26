@@ -77,3 +77,40 @@ Feature: Langy prompts for a model when the project has none configured
     And the question is shown above the prompt, with a line saying it is sent once a model is set up
     When a model resolves for the project
     Then the question is sent once
+
+  # A guided onboarding whose provider step was skipped reaches the panel with
+  # no model. The tour plays first; the setup comes after it as Langy's own
+  # message in the conversation, never over it
+  # (specs/features/onboarding/guided-tour.feature).
+  @integration
+  Scenario: The model setup waits while the guided tour plays
+    Given a project with no model provider configured
+    And the guided tour is running
+    When the panel renders
+    Then it shows the tour card reading "Doing guided tour"
+    And no model setup is shown
+
+  @integration
+  Scenario: After the tour Langy asks for a model inline, below the tour card
+    Given a project with no model provider configured
+    And the tour has ended and the guided kickoff waits to send
+    When the panel renders
+    Then the tour card stays at the top of the conversation
+    And below it Langy says "Now connect me to a model provider so I can integrate your app and start creating evals for you."
+    And the provider setup sits in that message, with a "Later" button
+    And the full-panel "Langy needs a model to get started" setup is not shown
+
+  @integration
+  Scenario: Connecting a provider from the guided prompt sends the kickoff
+    Given Langy is asking for a model below the tour card
+    When the user saves a provider key and a default chat model
+    Then the prompt goes away
+    And the guided kickoff is sent once
+
+  @integration
+  Scenario: Later puts the guided model prompt away for good
+    Given Langy is asking for a model below the tour card
+    When the user presses "Later"
+    Then the organization's guided onboarding records that the prompt was put off
+    And the guided kickoff is dropped without being sent
+    And the panel closes

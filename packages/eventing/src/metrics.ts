@@ -1,34 +1,43 @@
 import { performance } from "node:perf_hooks";
 
-import { Counter, Histogram, register } from "prom-client";
+import {
+  counter as facadeCounter,
+  histogram as facadeHistogram,
+} from "@langwatch/observability/metrics";
+import type { Attributes } from "@opentelemetry/api";
 
 import type { HandoffLaneKind } from "./services/handoff/failedHandoff.ts";
 
-type CounterMetric = Counter<string>;
-type HistogramMetric = Histogram<string>;
-
-function counter(name: string, help: string, labelNames: readonly string[]): CounterMetric {
-  return (
-    (register.getSingleMetric(name) as CounterMetric | undefined) ??
-    new Counter({ name, help, labelNames })
-  );
+function attributesOf(labelNames: readonly string[], values: readonly string[]): Attributes {
+  return Object.fromEntries(labelNames.map((label, index) => [label, values[index]]));
 }
 
+/** Recorded through the metrics facade, so OTLP push and the scrape door both carry it. */
+function counter(name: string, description: string, labelNames: readonly string[]) {
+  const handle = facadeCounter({ name, description });
+  return {
+    labels: (...values: string[]) => ({
+      inc: (value = 1) => handle.inc(attributesOf(labelNames, values), value),
+    }),
+  };
+}
+
+/** Boundaries come from HISTOGRAM_BOUNDARIES; the facade refuses a name without one. */
 function histogram({
   name,
   help,
   labelNames,
-  buckets = [1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000],
 }: {
   name: string;
   help: string;
   labelNames: readonly string[];
-  buckets?: number[];
-}): HistogramMetric {
-  return (
-    (register.getSingleMetric(name) as HistogramMetric | undefined) ??
-    new Histogram({ name, help, labelNames, buckets })
-  );
+}) {
+  const handle = facadeHistogram({ name, description: help });
+  return {
+    labels: (...values: string[]) => ({
+      observe: (value: number) => handle.observe(value, attributesOf(labelNames, values)),
+    }),
+  };
 }
 
 const projectionTotal = counter("es_projection_total", "Eventing projection executions", [
@@ -139,13 +148,11 @@ const foldCacheGetDuration = histogram({
   name: "es_fold_cache_get_duration_milliseconds",
   help: "Fold consistency cache reads",
   labelNames: ["projection_name", "source"],
-  buckets: [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500],
 });
 const foldCacheStoreDuration = histogram({
   name: "es_fold_cache_store_duration_milliseconds",
   help: "Fold consistency cache writes",
   labelNames: ["projection_name"],
-  buckets: [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500],
 });
 const foldCacheRedisErrorTotal = counter(
   "es_fold_cache_redis_error_total",
@@ -156,7 +163,6 @@ const foldCacheEntryBytes = histogram({
   name: "es_fold_cache_entry_bytes",
   help: "Serialized fold consistency cache entry bytes",
   labelNames: ["projection_name"],
-  buckets: [1_024, 8_192, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216],
 });
 const foldDedupUnavailableTotal = counter(
   "es_fold_dedup_unavailable_total",
@@ -172,7 +178,6 @@ const foldBlindReapplyEvents = histogram({
   name: "es_fold_blind_reapply_events",
   help: "Events blindly reapplied by a fold retry",
   labelNames: ["projection_name"],
-  buckets: [1, 2, 5, 10, 25, 50, 100, 250, 500],
 });
 const foldPostStoreFailureTotal = counter(
   "es_fold_post_store_failure_total",
@@ -204,24 +209,26 @@ const processOutboxDuration = histogram({
   name: "es_process_outbox_duration_milliseconds",
   help: "Process-manager outbox attempt duration",
   labelNames: ["process_name", "intent_type"],
-  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000],
 });
 const processWakeLag = histogram({
   name: "es_process_wake_lag_milliseconds",
   help: "Process-manager wake delay",
   labelNames: ["process_name"],
-  buckets: [50, 250, 1_000, 5_000, 15_000, 60_000, 300_000, 900_000, 1_800_000, 3_600_000],
 });
 const processOutboxDispatchLag = histogram({
   name: "es_process_outbox_dispatch_lag_milliseconds",
   help: "Process-manager outbox dispatch delay",
   labelNames: ["process_name"],
-  buckets: [50, 250, 1_000, 5_000, 15_000, 60_000, 300_000, 900_000, 1_800_000, 3_600_000],
 });
 const processIntentsSuppressed = counter(
   "es_process_intents_suppressed_total",
   "Already-dispatched process-manager intents suppressed",
   ["process_name"],
+);
+const jobsProjectGone = counter(
+  "es_jobs_project_gone_total",
+  "Jobs and outbox messages completed as no-ops because their project no longer exists",
+  ["queue", "job_type"],
 );
 
 export const incrementEsProjectionTotal = ({
@@ -513,6 +520,20 @@ export const incrementEsProcessIntentsSuppressed = ({
 }) => processIntentsSuppressed.labels(processName).inc(count);
 
 /**
+ * Counts jobs and outbox messages completed as no-ops because their project no longer
+ * exists. `count` is the number of payloads, not batches: a coalesced batch adds its size.
+ */
+export const incrementEsJobsProjectGone = ({
+  queue,
+  jobType,
+  count,
+}: {
+  queue: string;
+  jobType: string;
+  count: number;
+}) => jobsProjectGone.labels(queue, jobType).inc(count);
+
+/**
  * Store-side metrics series. Colocated with es_* family and the code that increments them.
  */
 const eventsStoredTotal = counter(
@@ -527,23 +548,22 @@ const storeDurationMs = histogram({
   labelNames: ["pipeline_name"],
 });
 
-export type EventSourcingStoreMetrics = {
-  eventsStored(pipelineName: string, count: number): void;
-  storeDuration(pipelineName: string, durationMs: number): void;
-};
-
-/** Publishes the two store-side series onto the process's prom-client registry. */
-export const PROMETHEUS_EVENT_SOURCING_METRICS: EventSourcingStoreMetrics = {
-  eventsStored: (pipelineName, count) => eventsStoredTotal.labels(pipelineName).inc(count),
-  storeDuration: (pipelineName, durationMs) =>
-    storeDurationMs.labels(pipelineName).observe(durationMs),
-};
-
-/** Records nothing. The default for a process that publishes no registry. */
-export const NOOP_EVENT_SOURCING_METRICS: EventSourcingStoreMetrics = {
-  eventsStored: () => undefined,
-  storeDuration: () => undefined,
-};
+/** Counts the events a pipeline stored, on `event_sourcing_events_stored_total`. */
+export const incrementEventSourcingEventsStored = ({
+  pipelineName,
+  count,
+}: {
+  pipelineName: string;
+  count: number;
+}) => eventsStoredTotal.labels(pipelineName).inc(count);
+/** Times one `storeEvents` call on `event_sourcing_store_duration_milliseconds`. */
+export const observeEventSourcingStoreDuration = ({
+  pipelineName,
+  durationMs,
+}: {
+  pipelineName: string;
+  durationMs: number;
+}) => storeDurationMs.labels(pipelineName).observe(durationMs);
 
 export async function withMetrics<T>({
   fn,
@@ -564,3 +584,27 @@ export async function withMetrics<T>({
     throw error;
   }
 }
+
+const eventLogIndexReadTotal = counter(
+  "es_event_log_index_read_total",
+  "Event log reads by how they were bounded: the aggregate index, an event id's time, or unbounded",
+  ["read", "outcome"],
+);
+
+/** How one event log read was bounded (dev/docs/plans/id-index-2026-10-10.md §4). */
+export type EventLogIndexReadOutcome =
+  | "index_hit"
+  | "index_miss"
+  | "unindexed"
+  | "window_hit"
+  | "window_fallback"
+  | "not_ksuid";
+
+/** Counts one event log read by how its time bound was chosen. */
+export const incrementEventLogIndexRead = ({
+  read,
+  outcome,
+}: {
+  read: "aggregate" | "event" | "replay";
+  outcome: EventLogIndexReadOutcome;
+}) => eventLogIndexReadTotal.labels(read, outcome).inc();

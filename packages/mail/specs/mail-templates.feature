@@ -111,9 +111,69 @@ Feature: The transactional messages LangWatch sends
     Then the email goes to that member and names the organization and the administrator
     And it says whether a second factor is now needed to open that organization
 
+  # A self-hosted operator cannot fix an upgrade step; LangWatch staff on Cloud can.
+  # Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
   @unit
-  Scenario: An upgrade alert shows each failed step with its error and its own link
-    Given two upgrade steps failed on an installation
+  Scenario: A self-hosted upgrade alert says what didn't finish in plain words
+    Given two background upgrade steps failed on a self-hosted installation
+    When the upgrade alert is rendered
+    Then the subject says part of the upgrade didn't finish and names the installation
+    And it counts the steps and says LangWatch keeps running
+    And each step is named by what it does, with a link that opens that step
+    And a step with a description shows no id, and no step shows error text or an attempt count
+
+  @unit
+  Scenario: A self-hosted upgrade alert for a failed blocking step does not say LangWatch keeps running
+    Given a blocking upgrade step failed on a self-hosted installation
+    When the upgrade alert is rendered
+    Then it says LangWatch can't start serving the new version until the step finishes
+    And it does not say LangWatch keeps running
+
+  @unit
+  Scenario: A self-hosted upgrade alert for mixed failures names only the blocking step as holding the new version
+    Given a blocking and a background upgrade step failed on a self-hosted installation
+    When the upgrade alert is rendered
+    Then it says the new version waits on the step marked below
+    And only the blocking step is marked as the one the new version waits on
+    And it says the other step runs in the background
+
+  @unit
+  Scenario: A self-hosted upgrade alert says the details were already sent
+    Given the hourly check already sent each failed step's diagnostics to LangWatch
+    When the self-hosted upgrade alert is rendered
+    Then it says LangWatch has the details and is looking into it
+    And it does not ask the operator to send anything
+
+  @unit
+  Scenario: A self-hosted upgrade alert points at Send to LangWatch where Connect is available
+    Given the installation can send diagnostics to LangWatch but did not send them by itself
+    When the self-hosted upgrade alert is rendered
+    Then it asks the operator to send the details from the step page
+
+  @unit
+  Scenario: A self-hosted upgrade alert falls back to the step id when a step has no description
+    Given a failed upgrade step that declares no description
+    When the self-hosted upgrade alert is rendered
+    Then that step is named by its id
+
+  @unit
+  Scenario: A self-hosted upgrade alert offers a retry and a way to reach the LangWatch team
+    Given an upgrade step failed on a self-hosted installation that cannot reach LangWatch
+    When the upgrade alert is rendered
+    Then it says the step can be retried from its page
+    And it asks the operator to download the diagnostics and send them to support@langwatch.ai
+    And it never asks the operator to fix the cause
+
+  @unit
+  Scenario: A self-hosted alert for a stopped runner asks for a running worker without internals
+    Given the upgrade runner on a self-hosted installation stopped
+    When the upgrade alert is rendered
+    Then it asks the operator to check that a LangWatch worker is running
+    And it names neither the lease nor the stopped process
+
+  @unit
+  Scenario: An upgrade alert on LangWatch Cloud shows each failed step with its id, error and own link
+    Given two upgrade steps failed on LangWatch Cloud
     When the upgrade alert is rendered
     Then the subject counts the failed steps and names the installation
-    And each step shows its id, its release, its error and a link that opens that step
+    And each step shows its id, its release, its attempt, its error and a link that opens that step

@@ -31,6 +31,7 @@ export {
 // a route states its sources, its answers and its door with.
 export {
   browserSessionContext,
+  callerAddressContext,
   defineRestRouter,
   permissionOf,
   projectRequestContext,
@@ -49,10 +50,20 @@ export {
 // The runtime half: the ports a process fills, and the mount that puts a
 // family's declaration behind the one execution path.
 export { RestHost, type RestIdentities, type RestFamilyBearers } from "./host.ts";
+export {
+  bindConfirmationGate,
+  nameUnlessMissing,
+  openConfirmationGate,
+  type RestConfirmation,
+  type RestConfirmationGate,
+  type RestConfirmationReceipt,
+  type RestConfirmationRequest,
+} from "./confirmation.ts";
 export { canonicalOtlpRequest, withOtlpPathAliases } from "./otlp-path-alias.ts";
 
 export {
   createRestRuntime,
+  type RestConfirmationLog,
   type RestDeprecationLog,
   type RestMountOptions,
   type RestRuntime,
@@ -98,6 +109,7 @@ export type {
   IdempotencyReceiptRecord,
 } from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
+export { recordRequestPrincipal } from "./request-principal.ts";
 export {
   bindMiddlewareContext,
   bodyLimit,
@@ -105,6 +117,7 @@ export {
   defineMiddlewareContext,
   loggerMiddleware,
   multipartMiddleware,
+  recordAnsweredCause,
   RequestValidationError,
   requestValidationErrorFrom,
   restCacheKey,
@@ -143,6 +156,7 @@ export {
   type AppRestProjectVariables,
   browserCallerOfRequest,
   browserSessionOfRequest,
+  callerAddressOfRequest,
   credentialPrincipalOf,
   credentialPrincipalOfToken,
   keyCredentialOfRequest,
@@ -165,8 +179,10 @@ export {
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
+  recordRouteTemplate,
   recordScimCredential,
   resolvePersonalCaller,
+  routeTemplateOf,
   type RestBrowserCaller,
   type RestResolvedScimCredential,
   scimCredentialOfRequest,

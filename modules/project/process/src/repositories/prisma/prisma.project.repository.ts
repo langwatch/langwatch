@@ -41,7 +41,7 @@ import {
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import type {
-  ProjectBackfillRow,
+  ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -151,10 +151,15 @@ export class PrismaProjectRepository
       ...(after === undefined ? {} : { where: { id: { gt: after } } }),
       ...(limit === undefined ? {} : { take: limit + 1 }),
     });
-    const projects = rows.map((row) => ({ id: row.id, organizationId: row.team.organizationId }));
-    if (limit === undefined || projects.length <= limit) return { projects, next: null };
-    const page = projects.slice(0, limit);
-    return { projects: page, next: page[page.length - 1]?.id ?? null };
+    const more = limit !== undefined && rows.length > limit;
+    const page = more ? rows.slice(0, limit) : rows;
+    // relationMode "prisma" keeps no foreign keys, so a deleted team leaves its projects behind.
+    const projects = page.flatMap((row) => {
+      const organizationId = row.team?.organizationId;
+      return organizationId ? [{ id: row.id, organizationId }] : [];
+    });
+    const orphanIds = page.filter((row) => !row.team?.organizationId).map((row) => row.id);
+    return { projects, orphanIds, next: more ? (page.at(-1)?.id ?? null) : null };
   }
 
   async listAllWithPrivateS3({
@@ -409,7 +414,7 @@ export class PrismaProjectRepository
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<ProjectBackfillRow[]> {
+  }): Promise<ProjectBackfillEntry[]> {
     const rows = await this.prisma.project.findMany({
       where: afterId === null ? {} : { id: { gt: afterId } },
       orderBy: { id: "asc" },
@@ -439,17 +444,25 @@ export class PrismaProjectRepository
         },
       },
     });
-    return rows.map((row) => ({
-      id: row.id,
-      createdAt: fromDate(row.createdAt),
-      organizationId: row.team.organizationId,
-      teamId: row.teamId,
-      isPersonal: row.isPersonal,
-      departmentId: row.departmentId,
-      presenceEnabled: row.presenceEnabled,
-      isArchived: row.archivedAt !== null,
-      adminUserId: row.team.organization.members[0]?.userId ?? null,
-    }));
+    return rows.map((row): ProjectBackfillEntry => {
+      // relationMode "prisma" keeps no foreign keys: a deleted team or organization leaves this.
+      const organization = row.team?.organization;
+      if (!organization) return { kind: "orphan", id: row.id };
+      return {
+        kind: "whole",
+        project: {
+          id: row.id,
+          createdAt: fromDate(row.createdAt),
+          organizationId: row.team.organizationId,
+          teamId: row.teamId,
+          isPersonal: row.isPersonal,
+          departmentId: row.departmentId,
+          presenceEnabled: row.presenceEnabled,
+          isArchived: row.archivedAt !== null,
+          adminUserId: organization.members[0]?.userId ?? null,
+        },
+      };
+    });
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
@@ -796,6 +809,13 @@ export class PrismaProjectRepository
     return row?.id ?? null;
   }
 
+  async markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: { id: input.projectId },
+      data: { legacyApiKeyLastUsedAt: toDate(input.at) },
+    });
+  }
+
   async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
     const result = await this.prisma.project.updateMany({
       where: { id: input.projectId, archivedAt: null },
@@ -1001,11 +1021,13 @@ export class PrismaProjectRepository
   }
 
   private mapProject(row: PrismaProject | null): Project | null {
-    return row ? projectSchema.parse(row) : null;
+    return row ? this.mapProjectRequired(row) : null;
   }
 
+  /** The legacy key's usage stamp is an operator column, not part of the project value. */
   private mapProjectRequired(row: PrismaProject): Project {
-    return projectSchema.parse(row);
+    const { legacyApiKeyLastUsedAt: _usage, ...project } = row;
+    return projectSchema.parse(project);
   }
 
   private mapInternal(row: PrismaProject | null): InternalProject | null {

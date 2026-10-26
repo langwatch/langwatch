@@ -4,6 +4,7 @@ import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,
   type EvaluationProcessingEvent,
+  evaluationAttemptFailedEventSchema,
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
   evaluationCompletedEventSchema,
@@ -157,6 +158,7 @@ export class EvaluationProcessingPipelineAdapter {
         evaluationStartedEventSchema,
         evaluationCompletedEventSchema,
         evaluationReportedEventSchema,
+        evaluationAttemptFailedEventSchema,
       ])
       .withClickHouseFoldProjection(
         EvaluationRunFoldProjection.create({
@@ -229,6 +231,9 @@ export class EvaluationProcessingPipelineAdapter {
                     occurredAt: context.occurredAt,
                     spanAttributes: data.span.attributes,
                   },
+                  ...(context.deliveryAttempt !== undefined && {
+                    deliveryAttempt: context.deliveryAttempt,
+                  }),
                 }),
             })
             .withPeerSubscriber("traceOriginEvaluationTrigger", {
@@ -240,6 +245,9 @@ export class EvaluationProcessingPipelineAdapter {
                   tenantId: String(context.tenantId),
                   traceId: String(context.aggregateId),
                   event: { type: ORIGIN_RESOLVED_EVENT_TYPE, occurredAt: context.occurredAt },
+                  ...(context.deliveryAttempt !== undefined && {
+                    deliveryAttempt: context.deliveryAttempt,
+                  }),
                 }),
             })
             .withPeerSubscriber("traceCustomEvaluationSync", {

@@ -32,6 +32,7 @@ export const apiKeyOrganizationsRest = defineRestRouter(ApiKeyOrganizationsDoorA
   .withCredential("instance_admin")
 
   .post("/", "provisionOrganization")
+  .keepsRecords()
   .withSharedPath(ORGANIZATIONS_SHARED_PATH)
   .withAccess({
     kind: "authenticated",

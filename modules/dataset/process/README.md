@@ -331,7 +331,7 @@ type Response = z.infer<typeof datasetRestListResponseSchema>; // ../contract/sr
 
 Create a new dataset
 
-Permission `datasets:create`. Declared at `src/transport/dataset.rest.ts:180`.
+Permission `datasets:create`. Declared at `src/transport/dataset.rest.ts:181`.
 
 Answers at `/api/dataset`, `/api/v1/dataset`; also, undocumented, `/api/dataset/2026-08-07`, `/api/v1/dataset/2026-08-07`, `/api/dataset/latest`, `/api/v1/dataset/latest`.
 
@@ -344,7 +344,7 @@ type Response = z.infer<typeof datasetRestSummarySchema>; // ../contract/src/dat
 
 Create records in a dataset in batch
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:208`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:210`.
 
 Answers at `/api/dataset/:slugOrId/records`, `/api/v1/dataset/:slugOrId/records`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/records`, `/api/v1/dataset/2026-08-07/:slugOrId/records`, `/api/dataset/latest/:slugOrId/records`, `/api/v1/dataset/latest/:slugOrId/records`.
 
@@ -374,7 +374,7 @@ interface Response {
 
 Add entries to a dataset
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:230`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:233`.
 
 Answers at `/api/dataset/:datasetSlug/entries`, `/api/v1/dataset/:datasetSlug/entries`; also, undocumented, `/api/dataset/2026-08-07/:datasetSlug/entries`, `/api/v1/dataset/2026-08-07/:datasetSlug/entries`, `/api/dataset/latest/:datasetSlug/entries`, `/api/v1/dataset/latest/:datasetSlug/entries`.
 
@@ -398,7 +398,7 @@ interface Response {
 
 Create a dataset from an uploaded file
 
-Permission `datasets:create`. Declared at `src/transport/dataset.rest.ts:251`.
+Permission `datasets:create`. Declared at `src/transport/dataset.rest.ts:255`.
 
 Answers at `/api/dataset/imports`, `/api/v1/dataset/imports`; also, undocumented, `/api/dataset/2026-08-07/imports`, `/api/v1/dataset/2026-08-07/imports`, `/api/dataset/latest/imports`, `/api/v1/dataset/latest/imports`.
 
@@ -416,7 +416,7 @@ interface Response {
 
 Import an uploaded file into a dataset
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:265`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:270`.
 
 Answers at `/api/dataset/:slugOrId/imports`, `/api/v1/dataset/:slugOrId/imports`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/imports`, `/api/v1/dataset/2026-08-07/:slugOrId/imports`, `/api/dataset/latest/:slugOrId/imports`, `/api/v1/dataset/latest/:slugOrId/imports`.
 
@@ -438,12 +438,12 @@ interface Response {
 
 Create a new dataset from an uploaded file (CSV, JSON, JSONL)
 
-Permission `datasets:create`. Deprecated. Declared at `src/transport/dataset.rest.ts:281`.
+Permission `datasets:create`. Deprecated. Declared at `src/transport/dataset.rest.ts:287`.
 
 Answers at `/api/dataset/upload`, `/api/v1/dataset/upload`; also, undocumented, `/api/dataset/2026-08-07/upload`, `/api/v1/dataset/2026-08-07/upload`, `/api/dataset/latest/upload`, `/api/v1/dataset/latest/upload`.
 
 ```typescript
-// Multipart: { fields: datasetRestUploadFieldsSchema, files: { file: { required: true } } } (inline, src/transport/dataset.rest.ts:283)
+// Multipart: { fields: datasetRestUploadFieldsSchema, files: { file: { required: true } } } (inline, src/transport/dataset.rest.ts:290)
 type Response = z.infer<typeof datasetRestUploadCreatedSchema>; // ../contract/src/dataset-rest.schemas.ts:214
 ```
 
@@ -451,13 +451,13 @@ type Response = z.infer<typeof datasetRestUploadCreatedSchema>; // ../contract/s
 
 Upload a file (CSV, JSON, JSONL) to an existing dataset
 
-Permission `datasets:update`. Deprecated. Declared at `src/transport/dataset.rest.ts:300`.
+Permission `datasets:update`. Deprecated. Declared at `src/transport/dataset.rest.ts:307`.
 
 Answers at `/api/dataset/:slugOrId/upload`, `/api/v1/dataset/:slugOrId/upload`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/upload`, `/api/v1/dataset/2026-08-07/:slugOrId/upload`, `/api/dataset/latest/:slugOrId/upload`, `/api/v1/dataset/latest/:slugOrId/upload`.
 
 ```typescript
 type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:105
-// Multipart: { fields: datasetRestNoUploadFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:303)
+// Multipart: { fields: datasetRestNoUploadFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:311)
 type Response = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:657
 ```
 
@@ -465,7 +465,7 @@ type Response = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/
 
 Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.
 
-Permission `datasets:manage`. Deprecated. Declared at `src/transport/dataset.rest.ts:324`.
+Permission `datasets:manage`. Deprecated. Declared at `src/transport/dataset.rest.ts:332`.
 
 Answers at `/api/dataset/attachments`, `/api/v1/dataset/attachments`; also, undocumented, `/api/dataset/2026-08-07/attachments`, `/api/v1/dataset/2026-08-07/attachments`, `/api/dataset/latest/attachments`, `/api/v1/dataset/latest/attachments`.
 
@@ -474,7 +474,7 @@ Answers at `/api/dataset/attachments`, `/api/v1/dataset/attachments`; also, undo
 interface Query {
   projectId: string;
 }
-// Multipart: { fields: datasetRestAttachmentFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:327)
+// Multipart: { fields: datasetRestAttachmentFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:336)
 // Response: storedDatasetAttachmentSchema, ../contract/src/dataset.ts:560
 type Response = ResponseDatasetAttachment;
 type ResponseDatasetAttachment = {
@@ -489,7 +489,7 @@ type ResponseDatasetAttachment = {
 
 Create an upload for an image or file cell
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:366`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:375`.
 
 Answers at `/api/dataset/attachments/uploads`, `/api/v1/dataset/attachments/uploads`; also, undocumented, `/api/dataset/2026-08-07/attachments/uploads`, `/api/v1/dataset/2026-08-07/attachments/uploads`, `/api/dataset/latest/attachments/uploads`, `/api/v1/dataset/latest/attachments/uploads`.
 
@@ -514,7 +514,7 @@ interface Response {
 
 Get a dataset by its slug or id, with every record inline. A dataset too large for one response is refused: read it page by page from `GET /{slugOrId}/records`.
 
-Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:387`.
+Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:397`.
 
 Answers at `/api/dataset/:slugOrId`, `/api/v1/dataset/:slugOrId`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId`, `/api/v1/dataset/2026-08-07/:slugOrId`, `/api/dataset/latest/:slugOrId`, `/api/v1/dataset/latest/:slugOrId`.
 
@@ -527,7 +527,7 @@ type Response = z.infer<typeof datasetRestDetailResponseSchema>; // ../contract/
 
 Update a dataset by its slug or id
 
-Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:417`.
+Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:428`.
 
 Answers at `/api/dataset/:slugOrId`, `/api/v1/dataset/:slugOrId`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId`, `/api/v1/dataset/2026-08-07/:slugOrId`, `/api/dataset/latest/:slugOrId`, `/api/v1/dataset/latest/:slugOrId`.
 
@@ -541,7 +541,7 @@ type Response = z.infer<typeof datasetRestSummarySchema>; // ../contract/src/dat
 
 Archive a dataset (soft-delete)
 
-Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:449`.
+Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:469`.
 
 Answers at `/api/dataset/:slugOrId`, `/api/v1/dataset/:slugOrId`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId`, `/api/v1/dataset/2026-08-07/:slugOrId`, `/api/dataset/latest/:slugOrId`, `/api/v1/dataset/latest/:slugOrId`.
 
@@ -558,7 +558,7 @@ interface Response {
 
 List records for a dataset (paginated). Each page also carries the dataset itself. A page too large for one response is refused with `dataset_page_too_large`: ask again with the smaller `limit` the error names.
 
-Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:459`.
+Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:486`.
 
 Answers at `/api/dataset/:slugOrId/records`, `/api/v1/dataset/:slugOrId/records`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/records`, `/api/v1/dataset/2026-08-07/:slugOrId/records`, `/api/dataset/latest/:slugOrId/records`, `/api/v1/dataset/latest/:slugOrId/records`.
 
@@ -572,7 +572,7 @@ type Response = z.infer<typeof datasetRestRecordPageSchema>; // ../contract/src/
 
 List entries of a dataset (paginated). Same as GET /:slugOrId/records.
 
-Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:484`.
+Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:512`.
 
 Answers at `/api/dataset/:datasetSlug/entries`, `/api/v1/dataset/:datasetSlug/entries`; also, undocumented, `/api/dataset/2026-08-07/:datasetSlug/entries`, `/api/v1/dataset/2026-08-07/:datasetSlug/entries`, `/api/dataset/latest/:datasetSlug/entries`, `/api/v1/dataset/latest/:datasetSlug/entries`.
 
@@ -586,7 +586,7 @@ type Response = z.infer<typeof datasetRestRecordPageSchema>; // ../contract/src/
 
 Update or create a record in a dataset
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:507`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:536`.
 
 Answers at `/api/dataset/:slugOrId/records/:recordId`, `/api/v1/dataset/:slugOrId/records/:recordId`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/records/:recordId`, `/api/v1/dataset/2026-08-07/:slugOrId/records/:recordId`, `/api/dataset/latest/:slugOrId/records/:recordId`, `/api/v1/dataset/latest/:slugOrId/records/:recordId`.
 
@@ -606,7 +606,7 @@ interface Body {
 
 Delete records from a dataset by IDs
 
-Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:526`.
+Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:556`.
 
 Answers at `/api/dataset/:slugOrId/records`, `/api/v1/dataset/:slugOrId/records`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/records`, `/api/v1/dataset/2026-08-07/:slugOrId/records`, `/api/dataset/latest/:slugOrId/records`, `/api/v1/dataset/latest/:slugOrId/records`.
 

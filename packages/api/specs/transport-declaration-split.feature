@@ -460,6 +460,14 @@ Feature: Transport declaration split
     And a list that is empty or repeats a kind, or a list on any door but the project door, is refused where it is written
 
   @integration
+  Scenario: A route tells the project door the legacy key scopes it names
+    Given a route behind the project door that asks a permission names legacy key scope flags with withLegacyKeyScope
+    When a caller presents a key
+    Then the door is told the route's permission and the scope flags it names
+    And a door that lists its known scope flags refuses, at mount, a route naming another
+    And a route naming scope flags behind another door, or one that asks no permission before the body, is refused at mount
+
+  @integration
   Scenario: A permission behind the CLI token door is asked of the token's person at its organization
     Given a route behind the CLI token door declares a permission, with no target or at the organization (Alex, 2026-10-05, E8)
     When a caller presents a live CLI token

@@ -5,10 +5,13 @@
  * One operation behind both, so the two doors cannot drift.
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  callerAddressContext,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import {
   SaasApi,
-  senderAddressHeadersSchema,
   USAGE_REPORT_REQUEST_MAX_BYTES,
   usageReportReceiptSchema,
   usageReportRequestSchema,
@@ -24,26 +27,28 @@ export const usageReportRest = defineRestRouter(SaasApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/track_usage", "receiveUsageReport")
+  .keepsRecords()
   .withoutAudit("ingestion")
   .withInput(usageReportRequestSchema)
   .withBodyLimit({ maxBytes: USAGE_REPORT_REQUEST_MAX_BYTES })
   .withAccess(USAGE_REPORT_DOOR)
-  .withHeaders(senderAddressHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .withOutput(usageReportReceiptSchema)
   .withDocs({ hide: true })
-  .handle(({ input, app }, headers) =>
-    app.receiveUsageReport({ report: input, addressHeaders: headers }),
+  .handle(({ input, app }, callerAddress) =>
+    app.receiveUsageReport({ report: input, callerAddress }),
   )
 
   .post("/api/connect/v1/stats", "receiveConnectUsageReport")
+  .keepsRecords()
   .withoutAudit("ingestion")
   .withInput(usageReportRequestSchema)
   .withBodyLimit({ maxBytes: USAGE_REPORT_REQUEST_MAX_BYTES })
   .withAccess(USAGE_REPORT_DOOR)
-  .withHeaders(senderAddressHeadersSchema)
+  .withMiddlewareContext(callerAddressContext)
   .withOutput(usageReportReceiptSchema)
   .withDocs({ hide: true })
-  .handle(({ input, app }, headers) =>
-    app.receiveUsageReport({ report: input, addressHeaders: headers }),
+  .handle(({ input, app }, callerAddress) =>
+    app.receiveUsageReport({ report: input, callerAddress }),
   )
   .build();

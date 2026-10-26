@@ -113,6 +113,7 @@ export function ledgerTablesDdl({ tables }: { tables: LedgerTableNames }): reado
     `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "owner" TEXT`,
     `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "description" TEXT`,
     `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "finish_by" TEXT`,
+    `ALTER TABLE ${tables.step} ADD COLUMN IF NOT EXISTS "log_tail" JSONB`,
     `CREATE TABLE IF NOT EXISTS ${tables.target} (
     "step_id" TEXT NOT NULL,
     "target" TEXT NOT NULL,

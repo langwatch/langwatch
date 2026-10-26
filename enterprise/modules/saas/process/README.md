@@ -6,7 +6,7 @@ The server half of [saas](../README.md). LangWatch Cloud's own surface.
 
 ## Installation
 
-`defineProcessModule("saas").withRepositories(saasRepositories).withApi(SaasModule).withTransports(usageReportRest).withEventing(saasUsageReportEventing)`, `src/saas.module.ts:11`.
+`defineProcessModule("saas").withRepositories(saasRepositories).withApi(SaasModule).withTransports(usageReportRest).provideMiddlewareContext(…).withEventing(saasUsageReportEventing)`, `src/saas.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 LangWatch Cloud's own surface. Every operation refuses on any other deployment.
 
-Peers call these through the token, declared at `../contract/src/saas.api.ts:58`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/saas.api.ts:55`; nothing else in this package is public.
 
 #### `receiveUsageReport`
 
@@ -28,40 +28,31 @@ receiveUsageReport(input: IncomingUsageReportRequest): Promise<UsageReportReceip
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/usage-report.rest.ts:21` |
+| Declared at | `src/transport/usage-report.rest.ts:24` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | project                                 |
 
 #### `POST /api/track_usage` · `receiveUsageReport`
 
-Public: anonymous product telemetry: a self-hosted install presents no credential. Hidden from the OpenAPI document. Declared at `src/transport/usage-report.rest.ts:26`.
+Public: anonymous product telemetry: a self-hosted install presents no credential. Hidden from the OpenAPI document. Declared at `src/transport/usage-report.rest.ts:29`.
 
 Answers at `/api/track_usage`.
 
 ```typescript
-type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:12
-type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:28
-// Response: usageReportReceiptSchema, ../contract/src/saas.api.ts:47
-interface Response {
-  message: "Event captured";
-  latest_release?: {
-    release: string;
-    commit: string | null;
-  };
-}
+type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:16
+type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:43
 ```
 
 #### `POST /api/connect/v1/stats` · `receiveConnectUsageReport`
 
-Public: anonymous product telemetry: a self-hosted install presents no credential. Hidden from the OpenAPI document. Declared at `src/transport/usage-report.rest.ts:38`.
+Public: anonymous product telemetry: a self-hosted install presents no credential. Hidden from the OpenAPI document. Declared at `src/transport/usage-report.rest.ts:42`.
 
 Answers at `/api/connect/v1/stats`.
 
 ```typescript
-type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:12
-type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:28
-type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:47
+type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:16
+type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:43
 ```
 
 ## tRPC transport
