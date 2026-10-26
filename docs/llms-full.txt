@@ -60240,6 +60240,26 @@ langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to 
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
+## Boards
+
+A board is the page widgets live on. **Use an existing board** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new board, or none fits and they agree.
+
+```bash
+langwatch boards list -f json                       # ids, names, widget counts
+langwatch boards get <boardId> -f json
+langwatch boards create "<name>" -f json            # empty board; prints platformUrl
+langwatch boards update <boardId> --name "<name>"   # rename; or --description / --clear-description
+langwatch boards delete <boardId>                   # removes the board and its widgets
+langwatch boards widgets list <boardId> -f json
+langwatch boards widgets create <boardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
+langwatch boards widgets update <boardId> <widgetId> --code-file widget.tsx --queries-file queries.json
+langwatch boards widgets delete <boardId> <widgetId>
+```
+
+- **Never pick a board for the user.** When more than one board fits, ask with the `question` tool (a choices card): one option per board from `langwatch boards list`, its id in `ref`.
+- **Confirm before any delete** of a board or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a board takes its widgets with it.
+- Boards need Dashboards switched on for the project. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
+
 ## Worked example: bar chart of daily trace counts
 
 `widget.tsx`:
