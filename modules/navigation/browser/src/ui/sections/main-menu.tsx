@@ -29,9 +29,9 @@ import { SideMenuLink } from "../blocks/side-menu-link.tsx";
 import { SidebarSection } from "./sidebar-section.tsx";
 
 /**
- * The LLM Ops sidebar's project sections. No Govern group (the product switcher has it),
- * no Ops group (the settings menu has it). Dashboards is its own product; once a member
- * can reach it, the Analytics entry opens it (dashboards-v1.feature AC3b).
+ * The project navigation sections the LLM Ops sidebar renders. The Govern group
+ * is gone because the product switcher replaces it, and the Ops group because
+ * the settings menu holds the operations pages. Dashboards is its own product.
  */
 export const MainMenuSections = function MainMenuSections({
   showExpanded,
@@ -51,9 +51,6 @@ export const MainMenuSections = function MainMenuSections({
   );
   const codingAgentLinks = useCodingAgentLinks();
   const { reachableProducts } = useReachableProducts();
-  const analyticsPath = reachableProducts.includes("dashboards")
-    ? projectNavItems.dashboards.path
-    : projectNavItems.analytics.path;
 
   const sectionProps = { showExpanded, project, pathname };
 
@@ -75,7 +72,7 @@ export const MainMenuSections = function MainMenuSections({
         {...sectionProps}
         codingAgentLinks={codingAgentLinks}
         showAnalytics={navigation.analytics}
-        analyticsPath={analyticsPath}
+        analyticsIsLegacy={reachableProducts.includes("dashboards")}
         showOnlineEvaluations={navigation.onlineEvaluations}
       />
       {navigation.test && (
@@ -121,24 +118,26 @@ function ObserveSection({
   pathname,
   codingAgentLinks,
   showAnalytics,
-  analyticsPath,
+  analyticsIsLegacy,
   showOnlineEvaluations,
 }: ProjectSectionProps & {
   codingAgentLinks: CodingAgentLinks;
   showAnalytics: boolean;
-  analyticsPath: string;
+  analyticsIsLegacy: boolean;
   showOnlineEvaluations: boolean;
 }) {
   return (
     <SidebarSection id="observe" label="Observe" showExpanded={showExpanded}>
       {showAnalytics && (
         <PageMenuLink
-          path={analyticsPath}
+          path={projectNavItems.analytics.path}
           icon={featureIcons.analytics.icon}
           label={projectNavItems.analytics.title}
           project={project}
           isActive={pathname.includes("/analytics")}
           showLabel={showExpanded}
+          legacy={analyticsIsLegacy}
+          legacyLabel="Legacy"
         />
       )}
       <PageMenuLink
