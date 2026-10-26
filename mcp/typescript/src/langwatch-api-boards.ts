@@ -45,6 +45,20 @@ export async function listProjectBoards({
   ) as Promise<{ data: BoardListItem[] }>;
 }
 
+/** One board at the deprecated project path, which answers while Dashboards is off too. */
+export async function getProjectBoard({
+  projectId,
+  boardId,
+}: {
+  projectId: string;
+  boardId: string;
+}): Promise<Board> {
+  return makeRequest(
+    "GET",
+    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/boards/${encodeURIComponent(boardId)}`,
+  ) as Promise<Board>;
+}
+
 /** Reads one Dashboards board; a board in another project, or only in Reports, answers 404. */
 export async function getBoard({ boardId }: { boardId: string }): Promise<Board> {
   return makeRequest("GET", boardPath(boardId)) as Promise<Board>;

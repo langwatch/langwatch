@@ -1153,6 +1153,18 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       /api/v1/projects/{projectId}/analytics/boards instead
     And any other failure is reported as it is, with no second request
 
+  @unit
+  Scenario: AC199t The MCP widget tools use the board routes and fall back to the project path on 404
+    Given the MCP tools `add_dashboard_widget` and `update_dashboard_widget`
+    When the board answers on /api/v1/boards/{boardId}
+    Then they create and change the widget under /api/v1/boards/{boardId}/widgets, and print no
+      deprecation note
+    When /api/v1/boards/{boardId} answers 404, as while Dashboards is off
+    Then they check the board, and create, place or change the widget, on the
+      /api/v1/projects/{projectId}/analytics routes instead
+    And an id that names no board there either is refused naming the id, and any other failure
+      is reported as it is
+
   # ---------------------------------------------------------------------------
   # Sidebar, My dashboard, From LangWatch and the ask bar (langwatch/tasks#911)
   # ---------------------------------------------------------------------------
