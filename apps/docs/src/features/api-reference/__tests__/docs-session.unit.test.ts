@@ -77,7 +77,7 @@ describe("when the playground sends as the connected member", () => {
     });
     expect(request.url).toBe(`${APP}/api/traces/search`);
     expect(request.headers["X-Auth-Token"]).toBe(grant.token);
-    expect(request.headers.Authorization).toBeUndefined();
+    expect(Object.keys(request.headers)).not.toContain("Authorization");
     expect(request.body).toBe('{"query":"refund"}');
   });
 });
