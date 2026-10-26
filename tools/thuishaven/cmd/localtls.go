@@ -23,7 +23,7 @@ func localHTTPClient(timeout time.Duration) *http.Client {
 	client := &http.Client{Timeout: timeout}
 	if pool := localRoots(portlessproxy.LocalCAPath()); pool != nil {
 		t := http.DefaultTransport.(*http.Transport).Clone()
-		t.TLSClientConfig = &tls.Config{RootCAs: pool}
+		t.TLSClientConfig = &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}
 		client.Transport = t
 	}
 	return client

@@ -217,7 +217,10 @@ func (p *Proxy) Remove(service, slug string) {
 	_ = p.run("alias", "--remove", p.naming.RouteName(service, slug))
 }
 
-func (p *Proxy) stateDir() string {
+func (p *Proxy) stateDir() string { return stateDir() }
+
+// stateDir is portless's state directory: PORTLESS_STATE_DIR, else ~/.portless.
+func stateDir() string {
 	if v := os.Getenv("PORTLESS_STATE_DIR"); v != "" {
 		return v
 	}
@@ -237,7 +240,7 @@ func (p *Proxy) CACertPath() string { return LocalCAPath() }
 // LocalCAPath is CACertPath for callers without a Proxy: haven's own CLI, which
 // signs in and calls the API over the portless HTTPS hostnames itself.
 func LocalCAPath() string {
-	ca := filepath.Join((&Proxy{}).stateDir(), "ca.pem")
+	ca := filepath.Join(stateDir(), "ca.pem")
 	if !fileExists(ca) {
 		return ""
 	}
