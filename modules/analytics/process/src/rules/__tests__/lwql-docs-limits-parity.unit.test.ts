@@ -30,6 +30,7 @@ const format = (value: number): string => value.toLocaleString("en-US");
 
 describe("given the LangWatchQL guide and the code's numbers", () => {
   describe("when the limits table is read", () => {
+    /** @scenario "The guide's limits table carries the shipped resource limits and the statement length" */
     it("carries the shipped resource limits and the statement length", () => {
       const table = section("limits-and-cost.mdx", "lwql-limits");
       const limits = DEFAULT_LWQL_RESOURCE_LIMITS;
@@ -48,6 +49,7 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
   });
 
   describe("when the per-plan rate table is read", () => {
+    /** @scenario "The guide's per-plan rate table carries each plan's queries per minute" */
     it("carries the lwqlPerMinute bound of each plan", () => {
       const table = section("limits-and-cost.mdx", "lwql-rates");
 
@@ -60,6 +62,7 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
   });
 
   describe("when the extraction function table is read", () => {
+    /** @scenario "The guide's extraction function page carries the key cap of each kind of key" */
     it("carries the key cap of each kind of key", () => {
       const table = section("extraction-functions.mdx", "lwql-key-caps");
       const caps = LWQL_APP_FUNCTION_KEY_CAPS;
@@ -69,6 +72,7 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
       expect(table).toContain(`| ${format(caps.span)} spans |`);
     });
 
+    /** @scenario "The guide's extraction function page carries the key cap of each kind of key" */
     it("states the distinct text cap beside the eval functions", () => {
       const doc = readFileSync(
         fileURLToPath(new URL(`${GUIDE_DIR}extraction-functions.mdx`, import.meta.url)),

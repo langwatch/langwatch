@@ -42835,8 +42835,8 @@ SELECT
   t.Attributes['user.id'] AS user,
   sum(j.Passed) AS annoyed,
   count() AS conversations
-FROM analytics.judgments AS j
-JOIN analytics.traces AS t ON t.TraceId = j.TraceId
+FROM langwatch.judgments AS j
+JOIN langwatch.traces AS t ON t.TraceId = j.TraceId
 WHERE j.RunId = {run:String}
   AND j.QuestionId = 'annoyed'
   AND j.CreatedAt >= subtractDays(now(), 7)
@@ -42954,7 +42954,7 @@ SELECT
   Attributes['gen_ai.conversation.id'] AS ThreadId,
   OccurredAt,
   eval(llm_readable_trace(TraceId, 8000), 'the customer sounds annoyed') AS q1
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= {start_at:DateTime}
   AND OccurredAt < {end_at:DateTime}
 ORDER BY TraceId
@@ -42968,7 +42968,7 @@ SELECT
   m.ConversationId AS ThreadId,
   max(m.OccurredAt) AS OccurredAt,
   eval(llm_readable_thread(m.ConversationId, 18729), 'the customer sounds annoyed') AS q1
-FROM analytics.trace_metrics AS m
+FROM langwatch.trace_metrics AS m
 WHERE m.OccurredAt >= {start_at:DateTime}
   AND m.OccurredAt < {end_at:DateTime}
   AND m.ConversationId != ''
@@ -42984,14 +42984,14 @@ SELECT
   SpanId,
   StartTime AS OccurredAt,
   eval(llm_messages_span(TraceId, SpanId), 'the model was asked to do two things at once') AS q1
-FROM analytics.spans
+FROM langwatch.spans
 WHERE StartTime >= {start_at:DateTime}
   AND StartTime < {end_at:DateTime}
   AND SpanAttributes['langwatch.span.type'] = 'llm'
 ORDER BY TraceId, SpanId
 ```
 
-A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `analytics.traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
+A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `langwatch.traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
 
 ## What is the token budget per row
 
@@ -74514,7 +74514,7 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 SELECT
   TraceId,
   eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
-FROM analytics.trace_metrics
+FROM langwatch.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId
 ```
@@ -74585,7 +74585,7 @@ Every judgement is also a row in the `judgments` analytics dataset, so a later q
 
 ```sql
 SELECT j.Label AS verdict, count() AS traces
-FROM analytics.judgments AS j
+FROM langwatch.judgments AS j
 WHERE j.RunId = {run:String} AND j.CreatedAt >= subtractDays(now(), 7)
 GROUP BY verdict
 ORDER BY traces DESC
