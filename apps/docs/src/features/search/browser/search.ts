@@ -90,10 +90,9 @@ function render() {
     const query = bar.input.value;
     rows = searchRows({ index, query });
     bar.results.replaceChildren(...groupElements({ rows }));
-    bar.dialog.querySelector<HTMLElement>(".chakra-spinner")?.toggleAttribute(
-      "hidden",
-      state !== "loading",
-    );
+    bar.dialog
+      .querySelector<HTMLElement>(".chakra-spinner")
+      ?.toggleAttribute("hidden", state !== "loading");
     bar.part("failed").hidden = state !== "failed";
     const empty = bar.part("empty");
     empty.hidden = !(state === "ready" && query && !rows.length);
@@ -152,10 +151,13 @@ function onKey(event: KeyboardEvent) {
   }
   if (modified && event.key.toLowerCase() === "l" && row.href) {
     event.preventDefault();
-    void navigator.clipboard.writeText(new URL(row.href, location.href).href).then(
-      () => (notice = "Link copied"),
-      () => (notice = "Could not copy link"),
-    ).then(render);
+    void navigator.clipboard
+      .writeText(new URL(row.href, location.href).href)
+      .then(
+        () => (notice = "Link copied"),
+        () => (notice = "Could not copy link"),
+      )
+      .then(render);
   }
 }
 

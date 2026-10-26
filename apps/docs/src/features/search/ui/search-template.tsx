@@ -81,7 +81,12 @@ export function SearchTemplates() {
               Search by topic, integration or endpoint
             </Text>
             <CommandBarFooter isMac={false} />
-            <Button className="docs-command-close" size="xs" variant="ghost" data-search-part="close">
+            <Button
+              className="docs-command-close"
+              size="xs"
+              variant="ghost"
+              data-search-part="close"
+            >
               Close
             </Button>
           </Box>

@@ -178,11 +178,11 @@ Feature: Static documentation with progressive interaction
 
   @e2e
   Scenario: Answer a first click on search, a context menu or the playground on a small download
-    Given search fills the command bar already drawn into the page
-    And the other islands render on a React compatible runtime a tenth of React's size, with only the theme recipes they render
-    When a reader first opens search, a page or theme menu, or the API playground
+    Given search and the page menu fill markup already drawn into the page
+    And the playground renders on a React compatible runtime a tenth of React's size
+    When a reader first opens search, the page menu, or the API playground
     Then search downloads at most 6,000 gzip bytes of script before it answers
-    And a context menu downloads at most 95,000
+    And the page menu downloads at most 3,000
     And the playground downloads at most 24,500
     And the page itself still loads under 3,000 gzip bytes of script before any interaction
 
@@ -343,6 +343,13 @@ Feature: Static documentation with progressive interaction
     Given every page carries the design system's command bar as inert markup, styled by the page stylesheet
     When a reader opens search
     Then the search island fills that markup in a native modal dialog
+    And it loads no component runtime and no design system code
+
+  @integration
+  Scenario: Open the page menu on its prerendered markup
+    Given every page carries the design system's page actions menu as inert markup beside its trigger
+    When a reader opens the page menu with a pointer or the keyboard
+    Then the menu shows as a popover below the trigger, with arrow keys, Home, End, Enter and Escape working
     And it loads no component runtime and no design system code
 
   @unit

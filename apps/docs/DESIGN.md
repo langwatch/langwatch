@@ -36,15 +36,15 @@ not recreated in the browser. The API uses the existing request generator,
 and validation. No automatic request is sent on mount.
 Navigation disposes the API root, aborts pending work and clears credentials.
 
-Search runs on no component runtime at all (see below). The menus and the playground
-run on `preact/compat` in the browser build, about a tenth of react-dom's size, so a
-first click on them downloads little. No island hydrates server markup: each mounts into an empty node, so
+Search and the page menu run on no component runtime at all (see below). The
+playground runs on `preact/compat` in the browser build, about a tenth of react-dom's
+size, so a first click on it downloads little. No island hydrates server markup: each mounts into an empty node, so
 prerendering keeps real React and the HTML is unchanged. Whole-page hydration, Chakra in a lazy page bundle, runtime
 highlighting and a second client-side copy of MDX are rejected. Hydrating small
 static buttons with React would charge the renderer cost for no useful state, so
 those controls use browser event delegation instead. Module scripts give each
-island a separate entry. Reading needs no runtime CSS generation; the shared
-command and menu surfaces described below load their runtime on interaction.
+island a separate entry. Reading needs no runtime CSS generation, and neither
+does the command bar or the page menu described below.
 
 ## Navigation and static hosting
 
@@ -125,11 +125,12 @@ their styles come from the page stylesheet like any other prerendered markup. Th
 search island is plain TypeScript: it moves the bar into a native modal `<dialog>`
 and fills rows by cloning the row templates, selecting one by toggling the
 `data-selected` attribute CommandBarItem styles. It downloads about 5 KB.
-The contextual Menu surfaces still load a deferred React/Chakra runtime. Their explicit design-system
-provider uses the recipes those islands render and the shared semantic foundation;
-it does not pull in a second full theme or next-themes. Prerendering keeps the
-full system. A new interactive Chakra component needs its recipe added to
-`src/app/island-theme.ts` and covered in the island parity checks. No navigation-module
+The page menu works the same way: the design system's Menu is drawn open, not
+portalled, into a template beside its trigger, and the context menus island shows
+that markup as a native popover, places it below the trigger's end edge, and runs
+the arrow keys, Enter, Escape and the copy actions by hand. A new interactive
+control follows the same pattern: draw it at build time, and keep its island to
+behaviour. No navigation-module
 browser code is imported. A docs-local result/action model leaves room for a
 future search mode without enabling Langy. Keyboard navigation keeps the caret
 in the search field and identifies its active result; Enter opens it, modifier

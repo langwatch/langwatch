@@ -6,7 +6,7 @@ import { gzipSync } from "node:zlib";
    chunk that entry imports. Measured 2026-10-23 on Preact; a little headroom above each.
    Search grew by its result icons the same day. */
 export const INTERACTION_BUDGETS = {
-  contextMenusInteractionGzip: 95_000,
+  contextMenusInteractionGzip: 3_000,
   searchInteractionGzip: 6_000,
   playgroundInteractionGzip: 24_500,
 };

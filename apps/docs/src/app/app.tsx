@@ -21,7 +21,7 @@ import "./docs.css";
 /** The page list the 404 island matches a missing address against. */
 const notFoundPages = notFoundIndex({ sections: nav.anchors, pages: nav.pages });
 
-/** Every recipe, for the prerender; each browser island selects its own (`island-theme.ts`). */
+/** Every recipe, for the prerender; no browser island loads the design system. */
 const docsSystem = createDesignSystem(docsTheme);
 
 export type AppProps = {

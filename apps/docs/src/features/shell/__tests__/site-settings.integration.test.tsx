@@ -107,16 +107,14 @@ describe("when docs.json lists contextual options", () => {
 
   /** @scenario "Offer the configured page actions" */
   it("offers exactly the configured actions in order", () => {
-    const html = render(
-      <PageMenu slug="guide" actions={["mcp", "claude", "cursor"]} initialOpen />,
-    );
+    const html = render(<PageMenu slug="guide" actions={["mcp", "claude", "cursor"]} />);
     const titles = [
       ...html.matchAll(
         /(Copy MCP server URL|Open in Claude|Connect to Cursor|Open in ChatGPT|View as Markdown|Connect to VS Code)/g,
       ),
     ].map((match) => match[1]);
     expect(titles).toEqual(["Copy MCP server URL", "Open in Claude", "Connect to Cursor"]);
-    const all = render(<PageMenu slug="guide" actions={[...CONTEXTUAL_OPTIONS]} initialOpen />);
+    const all = render(<PageMenu slug="guide" actions={[...CONTEXTUAL_OPTIONS]} />);
     for (const title of ["Copy page", "View as Markdown", "Open in ChatGPT", "Connect to VS Code"])
       expect(all).toContain(title);
   });

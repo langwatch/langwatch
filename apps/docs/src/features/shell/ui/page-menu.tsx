@@ -1,7 +1,6 @@
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, IconButton, Text } from "@langwatch/design-system/primitives";
 import { Check, ChevronDown, Code, Copy, FileText, Link2, Plug } from "lucide-react";
-import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { canonicalUrl, sitePath } from "../../../lib/site-path.ts";
@@ -28,17 +27,30 @@ function MenuLabel({
   title,
   description,
   shortcut,
+  copied,
 }: {
   icon: ReactNode;
   title: string;
   description: string;
   shortcut?: string;
+  /** The title and check mark a copy action switches to once it has copied. */
+  copied?: string;
 }) {
   return (
     <>
-      <span className="docs-menu-icon">{icon}</span>
+      <span className="docs-menu-icon">
+        {icon}
+        {copied ? <Check size={16} style={{ display: "none" }} /> : null}
+      </span>
       <Box minWidth="0" flex="1">
-        <Text as="span" display="block" fontWeight="500" whiteSpace="nowrap">
+        <Text
+          as="span"
+          display="block"
+          fontWeight="500"
+          whiteSpace="nowrap"
+          data-docs-menu-title=""
+          data-copied={copied}
+        >
           {title}
         </Text>
         <Text as="span" display="block" fontSize="12px" lineHeight="18px" color="fg.muted">
@@ -49,38 +61,15 @@ function MenuLabel({
     </>
   );
 }
-export function PageMenu({
-  slug,
-  actions,
-  initialOpen = false,
-}: {
-  slug: string;
-  actions: ContextualOption[];
-  initialOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(initialOpen);
-  const [copied, setCopied] = useState("");
-  const [error, setError] = useState(false);
+
+/**
+ * The page actions: a trigger, and the design system's menu drawn at build time into an inert
+ * template beside it. The context menus island shows that markup as a popover and runs the copy
+ * actions, so opening the menu downloads no component runtime.
+ */
+export function PageMenu({ slug, actions }: { slug: string; actions: ContextualOption[] }) {
   const url = canonicalUrl({ slug });
   const prompt = `Read ${url} and help me understand this page.`;
-  const copy = async (kind: string) => {
-    try {
-      let text = kind === "mcp" ? LANGWATCH_MCP_URL : url;
-      if (kind === "page") {
-        const response = await fetch(sitePath({ path: `/${slug}.md` }), { credentials: "omit" });
-        if (!response.ok) throw new Error("Markdown unavailable");
-        text = await response.text();
-      }
-      await navigator.clipboard.writeText(text);
-      setCopied(kind);
-      setError(false);
-    } catch {
-      setError(true);
-    }
-  };
-  const announcement = error
-    ? "Could not copy. Open the Markdown to select it."
-    : copied && "Copied to clipboard";
   const logo = (name: string) => (
     <img src={sitePath({ path: `/images/logos/${name}.svg` })} alt="" width={16} height={16} />
   );
@@ -105,10 +94,11 @@ export function PageMenu({
   );
   const items: Record<ContextualOption, () => ReactNode> = {
     copy: () => (
-      <Menu.Item key="copy" value="copy" closeOnSelect={false} onSelect={() => void copy("page")}>
+      <Menu.Item key="copy" value="copy" data-docs-menu-copy="page">
         <MenuLabel
-          icon={copied === "page" ? <Check size={16} /> : <Copy size={16} />}
-          title={copied === "page" ? "Copied page" : "Copy page"}
+          icon={<Copy size={16} />}
+          title="Copy page"
+          copied="Copied page"
           description="As Markdown, for LLMs"
           shortcut="Alt+Shift+C"
         />
@@ -169,59 +159,60 @@ export function PageMenu({
         description: "Install the LangWatch MCP server",
       }),
     mcp: () => (
-      <Menu.Item key="mcp" value="mcp" closeOnSelect={false} onSelect={() => void copy("mcp")}>
+      <Menu.Item key="mcp" value="mcp" data-docs-menu-copy={LANGWATCH_MCP_URL}>
         <MenuLabel
-          icon={copied === "mcp" ? <Check size={16} /> : <Plug size={16} />}
-          title={copied === "mcp" ? "Copied MCP server URL" : "Copy MCP server URL"}
+          icon={<Plug size={16} />}
+          title="Copy MCP server URL"
+          copied="Copied MCP server URL"
           description="Connect any MCP client to LangWatch"
         />
       </Menu.Item>
     ),
   };
   return (
-    <Menu.Root
-      open={open}
-      onOpenChange={({ open: next }) => setOpen(next)}
-      positioning={{ placement: "bottom-end", gutter: 6 }}
-    >
-      <Menu.Trigger asChild>
-        <IconButton
-          data-docs-page-menu=""
-          type="button"
-          variant="outline"
-          colorPalette="gray"
-          size="sm"
-          height="32px"
-          minHeight="32px"
-          minWidth="32px"
-          width="32px"
-          aria-label="More page actions"
-          borderStartRadius={actions.includes("copy") ? "0" : undefined}
-          marginInlineStart={actions.includes("copy") ? "-1px" : undefined}
-        >
-          <ChevronDown size={14} />
-        </IconButton>
-      </Menu.Trigger>
-      <Menu.Content
-        className="docs-context-menu"
-        width="310px"
-        maxWidth="calc(100vw - 32px)"
-        padding="1.5"
-        aria-label="Page actions"
+    <>
+      <IconButton
+        data-docs-page-menu=""
+        type="button"
+        variant="outline"
+        colorPalette="gray"
+        size="sm"
+        height="32px"
+        minHeight="32px"
+        minWidth="32px"
+        width="32px"
+        aria-label="More page actions"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        borderStartRadius={actions.includes("copy") ? "0" : undefined}
+        marginInlineStart={actions.includes("copy") ? "-1px" : undefined}
       >
-        {actions.map((action) => items[action]())}
-        <Menu.Separator />
-        <Menu.Item value="link" closeOnSelect={false} onSelect={() => void copy("link")}>
-          <MenuLabel
-            icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} />}
-            title={copied === "link" ? "Copied link" : "Copy page link"}
-            description="Share a direct link to this page"
-          />
-        </Menu.Item>
-        <Text as="output" aria-live="polite" className={error ? "docs-copy-error" : "docs-sr-only"}>
-          {announcement}
-        </Text>
-      </Menu.Content>
-    </Menu.Root>
+        <ChevronDown size={14} />
+      </IconButton>
+      <template>
+        <Menu.Root open>
+          <Menu.Content
+            portalled={false}
+            className="docs-context-menu"
+            width="310px"
+            maxWidth="calc(100vw - 32px)"
+            padding="1.5"
+            aria-label="Page actions"
+          >
+            {actions.map((action) => items[action]())}
+            <Menu.Separator />
+            <Menu.Item value="link" data-docs-menu-copy={url}>
+              <MenuLabel
+                icon={<Link2 size={16} />}
+                title="Copy page link"
+                copied="Copied link"
+                description="Share a direct link to this page"
+              />
+            </Menu.Item>
+            <output aria-live="polite" className="docs-sr-only" />
+          </Menu.Content>
+        </Menu.Root>
+      </template>
+    </>
   );
 }
