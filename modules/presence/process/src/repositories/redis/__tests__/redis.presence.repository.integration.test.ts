@@ -111,9 +111,13 @@ describe.skipIf(!redisUrl)("given the Redis presence repository", () => {
         { timeout: 3_000, interval: 100 },
       );
       const sessions = await repository.findByProject(projectId);
+      clock = START + 2_000;
+      await repository.findByProject(projectId);
 
       expect(removed).toBe(true);
+      expect(await redis.zscore(indexKey(projectId), "left")).toBeNull();
       expect(sessions.map((s) => s.sessionId)).toEqual(["live"]);
+      expect(await redis.zrange(indexKey(projectId), 0, -1)).toEqual(["live"]);
     });
   });
 
