@@ -197,7 +197,7 @@ func callAPI(ctx context.Context, c apiCall) (apiResult, error) {
 		req.Header.Set("X-Auth-Token", c.key)
 	}
 	secrets := append([]string{c.key}, c.scrubs...)
-	resp, err := (&http.Client{Timeout: apiHTTPTimeout}).Do(req)
+	resp, err := localHTTPClient(apiHTTPTimeout).Do(req)
 	if err != nil {
 		return apiResult{}, errors.New(scrub(fmt.Sprintf("haven: %v", err), secrets...))
 	}

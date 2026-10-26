@@ -158,7 +158,7 @@ func signIn(ctx context.Context, base *url.URL, email, password string) ([]*http
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Origin", origin)
-		resp, err := (&http.Client{Timeout: authHTTPTimeout}).Do(req)
+		resp, err := localHTTPClient(authHTTPTimeout).Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("could not reach %s: %w", origin, err)
 		}
