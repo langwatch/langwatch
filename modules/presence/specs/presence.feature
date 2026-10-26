@@ -102,6 +102,22 @@ Feature: Collaborative presence
     When presence reads the project's settings
     Then the project is unknown
 
+  # Listing reads a per-project index; a keyspace scan cost each listing tens of thousands
+  # of Redis round trips on a shared instance.
+  @integration
+  Scenario: Listing a project's sessions never scans the keyspace
+    Given sessions heartbeating in two projects
+    When presence lists one project's sessions
+    Then it returns that project's sessions once each
+    And it does not scan the keyspace
+
+  @integration
+  Scenario: A session that left or stopped heartbeating is not listed
+    Given one session that left and one whose TTL passed
+    When presence lists the project's sessions
+    Then neither is listed
+    And the project's index expires with its last session
+
   # The presenter is the existing session-person context the door binds, with image (rulings
   # 2026-10-05, "Presence presenter"); presence keeps no user peer.
   @unit
