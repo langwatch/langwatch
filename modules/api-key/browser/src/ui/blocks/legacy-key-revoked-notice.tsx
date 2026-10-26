@@ -8,8 +8,8 @@ export function LegacyKeyRevokedNotice() {
       title="The legacy project key no longer works"
       data-testid="legacy-key-revoked-notice"
     >
-      Create this key and put it wherever the legacy key was used. If you close this drawer, the
-      project has no key until you create one.
+      Create this key and put it wherever the legacy key was used. If you close this drawer, this
+      project may have no working key until you create one.
     </Banner>
   );
 }
