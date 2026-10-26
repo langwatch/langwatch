@@ -377,6 +377,28 @@ function PermissionsField({
   );
 }
 
+const CREATE_KEY_COPY = {
+  title: "Create new secret key",
+  submitLabel: "Create secret key",
+  defaultName: "",
+  notice: null,
+};
+
+const REPLACE_LEGACY_KEY_COPY = {
+  title: "Replace the legacy project key",
+  submitLabel: "Create key and revoke legacy key",
+  defaultName: "Replaces legacy project key",
+  notice: (
+    <Banner
+      status="warning"
+      title="The legacy project key stops working once this key is created"
+      data-testid="legacy-key-replace-notice"
+    >
+      Put the new key wherever the legacy key was used. It is shown only once.
+    </Banner>
+  ),
+};
+
 export function CreateApiKeyDrawer({
   isOpen,
   isCreating,
@@ -389,6 +411,7 @@ export function CreateApiKeyDrawer({
   currentProjectId,
   onClose,
   onCreate,
+  replacesLegacyKey = false,
 }: {
   isOpen: boolean;
   isCreating: boolean;
@@ -401,8 +424,11 @@ export function CreateApiKeyDrawer({
   currentProjectId?: string;
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
+  /** Opened from the legacy key row: the new key replaces it, which is revoked on create. */
+  replacesLegacyKey?: boolean;
 }) {
   const host = useApiKeyHost();
+  const copy = replacesLegacyKey ? REPLACE_LEGACY_KEY_COPY : CREATE_KEY_COPY;
   const currentUserId = host.currentUser()?.id ?? "";
 
   const [name, setName] = useState("");
@@ -471,7 +497,7 @@ export function CreateApiKeyDrawer({
 
   const resetForm = () => {
     setAttempted(false);
-    setName("");
+    setName(copy.defaultName);
     setDescription("");
     setExpirationPreset(EXPIRATION_UNCHOSEN);
     setCustomDate("");
@@ -490,7 +516,7 @@ export function CreateApiKeyDrawer({
     // deliberately not when anything the reset writes changes — listing those
     // would re-run the reset over the reader's own edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, currentUserId]);
+  }, [isOpen, currentUserId, replacesLegacyKey]);
 
   const handleCreate = () => {
     if (isCreating) return;
@@ -544,12 +570,12 @@ export function CreateApiKeyDrawer({
         onClose();
         resetForm();
       }}
-      title="Create new secret key"
+      title={copy.title}
       footer={{
         cancel: { onClick: onClose },
         busy: isCreating,
         primaryAction: {
-          label: "Create secret key",
+          label: copy.submitLabel,
           onClick: handleCreate,
           loading: isCreating,
           disabledReason: accessBlocked ? accessReason(myBindings) : void 0,
@@ -559,6 +585,7 @@ export function CreateApiKeyDrawer({
     >
       <VStack gap={5} align="start">
         {accessBlocked && <AccessNote myBindings={myBindings} />}
+        {copy.notice}
         {/* Key type — only admins can create service keys */}
         {isAdmin && (
           <KeyTypeField

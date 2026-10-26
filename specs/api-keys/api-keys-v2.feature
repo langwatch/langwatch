@@ -94,8 +94,8 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       When "ada" opens the API keys of project "alpha"
       Then a row "Project key" with a "Legacy" badge is listed, scoped to project "alpha"
       And it shows when the key was last used
-      And its only action is Revoke
-      And no control copies or rotates it
+      And its actions are "Replace with an API key" and Revoke
+      And no control copies it or hands out a new legacy key
 
     @integration
     Scenario: The legacy key status answers when the key was last used
@@ -123,6 +123,22 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       When "ada" opens the API keys of project "gamma"
       Then the legacy key status answers absent
       And no legacy row is shown
+
+    @integration
+    Scenario: Replacing the legacy key creates an API key and revokes the legacy one
+      Given "ada" chose "Replace with an API key" on the legacy key row of project "alpha"
+      Then the create key drawer opens on project "alpha", warning that the legacy key stops working once the key is created
+      When she chooses "Create key and revoke legacy key"
+      Then a new API key is created and its token is shown once
+      And the legacy key of project "alpha" is revoked
+      And the legacy key row is gone
+
+    @integration
+    Scenario: A failed revoke after the replacement still shows the new key
+      Given "ada" is replacing the legacy key of project "alpha"
+      When the new key is created but the revoke fails
+      Then the new token is still shown once
+      And an error says the legacy key still works and can be revoked from its row
 
     @integration
     Scenario: Revoking the legacy key asks for the project name

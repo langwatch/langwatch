@@ -252,11 +252,13 @@ function LegacyKeyTableRow({
   legacyKey,
   projectId,
   projectName,
+  onReplace,
   onRevoke,
 }: {
   legacyKey: LegacyKeyStatus;
   projectId: string;
   projectName: string | undefined;
+  onReplace: () => void;
   onRevoke: () => void;
 }) {
   return (
@@ -276,7 +278,7 @@ function LegacyKeyTableRow({
               </Badge>
             </HStack>
             <Text textStyle="caption" color="fg.muted" maxWidth="full" lineClamp={2}>
-              Replace it with a new key, then revoke it.
+              Replace it with an API key; it stops working once replaced.
             </Text>
           </VStack>
         </HStack>
@@ -321,6 +323,9 @@ function LegacyKeyTableRow({
             </Button>
           </Menu.Trigger>
           <Menu.Content>
+            <Menu.Item value="replace" data-testid="legacy-key-replace" onClick={onReplace}>
+              Replace with an API key
+            </Menu.Item>
             <Menu.Item
               value="revoke"
               color="fg.error"
@@ -369,6 +374,7 @@ export default function ApiKeysScreen() {
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
   const [isRevokingLegacyKey, setIsRevokingLegacyKey] = useState(false);
+  const [isReplacingLegacyKey, setIsReplacingLegacyKey] = useState(false);
 
   // The scopes the reader can see: the filter's options, and the names the
   // per-row chips resolve their ids to.
@@ -471,6 +477,7 @@ export default function ApiKeysScreen() {
           setNewToken(result.token);
           setNewKeyInput(input);
           void queryClient.apiKey.list.invalidate();
+          if (isReplacingLegacyKey) revokeReplacedLegacyKey();
         },
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't create API key" }),
       },
@@ -520,6 +527,26 @@ export default function ApiKeysScreen() {
     );
   };
 
+  // The new key is shown even when this revoke fails, so the reader never loses it.
+  const revokeReplacedLegacyKey = () => {
+    if (!scope.projectId) return;
+    revokeLegacyMutation.mutate(
+      { projectId: scope.projectId },
+      {
+        onSuccess: () => {
+          host.succeeded({ title: "Legacy project key replaced and revoked" });
+          void queryClient.project.getLegacyKeyStatus.invalidate();
+        },
+        onError: (error) =>
+          host.failed({
+            error,
+            fallbackTitle: "New key created, but the legacy project key still works",
+            description: "Revoke it from its row in the API keys list.",
+          }),
+      },
+    );
+  };
+
   const handleRevokeLegacyKey = () => {
     if (!scope.projectId) return;
     revokeLegacyMutation.mutate(
@@ -561,7 +588,14 @@ export default function ApiKeysScreen() {
           currentTeamId={scope.teamId}
           currentProjectId={scope.projectId}
         />
-        <PageLayout.HeaderButton primary onClick={onCreateOpen} data-testid="api-key-create">
+        <PageLayout.HeaderButton
+          primary
+          onClick={() => {
+            setIsReplacingLegacyKey(false);
+            onCreateOpen();
+          }}
+          data-testid="api-key-create"
+        >
           <Plus size={16} />
           Create new secret key
         </PageLayout.HeaderButton>
@@ -611,6 +645,10 @@ export default function ApiKeysScreen() {
                     legacyKey={legacyKey}
                     projectId={scope.projectId}
                     projectName={scope.projectName}
+                    onReplace={() => {
+                      setIsReplacingLegacyKey(true);
+                      onCreateOpen();
+                    }}
                     onRevoke={() => setIsRevokingLegacyKey(true)}
                   />
                 )}
@@ -654,6 +692,7 @@ export default function ApiKeysScreen() {
           currentProjectId={scope.projectId}
           onClose={onCreateClose}
           onCreate={handleCreate}
+          replacesLegacyKey={isReplacingLegacyKey}
         />
 
         <EditApiKeyDrawer
@@ -681,6 +720,7 @@ export default function ApiKeysScreen() {
           onClose={() => {
             setNewToken(null);
             setNewKeyInput(null);
+            setIsReplacingLegacyKey(false);
             onCreateClose();
           }}
         />
