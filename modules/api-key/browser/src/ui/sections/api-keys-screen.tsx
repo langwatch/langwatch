@@ -33,6 +33,7 @@ import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { type LegacyKeyStatus, useLegacyKey } from "../../behavior/use-legacy-key-status.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
 import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
+import type { CreateApiKeyInput } from "../../model/api-key-permissions.ts";
 import {
   filterRowsByScope,
   scopeFilterAddressWrite,
@@ -40,10 +41,12 @@ import {
   scopeHierarchyOf,
   type ScopeFilterValue,
 } from "../../model/api-key-scope-filter.ts";
+import { legacyKeyReplacementInput } from "../../model/legacy-key-replacement.ts";
 import { IngestionKeysSection } from "../blocks/ingestion-keys-section.tsx";
+import { LegacyProjectKeyBanner } from "../blocks/legacy-project-key-banner.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";
 import { RevokeLegacyKeyDialog } from "../blocks/revoke-legacy-key-dialog.tsx";
-import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./create-api-key-drawer.tsx";
+import { CreateApiKeyDrawer } from "./create-api-key-drawer.tsx";
 import { EditApiKeyDrawer } from "./edit-api-key-drawer.tsx";
 import { TokenCreatedDialog } from "./token-created-dialog.tsx";
 
@@ -252,13 +255,11 @@ function LegacyKeyTableRow({
   legacyKey,
   projectId,
   projectName,
-  onReplace,
   onRevoke,
 }: {
   legacyKey: LegacyKeyStatus;
   projectId: string;
   projectName: string | undefined;
-  onReplace: () => void;
   onRevoke: () => void;
 }) {
   return (
@@ -278,7 +279,7 @@ function LegacyKeyTableRow({
               </Badge>
             </HStack>
             <Text textStyle="caption" color="fg.muted" maxWidth="full" lineClamp={2}>
-              Replace it with an API key; it stops working once replaced.
+              Revoke it to get an API key in its place.
             </Text>
           </VStack>
         </HStack>
@@ -323,9 +324,6 @@ function LegacyKeyTableRow({
             </Button>
           </Menu.Trigger>
           <Menu.Content>
-            <Menu.Item value="replace" data-testid="legacy-key-replace" onClick={onReplace}>
-              Replace with an API key
-            </Menu.Item>
             <Menu.Item
               value="revoke"
               color="fg.error"
@@ -374,7 +372,6 @@ export default function ApiKeysScreen() {
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
   const [isRevokingLegacyKey, setIsRevokingLegacyKey] = useState(false);
-  const [isReplacingLegacyKey, setIsReplacingLegacyKey] = useState(false);
 
   // The scopes the reader can see: the filter's options, and the names the
   // per-row chips resolve their ids to.
@@ -453,7 +450,7 @@ export default function ApiKeysScreen() {
     document.getElementById(anchorId)?.scrollIntoView({ block: "center" });
   }, [isLoadingKeys, anchorId]);
 
-  const handleCreate = (input: CreateApiKeyInput): void => {
+  const handleCreate = (input: CreateApiKeyInput, onCreated?: () => void): void => {
     const problem = createInputProblem(input);
     if (problem) {
       host.failed({ error: void 0, ...problem });
@@ -477,7 +474,7 @@ export default function ApiKeysScreen() {
           setNewToken(result.token);
           setNewKeyInput(input);
           void queryClient.apiKey.list.invalidate();
-          if (isReplacingLegacyKey) revokeReplacedLegacyKey();
+          onCreated?.();
         },
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't create API key" }),
       },
@@ -527,40 +524,43 @@ export default function ApiKeysScreen() {
     );
   };
 
-  // The new key is shown even when this revoke fails, so the reader never loses it.
-  const revokeReplacedLegacyKey = () => {
-    if (!scope.projectId) return;
-    revokeLegacyMutation.mutate(
-      { projectId: scope.projectId },
-      {
-        onSuccess: () => {
-          host.succeeded({ title: "Legacy project key replaced and revoked" });
-          void queryClient.project.getLegacyKeyStatus.invalidate();
-        },
-        onError: (error) =>
-          host.failed({
-            error,
-            fallbackTitle: "New key created, but the legacy project key still works",
-            description: "Revoke it from its row in the API keys list.",
-          }),
-      },
-    );
-  };
-
+  // The replacement key is created first, so a failed create leaves the legacy
+  // key working; the new token is shown even when the revoke after it fails.
   const handleRevokeLegacyKey = () => {
-    if (!scope.projectId) return;
-    revokeLegacyMutation.mutate(
-      { projectId: scope.projectId },
-      {
-        onSuccess: () => {
-          setIsRevokingLegacyKey(false);
-          host.succeeded({ title: "Legacy project key revoked" });
-          void queryClient.project.getLegacyKeyStatus.invalidate();
+    const projectId = scope.projectId;
+    if (!projectId) return;
+    const revokeLegacyKey = () =>
+      revokeLegacyMutation.mutate(
+        { projectId },
+        {
+          onSuccess: () => {
+            host.succeeded({ title: "Legacy project key revoked" });
+            void queryClient.project.getLegacyKeyStatus.invalidate();
+          },
+          onError: (error) =>
+            host.failed({
+              error,
+              fallbackTitle: "New key created, but the legacy project key still works",
+              description: "Revoke it again from its row in the API keys list.",
+            }),
+          onSettled: () => setIsRevokingLegacyKey(false),
         },
-        onError: (error) =>
-          host.failed({ error, fallbackTitle: "Couldn't revoke the legacy project key" }),
-      },
-    );
+      );
+    const replacement = legacyKeyReplacementInput({
+      projectId,
+      isOrganizationAdmin: isAdmin,
+      reader: { myBindings: myBindings.data, organizationId, orgProjects: orgProjects.data ?? [] },
+    });
+    if (!replacement) {
+      setIsRevokingLegacyKey(false);
+      host.failed({
+        error: undefined,
+        fallbackTitle: "Couldn't revoke the legacy project key",
+        description: "Your role can't create a key that sends traces. Ask an organization admin.",
+      });
+      return;
+    }
+    handleCreate(replacement, revokeLegacyKey);
   };
 
   const getScopeBadge = (apiKeyRow: ApiKeyRow) => {
@@ -588,14 +588,7 @@ export default function ApiKeysScreen() {
           currentTeamId={scope.teamId}
           currentProjectId={scope.projectId}
         />
-        <PageLayout.HeaderButton
-          primary
-          onClick={() => {
-            setIsReplacingLegacyKey(false);
-            onCreateOpen();
-          }}
-          data-testid="api-key-create"
-        >
+        <PageLayout.HeaderButton primary onClick={onCreateOpen} data-testid="api-key-create">
           <Plus size={16} />
           Create new secret key
         </PageLayout.HeaderButton>
@@ -605,6 +598,8 @@ export default function ApiKeysScreen() {
           Keys that let your code and tools talk to LangWatch. Do not share your API keys or expose
           them in the browser or other client-side code.
         </Text>
+
+        {legacyKey && <LegacyProjectKeyBanner onRevoke={() => setIsRevokingLegacyKey(true)} />}
 
         <VStack gap={8} width="full" align="stretch">
           {/* Personal + service keys (ingestSourceType == null); the page heading titles them. */}
@@ -645,10 +640,6 @@ export default function ApiKeysScreen() {
                     legacyKey={legacyKey}
                     projectId={scope.projectId}
                     projectName={scope.projectName}
-                    onReplace={() => {
-                      setIsReplacingLegacyKey(true);
-                      onCreateOpen();
-                    }}
                     onRevoke={() => setIsRevokingLegacyKey(true)}
                   />
                 )}
@@ -691,8 +682,7 @@ export default function ApiKeysScreen() {
           currentTeamId={scope.teamId}
           currentProjectId={scope.projectId}
           onClose={onCreateClose}
-          onCreate={handleCreate}
-          replacesLegacyKey={isReplacingLegacyKey}
+          onCreate={(input) => handleCreate(input)}
         />
 
         <EditApiKeyDrawer
@@ -720,7 +710,6 @@ export default function ApiKeysScreen() {
           onClose={() => {
             setNewToken(null);
             setNewKeyInput(null);
-            setIsReplacingLegacyKey(false);
             onCreateClose();
           }}
         />
@@ -733,9 +722,9 @@ export default function ApiKeysScreen() {
         />
 
         <RevokeLegacyKeyDialog
-          open={isRevokingLegacyKey}
-          projectName={scope.projectName ?? "revoke"}
-          isRevoking={revokeLegacyMutation.isPending}
+          open={isRevokingLegacyKey && !newToken}
+          projectName={scope.projectName}
+          isRevoking={createMutation.isPending || revokeLegacyMutation.isPending}
           onClose={() => setIsRevokingLegacyKey(false)}
           onConfirm={handleRevokeLegacyKey}
         />

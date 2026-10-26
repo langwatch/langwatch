@@ -65,10 +65,10 @@ Feature: Unified API Keys
     Then the row for "CI Pipeline" carries that anchor id
     And it is scrolled into view once the keys have loaded
 
-  Scenario: The legacy project key can only be replaced or revoked from the keys page
+  Scenario: The legacy project key can only be revoked from the keys page
     Given the project has a legacy per-project service key
     When I navigate to Settings > API Keys
-    Then its row offers "Replace with an API key" and Revoke only
+    Then its row offers Revoke only, which swaps it for an API key
     And no control copies the project key or hands out a new one
 
   Scenario: Ingestion key names the device session that minted it

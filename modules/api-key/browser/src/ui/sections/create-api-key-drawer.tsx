@@ -5,7 +5,7 @@
  */
 
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
-import type { ApiKeyRole, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
+import type { ApiKeyRole } from "@langwatch/api-key-contract";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
@@ -21,7 +21,6 @@ import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { SettingsField } from "@langwatch/design-system/settings-field";
-import type { Instant } from "@langwatch/time";
 import { TriangleAlert } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
@@ -35,6 +34,7 @@ import {
 } from "../../model/api-key-form.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
+  type CreateApiKeyInput,
   deriveBindingRole,
   getUserPermissionsAtScope,
   type PermissionMode,
@@ -54,19 +54,6 @@ type MyBindings = {
 
 type OrgProject = { id: string; name: string; teamId: string };
 type OrgTeam = { id: string; name: string };
-
-export type CreateApiKeyInput = {
-  name: string;
-  description: string;
-  expiresAt: Instant | undefined;
-  permissionMode: PermissionMode;
-  keyType: "personal" | "service";
-  assignedToUserId?: string;
-  scopeType: string;
-  scopeId: string;
-  permissions?: string[];
-  bindings: ApiKeyTrpcGrant[];
-};
 
 type CreateKeyForm = {
   name: string;
@@ -377,28 +364,6 @@ function PermissionsField({
   );
 }
 
-const CREATE_KEY_COPY = {
-  title: "Create new secret key",
-  submitLabel: "Create secret key",
-  defaultName: "",
-  notice: null,
-};
-
-const REPLACE_LEGACY_KEY_COPY = {
-  title: "Replace the legacy project key",
-  submitLabel: "Create key and revoke legacy key",
-  defaultName: "Replaces legacy project key",
-  notice: (
-    <Banner
-      status="warning"
-      title="The legacy project key stops working once this key is created"
-      data-testid="legacy-key-replace-notice"
-    >
-      Put the new key wherever the legacy key was used. It is shown only once.
-    </Banner>
-  ),
-};
-
 export function CreateApiKeyDrawer({
   isOpen,
   isCreating,
@@ -411,7 +376,6 @@ export function CreateApiKeyDrawer({
   currentProjectId,
   onClose,
   onCreate,
-  replacesLegacyKey = false,
 }: {
   isOpen: boolean;
   isCreating: boolean;
@@ -424,11 +388,8 @@ export function CreateApiKeyDrawer({
   currentProjectId?: string;
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
-  /** Opened from the legacy key row: the new key replaces it, which is revoked on create. */
-  replacesLegacyKey?: boolean;
 }) {
   const host = useApiKeyHost();
-  const copy = replacesLegacyKey ? REPLACE_LEGACY_KEY_COPY : CREATE_KEY_COPY;
   const currentUserId = host.currentUser()?.id ?? "";
 
   const [name, setName] = useState("");
@@ -497,7 +458,7 @@ export function CreateApiKeyDrawer({
 
   const resetForm = () => {
     setAttempted(false);
-    setName(copy.defaultName);
+    setName("");
     setDescription("");
     setExpirationPreset(EXPIRATION_UNCHOSEN);
     setCustomDate("");
@@ -516,7 +477,7 @@ export function CreateApiKeyDrawer({
     // deliberately not when anything the reset writes changes — listing those
     // would re-run the reset over the reader's own edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, currentUserId, replacesLegacyKey]);
+  }, [isOpen, currentUserId]);
 
   const handleCreate = () => {
     if (isCreating) return;
@@ -570,12 +531,12 @@ export function CreateApiKeyDrawer({
         onClose();
         resetForm();
       }}
-      title={copy.title}
+      title="Create new secret key"
       footer={{
         cancel: { onClick: onClose },
         busy: isCreating,
         primaryAction: {
-          label: copy.submitLabel,
+          label: "Create secret key",
           onClick: handleCreate,
           loading: isCreating,
           disabledReason: accessBlocked ? accessReason(myBindings) : void 0,
@@ -585,7 +546,6 @@ export function CreateApiKeyDrawer({
     >
       <VStack gap={5} align="start">
         {accessBlocked && <AccessNote myBindings={myBindings} />}
-        {copy.notice}
         {/* Key type — only admins can create service keys */}
         {isAdmin && (
           <KeyTypeField

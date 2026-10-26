@@ -23,6 +23,8 @@ const { state } = vi.hoisted(() => ({
     createToken: "sk-lw-mintedtokenvalue0001",
     legacyKey: undefined as { present: boolean; lastUsedAt: string | null } | undefined,
     legacyRevokeFails: false,
+    createFails: false,
+    myBindings: [] as Record<string, unknown>[],
   },
 }));
 
@@ -43,7 +45,7 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
     }),
     apiKey: {
       list: { useQuery: () => ({ data: state.keys, isLoading: false }) },
-      myBindings: { useQuery: () => ({ data: [], isLoading: false }) },
+      myBindings: { useQuery: () => ({ data: state.myBindings, isLoading: false }) },
       orgProjects: {
         useQuery: () => ({
           data: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
@@ -57,8 +59,12 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
       create: {
         useMutation: () => ({
           isPending: false,
-          mutate: (input: unknown, handlers: { onSuccess: (r: unknown) => void }) => {
+          mutate: (
+            input: unknown,
+            handlers: { onSuccess: (r: unknown) => void; onError: (error: Error) => void },
+          ) => {
             mutations.create(input);
+            if (state.createFails) return handlers.onError(new Error("refused"));
             handlers.onSuccess({ token: state.createToken });
           },
         }),
@@ -207,6 +213,8 @@ beforeEach(() => {
   state.members = [];
   state.legacyKey = void 0;
   state.legacyRevokeFails = false;
+  state.createFails = false;
+  state.myBindings = [];
   mutations.create.mockClear();
   mutations.revoke.mockClear();
   mutations.revokeLegacy.mockClear();
@@ -411,11 +419,17 @@ describe("given keys bound at different scopes", () => {
 const LIVE_LEGACY_KEY = { present: true, lastUsedAt: "2026-10-25T12:00:00.000Z" };
 const ADMIN = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
 
+const confirmLegacyRevoke = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Revoke" }));
+  await user.click(await screen.findByTestId("legacy-key-revoke-confirm"));
+};
+
 describe("given the project still has a legacy key", () => {
   describe("when an organization admin opens the keys page", () => {
     /** @scenario The legacy key is listed as a row an admin can revoke */
-    /** @scenario The legacy project key can only be replaced or revoked from the keys page */
-    it("lists it with a Legacy badge, its project and last use, and offers Replace and Revoke", async () => {
+    /** @scenario The legacy project key can only be revoked from the keys page */
+    it("lists it with a Legacy badge, its project and last use, and offers only Revoke", async () => {
       const user = userEvent.setup();
       state.members = ADMIN;
       state.legacyKey = LIVE_LEGACY_KEY;
@@ -426,14 +440,37 @@ describe("given the project still has a legacy key", () => {
       expect(within(row).getByText("Web App")).toBeInTheDocument();
       expect(within(row).queryByText("Never used")).toBeNull();
       expect(screen.queryByRole("button", { name: "Copy secret key" })).toBeNull();
-      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
 
       await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
       const actions = await screen.findAllByRole("menuitem");
-      expect(actions.map((action) => action.textContent)).toEqual([
-        "Replace with an API key",
-        "Revoke",
-      ]);
+      expect(actions.map((action) => action.textContent)).toEqual(["Revoke"]);
+    });
+
+    /** @scenario A banner tells an admin that legacy project keys are going away */
+    it("shows the banner until the legacy key is revoked", () => {
+      state.members = ADMIN;
+      state.legacyKey = LIVE_LEGACY_KEY;
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+
+      const banner = screen.getByTestId("legacy-project-key-banner");
+      expect(banner).toHaveTextContent("Legacy project keys are going away");
+      expect(within(banner).getByRole("button", { name: "Revoke and replace" })).toBeInTheDocument();
+    });
+
+    /** @scenario The banner's button revokes and replaces the legacy key */
+    it("opens the revoke dialog from the banner", async () => {
+      const user = userEvent.setup();
+      state.members = ADMIN;
+      state.legacyKey = LIVE_LEGACY_KEY;
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+
+      await user.click(
+        within(screen.getByTestId("legacy-project-key-banner")).getByRole("button", {
+          name: "Revoke and replace",
+        }),
+      );
+
+      expect(await screen.findByTestId("legacy-key-revoke-confirm")).toBeInTheDocument();
     });
 
     it("lists it even when the organization has no other key", () => {
@@ -448,82 +485,84 @@ describe("given the project still has a legacy key", () => {
     });
   });
 
-  describe("when the admin replaces it with an API key", () => {
+  describe("when the admin revokes it", () => {
     beforeEach(() => {
       state.members = ADMIN;
       state.legacyKey = LIVE_LEGACY_KEY;
     });
 
-    /** @scenario Replacing the legacy key creates an API key and revokes the legacy one */
-    it("creates the key on this project, revokes the legacy key and shows the token once", async () => {
+    /** @scenario Revoking the legacy key says an API key takes its place */
+    it("says the key stops working and a new API key is shown once", async () => {
+      const user = userEvent.setup();
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+
+      await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Revoke" }));
+
+      expect(await screen.findByText("Revoke the legacy project key?")).toBeInTheDocument();
+      expect(screen.getByText(/stops working at once/)).toHaveTextContent(
+        /new API key for Web App .* show it to you once/,
+      );
+      expect(mutations.create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Revoking the legacy key swaps it for an API key */
+    it("creates a full-access key on this project, revokes the legacy key and shows the token", async () => {
       const user = userEvent.setup();
       const host = new FakeApiKeyHost();
       renderWithApiKeyHost(<ApiKeysScreen />, host);
 
-      await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Replace with an API key" }));
+      await confirmLegacyRevoke(user);
 
-      expect(await screen.findByTestId("legacy-key-replace-notice")).toBeInTheDocument();
-      expect(screen.getByTestId("api-key-name")).toHaveValue("Replaces legacy project key");
-      await user.click(await screen.findByText("Choose when this key expires"));
-      await user.click(await screen.findByRole("option", { name: "No expiration" }));
-      await user.click(screen.getByTestId("api-key-create-submit"));
-
-      await waitFor(() => expect(mutations.create).toHaveBeenCalled());
+      expect(mutations.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Project API Key",
+          description: "Project API Key",
+          expiresAt: undefined,
+          permissionMode: "all",
+          keyType: "service",
+          bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: "proj-1" }],
+        }),
+      );
       expect(mutations.revokeLegacy).toHaveBeenCalledWith({ projectId: "proj-1" });
       expect(mutations.invalidateLegacy).toHaveBeenCalled();
-      expect(host.successes).toContainEqual({ title: "Legacy project key replaced and revoked" });
+      expect(host.successes).toContainEqual({ title: "Legacy project key revoked" });
       expect(
-        within(await screen.findByTestId("token-created-key")).getByText("Replaces legacy project key"),
+        within(await screen.findByTestId("token-created-key")).getByText("Project API Key"),
       ).toBeInTheDocument();
     });
 
-    /** @scenario A failed revoke after the replacement still shows the new key */
+    /** @scenario A failed create leaves the legacy key working */
+    it("does not revoke the legacy key when the new key cannot be created", async () => {
+      const user = userEvent.setup();
+      state.createFails = true;
+      const host = new FakeApiKeyHost();
+      renderWithApiKeyHost(<ApiKeysScreen />, host);
+
+      await confirmLegacyRevoke(user);
+
+      await waitFor(() => expect(mutations.create).toHaveBeenCalled());
+      expect(mutations.revokeLegacy).not.toHaveBeenCalled();
+      expect(host.failures.map((failure) => failure.fallbackTitle)).toContain(
+        "Couldn't create API key",
+      );
+    });
+
+    /** @scenario A failed revoke after the swap still shows the new key */
     it("still shows the new token when the revoke fails, and says the legacy key still works", async () => {
       const user = userEvent.setup();
       state.legacyRevokeFails = true;
       const host = new FakeApiKeyHost();
       renderWithApiKeyHost(<ApiKeysScreen />, host);
 
-      await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Replace with an API key" }));
-      await user.click(await screen.findByText("Choose when this key expires"));
-      await user.click(await screen.findByRole("option", { name: "No expiration" }));
-      await user.click(screen.getByTestId("api-key-create-submit"));
+      await confirmLegacyRevoke(user);
 
       expect(
-        within(await screen.findByTestId("token-created-key")).getByText("Replaces legacy project key"),
+        within(await screen.findByTestId("token-created-key")).getByText("Project API Key"),
       ).toBeInTheDocument();
       expect(host.failures.map((failure) => failure.fallbackTitle)).toContain(
         "New key created, but the legacy project key still works",
       );
-    });
-  });
-
-  describe("when the admin revokes it", () => {
-    /** @scenario Revoking the legacy key asks for the project name */
-    /** @scenario A revoked legacy key leaves the list */
-    it("asks for the project name, then revokes it and refreshes the status", async () => {
-      const user = userEvent.setup();
-      state.members = ADMIN;
-      state.legacyKey = LIVE_LEGACY_KEY;
-      const host = new FakeApiKeyHost();
-      renderWithApiKeyHost(<ApiKeysScreen />, host);
-
-      await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Revoke" }));
-
-      expect(await screen.findByText("Revoke the legacy project key?")).toBeInTheDocument();
-      const confirm = () => screen.getByTestId("legacy-key-revoke-confirm");
-      await user.type(screen.getByTestId("legacy-key-revoke-name"), "Web Ap");
-      expect(confirm()).toBeDisabled();
-      await user.type(screen.getByTestId("legacy-key-revoke-name"), "p");
-      await waitFor(() => expect(confirm()).toBeEnabled());
-      await user.click(confirm());
-
-      expect(mutations.revokeLegacy).toHaveBeenCalledWith({ projectId: "proj-1" });
-      expect(mutations.invalidateLegacy).toHaveBeenCalled();
-      expect(host.successes).toContainEqual({ title: "Legacy project key revoked" });
     });
   });
 
@@ -539,6 +578,7 @@ describe("given the project still has a legacy key", () => {
       );
 
       expect(screen.queryByTestId("legacy-key-row")).toBeNull();
+      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
       expect(screen.queryByRole("alert")).toBeNull();
     });
   });
@@ -550,6 +590,41 @@ describe("given the project still has a legacy key", () => {
       renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
 
       expect(screen.getByTestId("legacy-key-row")).toBeInTheDocument();
+      expect(screen.getByTestId("legacy-project-key-banner")).toBeInTheDocument();
+    });
+
+    /** @scenario A project admin's swap gets a personal key with their role */
+    it("swaps it for a personal key with the admin role they hold on the project's team", async () => {
+      const user = userEvent.setup();
+      state.legacyKey = LIVE_LEGACY_KEY;
+      state.myBindings = [{ scopeType: "TEAM", scopeId: "team-1", role: "ADMIN" }];
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+
+      await confirmLegacyRevoke(user);
+
+      expect(mutations.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          keyType: "personal",
+          bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: "proj-1" }],
+        }),
+      );
+      expect(mutations.revokeLegacy).toHaveBeenCalledWith({ projectId: "proj-1" });
+    });
+
+    /** @scenario A swap whose new key could not send traces keeps the legacy key */
+    it("keeps the legacy key and creates nothing when their role could not send traces", async () => {
+      const user = userEvent.setup();
+      state.legacyKey = LIVE_LEGACY_KEY;
+      const host = new FakeApiKeyHost();
+      renderWithApiKeyHost(<ApiKeysScreen />, host);
+
+      await confirmLegacyRevoke(user);
+
+      expect(mutations.create).not.toHaveBeenCalled();
+      expect(mutations.revokeLegacy).not.toHaveBeenCalled();
+      expect(host.failures.map((failure) => failure.fallbackTitle)).toContain(
+        "Couldn't revoke the legacy project key",
+      );
     });
   });
 });
@@ -563,6 +638,7 @@ describe("given the project never had a legacy key", () => {
       renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
 
       expect(screen.queryByTestId("legacy-key-row")).toBeNull();
+      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
       expect(screen.queryByRole("alert")).toBeNull();
     });
   });

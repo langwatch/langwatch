@@ -94,8 +94,22 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       When "ada" opens the API keys of project "alpha"
       Then a row "Project key" with a "Legacy" badge is listed, scoped to project "alpha"
       And it shows when the key was last used
-      And its actions are "Replace with an API key" and Revoke
+      And its only action is Revoke
       And no control copies it or hands out a new legacy key
+
+    @integration
+    Scenario: A banner tells an admin that legacy project keys are going away
+      Given project "alpha" still has a live legacy key
+      When "ada" opens the API keys of project "alpha"
+      Then a warning banner titled "Legacy project keys are going away" says to use personal access tokens instead
+      And it offers "Revoke and replace"
+      And it stays until the legacy key is revoked
+
+    @integration
+    Scenario: The banner's button revokes and replaces the legacy key
+      Given project "alpha" still has a live legacy key
+      When "ada" clicks "Revoke and replace" on the banner
+      Then the same confirmation as the legacy row's Revoke opens
 
     @integration
     Scenario: The legacy key status answers when the key was last used
@@ -125,33 +139,49 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And no legacy row is shown
 
     @integration
-    Scenario: Replacing the legacy key creates an API key and revokes the legacy one
-      Given "ada" chose "Replace with an API key" on the legacy key row of project "alpha"
-      Then the create key drawer opens on project "alpha", warning that the legacy key stops working once the key is created
-      When she chooses "Create key and revoke legacy key"
-      Then a new API key is created and its token is shown once
-      And the legacy key of project "alpha" is revoked
-      And the legacy key row is gone
-
-    @integration
-    Scenario: A failed revoke after the replacement still shows the new key
-      Given "ada" is replacing the legacy key of project "alpha"
-      When the new key is created but the revoke fails
-      Then the new token is still shown once
-      And an error says the legacy key still works and can be revoked from its row
-
-    @integration
-    Scenario: Revoking the legacy key asks for the project name
+    Scenario: Revoking the legacy key says an API key takes its place
       Given "ada" chose Revoke on the legacy key row of project "alpha"
-      Then a dialog "Revoke the legacy project key?" says the key stops working at once and cannot be restored
-      And "Revoke for good" stays disabled until she types "alpha" exactly
+      Then a dialog "Revoke the legacy project key?" says the key stops working at once
+      And it says a new API key for project "alpha" is created and shown once
 
     @integration
-    Scenario: A revoked legacy key leaves the list
-      Given "ada" typed "alpha" in the revoke dialog
-      When she chooses "Revoke for good"
-      Then a toast says "Legacy project key revoked"
-      And the legacy key row is gone
+    Scenario: Revoking the legacy key swaps it for an API key
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      When they confirm
+      Then an API key "Project API Key" is created with full access to project "alpha" and no expiry
+      And its token is shown once
+      And the legacy key of project "alpha" is revoked
+      And a toast says "Legacy project key revoked"
+      And the legacy key row and the banner are gone
+
+    @integration
+    Scenario: A failed create leaves the legacy key working
+      Given "ada" confirmed Revoke on the legacy key row of project "alpha"
+      When the new API key cannot be created
+      Then the legacy key of project "alpha" is not revoked
+      And an error says the key could not be created
+
+    @integration
+    Scenario: A failed revoke after the swap still shows the new key
+      Given "ada" confirmed Revoke on the legacy key row of project "alpha"
+      When the new API key is created but the revoke fails
+      Then the new token is still shown once
+      And an error says the legacy key still works and can be revoked again from its row
+
+    @integration
+    Scenario: A project admin's swap gets a personal key with their role
+      Given "pat" administers the team that owns project "alpha" but not the organization
+      When "pat" confirms Revoke on the legacy key row of project "alpha"
+      Then a personal API key with the Admin role on project "alpha" is created
+      And the legacy key of project "alpha" is revoked
+
+    @integration
+    Scenario: A swap whose new key could not send traces keeps the legacy key
+      Given a reader who can manage project "alpha" holds no role on it that sends traces
+      When they confirm Revoke on the legacy key row of project "alpha"
+      Then no API key is created
+      And the legacy key of project "alpha" is not revoked
+      And an error says their role cannot create a key that sends traces
 
     @unit
     Scenario: A new project gets no customer-facing project key
