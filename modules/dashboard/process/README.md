@@ -878,7 +878,7 @@ type Response = z.infer<typeof dashboardDeletedResponseSchema>; // ../contract/s
 
 |             |                                              |
 | ----------- | -------------------------------------------- |
-| Declared at | `src/transport/dashboard.rest.ts:257`        |
+| Declared at | `src/transport/dashboard.rest.ts:258`        |
 | Base URL    | `/api/dashboards`, twin `/api/v1/dashboards` |
 | Addressing  | dated                                        |
 | Credential  | project                                      |
@@ -888,7 +888,7 @@ type Response = z.infer<typeof dashboardDeletedResponseSchema>; // ../contract/s
 
 List all dashboards for the project
 
-Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:262`.
+Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:263`.
 
 Answers only, undocumented, at `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`.
 
@@ -900,7 +900,7 @@ type Response = z.infer<typeof dashboardListResponseSchema>; // ../contract/src/
 
 Create a new dashboard
 
-Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:270`.
+Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:271`.
 
 Answers only, undocumented, at `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`.
 
@@ -913,7 +913,7 @@ type Response = z.infer<typeof dashboardResponseSchema>; // ../contract/src/dash
 
 Reorder dashboards by an ordered list of IDs
 
-Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:282`.
+Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:283`.
 
 Answers only, undocumented, at `/api/dashboards/2026-08-07/reorder`, `/api/v1/dashboards/2026-08-07/reorder`.
 
@@ -926,7 +926,7 @@ type Response = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/s
 
 Get a dashboard by its id, with its graphs
 
-Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:298`.
+Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:299`.
 
 Answers only, undocumented, at `/api/dashboards/2026-08-07/:reportId`, `/api/v1/dashboards/2026-08-07/:reportId`.
 
@@ -939,7 +939,7 @@ type Response = z.infer<typeof dashboardDetailResponseSchema>; // ../contract/sr
 
 Rename a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:312`.
+Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:313`.
 
 Answers only, undocumented, at `/api/dashboards/2026-08-07/:reportId`, `/api/v1/dashboards/2026-08-07/:reportId`.
 
@@ -953,7 +953,7 @@ type Response = z.infer<typeof dashboardResponseSchema>; // ../contract/src/dash
 
 Delete a dashboard and its graphs
 
-Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:330`.
+Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:331`.
 
 Answers only, undocumented, at `/api/dashboards/2026-08-07/:reportId`, `/api/v1/dashboards/2026-08-07/:reportId`.
 
