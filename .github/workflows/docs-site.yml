@@ -191,6 +191,32 @@ jobs:
             script: test:code-preference
             artifact: docs-site
             browser: true
+          - check: layout
+            name: Test page layout across widths and themes
+            script: test:layout
+            artifact: docs-site
+            browser: true
+          - check: polish
+            name: Test reading polish
+            script: test:polish
+            artifact: docs-site
+            browser: true
+          - check: news
+            name: Test the release strip
+            script: test:news
+            artifact: docs-site
+            browser: true
+          - check: refinement
+            name: Test reading refinements
+            script: test:refinement
+            artifact: docs-site
+            browser: true
+          - check: mount
+            name: Test the docs mount behind haven
+            script: test:mount --out-dir dist --base-path /docs
+            artifact: docs-site-mounted
+            browser: true
+            haven: true
           - check: links
             name: Check internal links
             # The production mount, so the URL ledger is checked at /docs.
@@ -225,6 +251,16 @@ jobs:
       - name: Install the test browser
         if: matrix.browser
         run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: matrix.haven
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      - name: Build haven
+        if: matrix.haven
+        run: |
+          go build -o "$RUNNER_TEMP/haven" ./cmd/haven
+          echo "DOCS_HAVEN_BINARY=$RUNNER_TEMP/haven" >> "$GITHUB_ENV"
       - name: ${{ matrix.name }}
         run: pnpm --filter @langwatch/docs-site ${{ matrix.script }}
 

@@ -2272,6 +2272,10 @@
     {
       "source": "/api-reference/dashboards/delete-dashboards",
       "destination": "/api-reference/reports/delete-reports"
+    },
+    {
+      "source": "/api-reference/dashboards",
+      "destination": "/api-reference/reports/overview"
     }
   ]
 }

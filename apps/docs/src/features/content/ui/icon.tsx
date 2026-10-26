@@ -1,10 +1,11 @@
 import { GitHubIcon, TypeScript } from "@langwatch/design-system/icons";
 import { Box, Image } from "@langwatch/design-system/primitives";
+import type { ComponentType } from "react";
 
 import { GenericIcon, ICONS, LOGO_ASSETS } from "../../../lib/icon-registry.ts";
 import { sitePath } from "../../../lib/site-path.ts";
 
-const BRAND_ICONS = { github: GitHubIcon, typescript: TypeScript };
+const BRAND_ICONS: Record<string, ComponentType> = { github: GitHubIcon, typescript: TypeScript };
 
 type IconProps = { icon?: string; size?: number | string };
 
@@ -27,7 +28,7 @@ export function Icon({ icon: name, size = 20 }: IconProps) {
       />
     );
   }
-  const Brand = Object.entries(BRAND_ICONS).find(([name]) => name === icon)?.[1];
+  const Brand = icon ? BRAND_ICONS[icon] : undefined;
   if (Brand) {
     return (
       <Box

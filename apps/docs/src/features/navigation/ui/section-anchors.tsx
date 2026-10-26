@@ -12,8 +12,15 @@ import {
   ShieldCheck,
   SquareTerminal,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const SECTION_ICONS = {
+import { publicSlug, sitePath } from "../../../lib/site-path.ts";
+import { localHref } from "../model/inline.ts";
+import { firstSlug } from "../model/nav.ts";
+import type { Section } from "../model/nav.ts";
+import { sections, support } from "./site-nav.ts";
+
+const SECTION_ICONS: Record<string, LucideIcon> = {
   Platform: BookOpen,
   Observability: Activity,
   "AI Gateway": Route,
@@ -24,15 +31,9 @@ const SECTION_ICONS = {
   "API Reference": Braces,
   "Get Support": LifeBuoy,
 };
-import { publicSlug, sitePath } from "../../../lib/site-path.ts";
-import { localHref } from "../model/inline.ts";
-import { firstSlug } from "../model/nav.ts";
-import type { Section } from "../model/nav.ts";
-import { sections, support } from "./site-nav.ts";
 
 function SectionGlyph({ title }: { title: string }) {
-  const entry = Object.entries(SECTION_ICONS).find(([label]) => label === title);
-  const Glyph = entry?.[1] ?? Blocks;
+  const Glyph = SECTION_ICONS[title] ?? Blocks;
   return <Glyph size={18} strokeWidth={1.8} aria-hidden="true" />;
 }
 

@@ -418,6 +418,13 @@
 /api-reference/query/extraction-functions
 /api-reference/query/overview
 /api-reference/query/run-a-langwatchql-query
+/api-reference/reports/create-reports
+/api-reference/reports/delete-reports
+/api-reference/reports/get-reports
+/api-reference/reports/list-reports
+/api-reference/reports/overview
+/api-reference/reports/update-reorder
+/api-reference/reports/update-reports
 /api-reference/role-bindings
 /api-reference/role-bindings/create-role-binding
 /api-reference/role-bindings/delete-role-binding
