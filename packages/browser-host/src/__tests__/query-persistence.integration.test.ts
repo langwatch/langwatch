@@ -584,13 +584,12 @@ describe("sealedUiQueryStore on a browser out of space", () => {
   const fullDisk = () => {
     const disk = memoryStore();
     const refusing = { refusals: 0 };
-    const put = disk.put;
     disk.put = async (key, value) => {
       if (refusing.refusals > 0) {
         refusing.refusals -= 1;
         throw outOfSpace();
       }
-      await put(key, value);
+      disk.entries.set(key, value);
     };
     return { disk, refusing };
   };
