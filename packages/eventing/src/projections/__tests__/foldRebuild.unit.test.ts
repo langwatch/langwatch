@@ -15,6 +15,7 @@ import {
   parseTestEvent,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers.ts";
+import { FoldRebuildIncompleteHistoryError } from "../../services/errorHandling.ts";
 import { type JobRegistryEntry, QueueManager } from "../../services/queues/queueManager.ts";
 import { MAX_APPLIED_EVENT_IDS } from "../foldCache/foldCacheEntry.ts";
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
@@ -126,9 +127,9 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
         const strict = new FoldProjectionExecutor({ refoldHistoryRetryDelaysMs: [] });
         await strict.execute(fold, original, context);
 
-        await expect(strict.rebuild(fold, redelivery, context)).rejects.toMatchObject({
-          code: "fold_rebuild_incomplete_history",
-        });
+        await expect(strict.rebuild(fold, redelivery, context)).rejects.toBeInstanceOf(
+          FoldRebuildIncompleteHistoryError,
+        );
         expect(current()?.state.seen).toEqual([original.id]);
       });
     });
@@ -244,9 +245,9 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
         const retrying = new FoldProjectionExecutor({ refoldHistoryRetryDelaysMs: [0] });
         await retrying.execute(fold, first, context);
 
-        await expect(retrying.rebuild(fold, missed, context)).rejects.toMatchObject({
-          code: "fold_rebuild_incomplete_history",
-        });
+        await expect(retrying.rebuild(fold, missed, context)).rejects.toBeInstanceOf(
+          FoldRebuildIncompleteHistoryError,
+        );
         expect(pages.filter((page) => page.after === undefined)).toHaveLength(2);
         expect(current()?.state.seen).toEqual([first.id]);
       });

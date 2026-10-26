@@ -276,7 +276,6 @@ export const APP_ERROR_CODES = [
   "filter_parse_error",
   "filter_too_complex",
   "filter_value_refused",
-  "fold_rebuild_incomplete_history",
   "forbidden",
   "gateway_budget_cycle_anchor_invalid",
   "gateway_budget_scope_unreachable",

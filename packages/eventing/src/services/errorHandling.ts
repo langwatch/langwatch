@@ -228,7 +228,6 @@ export class QueuedPayloadInvalidError extends NonRetryableGroupQueueError {
  */
 export class FoldRebuildIncompleteHistoryError extends RecoverableError {
   override readonly name = "FoldRebuildIncompleteHistoryError";
-  readonly code = "fold_rebuild_incomplete_history";
 
   constructor({ projection, aggregateId }: { projection: string; aggregateId: string }) {
     super(

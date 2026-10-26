@@ -271,7 +271,15 @@ describe("EventRepositoryClickHouse paged reads", () => {
       /** @scenario A page of an aggregate's history reads payloads only for its own rows */
       it("refuses the limit before any query runs", async () => {
         const client = createMockClient({});
-        const repository = repositoryFor(client);
+        const indexBounds = vi.fn();
+        const repository = EventingClickHouseEventRepository.create({
+          resolveClient: async () => client,
+          retention,
+          eventLogIndex: {
+            reader: { targetOf: async () => "shared", indexBounds },
+            readiness: { isReady: () => true },
+          },
+        });
 
         await expect(repository.getEventRecordsPaged({ ...history, limit })).rejects.toThrow(
           RangeError,
@@ -280,6 +288,7 @@ describe("EventRepositoryClickHouse paged reads", () => {
           RangeError,
         );
         expect(client.query).not.toHaveBeenCalled();
+        expect(indexBounds).not.toHaveBeenCalled();
       });
     });
   });

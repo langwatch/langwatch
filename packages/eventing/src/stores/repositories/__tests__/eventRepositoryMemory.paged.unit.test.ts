@@ -144,9 +144,7 @@ describe("EventRepositoryMemory.getEventRecordsPaged", () => {
       expect(all).toEqual(["e1", "e3a", "e3b", "e5"]);
     });
   });
-});
 
-describe("EventRepositoryMemory.getEventRecordsPaged", () => {
   describe("given a limit that is not a positive integer", () => {
     it.each([0, -1, 1.5])("refuses limit %s instead of reading an empty page", async (limit) => {
       const repo = EventRepositoryMemory.createForTesting();

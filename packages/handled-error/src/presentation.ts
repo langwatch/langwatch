@@ -1254,11 +1254,6 @@ const presentations = {
     title: "This API key is already revoked",
   },
 
-  fold_rebuild_incomplete_history: {
-    title: "Some data is still catching up",
-    describe: () => "This view is being rebuilt from recent events. It updates on its own shortly.",
-  },
-
   /**
    * The caller is signed in and simply may not do this.
    *

@@ -1076,11 +1076,12 @@ export class FoldProjectionExecutor {
     let { state } = folded;
     const applied = [...folded.applied];
     const missedToken = appliedTokenOf(missed);
-    if (!folded.seen.has(missedToken) && consumes(missed)) {
+    const appliesMissed = !folded.seen.has(missedToken) && consumes(missed);
+    if (appliesMissed) {
       state = projection.apply(state, missed);
       applied.push(missedToken);
     }
-    const rebuiltEventCount = folded.appliedCount + applied.length - folded.applied.length;
+    const rebuiltEventCount = folded.appliedCount + (appliesMissed ? 1 : 0);
     await projection.store.store(
       state,
       withAppliedEventIds(context, mergeAppliedEventIds({ previous: [], applied })),

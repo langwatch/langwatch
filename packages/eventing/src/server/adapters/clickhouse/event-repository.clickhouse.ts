@@ -579,7 +579,11 @@ export class EventingClickHouseEventRepository implements EventRepository {
     occurredAtFromMs?: number;
     failure: string;
   }): Promise<EventRecord[]> {
-    const { tenantId, aggregateType, aggregateId } = request;
+    const { tenantId, aggregateType, aggregateId, limit } = request;
+    // Before the index lookup below, so a refused limit issues no query at all.
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      throw new RangeError(`A page of event records needs a positive integer limit, got ${limit}`);
+    }
     try {
       const occurredAtFromMs = await this.occurredAtFloor({
         tenantId,
@@ -621,9 +625,6 @@ export class EventingClickHouseEventRepository implements EventRepository {
     occurredAtFromMs?: number;
   }): { query: string; query_params: Record<string, unknown>; declaresFullScan: boolean } {
     const { tenantId, aggregateType, aggregateId, upTo, after, limit, occurredAtFromMs } = request;
-    if (!Number.isSafeInteger(limit) || limit < 1) {
-      throw new RangeError(`A page of event records needs a positive integer limit, got ${limit}`);
-    }
     const upToClause = upTo
       ? `AND (
             EventTimestamp < {upToTimestamp:UInt64}
