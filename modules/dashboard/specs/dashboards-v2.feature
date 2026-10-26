@@ -1590,7 +1590,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # Guard rails
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: AC11 Existing boards are unaffected
     Given a board created before this change
     Then its widgets keep their stored code, labels and number format

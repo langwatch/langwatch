@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  * The guard rails of a board: its data goes to LWQL and never to the legacy analytics
- * procedures, and one widget whose query fails leaves every other widget drawing its own.
- * Only the sandboxed frame is stood in for, since jsdom cannot run it.
+ * procedures, one widget whose query fails leaves every other widget drawing its own, and a
+ * board saved earlier opens as it was stored. Only the sandboxed frame is stood in for.
  * @see modules/dashboard/specs/dashboards-v1.feature
+ * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
 import { analyticsTrpc } from "@langwatch/analytics-contract";
@@ -250,6 +251,60 @@ describe("given a board where one widget's LWQL query fails", () => {
     /** @scenario "AC23 A failing query does not take the board down" */
     it("still hands the other widget its own rows", () => {
       expect(results.get(TRACES.id)).toMatchObject({ rows: lwqlResult().rows });
+    });
+  });
+});
+
+describe("given a board saved before the v2 templates, with its own widget code", () => {
+  /** As stored then: no description, prompt or source, and a number format of its own. */
+  const SAVED = {
+    ...TRACES,
+    name: "Requests (old label)",
+    graph: {
+      version: 1 as const,
+      code: [
+        "export default function Widget() {",
+        '  const n = LW.useQuery("main").data?.[0]?.n ?? 0;',
+        '  return <span>{"$" + Number(n).toFixed(0)}</span>;',
+        "}",
+      ].join("\n"),
+      queries: [{ name: "main", sql: "SELECT sum(TotalCost) AS n FROM traces" }],
+    },
+  };
+  let calls: UiProcedureCall[] = [];
+  beforeEach(async () => {
+    calls = openStoredBoard({ widgets: [SAVED] }).calls;
+    await screen.findAllByTestId("sandboxed-frame");
+    await everyFrameRuns();
+  });
+
+  describe("when the member opens it", () => {
+    /** @scenario "AC11 Existing boards are unaffected" */
+    it("hands the widget frame its stored code, number format included, unchanged", () => {
+      const [frame] = screen.getAllByTestId("sandboxed-frame");
+      expect(frames.get(frame as Element)?.code).toBe(SAVED.graph.code);
+    });
+
+    /** @scenario "AC11 Existing boards are unaffected" */
+    it("shows the widget under its stored label", () => {
+      expect(screen.getByText(SAVED.name)).toBeInTheDocument();
+    });
+
+    /** @scenario "AC11 Existing boards are unaffected" */
+    it("runs the widget's stored query", () => {
+      expect(
+        calls.filter(({ path }) => path === "analytics.lwql.query").map(({ input }) => input),
+      ).toEqual([expect.objectContaining({ sql: SAVED.graph.queries[0]?.sql })]);
+    });
+
+    /** @scenario "AC11 Existing boards are unaffected" */
+    it("writes nothing back to the board or its widgets", () => {
+      const reads = ["boards.getAll", "boards.listStarred", "dashboardWidgets.list"];
+      expect(
+        calls
+          .map(({ path }) => path)
+          .filter((path) => path !== "analytics.lwql.query" && !reads.includes(path)),
+      ).toEqual([]);
     });
   });
 });
