@@ -618,6 +618,40 @@ describe("a route that names legacy key scopes", () => {
   });
 
   /** @scenario "A route tells the project door the legacy key scopes it names" */
+  it("tells the door the scopes named beside a target, and keeps them off the target", async () => {
+    const router = defineRestRouter(DoorsApi)
+      .withNamespace("legacy-scopes")
+      .withVersion(VERSION)
+      .post("/:projectId/connect", "run")
+      .keepsRecords()
+      .withParams(z.object({ projectId: z.string() }))
+      .withPermission("scenarios:manage", { at: "route", param: "projectId", legacyKey: "scope_a" })
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+
+    expect(router.routes[0]).toMatchObject({
+      permissionTarget: { at: "route", param: "projectId" },
+      legacyKeyScopes: ["scope_a"],
+    });
+    expect(router.routes[0]?.permissionTarget).not.toHaveProperty("legacyKey");
+
+    const answer = await mount(router, door).request(
+      `/api/legacy-scopes/${VERSION}/project-1/connect`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-auth-token": "legacy" },
+        body: "{}",
+      },
+    );
+
+    expect(answer.status).toBe(200);
+    expect(told.at(-1)).toEqual(["scope_a"]);
+  });
+
+  /** @scenario "A route tells the project door the legacy key scopes it names" */
   it("leaves a route whose input chooses its permission nowhere to name a flag", () => {
     const choice = permissionBy({ field: "kind", map: { a: "scenarios:manage" } });
     const scopes = { legacyKey: "scope_a" } as const;
