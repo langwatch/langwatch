@@ -533,18 +533,19 @@ export default function ApiKeysScreen() {
     );
   };
 
-  // Confirming opens the create drawer filled with the replacement key; closing
-  // it without creating leaves the legacy key working.
+  // Confirming revokes the legacy key, then opens the create drawer filled with
+  // its replacement. A reader whose key could not send traces is refused before
+  // the revoke, so they are never left with neither key.
   const handleRevokeLegacyKey = () => {
     const projectId = scope.projectId;
     if (!projectId) return;
-    setIsRevokingLegacyKey(false);
     const replacement = legacyKeyReplacementInput({
       projectId,
       isOrganizationAdmin: isAdmin,
       reader: { myBindings: myBindings.data, organizationId, orgProjects: orgProjects.data ?? [] },
     });
     if (!replacement) {
+      setIsRevokingLegacyKey(false);
       host.failed({
         error: undefined,
         fallbackTitle: "Couldn't revoke the legacy project key",
@@ -552,28 +553,17 @@ export default function ApiKeysScreen() {
       });
       return;
     }
-    setLegacyReplacement(replacement);
-  };
-
-  // The replacement key is created first, so a failed create leaves the legacy
-  // key working; the new token is shown even when the revoke after it fails.
-  const revokeLegacyKey = () => {
-    const projectId = scope.projectId;
-    setLegacyReplacement(null);
-    if (!projectId) return;
     revokeLegacyMutation.mutate(
       { projectId },
       {
         onSuccess: () => {
+          setIsRevokingLegacyKey(false);
           host.succeeded({ title: "Legacy project key revoked" });
           void queryClient.project.getLegacyKeyStatus.invalidate();
+          setLegacyReplacement(replacement);
         },
         onError: (error) =>
-          host.failed({
-            error,
-            fallbackTitle: "New key created, but the legacy project key still works",
-            description: "Revoke it again from its row in the API keys list.",
-          }),
+          host.failed({ error, fallbackTitle: "Couldn't revoke the legacy project key" }),
       },
     );
   };
@@ -701,7 +691,7 @@ export default function ApiKeysScreen() {
             setLegacyReplacement(null);
             onCreateClose();
           }}
-          onCreate={(input) => handleCreate(input, legacyReplacement ? revokeLegacyKey : undefined)}
+          onCreate={(input) => handleCreate(input, () => setLegacyReplacement(null))}
         />
 
         <EditApiKeyDrawer
@@ -743,6 +733,7 @@ export default function ApiKeysScreen() {
         <RevokeLegacyKeyDialog
           open={isRevokingLegacyKey}
           projectName={scope.projectName}
+          isRevoking={revokeLegacyMutation.isPending}
           access={readerAccess([myBindings, orgMembers, orgProjects])}
           onClose={() => setIsRevokingLegacyKey(false)}
           onConfirm={handleRevokeLegacyKey}
