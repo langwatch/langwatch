@@ -25,7 +25,7 @@ export function docsPagesPlugin({
         const entries = Object.keys(pages).map((slug) => {
           const file = path.join(docsRoot, `${slug}.mdx`);
           this.addWatchFile(file);
-          return `${JSON.stringify(slug)}: () => import(${JSON.stringify(file)})`;
+          return `${jsString(slug)}: () => import(${jsString(file)})`;
         });
         return `export default {${entries.join(",")}};`;
       },
@@ -34,6 +34,14 @@ export function docsPagesPlugin({
       reloadDocsSource({ docsRoot, file, server, onSourceChange });
     },
   };
+}
+
+/** A string literal safe anywhere in generated JavaScript, even beside `</script>`. */
+function jsString(value: string): string {
+  return JSON.stringify(value).replace(
+    /[<>/\u2028\u2029]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
 }
 
 /** The part of the dev server a source reload touches. */

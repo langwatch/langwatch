@@ -24,6 +24,16 @@ export function skillMarkdown({
   return [heading({ context, title }), lines.filter(Boolean).join("\n")].join("\n\n");
 }
 
+/** Text with every tag removed, repeated so `<<b>b>` cannot leave one behind. */
+function withoutTags(markup: string): string {
+  let text = markup;
+  for (let previous = ""; previous !== text;) {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, "");
+  }
+  return text;
+}
+
 const SKILL_CARD = /^(\s*)<div className="lw-accordion">\s*$/;
 
 /** Generated `lw-accordion` skill markup, read as the remark adapter reads it. */
@@ -34,7 +44,7 @@ function skillFromMarkup({ lines, context }: { lines: MarkedLine[]; context: Con
     .join("\n");
   const title = /lw-accordion-title"[^>]*>([^<]*)</.exec(markup)?.[1] ?? "Skill";
   const commands = [...markup.matchAll(/<code>([\s\S]*?)<\/code>/g)].map((match) =>
-    (match[1] ?? "").replace(/<[^>]+>/g, "").trim(),
+    withoutTags(match[1] ?? "").trim(),
   );
   const code = lines.filter((line) => line.code);
   const close = code.findIndex((line) => line.closes);
