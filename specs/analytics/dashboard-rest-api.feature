@@ -92,3 +92,10 @@ Feature: Dashboard REST API
     When I call GET /api/v1/dashboards
     Then I receive the Reports boards as before
     And the response carries no Deprecation and no Link header
+
+  @integration
+  Scenario: The dashboards API keeps answering when the rollout flag cannot be read
+    Given reading release_dashboards for the API key's project fails
+    When I call GET /api/v1/dashboards
+    Then I receive the Reports boards as before
+    And the response carries no Deprecation and no Link header
