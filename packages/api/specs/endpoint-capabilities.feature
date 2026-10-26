@@ -88,6 +88,14 @@ Feature: Endpoint capabilities - rate limiting, response caching, deprecation
     And a module that provides no value for that context is refused at mount
 
   @integration
+  Scenario: A deprecation that cannot be decided fails open
+    Given a family deprecated when a declared context that fails to resolve
+    When a caller calls it
+    Then the call is answered as if the family were not deprecated
+    And the answer carries no deprecation header
+    And the failure is logged as a warning
+
+  @integration
   Scenario: An endpoint declares the several answers it may give
     Given an endpoint declaring each status it answers with and the body that status carries
     When it answers with one of them that is not a success
