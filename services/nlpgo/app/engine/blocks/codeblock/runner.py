@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Code-block sandbox runner.
 
-Invoked by nlpgo for every code-block execution. Reads a JSON payload
-from stdin describing the user's Python code, declared inputs, and
-declared outputs; executes the code in a fresh module namespace;
-writes a structured JSON result to the path the payload names.
+Invoked by nlpgo for every code-block execution. Asks nlpgo for a JSON
+payload describing the user's Python code, declared inputs, declared
+outputs and working directory; executes the code in a fresh module
+namespace; writes a structured JSON result to the path the payload
+names.
 
-Nothing belonging to the run arrives on the command line or in the
-variables exec hands this process, because both are readable from /proc
-by anything running as the same user, which every other code block in
-the container does. The payload carries them instead, and this process
-makes itself non-dumpable before asking for it.
+Nothing belonging to the run arrives on the command line, in the
+variables exec hands this process, or on a descriptor it is handed: all
+three are readable from /proc by anything running as the same user,
+which every other code block in the container is. This process makes
+itself non-dumpable and then asks for the payload, which is why there
+is no moment where it holds something and can still be read.
 
 Four accepted user-code shapes (in this order of precedence):
 
@@ -104,36 +106,30 @@ import sys
 
 # FIRST, before the payload is asked for: take this process's own /proc
 # files away from everything running as the same user. Every code block
-# in the container does, so without this one execution reads another's
-# stdin through /proc/<pid>/fd/0 (the payload: project secrets and the
-# run's credential), its initial environment, and the path of its
-# working directory. stat and cmdline stay readable, which is what the
-# engine's teardown uses, and this process keeps its own /proc/self.
+# in the container runs as that user, so without this one execution
+# reads another's open descriptors, its initial variables and the path
+# of its working directory. State and the command line stay readable,
+# which is what the engine's teardown uses.
+#
+# nlpgo hands this process nothing of the run, so there is nothing to
+# read until this has happened: the payload is asked for below, over a
+# socket the engine answers by the kernel's own idea of who is asking.
 #
 # Best effort by necessity: it needs ctypes, and the result decides
-# nothing but how much is hidden. nlpgo waits for the byte on file
-# descriptor 3 before it writes the payload, so the write lands after
-# this either way.
+# nothing but how much is hidden.
 _PR_SET_DUMPABLE = 4
 
 
-def _hide_from_other_executions() -> bool:
+def _hide_from_other_executions() -> None:
     try:
         import ctypes
 
-        return ctypes.CDLL(None, use_errno=True).prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) == 0
+        ctypes.CDLL(None, use_errno=True).prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0)
     except Exception:  # noqa: BLE001 — nothing here is worth failing a run over
-        return False
+        pass
 
 
 _hide_from_other_executions()
-try:
-    os.write(3, b"1")
-    os.close(3)
-except OSError:
-    # No descriptor 3 when the runner is invoked by hand; nlpgo always
-    # passes one and stops waiting on end-of-file either way.
-    pass
 
 import inspect  # noqa: E402 — everything above runs before the payload exists
 import io
@@ -145,11 +141,12 @@ from contextlib import redirect_stdout, redirect_stderr
 from types import ModuleType, SimpleNamespace
 
 # nlpgo passes this runner as source on the command line, so the
-# interpreter puts the working directory first on sys.path — and that
-# directory is the one user code can write. Drop it (and any relative
-# entry that resolves to it) before anything is imported, so no import
-# can be answered by a file the executed code planted. PYTHONPATH keeps
-# its place: it is how the runtime images reach the curated sandbox
+# interpreter puts the working directory first on sys.path. Drop it (and
+# any relative entry that resolves to it) before anything is imported,
+# so no import can be answered by a file the executed code planted: the
+# run's directory, which this process moves into once it has its
+# payload, is the one place user code can write. PYTHONPATH keeps its
+# place: it is how the runtime images reach the curated sandbox
 # libraries.
 _WORK_DIR = os.getcwd()
 sys.path[:] = [
@@ -201,16 +198,57 @@ def format_user_traceback() -> str:
     return "".join(traceback.format_exception_only(*sys.exc_info()[:2]))
 
 
+_PAYLOAD_TIMEOUT_S = 30
+
+
+def read_payload() -> str:
+    """Ask nlpgo for this run's payload, now that this process is hidden.
+
+    Over the socket it named, which it answers by the pid of whoever
+    connects: this process gets its own run and nothing else does. Without
+    that variable (a developer running the runner by hand, or a platform
+    with no such socket) the payload comes on stdin as it used to.
+    """
+    channel = os.environ.get("NLPGO_CODE_BLOCK_CHANNEL")
+    if not channel:
+        return sys.stdin.read()
+
+    import socket
+
+    chunks = []
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.settimeout(_PAYLOAD_TIMEOUT_S)
+        sock.connect("\0" + channel)
+        while True:
+            chunk = sock.recv(1 << 16)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    return b"".join(chunks).decode("utf-8")
+
+
 def main() -> int:
-    raw = sys.stdin.read()
+    try:
+        raw = read_payload()
+    except OSError as e:
+        sys.stderr.write(f"runner: could not read the payload: {e}\n")
+        return 1
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as e:
         # No result path to write to: it arrives in the payload that just
         # failed to parse, so this one goes to stderr, which nlpgo reads
         # when no result file turns up.
-        sys.stderr.write(f"runner: invalid JSON on stdin: {e}\n")
+        sys.stderr.write(f"runner: invalid JSON in the payload: {e}\n")
         return 1
+
+    # The run's own directory, which this process is not started in: a
+    # working directory is readable from /proc, and in the moment before
+    # the hiding above it would have named the run. Relative paths in user
+    # code resolve here, as they always did.
+    work_dir = payload.get("work_dir")
+    if work_dir:
+        os.chdir(work_dir)
 
     result_path = payload.get("result_path")
     nonce = payload.get("nonce", "")

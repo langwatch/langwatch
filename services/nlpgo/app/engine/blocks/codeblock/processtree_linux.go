@@ -256,7 +256,7 @@ func (s sweep) claimsOrphan(entry procEntry) bool {
 	if s.servesALiveRun(entry) {
 		return false
 	}
-	return s.carriesRunMarks(entry.pid) || s.onlyThisRunCanAccountForIt(entry)
+	return s.carriesRunMarks(entry.pid) || s.noLiveRunCanAccountForIt(entry)
 }
 
 // servesALiveRun reports whether the process is an execution still running or
@@ -279,17 +279,17 @@ func (s sweep) carriesRunMarks(pid int) bool {
 		(s.scope.dir != "" && worksInside(pid, s.scope.dir))
 }
 
-// onlyThisRunCanAccountForIt dates an orphan that scrubbed both marks. A
-// process cannot be older than whatever started it, so one that predates every
-// execution still running, and does not predate this one, came from an
-// execution that has already finished — this one or an earlier one, and either
-// way nothing is waiting on it.
+// noLiveRunCanAccountForIt dates an orphan that scrubbed both marks. A process
+// cannot be older than whatever started it, so one that predates every
+// execution still running came from an execution that has already finished, and
+// nothing is waiting on it. Which finished execution it was does not matter:
+// whichever teardown finds it owes it the same SIGKILL.
 //
 // Only applied with the engine as subreaper, where a child of the engine is an
 // execution or came from one. Without that flag an orphan lands on PID 1 beside
 // the container's unrelated processes, and the marks are the only tie there is.
-func (s sweep) onlyThisRunCanAccountForIt(entry procEntry) bool {
-	if !subreaperActive || entry.ppid != s.selfPid || entry.startTicks < s.scope.startTicks {
+func (s sweep) noLiveRunCanAccountForIt(entry procEntry) bool {
+	if !subreaperActive || entry.ppid != s.selfPid {
 		return false
 	}
 	for pid, startTicks := range s.live {

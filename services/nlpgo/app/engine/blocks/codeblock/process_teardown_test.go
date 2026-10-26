@@ -341,6 +341,81 @@ func errOrFailure(err error, res *codeblock.Result) error {
 	return nil
 }
 
+// scrubbedOrphan starts a process with no tie to the run left: its middle
+// process exits at once so the engine adopts it, it leads a session of its
+// own, and it carries neither the run's token nor its working directory.
+const scrubbedOrphan = `
+import subprocess, sys, time
+
+ORPHAN = """
+import os, sys, time
+if os.fork():
+    sys.exit(0)
+os.setsid()
+with open(sys.argv[1], "w") as handle:
+    handle.write(str(os.getpid()))
+time.sleep(120)
+"""
+
+def execute(spool, nap):
+    subprocess.run(
+        [sys.executable, "-c", ORPHAN, spool],
+        cwd="/",
+        env={"PATH": "/usr/bin:/bin"},
+        timeout=30,
+    )
+    time.sleep(nap)
+    return {"ok": True}
+`
+
+// @scenario "no process an execution started is left running"
+func TestCodeBlock_AnOrphanSparedForALiveRunIsSweptLater(t *testing.T) {
+	requirePython(t)
+	exe := newExec(t)
+
+	// A process with every tie erased can only be dated: it is swept once no
+	// execution still running is old enough to have started it. Here an older
+	// execution is running when its own run ends, so that teardown has to
+	// leave it alone — and the next teardown after that execution ends has to
+	// take it, rather than sparing it forever for being older than itself.
+	older := make(chan error, 1)
+	go func() {
+		res, err := exe.Execute(context.Background(), codeblock.Request{
+			Code: `
+import time
+
+def execute(nap):
+    time.sleep(nap)
+    return {"ok": True}
+`,
+			Inputs:          map[string]any{"nap": 4.0},
+			DeclaredOutputs: []string{"ok"},
+		})
+		older <- errOrFailure(err, res)
+	}()
+	time.Sleep(300 * time.Millisecond)
+
+	spool := filepath.Join(t.TempDir(), "pid")
+	res, err := exe.Execute(context.Background(), codeblock.Request{
+		Code:            scrubbedOrphan,
+		Inputs:          map[string]any{"spool": spool, "nap": 0.0},
+		DeclaredOutputs: []string{"ok"},
+	})
+	require.NoError(t, errOrFailure(err, res))
+	orphan := waitForSpooledPid(t, spool)
+	require.True(t, processRunsNow(orphan),
+		"pid %d was swept while an execution old enough to own it was still running", orphan)
+
+	require.NoError(t, <-older, "the older execution failed")
+	last, err := exe.Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'ok': True}\n",
+		DeclaredOutputs: []string{"ok"},
+	})
+	require.NoError(t, errOrFailure(err, last))
+	assert.False(t, processExists(orphan),
+		"pid %d was spared by every teardown after the one that could not place it", orphan)
+}
+
 // spooledPid reads the pid the user code wrote out.
 func spooledPid(t *testing.T, spool string) int {
 	t.Helper()

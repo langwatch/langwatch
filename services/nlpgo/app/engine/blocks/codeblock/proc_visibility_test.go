@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -25,6 +26,13 @@ import (
 // payload, and nlpgo writes the payload only once that has happened. These
 // tests are the proof, and they need an unprivileged user: uid 0 reads those
 // files whatever the flag says.
+
+// outcome is what an execution running in a goroutine beside the test comes
+// back with, so the test can wait for it on a channel.
+type outcome struct {
+	res *codeblock.Result
+	err error
+}
 
 // probePeer reports what this execution can read of another process. Written
 // as a parameterized probe so the same code answers for a peer execution and
@@ -57,10 +65,6 @@ func TestCodeBlock_ExecutionCannotReadAnotherExecutionsProcEntries(t *testing.T)
 	// The first execution reports its own pid and stays alive while the second
 	// one goes looking, so what the second one meets is a refusal and not an
 	// exited process.
-	type outcome struct {
-		res *codeblock.Result
-		err error
-	}
 	holding := make(chan outcome, 1)
 	spool := filepath.Join(t.TempDir(), "pid")
 	go func() {
@@ -117,6 +121,146 @@ def execute(spool):
 	held := <-holding
 	require.NoError(t, held.err)
 	require.Nil(t, held.res.Error, "%+v", held.res.Error)
+}
+
+// @scenario "the interpreter is handed nothing belonging to the run"
+func TestCodeBlock_TheInterpreterIsHandedNothingOfTheRun(t *testing.T) {
+	requirePython(t)
+	exe := newExec(t)
+
+	// A descriptor exec hands the interpreter can be cloned out of /proc by
+	// another execution in the moment before the runner hides itself, and a
+	// clone of a pipe reads what is written to it later. So the payload is not
+	// on one: stdin is empty, and the only descriptor the interpreter starts
+	// with that leads anywhere is a stderr file with no name, outside the run.
+	res, err := exe.Execute(context.Background(), codeblock.Request{
+		Code: `
+import os
+
+def execute():
+    return {
+        "stdin": os.readlink("/proc/self/fd/0"),
+        "stderr": os.readlink("/proc/self/fd/2"),
+        "cwd": os.getcwd(),
+    }
+`,
+		DeclaredOutputs: []string{"stdin", "stderr", "cwd"},
+		Secrets:         map[string]string{"TOKEN": "sk-secret-of-the-project"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "%+v", res.Error)
+
+	assert.Equal(t, "/dev/null", res.Outputs["stdin"],
+		"the payload traveled on a descriptor the interpreter was handed at exec")
+	stderr, ok := res.Outputs["stderr"].(string)
+	require.True(t, ok, "expected a string, got %#v", res.Outputs["stderr"])
+	assert.Contains(t, stderr, "(deleted)",
+		"the interpreter's stderr file has a name, so another execution can open it")
+	workDir, ok := res.Outputs["cwd"].(string)
+	require.True(t, ok, "expected a string, got %#v", res.Outputs["cwd"])
+	assert.NotContains(t, stderr, workDir,
+		"the interpreter's stderr file names the run's directory")
+}
+
+// watchForAnInterpreter reports what it could read of every other interpreter
+// that started while it was running, which is the one moment a peer execution
+// has: before the runner makes itself non-dumpable.
+const watchForAnInterpreter = `
+import os, time
+
+def execute(seconds):
+    mine = os.getpid()
+    seen = {}
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        for name in os.listdir("/proc"):
+            if not name.isdigit() or int(name) == mine or name in seen:
+                continue
+            try:
+                with open("/proc/%s/cmdline" % name, "rb") as handle:
+                    argv = handle.read().decode("utf-8", "replace")
+            except OSError:
+                continue
+            if "python" not in argv:
+                continue
+            caught = {}
+            for entry in ("cwd", "fd/0", "fd/2"):
+                try:
+                    caught[entry] = os.readlink("/proc/%s/%s" % (name, entry))
+                except OSError as exc:
+                    caught[entry] = type(exc).__name__
+            try:
+                with open("/proc/%s/fd/0" % name, "rb") as handle:
+                    caught["stdin"] = handle.read(8192).decode("utf-8", "replace")
+            except OSError as exc:
+                caught["stdin"] = type(exc).__name__
+            seen[name] = caught
+    return {"seen": seen}
+`
+
+// @scenario "one execution cannot read another's payload, variables or directory through /proc"
+func TestCodeBlock_AWatchingExecutionCatchesNothingAtInterpreterStartup(t *testing.T) {
+	requirePython(t)
+	requireUnprivileged(t)
+	exe := newExec(t)
+
+	// The watcher spins on /proc for the whole run of the execution beside it,
+	// opening every interpreter it finds as early as it can. Whatever it
+	// manages to catch must carry neither the payload nor the other run's
+	// directory. It polls as fast as Python allows and may still miss the
+	// window, so this proves what a catch yields, not that there is one.
+	watching := make(chan outcome, 1)
+	go func() {
+		res, runErr := exe.Execute(context.Background(), codeblock.Request{
+			Code:            watchForAnInterpreter,
+			Inputs:          map[string]any{"seconds": 3.0},
+			DeclaredOutputs: []string{"seen"},
+		})
+		watching <- outcome{res: res, err: runErr}
+	}()
+
+	spool := filepath.Join(t.TempDir(), "pid")
+	watched, err := exe.Execute(context.Background(), codeblock.Request{
+		Code: `
+import os, time
+
+def execute(spool):
+    with open(spool, "w") as handle:
+        handle.write(str(os.getpid()))
+    time.sleep(1)
+    return {"dir": os.getcwd()}
+`,
+		Inputs:          map[string]any{"spool": spool},
+		DeclaredOutputs: []string{"dir"},
+		Secrets:         map[string]string{"TOKEN": "sk-secret-of-the-project"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, watched.Error, "%+v", watched.Error)
+	watchedDir, ok := watched.Outputs["dir"].(string)
+	require.True(t, ok, "expected a string, got %#v", watched.Outputs["dir"])
+	watchedPid := spooledPid(t, spool)
+
+	seen := <-watching
+	require.NoError(t, seen.err)
+	require.Nil(t, seen.res.Error, "%+v", seen.res.Error)
+	observations, ok := seen.res.Outputs["seen"].(map[string]any)
+	require.True(t, ok, "expected a map, got %#v", seen.res.Outputs["seen"])
+
+	caught, ok := observations[strconv.Itoa(watchedPid)]
+	if !ok {
+		t.Logf("the watcher never caught pid %d; the window it looks for is interpreter start-up", watchedPid)
+		return
+	}
+	readings, ok := caught.(map[string]any)
+	require.True(t, ok, "expected a map, got %#v", caught)
+	for entry, reading := range readings {
+		text, isText := reading.(string)
+		require.True(t, isText, "expected a string for %s, got %#v", entry, reading)
+		assert.NotContains(t, text, "sk-secret-of-the-project",
+			"a watching execution read the other run's payload out of its %s", entry)
+		assert.NotContains(t, text, watchedDir,
+			"a watching execution learned the other run's directory from its %s", entry)
+	}
 }
 
 // @scenario "the run's credential is never in the interpreter's initial variables"

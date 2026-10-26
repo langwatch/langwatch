@@ -1,11 +1,12 @@
 Feature: Code block — execute user Python with isolated subprocess and structured I/O
   The code block runs arbitrary Python written by the workflow author. nlpgo
   spawns a Python subprocess for each invocation — the runner it carries in its
-  own binary, passed to the interpreter as source — marshals declared inputs as
-  JSON over stdin, and reads declared outputs from a result file. Sandboxing is
-  process isolation with no syscall restrictions, so existing customer code
-  keeps working byte-for-byte; what the three isolation rules below add is that
-  one execution cannot reach another's code, directory or processes.
+  own binary, passed to the interpreter as source — hands the interpreter the
+  declared inputs as JSON when it asks for them, and reads declared outputs
+  from a result file. Sandboxing is process isolation with no syscall
+  restrictions, so existing customer code keeps working byte-for-byte; what the
+  four isolation rules below add is that one execution cannot reach another's
+  code, directory, processes or payload.
 
   See _shared/contract.md §7.
 
@@ -239,13 +240,19 @@ Feature: Code block — execute user Python with isolated subprocess and structu
   Rule: One execution cannot read another execution's process
 
     # Everything in the container runs as one user, and /proc hands a process
-    # running as that user another's open descriptors, initial environment and
-    # working directory. The payload carrying the project's decrypted secrets
-    # arrives on stdin, so the runner makes itself non-dumpable before it asks
-    # for the payload, and the engine writes the payload only once the runner
-    # reports that it has. Process state and the command line stay readable,
-    # which costs nothing: teardown reads the first, and the interpreter is
-    # given neither a secret nor a path belonging to the run on the second.
+    # running as that user another's open descriptors, initial variables and
+    # working directory. A descriptor exec hands the interpreter can be cloned
+    # in the moment before the runner hides itself, so the interpreter is
+    # handed nothing of the run: no payload, no credential, no directory and
+    # no path on its command line. Once non-dumpable it asks nlpgo for its
+    # payload over a socket nlpgo answers by the pid the kernel reports for
+    # the process connecting, and moves into its working directory from it.
+    #
+    # The limit: a process USER CODE starts is a fresh exec, which the kernel
+    # makes dumpable again, and it inherits the run's credential and directory
+    # from the runner's environment. A concurrent execution can read those out
+    # of such a child for as long as it runs. Closing that needs a uid per
+    # execution, which the container cannot have.
 
     @unit
     Scenario: one execution cannot read another's payload, variables or directory through /proc
@@ -255,6 +262,14 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And reading its initial variables is refused
       And reading its working directory is refused
       And reading its process state still works, because teardown reads it
+
+    @unit
+    Scenario: the interpreter is handed nothing belonging to the run
+      Given a code node whose body reports the descriptors it was started with
+      When the engine invokes the node
+      Then its standard input is empty, because the payload did not arrive on one
+      And the file its errors go to has no name another execution could open
+      And that file is not inside the run's working directory
 
     @unit
     Scenario: the run's credential is never in the interpreter's initial variables

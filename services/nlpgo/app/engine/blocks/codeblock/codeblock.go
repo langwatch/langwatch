@@ -164,6 +164,9 @@ type Executor struct {
 	// scratchRoot holds this process's per-execution directories. Created
 	// once, because its mode is what keeps them from being enumerated.
 	scratchRoot string
+	// payload is how an execution's payload reaches its interpreter, nil
+	// where there is no channel and the payload goes on stdin.
+	payload *payloadChannel
 }
 
 // New builds an Executor, reading the runner sources it holds in memory for
@@ -212,11 +215,23 @@ func New(opts Options) (*Executor, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A channel the runner asks for its payload on, so nothing of the run is
+	// in the interpreter when it starts. Without one the payload goes on
+	// stdin, which is where it was: worth saying out loud rather than failing
+	// the service over.
+	channel, err := newPayloadChannel()
+	if err != nil {
+		opts.logger().Warn("nlpgo_code_block_payload_channel_unavailable",
+			zap.Error(err),
+			zap.String("hint", "payloads travel to the interpreter on stdin instead, where another execution running as the same user can read them out of /proc in the moment before the runner hides itself"),
+		)
+	}
 	return &Executor{
 		opts:           opts,
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
 		scratchRoot:    scratchRoot,
+		payload:        channel,
 	}, nil
 }
 
@@ -457,53 +472,6 @@ func runnerEnv(credential map[string]string, runDir, token string) map[string]st
 	return env
 }
 
-// readySignal is how the runner says it has taken its own /proc files away
-// from the other executions. The payload is written only after that byte
-// arrives: it carries the project's decrypted secrets and the run's
-// credential, and until the runner is non-dumpable another execution could
-// have opened the interpreter's stdin through /proc and read them out of it.
-type readySignal struct {
-	read  *os.File
-	write *os.File
-}
-
-// newReadySignal hands the write end to the child as file descriptor 3.
-func newReadySignal(cmd *exec.Cmd) (*readySignal, error) {
-	read, write, err := os.Pipe()
-	if err != nil {
-		return nil, fmt.Errorf("codeblock: ready pipe: %w", err)
-	}
-	cmd.ExtraFiles = append(cmd.ExtraFiles, write)
-	return &readySignal{read: read, write: write}, nil
-}
-
-// releaseWriteEnd drops the parent's copy, so a child that dies before
-// signaling closes the pipe and await returns at once instead of waiting out
-// the whole budget.
-func (r *readySignal) releaseWriteEnd() {
-	_ = r.write.Close()
-}
-
-func (r *readySignal) close() {
-	_ = r.write.Close()
-	_ = r.read.Close()
-}
-
-// await blocks until the runner reports ready, the subprocess exits, or the
-// budget runs out, and never fails the run: an interpreter that cannot make
-// itself non-dumpable still has to be given its payload, and the worst case is
-// the window this closes staying open, which is where it was before.
-func (r *readySignal) await(budget time.Duration) {
-	_ = r.read.SetReadDeadline(time.Now().Add(budget))
-	_, _ = r.read.Read(make([]byte, 1))
-}
-
-// readyBudget bounds the wait for that byte. The runner signals before it
-// reads its payload, so this is interpreter start-up: generous enough for a
-// loaded node, and short enough that a runner which never signals does not
-// spend the node's whole timeout waiting.
-const readyBudget = 10 * time.Second
-
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// The operator's ceiling wins. A per-request value only ever shortens the
@@ -555,6 +523,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		"params":      req.Params,
 		"dspy_stub":   string(e.fakeDspySource),
 		"result_path": resultPath,
+		"work_dir":    runDir,
 		"nonce":       nonce,
 		"env":         runnerEnv(sandboxCredential(req.SandboxAPIKey, e.opts.SandboxEndpoint), runDir, token),
 	})
@@ -577,34 +546,32 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// see childEnv. What the run itself carries — secrets, its credential, its
 	// token, its directory — travels in the payload and is put into the
 	// environment by the runner, where another execution cannot read it.
-	cmd.Env = e.childEnv()
-	// Relative paths in user code resolve inside the disposable directory
-	// rather than the engine's working directory.
-	cmd.Dir = runDir
+	cmd.Env = append(e.childEnv(), e.payload.channelEnv()...)
+	// Started outside the run's directory, and the runner moves into it from
+	// the payload before any user code runs. A working directory is readable
+	// from /proc in the moment before the runner is hidden, so starting in the
+	// run's own directory would hand its name to anything watching.
+	cmd.Dir = "/"
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	// Written after the runner signals, so the payload is never sitting in a
-	// pipe another execution could open through /proc.
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, fmt.Errorf("codeblock: stdin pipe: %w", err)
+	// Without a payload channel (a developer's macOS checkout) the payload
+	// goes on stdin as it used to. With one, the interpreter is handed no
+	// stdin at all and asks for its payload once it is hidden.
+	var stdin io.WriteCloser
+	if e.payload == nil {
+		if stdin, err = cmd.StdinPipe(); err != nil {
+			return nil, fmt.Errorf("codeblock: stdin pipe: %w", err)
+		}
 	}
-	ready, err := newReadySignal(cmd)
+
+	// stderr goes to a file rather than to a buffer, so exec hands the child a
+	// descriptor instead of a pipe it copies in a goroutine. A process that
+	// detaches from the execution inherits that descriptor and would otherwise
+	// hold the pipe open, and with it Wait, for as long as it kept running —
+	// past the timeout the whole executor exists to enforce.
+	stderrFile, err := newRunnerStderr(e.scratchRoot)
 	if err != nil {
 		return nil, err
-	}
-	defer ready.close()
-
-	// stderr goes to a file in the run directory rather than to a buffer, so
-	// exec hands the child a descriptor instead of a pipe it copies in a
-	// goroutine. A process that detaches from the execution inherits that
-	// descriptor and would otherwise hold the pipe open, and with it Wait,
-	// for as long as it kept running — past the timeout the whole executor
-	// exists to enforce.
-	stderrPath := filepath.Join(runDir, "stderr.log")
-	stderrFile, err := os.Create(stderrPath)
-	if err != nil {
-		return nil, fmt.Errorf("codeblock: stderr file: %w", err)
 	}
 	defer func() { _ = stderrFile.Close() }()
 	cmd.Stderr = stderrFile
@@ -614,13 +581,13 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	cmd.WaitDelay = 2 * time.Second
 
 	started := time.Now()
-	startTicks, runErr := runningChildren.start(cmd)
+	runErr := runningChildren.start(cmd, payload)
 	if runErr == nil {
 		pid := cmd.Process.Pid
-		ready.releaseWriteEnd()
-		ready.await(readyBudget)
-		_, _ = stdin.Write(payload)
-		_ = stdin.Close()
+		if stdin != nil {
+			_, _ = stdin.Write(payload)
+			_ = stdin.Close()
+		}
 		runErr = cmd.Wait()
 		runningChildren.release(pid)
 		// Every exit path, not only the timeout: an execution that returned
@@ -628,17 +595,16 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		// that ran out of time can. Setpgid makes the interpreter the leader
 		// of its group, so its pid is the group id.
 		terminateRunTree(runScope{
-			pid:        pid,
-			pgid:       pid,
-			token:      token,
-			dir:        runDir,
-			startTicks: startTicks,
+			pid:   pid,
+			pgid:  pid,
+			token: token,
+			dir:   runDir,
 		}, e.opts.logger())
 	}
 	elapsed := time.Since(started)
 
 	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
-	stderrText := readRunnerStderr(stderrPath)
+	stderrText := readRunnerStderr(stderrFile)
 
 	if data, readErr := os.ReadFile(resultPath); readErr == nil && len(data) > 0 {
 		var parsed struct {
@@ -701,15 +667,34 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 // code that writes gigabytes to its descriptor, which is why there is one.
 const maxRunnerStderr = 64 << 10
 
+// newRunnerStderr opens the file the interpreter's own stderr goes to, in the
+// engine's scratch root and unlinked at once.
+//
+// Not in the run's directory: a descriptor exec hands the interpreter can be
+// cloned through /proc in the moment before the runner hides itself, and the
+// name of that descriptor would then name the run's directory. Unlinked
+// because a file with no name is a file another execution cannot open even
+// knowing where it was.
+func newRunnerStderr(scratchRoot string) (*os.File, error) {
+	file, err := os.CreateTemp(scratchRoot, "stderr-")
+	if err != nil {
+		return nil, fmt.Errorf("codeblock: stderr file: %w", err)
+	}
+	if err := os.Remove(file.Name()); err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("codeblock: stderr file: %w", err)
+	}
+	return file, nil
+}
+
 // readRunnerStderr reads what the subprocess wrote to its stderr, for the
 // paths where the runner never produced a result file and that text is the
-// only account of why.
-func readRunnerStderr(path string) string {
-	file, err := os.Open(path)
-	if err != nil {
+// only account of why. The file has no name, so it is read back through the
+// descriptor the executor still holds.
+func readRunnerStderr(file *os.File) string {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return ""
 	}
-	defer func() { _ = file.Close() }()
 	data, err := io.ReadAll(io.LimitReader(file, maxRunnerStderr))
 	if err != nil {
 		return ""
