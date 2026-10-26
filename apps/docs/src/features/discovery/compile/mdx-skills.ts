@@ -94,6 +94,3 @@ export function skillCards({ source }: { source: string }) {
   if (card) output.push(...card.lines.map((line) => line.text));
   return output.join("\n");
 }
-
-/* One converter per component the MDX renderer registers, plus the HTML media authors use.
-   A converter returns plain Markdown; content nested in a component is converted first. */
