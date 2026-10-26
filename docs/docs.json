@@ -1498,9 +1498,7 @@
               "api-reference/projects/get-a-dashboards-board",
               "api-reference/projects/update-project",
               "api-reference/projects/regenerate-api-key",
-              "api-reference/projects/create-a-dashboards-board",
-              "api-reference/projects/archive-project",
-              "api-reference/projects/delete-a-dashboards-board"
+              "api-reference/projects/archive-project"
             ]
           },
           {
