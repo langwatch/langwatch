@@ -233,29 +233,38 @@ export function restVersionSelectorMiddleware({
   };
 }
 
+/** A dated family's base and the routes it serves beneath it, each path as `datedRoutePattern`. */
+export type DatedFamilyRoutes = Readonly<{
+  base: string;
+  routes: readonly Readonly<{ method: string; pattern: RegExp }>[];
+}>;
+
 /**
  * The dated address a request pinning its version in `X-API-Version` is answered at, or null
- * when it is answered where it was sent: no header, `latest`, a path no dated family owns, or a
+ * when it is answered where it was sent: no header, `latest`, a path no dated family serves, or a
  * path naming a version itself. Throws when the header is no version or contradicts a dated path.
  */
 export function pinnedVersionPath({
+  method,
   path,
   header,
-  datedBases,
+  datedFamilies,
 }: Readonly<{
+  method: string;
   path: string;
   header: string | undefined;
-  /** Each dated family's own base, `/api/<namespace>` and its `/api/v1` twin. */
-  datedBases: readonly string[];
+  /** Each dated family's base, `/api/<namespace>` and its `/api/v1` twin, with its routes. */
+  datedFamilies: readonly DatedFamilyRoutes[];
 }>): string | null {
   if (header === void 0) return null;
 
-  const base = datedBases.find((each) => path === each || path.startsWith(`${each}/`));
-  if (base === void 0) return null;
+  // A literal or shared-path route beneath a dated base has no dated address to be sent to.
+  const served = datedFamilies.find((family) => servesPath({ family, method, path }));
+  if (served === void 0) return null;
 
   if (!isVersionSegment(header)) throw new InvalidApiVersionError();
 
-  const rest = path.slice(base.length);
+  const rest = path.slice(served.base.length);
   const named = rest.split("/")[1] ?? "";
 
   if (isVersionSegment(named)) {
@@ -265,7 +274,49 @@ export function pinnedVersionPath({
     return null;
   }
 
-  return header === VERSION_LATEST ? null : `${base}/${header}${rest}`;
+  return header === VERSION_LATEST ? null : `${served.base}/${header}${rest}`;
+}
+
+/** Whether one of the family's routes answers the request, at its base or a version beneath it. */
+function servesPath({
+  family,
+  method,
+  path,
+}: {
+  family: DatedFamilyRoutes;
+  method: string;
+  path: string;
+}): boolean {
+  if (path !== family.base && !path.startsWith(`${family.base}/`)) return false;
+
+  const rest = path.slice(family.base.length);
+  const named = rest.split("/")[1] ?? "";
+  const route = (isVersionSegment(named) ? rest.slice(named.length + 1) : rest) || "/";
+
+  // HEAD is answered by the GET route, as Hono does.
+  const asked = method.toLowerCase() === "head" ? "get" : method.toLowerCase();
+
+  return family.routes.some(
+    (each) => each.method.toLowerCase() === asked && each.pattern.test(route),
+  );
+}
+
+/**
+ * A route path relative to its family's base (`/`, `/:id`, `/:id{.+}/tags`, `/*`) as a pattern
+ * matching the request paths it answers.
+ */
+export function datedRoutePattern(routePath: string): RegExp {
+  const source = routePath
+    .split("/")
+    .map((segment) => {
+      const param = /^:\w+(?:\{(.+)\})?\??$/.exec(segment);
+      if (param) return `(?:${param[1] ?? "[^/]+"})`;
+      if (segment === "*") return ".*";
+      return segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    })
+    .join("/");
+
+  return new RegExp(`^${source}/?$`);
 }
 
 function isVersionSegment(value: string): boolean {

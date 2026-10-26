@@ -61,6 +61,40 @@ const plain = defineRestRouter(ThingApi)
   .build()
   .router();
 
+const NotesApi = moduleApi<ThingApi>()("dashboard");
+const SHARED_THINGS = {
+  owner: "annotation",
+  reason: "notes hang off a thing",
+  permanent: true,
+} as const;
+
+/** Another module's literal route beneath the dated `/api/v1/things` base, on a shared path. */
+const literalNotes = defineRestRouter(NotesApi)
+  .withNamespace("thing-notes")
+  .withVersion(FIRST)
+  .withAddressing("literal", { v1Twin: false })
+  .get("/api/v1/things/:thingId/notes", "listThingNotes")
+  .withSharedPath(SHARED_THINGS)
+  .withAccess(PUBLIC)
+  .withParams(z.object({ thingId: z.string() }))
+  .withOutput(served)
+  .handle(({ app, input }) => app.serve({ id: input.thingId }))
+  .build()
+  .router();
+
+/** Another module's dated family whose every route sits on the things namespace's shared path. */
+const sharedRatings = defineRestRouter(NotesApi)
+  .withNamespace("things")
+  .withVersion(SECOND)
+  .get("/:thingId/rating", "getThingRating")
+  .withSharedPath(SHARED_THINGS)
+  .withAccess(PUBLIC)
+  .withParams(z.object({ thingId: z.string() }))
+  .withOutput(served)
+  .handle(({ app, input }) => app.serve({ id: input.thingId }))
+  .build()
+  .router();
+
 /** Which registration answered, and with what. */
 const answering =
   (registration: string): (() => ThingApi) =>
@@ -87,6 +121,8 @@ function host() {
   server.mount(things({ version: FIRST, supersededAt: SECOND }), answering("first"));
   server.mount(things({ version: SECOND }), answering("second"));
   server.mount(plain, answering("plain"));
+  server.mount(literalNotes, answering("notes"));
+  server.mount(sharedRatings, answering("rating"));
 
   return server;
 }
@@ -224,6 +260,40 @@ describe("given a namespace registered at one date and superseded by a new famil
       "invalid_api_version",
       "invalid_api_version",
     ]);
+  });
+});
+
+describe("given routes of other families beneath a dated family's base", () => {
+  /** @scenario "A header leaves a path the dated family does not serve to the route that does" */
+  it("answers a literal shared-path route as without the header", async () => {
+    const server = host();
+
+    const [pinned, bare] = await Promise.all([
+      ask(server, "/api/v1/things/thing-1/notes", { version: SECOND }),
+      ask(server, "/api/v1/things/thing-1/notes"),
+    ]);
+
+    expect(pinned).toEqual(bare);
+    expect({ status: pinned.status, answer: pinned.answer }).toEqual({
+      status: 200,
+      answer: "notes:thing-1",
+    });
+  });
+
+  /** @scenario "A header leaves a path the dated family does not serve to the route that does" */
+  it("pins a dated family on the shared path at its own dated address", async () => {
+    const server = host();
+
+    const [pinned, before] = await Promise.all([
+      ask(server, "/api/v1/things/thing-1/rating", { version: SECOND }),
+      ask(server, "/api/v1/things/thing-1/rating", { version: FIRST }),
+    ]);
+
+    expect({ status: pinned.status, answer: pinned.answer }).toEqual({
+      status: 200,
+      answer: "rating:thing-1",
+    });
+    expect(before.status).toBe(404);
   });
 });
 

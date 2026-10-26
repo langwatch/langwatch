@@ -73,7 +73,7 @@
       "root": "modules/dashboard",
       "classification": "core",
       "subjects": ["dashboard", "graph", "saved-workbench-chart"],
-      "restNamespaces": ["boards", "dashboards", "graphs"]
+      "restNamespaces": ["dashboards", "graphs"]
     },
     {
       "id": "data-privacy",

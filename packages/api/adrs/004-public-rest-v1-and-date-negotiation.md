@@ -67,12 +67,14 @@ errors; endpoints do not register error catalogues.
 
 ### Amendment 2026-10-26: the header is served, and a family can hand over a path
 
-The REST host reads `X-API-Version` on a path a dated family owns and answers the request
-again at its dated address, so a header and a dated URL select through the one path; on a
-path no dated family owns, the header changes nothing. Only a URL naming a date conflicts with
-a header naming another; a URL naming `latest` or `preview` is answered there, since the
-SDK's management calls address `latest` while every request names its pinned date. The version guards mount ahead of a
-family's routes, so a date no route names is read as the version and never as a `/:id`.
+The REST host reads `X-API-Version` on a request a dated family's route answers (method and
+path) and answers it again at its dated address, so a header and a dated URL select through
+the one path. Anywhere else, a literal or shared-path route beneath a dated base included, the
+header changes nothing: that route has no dated address to be sent to. Only a URL naming a
+date conflicts with a header naming another; a URL naming `latest` or `preview` is answered
+there, since the SDK's management calls address `latest` while every request names its pinned
+date. The version guards mount ahead of a family's routes, so a date no route names is read as
+the version and never as a `/:id`.
 
 A dated family declared `.withSupersededAt(date)` answers only its own dates up to the day
 before `date`, and leaves `latest` and the bare path to the newer family of its namespace

@@ -67,6 +67,13 @@ Feature: Public REST is a first-class API surface
     And it is not refused as a conflict
 
   @versioning @integration
+  Scenario: A header leaves a path the dated family does not serve to the route that does
+    Given a literal or shared-path route answers beneath a dated family's base
+    When X-API-Version names a real date
+    Then that route answers as it does without the header
+    And a dated family on the shared path answers at its own dated address
+
+  @versioning @integration
   Scenario: Invalid and unavailable header versions differ
     When X-API-Version is neither latest nor a real calendar date
     Then the response is 400 invalid_api_version

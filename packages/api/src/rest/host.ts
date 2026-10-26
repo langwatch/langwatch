@@ -21,7 +21,9 @@ import {
   canonicalV1Path,
   claimsNoPrefix,
   middlewareScopesOf,
+  datedRoutePattern,
   pinnedVersionPath,
+  type DatedFamilyRoutes,
   routeScopesOf,
   type MountableRestApp,
 } from "./addressing.ts";
@@ -129,8 +131,8 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   private readonly prefixes: ClaimedPrefix[] = [];
   private readonly unclaimed: UnclaimedAddress[] = [];
 
-  /** Each dated family's base and its `/api/v1` twin: where `X-API-Version` pins a date. */
-  private readonly datedBases: string[] = [];
+  /** Each dated family's base, its `/api/v1` twin and its routes: where `X-API-Version` pins. */
+  private readonly datedFamilies: DatedFamilyRoutes[] = [];
 
   private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {
     // Ahead of every family: a pinned request is answered again at its dated address, so the
@@ -139,10 +141,10 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       let pinned: string | null;
 
       try {
-        pinned = pinnedVersionPath({
+        pinned = this.pinnedAddressOf({
+          method: context.req.method,
           path: context.req.path,
           header: context.req.header(API_VERSION_HEADER),
-          datedBases: this.datedBases,
         });
       } catch (error) {
         return canonicalErrorResponse(error, context);
@@ -155,6 +157,16 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
 
       return this.app.fetch(new Request(url, context.req.raw), context.env);
     });
+  }
+
+  /**
+   * The dated address a request naming `X-API-Version` is answered at, or null where it was sent:
+   * only a route of a dated family mounted so far is pinned (public-rest.feature).
+   */
+  pinnedAddressOf(
+    request: Readonly<{ method: string; path: string; header: string | undefined }>,
+  ): string | null {
+    return pinnedVersionPath({ ...request, datedFamilies: this.datedFamilies });
   }
 
   /**
@@ -242,15 +254,22 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     assertEveryRouteDeclared({ app: this.app, registry: allRegisteredRoutes() });
   }
 
-  /** A dated family owning its namespace answers a pinned version at its dated addresses. */
+  /**
+   * A dated family answers a pinned version at its dated addresses, a family wholly on another's
+   * shared path included; a literal route beneath its base has none and is left alone.
+   */
   private noteDatedBase(declaration: RestTransportDeclaration<unknown>): void {
-    if (declaration.addressing !== "dated" || claimsNoPrefix(declaration)) return;
+    if (declaration.addressing !== "dated") return;
 
     const base = basePathOf(declaration);
     const twin = declaration.v1Twin ? canonicalV1Path(base) : null;
+    const routes = declaration.routes.map((route) => ({
+      method: route.method,
+      pattern: datedRoutePattern(route.path),
+    }));
 
     for (const each of twin ? [base, twin] : [base]) {
-      if (!this.datedBases.includes(each)) this.datedBases.push(each);
+      this.datedFamilies.push({ base: each, routes });
     }
   }
 

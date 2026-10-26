@@ -8,7 +8,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { RestIdentity } from "@langwatch/api/hosting";
-import { RestHost } from "@langwatch/api/rest";
+import {
+  basePathOf,
+  DASHBOARDS_API_VERSION,
+  RestHost,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import { composeApiApplication } from "@langwatch/process";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { Hono } from "hono";
@@ -136,6 +141,40 @@ describe("the OpenAPI document generated from the installed declarations", () =>
   });
 
   /** @scenario "The api serves the generated document" */
+  // public-rest.feature: "A header leaves a path the dated family does not serve to the route
+  // that does", across every family the api installs.
+  it("pins X-API-Version only for routes of dated families", () => {
+    const sample = (path: string) => path.replace(/:\w+(\{[^}]*\})?|\*/g, "x");
+    const literal: string[] = [];
+    const dated: string[] = [];
+    for (const module of processModules) {
+      for (const transport of module.transports ?? []) {
+        if (transport.protocol !== "rest") continue;
+        const declaration = transport.router() as RestTransportDeclaration<unknown>;
+        for (const route of declaration.routes) {
+          const asked = (path: string) => ({ method: route.method, path: sample(path) });
+          if (declaration.addressing === "literal") literal.push(JSON.stringify(asked(route.path)));
+          if (declaration.addressing === "dated" && !declaration.supersededAt) {
+            const suffix = route.path === "/" ? "" : route.path;
+            dated.push(JSON.stringify(asked(`${basePathOf(declaration)}${suffix}`)));
+          }
+        }
+      }
+    }
+    const pinned = (each: string) =>
+      booted.rest.pinnedAddressOf({ ...JSON.parse(each), header: DASHBOARDS_API_VERSION });
+
+    expect(literal.filter((each) => pinned(each) !== null)).toEqual([]);
+    expect(dated.filter((each) => pinned(each) === null)).toEqual([]);
+    expect(
+      booted.rest.pinnedAddressOf({
+        method: "POST",
+        path: "/api/v1/analytics/reports",
+        header: DASHBOARDS_API_VERSION,
+      }),
+    ).toBeNull();
+  });
+
   it("is the document the api answers at /api/openapi.json", async () => {
     const response = await booted.application.request("/api/openapi.json");
 
