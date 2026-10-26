@@ -26,8 +26,7 @@ class ClickHouseTraceFacetEventsRepository {
    * the values. A search filter's trace-scope subquery runs once per half: it reads light
    * trace_summaries columns, cheap beside the heavy map a single pass drags through the join. */
   buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = this.facetQueries.buildTimeWhere("StartTime", ctx);
-    const bounds = this.facetQueries.buildTimeWhere("StartTime");
+    const bounds = this.facetQueries.buildTimeBounds("StartTime");
     const traceScope = this.facetQueries.buildTraceScope("StartTime", ctx);
     const prefixFilter = ctx.prefix ? "AND lower(name) ILIKE concat({prefix:String}, '%')" : "";
     return {
@@ -45,7 +44,8 @@ class ClickHouseTraceFacetEventsRepository {
           FROM (
             SELECT arrayJoin(\`Events.Name\`) AS name
             FROM stored_spans
-            WHERE ${where}
+            WHERE ${bounds}
+              ${traceScope ? `AND ${traceScope}` : ""}
               AND length(\`Events.Name\`) > 0
           )
           WHERE name != ''

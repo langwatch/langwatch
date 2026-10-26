@@ -40,11 +40,16 @@ export class ClickHouseTraceFacetQueryRepository {
     ctx?: Pick<FacetQueryContext, "filterWhere" | "isLiveWindow">,
   ): string {
     const traceScope = this.buildTraceScope(timeColumn, ctx);
+    const bounds = this.buildTimeBounds(timeColumn);
+    return traceScope ? `${bounds} AND ${traceScope}` : bounds;
+  }
+
+  /** The tenant and window predicates alone, for a builder that places them apart. */
+  buildTimeBounds(timeColumn: keyof typeof FACET_TABLE_BY_TIME_COLUMN): string {
     return [
       tenantScope(timeColumn),
       `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
       `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
-      ...(traceScope ? [traceScope] : []),
     ].join(" AND ");
   }
 
