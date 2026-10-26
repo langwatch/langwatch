@@ -283,6 +283,7 @@ describe("given an unregistered docs origin", () => {
 });
 
 describe("given an operator impersonating a member", () => {
+  /** @scenario "No docs session key is minted while an operator acts as another member" */
   it("refuses with permission_denied before any read or write", async () => {
     const { app, apiKeys, getScope } = await appOver();
     const create = vi.spyOn(apiKeys, "create");

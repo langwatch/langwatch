@@ -21,21 +21,21 @@ Feature: Docs session keys for the documentation playground
     When the member loses a permission or leaves the project
     Then the key's next call that needs it is refused
 
-  @unit
+  @integration
   Scenario: The consent page refuses an unregistered docs origin
     Given a consent request from an origin that is not registered for docs
     When the consent page loads
     Then it explains that this site cannot connect to LangWatch
     And no key can be minted for that origin
 
-  @unit
+  @integration
   Scenario: No docs session key is minted while an operator acts as another member
     Given an operator impersonating a member
     When the consent page asks to mint a docs session key
     Then permission_denied is returned with status 403
     And no key is minted
 
-  @unit
+  @integration
   Scenario: A member who denies access mints nothing
     Given the consent page is open
     When the member denies access
