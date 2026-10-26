@@ -1,7 +1,12 @@
-import { apiKeyApi } from "./api-key-api.ts";
+import type { OutputsFromMap } from "@langwatch/api/web";
+
+import { type ApiKeyApiMap, apiKeyApi } from "./api-key-api.ts";
 
 /** The project's legacy key while it still authenticates, or null once it is gone. */
-export type LegacyKeyStatus = { lastUsedAt: string | null };
+export type LegacyKeyStatus = Pick<
+  OutputsFromMap<ApiKeyApiMap>["project"]["getLegacyKeyStatus"],
+  "lastUsedAt"
+>;
 
 /**
  * The project's legacy key, if it still works. The server answers only those with
@@ -19,5 +24,5 @@ export function useLegacyKey({
     { enabled: !!projectId && canManageProject, retry: false },
   );
   if (status.data?.present !== true) return null;
-  return { lastUsedAt: status.data.lastUsedAt ?? null };
+  return { lastUsedAt: status.data.lastUsedAt };
 }
