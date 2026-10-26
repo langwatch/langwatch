@@ -72161,73 +72161,6 @@ The same data renders in the product on the [sessions](/coding-agents/sessions) 
 
 ---
 
-# FILE: ./api-reference/dashboards/create-dashboards.mdx
-
----
-title: "Create a new dashboard"
-openapi: "POST /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/delete-dashboards.mdx
-
----
-title: "Delete a dashboard and its graphs"
-openapi: "DELETE /api/v1/dashboards/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/get-dashboards.mdx
-
----
-title: "Get a dashboard by its id, including its graphs"
-openapi: "GET /api/v1/dashboards/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/list-dashboards.mdx
-
----
-title: "List Dashboards"
-openapi: "GET /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/overview.mdx
-
----
-title: "Overview"
-description: "Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs."
----
-
-## Intro
-
-Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.
-
----
-
-# FILE: ./api-reference/dashboards/put-update-reorder-reorder.mdx
-
----
-title: "Update Reorder"
-openapi: "PUT /api/v1/dashboards/reorder"
----
-
----
-
-# FILE: ./api-reference/dashboards/update-dashboards.mdx
-
----
-title: "Rename a dashboard"
-openapi: "PATCH /api/v1/dashboards/{id}"
----
-
----
-
 # FILE: ./api-reference/datasets/action-records.mdx
 
 ---
@@ -75465,6 +75398,73 @@ A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LI
 ---
 title: "Run a LangWatchQL query"
 openapi: "POST /api/v1/query"
+---
+
+---
+
+# FILE: ./api-reference/reports/create-reports.mdx
+
+---
+title: "Create a new dashboard"
+openapi: "POST /api/v1/analytics/reports"
+---
+
+---
+
+# FILE: ./api-reference/reports/delete-reports.mdx
+
+---
+title: "Delete a dashboard and its graphs"
+openapi: "DELETE /api/v1/analytics/reports/{reportId}"
+---
+
+---
+
+# FILE: ./api-reference/reports/get-reports.mdx
+
+---
+title: "Get a dashboard by its id, including its graphs"
+openapi: "GET /api/v1/analytics/reports/{reportId}"
+---
+
+---
+
+# FILE: ./api-reference/reports/list-reports.mdx
+
+---
+title: "List Reports"
+openapi: "GET /api/v1/analytics/reports"
+---
+
+---
+
+# FILE: ./api-reference/reports/overview.mdx
+
+---
+title: "Overview"
+description: "Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs."
+---
+
+## Intro
+
+Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs.
+
+---
+
+# FILE: ./api-reference/reports/update-reorder.mdx
+
+---
+title: "Update Reorder"
+openapi: "PUT /api/v1/analytics/reports/reorder"
+---
+
+---
+
+# FILE: ./api-reference/reports/update-reports.mdx
+
+---
+title: "Rename a dashboard"
+openapi: "PATCH /api/v1/analytics/reports/{reportId}"
 ---
 
 ---

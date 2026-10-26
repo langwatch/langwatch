@@ -29255,9 +29255,9 @@
         ]
       }
     },
-    "/api/v1/dashboards": {
+    "/api/v1/analytics/reports": {
       "get": {
-        "operationId": "getApiDashboards",
+        "operationId": "getApiV1AnalyticsReports",
         "responses": {
           "200": {
             "description": "Success",
@@ -29326,7 +29326,7 @@
         },
         "description": "List all dashboards for the project with graph counts",
         "tags": [
-          "Dashboards"
+          "Analytics / Reports"
         ],
         "security": [
           {
@@ -29344,7 +29344,7 @@
         }
       },
       "post": {
-        "operationId": "postApiDashboards",
+        "operationId": "postApiV1AnalyticsReports",
         "responses": {
           "201": {
             "description": "Success",
@@ -29395,7 +29395,7 @@
         },
         "description": "Create a new dashboard",
         "tags": [
-          "Dashboards"
+          "Analytics / Reports"
         ],
         "security": [
           {
@@ -29433,9 +29433,9 @@
         }
       }
     },
-    "/api/v1/dashboards/reorder": {
+    "/api/v1/analytics/reports/reorder": {
       "put": {
-        "operationId": "putApiDashboardsReorder",
+        "operationId": "putApiV1AnalyticsReportsReorder",
         "responses": {
           "200": {
             "description": "Success",
@@ -29460,7 +29460,7 @@
         },
         "description": "Reorder dashboards by providing an ordered list of IDs",
         "tags": [
-          "Dashboards"
+          "Analytics / Reports"
         ],
         "security": [
           {
@@ -29501,9 +29501,9 @@
         }
       }
     },
-    "/api/v1/dashboards/{id}": {
+    "/api/v1/analytics/reports/{reportId}": {
       "get": {
-        "operationId": "getApiDashboardsById",
+        "operationId": "getApiV1AnalyticsReportsByReportId",
         "responses": {
           "200": {
             "description": "Success",
@@ -29650,7 +29650,7 @@
         },
         "description": "Get a dashboard by its id, including its graphs",
         "tags": [
-          "Dashboards"
+          "Analytics / Reports"
         ],
         "security": [
           {
@@ -29669,7 +29669,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "reportId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -29679,7 +29679,7 @@
         ]
       },
       "patch": {
-        "operationId": "patchApiDashboardsById",
+        "operationId": "patchApiV1AnalyticsReportsByReportId",
         "responses": {
           "200": {
             "description": "Success",
@@ -29730,7 +29730,7 @@
         },
         "description": "Rename a dashboard",
         "tags": [
-          "Dashboards"
+          "Analytics / Reports"
         ],
         "security": [
           {
@@ -29749,7 +29749,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "reportId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -29779,7 +29779,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteApiDashboardsById",
+        "operationId": "deleteApiV1AnalyticsReportsByReportId",
         "responses": {
           "200": {
             "description": "Success",
@@ -29810,7 +29810,7 @@
         },
         "description": "Delete a dashboard and its graphs (hard delete, cascade)",
         "tags": [
-          "Dashboards"
+          "Analytics / Reports"
         ],
         "security": [
           {
@@ -29829,7 +29829,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "reportId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -33607,7 +33607,7 @@
             }
           },
           "404": {
-            "description": "No dashboard widget with this id, or no Dashboards board with this id, in this project. A board made by POST /api/dashboards is an Analytics Reports board and is not found here.",
+            "description": "No dashboard widget with this id, or no Dashboards board with this id, in this project. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33831,9 +33831,9 @@
         }
       }
     },
-    "/api/v1/boards": {
+    "/api/v1/dashboards": {
       "get": {
-        "operationId": "getApiBoards",
+        "operationId": "getApiDashboards",
         "responses": {
           "200": {
             "description": "The project's boards",
@@ -34246,7 +34246,7 @@
         "description": "Lists the Dashboards boards of the key's project, each with how many widgets it holds.",
         "summary": "List boards",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -34264,7 +34264,7 @@
         }
       },
       "post": {
-        "operationId": "postApiBoards",
+        "operationId": "postApiDashboards",
         "responses": {
           "201": {
             "description": "The board was created",
@@ -34656,10 +34656,10 @@
             }
           }
         },
-        "description": "Creates an empty Dashboards board in the key's project. Add widgets to it with POST /api/v1/boards/{boardId}/widgets.",
+        "description": "Creates an empty Dashboards board in the key's project. Add widgets to it with POST /api/v1/dashboards/{dashboardId}/widgets.",
         "summary": "Create a board",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -34697,9 +34697,9 @@
         }
       }
     },
-    "/api/v1/boards/{boardId}": {
+    "/api/v1/dashboards/{dashboardId}": {
       "get": {
-        "operationId": "getApiBoardsByBoardId",
+        "operationId": "getApiDashboardsByDashboardId",
         "responses": {
           "200": {
             "description": "The board",
@@ -35009,7 +35009,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/dashboards is an Analytics Reports board and is not found here.",
+            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35176,7 +35176,7 @@
         "description": "Returns one Dashboards board.",
         "summary": "Get a board",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -35195,7 +35195,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "boardId",
+            "name": "dashboardId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -35205,7 +35205,7 @@
         ]
       },
       "patch": {
-        "operationId": "patchApiBoardsByBoardId",
+        "operationId": "patchApiDashboardsByDashboardId",
         "responses": {
           "200": {
             "description": "The updated board",
@@ -35515,7 +35515,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/dashboards is an Analytics Reports board and is not found here.",
+            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35682,7 +35682,7 @@
         "description": "Changes a board's name or description; a field the body leaves out keeps its value, and a null description clears it.",
         "summary": "Update a board",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -35701,7 +35701,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "boardId",
+            "name": "dashboardId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -35740,7 +35740,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteApiBoardsByBoardId",
+        "operationId": "deleteApiDashboardsByDashboardId",
         "responses": {
           "200": {
             "description": "The board was deleted",
@@ -36015,7 +36015,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/dashboards is an Analytics Reports board and is not found here.",
+            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36182,7 +36182,7 @@
         "description": "Deletes a board together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted board's id and name.",
         "summary": "Delete a board",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -36201,7 +36201,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "boardId",
+            "name": "dashboardId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -36211,9 +36211,9 @@
         ]
       }
     },
-    "/api/v1/boards/{boardId}/widgets": {
+    "/api/v1/dashboards/{dashboardId}/widgets": {
       "get": {
-        "operationId": "getApiBoardsByBoardIdWidgets",
+        "operationId": "getApiDashboardsByDashboardIdWidgets",
         "responses": {
           "200": {
             "description": "The board's widgets",
@@ -36692,7 +36692,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/dashboards is an Analytics Reports board and is not found here.",
+            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36859,7 +36859,7 @@
         "description": "Lists the widgets on one board, each with its React source and named queries.",
         "summary": "List a board's widgets",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -36878,7 +36878,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "boardId",
+            "name": "dashboardId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -36888,7 +36888,7 @@
         ]
       },
       "post": {
-        "operationId": "postApiBoardsByBoardIdWidgets",
+        "operationId": "postApiDashboardsByDashboardIdWidgets",
         "responses": {
           "201": {
             "description": "The widget was saved on the board",
@@ -37355,7 +37355,7 @@
             }
           },
           "404": {
-            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/dashboards is an Analytics Reports board and is not found here.",
+            "description": "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -37522,7 +37522,7 @@
         "description": "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this board at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.",
         "summary": "Create a widget on a board",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -37541,7 +37541,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "boardId",
+            "name": "dashboardId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -37711,9 +37711,9 @@
         }
       }
     },
-    "/api/v1/boards/{boardId}/widgets/{widgetId}": {
+    "/api/v1/dashboards/{dashboardId}/widgets/{widgetId}": {
       "get": {
-        "operationId": "getApiBoardsByBoardIdWidgetsByWidgetId",
+        "operationId": "getApiDashboardsByDashboardIdWidgetsByWidgetId",
         "responses": {
           "200": {
             "description": "The widget",
@@ -38347,7 +38347,7 @@
         "description": "Returns one widget on this board with its React source and named queries.",
         "summary": "Get a widget on a board",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -38366,7 +38366,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "boardId",
+            "name": "dashboardId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -38385,7 +38385,7 @@
         ]
       },
       "patch": {
-        "operationId": "patchApiBoardsByBoardIdWidgetsByWidgetId",
+        "operationId": "patchApiDashboardsByDashboardIdWidgetsByWidgetId",
         "responses": {
           "200": {
             "description": "The updated widget",
@@ -39019,7 +39019,7 @@
         "description": "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
         "summary": "Update a widget on a board",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -39038,7 +39038,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "boardId",
+            "name": "dashboardId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -39208,7 +39208,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteApiBoardsByBoardIdWidgetsByWidgetId",
+        "operationId": "deleteApiDashboardsByDashboardIdWidgetsByWidgetId",
         "responses": {
           "200": {
             "description": "Success",
@@ -39636,7 +39636,7 @@
         "description": "Deletes one widget on this board. Answers 204 with no body.",
         "summary": "Delete a widget on a board",
         "tags": [
-          "Dashboards / Boards"
+          "Dashboards"
         ],
         "security": [
           {
@@ -39655,7 +39655,7 @@
         "parameters": [
           {
             "in": "path",
-            "name": "boardId",
+            "name": "dashboardId",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -40086,7 +40086,7 @@
             }
           }
         },
-        "description": "Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports boards are listed by /api/v1/dashboards instead.",
+        "description": "Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports boards are listed by /api/v1/analytics/reports instead.",
         "summary": "List Dashboards boards",
         "tags": [
           "Analytics / LangWatchQL"

@@ -113,7 +113,7 @@ def sync_detailed(
 
      Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a
     board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics
-    Reports boards are listed by /api/v1/dashboards instead.
+    Reports boards are listed by /api/v1/analytics/reports instead.
 
     Args:
         project_id (str):
@@ -153,7 +153,7 @@ def sync(
 
      Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a
     board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics
-    Reports boards are listed by /api/v1/dashboards instead.
+    Reports boards are listed by /api/v1/analytics/reports instead.
 
     Args:
         project_id (str):
@@ -187,7 +187,7 @@ async def asyncio_detailed(
 
      Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a
     board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics
-    Reports boards are listed by /api/v1/dashboards instead.
+    Reports boards are listed by /api/v1/analytics/reports instead.
 
     Args:
         project_id (str):
@@ -225,7 +225,7 @@ async def asyncio(
 
      Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a
     board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics
-    Reports boards are listed by /api/v1/dashboards instead.
+    Reports boards are listed by /api/v1/analytics/reports instead.
 
     Args:
         project_id (str):
