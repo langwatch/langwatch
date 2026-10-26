@@ -4,7 +4,13 @@
 Invoked by nlpgo for every code-block execution. Reads a JSON payload
 from stdin describing the user's Python code, declared inputs, and
 declared outputs; executes the code in a fresh module namespace;
-writes a structured JSON result to the path passed as argv[1].
+writes a structured JSON result to the path the payload names.
+
+Nothing belonging to the run arrives on the command line or in the
+variables exec hands this process, because both are readable from /proc
+by anything running as the same user, which every other code block in
+the container does. The payload carries them instead, and this process
+makes itself non-dumpable before asking for it.
 
 Four accepted user-code shapes (in this order of precedence):
 
@@ -51,12 +57,15 @@ filesystem, so the executed code has no copy of either to rewrite.
 
 Wire shape (stdin):
     {
-      "code":      "<python source>",
-      "inputs":    {"name": value, ...},
-      "outputs":   ["name", ...],
-      "secrets":   {"NAME": "value", ...},
-      "params":    {"NAME": value, ...},
-      "dspy_stub": "<python source of the dspy stand-in>"
+      "code":        "<python source>",
+      "inputs":      {"name": value, ...},
+      "outputs":     ["name", ...],
+      "secrets":     {"NAME": "value", ...},
+      "params":      {"NAME": value, ...},
+      "dspy_stub":   "<python source of the dspy stand-in>",
+      "result_path": "<where to write the result>",
+      "nonce":       "<stamped on the result so nlpgo knows it is ours>",
+      "env":         {"NAME": "value", ...}
     }
 
 The optional `secrets` map is the project's decrypted secrets (rides on
@@ -79,6 +88,7 @@ Wire shape (result file):
       "stdout":     "<captured stdout>",
       "stderr":     "<captured stderr>",
       "duration_ms": <int>,
+      "nonce":      "<the nonce from the payload>",
       "error":      null | {
           "type":      "<ExceptionClassName>",
           "message":   "<str(e)>",
@@ -89,12 +99,46 @@ Wire shape (result file):
 
 from __future__ import annotations
 
-import inspect
+import os
+import sys
+
+# FIRST, before the payload is asked for: take this process's own /proc
+# files away from everything running as the same user. Every code block
+# in the container does, so without this one execution reads another's
+# stdin through /proc/<pid>/fd/0 (the payload: project secrets and the
+# run's credential), its initial environment, and the path of its
+# working directory. stat and cmdline stay readable, which is what the
+# engine's teardown uses, and this process keeps its own /proc/self.
+#
+# Best effort by necessity: it needs ctypes, and the result decides
+# nothing but how much is hidden. nlpgo waits for the byte on file
+# descriptor 3 before it writes the payload, so the write lands after
+# this either way.
+_PR_SET_DUMPABLE = 4
+
+
+def _hide_from_other_executions() -> bool:
+    try:
+        import ctypes
+
+        return ctypes.CDLL(None, use_errno=True).prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) == 0
+    except Exception:  # noqa: BLE001 — nothing here is worth failing a run over
+        return False
+
+
+_hide_from_other_executions()
+try:
+    os.write(3, b"1")
+    os.close(3)
+except OSError:
+    # No descriptor 3 when the runner is invoked by hand; nlpgo always
+    # passes one and stops waiting on end-of-file either way.
+    pass
+
+import inspect  # noqa: E402 — everything above runs before the payload exists
 import io
 import json
-import os
 import re
-import sys
 import time
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
@@ -123,12 +167,10 @@ def install_dspy_stub(source):
     """Build the bundled dspy stand-in from source and register it."""
     global fake_dspy
     module = ModuleType("fake_dspy")
-    module.__dict__["__name__"] = "fake_dspy"
     exec(compile(source, "<fake_dspy>", "exec"), module.__dict__)
     fake_dspy = module
     sys.modules["fake_dspy"] = module
     sys.modules.setdefault("dspy", module)
-    return module
 
 
 # The runner is compiled from source nlpgo passes on the command line, so its
@@ -149,34 +191,43 @@ def format_user_traceback() -> str:
 
     Formatted as text and filtered, rather than rebuilt from the frame list,
     so a chained exception keeps its "During handling of the above" section.
-    Left whole when no user frame is in it: a failure inside the runner still
-    reports where it happened.
+    A failure the runner raised itself, such as a declared output the code
+    never set, has no frame left once its own are gone, and reports as the
+    exception alone rather than as a walk through the runner.
     """
-    text = traceback.format_exc()
-    if '"%s"' % _USER_CODE_FILENAME not in text:
+    text = _RUNNER_FRAME.sub("", traceback.format_exc())
+    if '  File "' in text:
         return text
-    return _RUNNER_FRAME.sub("", text)
+    return "".join(traceback.format_exception_only(*sys.exc_info()[:2]))
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        sys.stderr.write("usage: runner.py <result_path>\n")
-        return 2
-    result_path = sys.argv[1]
     raw = sys.stdin.read()
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as e:
-        write_result(result_path, error={
-            "type": "ProtocolError",
-            "message": f"invalid JSON on stdin: {e}",
-            "traceback": "",
-        })
+        # No result path to write to: it arrives in the payload that just
+        # failed to parse, so this one goes to stderr, which nlpgo reads
+        # when no result file turns up.
+        sys.stderr.write(f"runner: invalid JSON on stdin: {e}\n")
         return 1
+
+    result_path = payload.get("result_path")
+    nonce = payload.get("nonce", "")
+    if not result_path:
+        sys.stderr.write("runner: payload carries no result_path\n")
+        return 2
+
+    # The run's own environment: its credential, its scratch directory and
+    # the token nlpgo's teardown recognizes its processes by. Set here
+    # rather than handed to this process by exec, so none of it sits in
+    # the initial environment another execution can read out of /proc.
+    for name, value in (payload.get("env") or {}).items():
+        os.environ[str(name)] = str(value)
 
     stub_source = payload.get("dspy_stub")
     if not stub_source:
-        write_result(result_path, error={
+        write_result(result_path, nonce, error={
             "type": "ProtocolError",
             "message": "payload carries no dspy_stub source",
             "traceback": "",
@@ -215,7 +266,7 @@ def main() -> int:
             # number stays a number and a boolean stays a boolean.
             if params:
                 module_globals["params"] = SimpleNamespace(**params)
-            exec(compile(code, "<code-block>", "exec"), module_globals)
+            exec(compile(code, _USER_CODE_FILENAME, "exec"), module_globals)
             result = _invoke_user_entrypoint(module_globals, inputs)
             result = _coerce_result(result)
             # Validate declared outputs are present (these are wired to
@@ -240,6 +291,7 @@ def main() -> int:
     elapsed_ms = int((time.perf_counter() - started) * 1000)
     write_result(
         result_path,
+        nonce,
         outputs=outputs,
         stdout=stdout_buf.getvalue(),
         stderr=stderr_buf.getvalue(),
@@ -336,13 +388,20 @@ def _coerce_result(result):
     )
 
 
-def write_result(path, **fields):
+def write_result(path, nonce, **fields):
+    """Write the result file, stamped with the nonce from the payload.
+
+    nlpgo reads a result only when the stamp matches, so a file written
+    by anything that never saw the payload is not read as this run's
+    output.
+    """
     payload = {
         "outputs": fields.get("outputs", {}),
         "stdout": fields.get("stdout", ""),
         "stderr": fields.get("stderr", ""),
         "duration_ms": fields.get("duration_ms", 0),
         "error": fields.get("error"),
+        "nonce": nonce,
     }
     try:
         with open(path, "w", encoding="utf-8") as f:

@@ -236,6 +236,41 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then listing the root that holds the execution directories is refused
       And a directory belonging to a finished execution cannot be read or written
 
+  Rule: One execution cannot read another execution's process
+
+    # Everything in the container runs as one user, and /proc hands a process
+    # running as that user another's open descriptors, initial environment and
+    # working directory. The payload carrying the project's decrypted secrets
+    # arrives on stdin, so the runner makes itself non-dumpable before it asks
+    # for the payload, and the engine writes the payload only once the runner
+    # reports that it has. Process state and the command line stay readable,
+    # which costs nothing: teardown reads the first, and the interpreter is
+    # given neither a secret nor a path belonging to the run on the second.
+
+    @unit
+    Scenario: one execution cannot read another's payload, variables or directory through /proc
+      Given a code node whose body reads the /proc entries of another running execution
+      When the executor runs it beside that execution
+      Then reading the other execution's open descriptors is refused
+      And reading its initial variables is refused
+      And reading its working directory is refused
+      And reading its process state still works, because teardown reads it
+
+    @unit
+    Scenario: the run's credential is never in the interpreter's initial variables
+      Given the run carries a sandbox key
+      When the engine invokes a code node
+      Then user code still reads the key as LANGWATCH_API_KEY
+      And the key is not among the variables the interpreter was started with
+      And the command line names no directory belonging to the run
+
+    @unit
+    Scenario: a result file this execution did not write is not read as its output
+      Given a code node whose body writes a result file of its own and exits
+      When the executor runs the request
+      Then the execution reports a runner error
+      And the values in that file are not returned as the node's outputs
+
   Rule: No process an execution started outlives it
 
     # The interpreter leads a process group of its own and every exit path
@@ -246,6 +281,13 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     # them as its own children, kills them and collects their exit status.
     # This needs no capability, no cgroup write, no PID namespace and no second
     # UID, which is what makes it deployable in the shipped container.
+    #
+    # Adoption says an execution started a process, not which one. A process
+    # that also erased the run's marks from its environment and working
+    # directory is swept by the first teardown that can tell it apart from
+    # every execution still running, which is the moment it is older than all
+    # of them: killing a live tenant's helper would be worse than sweeping one
+    # process late.
 
     @unit
     Scenario: no process an execution started is left running

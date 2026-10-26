@@ -28,18 +28,26 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // prSetChildSubreaper is PR_SET_CHILD_SUBREAPER: orphaned descendants reparent
-// to this process instead of to PID 1.
-const prSetChildSubreaper = 36
+// to this process instead of to PID 1. prSetDumpable is PR_SET_DUMPABLE, which
+// at 0 takes this process's own /proc files away from processes running as the
+// same user.
+const (
+	prSetDumpable       = 4
+	prSetChildSubreaper = 36
+)
 
-// subreaperOnce guards one prctl per process, and subreaperActive records
-// whether it took. Without it a detached grandchild reparents to PID 1 and
-// leaves the sweep with no way to tell it apart from the rest of the
-// container, so the orphan rule is only applied when this is true.
+// hardeningOnce guards one pass of prctls per process, and subreaperActive
+// records whether the subreaper flag took. Without that flag a detached
+// grandchild reparents to PID 1 and leaves the sweep with no way to tell it
+// apart from the rest of the container, so the orphan rule is only applied
+// when this is true.
 var (
-	subreaperOnce   sync.Once
+	hardeningOnce   sync.Once
 	subreaperActive bool
 )
 
@@ -49,20 +57,39 @@ var (
 // worker forever is worse than returning.
 const teardownDeadline = 2 * time.Second
 
-// enableProcessTeardown marks the engine as the reaper for orphaned
-// descendants. Called when an Executor is built, because from then on this
-// process spawns user code.
-func enableProcessTeardown() {
-	subreaperOnce.Do(func() {
+// enableProcessHardening prepares this process for running untrusted code.
+// Called when an Executor is built, because from then on this process spawns
+// code that runs as the same user it does.
+//
+// PR_SET_CHILD_SUBREAPER makes the engine the reaper for orphaned descendants,
+// which is what teardown is built on.
+//
+// PR_SET_DUMPABLE 0 takes the engine's own /proc files away from every other
+// process running as that same user, and a code block is one of those. Without
+// it, the engine's own process environment is readable by any code block that
+// looks — the whole pod environment this executor's allowlist exists to
+// withhold, including the database and ClickHouse credentials and the
+// instance's own LangWatch key — and the engine's memory and open descriptors
+// go with it. What stays readable is stat, status and cmdline, which is all
+// teardown and the metrics this service exports read; the protected files
+// become root-owned, so the engine cannot read its own either, and nothing
+// here does (no os.Executable, no /proc/self reader, runtime metrics come from
+// runtime/metrics). The other cost is core dumps of the engine, which nothing
+// collects, and reading those files from inside the container as the same
+// user, which a distroless image has no shell for anyway.
+func enableProcessHardening() {
+	hardeningOnce.Do(func() {
 		_, _, errno := syscall.Syscall(syscall.SYS_PRCTL, prSetChildSubreaper, 1, 0)
 		subreaperActive = errno == 0
+		_, _, _ = syscall.Syscall(syscall.SYS_PRCTL, prSetDumpable, 0, 0)
 	})
 }
 
 // terminateRunTree kills every process the execution still owns and reaps the
-// ones that have become this process's children. It returns the pids it could
-// not account for, which is empty in every case but a wedged process.
-func terminateRunTree(scope runScope) []int {
+// ones that have become this process's children. A process still standing
+// after the deadline is logged: SIGKILL cannot be refused, so this is a
+// process wedged in the kernel, and the run it came from is over.
+func terminateRunTree(scope runScope, logger *zap.Logger) {
 	if scope.pgid > 0 {
 		_ = syscall.Kill(-scope.pgid, syscall.SIGKILL)
 	}
@@ -71,11 +98,15 @@ func terminateRunTree(scope runScope) []int {
 	for {
 		claimed := claimedProcesses(scope, selfPid)
 		if len(claimed) == 0 {
-			return nil
+			return
 		}
 		killAndReap(claimed, selfPid)
 		if time.Now().After(deadline) {
-			return pidsOf(claimed)
+			logger.Warn("nlpgo_code_block_teardown_incomplete",
+				zap.Ints("pids", pidsOf(claimed)),
+				zap.String("hint", "these processes outlived a code block and did not die to SIGKILL within the deadline, which means they are blocked in the kernel; they hold a slot in the container's process table until they unblock"),
+			)
+			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -129,21 +160,21 @@ func runStartMarker(pid int) uint64 {
 }
 
 // claimedProcesses returns the live processes belonging to the run: the
-// interpreter, anything sharing its process group, anything still holding its
-// environment token or working directory, every descendant of those, and —
-// once the engine is the subreaper — any child of the engine that is not a
-// running execution, which can only be a process that detached from one.
+// interpreter, anything sharing its process group, every descendant of those,
+// and the orphans the engine has adopted that are tied to this run rather than
+// to an execution still going (see claimsOrphan).
 //
-// The live-execution set and the /proc scan are read together, before anything
-// is killed, so a child that another execution starts in the meantime cannot be
-// read as an escapee.
+// The table is read BEFORE the live-execution set, and the order is the whole
+// reason a child another execution starts mid-sweep is not read as an escapee:
+// a pid is registered under the same lock as its Start, so a process already in
+// the table is a process the later snapshot is bound to report.
 func claimedProcesses(scope runScope, selfPid int) []procEntry {
+	entries := readProcTable()
 	pass := sweep{
 		scope:   scope,
 		selfPid: selfPid,
 		live:    runningChildren.snapshot(),
 	}
-	entries := readProcTable()
 
 	claimed := make(map[int]struct{}, len(entries))
 	for _, entry := range entries {
@@ -190,7 +221,7 @@ func addDescendants(entries []procEntry, claimed map[int]struct{}) {
 type sweep struct {
 	scope   runScope
 	selfPid int
-	live    map[int]struct{}
+	live    map[int]uint64
 }
 
 // claims decides whether one process belongs to the run.
@@ -208,32 +239,65 @@ func (s sweep) claims(entry procEntry) bool {
 		return true
 	case s.scope.pgid > 0 && entry.pgid == s.scope.pgid:
 		return true
-	case entry.ppid == s.selfPid:
-		return s.isEscapedChild(entry)
-	case entry.ppid == 1:
-		return s.carriesRunMarks(entry.pid)
+	case entry.ppid == s.selfPid || entry.ppid == 1:
+		return s.claimsOrphan(entry)
 	default:
 		return false
 	}
 }
 
-// isEscapedChild reads a child of the engine. One that no execution is running
-// and that started no earlier than this execution's interpreter can only have
-// got there by detaching from an execution and losing its parent.
-func (s sweep) isEscapedChild(entry procEntry) bool {
-	if !subreaperActive || entry.startTicks < s.scope.startTicks {
+// claimsOrphan decides on a process whose parent is gone. Being adopted says
+// an execution started it, not which one, so it is claimed only on a positive
+// tie to this run: a mark it still carries, or a start time no running
+// execution can account for. Anything that may belong to an execution still
+// running is left alone — killing another tenant's live helper is worse than
+// leaving a process of a finished run for the next teardown to find.
+func (s sweep) claimsOrphan(entry procEntry) bool {
+	if s.servesALiveRun(entry) {
 		return false
 	}
-	_, running := s.live[entry.pid]
-	return !running
+	return s.carriesRunMarks(entry.pid) || s.onlyThisRunCanAccountForIt(entry)
 }
 
-// carriesRunMarks reads a process adopted by init, which is where orphans go
-// when the subreaper flag did not take. Nothing about the process tree ties it
-// to this run any more, so the inherited token and working directory have to.
+// servesALiveRun reports whether the process is an execution still running or
+// sits in one's process group, which is where a child that was orphaned
+// without detaching stays.
+func (s sweep) servesALiveRun(entry procEntry) bool {
+	if _, running := s.live[entry.pid]; running {
+		return true
+	}
+	_, inGroup := s.live[entry.pgid]
+	return inGroup
+}
+
+// carriesRunMarks reads the marks a process inherits from the run that started
+// it and keeps through losing its parent and its process group: the run's
+// token in its environment, and its working directory. Both are per-run, so a
+// process carrying either is this run's and no other's.
 func (s sweep) carriesRunMarks(pid int) bool {
 	return (s.scope.token != "" && hasRunToken(pid, s.scope.token)) ||
 		(s.scope.dir != "" && worksInside(pid, s.scope.dir))
+}
+
+// onlyThisRunCanAccountForIt dates an orphan that scrubbed both marks. A
+// process cannot be older than whatever started it, so one that predates every
+// execution still running, and does not predate this one, came from an
+// execution that has already finished — this one or an earlier one, and either
+// way nothing is waiting on it.
+//
+// Only applied with the engine as subreaper, where a child of the engine is an
+// execution or came from one. Without that flag an orphan lands on PID 1 beside
+// the container's unrelated processes, and the marks are the only tie there is.
+func (s sweep) onlyThisRunCanAccountForIt(entry procEntry) bool {
+	if !subreaperActive || entry.ppid != s.selfPid || entry.startTicks < s.scope.startTicks {
+		return false
+	}
+	for pid, startTicks := range s.live {
+		if pid != s.scope.pid && startTicks <= entry.startTicks {
+			return false
+		}
+	}
+	return true
 }
 
 // procPath names one of a process's /proc files. Built by hand rather than
@@ -305,10 +369,15 @@ func readProcEntry(pid int) (procEntry, bool) {
 	return entry, true
 }
 
-// hasRunToken reports whether the process still carries the run's token in its
-// environment. Inherited across fork and exec, so it survives the detach a
-// process group does not — right up to an exec with a scrubbed environment,
-// which is what the orphan rule is for.
+// hasRunToken reports whether the process still carries the run's token. The
+// runner puts it in its own environment, so anything it starts inherits it,
+// which survives the detach a process group does not — right up to an exec
+// with a scrubbed environment, which is what the orphan rule is for.
+//
+// Never consulted for the interpreter, which makes itself non-dumpable and
+// would refuse this read: it is named by pid and process group instead. The
+// same is true of a descendant that forked without exec and kept that flag,
+// which the process group or the orphan rule catches.
 func hasRunToken(pid int, token string) bool {
 	raw, err := os.ReadFile(procPath(pid, "environ"))
 	if err != nil {

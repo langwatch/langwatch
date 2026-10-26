@@ -10,15 +10,18 @@
 // The tests for that property are Linux-only for the same reason.
 package codeblock
 
-import "syscall"
+import (
+	"syscall"
 
-func enableProcessTeardown() {}
+	"go.uber.org/zap"
+)
+
+func enableProcessHardening() {}
 
 func runStartMarker(int) uint64 { return 0 }
 
-func terminateRunTree(scope runScope) []int {
+func terminateRunTree(scope runScope, _ *zap.Logger) {
 	if scope.pgid > 0 {
 		_ = syscall.Kill(-scope.pgid, syscall.SIGKILL)
 	}
-	return nil
 }

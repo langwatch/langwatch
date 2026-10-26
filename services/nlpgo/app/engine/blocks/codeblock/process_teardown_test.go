@@ -3,7 +3,10 @@
 package codeblock_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -218,6 +221,126 @@ func TestCodeBlock_DetachedChildCannotHoldTheExecutionOpen(t *testing.T) {
 	assert.False(t, processExists(spooledPid(t, spool)))
 }
 
+// @scenario "no process an execution started is left running"
+func TestCodeBlock_TeardownSparesAProcessAnotherExecutionIsStillUsing(t *testing.T) {
+	requirePython(t)
+	exe := newExec(t)
+
+	// Being adopted by the engine says an execution started the process, not
+	// which one. A run still going may be waiting on the process it started,
+	// so a teardown beside it has to leave that process alone, and its own
+	// teardown has to take it in the end.
+	holder := make(chan error, 1)
+	spool := filepath.Join(t.TempDir(), "pid")
+	sweeper := make(chan error, 1)
+	go func() {
+		res, err := exe.Execute(context.Background(), codeblock.Request{
+			Code: `
+import time
+
+def execute(nap):
+    time.sleep(nap)
+    return {"ok": True}
+`,
+			Inputs:          map[string]any{"nap": 3.0},
+			DeclaredOutputs: []string{"ok"},
+		})
+		sweeper <- errOrFailure(err, res)
+	}()
+	// The sweeper starts first so that the process below is YOUNGER than it:
+	// an older one is spared by its age alone, which would prove nothing.
+	time.Sleep(300 * time.Millisecond)
+	go func() {
+		res, err := exe.Execute(context.Background(), codeblock.Request{
+			Code: `
+import subprocess, sys, time
+
+# A background process whose middle one exits at once: the engine adopts the
+# grandchild, which also left the run's process group, while the execution
+# that started it is still going.
+ORPHAN = """
+import os, sys, time
+if os.fork():
+    sys.exit(0)
+os.setsid()
+with open(sys.argv[1], "w") as handle:
+    handle.write(str(os.getpid()))
+time.sleep(120)
+"""
+
+def execute(spool, nap):
+    subprocess.run([sys.executable, "-c", ORPHAN, spool], timeout=30)
+    time.sleep(nap)
+    return {"ok": True}
+`,
+			Inputs:          map[string]any{"spool": spool, "nap": 6.0},
+			DeclaredOutputs: []string{"ok"},
+		})
+		holder <- errOrFailure(err, res)
+	}()
+
+	held := waitForSpooledPid(t, spool)
+	require.NoError(t, <-sweeper, "the short execution beside the holder failed")
+	require.True(t, processRunsNow(held),
+		"pid %d belonged to an execution that was still running and another execution's teardown killed it", held)
+
+	require.NoError(t, <-holder, "the holding execution failed")
+	assert.False(t, processExists(held),
+		"pid %d outlived the execution that started it", held)
+}
+
+// @scenario "no process an execution started is left running"
+func TestCodeBlock_TeardownDoesNotKillExecutionsStartingBesideIt(t *testing.T) {
+	requirePython(t)
+	exe := newExec(t)
+
+	// Teardown identifies what to kill from a /proc scan and the set of
+	// running executions. Taken in the wrong order, an interpreter that starts
+	// during the scan is in neither and reads as a process that escaped a run.
+	// Two workers rather than many: a pair spends most of its time with the
+	// execution tearing down as the only one running, which is when nothing
+	// else can vouch for the newcomer.
+	const workers, each = 2, 25
+	var wg sync.WaitGroup
+	failures := make([]error, workers*each)
+	for worker := range workers {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			for run := range each {
+				res, err := exe.Execute(context.Background(), codeblock.Request{
+					Code: `
+def execute():
+    return {"ok": True}
+`,
+					DeclaredOutputs: []string{"ok"},
+				})
+				failures[worker*each+run] = errOrFailure(err, res)
+			}
+		}(worker)
+	}
+	wg.Wait()
+
+	for slot, err := range failures {
+		require.NoError(t, err, "execution %d did not survive a teardown running beside it", slot)
+	}
+}
+
+// errOrFailure flattens what an execution can return into one error, so a
+// goroutine can report either over a channel.
+func errOrFailure(err error, res *codeblock.Result) error {
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return errors.New("the execution returned no result")
+	}
+	if res.Error != nil {
+		return fmt.Errorf("%s: %s", res.Error.Type, res.Error.Message)
+	}
+	return nil
+}
+
 // spooledPid reads the pid the user code wrote out.
 func spooledPid(t *testing.T, spool string) int {
 	t.Helper()
@@ -227,6 +350,18 @@ func spooledPid(t *testing.T, spool string) int {
 	require.NoError(t, err)
 	require.Positive(t, pid)
 	return pid
+}
+
+// processRunsNow answers for this instant, where processExists waits for a
+// process to go away: a live process is the thing being asserted here, so the
+// answer must not be allowed to arrive late.
+func processRunsNow(pid int) bool {
+	raw, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+	if err != nil {
+		return false
+	}
+	fields := strings.Fields(string(raw[bytes.LastIndexByte(raw, ')')+1:]))
+	return len(fields) > 0 && fields[0] != "Z"
 }
 
 // processExists reports whether the pid is still in the process table.

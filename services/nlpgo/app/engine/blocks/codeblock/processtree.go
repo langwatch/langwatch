@@ -26,30 +26,34 @@ type runScope struct {
 }
 
 // liveChildren is the set of interpreter pids the executor has started and not
-// yet reaped, process-wide rather than per-Executor because the teardown sweep
-// reasons about every child of this process at once.
+// yet reaped, each with the moment it started, process-wide rather than
+// per-Executor because the teardown sweep reasons about every child of this
+// process at once.
 //
-// Teardown treats a child of the engine that is in this set as a running
-// execution and anything else as a process that escaped one (see
-// processtree_linux.go). That inference is why registration and exec.Cmd.Start
-// happen under the same write lock: a pid that existed but was not yet
-// registered would read as an escapee and be killed moments after it started.
+// Teardown reads it twice over (see processtree_linux.go): a child of the
+// engine in this set is a running execution, and a process that cannot have
+// come from any execution in it belongs to one that has finished. Registration
+// and exec.Cmd.Start happen under the same write lock so that a pid which
+// exists is a pid already registered.
 type liveChildren struct {
 	mu   sync.RWMutex
-	pids map[int]struct{}
+	pids map[int]uint64
 }
 
-var runningChildren = &liveChildren{pids: map[int]struct{}{}}
+var runningChildren = &liveChildren{pids: map[int]uint64{}}
 
-// start launches cmd and registers its pid in one atomic step.
-func (l *liveChildren) start(cmd *exec.Cmd) error {
+// start launches cmd and registers its pid in one atomic step, with the start
+// time read while the process is certain to be alive: its /proc entry is gone
+// once exec has reaped it, and teardown needs that time to date the run.
+func (l *liveChildren) start(cmd *exec.Cmd) (uint64, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if err := cmd.Start(); err != nil {
-		return err
+		return 0, err
 	}
-	l.pids[cmd.Process.Pid] = struct{}{}
-	return nil
+	startTicks := runStartMarker(cmd.Process.Pid)
+	l.pids[cmd.Process.Pid] = startTicks
+	return startTicks, nil
 }
 
 // release forgets a pid once exec has reaped it.
@@ -59,16 +63,16 @@ func (l *liveChildren) release(pid int) {
 	delete(l.pids, pid)
 }
 
-// snapshot returns the registered pids. The caller holds nothing afterwards, so
-// a pid it reports is only a pid that was running an execution at the moment of
-// the call; identifying a process and killing it are therefore separate steps,
-// and only the first one needs the lock.
-func (l *liveChildren) snapshot() map[int]struct{} {
+// snapshot returns the registered pids with their start times. The caller
+// holds nothing afterwards, so what it reports is the set of executions that
+// were running at the moment of the call; identifying a process and killing it
+// are therefore separate steps, and only the first one needs the lock.
+func (l *liveChildren) snapshot() map[int]uint64 {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	live := make(map[int]struct{}, len(l.pids))
-	for pid := range l.pids {
-		live[pid] = struct{}{}
+	live := make(map[int]uint64, len(l.pids))
+	for pid, startTicks := range l.pids {
+		live[pid] = startTicks
 	}
 	return live
 }
