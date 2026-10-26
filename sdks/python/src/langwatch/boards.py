@@ -1,5 +1,5 @@
 """
-API facade for the Dashboards boards at /api/v1/boards and the widgets on them.
+API facade for the Dashboards boards at /api/v1/dashboards and the widgets on them.
 
 The project comes from the API key. While Dashboards is switched off for the
 key's project, every route answers 404.
@@ -53,7 +53,7 @@ def _quote(value: str) -> str:
 
 
 class BoardsFacade:
-    """Boards in the Dashboards area and their widgets, over /api/v1/boards."""
+    """Boards in the Dashboards area and their widgets, over /api/v1/dashboards."""
 
     def __init__(self, rest_api_client: LangWatchRestApiClient) -> None:
         self._client = rest_api_client
@@ -83,15 +83,15 @@ class BoardsFacade:
 
     def list(self) -> Dict[str, Any]:
         """List the boards of the key's project, each with its widget count."""
-        return self._send("GET", "/api/v1/boards")
+        return self._send("GET", "/api/v1/dashboards")
 
     def get(self, board_id: str) -> Dict[str, Any]:
         """Read one board."""
-        return self._send("GET", f"/api/v1/boards/{_quote(board_id)}")
+        return self._send("GET", f"/api/v1/dashboards/{_quote(board_id)}")
 
     def create(self, *, name: str) -> Dict[str, Any]:
         """Create an empty board."""
-        return self._send("POST", "/api/v1/boards", {"name": name})
+        return self._send("POST", "/api/v1/dashboards", {"name": name})
 
     def update(
         self,
@@ -108,17 +108,17 @@ class BoardsFacade:
             body["description"] = description
         if not body:
             raise ValueError("Provide at least one of name or description.")
-        return self._send("PATCH", f"/api/v1/boards/{_quote(board_id)}", body)
+        return self._send("PATCH", f"/api/v1/dashboards/{_quote(board_id)}", body)
 
     def delete(self, board_id: str) -> Dict[str, Any]:
         """Delete a board with the widgets on it."""
-        return self._send("DELETE", f"/api/v1/boards/{_quote(board_id)}")
+        return self._send("DELETE", f"/api/v1/dashboards/{_quote(board_id)}")
 
     # -- widgets on a board --------------------------------------------------
 
     def list_widgets(self, board_id: str) -> Dict[str, Any]:
         """List the widgets on one board."""
-        return self._send("GET", f"/api/v1/boards/{_quote(board_id)}/widgets")
+        return self._send("GET", f"/api/v1/dashboards/{_quote(board_id)}/widgets")
 
     def create_widget(
         self,
@@ -136,7 +136,7 @@ class BoardsFacade:
             body["description"] = description
         if prompt is not None:
             body["prompt"] = prompt
-        return self._send("POST", f"/api/v1/boards/{_quote(board_id)}/widgets", body)
+        return self._send("POST", f"/api/v1/dashboards/{_quote(board_id)}/widgets", body)
 
     def get_widget(self, board_id: str, widget_id: str) -> Dict[str, Any]:
         """Read one widget on this board."""
@@ -173,4 +173,4 @@ class BoardsFacade:
 
     @staticmethod
     def _widget_path(board_id: str, widget_id: str) -> str:
-        return f"/api/v1/boards/{_quote(board_id)}/widgets/{_quote(widget_id)}"
+        return f"/api/v1/dashboards/{_quote(board_id)}/widgets/{_quote(widget_id)}"

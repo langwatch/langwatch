@@ -1,13 +1,13 @@
 """
-API facade for managing LangWatch dashboards via REST API.
+API facade for the Analytics Reports dashboards at /api/v1/analytics/reports.
 
-Provides list, get, create, rename, and delete operations for dashboards
-with proper error handling.
+These are the Analytics Reports dashboards, not the Dashboards-area boards
+(those are `langwatch.boards`, at /api/v1/dashboards). Provides list, get,
+create, rename, and delete operations with proper error handling.
 Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
-import warnings
 from typing import Any, Dict
 
 import httpx
@@ -20,26 +20,8 @@ from langwatch.state import get_instance
 from langwatch.utils.exceptions import extract_api_error_detail
 
 
-_DEPRECATION_WARNED = False
-
-DASHBOARDS_DEPRECATION_MESSAGE = (
-    "/api/v1/dashboards is deprecated for this project: Dashboards boards are at "
-    "/api/v1/boards. Use langwatch.boards (or `langwatch boards` in the CLI)."
-)
-
-
-def _warn_if_deprecated(response: httpx.Response) -> None:
-    """Warn once per process when the server marks this API deprecated; it keeps working."""
-    global _DEPRECATION_WARNED
-    if _DEPRECATION_WARNED or response.headers.get("Deprecation") is None:
-        return
-    _DEPRECATION_WARNED = True
-    warnings.warn(DASHBOARDS_DEPRECATION_MESSAGE, FutureWarning, stacklevel=4)
-
-
 def _raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
     """Map HTTP error status codes to appropriate exceptions."""
-    _warn_if_deprecated(response)
     if response.is_success:
         return
 
@@ -79,7 +61,7 @@ def _quote(value: str) -> str:
 
 class DashboardsFacade:
     """
-    Facade for managing LangWatch dashboards via REST API.
+    Facade for the Analytics Reports dashboards via REST API.
 
     Provides list, get, create, rename, and delete operations.
     """
@@ -108,7 +90,7 @@ class DashboardsFacade:
         Returns:
             Dictionary with dashboard data.
         """
-        response = self._http().get("/api/v1/dashboards")
+        response = self._http().get("/api/v1/analytics/reports")
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -122,7 +104,7 @@ class DashboardsFacade:
         Returns:
             Dictionary containing the dashboard data.
         """
-        response = self._http().get(f"/api/v1/dashboards/{_quote(dashboard_id)}")
+        response = self._http().get(f"/api/v1/analytics/reports/{_quote(dashboard_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -141,7 +123,7 @@ class DashboardsFacade:
             Dictionary containing the created dashboard data.
         """
         body: Dict[str, Any] = {"name": name}
-        response = self._http().post("/api/v1/dashboards", json=body)
+        response = self._http().post("/api/v1/analytics/reports", json=body)
         _raise_for_status(response, operation="create")
         return response.json()
 
@@ -163,7 +145,7 @@ class DashboardsFacade:
         """
         body: Dict[str, Any] = {"name": name}
         response = self._http().patch(
-            f"/api/v1/dashboards/{_quote(dashboard_id)}", json=body
+            f"/api/v1/analytics/reports/{_quote(dashboard_id)}", json=body
         )
         _raise_for_status(response, operation="rename")
         return response.json()
@@ -178,6 +160,6 @@ class DashboardsFacade:
         Returns:
             Dictionary with deletion result.
         """
-        response = self._http().delete(f"/api/v1/dashboards/{_quote(dashboard_id)}")
+        response = self._http().delete(f"/api/v1/analytics/reports/{_quote(dashboard_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()

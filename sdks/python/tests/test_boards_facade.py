@@ -1,19 +1,17 @@
-"""Unit coverage for the boards facade and the dashboards deprecation warning:
-every method hits its /api/v1/boards route with the right verb and body, and
-the dashboards facade warns once when the server marks it deprecated.
+"""Unit coverage for the boards facade and the Analytics Reports dashboards facade:
+every boards method hits its /api/v1/dashboards route with the right verb and
+body, and the dashboards facade uses /api/v1/analytics/reports.
 
 Spec: modules/dashboard/specs/dashboards-v2.feature
-  AC199s Split: the CLI and MCP manage boards and warn on the deprecated route
+  AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards
 """
 
 import json
-import warnings
 from typing import Any
 
 import httpx
 import pytest
 
-import langwatch.dashboards as dashboards_module
 from langwatch.boards import BoardsFacade
 from langwatch.dashboards import DashboardsFacade
 
@@ -31,7 +29,7 @@ class FakeRestClient:
         return self._http
 
 
-def recorder(responses: dict[tuple[str, str], Any], headers: dict[str, str] | None = None):
+def recorder(responses: dict[tuple[str, str], Any]):
     calls: list[tuple[str, str, Any | None]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -41,8 +39,8 @@ def recorder(responses: dict[tuple[str, str], Any], headers: dict[str, str] | No
         assert key in responses, f"unexpected call {key}"
         payload = responses[key]
         if payload is None:
-            return httpx.Response(204, headers=headers or {})
-        return httpx.Response(200, json=payload, headers=headers or {})
+            return httpx.Response(204)
+        return httpx.Response(200, json=payload)
 
     return handler, calls
 
@@ -52,16 +50,16 @@ def test_board_routes_and_bodies():
     widget = {"id": "w_1", "name": "Traces", "dashboardId": "b_1"}
     handler, calls = recorder(
         {
-            ("GET", "/api/v1/boards"): {"data": [board]},
-            ("POST", "/api/v1/boards"): board,
-            ("GET", "/api/v1/boards/b_1"): board,
-            ("PATCH", "/api/v1/boards/b_1"): board,
-            ("DELETE", "/api/v1/boards/b_1"): {"id": "b_1", "name": "Usage"},
-            ("GET", "/api/v1/boards/b_1/widgets"): {"data": [widget]},
-            ("POST", "/api/v1/boards/b_1/widgets"): widget,
-            ("GET", "/api/v1/boards/b_1/widgets/w_1"): widget,
-            ("PATCH", "/api/v1/boards/b_1/widgets/w_1"): widget,
-            ("DELETE", "/api/v1/boards/b_1/widgets/w_1"): None,
+            ("GET", "/api/v1/dashboards"): {"data": [board]},
+            ("POST", "/api/v1/dashboards"): board,
+            ("GET", "/api/v1/dashboards/b_1"): board,
+            ("PATCH", "/api/v1/dashboards/b_1"): board,
+            ("DELETE", "/api/v1/dashboards/b_1"): {"id": "b_1", "name": "Usage"},
+            ("GET", "/api/v1/dashboards/b_1/widgets"): {"data": [widget]},
+            ("POST", "/api/v1/dashboards/b_1/widgets"): widget,
+            ("GET", "/api/v1/dashboards/b_1/widgets/w_1"): widget,
+            ("PATCH", "/api/v1/dashboards/b_1/widgets/w_1"): widget,
+            ("DELETE", "/api/v1/dashboards/b_1/widgets/w_1"): None,
         }
     )
     boards = BoardsFacade(FakeRestClient(handler))  # type: ignore[arg-type]
@@ -78,20 +76,20 @@ def test_board_routes_and_bodies():
     boards.delete_widget("b_1", "w_1")
 
     assert calls == [
-        ("GET", "/api/v1/boards", None),
-        ("POST", "/api/v1/boards", {"name": "Usage"}),
-        ("GET", "/api/v1/boards/b_1", None),
-        ("PATCH", "/api/v1/boards/b_1", {"description": None}),
-        ("DELETE", "/api/v1/boards/b_1", None),
-        ("GET", "/api/v1/boards/b_1/widgets", None),
+        ("GET", "/api/v1/dashboards", None),
+        ("POST", "/api/v1/dashboards", {"name": "Usage"}),
+        ("GET", "/api/v1/dashboards/b_1", None),
+        ("PATCH", "/api/v1/dashboards/b_1", {"description": None}),
+        ("DELETE", "/api/v1/dashboards/b_1", None),
+        ("GET", "/api/v1/dashboards/b_1/widgets", None),
         (
             "POST",
-            "/api/v1/boards/b_1/widgets",
+            "/api/v1/dashboards/b_1/widgets",
             {"name": "Traces", "code": "export default () => null;", "queries": []},
         ),
-        ("GET", "/api/v1/boards/b_1/widgets/w_1", None),
-        ("PATCH", "/api/v1/boards/b_1/widgets/w_1", {"name": "P95"}),
-        ("DELETE", "/api/v1/boards/b_1/widgets/w_1", None),
+        ("GET", "/api/v1/dashboards/b_1/widgets/w_1", None),
+        ("PATCH", "/api/v1/dashboards/b_1/widgets/w_1", {"name": "P95"}),
+        ("DELETE", "/api/v1/dashboards/b_1/widgets/w_1", None),
     ]
 
 
@@ -114,31 +112,28 @@ def test_flag_off_404_is_not_found():
         boards.list()
 
 
-def test_dashboards_warns_once_when_deprecated(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(dashboards_module, "_DEPRECATION_WARNED", False)
-    handler, _ = recorder(
-        {("GET", "/api/v1/dashboards"): {"data": []}},
-        headers={"Deprecation": "true", "Link": '</api/v1/boards>; rel="successor-version"'},
+def test_analytics_reports_dashboards_use_the_reports_routes():
+    handler, calls = recorder(
+        {
+            ("GET", "/api/v1/analytics/reports"): {"data": []},
+            ("POST", "/api/v1/analytics/reports"): {"id": "d_1"},
+            ("GET", "/api/v1/analytics/reports/d_1"): {"id": "d_1"},
+            ("PATCH", "/api/v1/analytics/reports/d_1"): {"id": "d_1"},
+            ("DELETE", "/api/v1/analytics/reports/d_1"): {"id": "d_1"},
+        }
     )
     dashboards = DashboardsFacade(FakeRestClient(handler))  # type: ignore[arg-type]
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        assert dashboards.list() == {"data": []}
-        dashboards.list()
+    dashboards.list()
+    dashboards.create(name="Usage")
+    dashboards.get("d_1")
+    dashboards.rename("d_1", name="Cost")
+    dashboards.delete("d_1")
 
-    messages = [str(w.message) for w in caught if issubclass(w.category, FutureWarning)]
-    assert len(messages) == 1
-    assert "/api/v1/boards" in messages[0]
-
-
-def test_dashboards_stays_quiet_without_the_header(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(dashboards_module, "_DEPRECATION_WARNED", False)
-    handler, _ = recorder({("GET", "/api/v1/dashboards"): {"data": []}})
-    dashboards = DashboardsFacade(FakeRestClient(handler))  # type: ignore[arg-type]
-
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        dashboards.list()
-
-    assert [w for w in caught if issubclass(w.category, FutureWarning)] == []
+    assert calls == [
+        ("GET", "/api/v1/analytics/reports", None),
+        ("POST", "/api/v1/analytics/reports", {"name": "Usage"}),
+        ("GET", "/api/v1/analytics/reports/d_1", None),
+        ("PATCH", "/api/v1/analytics/reports/d_1", {"name": "Cost"}),
+        ("DELETE", "/api/v1/analytics/reports/d_1", None),
+    ]
