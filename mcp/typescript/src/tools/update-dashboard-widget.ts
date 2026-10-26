@@ -4,12 +4,8 @@
  * found somewhere else by mistake. Spec: modules/dashboard/specs/dashboard-widget-mcp.feature
  */
 
-import {
-  type DashboardWidget,
-  getDashboardWidget,
-  updateDashboardWidget,
-} from "../langwatch-api-dashboard-widgets.js";
-import { getCurrentProject } from "../langwatch-api-projects.js";
+import { getBoardWidget, updateBoardWidget } from "../langwatch-api-boards.js";
+import type { DashboardWidget } from "../langwatch-api-dashboard-widgets.js";
 import { LangWatchApiError } from "../langwatch-api.js";
 import { assertDashboardExists } from "./dashboard-exists.js";
 import {
@@ -43,12 +39,11 @@ export async function handleUpdateDashboardWidget(
       ? undefined
       : normalizeDashboardWidgetQueries({ queries: params.queries });
 
-  const project = await getCurrentProject();
   await assertDashboardExists({ dashboardId });
-  const current = await getWidgetOnDashboard({ projectId: project.id, widgetId, dashboardId });
+  const current = await getWidgetOnDashboard({ widgetId, dashboardId });
 
-  const widget = await updateDashboardWidget({
-    projectId: project.id,
+  const widget = await updateBoardWidget({
+    boardId: dashboardId,
     widgetId: current.id,
     ...(name === undefined ? {} : { name }),
     ...(code === undefined ? {} : { code }),
@@ -67,31 +62,22 @@ export async function handleUpdateDashboardWidget(
   ].join("\n");
 }
 
-/** The widget, refused by id when it is not in this project or not on this dashboard. */
+/** The widget, refused by id when it is not on this dashboard (the board route answers 404). */
 async function getWidgetOnDashboard({
-  projectId,
   widgetId,
   dashboardId,
 }: {
-  projectId: string;
   widgetId: string;
   dashboardId: string;
 }): Promise<DashboardWidget> {
-  let widget: DashboardWidget;
   try {
-    widget = await getDashboardWidget({ projectId, widgetId });
+    return await getBoardWidget({ boardId: dashboardId, widgetId });
   } catch (error) {
     if (error instanceof LangWatchApiError && error.status === 404) {
       throw new Error(
-        `No widget with ID "${widgetId}" was found in this project. Use the widget ID add_dashboard_widget returned.`,
+        `No widget with ID "${widgetId}" was found on dashboard "${dashboardId}". Use the widget ID add_dashboard_widget returned, and the dashboard it was added to.`,
       );
     }
     throw error;
   }
-  if (widget.dashboardId !== dashboardId) {
-    throw new Error(
-      `Widget "${widgetId}" is not on dashboard "${dashboardId}". Pass the dashboard the widget was added to.`,
-    );
-  }
-  return widget;
 }

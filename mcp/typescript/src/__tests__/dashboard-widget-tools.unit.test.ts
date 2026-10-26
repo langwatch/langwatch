@@ -6,21 +6,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../langwatch-api-boards.js", () => ({
   createBoardWidget: vi.fn(),
   getBoard: vi.fn(),
+  getBoardWidget: vi.fn(),
   listBoards: vi.fn(),
+  updateBoardWidget: vi.fn(),
 }));
 
-vi.mock("../langwatch-api-dashboard-widgets.js", () => ({
-  getDashboardWidget: vi.fn(),
-  updateDashboardWidget: vi.fn(),
-}));
-
-vi.mock("../langwatch-api-projects.js", () => ({
-  getCurrentProject: vi.fn(),
-}));
-
-import { createBoardWidget, getBoard, listBoards } from "../langwatch-api-boards.js";
-import { getDashboardWidget, updateDashboardWidget } from "../langwatch-api-dashboard-widgets.js";
-import { getCurrentProject } from "../langwatch-api-projects.js";
+import {
+  createBoardWidget,
+  getBoard,
+  getBoardWidget,
+  listBoards,
+  updateBoardWidget,
+} from "../langwatch-api-boards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
 import { handleAddDashboardWidget } from "../tools/add-dashboard-widget.js";
 import { handleListDashboardBoards } from "../tools/list-dashboard-boards.js";
@@ -29,9 +26,8 @@ import { handleUpdateDashboardWidget } from "../tools/update-dashboard-widget.js
 const mockGetBoard = vi.mocked(getBoard);
 const mockListBoards = vi.mocked(listBoards);
 const mockCreateDashboardWidget = vi.mocked(createBoardWidget);
-const mockGetCurrentProject = vi.mocked(getCurrentProject);
-const mockGetDashboardWidget = vi.mocked(getDashboardWidget);
-const mockUpdateDashboardWidget = vi.mocked(updateDashboardWidget);
+const mockGetDashboardWidget = vi.mocked(getBoardWidget);
+const mockUpdateDashboardWidget = vi.mocked(updateBoardWidget);
 
 const sampleWidget = {
   id: "widget_1",
@@ -60,12 +56,6 @@ const sampleBoard = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetCurrentProject.mockResolvedValue({
-    id: "proj_abc123",
-    name: "My Project",
-    slug: "my-project",
-    isPersonal: false,
-  });
   mockGetBoard.mockResolvedValue(sampleBoard);
   mockCreateDashboardWidget.mockResolvedValue({ ...sampleWidget, dashboardId: "dash_1" });
 });
@@ -210,11 +200,11 @@ describe("handleUpdateDashboardWidget()", () => {
       });
 
       expect(mockGetDashboardWidget).toHaveBeenCalledWith({
-        projectId: "proj_abc123",
+        boardId: "dash_1",
         widgetId: "widget_1",
       });
       expect(mockUpdateDashboardWidget).toHaveBeenCalledWith({
-        projectId: "proj_abc123",
+        boardId: "dash_1",
         widgetId: "widget_1",
         name: "Errors per day",
         code: "export default () => <div />;",
@@ -233,7 +223,7 @@ describe("handleUpdateDashboardWidget()", () => {
       });
 
       expect(mockUpdateDashboardWidget).toHaveBeenCalledWith({
-        projectId: "proj_abc123",
+        boardId: "dash_1",
         widgetId: "widget_1",
         queries: [{ name: "errors", sql: "SELECT 1" }],
         description: "Errors per day",
@@ -263,8 +253,10 @@ describe("handleUpdateDashboardWidget()", () => {
   });
 
   describe("when the widget is on another dashboard", () => {
-    it("names both ids and changes nothing", async () => {
-      mockGetDashboardWidget.mockResolvedValue({ ...placedWidget, dashboardId: "dash_other" });
+    it("names both ids and changes nothing, as the board route answers 404", async () => {
+      mockGetDashboardWidget.mockRejectedValue(
+        new LangWatchApiError("LangWatch API error 404: Not found", 404, "{}"),
+      );
 
       await expect(
         handleUpdateDashboardWidget({
@@ -306,7 +298,7 @@ describe("handleUpdateDashboardWidget()", () => {
         handleUpdateDashboardWidget({ dashboardId: "dash_1", widgetId: "widget_1" }),
       ).rejects.toThrow(/at least one/i);
 
-      expect(mockGetCurrentProject).not.toHaveBeenCalled();
+      expect(mockGetBoard).not.toHaveBeenCalled();
       expect(mockUpdateDashboardWidget).not.toHaveBeenCalled();
     });
   });

@@ -1,20 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  type DashboardBoard,
-  DashboardWidgetsApiService,
-} from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+  type BoardListItem,
+  BoardsApiService,
+} from "@/client-sdk/services/boards/boards-api.service";
 
 import { formatTable } from "../../../utils/formatting";
 import { listDashboardWidgetBoardsCommand } from "../boards";
 
-vi.mock(
-  "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service",
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return { ...actual, DashboardWidgetsApiService: vi.fn() };
-  },
-);
+vi.mock("@/client-sdk/services/boards/boards-api.service", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, BoardsApiService: vi.fn() };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -48,8 +45,8 @@ describe("listDashboardWidgetBoardsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListBoards = vi.fn();
-    vi.mocked(DashboardWidgetsApiService).mockImplementation(function () {
-      return { listBoards: mockListBoards } as unknown as DashboardWidgetsApiService;
+    vi.mocked(BoardsApiService).mockImplementation(function () {
+      return { list: mockListBoards } as unknown as BoardsApiService;
     });
     consoleSpy = vi.spyOn(console, "log").mockImplementation(noop);
   });
@@ -59,7 +56,7 @@ describe("listDashboardWidgetBoardsCommand()", () => {
       const boards = [
         { id: "board_1", name: "Latency", widgetCount: 3 },
         { id: "board_2", name: "Cost", widgetCount: 0 },
-      ] as unknown as DashboardBoard[];
+      ] as unknown as BoardListItem[];
       mockListBoards.mockResolvedValue({ data: boards });
 
       const result = await listDashboardWidgetBoardsCommand();
