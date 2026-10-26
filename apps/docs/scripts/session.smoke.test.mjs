@@ -5,7 +5,8 @@ import { parseArgs } from "node:util";
 import { chromium } from "playwright";
 
 /* Runs against a haven stack built with `--app-origin self`, signed in through
-   `haven browser login --as admin --out <state>`; never against a shared deployment. */
+   `haven browser login --as admin --out <state>`; never against a shared deployment.
+   The test signs that session out, so sign in again before the next run. */
 const { values } = parseArgs({
   options: { base: { type: "string" }, state: { type: "string" } },
 });
@@ -23,7 +24,7 @@ const slug = "api-reference/datasets/list-dataset";
 const endpoint = "/api/v1/dataset";
 
 /** @scenario "Connect and send through haven, where the docs share the app's address" */
-await it("connects, sends as the member, and loses access when the member signs out", async () => {
+await it("connects, disconnects, sends as the member, and loses access when the member signs out", async () => {
   const browser = await chromium.launch();
   try {
     const context = await browser.newContext({
@@ -36,14 +37,20 @@ await it("connects, sends as the member, and loses access when the member signs 
     await page.goto(`${base}/docs/${slug}`, { waitUntil: "networkidle" });
     await page.click("#try-it-button");
 
-    const [popup] = await Promise.all([
-      page.waitForEvent("popup"),
-      page.click("[data-docs-session-connect]"),
-    ]);
-    await popup.getByRole("button", { name: "Allow" }).click();
-    await popup.waitForEvent("close");
     const status = page.locator("[data-docs-session-status]");
-    await assert.doesNotReject(status.filter({ hasText: /^Sending as you in / }).waitFor());
+    const connect = async () => {
+      const [popup] = await Promise.all([
+        page.waitForEvent("popup"),
+        page.click("[data-docs-session-connect]"),
+      ]);
+      await popup.getByRole("button", { name: "Allow" }).click();
+      await popup.waitForEvent("close");
+      await status.filter({ hasText: /^Sending as you in / }).waitFor();
+    };
+    await connect();
+    await page.click("[data-docs-session-disconnect]");
+    await status.filter({ hasText: /^Disconnected\.$/ }).waitFor();
+    await connect();
 
     const send = async () => {
       const [response] = await Promise.all([

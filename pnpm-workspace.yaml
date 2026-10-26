@@ -188,12 +188,12 @@ catalog:
   typescript: ^7.0.2
   typescript-eslint: ^8.55.0
   undici: ^8.10.2
+  unified: ^11.0.5
   use-debounce: ^10.1.1
   usehooks-ts: ^3.1.1
   vega: 6.3.1
   vega-lite: 6.4.3
   vite: ^8.3.3
-  unified: ^11.0.5
   vitest: ^5.0.1
   vitest-browser-react: ^2.3.0
   web-push: ^3.6.7
