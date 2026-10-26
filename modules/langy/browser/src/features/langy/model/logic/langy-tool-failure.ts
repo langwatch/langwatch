@@ -165,7 +165,12 @@ const ACCESS_DENIAL_CODES = new Set([
  * The codes that mean Langy's own sandbox key was missing or refused: an
  * internal failure, never the reader's access and never theirs to sign in to.
  */
-const SANDBOX_CREDENTIAL_CODES = new Set(["missing_api_key", "unauthorized"]);
+const SANDBOX_CREDENTIAL_CODES = new Set([
+  "missing_api_key",
+  "unauthorized",
+  // The CLI's local "Not logged in" check, which never reaches the server.
+  "not_authenticated",
+]);
 
 /**
  * The codes that mean "your plan does not include any more of these".

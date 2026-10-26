@@ -98,7 +98,7 @@ func TestAgentsTemplate_ReportsSandboxCredentialFailureAsInternalError(t *testin
 		t.Fatalf("AgentsTemplate: %v", err)
 	}
 	for _, phrase := range []string{
-		"`missing_api_key`, `unauthorized` or \"Not logged in\" is your sandbox credential",
+		"`missing_api_key`, `unauthorized`, `not_authenticated` or \"Not logged in\" is your sandbox credential",
 		"never tell them to sign in",
 		"never claim you lack the CLI or tools",
 		"say you hit an internal error, name the read or write that failed",

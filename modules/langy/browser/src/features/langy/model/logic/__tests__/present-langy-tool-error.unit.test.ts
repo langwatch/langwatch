@@ -106,6 +106,12 @@ describe("presentLangyToolError", () => {
       httpStatus: 0,
       suggestions: ["Run `langwatch login` to authenticate"],
     },
+    {
+      code: "not_authenticated",
+      message: "Not logged in. Run `langwatch login --device` to sign in via your company SSO.",
+      httpStatus: 0,
+      suggestions: [],
+    },
   ])("given Langy's own credential failed with $code", (error) => {
     const failure = failureDocument({
       ...error,
@@ -135,7 +141,7 @@ describe("presentLangyToolError", () => {
 
   describe("given a missing key on the developer's own machine", () => {
     /** @scenario "A missing key on the developer's own machine keeps the CLI's own words" */
-    it.each(["missing_api_key", "unauthorized"])(
+    it.each(["missing_api_key", "unauthorized", "not_authenticated"])(
       "keeps the CLI's sentence and next steps for a local tool (%s)",
       (code) => {
         const presentation = presentLangyToolError({
