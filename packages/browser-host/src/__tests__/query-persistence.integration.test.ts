@@ -582,6 +582,19 @@ describe("sealedUiQueryStore budget", () => {
     });
   });
 
+  describe("given the store is closed before a removal is asked for", () => {
+    it("still removes the row", async () => {
+      const disk = memoryStore();
+      const store = mirror(disk, { at: 1 });
+      await store.put("lw-query:alice:a", row("a"));
+
+      await store.close();
+      await store.delete("lw-query:alice:a");
+
+      expect(disk.entries.size).toBe(0);
+    });
+  });
+
   describe("given a removal asked for after a write still queued", () => {
     it("removes the row rather than letting the write put it back", async () => {
       const disk = memoryStore();
