@@ -65,7 +65,10 @@ const widgetOrBoardNotFoundResponse: Record<404, RouteResponse> = {
   },
 };
 
-/** The widget as the API publishes it. */
+/**
+ * The widget as the API publishes it. `platformUrl` is the Dashboards list; a widget on a board
+ * links to that board's page.
+ */
 export function widgetResource(
   widget: DashboardWidget,
   platformUrl: string,
@@ -76,7 +79,9 @@ export function widgetResource(
     definition: { ...widget.definition, queries: [...widget.definition.queries] },
     createdAt: widget.createdAt.toString(),
     updatedAt: widget.updatedAt.toString(),
-    platformUrl,
+    platformUrl: widget.dashboardId
+      ? `${platformUrl}/${encodeURIComponent(widget.dashboardId)}`
+      : platformUrl,
     dashboardId: widget.dashboardId,
     gridColumn: widget.gridColumn,
     gridRow: widget.gridRow,

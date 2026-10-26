@@ -704,12 +704,12 @@ export class DashboardModule implements DashboardApi {
     return { success: true };
   }
 
-  /** Where a reader opens the dashboards list a widget lands on. */
+  /** Where a reader opens the Dashboards list; a placed widget links to its board beneath it. */
   dashboardWidgetPlatformUrl(input: { projectSlug: string }): string {
     return dashboardPlatformUrl({
       publicBaseUrl: this.#publicBaseUrl,
       projectSlug: input.projectSlug,
-      path: "/analytics/reports",
+      path: "/dashboards",
     });
   }
 

@@ -96,7 +96,9 @@ async function projectWithBothBoards({
     runtime.mount(router, {
       app: () => app,
       middlewareContext: [
-        bindMiddlewareContext(dashboardWidgetUrl, () => `${BASE}/dashboards`),
+        bindMiddlewareContext(dashboardWidgetUrl, () =>
+          app.dashboardWidgetPlatformUrl({ projectSlug: "project-one" }),
+        ),
         bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
         bindMiddlewareContext(boardsReleased, () =>
           released === "unreadable"
@@ -215,10 +217,18 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
 
       expect({
         refused: refusal(refused),
-        placed: { status: placed.status, dashboardId: placed.json?.dashboardId },
+        placed: {
+          status: placed.status,
+          dashboardId: placed.json?.dashboardId,
+          platformUrl: placed.json?.platformUrl,
+        },
       }).toEqual({
         refused: { status: 404, code: "dashboard_not_found" },
-        placed: { status: 201, dashboardId: board.id },
+        placed: {
+          status: 201,
+          dashboardId: board.id,
+          platformUrl: `${BASE}/project-one/dashboards/${board.id}`,
+        },
       });
     });
   });
