@@ -143,6 +143,16 @@ def test_explicit_max_completion_tokens_is_kept(provider, monkeypatch):
     assert "max_tokens" not in provider.last_request
 
 
+# @scenario "A judge on a model that takes max_completion_tokens reaches the model"
+def test_an_empty_max_completion_tokens_takes_the_limit(provider):
+    litellm_patch.litellm.completion(
+        **judge_request(MARKED_MODEL, max_tokens=4096, max_completion_tokens=None)
+    )
+
+    assert provider.last_request["max_completion_tokens"] == 4096
+    assert "max_tokens" not in provider.last_request
+
+
 class TestOutputTokensParameter:
     def test_reads_the_mark_from_the_catalog(self):
         assert output_tokens_parameter(MARKED_MODEL) == "max_completion_tokens"
@@ -151,6 +161,10 @@ class TestOutputTokensParameter:
     def test_looks_an_azure_model_up_by_its_openai_entry(self):
         assert output_tokens_parameter("azure/gpt-6-astra") == "max_completion_tokens"
         assert output_tokens_parameter("azure/gpt-4o") == "max_tokens"
+
+    def test_looks_an_unprefixed_model_up_as_openai(self):
+        assert output_tokens_parameter("gpt-6-astra") == "max_completion_tokens"
+        assert output_tokens_parameter("gpt-4o") == "max_tokens"
 
     def test_knows_nothing_without_a_model(self):
         assert output_tokens_parameter(None) is None

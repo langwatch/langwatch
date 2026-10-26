@@ -101,7 +101,7 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 	defer disp.Close()
-	catalog := loadModelCatalog(deps.Logger, os.Getenv)
+	catalog := loadModelCatalog(deps.Logger, cfg.ModelCatalogDir)
 	llm := llmexecutor.New(dispatcheradapter.New(disp), llmexecutor.WithModelCatalog(catalog))
 	deps.Logger.Info("nlpgo_llm_wired", zap.String("transport", "in_process_dispatcher"))
 
@@ -109,10 +109,10 @@ func Run(ctx context.Context, opts Options) error {
 	// process). It bridges the OpenAI-shape /go/proxy/v1/* surface
 	// (used by the prompt playground + model.factory.ts) into the
 	// in-process gateway. Header-based auth: x-litellm-* → Credential.
-	playground := httpapi.NewPlaygroundProxyFromShim(
-		playgroundDispatcherShim{disp: disp},
-		httpapi.WithPlaygroundModelCatalog(catalog),
-	)
+	playground := nlpgo.PlaygroundWiring{
+		Proxy:        httpapi.NewPlaygroundProxyFromShim(playgroundDispatcherShim{disp: disp}),
+		ModelCatalog: catalog,
+	}
 
 	eng := newEngine(&cfg, engineParts{http: httpExec, ssrf: ssrfOpts, code: codeExec, llm: llm})
 	executor := engineAdapter{eng: eng}
@@ -122,7 +122,7 @@ func Run(ctx context.Context, opts Options) error {
 		app.WithWorkflowExecutor(executor),
 	)
 
-	return nlpgo.Serve(ctx, application, deps, cfg, playground)
+	return nlpgo.Serve(ctx, nlpgo.ServeInput{App: application, Deps: deps, Cfg: cfg, Playground: playground})
 }
 
 // withPublicServiceName stamps the operator-facing service identity on ctx.
@@ -290,8 +290,7 @@ func resolveSandboxPython(explicit string, getenv func(string) string) string {
 // checkout's in a development run. Without one the engine still serves, and
 // every model keeps the name rule the engine applied before the catalog; the
 // error says so once at boot.
-func loadModelCatalog(logger *zap.Logger, getenv func(string) string) litellm.OutputTokensLookup {
-	dir := getenv(modelcatalog.DirEnv)
+func loadModelCatalog(logger *zap.Logger, dir string) litellm.OutputTokensLookup {
 	if dir == "" {
 		wd, err := os.Getwd()
 		found := false
@@ -299,7 +298,7 @@ func loadModelCatalog(logger *zap.Logger, getenv func(string) string) litellm.Ou
 			dir, found = modelcatalog.FindDir(wd)
 		}
 		if !found {
-			logger.Error("nlpgo_model_catalog_missing", zap.String("env", modelcatalog.DirEnv))
+			logger.Error("nlpgo_model_catalog_missing", zap.String("env", "LANGWATCH_MODEL_CATALOG_DIR"))
 			return nil
 		}
 	}

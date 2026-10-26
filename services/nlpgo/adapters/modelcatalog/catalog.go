@@ -12,9 +12,6 @@ import (
 	"strings"
 )
 
-// DirEnv names the directory the runtime images copy the catalog files into.
-const DirEnv = "LANGWATCH_MODEL_CATALOG_DIR"
-
 const (
 	baseFile    = "model-catalog.json"
 	overlayFile = "model-catalog.overlay.json"
@@ -71,7 +68,7 @@ func readFile(dir, name string) (catalogFile, error) {
 }
 
 // FindDir walks up from start to the checkout's catalog directory, the one a
-// development run reads when DirEnv is not set.
+// development run reads when no directory is configured.
 func FindDir(start string) (string, bool) {
 	for dir := start; ; dir = filepath.Dir(dir) {
 		candidate := filepath.Join(dir, checkoutDir)

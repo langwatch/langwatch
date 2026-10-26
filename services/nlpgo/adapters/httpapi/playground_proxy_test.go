@@ -18,7 +18,6 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 )
 
 // fakeProxy is a minimal PlaygroundProxy stub for handler tests. It
@@ -600,15 +599,6 @@ func TestFilterPassthroughHeaders_StripsTheInternalSecret(t *testing.T) {
 	}
 }
 
-// catalogProxy is a fakeProxy that knows a model catalog, the way the proxy
-// NewPlaygroundProxyFromShim builds does.
-type catalogProxy struct {
-	*fakeProxy
-	catalog litellm.OutputTokensLookup
-}
-
-func (p catalogProxy) ModelCatalog() litellm.OutputTokensLookup { return p.catalog }
-
 type fakeCatalog map[string]string
 
 func (c fakeCatalog) OutputTokensParameter(modelID string) (string, bool) {
@@ -616,16 +606,17 @@ func (c fakeCatalog) OutputTokensParameter(modelID string) (string, bool) {
 	return param, known
 }
 
-func postChatCompletion(t *testing.T, proxy PlaygroundProxy, body string) {
+func postChatCompletion(t *testing.T, deps RouterDeps, body string) {
 	t.Helper()
 	probes := health.New("test")
 	probes.MarkStarted()
-	srv := httptest.NewServer(NewRouter(RouterDeps{Health: probes, Version: "test", PlaygroundProxy: proxy}))
+	deps.Health, deps.Version = probes, "test"
+	srv := httptest.NewServer(NewRouter(deps))
 	t.Cleanup(srv.Close)
 
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/go/proxy/v1/chat/completions", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-litellm-model", "openai/gpt-4.1")
+	req.Header.Set("x-litellm-model", "openai/gpt-5-mini")
 	req.Header.Set("x-litellm-api_key", "sk-test")
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -644,9 +635,10 @@ func okProxy() *fakeProxy {
 // @scenario "A workflow LLM call on a marked model sends max_completion_tokens"
 func TestPlaygroundProxy_CatalogMarkRenamesTheLimit(t *testing.T) {
 	fake := okProxy()
-	proxy := catalogProxy{fakeProxy: fake, catalog: fakeCatalog{"openai/acme-reasoner": "max_completion_tokens"}}
+	catalog := fakeCatalog{"openai/acme-reasoner": "max_completion_tokens"}
 
-	postChatCompletion(t, proxy, `{"model":"openai/acme-reasoner","max_tokens":64,"messages":[]}`)
+	postChatCompletion(t, RouterDeps{PlaygroundProxy: fake, ModelCatalog: catalog},
+		`{"model":"openai/acme-reasoner","max_tokens":64,"messages":[]}`)
 
 	assert.NotContains(t, string(fake.gotRequest.Body), `"max_tokens"`)
 	assert.Contains(t, string(fake.gotRequest.Body), `"max_completion_tokens":64`)
@@ -654,19 +646,10 @@ func TestPlaygroundProxy_CatalogMarkRenamesTheLimit(t *testing.T) {
 
 func TestPlaygroundProxy_DoublyPrefixedReasoningModelKeepsTheNameRule(t *testing.T) {
 	fake := okProxy()
-	proxy := catalogProxy{fakeProxy: fake, catalog: fakeCatalog{}}
 
-	postChatCompletion(t, proxy, `{"model":"custom/openai/gpt-5","max_tokens":64,"messages":[]}`)
+	postChatCompletion(t, RouterDeps{PlaygroundProxy: fake, ModelCatalog: fakeCatalog{}},
+		`{"model":"custom/openai/gpt-5","max_tokens":64,"messages":[]}`)
 
 	assert.NotContains(t, string(fake.gotRequest.Body), `"max_tokens"`)
 	assert.Contains(t, string(fake.gotRequest.Body), `"max_completion_tokens"`)
-}
-
-func TestNewPlaygroundProxyFromShim_HandsTheCatalogToTheHandler(t *testing.T) {
-	catalog := fakeCatalog{"openai/acme-reasoner": "max_completion_tokens"}
-	proxy := NewPlaygroundProxyFromShim(nil, WithPlaygroundModelCatalog(catalog))
-
-	source, ok := proxy.(modelCatalogSource)
-	require.True(t, ok)
-	assert.Equal(t, catalog, source.ModelCatalog())
 }

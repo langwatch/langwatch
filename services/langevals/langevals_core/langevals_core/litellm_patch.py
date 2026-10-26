@@ -420,7 +420,8 @@ def apply_output_tokens_parameter(
         return kwargs
 
     limit = kwargs.pop("max_tokens")
-    kwargs.setdefault("max_completion_tokens", limit)
+    if kwargs.get("max_completion_tokens") is None:
+        kwargs["max_completion_tokens"] = limit
     return kwargs
 
 

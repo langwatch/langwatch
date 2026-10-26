@@ -197,22 +197,13 @@ func NeedsReasoningOverrides(modelID string, catalog OutputTokensLookup) bool {
 // regex matches consistently across `openai/o3` and bare `o3`, and the
 // catalog is asked by the provider-prefixed id.
 func ApplyReasoningOverrides(modelID string, body map[string]any, catalog OutputTokensLookup) bool {
-	reasoning := IsReasoningModel(modelID)
-	rename := takesMaxCompletionTokens(modelID, catalog)
-	if !reasoning && !rename {
+	if !takesMaxCompletionTokens(modelID, catalog) {
 		return false
 	}
-	if reasoning {
+	moveMaxTokensToMaxCompletionTokens(body)
+	if IsReasoningModel(modelID) {
 		body["temperature"] = float64(1.0)
-	}
-
-	key := "max_tokens"
-	if rename {
-		key = "max_completion_tokens"
-		moveMaxTokensToMaxCompletionTokens(body)
-	}
-	if reasoning {
-		floorOutputTokens(body, key)
+		floorOutputTokens(body)
 	}
 	return true
 }
@@ -230,14 +221,14 @@ func moveMaxTokensToMaxCompletionTokens(body map[string]any) {
 	}
 }
 
-// floorOutputTokens raises the limit under key to reasoningMaxTokensFloor,
+// floorOutputTokens raises max_completion_tokens to reasoningMaxTokensFloor,
 // keeping a higher one.
-func floorOutputTokens(body map[string]any, key string) {
+func floorOutputTokens(body map[string]any) {
 	floor := reasoningMaxTokensFloor
-	if n, ok := intValue(body[key]); ok && n > floor {
+	if n, ok := intValue(body["max_completion_tokens"]); ok && n > floor {
 		floor = n
 	}
-	body[key] = floor
+	body["max_completion_tokens"] = floor
 }
 
 func intValue(v any) (int, bool) {

@@ -19,15 +19,18 @@ def _catalog() -> Dict[str, Dict[str, Any]]:
 
 
 def catalog_entry(model: Optional[str]) -> Optional[Dict[str, Any]]:
-    """The catalog entry for a litellm model id. An Azure deployment serves an
-    OpenAI model, so `azure/<name>` is looked up as `openai/<name>`."""
+    """The catalog entry for a litellm model id. litellm reads an unprefixed id
+    as OpenAI's, and an Azure deployment serves an OpenAI model, so `<name>`
+    and `azure/<name>` are looked up as `openai/<name>`."""
     if not model:
         return None
     models = _catalog()
     if model in models:
         return models[model]
     provider, _, name = model.partition("/")
-    if provider == "azure" and name:
+    if not name:
+        return models.get(f"openai/{provider}")
+    if provider == "azure":
         return models.get(f"openai/{name}")
     return None
 
