@@ -23,20 +23,20 @@ Feature: Generate and run the documentation site
     Then it renders on at most four independent workers, fewer when memory is short
     And the stylesheet, search index, page files and build version match a single-worker build
 
-  @unimplemented
+  @unit
   Scenario: Reject invalid documentation
     Given a configured page has invalid MDX or cannot render
     When the documentation build command runs
     Then it fails with the affected page identified
 
-  @unimplemented
+  @unit
   Scenario: Reload changed source during development
     Given the development server is running
     When an MDX page or its imported snippet changes
     Then the browser displays the updated content without restarting the server
     And search uses the updated source
 
-  @unimplemented
+  @unit
   Scenario: Reload navigation and API definitions
     Given the development server is running
     When docs.json or an OpenAPI document changes

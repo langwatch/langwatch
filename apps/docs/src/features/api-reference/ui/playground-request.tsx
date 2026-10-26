@@ -22,12 +22,10 @@ import { Panel } from "./panel.tsx";
 function ParamInput({
   param,
   value,
-  error,
   onChange,
 }: {
   param: Parameter;
   value: string;
-  error?: string;
   onChange: (value: string) => void;
 }) {
   const id = `pg-${param.in}-${param.name}`;
@@ -56,12 +54,7 @@ function ParamInput({
           </Badge>
         ) : null}
       </chakra.label>
-      <ParamControl param={param} value={value} error={error} onChange={onChange} />
-      {error ? (
-        <Text id={`${id}-error`} margin="0" marginTop="1" fontSize="12px" color="red.fg">
-          {error}
-        </Text>
-      ) : null}
+      <ParamControl param={param} value={value} onChange={onChange} />
     </Box>
   );
 }
@@ -69,12 +62,10 @@ function ParamInput({
 function ParamControl({
   param,
   value,
-  error,
   onChange,
 }: {
   param: Parameter;
   value: string;
-  error?: string;
   onChange: (value: string) => void;
 }) {
   const id = `pg-${param.in}-${param.name}`;
@@ -120,8 +111,6 @@ function ParamControl({
       value={value}
       inputMode={numeric ? "numeric" : undefined}
       placeholder={param.name}
-      aria-invalid={error ? true : undefined}
-      aria-describedby={error ? `${id}-error` : undefined}
       onChange={(event) => onChange(event.target.value)}
       autoComplete="off"
       spellCheck={false}
@@ -131,12 +120,10 @@ function ParamControl({
 function AuthField({
   scheme,
   value,
-  error,
   onChange,
 }: {
   scheme?: Scheme;
   value: string;
-  error?: string;
   onChange: (value: string) => void;
 }) {
   const [reveal, setReveal] = useState(false);
@@ -160,7 +147,6 @@ function AuthField({
       <Flex gap="2" marginTop="1">
         <Input
           id="pg-auth"
-          aria-invalid={Boolean(error)}
           size="sm"
           type={reveal ? "text" : "password"}
           value={value}
@@ -190,11 +176,6 @@ function AuthField({
           Clear
         </Button>
       </Flex>
-      {error ? (
-        <Text color="red.fg" fontSize="12px">
-          {error}
-        </Text>
-      ) : null}
       <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
         Kept in this tab. Cleared when you reload.
       </Text>
@@ -242,15 +223,7 @@ function SendActions({
     </Box>
   );
 }
-function BodyEditor({
-  body,
-  error,
-  onChange,
-}: {
-  body: string;
-  error?: string;
-  onChange: (value: string) => void;
-}) {
+function BodyEditor({ body, onChange }: { body: string; onChange: (value: string) => void }) {
   return (
     <Box>
       <chakra.label
@@ -273,17 +246,10 @@ function BodyEditor({
         fontSize="12px"
         value={body}
         spellCheck={false}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? "pg-body-error" : undefined}
         onChange={(event) => {
           onChange(event.target.value);
         }}
       />
-      {error ? (
-        <Text id="pg-body-error" margin="0" marginTop="1" fontSize="12px" color="red.fg">
-          {error}
-        </Text>
-      ) : null}
     </Box>
   );
 }
@@ -291,12 +257,10 @@ function BodyEditor({
 function ParameterFields({
   parameters,
   values,
-  errors,
   onEdit,
 }: {
   parameters: Parameter[];
   values: Record<string, string>;
-  errors: Record<string, string>;
   onEdit: (input: { location: string; name: string; value: string }) => void;
 }) {
   const required = parameters.filter((param) => param.required);
@@ -307,7 +271,6 @@ function ParameterFields({
       key={`${param.in}:${param.name}`}
       param={param}
       value={values[paramKey({ location: param.in, name: param.name })] ?? ""}
-      error={errors[paramKey({ location: param.in, name: param.name })]}
       onChange={(value) => onEdit({ location: param.in, name: param.name, value })}
     />
   );
@@ -363,7 +326,6 @@ export function PlaygroundRequest({
 }) {
   const { values, body } = state;
   const [key, setKey] = useState("");
-  const errors: Record<string, string> = {};
   const formRef = useRef<HTMLDivElement>(null);
   const { tryOpen, setTryOpen } = useEndpointState();
   const scheme = operation.schemes[0];
@@ -412,19 +374,13 @@ export function PlaygroundRequest({
             <Text margin="0" fontSize="12px" color="fg.muted">
               {host}
             </Text>
-            <AuthField scheme={scheme} value={key} error={errors.auth} onChange={setKey} />
+            <AuthField scheme={scheme} value={key} onChange={setKey} />
 
-            <ParameterFields
-              parameters={operation.parameters}
-              values={values}
-              errors={errors}
-              onEdit={edit}
-            />
+            <ParameterFields parameters={operation.parameters} values={values} onEdit={edit} />
 
             {operation.body && bodyContent ? (
               <BodyEditor
                 body={body}
-                error={errors.body}
                 onChange={(value) => {
                   onTouched();
                   onChange({ ...state, body: value });

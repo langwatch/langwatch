@@ -47,6 +47,7 @@ import { builtFontPaths, publishMedia } from "./hashed-assets.ts";
 import { optimisePageImages } from "./image-variants.ts";
 import { writeOutputFiles } from "./output-files.ts";
 import { renderCache, renderedPageSchema, type RenderedPage } from "./render-cache.ts";
+import { failOnSkippedPages } from "./render-failures.ts";
 import {
   pageCacheKey,
   PRERENDER_PLAN_FILE,
@@ -364,20 +365,6 @@ async function publishPageMedia({
   };
 }
 
-function reportSkipped({ skipped }: { skipped: { slug: string; reason: string }[] }) {
-  const reasons = new Map<string, { count: number; example: string }>();
-  for (const { slug, reason } of skipped) {
-    const entry = reasons.get(reason) ?? { count: 0, example: slug };
-    entry.count += 1;
-    reasons.set(reason, entry);
-  }
-  for (const [reason, { count, example }] of [...reasons]
-    .toSorted((a, b) => b[1].count - a[1].count)
-    .slice(0, 15)) {
-    console.log(`  ${count}x ${reason} (e.g. ${example}.mdx)`);
-  }
-}
-
 async function generate() {
   const started = performance.now();
   const { outDir: dist, basePath } = readBuildOptions();
@@ -447,9 +434,7 @@ async function generate() {
   console.log(
     `\n[docs-site] compiled: ${slugs.length - 1 - skipped.length}, skipped: ${skipped.length}, reused: ${run.reused}, rendered: ${run.rendered} on ${run.workers} workers in ${seconds}s`,
   );
-  reportSkipped({ skipped });
-  if (skipped.length > 0)
-    throw new Error(`Documentation rendering failed for ${skipped.length} pages`);
+  failOnSkippedPages({ skipped });
   await writeVersionedPages({ outDir: dist, pages });
 }
 

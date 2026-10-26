@@ -140,12 +140,6 @@ no page pays its 85 KB up front.
 Headings use the brand's Sentient serif; body text is Inter and code JetBrains
 Mono, all self-hosted. Brand orange (#f56b1a) decorates; text accents use its
 darker brand-700 companion so they meet AA on paper.
-The static floor uses the marketing mesh palette and is present without scripts.
-The home header carries the website's light and dark Warp mesh (a port of its WarpAccent): a
-CSS gradient paints first and stays for reduced motion or no WebGL; the idle reading island
-loads the mesh island only on that page, which draws at half resolution and pauses off screen.
-It compiles its shaders in parallel where the browser can, and keeps the gradient on a software
-WebGL renderer (SwiftShader, llvmpipe, WARP), which would block input for most of a second.
 
 Design-system candidates: Kbd size variants; CommandBarInput native input/ARIA
 props; semantic link/button command rows with a badge/secondary-line slot. The
@@ -153,9 +147,10 @@ existing navigation catalogue, recent-item storage and Langy handoff remain owne
 by navigation and are not duplicated in docs.
 
 The page menu supports Markdown copy/view, Claude, ChatGPT and copying a link.
-Cursor, VS Code and MCP actions are omitted: docs.json lists their names but does
-not provide an install target or a supported page-handoff URL. Inventing those
-would produce a misleading action.
+It also connects editors to the LangWatch MCP server, which searches these docs:
+Cursor and VS Code get their install deep links, and any other MCP client can copy
+the server URL. A static site hosts no server, so every MCP action points at
+app.langwatch.ai/mcp.
 
 ## Release announcement
 
