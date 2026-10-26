@@ -4,6 +4,7 @@
  * and the `local-storage` event lets readers see a write with no reload.
  */
 
+import { isOutOfSpace } from "@langwatch/browser-host/query-persistence";
 import type { UiScopeSelection } from "@langwatch/organization-contract";
 import { useCallback, useSyncExternalStore } from "react";
 
@@ -71,8 +72,9 @@ export function writeUiScopeSelection({
     const key = WRITE_KEYS[write.key];
     try {
       storage.setItem(key, JSON.stringify(write.value));
-    } catch {
-      continue;
+    } catch (error) {
+      if (isOutOfSpace(error)) continue;
+      throw error;
     }
     broadcast?.(key);
   }

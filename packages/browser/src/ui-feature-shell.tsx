@@ -173,7 +173,33 @@ const useUnavailableUiSession: UiSessionSource = () => ({
   scope: UNAVAILABLE_UI_SCOPE,
 });
 
-/** Mirrors the planned reads onto the sealed disk and syncs tabs; returns the stop. */
+/** How many passes an impersonation's wipe gets before it gives up, a second apart and more. */
+const WIPE_ATTEMPTS = 3;
+
+/** Wipes the mirror once the last mirror's writes have landed, retrying a pass that failed. */
+async function wipeMirror({
+  store,
+  after,
+}: {
+  store: UiQueryStore<unknown>;
+  after: Promise<void>;
+}): Promise<void> {
+  await after;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await clearPersistedUiQueries({ store });
+      return;
+    } catch (error) {
+      if (attempt >= WIPE_ATTEMPTS) throw error;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
+    }
+  }
+}
+
+/**
+ * Mirrors the planned reads onto the sealed disk and syncs tabs. The stop it returns settles once
+ * the writes already under way have landed; none starts after it.
+ */
 function startQueryMirror({
   queryClient,
   plan,
@@ -194,7 +220,7 @@ function startQueryMirror({
   store: UiQueryStore<unknown>;
   sessionQueryKey: readonly unknown[];
   versions: UiQueryVersions;
-}): () => void {
+}): () => Promise<void> {
   const sealed =
     cacheKey !== void 0 && plan.persisted.size > 0
       ? sealedUiQueryStore({ store, cacheKey, previousCacheKey })
@@ -220,6 +246,7 @@ function startQueryMirror({
   return () => {
     unsubscribe();
     stopSync();
+    return sealed?.close() ?? Promise.resolve();
   };
 }
 
@@ -313,6 +340,7 @@ export function createUiFeatureShell({
     const impersonating = Boolean(actor?.impersonator);
     const { cacheKey, previousCacheKey } = sealingKeysOf(queryClient.getQueryData(sessionQueryKey));
     const seen = useRef<SeenSession>({ userId: void 0, cacheKey: void 0 });
+    const lastMirrorLanded = useRef<Promise<void>>(Promise.resolve());
     // Declared ahead of the mirror: its cleanup has run, so nothing cleared is written back.
     useEffect(() => {
       const was = seen.current;
@@ -331,8 +359,10 @@ export function createUiFeatureShell({
     useEffect(() => {
       if (!userId) return;
       const store = queryStore ?? indexedDbQueryStore;
-      if (impersonating) void clearPersistedUiQueries({ store }).catch(() => void 0);
-      return startQueryMirror({
+      if (impersonating) {
+        void wipeMirror({ store, after: lastMirrorLanded.current }).catch(() => void 0);
+      }
+      const stop = startQueryMirror({
         queryClient,
         plan: cachePlan,
         userId,
@@ -343,6 +373,9 @@ export function createUiFeatureShell({
         sessionQueryKey,
         versions,
       });
+      return () => {
+        lastMirrorLanded.current = stop();
+      };
     }, [queryClient, userId, impersonating, cacheKey, previousCacheKey, watch]);
     const resolved = useMemo(
       () =>

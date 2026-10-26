@@ -147,7 +147,11 @@ export type UiQueryMirrorBudget = Readonly<{
 const READ_AT_FLUSH_MS = 60_000;
 
 /** A sealed store; a touched row is read, so the last to be evicted. */
-export type UiSealedQueryStore = UiQueryStore & { touch(key: string): void };
+export type UiSealedQueryStore = UiQueryStore & {
+  touch(key: string): void;
+  /** Stops every later write; settles once the writes already under way have landed. */
+  close(): Promise<void>;
+};
 
 /** One row as this document knows it, without reading the disk again. */
 type UiMirrorEntry = { bytes: number; readAt: number; flushedReadAt: number };
@@ -245,7 +249,17 @@ type SealContext = {
   learned: Promise<void> | undefined;
   unflushed: Set<string>;
   flushTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The tail of this store's writes, which run one at a time so each sees the last's room. */
+  writes: Promise<void>;
+  closed: boolean;
 };
+
+/** Runs `step` after every write before it; a closed store's step never runs. */
+function inTurn(context: SealContext, step: () => Promise<void>): Promise<void> {
+  const turn = context.writes.then(() => (context.closed ? void 0 : step()));
+  context.writes = turn.catch(() => void 0);
+  return turn;
+}
 
 async function removeRow({ context, key }: { context: SealContext; key: string }) {
   context.manifest.delete(key);
@@ -332,21 +346,23 @@ async function sealRow({
   const sealed = await sealQuery({ cipher, key, plain });
   const bytes = sealed.sealed.byteLength;
   const row = { ...sealed, bytes, readAt };
-  await makeRoom({ context, key, bytes, budget: context.budget });
-  try {
-    await context.store.put(key, row);
-  } catch (error) {
-    if (!isOutOfSpace(error)) throw error;
-    // The browser's limit came first. Shed the coldest half once; still full, keep nothing.
-    await makeRoom({ context, key, bytes, budget: halfOfTheRest({ context, key, bytes }) });
+  await inTurn(context, async () => {
+    await makeRoom({ context, key, bytes, budget: context.budget });
     try {
       await context.store.put(key, row);
-    } catch {
-      await removeRow({ context, key });
-      return;
+    } catch (error) {
+      if (!isOutOfSpace(error)) throw error;
+      // The browser's limit came first. Shed the coldest half once; still full, keep nothing.
+      await makeRoom({ context, key, bytes, budget: halfOfTheRest({ context, key, bytes }) });
+      try {
+        await context.store.put(key, row);
+      } catch {
+        await removeRow({ context, key });
+        return;
+      }
     }
-  }
-  context.manifest.set(key, { bytes, readAt, flushedReadAt: readAt });
+    context.manifest.set(key, { bytes, readAt, flushedReadAt: readAt });
+  });
 }
 
 /** A row only last epoch's key opens is re-sealed under this one, in the background. */
@@ -390,13 +406,15 @@ async function flushReadAt(context: SealContext): Promise<void> {
   context.flushTimer = void 0;
   const keys = [...context.unflushed];
   context.unflushed.clear();
-  for (const key of keys) {
-    const entry = context.manifest.get(key);
-    const value = await context.store.get(key);
-    if (!entry || !isSealedQuery(value)) continue;
-    await context.store.put(key, { ...value, readAt: entry.readAt });
-    entry.flushedReadAt = entry.readAt;
-  }
+  await inTurn(context, async () => {
+    for (const key of keys) {
+      const entry = context.manifest.get(key);
+      const value = await context.store.get(key);
+      if (!entry || !isSealedQuery(value)) continue;
+      await context.store.put(key, { ...value, readAt: entry.readAt });
+      entry.flushedReadAt = entry.readAt;
+    }
+  });
 }
 
 /** Marks a row read now; it reaches the disk at most once a minute. */
@@ -439,6 +457,8 @@ export function sealedUiQueryStore({
     learned: void 0,
     unflushed: new Set(),
     flushTimer: void 0,
+    writes: Promise.resolve(),
+    closed: false,
   };
   return {
     get: (key) => openRow({ context, key }),
@@ -446,6 +466,11 @@ export function sealedUiQueryStore({
     delete: (key) => removeRow({ context, key }),
     keys: () => store.keys(),
     touch: (key) => touchReadAt({ context, key }),
+    close: () => {
+      context.closed = true;
+      clearTimeout(context.flushTimer);
+      return context.writes;
+    },
   };
 }
 

@@ -539,6 +539,45 @@ describe("sealedUiQueryStore budget", () => {
     });
   });
 
+  describe("given two reads mirrored at once into a full mirror", () => {
+    it("still keeps the mirror within its budget", async () => {
+      const disk = memoryStore();
+      // A disk slow enough that the two writes overlap, as IndexedDB's do.
+      disk.put = async (key, value) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        disk.entries.set(key, value);
+      };
+      const clock = { at: 1 };
+      const store = mirror(disk, clock);
+      await store.put("lw-query:alice:a", row("a"));
+      clock.at = 2;
+      await store.put("lw-query:alice:b", row("b"));
+      clock.at = 3;
+
+      await Promise.all([
+        store.put("lw-query:alice:c", row("c")),
+        store.put("lw-query:alice:d", row("d")),
+      ]);
+
+      expect(disk.entries.size).toBe(2);
+    });
+  });
+
+  describe("given the store is closed while a write is under way", () => {
+    it("writes nothing once the close has settled", async () => {
+      const disk = memoryStore();
+      const store = mirror(disk, { at: 1 });
+
+      const underWay = store.put("lw-query:alice:a", row("a"));
+      await store.close();
+      const atClose = [...disk.entries.keys()];
+      await underWay;
+      await store.put("lw-query:alice:b", row("b"));
+
+      expect([...disk.entries.keys()]).toEqual(atClose);
+    });
+  });
+
   describe("given a row read since it was written", () => {
     /** @scenario "Reading a row protects it from eviction" */
     it("keeps it and evicts the one nobody read", async () => {

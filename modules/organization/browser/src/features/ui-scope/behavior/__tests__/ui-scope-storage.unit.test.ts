@@ -121,6 +121,21 @@ describe("given a resolution that asked for its selection to be remembered", () 
       });
     });
 
+    describe("when the browser refuses a write for another reason", () => {
+      it("lets the failure through rather than hiding it", () => {
+        vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+          throw new DOMException("Access is denied.", "SecurityError");
+        });
+
+        expect(() =>
+          writeUiScopeSelection({
+            writes: [{ key: "projectSlug", value: "acme-app" }],
+            storage: window.localStorage,
+          }),
+        ).toThrow(expect.objectContaining({ name: "SecurityError" }));
+      });
+    });
+
     it("writes nothing at all when the resolution asked for nothing", () => {
       const setItem = vi.spyOn(Storage.prototype, "setItem");
 
