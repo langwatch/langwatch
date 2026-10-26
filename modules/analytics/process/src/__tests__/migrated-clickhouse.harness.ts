@@ -283,9 +283,9 @@ const QUIET_POLLS = 3;
 const QUIET_POLL_MS = 1_000;
 
 /**
- * Waits until no user database on the endpoint runs a merge or mutation, and `tables` hold no
- * outdated part. The cap counts the whole server's RSS, which suites share, so a seed or a capped
- * query must not overlap background work or held old parts. `system` log tables always merge.
+ * Waits until the endpoint's database runs no merge or mutation and `tables` hold no outdated
+ * part. The cap counts whole-process RSS, so a seed or a capped query must not overlap this
+ * database's background work or held old parts. Other databases are not ours to drain.
  */
 export async function waitForQuietMigratedServer({
   client,
@@ -307,8 +307,8 @@ export async function waitForQuietMigratedServer({
       await client.query({
         query: `
           SELECT
-            (SELECT count() FROM system.merges WHERE database != 'system')
-            + (SELECT count() FROM system.mutations WHERE database != 'system' AND NOT is_done)
+            (SELECT count() FROM system.merges WHERE database = currentDatabase())
+            + (SELECT count() FROM system.mutations WHERE database = currentDatabase() AND NOT is_done)
             + (SELECT count() FROM system.parts
                WHERE database = currentDatabase() AND NOT active AND has({tables:Array(String)}, table))
             AS busy
