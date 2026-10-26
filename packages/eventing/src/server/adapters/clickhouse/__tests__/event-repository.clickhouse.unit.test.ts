@@ -19,6 +19,26 @@ function repositoryFor(client: EventingClickHouseClient): EventingClickHouseEven
   });
 }
 
+/** An index ready on every target, answering one range for every aggregate it is asked. */
+function indexedRepository({ rows }: { rows: unknown[] }) {
+  const query = vi.fn(async () => ({ json: vi.fn().mockResolvedValue(rows) }));
+  const client: EventingClickHouseClient = { query, insert: vi.fn() };
+  const indexBounds = vi.fn(async () => ({
+    n: 1,
+    fromMs: 1_600_000_000_000,
+    toMs: 1_700_000_000_000,
+  }));
+  const repository = EventingClickHouseEventRepository.create({
+    resolveClient: async () => client,
+    retention,
+    eventLogIndex: {
+      reader: { targetOf: async () => "shared", indexBounds },
+      readiness: { isReady: () => true },
+    },
+  });
+  return { repository, query, indexBounds };
+}
+
 /**
  * A client that answers with the stored row projected through the query's own
  * SELECT list, the way ClickHouse does — a mock returning every column
@@ -270,16 +290,7 @@ describe("EventRepositoryClickHouse paged reads", () => {
     describe("when either paged read runs", () => {
       /** @scenario A page of an aggregate's history reads payloads only for its own rows */
       it("refuses the limit before any query runs", async () => {
-        const client = createMockClient({});
-        const indexBounds = vi.fn();
-        const repository = EventingClickHouseEventRepository.create({
-          resolveClient: async () => client,
-          retention,
-          eventLogIndex: {
-            reader: { targetOf: async () => "shared", indexBounds },
-            readiness: { isReady: () => true },
-          },
-        });
+        const { repository, query, indexBounds } = indexedRepository({ rows: [] });
 
         await expect(repository.getEventRecordsPaged({ ...history, limit })).rejects.toThrow(
           RangeError,
@@ -287,7 +298,7 @@ describe("EventRepositoryClickHouse paged reads", () => {
         await expect(repository.getEventRecordsUpToPaged({ ...upTo, limit })).rejects.toThrow(
           RangeError,
         );
-        expect(client.query).not.toHaveBeenCalled();
+        expect(query).not.toHaveBeenCalled();
         expect(indexBounds).not.toHaveBeenCalled();
       });
     });
@@ -330,26 +341,6 @@ describe("EventRepositoryClickHouse full-scan declarations", () => {
 });
 
 describe("EventRepositoryClickHouse over a ready event log index", () => {
-  /** An index ready on every target, answering one range for every aggregate it is asked. */
-  function indexedRepository({ rows }: { rows: unknown[] }) {
-    const query = vi.fn(async () => ({ json: vi.fn().mockResolvedValue(rows) }));
-    const client: EventingClickHouseClient = { query, insert: vi.fn() };
-    const indexBounds = vi.fn(async () => ({
-      n: 1,
-      fromMs: 1_600_000_000_000,
-      toMs: 1_700_000_000_000,
-    }));
-    const repository = EventingClickHouseEventRepository.create({
-      resolveClient: async () => client,
-      retention,
-      eventLogIndex: {
-        reader: { targetOf: async () => "shared", indexBounds },
-        readiness: { isReady: () => true },
-      },
-    });
-    return { repository, query, indexBounds };
-  }
-
   describe("given a read that names its own lower bound", () => {
     /** @scenario "a read that already has a lower bound skips the index" */
     it("reads with that bound and never asks the index", async () => {
