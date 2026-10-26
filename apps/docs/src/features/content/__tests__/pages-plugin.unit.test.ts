@@ -1,13 +1,12 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 
-import type { HmrContext, ModuleNode } from "vite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { docsFixture } from "../../../testing/docs-fixture.ts";
 import { buildNav } from "../../navigation/compile/nav.ts";
 import { sourceSearchIndex } from "../../search/compile/search-index.ts";
-import { docsPagesPlugin } from "../compile/pages-plugin.ts";
+import { reloadDocsSource } from "../compile/pages-plugin.ts";
 
 const CONFIG = {
   navigation: { anchors: [{ anchor: "Docs", groups: [{ group: "Start", pages: ["guide"] }] }] },
@@ -26,30 +25,22 @@ afterEach(() => fixture.dispose());
 
 /** A dev server holding the docs' virtual modules and one ordinary module. */
 function devServer() {
-  const modules = new Map(
-    ["\0virtual:docs-pages", "\0virtual:docs-nav", "/src/app/main.tsx"].map((id) => [
-      id,
-      { id } as ModuleNode,
-    ]),
-  );
-  const invalidated: (string | null)[] = [];
+  const ids = ["\0virtual:docs-pages", "\0virtual:docs-nav", "/src/app/main.tsx"];
+  const invalidated: string[] = [];
   const sent: unknown[] = [];
   const server = {
     moduleGraph: {
-      idToModuleMap: modules,
-      invalidateModule: (mod: ModuleNode) => invalidated.push(mod.id),
+      idToModuleMap: new Map(ids.map((id) => [id, { id }])),
+      invalidateModule: (mod: { id: string }) => void invalidated.push(mod.id),
     },
-    ws: { send: (payload: unknown) => sent.push(payload) },
+    ws: { send: (payload: { type: "full-reload" }) => void sent.push(payload) },
   };
-  return { server: server as unknown as HmrContext["server"], invalidated, sent };
+  return { server, invalidated, sent };
 }
 
 function hotUpdate({ file, onSourceChange }: { file: string; onSourceChange: () => void }) {
-  const plugin = docsPagesPlugin({ docsRoot: fixture.docsRoot, onSourceChange });
   const dev = devServer();
-  const handler = plugin.handleHotUpdate;
-  if (typeof handler !== "function") throw new Error("docs-pages has no hot update handler");
-  void handler.call({} as never, { file, server: dev.server } as HmrContext);
+  reloadDocsSource({ docsRoot: fixture.docsRoot, file, server: dev.server, onSourceChange });
   return dev;
 }
 

@@ -31,12 +31,36 @@ export function docsPagesPlugin({
       },
     },
     handleHotUpdate({ file, server }) {
-      if (!file.startsWith(docsRoot + path.sep) && file !== changelogPath({ docsRoot })) return;
-      onSourceChange();
-      for (const [id, mod] of server.moduleGraph.idToModuleMap) {
-        if (id.startsWith("\0virtual:docs-")) server.moduleGraph.invalidateModule(mod);
-      }
-      server.ws.send({ type: "full-reload" });
+      reloadDocsSource({ docsRoot, file, server, onSourceChange });
     },
   };
+}
+
+/** The part of the dev server a source reload touches. */
+type ReloadServer<Module> = {
+  moduleGraph: {
+    idToModuleMap: Map<string, Module>;
+    invalidateModule: (mod: Module) => void;
+  };
+  ws: { send: (payload: { type: "full-reload" }) => void };
+};
+
+/** Invalidates every docs virtual module and reloads the browser when a docs source changes. */
+export function reloadDocsSource<Module>({
+  docsRoot,
+  file,
+  server,
+  onSourceChange,
+}: {
+  docsRoot: string;
+  file: string;
+  server: ReloadServer<Module>;
+  onSourceChange: () => void;
+}) {
+  if (!file.startsWith(docsRoot + path.sep) && file !== changelogPath({ docsRoot })) return;
+  onSourceChange();
+  for (const [id, mod] of server.moduleGraph.idToModuleMap) {
+    if (id.startsWith("\0virtual:docs-")) server.moduleGraph.invalidateModule(mod);
+  }
+  server.ws.send({ type: "full-reload" });
 }
