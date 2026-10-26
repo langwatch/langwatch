@@ -619,13 +619,12 @@ describe("a route that names legacy key scopes", () => {
 
   /** @scenario "A route tells the project door the legacy key scopes it names" */
   it("leaves a route whose input chooses its permission nowhere to name a flag", () => {
+    const choice = permissionBy({ field: "kind", map: { a: "scenarios:manage" } });
+    const scopes = { legacyKey: "scope_a" } as const;
     const chosen = base()
       .withInput(z.object({ kind: z.enum(["a"]) }))
-      .withPermission(
-        permissionBy({ field: "kind", map: { a: "scenarios:manage" } }),
-        // @ts-expect-error the input chooses the permission after the body, too late for a scope
-        { legacyKey: "scope_a" },
-      )
+      // @ts-expect-error the input chooses the permission after the body, too late for a scope
+      .withPermission(choice, scopes)
       .withOutput(z.object({ ran: z.boolean() }))
       .withoutAudit("test route")
       .handle(() => ({ ran: true }))
