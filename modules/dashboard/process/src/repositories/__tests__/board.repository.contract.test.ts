@@ -60,6 +60,18 @@ function contractCases(backend: DashboardBackend): void {
       await expect(widget("dash_absent")).rejects.toThrow(DashboardNotFoundError);
       await expect(widget(foreign.id)).rejects.toThrow(DashboardNotFoundError);
     });
+
+    it("refuses to move a widget onto it as a missing board", async () => {
+      const foreign = await board("Theirs", backend.otherProjectId());
+      const placed = await widget();
+      const assign = (dashboardId: string) =>
+        backend
+          .widgets()
+          .assignToDashboard({ id: placed.id, projectId: backend.projectId(), dashboardId });
+
+      await expect(assign("dash_absent")).rejects.toThrow(DashboardNotFoundError);
+      await expect(assign(foreign.id)).rejects.toThrow(DashboardNotFoundError);
+    });
   });
 
   describe("when boards are written", () => {

@@ -25,7 +25,7 @@ import type {
 } from "../dashboard-widget.repository.ts";
 import { MemoryDashboardDatabase } from "./memory.dashboard.database.ts";
 
-/** In-memory parity for widget CRUD; `createWidget` refuses a board this project does not own. */
+/** In-memory parity for widget CRUD; create and assign refuse a board this project does not own. */
 export class MemoryDashboardWidgetRepository implements DashboardWidgetRepository {
   #database: MemoryDashboardDatabase;
 
@@ -137,6 +137,7 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
   }
 
   async assignToDashboard(input: AssignDashboardWidgetInput): Promise<DashboardWidgetRow> {
+    if (!this.#ownsBoard(input)) throw new DashboardNotFoundError(input.projectId);
     const current = this.#require(input);
     const onDashboard = this.#rows.filter(
       (row) => row.projectId === input.projectId && row.dashboardId === input.dashboardId,
