@@ -7,13 +7,19 @@
 export const DASHBOARDS_DEPRECATION_NOTE =
   "Note: /api/v1/dashboards is deprecated for this project; use list_dashboard_boards and the other board tools (/api/v1/boards).";
 
+import { createHash } from "node:crypto";
 import { tryGetConfig } from "./config.ts";
 
 // The HTTP server serves many API keys in one process, so the flag state is kept per key.
+// Keys are hashed so raw secrets do not sit in long-lived memory.
 const seen = new Set<string>();
 const surfaced = new Set<string>();
 
-const currentKey = (): string => tryGetConfig()?.apiKey ?? "";
+const currentKey = (): string =>
+  createHash("sha256")
+    .update(tryGetConfig()?.apiKey ?? "")
+    .digest("hex")
+    .slice(0, 16);
 
 /** Records a response's deprecation; only `/api/v1/dashboards` answers count. */
 export function noteDashboardsDeprecation({
