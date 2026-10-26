@@ -1713,6 +1713,8 @@ function handlerMiddleware<Api>({
         scope: resolved,
         context,
         run: async () => {
+          // Before the click, so a context that refuses never shows a card or spends a click.
+          const resolvedContexts = await resolveContexts({ route, contexts, context, input });
           // After every permission check and inside the trail, so a refusal is recorded too.
           const receipt = await confirmMarkedRequest({
             mark: route.confirmation,
@@ -1742,7 +1744,7 @@ function handlerMiddleware<Api>({
                   session: sessionOf({ route, credential, caller }),
                   key: keyOf({ route, credential, request: context.req.raw }),
                 }),
-                ...(await resolveContexts({ route, contexts, context, input })),
+                ...resolvedContexts,
               ),
           });
         },

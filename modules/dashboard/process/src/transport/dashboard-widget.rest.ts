@@ -66,7 +66,7 @@ const widgetOrBoardNotFoundResponse: Record<404, RouteResponse> = {
 };
 
 /** The widget as the API publishes it. */
-function widgetResource(
+export function widgetResource(
   widget: DashboardWidget,
   platformUrl: string,
 ): z.infer<typeof dashboardWidgetResourceSchema> {

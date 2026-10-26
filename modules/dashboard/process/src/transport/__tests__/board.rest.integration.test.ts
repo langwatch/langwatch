@@ -9,16 +9,17 @@ import {
   bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
+  recordProjectCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import type { Actor } from "@langwatch/authorization";
+import type { Actor, RestResolvedProjectCredential } from "@langwatch/authorization";
 import { MY_DASHBOARD_NAME, type DashboardApi } from "@langwatch/dashboard-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
 import { boardProjectRest } from "../board-project.rest.ts";
-import { boardRest, boardWidgetCaller, dashboardsReleased } from "../board.rest.ts";
+import { boardRest, boardsReleased, dashboardsReleased, releasedOrRefused } from "../board.rest.ts";
 import {
   dashboardWidgetCallerSource,
   dashboardWidgetRest,
@@ -32,11 +33,39 @@ const API_KEY: Actor = { type: "api_key", id: "key-of-project-1" };
 const MEMBER = { type: "user", id: "user-1" } as const satisfies Actor;
 const CODE = "export default () => null;";
 
+/** What the project door resolves a Langy session key of `user-1` in PROJECT to. */
+const LANGY_KEY: RestResolvedProjectCredential = {
+  type: "apiKey",
+  apiKeyId: "langy-key",
+  userId: MEMBER.id,
+  organizationId: "organization-1",
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  isLangySessionKey: true,
+  project: {
+    id: PROJECT,
+    slug: "project-one",
+    name: "Project one",
+    teamId: "team-1",
+    organizationId: "organization-1",
+    isPersonal: false,
+    ownerUserId: null,
+    kind: "application",
+  },
+};
+
 async function projectWithBothBoards({
   actor = API_KEY,
   released = true,
-}: { actor?: Actor; released?: boolean | "unreadable" } = {}) {
+  langy = false,
+}: { actor?: Actor; released?: boolean | "unreadable"; langy?: boolean } = {}) {
   const caller = { actor, scope: { tier: "project" as const, id: PROJECT } };
+  // Each card the gate was asked for, with the names it read; it holds a click for every one.
+  const cards: { resource: string; names: (string | null | undefined)[] }[] = [];
+  const admit = ({ request }: { request: Request }) => {
+    if (langy) recordProjectCredential(request, LANGY_KEY);
+    return caller;
+  };
   const app = createDashboardTestApp({ publicBaseUrl: BASE });
   const reports = await app.create({ projectId: PROJECT, name: "Reports" });
   const board = await app.createBoard({ projectId: PROJECT, name: "Usage" });
@@ -50,10 +79,17 @@ async function projectWithBothBoards({
   const runtime = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
-    identity: {
-      authenticate: () => caller,
-      identify: () => caller,
-    },
+    identity: { authenticate: admit, identify: admit },
+    ...(langy
+      ? {
+          servedDoors: true as const,
+          confirmations: {
+            confirm: async ({ resource, targets }) => {
+              cards.push({ resource, names: await Promise.all(targets.map((t) => t.name())) });
+            },
+          },
+        }
+      : {}),
   });
   const mount = (router: RestTransportDeclaration<DashboardApi>) =>
     runtime.mount(router, {
@@ -64,10 +100,11 @@ async function projectWithBothBoards({
         bindMiddlewareContext(dashboardsReleased, () =>
           released === "unreadable" ? Promise.reject(new Error("flag service down")) : released,
         ),
-        bindMiddlewareContext(boardWidgetCaller, () => ({
-          platformUrl: `${BASE}/dashboards`,
-          source: { kind: "api" as const },
-        })),
+        bindMiddlewareContext(boardsReleased, () =>
+          released === "unreadable"
+            ? Promise.reject(new Error("flag service down"))
+            : releasedOrRefused(released),
+        ),
       ],
       onError: canonicalErrorResponse,
     });
@@ -98,7 +135,7 @@ async function projectWithBothBoards({
     };
   };
 
-  return { app, reports, board, widget, send };
+  return { app, reports, board, widget, send, cards };
 }
 
 const BOARDS = "/api/v1/boards";
@@ -445,6 +482,49 @@ describe("given Dashboards is switched off for the key's project", () => {
       boards: boards.map(({ name }) => name),
       widgets: widgets.map(({ name }) => name),
     }).toEqual({ boards: ["Usage"], widgets: ["Traces"] });
+  });
+});
+
+describe("given a Langy session key deleting at /api/v1/boards", () => {
+  describe("when Dashboards is switched off for the key's project", () => {
+    /**
+     * @scenario "AC199q Split: /api/v1/boards is not there while Dashboards is off"
+     * @scenario "A route the project cannot reach refuses a Langy key before any card"
+     */
+    it("answers 404 dashboards_not_released before any card, and reads no name", async () => {
+      const { board, widget, send, cards, app } = await projectWithBothBoards({
+        released: false,
+        langy: true,
+        actor: MEMBER,
+      });
+
+      const answers = await Promise.all([
+        send("boards", `${BOARDS}/${board.id}`, { method: "DELETE" }),
+        send("boards", `${BOARDS}/${board.id}/widgets/${widget.id}`, { method: "DELETE" }),
+      ]);
+
+      expect(answers.map(refusal)).toEqual([
+        { status: 404, code: "dashboards_not_released" },
+        { status: 404, code: "dashboards_not_released" },
+      ]);
+      expect(cards).toEqual([]);
+      expect((await app.findBoards({ projectId: PROJECT })).map(({ id }) => id)).toContain(
+        board.id,
+      );
+    });
+  });
+
+  describe("when Dashboards is switched on", () => {
+    it("asks for the click on a card naming the board, then deletes it", async () => {
+      const { board, send, cards } = await projectWithBothBoards({ langy: true, actor: MEMBER });
+
+      const deleted = await send("boards", `${BOARDS}/${board.id}`, { method: "DELETE" });
+
+      expect({ status: deleted.status, cards }).toEqual({
+        status: 200,
+        cards: [{ resource: "board", names: ["Usage"] }],
+      });
+    });
   });
 });
 

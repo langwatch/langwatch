@@ -3,8 +3,7 @@
  * board's widgets as its sub-resource. Not there while `release_dashboards` is off for the key's
  * project (dashboards-v2.feature AC199l, AC199n to AC199q). Reports boards: /api/v1/dashboards.
  */
-import { DashboardWidgetNotFoundError, type DashboardWidget } from "@langwatch/analytics-contract";
-import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { DashboardWidgetNotFoundError } from "@langwatch/analytics-contract";
 import {
   apiErrorSchema,
   canonicalBaseResponses,
@@ -35,16 +34,20 @@ import {
 import { z } from "zod";
 
 import { authorOfActor, viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
-import { dashboardWidgetUrl } from "./dashboard-widget.rest.ts";
+import {
+  dashboardWidgetCallerSource,
+  dashboardWidgetUrl,
+  widgetResource,
+} from "./dashboard-widget.rest.ts";
 
 /** Whether `release_dashboards` is on for the key's project, read on each request. */
 export const dashboardsReleased = defineMiddlewareContext("dashboardsReleased", z.boolean());
 
-/** A new widget's deep link and the source it records when its body names none. */
-export const boardWidgetCaller = defineMiddlewareContext(
-  "boardWidgetCaller",
-  z.object({ platformUrl: z.string(), source: dashboardWidgetSourceSchema }),
-);
+/**
+ * `release_dashboards` for the key's project, resolved before the confirmation gate: while it is
+ * off this family refuses as a path that does not exist, so a Langy key gets no card either.
+ */
+export const boardsReleased = defineMiddlewareContext("boardsReleased", z.literal(true));
 
 /** Where the routes this family supersedes point a caller (dashboards-v2.feature AC199r). */
 export const BOARDS_SUCCESSOR = "/api/v1/boards";
@@ -52,9 +55,10 @@ export const BOARDS_SUCCESSOR = "/api/v1/boards";
 /** The tags every operation in this file carries in the published document. */
 const BOARD_TAGS = ["Dashboards / Boards"];
 
-/** While the flag is off the family answers as a path that does not exist. */
-function assertReleased(released: boolean): void {
+/** The `boardsReleased` value, or, while the flag is off, the refusal of a missing path. */
+export function releasedOrRefused(released: boolean): true {
   if (!released) throw new DashboardsNotReleasedError();
+  return true;
 }
 
 const boardNotFoundResponse: Record<404, RouteResponse> = {
@@ -89,33 +93,13 @@ export function boardResource(
   };
 }
 
-/** The widget as the API publishes it. */
-function widgetResource(
-  widget: DashboardWidget,
-  platformUrl: string,
-): z.infer<typeof dashboardWidgetResourceSchema> {
-  return {
-    id: widget.id,
-    name: widget.name,
-    definition: { ...widget.definition, queries: [...widget.definition.queries] },
-    createdAt: widget.createdAt.toString(),
-    updatedAt: widget.updatedAt.toString(),
-    platformUrl,
-    dashboardId: widget.dashboardId,
-    gridColumn: widget.gridColumn,
-    gridRow: widget.gridRow,
-    colSpan: widget.colSpan,
-    rowSpan: widget.rowSpan,
-  };
-}
-
 export const boardRest = defineRestRouter(DashboardApi)
   .withNamespace("boards")
   .withVersion(MANAGEMENT_API_VERSION)
 
   .get("/", "getApiBoards")
   .withPermission("analytics:view")
-  .withMiddlewareContext(dashboardsReleased)
+  .withMiddlewareContext(boardsReleased)
   .withOutput(boardListSchema)
   .withDocs({
     summary: "List boards",
@@ -124,8 +108,7 @@ export const boardRest = defineRestRouter(DashboardApi)
     tags: BOARD_TAGS,
     responses: { ...canonicalBaseResponses, 200: { description: "The project's boards" } },
   })
-  .handle(async ({ app, scope, actor }, released) => {
-    assertReleased(released);
+  .handle(async ({ app, scope, actor }) => {
     const projectId = scope.id;
     const boards = await app.findBoards({ projectId, ...viewerOfActor({ actor }) });
     const links = await app.getBoardLinks({
@@ -146,7 +129,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withAudit("boards.create")
   .withInput(createBoardSchema)
   .withPermission("analytics:create")
-  .withMiddlewareContext(dashboardsReleased)
+  .withMiddlewareContext(boardsReleased)
   .withOutput(boardResourceSchema)
   .withStatus(201)
   .withDocs({
@@ -156,8 +139,7 @@ export const boardRest = defineRestRouter(DashboardApi)
     tags: BOARD_TAGS,
     responses: { ...canonicalBaseResponses, 201: { description: "The board was created" } },
   })
-  .handle(async ({ app, input, scope, actor }, released) => {
-    assertReleased(released);
+  .handle(async ({ app, input, scope, actor }) => {
     const projectId = scope.id;
     const board = await app.createBoard({
       projectId,
@@ -172,7 +154,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .get("/:boardId", "getApiBoardsByBoardId")
   .withParams(boardIdParamsSchema)
   .withPermission("analytics:view")
-  .withMiddlewareContext(dashboardsReleased)
+  .withMiddlewareContext(boardsReleased)
   .withOutput(boardResourceSchema)
   .withDocs({
     summary: "Get a board",
@@ -184,8 +166,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       200: { description: "The board" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, released) => {
-    assertReleased(released);
+  .handle(async ({ app, input, scope, actor }) => {
     const projectId = scope.id;
     const board = await app.getBoard({
       projectId,
@@ -203,7 +184,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withParams(boardIdParamsSchema)
   .withInput(updateBoardSchema)
   .withPermission("analytics:update")
-  .withMiddlewareContext(dashboardsReleased)
+  .withMiddlewareContext(boardsReleased)
   .withOutput(boardResourceSchema)
   .withDocs({
     summary: "Update a board",
@@ -216,8 +197,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       200: { description: "The updated board" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, released) => {
-    assertReleased(released);
+  .handle(async ({ app, input, scope, actor }) => {
     const projectId = scope.id;
     const board = await app.updateBoard({
       projectId,
@@ -246,7 +226,7 @@ export const boardRest = defineRestRouter(DashboardApi)
         nameOf: (board) => board.name,
       }),
   })
-  .withMiddlewareContext(dashboardsReleased)
+  .withMiddlewareContext(boardsReleased)
   .withOutput(dashboardDeletedResponseSchema)
   .withDocs({
     summary: "Delete a board",
@@ -259,8 +239,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       200: { description: "The board was deleted" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, released) => {
-    assertReleased(released);
+  .handle(async ({ app, input, scope, actor }) => {
     const board = await app.deleteBoard({
       projectId: scope.id,
       dashboardId: input.boardId,
@@ -273,7 +252,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .get("/:boardId/widgets", "getApiBoardsByBoardIdWidgets")
   .withParams(boardIdParamsSchema)
   .withPermission("analytics:view")
-  .withMiddlewareContext(dashboardsReleased, dashboardWidgetUrl)
+  .withMiddlewareContext(dashboardWidgetUrl, boardsReleased)
   .withOutput(dashboardWidgetListSchema)
   .withDocs({
     summary: "List a board's widgets",
@@ -285,8 +264,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       200: { description: "The board's widgets" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, released, platformUrl) => {
-    assertReleased(released);
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const widgets = await app.listDashboardWidgets({
       projectId: scope.id,
       dashboardId: input.boardId,
@@ -302,7 +280,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withParams(boardIdParamsSchema)
   .withInput(createDashboardWidgetSchema)
   .withPermission("analytics:create")
-  .withMiddlewareContext(dashboardsReleased, boardWidgetCaller)
+  .withMiddlewareContext(dashboardWidgetUrl, dashboardWidgetCallerSource, boardsReleased)
   .withOutput(dashboardWidgetResourceSchema)
   .withStatus(201)
   .withDocs({
@@ -316,8 +294,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       201: { description: "The widget was saved on the board" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, released, { platformUrl, source }) => {
-    assertReleased(released);
+  .handle(async ({ app, input, scope, actor }, platformUrl, source) => {
     const widget = await app.createDashboardWidget({
       projectId: scope.id,
       dashboardId: input.boardId,
@@ -336,7 +313,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .get("/:boardId/widgets/:widgetId", "getApiBoardsByBoardIdWidgetsByWidgetId")
   .withParams(boardWidgetParamsSchema)
   .withPermission("analytics:view")
-  .withMiddlewareContext(dashboardsReleased, dashboardWidgetUrl)
+  .withMiddlewareContext(dashboardWidgetUrl, boardsReleased)
   .withOutput(dashboardWidgetResourceSchema)
   .withDocs({
     summary: "Get a widget on a board",
@@ -348,8 +325,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       200: { description: "The widget" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, released, platformUrl) => {
-    assertReleased(released);
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const widget = await app.getDashboardWidget({
       projectId: scope.id,
       id: input.widgetId,
@@ -366,7 +342,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withParams(boardWidgetParamsSchema)
   .withInput(updateDashboardWidgetSchema)
   .withPermission("analytics:update")
-  .withMiddlewareContext(dashboardsReleased, dashboardWidgetUrl)
+  .withMiddlewareContext(dashboardWidgetUrl, boardsReleased)
   .withOutput(dashboardWidgetResourceSchema)
   .withDocs({
     summary: "Update a widget on a board",
@@ -379,8 +355,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       200: { description: "The updated widget" },
     },
   })
-  .handle(async ({ app, input, scope, actor }, released, platformUrl) => {
-    assertReleased(released);
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const { name, code, queries, description, source } = input;
     const widget = await app.updateDashboardWidget({
       projectId: scope.id,
@@ -405,14 +380,19 @@ export const boardRest = defineRestRouter(DashboardApi)
     resource: "dashboard widget",
     action: "delete",
     idParam: "widgetId",
-    name: ({ app, projectId, id, ownerUserId }) =>
+    name: ({ app, projectId, id, ownerUserId, input }) =>
       nameUnlessMissing({
-        read: app.getDashboardWidget({ projectId, id, ...viewerOfOwner({ ownerUserId }) }),
+        read: app.getDashboardWidget({
+          projectId,
+          id,
+          onDashboardId: boardIdParamsSchema.parse(input).boardId,
+          ...viewerOfOwner({ ownerUserId }),
+        }),
         missing: DashboardWidgetNotFoundError,
         nameOf: (widget) => widget.name,
       }),
   })
-  .withMiddlewareContext(dashboardsReleased)
+  .withMiddlewareContext(boardsReleased)
   .withOutput(z.void())
   .withDocs({
     summary: "Delete a widget on a board",
@@ -424,8 +404,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       204: { description: "The widget was deleted", content: {} },
     },
   })
-  .handle(async ({ app, input, scope, actor }, released) => {
-    assertReleased(released);
+  .handle(async ({ app, input, scope, actor }) => {
     await app.deleteDashboardWidget({
       projectId: scope.id,
       id: input.widgetId,

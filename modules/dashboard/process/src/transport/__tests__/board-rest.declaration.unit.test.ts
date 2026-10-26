@@ -9,8 +9,9 @@ import { boardProjectRest } from "../board-project.rest.ts";
 import { boardRest } from "../board.rest.ts";
 import { dashboardRest } from "../dashboard.rest.ts";
 
-const routesOf = (declaration: ReturnType<typeof boardRest.router>) =>
-  declaration.routes.map((route) => [route.method, route.path, route.permission]);
+const routesOf = (declaration: {
+  routes: readonly { method: string; path: string; permission?: unknown }[];
+}) => declaration.routes.map((route) => [route.method, route.path, route.permission]);
 
 describe("given the /api/v1/boards family", () => {
   const declaration = boardRest.router();
@@ -44,7 +45,7 @@ describe("given the /api/v1/boards family", () => {
     it("asks every route whether Dashboards is released for the key's project", () => {
       expect(
         declaration.routes.every((route) =>
-          route.middleware?.some((context) => context.name === "dashboardsReleased"),
+          route.middleware?.some((context) => context.name === "boardsReleased"),
         ),
       ).toBe(true);
     });

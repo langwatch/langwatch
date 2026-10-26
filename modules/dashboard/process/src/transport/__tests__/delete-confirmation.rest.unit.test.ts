@@ -66,13 +66,16 @@ async function namesFor({
   app,
   mark,
   id,
+  input = {},
 }: {
   app: DashboardApi;
   mark: ReturnType<typeof markOf>;
   id: string;
+  /** The route's own input, as the runtime hands it to the mark. */
+  input?: Readonly<Record<string, unknown>>;
 }) {
   const nameFor = (ownerUserId: string | null) =>
-    mark.name({ app, projectId: PROJECT, id, ownerUserId });
+    mark.name({ app, projectId: PROJECT, id, ownerUserId, input });
   // A name means a card; undefined means gone, and the handler would answer for it alone.
   return {
     owner: await nameFor(OWNER.userId),
@@ -226,5 +229,38 @@ describe("a Langy key's delete card for a record on its owner's Only me board", 
 
       expect(names).toEqual({ owner: "Traces", other: undefined, nobody: undefined });
     });
+  });
+});
+
+describe("a Langy key's delete card for a widget at /api/v1/boards/{boardId}/widgets/{widgetId}", () => {
+  /**
+   * @scenario "The card reads the item through the path the delete acts on"
+   * @scenario "AC199p Split: a board's widgets are a sub-resource of the board"
+   */
+  it("names it through its own board, and reads it as gone through another board", async () => {
+    const { app } = appWithDatabase();
+    const holding = await app.createBoard({ projectId: PROJECT, name: "Holding" });
+    const other = await app.createBoard({ projectId: PROJECT, name: "Other" });
+    const widget = await app.createDashboardWidget({
+      projectId: PROJECT,
+      dashboardId: holding.id,
+      name: "Traces",
+      code: "export default () => null;",
+      queries: [],
+    });
+    const mark = markOf(boardRest.router(), "dashboard widget");
+    const nameThrough = (boardId: string) =>
+      mark.name({
+        app,
+        projectId: PROJECT,
+        id: widget.id,
+        ownerUserId: null,
+        input: { boardId, widgetId: widget.id },
+      });
+
+    expect({
+      own: await nameThrough(holding.id),
+      other: await nameThrough(other.id),
+    }).toEqual({ own: "Traces", other: undefined });
   });
 });

@@ -30,6 +30,7 @@ import {
 } from "../credential.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
+import { bindMiddlewareContext, defineMiddlewareContext } from "../request.ts";
 import { canonicalErrorResponse } from "../response.ts";
 import { createRestRuntime } from "../runtime.ts";
 
@@ -40,6 +41,15 @@ class EvaluatorInUseError extends HandledError {
     super("evaluator_in_use", "in use", { httpStatus: 409 });
   }
 }
+
+class RecordsNotReleasedError extends HandledError {
+  constructor() {
+    super("records_not_released", "Not found", { httpStatus: 404 });
+  }
+}
+
+/** A context that refuses while the records feature is switched off for the project. */
+const recordsReleased = defineMiddlewareContext("recordsReleased", z.literal(true));
 
 interface RecordsApi {
   remove(input: unknown): Promise<unknown>;
@@ -143,8 +153,9 @@ const router = defineRestRouter(RecordsApi)
     resource: "evaluator",
     action: "delete",
     idParam: "id",
-    name: ({ app, id, ownerUserId }) => {
+    name: ({ app, id, ownerUserId, input }) => {
       namedFor.push(ownerUserId);
+      namedWith.push(input);
       return app.nameOf(id);
     },
   })
@@ -227,6 +238,8 @@ let refundFailures: { refundError: unknown; routeError: unknown }[] = [];
 let asked: { request: RestConfirmationRequest; names: (string | null | undefined)[] }[];
 /** Whom each name was read for: the key's owner, so a record only they see still gets a card. */
 let namedFor: (string | null)[];
+/** The route input each name was read with. */
+let namedWith: Readonly<Record<string, unknown>>[];
 
 const app: RecordsApi = {
   remove: async () => {
@@ -303,6 +316,7 @@ beforeEach(() => {
   refundFailures = [];
   asked = [];
   namedFor = [];
+  namedWith = [];
 });
 
 describe("a route marked as removing something", () => {
@@ -331,6 +345,7 @@ describe("a route marked as removing something", () => {
         },
       ]);
       expect(namedFor).toEqual(["user-1"]);
+      expect(namedWith).toEqual([{ id: "ev-1" }]);
     });
   });
 
@@ -548,6 +563,73 @@ describe("a route marked as removing something", () => {
       expect([enabling.status, disabling.status]).toEqual([200, 409]);
       expect(asked.map(({ request }) => request.action)).toEqual(["disable"]);
     });
+  });
+});
+
+describe("when a marked route declares a context that refuses", () => {
+  const gatedRouter = defineRestRouter(RecordsApi)
+    .withNamespace("gated-records")
+    .withVersion(VERSION)
+    .delete("/:id", "remove")
+    .withAudit("records.delete")
+    .withParams(z.object({ id: z.string() }))
+    .withPermission("evaluations:manage")
+    .withConfirmation({
+      resource: "evaluator",
+      action: "delete",
+      idParam: "id",
+      name: ({ app, id }) => {
+        namedFor.push(null);
+        return app.nameOf(id);
+      },
+    })
+    .withMiddlewareContext(recordsReleased)
+    .withOutput(z.object({ removed: z.string() }))
+    .handle(async ({ app, input }) => {
+      await app.remove(input);
+      return { removed: input.id };
+    })
+    .build()
+    .router();
+
+  async function callGated({ released }: { released: boolean }) {
+    const response = await createRestRuntime({
+      authorization: authorizationPort,
+      identity: door,
+      audit: { record: async () => {} },
+      confirmations: gateFor([]),
+      servedDoors: true,
+    })
+      .mount(gatedRouter, {
+        app: () => app,
+        middlewareContext: [
+          bindMiddlewareContext(recordsReleased, () => {
+            if (!released) throw new RecordsNotReleasedError();
+            return true as const;
+          }),
+        ],
+        onError: canonicalErrorResponse,
+      })
+      .request(`/api/gated-records/${VERSION}/ev-1`, {
+        method: "DELETE",
+        headers: { "x-auth-token": "langy" },
+      });
+    return { status: response.status, body: (await response.json()) as { code?: string } };
+  }
+
+  /** @scenario "A route the project cannot reach refuses a Langy key before any card" */
+  it("answers with that refusal, and shows no card and reads no name", async () => {
+    const answer = await callGated({ released: false });
+
+    expect(answer).toMatchObject({ status: 404, body: { code: "records_not_released" } });
+    expect({ asked, namedFor, ran }).toEqual({ asked: [], namedFor: [], ran: [] });
+  });
+
+  it("asks for the click as before once the context resolves", async () => {
+    const answer = await callGated({ released: true });
+
+    expect(answer).toMatchObject({ status: 409, body: { code: "langy_confirmation_required" } });
+    expect(asked).toHaveLength(1);
   });
 });
 
