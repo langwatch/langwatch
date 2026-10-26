@@ -1,9 +1,10 @@
 /**
- * REST for a project's Analytics Reports dashboards, under `/api/v1/analytics/reports`. Every
- * answer carries the address a reader opens the dashboard at (dashboard-rest-api.feature,
- * dashboards-v2.feature AC199r). `/api/v1/dashboards` is the Dashboards area's family.
+ * REST for a project's Analytics Reports dashboards, under `/api/v1/analytics/reports`, and at
+ * `/api/v1/dashboards` for a caller pinning a version before 2026-10-26, when that path became the
+ * Dashboards API (dashboard-rest-api.feature, dashboards-v2.feature AC199r, AC199u).
  */
 import {
+  DASHBOARDS_API_VERSION,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   nameUnlessMissing,
@@ -16,6 +17,7 @@ import {
   dashboardReorderResponseSchema,
   dashboardResponseSchema,
   dashboardRestNameSchema,
+  dashboardRestParamsSchema,
   dashboardRestReorderSchema,
   DashboardApi,
   DashboardNotFoundError,
@@ -244,6 +246,105 @@ export const dashboardRest = defineRestRouter(DashboardApi)
       app,
       projectId: scope.id,
       dashboardId: input.reportId,
+      ...viewerOfActor({ actor }),
+    }),
+  )
+  .build();
+
+/**
+ * `/api/v1/dashboards` as it answered before 2026-10-26: the Reports boards, for a caller that
+ * pins an earlier version. Undocumented; the Dashboards API answers latest and the bare path.
+ */
+export const dashboardRestBeforeDashboardsApi = defineRestRouter(DashboardApi)
+  .withNamespace("dashboards")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withSupersededAt(DASHBOARDS_API_VERSION)
+
+  .get("/", "getApiDashboardsReports")
+  .withPermission("analytics:view")
+  .withOutput(dashboardListResponseSchema)
+  .withDocs({ tags: REPORT_TAGS, description: "List all dashboards for the project" })
+  .handle(({ app, scope, actor }) =>
+    reportOperations.list({ app, projectId: scope.id, ...viewerOfActor({ actor }) }),
+  )
+
+  .post("/", "postApiDashboardsReports")
+  .keepsRecords()
+  .withAudit("dashboards.create")
+  .withInput(dashboardRestNameSchema)
+  .withPermission("analytics:create")
+  .withOutput(dashboardResponseSchema)
+  .withStatus(201)
+  .withDocs({ tags: REPORT_TAGS, description: "Create a new dashboard" })
+  .handle(({ app, input, scope }) =>
+    reportOperations.create({ app, projectId: scope.id, name: input.name }),
+  )
+
+  .put("/reorder", "putApiDashboardsReportsReorder")
+  .keepsRecords()
+  .withAudit("dashboards.reorderDashboards")
+  .withInput(dashboardRestReorderSchema)
+  .withPermission("analytics:update")
+  .withOutput(dashboardReorderResponseSchema)
+  .withDocs({ tags: REPORT_TAGS, description: "Reorder dashboards by an ordered list of IDs" })
+  .handle(({ app, input, scope, actor }) =>
+    reportOperations.reorder({
+      app,
+      projectId: scope.id,
+      dashboardIds: input.dashboardIds,
+      ...viewerOfActor({ actor }),
+    }),
+  )
+
+  .get("/:id", "getApiDashboardsReportsById")
+  .withParams(dashboardRestParamsSchema)
+  .withPermission("analytics:view")
+  .withOutput(dashboardDetailResponseSchema)
+  .withDocs({ tags: REPORT_TAGS, description: "Get a dashboard by its id, with its graphs" })
+  .handle(({ app, input, scope, actor }) =>
+    reportOperations.read({
+      app,
+      projectId: scope.id,
+      dashboardId: input.id,
+      ...viewerOfActor({ actor }),
+    }),
+  )
+
+  .patch("/:id", "patchApiDashboardsReportsById")
+  .keepsRecords()
+  .withAudit("dashboards.rename")
+  .withParams(dashboardRestParamsSchema)
+  .withInput(dashboardRestNameSchema)
+  .withPermission("analytics:update")
+  .withOutput(dashboardResponseSchema)
+  .withDocs({ tags: REPORT_TAGS, description: "Rename a dashboard" })
+  .handle(({ app, input, scope, actor }) =>
+    reportOperations.rename({
+      app,
+      projectId: scope.id,
+      dashboardId: input.id,
+      name: input.name,
+      ...viewerOfActor({ actor }),
+    }),
+  )
+
+  .delete("/:id", "deleteApiDashboardsReportsById")
+  .withAudit("dashboards.delete")
+  .withParams(dashboardRestParamsSchema)
+  .withPermission("analytics:manage")
+  .withConfirmation({
+    resource: "dashboard",
+    action: "delete",
+    idParam: "id",
+    name: (target) => reportOperations.nameForDelete(target),
+  })
+  .withOutput(dashboardDeletedResponseSchema)
+  .withDocs({ tags: REPORT_TAGS, description: "Delete a dashboard and its graphs" })
+  .handle(({ app, input, scope, actor }) =>
+    reportOperations.delete({
+      app,
+      projectId: scope.id,
+      dashboardId: input.id,
       ...viewerOfActor({ actor }),
     }),
   )

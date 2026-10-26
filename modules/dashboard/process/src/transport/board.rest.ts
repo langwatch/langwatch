@@ -8,8 +8,8 @@ import {
   apiErrorSchema,
   canonicalBaseResponses,
   defineMiddlewareContext,
+  DASHBOARDS_API_VERSION,
   defineRestRouter,
-  MANAGEMENT_API_VERSION,
   nameUnlessMissing,
   resolver,
   type RouteResponse,
@@ -89,7 +89,7 @@ export function boardResource(
 
 export const boardRest = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
-  .withVersion(MANAGEMENT_API_VERSION)
+  .withVersion(DASHBOARDS_API_VERSION)
 
   .get("/", "getApiDashboards")
   .withPermission("analytics:view")

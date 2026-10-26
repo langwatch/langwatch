@@ -644,6 +644,11 @@ export type RestTransportDeclaration<
   /** The family's own path segment: `/api/<namespace>`. */
   readonly namespace: string;
   readonly version: DateVersion;
+  /**
+   * The date a newer family of the same namespace took over from: this one answers only the
+   * dates from `version` up to the day before, and leaves `latest` and the bare path to it.
+   */
+  readonly supersededAt?: DateVersion;
   readonly addressing: RestAddressing;
   /** Whether the family's `dated` addresses also answer under `/api/v1`. */
   readonly v1Twin: boolean;
@@ -1960,6 +1965,7 @@ class RestTransportRouter<
   private root = false;
   private generation = DEFAULT_GENERATION;
   private deprecated: RestDeprecation | undefined;
+  private supersededAt: DateVersion | undefined;
 
   private readonly api: FeatureApiWitness<Api>;
   readonly namespace: string;
@@ -2013,6 +2019,7 @@ class RestTransportRouter<
     router.root = this.root;
     router.generation = this.generation;
     router.deprecated = this.deprecated;
+    router.supersededAt = this.supersededAt;
 
     return router;
   }
@@ -2040,6 +2047,27 @@ class RestTransportRouter<
     return this;
   }
 
+  /**
+   * Hands `latest` and the bare path to a newer family of this namespace registered at
+   * `version`: this one keeps answering a caller who pins an earlier date.
+   */
+  withSupersededAt(
+    version: DateVersion,
+  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session, Named, Needs> {
+    assertVersionLabel(version);
+
+    if (this.addressing !== "dated" || version <= this.version) {
+      throw new Error(
+        `REST "${this.namespace}" can only be superseded as a dated family, at a date after ` +
+          `its own ${this.version}`,
+      );
+    }
+
+    this.supersededAt = version;
+
+    return this;
+  }
+
   /** Marks every route of the family superseded by `successor`. */
   withDeprecated(
     deprecated: RestDeprecation,
@@ -2060,6 +2088,7 @@ class RestTransportRouter<
       api: this.api,
       namespace: this.namespace,
       version: this.version,
+      ...(this.supersededAt ? { supersededAt: this.supersededAt } : {}),
       addressing: this.addressing,
       v1Twin: this.v1Twin,
       generation: this.generation,

@@ -16,8 +16,12 @@ import type {
 import type { RateLimiter } from "../ports.ts";
 import { allRegisteredRoutes } from "../route-registry.ts";
 import {
+  API_VERSION_HEADER,
+  basePathOf,
+  canonicalV1Path,
   claimsNoPrefix,
   middlewareScopesOf,
+  pinnedVersionPath,
   routeScopesOf,
   type MountableRestApp,
 } from "./addressing.ts";
@@ -125,7 +129,33 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   private readonly prefixes: ClaimedPrefix[] = [];
   private readonly unclaimed: UnclaimedAddress[] = [];
 
-  private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {}
+  /** Each dated family's base and its `/api/v1` twin: where `X-API-Version` pins a date. */
+  private readonly datedBases: string[] = [];
+
+  private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {
+    // Ahead of every family: a pinned request is answered again at its dated address, so the
+    // header and a dated URL select through the one path (public-rest.feature).
+    this.app.use("*", async (context, next) => {
+      let pinned: string | null;
+
+      try {
+        pinned = pinnedVersionPath({
+          path: context.req.path,
+          header: context.req.header(API_VERSION_HEADER),
+          datedBases: this.datedBases,
+        });
+      } catch (error) {
+        return canonicalErrorResponse(error, context);
+      }
+
+      if (pinned === null) return next();
+
+      const url = new URL(context.req.raw.url);
+      url.pathname = pinned;
+
+      return this.app.fetch(new Request(url, context.req.raw), context.env);
+    });
+  }
 
   /**
    * One declared family. Every credential kind opens for each mount: a ROUTE
@@ -139,6 +169,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   ): MountableRestApp {
     const declaration = transport as RestTransportDeclaration<unknown>;
     this.claimNamespace(declaration);
+    this.noteDatedBase(declaration);
     const identities: Partial<Record<RestDoorCredential, RestDoor>> = {
       ...this.options.identities,
       ...(this.options.bearers
@@ -209,6 +240,18 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
    */
   assertEveryRouteDeclared(): void {
     assertEveryRouteDeclared({ app: this.app, registry: allRegisteredRoutes() });
+  }
+
+  /** A dated family owning its namespace answers a pinned version at its dated addresses. */
+  private noteDatedBase(declaration: RestTransportDeclaration<unknown>): void {
+    if (declaration.addressing !== "dated" || claimsNoPrefix(declaration)) return;
+
+    const base = basePathOf(declaration);
+    const twin = declaration.v1Twin ? canonicalV1Path(base) : null;
+
+    for (const each of twin ? [base, twin] : [base]) {
+      if (!this.datedBases.includes(each)) this.datedBases.push(each);
+    }
   }
 
   /**

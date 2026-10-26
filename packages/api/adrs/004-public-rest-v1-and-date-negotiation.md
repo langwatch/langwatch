@@ -2,7 +2,8 @@
 
 **Date:** 2026-08-27
 
-**Status:** Accepted, amended 2026-09-04 (`v1` is not public-REST-only)
+**Status:** Accepted, amended 2026-09-04 (`v1` is not public-REST-only) and 2026-10-26
+(the header is served; a family can be superseded at a later date)
 
 **Behavioural contract:**
 [../specs/public-rest.feature](../specs/public-rest.feature)
@@ -63,6 +64,18 @@ operation id; explicit mounts receive deterministic suffixes. All mounts use
 the same resolved endpoint pipeline, including auth, capabilities, error
 mapping and response validation. Errors remain centrally derived from thrown
 errors; endpoints do not register error catalogues.
+
+### Amendment 2026-10-26: the header is served, and a family can hand over a path
+
+The REST host reads `X-API-Version` on a path a dated family owns and answers the request
+again at its dated address, so a header and a dated URL select through the one path; on a
+path no dated family owns, the header changes nothing. The version guards mount ahead of a
+family's routes, so a date no route names is read as the version and never as a `/:id`.
+
+A dated family declared `.withSupersededAt(date)` answers only its own dates up to the day
+before `date`, and leaves `latest` and the bare path to the newer family of its namespace
+registered at `date`. `/api/v1/dashboards` uses it: the Reports boards before 2026-10-26,
+the Dashboards API from then on.
 
 ## Consequences
 
