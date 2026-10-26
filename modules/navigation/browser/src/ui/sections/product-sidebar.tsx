@@ -111,8 +111,9 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
 
 /**
  * The pinned utility block at the bottom of every sidebar: usage, Settings,
- * Support and the theme control; in Dashboards, Insights sits just above Settings. The Settings sidebar drops its own entry
- * since the top bar already names it.
+ * Support and the theme control. In Dashboards, Insights sits just above
+ * Settings. The Settings sidebar drops its own entry since the top bar
+ * already names it.
  */
 function SidebarBottomBlock({
   surface,
