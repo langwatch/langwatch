@@ -24,7 +24,8 @@ const { state } = vi.hoisted(() => ({
     legacyKey: undefined as { present: boolean; lastUsedAt: string | null } | undefined,
     legacyRevokeFails: false,
     createFails: false,
-    myBindings: [] as Record<string, unknown>[],
+    myBindings: [] as Record<string, unknown>[] | undefined,
+    myBindingsFail: false,
   },
 }));
 
@@ -45,7 +46,13 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
     }),
     apiKey: {
       list: { useQuery: () => ({ data: state.keys, isLoading: false }) },
-      myBindings: { useQuery: () => ({ data: state.myBindings, isLoading: false }) },
+      myBindings: {
+        useQuery: () => ({
+          data: state.myBindingsFail ? void 0 : state.myBindings,
+          isLoading: false,
+          isError: state.myBindingsFail,
+        }),
+      },
       orgProjects: {
         useQuery: () => ({
           data: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
@@ -100,12 +107,19 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
           isPending: false,
           mutate: (
             input: unknown,
-            handlers: { onSuccess: () => void; onError: (error: Error) => void },
+            handlers: {
+              onSuccess: () => void;
+              onError: (error: Error) => void;
+              onSettled: () => void;
+            },
           ) => {
             mutations.revokeLegacy(input);
-            if (state.legacyRevokeFails) return handlers.onError(new Error("refused"));
-            state.legacyKey = { present: false, lastUsedAt: null };
-            handlers.onSuccess();
+            if (state.legacyRevokeFails) handlers.onError(new Error("refused"));
+            else {
+              state.legacyKey = { present: false, lastUsedAt: null };
+              handlers.onSuccess();
+            }
+            handlers.onSettled();
           },
         }),
       },
@@ -215,6 +229,7 @@ beforeEach(() => {
   state.legacyRevokeFails = false;
   state.createFails = false;
   state.myBindings = [];
+  state.myBindingsFail = false;
   mutations.create.mockClear();
   mutations.revoke.mockClear();
   mutations.revokeLegacy.mockClear();
@@ -500,7 +515,7 @@ describe("given the project still has a legacy key", () => {
       await user.click(await screen.findByRole("menuitem", { name: "Revoke" }));
 
       expect(await screen.findByText("Revoke the legacy project key?")).toBeInTheDocument();
-      expect(screen.getByText(/stops working at once/)).toHaveTextContent(
+      expect(screen.getByText(/stops working within seconds/)).toHaveTextContent(
         /new API key for Web App .* show it to you once/,
       );
       expect(mutations.create).not.toHaveBeenCalled();
@@ -526,6 +541,8 @@ describe("given the project still has a legacy key", () => {
       );
       expect(mutations.revokeLegacy).toHaveBeenCalledWith({ projectId: "proj-1" });
       expect(mutations.invalidateLegacy).toHaveBeenCalled();
+      expect(screen.queryByTestId("legacy-key-row")).toBeNull();
+      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
       expect(host.successes).toContainEqual({ title: "Legacy project key revoked" });
       expect(
         within(await screen.findByTestId("token-created-key")).getByText("Project API Key"),
@@ -609,6 +626,33 @@ describe("given the project still has a legacy key", () => {
         }),
       );
       expect(mutations.revokeLegacy).toHaveBeenCalledWith({ projectId: "proj-1" });
+    });
+
+    /** @scenario Revoke waits until the reader's roles are known */
+    it("keeps Revoke unavailable while their roles are still loading", async () => {
+      const user = userEvent.setup();
+      state.legacyKey = LIVE_LEGACY_KEY;
+      state.myBindings = undefined;
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+
+      await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Revoke" }));
+
+      expect(await screen.findByTestId("legacy-key-revoke-confirm")).toBeDisabled();
+    });
+
+    /** @scenario Revoke says so when the reader's roles could not be read */
+    it("keeps Revoke unavailable and says why when their roles could not be read", async () => {
+      const user = userEvent.setup();
+      state.legacyKey = LIVE_LEGACY_KEY;
+      state.myBindingsFail = true;
+      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
+
+      await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Revoke" }));
+
+      expect(await screen.findByTestId("legacy-key-revoke-confirm")).toBeDisabled();
+      expect(mutations.create).not.toHaveBeenCalled();
     });
 
     /** @scenario A swap whose new key could not send traces keeps the legacy key */

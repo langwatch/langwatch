@@ -9,7 +9,6 @@ import {
   type ApiKeyRole,
   categorizablePermissions,
   PERMISSION_CATEGORIES,
-  type ApiKeyTrpcGrant,
   type PermissionCategory,
 } from "@langwatch/api-key-contract";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
@@ -18,7 +17,6 @@ import {
   builtinRolePermissions,
   roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
-import type { Instant } from "@langwatch/time";
 
 /** The team-role vocabulary the API key surfaces speak. */
 export type ApiKeyTeamRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
@@ -55,19 +53,6 @@ export function categoryAccessAvailability({
 }
 
 export type PermissionMode = "all" | "readonly" | "restricted";
-
-export type CreateApiKeyInput = {
-  name: string;
-  description: string;
-  expiresAt: Instant | undefined;
-  permissionMode: PermissionMode;
-  keyType: "personal" | "service";
-  assignedToUserId?: string;
-  scopeType: string;
-  scopeId: string;
-  permissions?: string[];
-  bindings: ApiKeyTrpcGrant[];
-};
 
 export function permissionsSummary({
   permissionMode,

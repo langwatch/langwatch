@@ -141,8 +141,20 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     @integration
     Scenario: Revoking the legacy key says an API key takes its place
       Given "ada" chose Revoke on the legacy key row of project "alpha"
-      Then a dialog "Revoke the legacy project key?" says the key stops working at once
+      Then a dialog "Revoke the legacy project key?" says the key stops working within seconds
       And it says a new API key for project "alpha" is created and shown once
+
+    @integration
+    Scenario: Revoke waits until the reader's roles are known
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      And the page has not yet read their roles
+      Then the dialog's Revoke is unavailable
+
+    @integration
+    Scenario: Revoke says so when the reader's roles could not be read
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      And the page could not read their roles
+      Then the dialog's Revoke is unavailable and says their access could not be checked
 
     @integration
     Scenario: Revoking the legacy key swaps it for an API key

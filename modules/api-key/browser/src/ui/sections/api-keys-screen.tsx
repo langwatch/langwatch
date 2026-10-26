@@ -33,7 +33,7 @@ import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { type LegacyKeyStatus, useLegacyKey } from "../../behavior/use-legacy-key-status.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
 import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
-import type { CreateApiKeyInput } from "../../model/api-key-permissions.ts";
+import type { CreateApiKeyInput } from "../../model/api-key-form.ts";
 import {
   filterRowsByScope,
   scopeFilterAddressWrite,
@@ -52,6 +52,14 @@ import { TokenCreatedDialog } from "./token-created-dialog.tsx";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type ApiKeyRow = WireOf<ApiKeyListEntry>;
+
+/** Whether the reads that decide a swapped key's type and role have all answered. */
+function readerAccess(
+  reads: readonly { data: unknown; isError: boolean }[],
+): "loading" | "failed" | "ready" {
+  if (reads.some((read) => read.isError)) return "failed";
+  return reads.every((read) => read.data !== undefined) ? "ready" : "loading";
+}
 
 /** Why a create request cannot be sent, or null when it can. */
 function createInputProblem(
@@ -725,6 +733,7 @@ export default function ApiKeysScreen() {
           open={isRevokingLegacyKey && !newToken}
           projectName={scope.projectName}
           isRevoking={createMutation.isPending || revokeLegacyMutation.isPending}
+          access={readerAccess([myBindings, orgMembers, orgProjects])}
           onClose={() => setIsRevokingLegacyKey(false)}
           onConfirm={handleRevokeLegacyKey}
         />

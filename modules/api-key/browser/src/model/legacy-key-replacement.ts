@@ -1,4 +1,5 @@
-import { type CreateApiKeyInput, deriveBindingRole } from "./api-key-permissions.ts";
+import type { CreateApiKeyInput } from "./api-key-form.ts";
+import { deriveBindingRole } from "./api-key-permissions.ts";
 
 export const LEGACY_KEY_REPLACEMENT_NAME = "Project API Key";
 

@@ -29,12 +29,12 @@ import {
   earliestCustomExpiration,
   EXPIRATION_OPTIONS,
   EXPIRATION_UNCHOSEN,
+  type CreateApiKeyInput,
   isExpirationChosen,
   resolveExpiresAt,
 } from "../../model/api-key-form.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
-  type CreateApiKeyInput,
   deriveBindingRole,
   getUserPermissionsAtScope,
   type PermissionMode,
