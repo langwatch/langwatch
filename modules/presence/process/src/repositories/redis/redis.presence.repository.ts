@@ -61,8 +61,10 @@ export class RedisPresenceRepository extends PresenceRepository {
       .del(this.sessionKey(projectId, sessionId))
       .zrem(this.indexKey(projectId), sessionId)
       .exec();
-    const [deleteError, deleted] = results?.[0] ?? [];
-    if (deleteError) throw deleteError;
+    if (!results) throw new Error(`Failed to remove presence session ${sessionId}`);
+    const failed = results.find(([error]) => error);
+    if (failed?.[0]) throw failed[0];
+    const [, deleted] = results[0] ?? [];
     return typeof deleted === "number" && deleted > 0;
   }
 
