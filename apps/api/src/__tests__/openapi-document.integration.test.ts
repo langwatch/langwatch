@@ -140,9 +140,8 @@ describe("the OpenAPI document generated from the installed declarations", () =>
     });
   });
 
-  /** @scenario "The api serves the generated document" */
-  // public-rest.feature: "A header leaves a path the dated family does not serve to the route
-  // that does", across every family the api installs.
+  // Across every family the api installs, not only the host test's own.
+  /** @scenario "A header leaves a path the dated family does not serve to the route that does" */
   it("pins X-API-Version only for routes of dated families", () => {
     const sample = (path: string) => path.replace(/:\w+(\{[^}]*\})?|\*/g, "x");
     const literal: string[] = [];
@@ -175,6 +174,7 @@ describe("the OpenAPI document generated from the installed declarations", () =>
     ).toBeNull();
   });
 
+  /** @scenario "The api serves the generated document" */
   it("is the document the api answers at /api/openapi.json", async () => {
     const response = await booted.application.request("/api/openapi.json");
 
