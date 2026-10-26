@@ -55,6 +55,7 @@ export const langWatchQLKeyReachSchema: z.ZodType<LangWatchQLKeyReach> = z.discr
           .object({ id: z.string().min(1), teamId: z.string().min(1) })
           .strict()
           .optional(),
+        isLangySessionKey: z.boolean().optional(),
       })
       .strict(),
   ],

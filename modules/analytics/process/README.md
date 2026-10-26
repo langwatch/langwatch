@@ -312,7 +312,7 @@ Authenticated: Any API key reaches the projects it holds analytics:view on: the 
 Answers at `/api/v1/query`.
 
 ```typescript
-// Body: lwqlKeyStatementSchema, ../contract/src/features/lwql/analytics-lwql.schemas.ts:140
+// Body: lwqlKeyStatementSchema, ../contract/src/features/lwql/analytics-lwql.schemas.ts:141
 interface Body {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
