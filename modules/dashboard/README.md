@@ -11,7 +11,7 @@ Dashboards and the graphs and saved workbench charts on them.
 | Classification | core (`modules/catalogue.json`)                                                                                |
 | Subjects       | dashboard, graph, saved-workbench-chart                                                                        |
 | Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `DashboardApi` = `moduleApi<DashboardApi>()("dashboard")`, `contract/src/dashboard.api.ts:402` (58 operations) |
+| Api token      | `DashboardApi` = `moduleApi<DashboardApi>()("dashboard")`, `contract/src/dashboard.api.ts:408` (58 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 
 ## What dashboard owns

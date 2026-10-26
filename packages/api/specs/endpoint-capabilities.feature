@@ -78,6 +78,16 @@ Feature: Endpoint capabilities - rate limiting, response caching, deprecation
     Then the error response still carries the deprecation headers
 
   @integration
+  Scenario: A family deprecated only for some callers asks per request
+    Given a family deprecated when a declared context answers true for the caller
+    When a caller the context answers true for calls it
+    Then the answer carries the deprecation headers, refusals after the door included
+    When a caller the context answers false for calls it
+    Then the answer carries no deprecation header
+    And the published document does not mark the operation deprecated
+    And a module that provides no value for that context is refused at mount
+
+  @integration
   Scenario: An endpoint declares the several answers it may give
     Given an endpoint declaring each status it answers with and the body that status carries
     When it answers with one of them that is not a success

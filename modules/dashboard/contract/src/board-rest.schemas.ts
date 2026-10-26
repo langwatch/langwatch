@@ -1,11 +1,12 @@
 /**
- * The Dashboards boards REST family's wire shapes, under
- * `/api/v1/projects/:projectId/analytics/boards`: the boards a widget can be added to.
+ * The Dashboards boards REST wire shapes: `/api/v1/boards` and its widgets, and the deprecated
+ * `/api/v1/projects/:projectId/analytics/boards` reads.
  */
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  dashboardDescriptionSchema,
   dashboardIdSchema,
   dashboardNameSchema,
   dashboardScopeSchema,
@@ -53,3 +54,34 @@ const boardParamsSchemaDefinition = z.object({
 });
 export interface BoardParamsSchema extends Named<typeof boardParamsSchemaDefinition> {}
 export const boardParamsSchema: BoardParamsSchema = boardParamsSchemaDefinition;
+
+// -- `/api/v1/boards`: the project comes from the key, never the path ---------
+
+const boardIdParamsSchemaDefinition = z.object({ boardId: dashboardIdSchema });
+export interface BoardIdParamsSchema extends Named<typeof boardIdParamsSchemaDefinition> {}
+export const boardIdParamsSchema: BoardIdParamsSchema = boardIdParamsSchemaDefinition;
+
+const boardWidgetParamsSchemaDefinition = z.object({
+  ...boardIdParamsSchema.shape,
+  widgetId: z.string().min(1),
+});
+export interface BoardWidgetParamsSchema extends Named<typeof boardWidgetParamsSchemaDefinition> {}
+export const boardWidgetParamsSchema: BoardWidgetParamsSchema = boardWidgetParamsSchemaDefinition;
+
+const createBoardSchemaDefinition = z.object({ name: dashboardNameSchema });
+export interface CreateBoardSchema extends Named<typeof createBoardSchemaDefinition> {}
+export const createBoardSchema: CreateBoardSchema = createBoardSchemaDefinition;
+
+const updateBoardSchemaDefinition = z
+  .object({
+    name: dashboardNameSchema.optional(),
+    /** `null` clears it. */
+    description: dashboardDescriptionSchema.nullable().optional(),
+  })
+  .refine(
+    (body) => body.name !== undefined || body.description !== undefined,
+    "Provide at least one of name or description.",
+  )
+  .meta({ minProperties: 1 });
+export interface UpdateBoardSchema extends Named<typeof updateBoardSchemaDefinition> {}
+export const updateBoardSchema: UpdateBoardSchema = updateBoardSchemaDefinition;

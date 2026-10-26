@@ -81,6 +81,9 @@ const UNDOCUMENTED_CHECKUP =
 const UNDOCUMENTED_DASHBOARD_WIDGETS =
   "Live surface gated behind the release_dashboards and release_lwql_workbench feature flags, deliberately undocumented until release.";
 
+const UNDOCUMENTED_BOARDS =
+  "Live surface gated behind the release_dashboards feature flag (it answers 404 while the flag is off for the key's project), deliberately undocumented until release.";
+
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
 
@@ -138,6 +141,10 @@ const SKIP_PATHS: Record<string, string> = {
     UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
     UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/boards": UNDOCUMENTED_BOARDS,
+  "/api/v1/boards/{boardId}": UNDOCUMENTED_BOARDS,
+  "/api/v1/boards/{boardId}/widgets": UNDOCUMENTED_BOARDS,
+  "/api/v1/boards/{boardId}/widgets/{widgetId}": UNDOCUMENTED_BOARDS,
   "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/session": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/validate": UNDOCUMENTED_APP_INTERNAL,

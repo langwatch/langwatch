@@ -640,6 +640,97 @@ describe("a family the declaration marked superseded", () => {
   });
 });
 
+const supersededFor = defineMiddlewareContext("supersededFor", z.boolean());
+
+const sometimesLegacy = defineRestRouter(ReportApi)
+  .withNamespace("sometimes-legacy")
+  .withVersion(VERSION)
+  .withDeprecated({ successor: "/api/v1/reports", when: supersededFor })
+  .get("/:id", "getSometimesLegacyReport")
+  .withParams(z.object({ id: z.string().min(4) }))
+  .withPermission("annotations:view")
+  .withOutput(z.object({ id: z.string() }))
+  .handle(async ({ app, input }) => app.read({ id: input.id }))
+  .build();
+
+function sometimesLegacyApp({ superseded }: { superseded?: boolean }): Hono {
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: { authenticate: () => ({ actor: null, scope: { tier: "project", id: "p-1" } }) },
+  });
+
+  return runtime.mount(sometimesLegacy.router(), {
+    app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
+    credential: "project",
+    middlewareContext:
+      superseded === undefined ? [] : [bindMiddlewareContext(supersededFor, () => superseded)],
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a family deprecated only for some callers", () => {
+  /** @scenario "A family deprecated only for some callers asks per request" */
+  it("carries the headers for a caller the context answers true for, refusals included", async () => {
+    const app = sometimesLegacyApp({ superseded: true });
+
+    const [served, refused] = await Promise.all([
+      app.request("/api/sometimes-legacy/report-1"),
+      app.request("/api/sometimes-legacy/no"),
+    ]);
+
+    expect(
+      [served, refused].map((response) => ({
+        status: response.status,
+        deprecation: response.headers.get("Deprecation"),
+        link: response.headers.get("Link"),
+        sunset: response.headers.get("Sunset"),
+      })),
+    ).toEqual([
+      {
+        status: 200,
+        deprecation: "true",
+        link: '</api/v1/reports>; rel="successor-version"',
+        sunset: null,
+      },
+      {
+        status: 422,
+        deprecation: "true",
+        link: '</api/v1/reports>; rel="successor-version"',
+        sunset: null,
+      },
+    ]);
+  });
+
+  /** @scenario "A family deprecated only for some callers asks per request" */
+  it("carries none for a caller the context answers false for", async () => {
+    const response = await sometimesLegacyApp({ superseded: false }).request(
+      "/api/sometimes-legacy/report-1",
+    );
+
+    expect({
+      status: response.status,
+      deprecation: response.headers.get("Deprecation"),
+      link: response.headers.get("Link"),
+    }).toEqual({ status: 200, deprecation: null, link: null });
+  });
+
+  /** @scenario "A family deprecated only for some callers asks per request" */
+  it("is not published as deprecated", async () => {
+    const published = await generateSpecs(sometimesLegacyApp({ superseded: true }), SPEC_OPTIONS);
+    const item = published.paths?.["/api/v1/sometimes-legacy/{id}"] as
+      | { get?: { deprecated?: boolean } }
+      | undefined;
+
+    expect(item?.get).toBeDefined();
+    expect(item?.get?.deprecated).toBeUndefined();
+  });
+
+  /** @scenario "A family deprecated only for some callers asks per request" */
+  it("is refused at mount when its module provides no value for the context", () => {
+    expect(() => sometimesLegacyApp({})).toThrow(/deprecated when "supersededFor"/);
+  });
+});
+
 describe("a route declared public", () => {
   /** @scenario "A route that answers without a credential resolves none" */
   it("answers without resolving a credential, with a null actor and a null scope", async () => {

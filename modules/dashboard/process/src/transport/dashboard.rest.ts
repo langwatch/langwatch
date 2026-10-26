@@ -1,7 +1,7 @@
 /**
- * REST for a project's dashboards, under `/api/dashboards`. Every answer
- * carries the address a reader opens the dashboard at, which the application
- * builds from the project's slug and the deployment's base URL.
+ * REST for a project's Reports dashboards, under `/api/dashboards`. Every answer carries the
+ * address a reader opens the dashboard at. Deprecated, never blocked, for a key whose project has
+ * Dashboards switched on (dashboard-rest-api.feature).
  */
 import { defineRestRouter, MANAGEMENT_API_VERSION, nameUnlessMissing } from "@langwatch/api/rest";
 import {
@@ -19,10 +19,12 @@ import {
 } from "@langwatch/dashboard-contract";
 
 import { viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
+import { BOARDS_SUCCESSOR, dashboardsReleased } from "./board.rest.ts";
 
 export const dashboardRest = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
   .withVersion(MANAGEMENT_API_VERSION)
+  .withDeprecated({ successor: BOARDS_SUCCESSOR, when: dashboardsReleased })
 
   .get("/", "getApiDashboards")
   .withPermission("analytics:view")
