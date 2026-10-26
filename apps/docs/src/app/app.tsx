@@ -3,15 +3,17 @@ import { createDesignSystem } from "@langwatch/design-system/system";
 import { MDXProvider } from "@mdx-js/react";
 import nav from "virtual:docs-nav";
 
-import type { HighlightedExamples, Operation } from "../features/api-reference/model/operation.ts";
-import { EndpointStateProvider } from "../features/api-reference/ui/endpoint-state.tsx";
-import { Playground } from "../features/api-reference/ui/playground.tsx";
-import { EndpointReference, EndpointSummary } from "../features/api-reference/ui/reference.tsx";
-import { mdxComponents } from "../features/content/ui/mdx-components.ts";
-import { notFoundIndex } from "../features/navigation/model/not-found.ts";
-import { NotFoundPage, NotFoundRail } from "../features/navigation/ui/not-found-page.tsx";
-import { InlineContent } from "../features/shell/ui/inline-content.tsx";
-import { DocsShell } from "../features/shell/ui/shell.tsx";
+import type { HighlightedExamples, Operation } from "../features/api-reference/model.ts";
+import {
+  EndpointReference,
+  EndpointStateProvider,
+  EndpointSummary,
+  Playground,
+} from "../features/api-reference/ui.ts";
+import { mdxComponents } from "../features/content/ui.ts";
+import { notFoundIndex } from "../features/navigation/model.ts";
+import { NotFoundPage, NotFoundRail } from "../features/navigation/ui.ts";
+import { DocsShell, InlineContent } from "../features/shell/ui.ts";
 import { TypeRegion } from "../lib/type-mode.tsx";
 import type { PageModule } from "./pages.ts";
 import { docsTheme } from "./theme-config.ts";

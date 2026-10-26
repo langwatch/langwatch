@@ -3,11 +3,9 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import type { InlineConfig } from "vite";
 
-import { docsOpenapiPlugin } from "../features/api-reference/compile/openapi.ts";
-import { docsMdxPlugin } from "../features/content/compile/mdx-plugin.ts";
-import { docsPagesPlugin } from "../features/content/compile/pages-plugin.ts";
-import { docsNavPlugin } from "../features/navigation/compile/nav-plugin.ts";
-import { openapiPages } from "../features/navigation/compile/nav.ts";
+import { docsOpenapiPlugin } from "../features/api-reference/compile.ts";
+import { docsMdxPlugin } from "../features/content/compile.ts";
+import { docsNavPlugin, docsPagesPlugin, openapiPages } from "../features/navigation/compile.ts";
 import { appRoot, docsRoot } from "../paths.ts";
 import { browserRuntimePlugin } from "./browser-runtime-plugin.ts";
 import { docsDevPlugin } from "./dev-server.ts";

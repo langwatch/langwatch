@@ -1,7 +1,7 @@
 import { Flex } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
-import type { CodeSource } from "../../code/ui/code-parts.tsx";
+import type { CodeSource } from "../../code/model.ts";
 import { generateExample, initialBodyOf } from "../model/codegen.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { EXAMPLE_LANGUAGES } from "../model/operation.ts";

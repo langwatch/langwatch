@@ -3,11 +3,10 @@ import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type * as SearchRowsModule from "../model/search-rows.ts";
 import { SearchTemplates } from "../ui/search-template.tsx";
 
-const rendering = vi.hoisted(() => ({ fails: false }));
-const indexLoads = vi.hoisted(() => ({ count: 0, fails: false }));
+/* The real store fetches, decodes and memoises the index; only the network is a stand-in. */
+const indexLoads = vi.hoisted(() => ({ count: 0, fails: true }));
 
 vi.hoisted(() => {
   /* jsdom has the dialog element but not its modal methods. */
@@ -22,24 +21,14 @@ vi.hoisted(() => {
   Element.prototype.scrollIntoView = () => {};
 });
 
-vi.mock("../browser/search-index-store.ts", () => ({
-  currentBuild: () => "test",
-  loadSearchIndex: () => {
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async () => {
     indexLoads.count += 1;
-    return indexLoads.fails ? Promise.reject(new Error("offline")) : Promise.resolve(null);
-  },
-}));
-
-vi.mock("../model/search-rows.ts", async (importOriginal) => {
-  const original = await importOriginal<typeof SearchRowsModule>();
-  return {
-    ...original,
-    searchRows: (input: Parameters<typeof original.searchRows>[0]) => {
-      if (rendering.fails) throw new Error("render failed");
-      return original.searchRows(input);
-    },
-  };
-});
+    if (indexLoads.fails) return new Response("", { status: 503 });
+    return Response.json([{ slug: "intro", title: "Intro", description: "" }]);
+  }),
+);
 
 document.body.innerHTML = renderToStaticMarkup(
   <DesignSystemTestProvider>
@@ -70,7 +59,6 @@ async function openSearch() {
 }
 
 beforeEach(() => {
-  rendering.fails = false;
   indexLoads.fails = false;
 });
 
@@ -145,11 +133,17 @@ describe("when rendering the search results throws", () => {
   /** @scenario "Explain a search that fails to render" */
   it("says search stopped working in place of the results", async () => {
     const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
-    rendering.fails = true;
-    await openSearch();
-    expect(part("broken")?.hidden).toBe(false);
-    expect(part("broken")?.textContent).toMatch(/Search stopped working/);
-    expect(dialog()?.querySelectorAll("[data-index]")).toHaveLength(0);
-    quiet.mockRestore();
+    /* Without the action row's template, the real `fromTemplate` throws mid-render. */
+    const template = document.getElementById("docs-search-action");
+    template?.remove();
+    try {
+      await openSearch();
+      expect(part("broken")?.hidden).toBe(false);
+      expect(part("broken")?.textContent).toMatch(/Search stopped working/);
+      expect(dialog()?.querySelectorAll("[data-index]")).toHaveLength(0);
+    } finally {
+      if (template) document.body.append(template);
+      quiet.mockRestore();
+    }
   });
 });

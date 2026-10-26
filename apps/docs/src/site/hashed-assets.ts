@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { FONT_SOURCE, SOCIAL_IMAGE } from "../features/discovery/compile/page-head.ts";
+import { FONT_SOURCE, SOCIAL_IMAGE } from "../features/discovery/compile.ts";
 import { DOCS_URL, withBasePath } from "../lib/site-path.ts";
 import { STATIC_DIRS } from "./document.ts";
 

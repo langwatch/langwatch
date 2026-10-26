@@ -2,13 +2,18 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { canonicalUrl, docsUrl } from "../../../lib/site-path.ts";
-import { resolveOperation } from "../../api-reference/compile/openapi.ts";
-import { generateExample, initialBodyOf } from "../../api-reference/model/codegen.ts";
-import type { Content, Operation } from "../../api-reference/model/operation.ts";
-import { readFrontmatter, withoutFrontmatter } from "../../content/compile/frontmatter.ts";
-import { readDocsConfig } from "../../navigation/compile/nav.ts";
-import { withReleaseNotes } from "../../releases/compile/releases.ts";
-import { FENCE, mapProse, markedLines, mdxToMarkdown } from "./mdx-markdown.ts";
+import { resolveOperation } from "../../api-reference/compile.ts";
+import {
+  type Content,
+  generateExample,
+  initialBodyOf,
+  type Operation,
+} from "../../api-reference/model.ts";
+import { readFrontmatter, withoutFrontmatter } from "../../content/compile.ts";
+import { readDocsConfig } from "../../navigation/compile.ts";
+import { withReleaseNotes } from "../../releases/compile.ts";
+import { mdxToMarkdown } from "./mdx-markdown.ts";
+import { FENCE, mapProse, markedLines } from "./mdx-text.ts";
 import { pageDescription } from "./page-head.ts";
 
 const JSON_LINE = 80;

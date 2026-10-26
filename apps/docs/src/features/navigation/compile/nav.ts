@@ -6,13 +6,13 @@ import path from "node:path";
 import { z } from "zod";
 
 import { docsUrl } from "../../../lib/site-path.ts";
-import { operationIndex, parseOpenapiRef } from "../../api-reference/compile/openapi.ts";
-import { readFrontmatter } from "../../content/compile/frontmatter.ts";
-import { pageLastModified } from "../../discovery/compile/last-modified.ts";
-import { readReleases } from "../../releases/compile/releases.ts";
+import { operationIndex, parseOpenapiRef } from "../../api-reference/compile.ts";
+import { readFrontmatter } from "../../content/compile.ts";
+import { readReleases } from "../../releases/compile.ts";
 import { localHref, parseInline } from "../model/inline.ts";
 import { contextualOptions } from "../model/nav.ts";
 import type { Announcement, Nav, NavItem, PageMeta } from "../model/nav.ts";
+import { pageLastModified } from "./last-modified.ts";
 
 const ACRONYMS = new Set([
   "api",

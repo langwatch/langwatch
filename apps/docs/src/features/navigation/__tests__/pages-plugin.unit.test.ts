@@ -4,8 +4,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { docsFixture } from "../../../testing/docs-fixture.ts";
-import { buildNav } from "../../navigation/compile/nav.ts";
 import { sourceSearchIndex } from "../../search/compile/search-index.ts";
+import { buildNav } from "../compile/nav.ts";
 import { reloadDocsSource } from "../compile/pages-plugin.ts";
 
 const CONFIG = {

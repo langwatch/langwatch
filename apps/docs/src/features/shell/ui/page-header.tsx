@@ -3,7 +3,7 @@ import { Check, Copy } from "lucide-react";
 
 import { useCopy } from "../../../lib/clipboard.ts";
 import { sitePath } from "../../../lib/site-path.ts";
-import type { ContextualOption } from "../../navigation/model/nav.ts";
+import type { ContextualOption } from "../../navigation/model.ts";
 import { PageMenu } from "./page-menu.tsx";
 
 async function readMarkdown({ slug }: { slug: string }): Promise<string> {

@@ -2,7 +2,7 @@ import { Box, IconButton, Link } from "@langwatch/design-system/primitives";
 import { ArrowRight, X } from "lucide-react";
 
 import { sitePath } from "../../../lib/site-path.ts";
-import { site } from "../../navigation/ui/site-nav.ts";
+import { site } from "../../navigation/ui.ts";
 
 export function SiteBanner() {
   const release = site.releases[0];

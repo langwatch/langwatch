@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { readDocsConfig, type DocsItem } from "../../features/navigation/compile/nav.ts";
+import { type DocsItem, readDocsConfig } from "../../features/navigation/compile.ts";
 import { DOCS_URL } from "../../lib/site-path.ts";
 import {
   approximateTokens,

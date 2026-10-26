@@ -98,12 +98,8 @@ describe("when a navigation group holds a single page", () => {
 describe("when a page renders the mobile navigation drawer", () => {
   const html = render(
     <MobileNav
-      site={{
-        llms: "/llms.txt",
-        signIn: "https://app.langwatch.ai",
-        github: "https://github.com/langwatch/langwatch",
-        stars: null,
-      }}
+      githubLink={null}
+      site={{ llms: "/llms.txt", signIn: "https://app.langwatch.ai" }}
     />,
   );
 

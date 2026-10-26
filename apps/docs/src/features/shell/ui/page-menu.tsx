@@ -4,7 +4,7 @@ import { Check, ChevronDown, Code, Copy, FileText, Link2, Plug } from "lucide-re
 import type { ReactNode } from "react";
 
 import { canonicalUrl, sitePath } from "../../../lib/site-path.ts";
-import type { ContextualOption } from "../../navigation/model/nav.ts";
+import type { ContextualOption } from "../../navigation/model.ts";
 
 /** The LangWatch MCP server, which searches these docs; a static site hosts no server itself. */
 export const LANGWATCH_MCP_URL = "https://app.langwatch.ai/mcp";

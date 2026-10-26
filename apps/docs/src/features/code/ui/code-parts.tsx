@@ -4,16 +4,8 @@ import { z } from "zod";
 
 import type { CopyState } from "../../../lib/clipboard.ts";
 import { useCopy } from "../../../lib/clipboard.ts";
-import { PROMPT_ATTRIBUTE } from "./copy-source.ts";
-
-export type CodeSource = {
-  lang: string;
-  title: string;
-  code: string;
-  lines: string[];
-  highlight: number[];
-  numbered: boolean;
-};
+import type { CodeSource } from "../model/code-source.ts";
+import { PROMPT_ATTRIBUTE } from "../model/copy-source.ts";
 
 const LINE_HEIGHT = "22px";
 

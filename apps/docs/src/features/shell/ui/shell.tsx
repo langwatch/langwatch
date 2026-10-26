@@ -3,13 +3,13 @@ import type { ReactNode } from "react";
 
 import { TypeRegion } from "../../../lib/type-mode.tsx";
 import type { TypeMode } from "../../../lib/type-mode.tsx";
-import { neighbours, trailOf } from "../../navigation/model/nav.ts";
-import { MobileNav } from "../../navigation/ui/mobile-nav.tsx";
-import { SideNav } from "../../navigation/ui/side-nav.tsx";
-import { sectionOf, site } from "../../navigation/ui/site-nav.ts";
-import { SiteAnnouncement } from "../../releases/ui/announcement.tsx";
-import { SiteBanner } from "../../releases/ui/banner.tsx";
-import { SearchTemplates } from "../../search/ui/search-template.tsx";
+import { neighbours, trailOf } from "../../navigation/model.ts";
+import { MobileNav, sectionOf, SideNav, site } from "../../navigation/ui.ts";
+import { SearchTemplates } from "../../search/ui.ts";
+import { AgentLauncher } from "./agent-launcher.tsx";
+import { SiteAnnouncement } from "./announcement.tsx";
+import { SiteBanner } from "./banner.tsx";
+import { GithubLink } from "./github-link.tsx";
 import { Header, HEADER_HEIGHT, type PageKind } from "./header.tsx";
 import { PageFooter } from "./page-footer.tsx";
 import { PageHeader } from "./page-header.tsx";
@@ -133,7 +133,7 @@ export function DocsShell({
         data-scene={aside ? "true" : void 0}
       >
         <LeftRail>
-          <SideNav active={section} slug={slug} treeId="page-tree" />
+          <SideNav active={section} launcher={<AgentLauncher />} slug={slug} treeId="page-tree" />
         </LeftRail>
         {aside ? (
           <>
@@ -226,7 +226,7 @@ export function DocsShell({
         ) : null}
       </Box>
       <SiteFooter />
-      <MobileNav site={site} />
+      <MobileNav githubLink={<GithubLink site={site} />} site={site} />
       <SearchTemplates />
     </Box>
   );

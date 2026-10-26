@@ -1,3 +1,4 @@
+import { applyTheme } from "../../../lib/theme.ts";
 import { fillMobileNav } from "./mobile-tree.ts";
 
 function closeMenus() {
@@ -7,18 +8,11 @@ function closeMenus() {
   });
 }
 
-function applyTheme({ choice }: { choice: string }) {
+function chooseTheme({ choice }: { choice: string }) {
   const dark =
     choice === "dark" ||
     (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark", dark);
-  document.documentElement.classList.toggle("light", !dark);
-  document.documentElement.style.colorScheme = dark ? "dark" : "light";
-  try {
-    localStorage.setItem("theme", choice);
-  } catch {
-    /* Storage is optional. */
-  }
+  applyTheme({ dark, choice });
 }
 
 function openMobile() {
@@ -62,7 +56,7 @@ export function installMenus() {
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     try {
       if (!localStorage.getItem("theme") || localStorage.getItem("theme") === "system")
-        applyTheme({ choice: "system" });
+        chooseTheme({ choice: "system" });
     } catch {
       /* The current theme is retained. */
     }

@@ -1,6 +1,6 @@
 import { Badge, Box, Flex, Text } from "@langwatch/design-system/primitives";
 
-import { DocsField, Expandable } from "../../content/ui/fields.tsx";
+import { DocsField, Expandable } from "../../content/ui.ts";
 import type { Parameter, Schema } from "../model/operation.ts";
 
 const MAX_DEPTH = 4;

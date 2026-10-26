@@ -4,11 +4,14 @@ import { Children, isValidElement, useState } from "react";
 import type { ReactNode } from "react";
 
 import { usePreference, writePreference } from "../../../lib/storage.ts";
-import { tabFamilies } from "../../code/model/language-family.ts";
-import { CodeBar, CodeFrame } from "../../code/ui/code-block.tsx";
-import { CodeBody, CopyAction, sourceFromProps } from "../../code/ui/code-parts.tsx";
-import type { CodeSource } from "../../code/ui/code-parts.tsx";
-import { codeFilename, languageName, preferenceGroupFor } from "../../code/ui/languages.ts";
+import {
+  codeFilename,
+  type CodeSource,
+  languageName,
+  preferenceGroupFor,
+  tabFamilies,
+} from "../../code/model.ts";
+import { CodeBar, CodeBody, CodeFrame, CopyAction, sourceFromProps } from "../../code/ui.ts";
 import { readingTabList, readingTabTrigger, tabValue } from "./tabs.tsx";
 
 type Item = { label: string; source?: CodeSource; content?: ReactNode };

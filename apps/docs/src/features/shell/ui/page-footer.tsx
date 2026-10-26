@@ -3,8 +3,8 @@ import { ArrowLeft, ArrowRight, MessageSquareWarning, PencilLine } from "lucide-
 import type { ReactNode } from "react";
 
 import { canonicalUrl, pagePath } from "../../../lib/site-path.ts";
-import { trailOf } from "../../navigation/model/nav.ts";
-import { sectionOf, site } from "../../navigation/ui/site-nav.ts";
+import { trailOf } from "../../navigation/model.ts";
+import { sectionOf, site } from "../../navigation/ui.ts";
 import { LastUpdated } from "./last-updated.tsx";
 
 type Neighbour = { slug: string; title: string } | undefined;

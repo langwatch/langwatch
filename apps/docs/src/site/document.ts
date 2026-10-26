@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { Operation } from "../features/api-reference/model/operation.ts";
+import type { Operation } from "../features/api-reference/model.ts";
 
 /** Lazy browser entries by name; the bootstrap loads each through a `docs-island-<name>` meta. */
 export const ISLANDS = {

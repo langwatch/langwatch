@@ -2,8 +2,8 @@ import path from "node:path";
 
 import type { Plugin } from "vite";
 
-import { buildNav } from "../../navigation/compile/nav.ts";
-import { changelogPath } from "../../releases/compile/releases.ts";
+import { changelogPath } from "../../releases/compile.ts";
+import { buildNav } from "./nav.ts";
 
 const ID = "virtual:docs-pages";
 

@@ -32,7 +32,7 @@ export type SearchRow = {
   glyph: string;
 };
 
-/** The command bar's rows for a query: matching pages and headings, then the quick actions. */
+/** The command bar's rows for a query: quick actions first, then matching pages and headings. */
 export function searchRows({
   index,
   query,

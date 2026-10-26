@@ -6,9 +6,9 @@ import { preview } from "vite";
 
 import {
   readBuiltRedirects,
-  resolveRedirect,
   type Redirects,
-} from "../features/navigation/compile/redirects.ts";
+  resolveRedirect,
+} from "../features/navigation/compile.ts";
 import { stripBasePath } from "../lib/site-path.ts";
 import { appRoot } from "../paths.ts";
 import { isHashedFile } from "./hashed-assets.ts";

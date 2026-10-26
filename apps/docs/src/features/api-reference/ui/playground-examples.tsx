@@ -2,11 +2,9 @@ import { Box, Flex, Tabs, Text } from "@langwatch/design-system/primitives";
 import { FileCode } from "lucide-react";
 
 import { usePreference, writePreference } from "../../../lib/storage.ts";
-import { languageFamily } from "../../code/model/language-family.ts";
-import { CodeBar } from "../../code/ui/code-block.tsx";
-import { CodeBody, CopyAction } from "../../code/ui/code-parts.tsx";
-import type { CodeSource } from "../../code/ui/code-parts.tsx";
-import { readingTabList, readingTabTrigger } from "../../content/ui/tabs.tsx";
+import { type CodeSource, languageFamily } from "../../code/model.ts";
+import { CodeBar, CodeBody, CopyAction } from "../../code/ui.ts";
+import { readingTabList, readingTabTrigger } from "../../content/ui.ts";
 import { exampleFromSchema } from "../model/codegen.ts";
 import { EXAMPLE_LANGUAGES } from "../model/operation.ts";
 import type { Operation } from "../model/operation.ts";

@@ -2,8 +2,8 @@ import { Box, Flex, Text, VisuallyHidden } from "@langwatch/design-system/primit
 import { Check, ChevronRight, Copy } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { PROMPT_ATTRIBUTE } from "../../code/ui/copy-source.ts";
-import { PROMPT_BODY_ATTRIBUTE } from "./prompt-attributes.ts";
+import { PROMPT_ATTRIBUTE } from "../../code/model.ts";
+import { PROMPT_BODY_ATTRIBUTE } from "../model/prompt-attributes.ts";
 
 function CopyIcons() {
   return (

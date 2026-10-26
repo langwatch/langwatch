@@ -8,29 +8,28 @@ import { isMainThread, parentPort, workerData } from "node:worker_threads";
 import { z } from "zod";
 
 import { render } from "../app/entry-server.tsx";
-import { SPEC_FILES } from "../features/api-reference/compile/openapi.ts";
+import { SPEC_FILES } from "../features/api-reference/compile.ts";
+import { extractPromptBodies, extractSkillPrompts } from "../features/content/compile.ts";
 import {
-  extractPromptBodies,
-  extractSkillPrompts,
-} from "../features/content/compile/skill-prompts.ts";
-import { readAgentSkills } from "../features/discovery/compile/agent-skills.ts";
-import {
+  breadcrumbTrail,
   discoveryFiles,
+  FONT_SOURCE,
   llmsFull,
   PAGE_EXPORT_EXTENSIONS,
-} from "../features/discovery/compile/discovery-files.ts";
-import { pageLastModified } from "../features/discovery/compile/last-modified.ts";
-import { pageMarkdown } from "../features/discovery/compile/markdown-export.ts";
-import { breadcrumbTrail, FONT_SOURCE, pageHead } from "../features/discovery/compile/page-head.ts";
-import { buildNav } from "../features/navigation/compile/nav.ts";
+  pageHead,
+  pageMarkdown,
+  readAgentSkills,
+} from "../features/discovery/compile.ts";
 import {
+  buildNav,
   isStaticRedirect,
-  siteRedirects,
+  pageLastModified,
   redirectPage,
   redirectTarget,
-} from "../features/navigation/compile/redirects.ts";
-import type { Nav } from "../features/navigation/model/nav.ts";
-import { publishSearchIndex, searchEntry } from "../features/search/compile/search-index.ts";
+  siteRedirects,
+} from "../features/navigation/compile.ts";
+import type { Nav } from "../features/navigation/model.ts";
+import { publishSearchIndex, searchEntry } from "../features/search/compile.ts";
 import { publicSlug, withBasePath } from "../lib/site-path.ts";
 import { appRoot, cacheRoot, docsRoot, readBuildOptions } from "../paths.ts";
 import { writeVersionedPages } from "./build-version.ts";

@@ -28,11 +28,11 @@ vi.hoisted(() => {
       toggle(this, false);
     },
   });
-  const matches = Element.prototype.matches;
-  Object.assign(Element.prototype, {
-    matches(this: Element, selector: string) {
+  /* On HTMLElement, so Element's own `matches` stays reachable underneath. */
+  Object.assign(HTMLElement.prototype, {
+    matches(this: HTMLElement, selector: string) {
       if (selector === ":popover-open") return this.hasAttribute("data-open");
-      return matches.call(this, selector);
+      return Element.prototype.matches.call(this, selector);
     },
   });
   Element.prototype.scrollIntoView = () => {};

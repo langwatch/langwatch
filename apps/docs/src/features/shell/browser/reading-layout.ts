@@ -1,5 +1,5 @@
 import { sitePath } from "../../../lib/site-path.ts";
-import { installSidebar } from "../../navigation/browser/sidebar.ts";
+import { installSidebar } from "../../navigation/browser.ts";
 
 installSidebar();
 

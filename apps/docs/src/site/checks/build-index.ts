@@ -1,11 +1,8 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
-import {
-  namedFragments,
-  PROMPT_FRAGMENT_FILE,
-} from "../../features/content/compile/skill-prompts.ts";
-import { readBuiltRedirects, type Redirects } from "../../features/navigation/compile/redirects.ts";
+import { namedFragments, PROMPT_FRAGMENT_FILE } from "../../features/content/compile.ts";
+import { readBuiltRedirects, type Redirects } from "../../features/navigation/compile.ts";
 
 /** What the checks need from one built HTML file, read once. */
 export type HtmlFacts = {

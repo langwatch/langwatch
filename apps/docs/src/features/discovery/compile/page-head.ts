@@ -1,14 +1,9 @@
 import { isProduction } from "../../../config.ts";
 import { canonicalUrl, docsUrl, sitePath } from "../../../lib/site-path.ts";
 import { docsRoot } from "../../../paths.ts";
-import type { Operation } from "../../api-reference/model/operation.ts";
-import { pageDates, readDocsConfig } from "../../navigation/compile/nav.ts";
-import {
-  firstSlug,
-  ownsSlug,
-  type Organization,
-  type Section,
-} from "../../navigation/model/nav.ts";
+import type { Operation } from "../../api-reference/model.ts";
+import { pageDates, readDocsConfig } from "../../navigation/compile.ts";
+import { firstSlug, type Organization, ownsSlug, type Section } from "../../navigation/model.ts";
 
 /**
  * Where the web fonts live: dev serves them at this path, a build renames each to Vite's hashed

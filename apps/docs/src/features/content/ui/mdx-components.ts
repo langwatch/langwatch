@@ -1,4 +1,4 @@
-import { DocsCodeBlock } from "../../code/ui/code-block.tsx";
+import { DocsCodeBlock } from "../../code/ui.ts";
 import { Accordion, AccordionGroup } from "./accordion.tsx";
 import { AgentActions } from "./agent-actions.tsx";
 import { AgentQuickStart } from "./agent-quick-start.tsx";

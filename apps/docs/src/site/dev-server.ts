@@ -5,17 +5,17 @@ import path from "node:path";
 import type { Connect, Plugin, ViteDevServer } from "vite";
 
 import type { render as renderPage } from "../app/entry-server.tsx";
-import { readAgentSkills } from "../features/discovery/compile/agent-skills.ts";
 import {
+  breadcrumbTrail,
   discoveryFiles,
   exportSlug,
   PAGE_EXPORT_EXTENSIONS,
-} from "../features/discovery/compile/discovery-files.ts";
-import { pageMarkdown } from "../features/discovery/compile/markdown-export.ts";
-import { breadcrumbTrail, pageHead } from "../features/discovery/compile/page-head.ts";
-import { buildNav } from "../features/navigation/compile/nav.ts";
-import { siteRedirects, resolveRedirect } from "../features/navigation/compile/redirects.ts";
-import { publishSearchIndex, sourceSearchIndex } from "../features/search/compile/search-index.ts";
+  pageHead,
+  pageMarkdown,
+  readAgentSkills,
+} from "../features/discovery/compile.ts";
+import { buildNav, resolveRedirect, siteRedirects } from "../features/navigation/compile.ts";
+import { publishSearchIndex, sourceSearchIndex } from "../features/search/compile.ts";
 import { appRoot } from "../paths.ts";
 import {
   composeDocument,

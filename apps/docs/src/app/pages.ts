@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import operations from "virtual:docs-operations";
 import loaders from "virtual:docs-pages";
 
-import type { Operation } from "../features/api-reference/model/operation.ts";
+import type { Operation } from "../features/api-reference/model.ts";
 
 function EmptyPage() {
   return null;

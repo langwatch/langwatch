@@ -6,9 +6,8 @@ import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import type { Plugin } from "vite";
 
-import { closeDiagrams } from "../../code/compile/diagrams.ts";
-import { rehypeDocsCode } from "../../code/compile/rehype-code.ts";
-import { changelogPath, withReleaseNotes } from "../../releases/compile/releases.ts";
+import { closeDiagrams, rehypeDocsCode } from "../../code/compile.ts";
+import { changelogPath, withReleaseNotes } from "../../releases/compile.ts";
 import {
   rehypeDocsAccessibility,
   rehypeDocsHeadings,

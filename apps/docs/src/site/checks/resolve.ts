@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { resolveRedirect } from "../../features/navigation/compile/redirects.ts";
+import { resolveRedirect } from "../../features/navigation/compile.ts";
 import { DOCS_URL, stripBasePath, withBasePath } from "../../lib/site-path.ts";
 import type { BuildIndex } from "./build-index.ts";
 

@@ -1,4 +1,4 @@
-import type { Release } from "../../releases/model/release.ts";
+import type { Release } from "../../releases/model.ts";
 import type { Inline } from "./inline.ts";
 
 export type NavItem =

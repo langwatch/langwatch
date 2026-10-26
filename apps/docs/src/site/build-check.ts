@@ -5,13 +5,14 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { PROMPT_FRAGMENT_FILE } from "../features/content/compile/skill-prompts.ts";
-import { readDocsConfig, type DocsItem } from "../features/navigation/compile/nav.ts";
+import { PROMPT_FRAGMENT_FILE } from "../features/content/compile.ts";
 import {
+  type DocsItem,
   isStaticRedirect,
   readBuiltRedirects,
+  readDocsConfig,
   redirectTarget,
-} from "../features/navigation/compile/redirects.ts";
+} from "../features/navigation/compile.ts";
 import { docsRoot } from "../paths.ts";
 import { pageTargets } from "./document.ts";
 import { htmlMediaPaths, isHashedFile, isStableAsset } from "./hashed-assets.ts";

@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 
 import { withBasePath } from "../../../lib/site-path.ts";
-import { PROMPT_ATTRIBUTE, PROMPT_FILE_ATTRIBUTE } from "../../code/ui/copy-source.ts";
-import { PROMPT_BODY_ATTRIBUTE, PROMPT_FRAGMENT_ATTRIBUTE } from "../ui/prompt-attributes.ts";
+import { PROMPT_ATTRIBUTE, PROMPT_FILE_ATTRIBUTE } from "../../code/model.ts";
+import { PROMPT_BODY_ATTRIBUTE, PROMPT_FRAGMENT_ATTRIBUTE } from "../model/prompt-attributes.ts";
 
 const PROMPT_PATTERN = new RegExp(` ${PROMPT_ATTRIBUTE}="([^"]*)"`, "g");
 const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };

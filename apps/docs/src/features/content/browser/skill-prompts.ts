@@ -1,4 +1,4 @@
-import { PROMPT_FRAGMENT_ATTRIBUTE as FRAGMENT_ATTRIBUTE } from "../ui/prompt-attributes.ts";
+import { PROMPT_FRAGMENT_ATTRIBUTE as FRAGMENT_ATTRIBUTE } from "../model/prompt-attributes.ts";
 
 /** Replaces the preview with the rendered body once; a failed fetch is retried on the next open. */
 async function fill({ details }: { details: HTMLDetailsElement }) {

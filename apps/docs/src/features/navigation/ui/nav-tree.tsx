@@ -2,7 +2,7 @@ import { Box, chakra, Text } from "@langwatch/design-system/primitives";
 
 import { isColourLogo } from "../../../lib/logos.ts";
 import { pagePath, sitePath } from "../../../lib/site-path.ts";
-import { Icon } from "../../content/ui/icon.tsx";
+import { Icon } from "../../content/ui.ts";
 import { endpointCount, groupTarget, methodOf, soleChild, startsOpen } from "../model/nav.ts";
 import type { NavItem, PageMeta } from "../model/nav.ts";
 

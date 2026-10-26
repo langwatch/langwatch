@@ -2,7 +2,7 @@ import { Box, Button, Flex, Text, chakra } from "@langwatch/design-system/primit
 import { ChevronDown, Play } from "lucide-react";
 
 import { TypeRegion } from "../../../lib/type-mode.tsx";
-import { DocsField } from "../../content/ui/fields.tsx";
+import { DocsField } from "../../content/ui.ts";
 import type { Operation } from "../model/operation.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { MethodBadge } from "./method-badge.tsx";

@@ -1,5 +1,5 @@
 import { canonicalUrl, docsUrl, publicSlug } from "../../../lib/site-path.ts";
-import { flatPages, type Section } from "../../navigation/model/nav.ts";
+import { flatPages, type Section } from "../../navigation/model.ts";
 import { agentCard, agentSkillsIndex, skillFile } from "./agent-discovery.ts";
 import type { AgentSkill } from "./agent-discovery.ts";
 import { INDEX_LINE } from "./markdown-export.ts";

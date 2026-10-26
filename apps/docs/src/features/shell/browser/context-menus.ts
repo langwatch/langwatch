@@ -16,15 +16,8 @@ type PageMenu = {
 
 const menus = new WeakMap<HTMLElement, PageMenu>();
 
-/** The prerendered menu beside a trigger, moved out of its template into a popover once. */
-function pageMenu({ trigger }: { trigger: HTMLElement }): PageMenu | null {
-  const known = menus.get(trigger);
-  if (known) return known;
-  const template = trigger.parentElement?.querySelector("template");
-  const popover = template?.content.firstElementChild?.cloneNode(true);
-  if (!(popover instanceof HTMLElement)) return null;
-  const content = popover.querySelector<HTMLElement>('[role="menu"]');
-  if (!content) return null;
+/** Strips the template's inline state so the copy works as a popover menu. */
+function preparePopover({ content, popover }: { content: HTMLElement; popover: HTMLElement }) {
   popover.removeAttribute("style");
   popover.classList.add("docs-menu-popover");
   popover.popover = "auto";
@@ -34,25 +27,47 @@ function pageMenu({ trigger }: { trigger: HTMLElement }): PageMenu | null {
     item.id ||= `docs-page-menu-${position}`;
     item.tabIndex = -1;
   }
-  const menu: PageMenu = { trigger, popover, content, closedAt: 0 };
-  popover.addEventListener("toggle", (event) => {
-    const open = (event as ToggleEvent).newState === "open";
-    trigger.setAttribute("aria-expanded", String(open));
-    if (open) return;
-    menu.closedAt = performance.now();
-    highlight({ menu, item: null });
-    if (!document.activeElement || popover.contains(document.activeElement))
-      trigger.focus({ preventScroll: true });
-  });
-  content.addEventListener("keydown", (event) => onKey({ menu, event }));
-  content.addEventListener("pointermove", (event) => {
-    const item = event.target instanceof Element ? event.target.closest<HTMLElement>(ITEM) : null;
+}
+
+function onToggle({ event, menu }: { event: Event; menu: PageMenu }) {
+  const open = (event as ToggleEvent).newState === "open";
+  menu.trigger.setAttribute("aria-expanded", String(open));
+  if (open) return;
+  menu.closedAt = performance.now();
+  highlight({ menu, item: null });
+  if (!document.activeElement || menu.popover.contains(document.activeElement))
+    menu.trigger.focus({ preventScroll: true });
+}
+
+function itemAt({ event }: { event: Event }) {
+  return event.target instanceof Element ? event.target.closest<HTMLElement>(ITEM) : null;
+}
+
+function wireMenu({ menu }: { menu: PageMenu }) {
+  menu.popover.addEventListener("toggle", (event) => onToggle({ event, menu }));
+  menu.content.addEventListener("keydown", (event) => onKey({ menu, event }));
+  menu.content.addEventListener("pointermove", (event) => {
+    const item = itemAt({ event });
     if (item) highlight({ menu, item });
   });
-  content.addEventListener("click", (event) => {
-    const item = event.target instanceof Element ? event.target.closest<HTMLElement>(ITEM) : null;
+  menu.content.addEventListener("click", (event) => {
+    const item = itemAt({ event });
     if (item) choose({ menu, item });
   });
+}
+
+/** The prerendered menu beside a trigger, moved out of its template into a popover once. */
+function pageMenu({ trigger }: { trigger: HTMLElement }): PageMenu | null {
+  const known = menus.get(trigger);
+  if (known) return known;
+  const template = trigger.parentElement?.querySelector("template");
+  const popover = template?.content.firstElementChild?.cloneNode(true);
+  if (!(popover instanceof HTMLElement)) return null;
+  const content = popover.querySelector<HTMLElement>('[role="menu"]');
+  if (!content) return null;
+  preparePopover({ content, popover });
+  const menu: PageMenu = { trigger, popover, content, closedAt: 0 };
+  wireMenu({ menu });
   template?.after(popover);
   trigger.closest<HTMLElement>("[data-docs-menu-root]")?.setAttribute("data-mounted", "");
   menus.set(trigger, menu);

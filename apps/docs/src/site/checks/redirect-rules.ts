@@ -1,4 +1,4 @@
-import { matchRedirect } from "../../features/navigation/model/redirect-match.ts";
+import { matchRedirect } from "../../features/navigation/model.ts";
 import type { BuildIndex } from "./build-index.ts";
 import type { LinkIssue } from "./resolve.ts";
 

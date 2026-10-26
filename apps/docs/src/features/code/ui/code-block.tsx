@@ -2,8 +2,8 @@ import { Box, Flex, Text } from "@langwatch/design-system/primitives";
 import { FileCode, Terminal } from "lucide-react";
 import { z } from "zod";
 
+import { codeFilename, languageName } from "../model/languages.ts";
 import { CodeBody, CopyAction, sourceFromProps } from "./code-parts.tsx";
-import { codeFilename, languageName } from "./languages.ts";
 
 const TERMINAL_LANGUAGES = ["bash", "sh", "shell", "zsh", "console", "terminal", "shellscript"];
 

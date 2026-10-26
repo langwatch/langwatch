@@ -2,8 +2,8 @@ import path from "node:path";
 
 import type { Plugin } from "vite";
 
-import { SPEC_FILES } from "../../api-reference/compile/openapi.ts";
-import { changelogPath } from "../../releases/compile/releases.ts";
+import { SPEC_FILES } from "../../api-reference/compile.ts";
+import { changelogPath } from "../../releases/compile.ts";
 import { readStars } from "./github-stars.ts";
 import { buildNav } from "./nav.ts";
 

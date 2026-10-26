@@ -1,7 +1,9 @@
+import { startAgentChoice } from "../features/shell/browser.ts";
 /* Deferred reading enhancements, kept out of the bootstrap budget: speculative prefetch, the
    sidebar agent selection and the media island on pages that hold clips. */
 import type { PrefetchRequest } from "./navigation.ts";
-import "../features/shell/browser/agent-choice.ts";
+
+startAgentChoice();
 
 const MAX_IN_FLIGHT = 2;
 const HOVER_DWELL_MS = 80;

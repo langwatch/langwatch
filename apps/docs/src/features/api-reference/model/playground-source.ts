@@ -1,4 +1,4 @@
-import type { CodeSource } from "../../code/ui/code-parts.tsx";
+import type { CodeSource } from "../../code/model.ts";
 
 export function plainLines({ code }: { code: string }): string[] {
   return code

@@ -65,5 +65,41 @@
     "vite": "catalog:",
     "vitest": "catalog:",
     "yaml": "catalog:"
+  },
+  "langwatch": {
+    "layout": "app-features",
+    "features": {
+      "code": [],
+      "releases": [],
+      "content": [
+        "code",
+        "releases"
+      ],
+      "api-reference": [
+        "code",
+        "content"
+      ],
+      "navigation": [
+        "api-reference",
+        "content",
+        "releases"
+      ],
+      "discovery": [
+        "api-reference",
+        "code",
+        "content",
+        "navigation",
+        "releases"
+      ],
+      "search": [
+        "content",
+        "discovery",
+        "navigation"
+      ],
+      "shell": [
+        "navigation",
+        "search"
+      ]
+    }
   }
 }

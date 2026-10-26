@@ -4,8 +4,7 @@ import { Children, isValidElement, useState } from "react";
 import type { ReactNode } from "react";
 
 import { usePreference, writePreference } from "../../../lib/storage.ts";
-import { tabFamilies } from "../../code/model/language-family.ts";
-import { preferenceGroupFor } from "../../code/ui/languages.ts";
+import { preferenceGroupFor, tabFamilies } from "../../code/model.ts";
 
 /** Docs reading treatment: neutral labels, a 2px accent underline, 44px triggers. */
 export const readingTabList = {

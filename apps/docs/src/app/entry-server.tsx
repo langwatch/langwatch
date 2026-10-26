@@ -1,11 +1,14 @@
 import { renderToString } from "react-dom/server";
 import nav from "virtual:docs-nav";
 
-import { generateExample, initialBodyOf } from "../features/api-reference/model/codegen.ts";
-import { EXAMPLE_LANGUAGES } from "../features/api-reference/model/operation.ts";
-import type { HighlightedExamples } from "../features/api-reference/model/operation.ts";
-import { highlightLines } from "../features/code/compile/highlight.ts";
-import { headDescription } from "../features/discovery/compile/page-head.ts";
+import {
+  EXAMPLE_LANGUAGES,
+  generateExample,
+  type HighlightedExamples,
+  initialBodyOf,
+} from "../features/api-reference/model.ts";
+import { highlightLines } from "../features/code/compile.ts";
+import { headDescription } from "../features/discovery/compile.ts";
 import { App } from "./app.tsx";
 import { loadOperation, loadPage } from "./pages.ts";
 

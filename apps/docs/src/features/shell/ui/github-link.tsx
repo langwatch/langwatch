@@ -2,7 +2,7 @@ import { GitHubIcon } from "@langwatch/design-system/icons";
 import { Link, Text } from "@langwatch/design-system/primitives";
 import { Star } from "lucide-react";
 
-import type { SiteMeta } from "../../navigation/model/nav.ts";
+import type { SiteMeta } from "../../navigation/model.ts";
 
 const COUNT = new Intl.NumberFormat("en-GB");
 

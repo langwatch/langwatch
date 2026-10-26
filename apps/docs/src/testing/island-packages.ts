@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-/** Every package a browser island imports, following its relative imports through the source tree. */
+/**
+ * Every package a browser island imports, following its relative imports and the re-exports of
+ * feature entries through the source tree.
+ */
 export function islandPackages({ entry }: { entry: string }) {
   const packages = new Set<string>();
   const seen = new Set<string>();
@@ -10,7 +13,7 @@ export function islandPackages({ entry }: { entry: string }) {
     seen.add(file);
     const source = readFileSync(file, "utf8");
     for (const [, kind, specifier = ""] of source.matchAll(
-      /^import (type )?[^;]*?from "([^"]+)"/gms,
+      /^(?:import|export) (type )?[^;]*?from "([^"]+)"/gms,
     )) {
       if (kind) continue;
       if (specifier.startsWith(".")) visit(path.resolve(path.dirname(file), specifier));

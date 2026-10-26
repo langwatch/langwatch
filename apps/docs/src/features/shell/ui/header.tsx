@@ -4,7 +4,7 @@ import { Box, Button, Flex, IconButton, Link, Text } from "@langwatch/design-sys
 import { ArrowUpRight, Command, Menu as MenuIcon, Search } from "lucide-react";
 
 import { pagePath } from "../../../lib/site-path.ts";
-import { site } from "../../navigation/ui/site-nav.ts";
+import { site } from "../../navigation/ui.ts";
 import { GithubLink } from "./github-link.tsx";
 import { ThemeMenu } from "./theme-menu.tsx";
 

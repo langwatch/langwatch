@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseInline } from "../../navigation/model/inline.ts";
 import { CONTEXTUAL_OPTIONS } from "../../navigation/model/nav.ts";
-import { SiteAnnouncement } from "../../releases/ui/announcement.tsx";
+import { SiteAnnouncement } from "../ui/announcement.tsx";
 import { InlineContent } from "../ui/inline-content.tsx";
 import { LastUpdated } from "../ui/last-updated.tsx";
 import { PageHeader } from "../ui/page-header.tsx";

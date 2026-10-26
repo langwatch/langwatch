@@ -1,4 +1,5 @@
 import { slide } from "../../../lib/slide.ts";
+import { applyTheme } from "../../../lib/theme.ts";
 
 document.addEventListener("click", (event) => {
   const button = event.target instanceof Element ? event.target.closest("button") : null;
@@ -31,16 +32,7 @@ document.addEventListener("click", (event) => {
 function toggleTheme({ button }: { button: HTMLElement }) {
   const root = document.documentElement;
   const dark = !root.classList.contains("dark");
-  const apply = () => {
-    root.classList.toggle("dark", dark);
-    root.classList.toggle("light", !dark);
-    root.style.colorScheme = dark ? "dark" : "light";
-    try {
-      localStorage.setItem("theme", dark ? "dark" : "light");
-    } catch {
-      /* Storage is optional. */
-    }
-  };
+  const apply = () => applyTheme({ dark, choice: dark ? "dark" : "light" });
   if (
     !document.startViewTransition ||
     !matchMedia("(prefers-reduced-motion: no-preference)").matches

@@ -1,4 +1,4 @@
-import { EXAMPLE_LANGUAGES } from "../../api-reference/model/operation.ts";
+import { EXAMPLE_LANGUAGES } from "../../api-reference/model.ts";
 
 /**
  * How the site treats one authored key. `pinned` means the site implements exactly this value,

@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { build, loadEnv } from "vite";
 
-import { buildNav } from "../features/navigation/compile/nav.ts";
+import { buildNav } from "../features/navigation/compile.ts";
 import { appRoot, cacheRoot, docsRoot, publicRoot, readBuildOptions } from "../paths.ts";
 import { assertMaterializedAssets } from "./assets.ts";
 import { buildFingerprint, buildRecords } from "./build-inputs.ts";

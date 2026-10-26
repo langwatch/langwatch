@@ -5,7 +5,7 @@ import path from "node:path";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
-import { searchEntrySchema } from "../features/search/model/search-entry.ts";
+import { searchEntrySchema } from "../features/search/model.ts";
 
 /* A search entry is checked against the search model's own schema but kept as published,
    so a cached page and a freshly rendered one produce the same search-index.json bytes. */

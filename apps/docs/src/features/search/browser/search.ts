@@ -22,26 +22,39 @@ let state: "loading" | "ready" | "failed" = "loading";
 let notice = "";
 let opener: HTMLElement | null = null;
 
-/** The prerendered command bar, moved into the page once and reused for every open. */
-function commandBar(): Bar {
-  if (bar) return bar;
-  const dialog = fromTemplate({ id: "docs-search-dialog" }) as HTMLDialogElement;
-  const input = dialog.querySelector("input");
-  const results = dialog.querySelector<HTMLElement>("#docs-search-results");
-  if (!input || !results) throw new Error("The search template has no field or result list");
+/** Names the field for assistive technology and shows the platform's shortcut key. */
+function labelField({ dialog, input }: { dialog: HTMLDialogElement; input: HTMLInputElement }) {
   input.type = "search";
   input.setAttribute("aria-label", "Search the LangWatch docs");
   input.setAttribute("aria-controls", "docs-search-results");
   input.setAttribute("aria-autocomplete", "list");
-  if (/Mac|iPhone|iPad/.test(navigator.platform)) {
-    for (const hint of dialog.querySelectorAll(".docs-command-bar > div:last-of-type p"))
-      hint.textContent = hint.textContent?.replace("Ctrl", "⌘") ?? "";
-  }
-  const part = (name: string) => {
+  if (!/Mac|iPhone|iPad/.test(navigator.platform)) return;
+  for (const hint of dialog.querySelectorAll(".docs-command-bar > div:last-of-type p"))
+    hint.textContent = hint.textContent?.replace("Ctrl", "⌘") ?? "";
+}
+
+function partsOf({ dialog }: { dialog: HTMLDialogElement }) {
+  return (name: string) => {
     const element = dialog.querySelector<HTMLElement>(`[data-search-part="${name}"]`);
     if (!element) throw new Error(`The search template has no ${name} part`);
     return element;
   };
+}
+
+function onResultsHover(event: MouseEvent) {
+  const row = event.target instanceof Element ? event.target.closest("[data-index]") : null;
+  const position = Number(row?.getAttribute("data-index") ?? Number.NaN);
+  if (Number.isInteger(position) && position !== selected) select({ position });
+}
+
+function onResultsClick({ dialog, event }: { dialog: HTMLDialogElement; event: MouseEvent }) {
+  const target = event.target instanceof Element ? event.target.closest("a, button") : null;
+  if (target instanceof HTMLAnchorElement) dialog.close();
+  if (target instanceof HTMLButtonElement && target.dataset.searchAction)
+    void run({ id: target.dataset.searchAction });
+}
+
+function wireBar({ dialog, input, part, results }: Bar) {
   input.addEventListener("input", () => {
     selected = 0;
     notice = "";
@@ -53,21 +66,24 @@ function commandBar(): Bar {
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
   });
-  results.addEventListener("mousemove", (event) => {
-    const row = event.target instanceof Element ? event.target.closest("[data-index]") : null;
-    const position = Number(row?.getAttribute("data-index") ?? Number.NaN);
-    if (Number.isInteger(position) && position !== selected) select({ position });
-  });
-  results.addEventListener("click", (event) => {
-    const target = event.target instanceof Element ? event.target.closest("a, button") : null;
-    if (target instanceof HTMLAnchorElement) dialog.close();
-    if (target instanceof HTMLButtonElement && target.dataset.searchAction)
-      void run({ id: target.dataset.searchAction });
-  });
+  results.addEventListener("mousemove", onResultsHover);
+  results.addEventListener("click", (event) => onResultsClick({ dialog, event }));
   part("retry").addEventListener("click", () => void load());
   part("close").addEventListener("click", () => dialog.close());
+}
+
+/** The prerendered command bar, moved into the page once and reused for every open. */
+function commandBar(): Bar {
+  if (bar) return bar;
+  const dialog = fromTemplate({ id: "docs-search-dialog" }) as HTMLDialogElement;
+  const input = dialog.querySelector("input");
+  const results = dialog.querySelector<HTMLElement>("#docs-search-results");
+  if (!input || !results) throw new Error("The search template has no field or result list");
+  labelField({ dialog, input });
+  const built = { dialog, input, part: partsOf({ dialog }), results };
+  wireBar(built);
   document.body.append(dialog);
-  bar = { dialog, input, results, part };
+  bar = built;
   return bar;
 }
 
@@ -77,7 +93,9 @@ function select({ position }: { position: number }) {
   for (const row of bar.results.querySelectorAll("[data-index]")) {
     const current = row.getAttribute("data-index") === String(position);
     row.toggleAttribute("data-selected", current);
-    row.closest("li")?.toggleAttribute("aria-current", current);
+    const item = row.closest("li");
+    if (current) item?.setAttribute("aria-current", "true");
+    else item?.removeAttribute("aria-current");
   }
   bar.input.setAttribute("aria-activedescendant", rows.length ? `docs-command-${position}` : "");
   document.getElementById(`docs-command-${position}`)?.scrollIntoView({ block: "nearest" });

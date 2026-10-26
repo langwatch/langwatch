@@ -220,7 +220,7 @@ function schedule() {
   }, 2800);
 }
 
-document.addEventListener("pointerdown", (event) => {
+function onPointerDown(event: PointerEvent) {
   const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
   if (!pick || event.button !== 0) return;
   event.preventDefault();
@@ -230,8 +230,9 @@ document.addEventListener("pointerdown", (event) => {
   if (reel) Object.assign(reel, { goal: from, target: undefined });
   const sample = { time: event.timeStamp, y: event.clientY };
   drag = { id: event.pointerId, startY: event.clientY, from, moved: false, samples: [sample] };
-});
-document.addEventListener("pointermove", (event) => {
+}
+
+function onPointerMove(event: PointerEvent) {
   const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
   if (!pick || drag?.id !== event.pointerId) return;
   const dy = event.clientY - drag.startY;
@@ -241,54 +242,50 @@ document.addEventListener("pointermove", (event) => {
   pick.dataset.dragging = "";
   reel.position = drag.from - dy / WHEEL.stepPx;
   run({ turning: reel });
-});
-for (const type of ["pointerup", "pointercancel"]) {
-  document.addEventListener(type, (event) => {
-    const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
-    if (pick && event instanceof PointerEvent && drag?.id === event.pointerId)
-      release({ event, pick });
-  });
 }
-document.addEventListener(
-  "wheel",
-  (event) => {
-    const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
-    if (!pick || drag) return;
-    event.preventDefault();
-    const lines = [1, 33, 100][event.deltaMode] ?? 1;
-    const step = (event.deltaY * lines) / 100;
-    const gesture = wheeling;
-    clearTimeout(wheeling);
-    if (!motion.matches) {
-      wheeling = setTimeout(() => (wheeling = undefined), 200);
-      if (!gesture) turnTo({ pick, slot: CODING_AGENTS.indexOf(chosen) + Math.sign(step) });
-      return;
-    }
-    const turning = grab({ pick });
-    Object.assign(turning, { goal: turning.goal + step, tau: WHEEL.snapTau, target: undefined });
-    wheeling = setTimeout(() => {
-      wheeling = undefined;
-      turning.goal = Math.round(turning.goal);
-    }, 140);
-    run({ turning });
-  },
-  { passive: false },
-);
-document.addEventListener("change", (event) => {
+
+function onPointerEnd(event: Event) {
+  const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
+  if (pick && event instanceof PointerEvent && drag?.id === event.pointerId)
+    release({ event, pick });
+}
+
+function onWheel(event: WheelEvent) {
+  const pick = event.target instanceof Element ? event.target.closest<HTMLElement>(PICK) : null;
+  if (!pick || drag) return;
+  event.preventDefault();
+  const lines = [1, 33, 100][event.deltaMode] ?? 1;
+  const step = (event.deltaY * lines) / 100;
+  const gesture = wheeling;
+  clearTimeout(wheeling);
+  if (!motion.matches) {
+    wheeling = setTimeout(() => (wheeling = undefined), 200);
+    if (!gesture) turnTo({ pick, slot: CODING_AGENTS.indexOf(chosen) + Math.sign(step) });
+    return;
+  }
+  const turning = grab({ pick });
+  Object.assign(turning, { goal: turning.goal + step, tau: WHEEL.snapTau, target: undefined });
+  wheeling = setTimeout(() => {
+    wheeling = undefined;
+    turning.goal = Math.round(turning.goal);
+  }, 140);
+  run({ turning });
+}
+
+function onChange(event: Event) {
   const select = event.target;
   if (!(select instanceof HTMLSelectElement) || !select.closest(LAUNCHER)) return;
   manual = true;
   clearTimeout(timer);
   chosen = select.value;
   show();
-});
-document.addEventListener("pointerover", (event) => {
+}
+
+function onApproach(event: Event) {
   if (event.target instanceof Element && event.target.closest(LAUNCHER)) show();
-});
-document.addEventListener("focusin", (event) => {
-  if (event.target instanceof Element && event.target.closest(LAUNCHER)) show();
-});
-document.addEventListener("docs:navigated", () => {
+}
+
+function onNavigated() {
   if (reel) {
     cancelAnimationFrame(reel.frame);
     chosen = agentAt({ slot: reel.goal });
@@ -296,11 +293,25 @@ document.addEventListener("docs:navigated", () => {
   }
   show();
   schedule();
-});
-motion.addEventListener("change", () => {
+}
+
+function onMotionChange() {
   clearTimeout(timer);
   show();
   schedule();
-});
-show();
-schedule();
+}
+
+/** Wires the sidebar agent launcher: drag, wheel and select turn it; idle, it cycles. */
+export function startAgentChoice() {
+  document.addEventListener("pointerdown", onPointerDown);
+  document.addEventListener("pointermove", onPointerMove);
+  for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, onPointerEnd);
+  document.addEventListener("wheel", onWheel, { passive: false });
+  document.addEventListener("change", onChange);
+  document.addEventListener("pointerover", onApproach);
+  document.addEventListener("focusin", onApproach);
+  document.addEventListener("docs:navigated", onNavigated);
+  motion.addEventListener("change", onMotionChange);
+  show();
+  schedule();
+}

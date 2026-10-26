@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { z } from "zod/mini";
 
 import { ICONS, LOGO_ASSETS } from "../../../lib/icon-registry.ts";
-import type { Heading } from "../../content/compile/rehype-content.ts";
-import { pageMarkdown } from "../../discovery/compile/markdown-export.ts";
-import { trailOf, type NavItem, type Section } from "../../navigation/model/nav.ts";
+import type { Heading } from "../../content/compile.ts";
+import { pageMarkdown } from "../../discovery/compile.ts";
+import { type NavItem, type Section, trailOf } from "../../navigation/model.ts";
 import {
   searchEntrySchema,
   type PublishedSearchEntry,

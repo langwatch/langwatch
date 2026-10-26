@@ -4,7 +4,7 @@ import { Box, Flex, Link, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 
 import { sitePath } from "../../../lib/site-path.ts";
-import { site } from "../../navigation/ui/site-nav.ts";
+import { site } from "../../navigation/ui.ts";
 
 const FOOTER_GROUPS = [
   {

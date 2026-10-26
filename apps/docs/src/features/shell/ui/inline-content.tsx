@@ -1,7 +1,7 @@
 import { Link } from "@langwatch/design-system/primitives";
 
 import { sitePath } from "../../../lib/site-path.ts";
-import type { Inline } from "../../navigation/model/inline.ts";
+import type { Inline } from "../../navigation/model.ts";
 
 /** docs.json inline Markdown as markup; site links follow the build's base path. */
 export function InlineContent({ nodes }: { nodes: Inline[] }) {

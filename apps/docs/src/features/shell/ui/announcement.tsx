@@ -1,8 +1,8 @@
 import { Box, IconButton } from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 
-import type { Announcement } from "../../navigation/model/nav.ts";
-import { InlineContent } from "../../shell/ui/inline-content.tsx";
+import type { Announcement } from "../../navigation/model.ts";
+import { InlineContent } from "./inline-content.tsx";
 
 /** The docs.json banner, above the release update; dismissal is keyed by its content. */
 export function SiteAnnouncement({ announcement }: { announcement: Announcement | null }) {
