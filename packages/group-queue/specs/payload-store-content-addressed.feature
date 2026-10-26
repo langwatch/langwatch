@@ -42,7 +42,7 @@ Feature: GroupQueue content-addressed tiered payload store
   #     A missing blob completes the slot without the handler
   #     (recoverable via replay) — a fail-safe, never a wedge. A group parked past
   #     the lifecycle loses its blob the same way; replay recovers it.
-  #   - Retiring the LAST lease shortens the blob's expiry to a 1-hour grace
+  #   - Retiring the LAST lease shortens the blob's expiry to a 15-minute grace
   #     window rather than leaving the full 4-day backstop.
   #     Shortening an expiry is not deletion: any later take re-arms the 4-day
   #     backstop, so the release stays safe against a producer that wrote these
@@ -60,7 +60,7 @@ Feature: GroupQueue content-addressed tiered payload store
     And the inline tier ceiling is configured at 4 KiB
     And the S3 tier threshold is configured at 256 KiB
     And the blob TTL backstop is configured at 4 days
-    And the released-blob grace window is configured at 1 hour
+    And the released-blob grace window is configured at 15 minutes
 
   # ===========================================================================
   # content-addressed tiers
