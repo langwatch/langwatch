@@ -70,6 +70,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   .get("/", "getApiExperiments")
   .withQuery(listExperimentsQuerySchema)
   .withPermission("experiments:view")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withOutput(experimentsListResponseSchema)
   .withDocs({
     tags: EXPERIMENT_TAGS,
@@ -112,6 +113,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   .get("/:slug", "getApiExperimentsBySlug")
   .withParams(slugParamsSchema)
   .withPermission("experiments:view")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withOutput(experimentSummarySchema)
   .withDocs({
     tags: EXPERIMENT_TAGS,
@@ -136,8 +138,10 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   })
 
   .post("/", "postApiExperiments")
+  .keepsRecords()
   .withInput(createExperimentBodySchema)
   .withPermission("experiments:create")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withAudit("experiments.saveExperiment")
   .withOutput(createExperimentResponseSchema)
   .withDocs({

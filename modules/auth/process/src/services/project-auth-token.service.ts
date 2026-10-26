@@ -30,11 +30,11 @@ export class ProjectAuthTokenService {
    */
   async validateProjectAuthToken(input: {
     token: string | undefined;
-    forwardedFor: string | undefined;
+    callerAddress: string | null;
   }): Promise<{ projectSlug: string }> {
     if (!input.token) throw new ProjectMissingCredentialsError();
 
-    await this.countCall(callerKeyOf(input.forwardedFor));
+    await this.countCall(callerKeyOf(input.callerAddress));
     const resolved = await this.deps.apiKeys.findResolvedToken({ token: input.token });
     if (!resolved) throw new ProjectInvalidCredentialsError();
     // ADR-177 decision 7: an SDK is never told an aggregate's stored key is good to send with.

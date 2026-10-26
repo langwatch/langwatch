@@ -3,10 +3,12 @@
 # Implementation:
 #   sdks/typescript/src/cli/commands/ingestion/hook.ts                 (the hook command, shared by every agent)
 #   sdks/typescript/src/cli/commands/ingestion/hook-input.ts           (the payload the agent writes to its stdin)
+#   sdks/typescript/src/cli/commands/ingestion/end-process.ts          (ends the hook process inside its time budget)
 #   sdks/typescript/src/cli/commands/ingestion/git-context.ts          (what git says about the session's directory)
-#   sdks/typescript/src/cli/commands/ingestion/hook-state.ts           (the per-session fingerprint store)
+#   sdks/typescript/src/cli/utils/governance/hook-state.ts             (the per-session fingerprint store)
 #   sdks/typescript/src/cli/commands/ingestion/install.ts              (each tool's seam wired at install)
-#   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts  (the Claude Code and Codex hook files)
+#   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts  (the Claude Code, Codex and Copilot hook files)
+#   sdks/typescript/src/cli/utils/governance/shell-rc.ts               (the wrapper's persist offer, which writes the Copilot hook file)
 #   sdks/typescript/src/cli/utils/governance/opencode-plugin.ts        (the opencode plugin file)
 #   sdks/typescript/src/cli/utils/governance/telemetry-targets.ts      (logout removal)
 #
@@ -178,6 +180,12 @@ Rule: The hook reports the git identity of the session
     When another agent reports the same session id
     Then the second agent posts rather than reading the first one's fingerprint
 
+  @unit
+  Scenario: An isolated CLI config keeps its own session fingerprints
+    Given LANGWATCH_CLI_CONFIG names a config outside the home directory
+    When the hook records a session's fingerprint
+    Then the fingerprint is kept beside that config, not under the home directory
+
 Rule: The session's own name travels with its context
 
   Claude names every session: --name at launch, /rename mid-session, or its
@@ -270,6 +278,28 @@ Rule: The hook never disturbs the session
     Given a hook invocation whose telemetry endpoint is unreachable
     When the hook runs
     Then stdout stays empty and the exit code is zero
+
+  # A post given up at its own deadline still leaves the connection attempt
+  # open until the system abandons it, about ten seconds on, and that alone
+  # kept the process past the ten seconds every agent allows a hook.
+  @unit
+  Scenario: The hook process ends once its work is done, with a connection still open
+    Given a hook whose post was given up with its connection attempt still open
+    When the hook's work is done
+    Then the process ends itself with exit code zero and nothing on stdout
+
+  @unit
+  Scenario: The hook process ends inside the agent's hook timeout whatever it waits on
+    Given a hook still waiting on the collector when its time budget runs out
+    When the budget ends
+    Then the process ends with exit code zero and nothing on stdout
+    And the budget leaves room for the process to start inside the agent's ten seconds
+
+  @unit
+  Scenario: The hook process ends with exit code zero when its work fails
+    Given a hook whose work fails before it posts anything
+    When the failure reaches the process
+    Then the process ends itself with exit code zero
 
 Rule: A tool pinned to a project reports with the pinned key
 
@@ -560,3 +590,188 @@ Rule: A revoked ingest key heals itself
     Given an opencode plugin whose hook command cannot be spawned
     When a session event reaches it
     Then the event handler resolves and nothing is thrown
+
+Rule: Copilot reports through one hook file LangWatch owns
+  ADR-039 §Extension #3. The Copilot CLI and Copilot Chat in VS Code both load
+  every file in ~/.copilot/hooks, so LangWatch writes its own file there and
+  never edits the user's. The captured payloads live in
+  sdks/typescript/src/cli/commands/ingestion/__tests__/fixtures/copilot-hook-payloads.json.
+
+  @unit
+  Scenario: A VS Code Copilot hook payload reads like Claude Code's
+    Given the hook payloads captured from VS Code Copilot Chat
+    When each payload is read
+    Then it yields the session id, the directory and Claude Code's event name
+
+  @unit
+  Scenario: A Copilot CLI hook payload yields its session id and directory
+    Given the hook payloads captured from the Copilot CLI, which spell the session id sessionId
+    When each payload is read
+    Then it yields the session id and the directory
+
+  @unit
+  Scenario: Installing copilot writes LangWatch's own hook file
+    Given a Copilot hooks folder without the LangWatch file
+    When the copilot ingestion install runs twice
+    Then exactly one LangWatch hook file is present
+    And it runs the hook command for copilot on sessionStart and agentStop
+    And each entry carries the command for both bash and PowerShell, so it runs on Windows too
+
+  @unit
+  Scenario: The Copilot hook file follows COPILOT_HOME
+    Given COPILOT_HOME points at another folder
+    When the copilot ingestion install runs
+    Then the LangWatch hook file is written under that folder's hooks directory
+
+  @unit
+  Scenario: The user's own Copilot hook files are never touched
+    Given a Copilot hooks folder holding a hook file the user wrote
+    When the copilot ingestion install runs and logout then removes the telemetry targets
+    Then the user's hook file is unchanged throughout
+    And the LangWatch hook file is gone after logout
+
+  # Running the LangWatch command does not make a file LangWatch's: only a file
+  # holding nothing but LangWatch's own entries is, so no user hook is lost.
+  @unit
+  Scenario: A langwatch.json the user wrote around the LangWatch command is never rewritten or removed
+    Given a Copilot langwatch.json that runs the LangWatch hook command beside the user's own hooks
+    When the copilot ingestion install runs and logout then removes the telemetry targets
+    Then the file is unchanged throughout
+    And logout does not offer to remove it
+
+  @unit
+  Scenario: A langwatch.json the CLI cannot read is never written over
+    Given a Copilot langwatch.json that exists but cannot be read
+    When the copilot ingestion install runs
+    Then it fails naming the file
+    And the file is left exactly as it was
+
+  @unit
+  Scenario: A Copilot hook file holding only LangWatch's entries is brought up to date
+    Given a langwatch.json an older CLI wrote, holding only LangWatch's entries in another shape
+    When the copilot ingestion install runs
+    Then the file is rewritten to the current LangWatch hook file
+
+  # A user's file at LangWatch's path means Copilot sessions never report their
+  # repository, so saying "wired" and nothing else would hide that for good.
+  @unit
+  Scenario: Instrumenting Copilot over the user's langwatch.json says repository linking is off
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file does not run the LangWatch hook command
+    When `langwatch instrument copilot` or `langwatch instrument code` runs
+    Then the file is left exactly as it was
+    And the user is told the file is not LangWatch's and was left alone
+    And that Copilot sessions will not report their repository or branch
+    And to rename the file and run the same command again
+
+  # A user's file that runs the LangWatch hook command itself still reports
+  # each session's repository and branch, so saying linking is off would be
+  # wrong, and asking them to rename it would cost them their own hooks.
+  @unit
+  Scenario: A user's langwatch.json that runs the LangWatch hook is not reported as turning linking off
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file runs the LangWatch hook command for copilot beside hooks of the user's own
+    When `langwatch instrument copilot`, the copilot wrapper or the copilot ingestion install runs
+    Then the file is left exactly as it was
+    And the user is not told repository linking is off
+    And the ingestion install does not say a LangWatch hook file was added
+
+  # The user may launch the CLI by its full path, through npx, or the way the
+  # CLI writes itself into codex (the node binary and the CLI's entry script).
+  # Each still runs the hook; a different program whose name only starts with
+  # langwatch does not.
+  @unit
+  Scenario Outline: A user's langwatch.json running the hook by path or npx is not reported as turning linking off
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file runs `<command>` on sessionStart
+    When the copilot hook file is asserted
+    Then the file is reported as the user's own file that runs the LangWatch hook
+    And the file is left exactly as it was
+
+    Examples:
+      | launcher           | command                                                                                         |
+      | an absolute path   | /opt/homebrew/bin/langwatch ingest hook copilot                                                 |
+      | a quoted path      | "/Users/me/My Tools/langwatch" ingest hook copilot                                              |
+      | npx                | npx langwatch ingest hook copilot                                                               |
+      | npx with a version | npx -y langwatch@1.19.0 ingest hook copilot                                                     |
+      | node and the entry | /usr/local/bin/node /usr/local/lib/node_modules/langwatch/dist/cli/index.js ingest hook copilot |
+
+  @unit
+  Scenario Outline: A user's langwatch.json running another program named like langwatch still gets the notice
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file runs `<command>` on sessionStart
+    When the copilot hook file is asserted
+    Then the file is reported as not LangWatch's, with repository linking off
+
+    Examples:
+      | command                                             |
+      | /opt/homebrew/bin/langwatch-foo ingest hook copilot |
+      | npx langwatch-foo ingest hook copilot               |
+      | npx @acme/langwatch ingest hook copilot             |
+      | langwatch ingest hook claude-code                   |
+
+  @unit
+  Scenario: The copilot ingestion install reports the user's langwatch.json it left alone
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file does not run the LangWatch hook command
+    When the copilot ingestion install runs
+    Then the report says the file is not LangWatch's and repository linking is off
+    And it does not say a LangWatch hook file was added
+
+  # A user who only ever runs `langwatch copilot` or `langwatch code` never runs
+  # the install, so the wrapper's offer to keep capturing writes the file too.
+  # Its question names the file, because a bare Enter is a yes.
+  @unit
+  Scenario: Starting Copilot through the wrapper writes the LangWatch hook file
+    Given a Copilot hooks folder without the LangWatch file
+    When the user says yes to the offer `langwatch copilot` or `langwatch code` makes to keep capturing
+    Then the question named the LangWatch hook file before the answer
+    And the LangWatch hook file runs the hook command for copilot on sessionStart and agentStop
+
+  @unit
+  Scenario: The wrapper's offer never promises a hook file it will not write
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file does not run the LangWatch hook command
+    When the user says yes to the offer the copilot wrapper makes to keep capturing
+    Then the question did not name the hook file
+    And the file is left exactly as it was
+    And the wrapper says the file is not LangWatch's and repository linking is off
+
+  @unit
+  Scenario: Declining the wrapper's offer writes no Copilot hook file
+    Given a Copilot hooks folder without the LangWatch file
+    When the user answers no to the offer the copilot wrapper makes to keep capturing
+    Then no LangWatch hook file is written
+
+  @unit
+  Scenario: A device that persisted Copilot capture earlier still gets the hook file
+    Given a scoped copilot function persisted before the wrapper wrote the hook file
+    When the wrapper re-asserts that device's telemetry wiring
+    Then the LangWatch hook file is written without asking again
+
+  @unit
+  Scenario: A login re-asserts the Copilot hook file where Copilot capture is persisted
+    Given a scoped copilot function persisted for this login and no LangWatch hook file
+    When a new login refreshes the telemetry wiring
+    Then the LangWatch hook file is written
+
+  @unit
+  Scenario: The copilot record declares the copilot agent and the span session id
+    Given a Copilot hook invocation inside a git repository
+    When the hook runs
+    Then one record is posted declaring the agent "copilot"
+    And it carries the session id from the payload, which is the conversation id on Copilot's spans
+
+  @unit
+  Scenario: A Copilot hook posts with the personal key of the surface that ran it
+    Given personal ingest keys for copilot_cli and copilot_vscode
+    When the hook runs from the Copilot CLI, which sets COPILOT_CLI
+    And the hook runs from VS Code, which does not
+    Then the first posts with the copilot_cli key
+    And the second posts with the copilot_vscode key
+
+  @unit
+  Scenario: Every agent's hook wiring comes from one per-agent table
+    Given the per-agent table that names each agent's tool slug, server agent id, key source types, session id source and hook target
+    When the hooks are installed and run for Claude Code, Codex and opencode
+    Then their hook files, records and key lookups are the same as before the table

@@ -265,7 +265,10 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           };
         })
         .onWake((state, ctx) => {
-          const due = drainDue(state, ctx.at);
+          // Drain everything overdue by the handling instant, not only what was
+          // due by the slot this wake was armed for: a late wake settles the
+          // whole backlog in one commit instead of one boundary per re-arm.
+          const due = drainDue(state, Math.max(ctx.at, ctx.now));
           return {
             state: due.state,
             intents: [

@@ -70,6 +70,12 @@ Feature: Composing durable coding-agent session processing
     Then the project is recorded as having seen coding-agent activity
 
   @unit
+  Scenario: A helper-thread session stamps its project too
+    Given durable coding-agent session processing composed over a project seam
+    When a folded helper-thread session is stored
+    Then the project is recorded as having seen coding-agent activity
+
+  @unit
   Scenario: The worker mounts the pipeline rather than being handed one
     Given a worker graph composed with no coding-agent capability passed in
     When the graph is composed

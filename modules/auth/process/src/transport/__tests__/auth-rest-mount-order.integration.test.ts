@@ -6,6 +6,8 @@
 import { publicRoute } from "@langwatch/api/access";
 import {
   BearerIdentity,
+  bindMiddlewareContext,
+  callerAddressContext,
   MANAGEMENT_API_VERSION,
   defineRestRouter,
   RestHost,
@@ -40,11 +42,13 @@ const cliPlaneRest = defineRestRouter(CliPlaneApi)
   .withOutput(z.object({ plane: z.string() }))
   .handle(({ app }) => app.bootstrap())
   .post("/api/auth/cli/device-code", "startCliDeviceCode")
+  .keepsRecords()
   .withAccess(CLI_PLANE_DOOR)
   .withOutput(z.object({ plane: z.string() }))
   .withoutAudit("test route")
   .handle(({ app }) => app.deviceCode())
   .post("/api/auth/cli/project-key", "readCliProjectKey")
+  .keepsRecords()
   .withAccess(CLI_PLANE_DOOR)
   .withOutput(z.object({ plane: z.string() }))
   .withoutAudit("test route")
@@ -75,6 +79,7 @@ function mountedInInstallOrder() {
     },
     bearers: () => closed,
     audit: { record: async () => {} },
+    middlewareContext: [bindMiddlewareContext(callerAddressContext, () => null)],
   });
   host.mount(authRest.router(), () => door);
   host.mount(cliPlaneRest.router(), () => ({

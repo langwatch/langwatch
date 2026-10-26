@@ -2,6 +2,8 @@
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { nowInstant } from "@langwatch/time";
 
+import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
+
 type Joined = Pick<
   NurturingSignalOf<"invite_accepted">,
   "userId" | "organizationId" | "organizationName"
@@ -59,7 +61,7 @@ export function fireSsoAutoAdded({
         has_prompts: false,
         has_simulations: false,
         has_subscription: false,
-        createdAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
+        createdAt: unixSecondsOf(nowInstant().epochMilliseconds),
       },
     },
     ...joinedCalls({ joined: signal, event: "joined_via_sso" }),

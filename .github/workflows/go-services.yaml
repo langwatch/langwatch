@@ -80,6 +80,13 @@ jobs:
           # lives under .github/. Checking out the rest of the tree is pure
           # runner time.
           sparse-checkout: .github
+      # dorny diffs a pull request from the event's base commit, which can be
+      # older than the main this merge commit is built on, and so counts main's
+      # newer commits as changed. Diff from the merge commit's first parent.
+      - name: Diff from the main the merge commit is built on
+        if: github.event_name == 'pull_request'
+        id: diff-base
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/pull-request-diff-base.sh" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name != 'workflow_dispatch'
         id: filter
@@ -87,6 +94,7 @@ jobs:
           # Empty: diff with git, never the files API, which stops at 3,000
           # files (specs/ci/path-filters.feature).
           token: ""
+          base: ${{ steps.diff-base.outputs.sha }}
           filters: |
             service:
               - 'services/aigateway/**'

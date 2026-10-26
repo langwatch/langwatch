@@ -86,6 +86,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
   .post("/:slug/run", "postApiExperimentsBySlugRun")
+  .keepsRecords()
   .withParams(slugParamsSchema)
   // The body is read unparsed under any Content-Type, as main read it: an
   // empty one is a full run, malformed JSON is a 400 in this family's own
@@ -93,6 +94,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withPermission("evaluations:create")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withoutAudit("run, not a change")
   .withResponse("negotiated", {})
   .withDocs({
@@ -141,6 +143,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/runs", "getApiExperimentsRuns")
   .withQuery(listRunsQuerySchema)
   .withPermission("evaluations:view")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .responds({ 200: listRunsResponseSchema, 400: runRefusalSchema })
   .withDocs({
     summary: "List runs of an experiment",
@@ -166,6 +169,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .get("/runs/:runId", "getApiExperimentsRunsByRunId")
   .withParams(runIdParamsSchema)
   .withPermission("evaluations:view")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withOutput(runStatusResponseSchema)
   .withDocs({
     summary: "Poll a run",
@@ -184,6 +188,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withParams(runIdParamsSchema)
   .withQuery(runResultsQuerySchema)
   .withPermission("evaluations:view")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withOutput(runResultsResponseSchema)
   .withDocs({
     summary: "Read run results",
@@ -208,6 +213,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withParams(slugParamsSchema)
   .withQuery(workbenchStateQuerySchema)
   .withPermission("experiments:view")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withOutput(workbenchStateAnswerSchema)
   .withDocs({
     summary: "Read an experiment's setup",
@@ -228,9 +234,11 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── PUT /:slug/workbench-state ───────────────────────────────────────
   .put("/:slug/workbench-state", "putApiExperimentsBySlugWorkbenchState")
+  .keepsRecords()
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
   .withPermission("experiments:update")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withAudit("experiments.saveEvaluationsV3")
   .withOutput(saveWorkbenchStateResponseSchema)
   .withDocs({
@@ -264,6 +272,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withParams(slugParamsSchema)
   .withQuery(listVersionsQuerySchema)
   .withPermission("experiments:view")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withOutput(listWorkbenchVersionsResponseSchema)
   .withDocs({
     summary: "List an experiment's versions",
@@ -284,8 +293,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   // ── POST /:slug/versions/:version/restore ────────────────────────────
   .post("/:slug/versions/:version/restore", "postApiExperimentsBySlugVersionsByVersionRestore")
+  .keepsRecords()
   .withParams(slugVersionParamsSchema)
   .withPermission("experiments:update")
+  .withLegacyKeyScope("legacy_project_key_experiments")
   .withAudit("experiments.restoreWorkbenchVersion")
   .withInput(restoreWorkbenchVersionBodySchema)
   .withOutput(restoreWorkbenchVersionResponseSchema)

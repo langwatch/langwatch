@@ -9,5 +9,6 @@ export type {
   ListedRun,
   ListedWork,
   QueueSendOptions,
+  QueueSendResult,
 } from "./queue.types.ts";
-export { resolveDeduplicationStrategy } from "./queue.types.ts";
+export { resolveDeduplicationStrategy, sendEach } from "./queue.types.ts";

@@ -23,6 +23,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
@@ -36,6 +37,7 @@
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@opentelemetry/api": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },

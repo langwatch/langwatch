@@ -53,7 +53,7 @@ export { eventIdempotencyKey } from "./commands/idempotency-key.ts";
 export { AggregateTypeSchema, type AggregateType } from "./domain/aggregateType.ts";
 export { createEventCatalogue, defineAggregate, EventCatalogue } from "./domain/definitions.ts";
 export type { AggregateDefinition, EventDefinition } from "./domain/definitions.ts";
-export type { PipelineEventSchema } from "./domain/eventSchemas.ts";
+export type { ParsingSchema, PipelineEventSchema } from "./domain/eventSchemas.ts";
 export type { TenantId } from "./domain/tenantId.ts";
 export { createTenantId, TenantIdSchema } from "./domain/tenantId.ts";
 export type { Event, EventType, Projection } from "./domain/types.ts";
@@ -174,6 +174,9 @@ export type {
   EventSubscriberContext,
   EventSubscriberDefinition,
   EventSubscriberOptions,
+  PeerBatchSubscriberDefinition,
+  PeerEventSubscriberDefinition,
+  PeerSubscriberBatchItem,
   PeerSubscriberContext,
   PeerSubscriberDefinition,
   PeerSubscriberEnqueueOptions,
@@ -197,11 +200,6 @@ export { EventUtils } from "./utils/event.utils.ts";
 export * from "./deferred.ts";
 export * from "./disabledPipeline.ts";
 export * from "./mapCommands.ts";
-export {
-  NOOP_EVENT_SOURCING_METRICS,
-  PROMETHEUS_EVENT_SOURCING_METRICS,
-  type EventSourcingStoreMetrics,
-} from "./metrics.ts";
 export * from "./parseErrorText.ts";
 export * from "./pipeline/processBuilder.ts";
 export * from "./pipeline/processManagerDefinition.ts";

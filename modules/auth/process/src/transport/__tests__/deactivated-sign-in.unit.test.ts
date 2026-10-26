@@ -25,6 +25,7 @@ function repoAnswering(
   deactivatedAt: Instant | null,
   signupConfirmationPending = false,
   lastLoginAt: Instant | null = nowInstant(),
+  passwordResetRequiredAt: Instant | null = null,
 ) {
   const getUserForHooks = vi.fn(async () => ({
     id: "user-1",
@@ -35,6 +36,7 @@ function repoAnswering(
     signupConfirmationPending,
     emailVerified: true,
     lastLoginAt,
+    passwordResetRequiredAt,
   }));
   const findFederatedAccountsForUser = vi.fn(async () => [
     { providerId: "auth0", accountId: "waad|acme|sam" },
@@ -151,6 +153,36 @@ describe("the before-session-create hook", () => {
         await expect(attempt(pending.repo)).resolves.toBe(false);
         await expect(attempt(confirmed.repo)).resolves.toBeUndefined();
       });
+    });
+  });
+
+  describe("given a user whose password is marked as requiring a reset", () => {
+    type MintContext = NonNullable<Parameters<ReturnType<typeof createBeforeSessionCreateHook>>[1]>;
+    const marked = () => repoAnswering(null, false, nowInstant(), nowInstant()).repo;
+    const mintOn = (path: string) =>
+      createBeforeSessionCreateHook({
+        sessionClaims: { identity: identityAnswering(null).identity, evidence: NO_CLAIMS.evidence },
+        repo: marked(),
+        collaborators: CONTINUING,
+      })(sessionFor("user-1"), createApiFixture<MintContext>({ path }));
+
+    /** @scenario "A correct password for a marked user opens no session" */
+    it("refuses the password session with the code the sign-in screen reads", async () => {
+      await expect(mintOn("/sign-in/email")).rejects.toMatchObject({
+        body: { code: "PASSWORD_RESET_REQUIRED" },
+      });
+    });
+
+    /** @scenario "A marked user still signs in through a provider or a passkey" */
+    it("lets provider, single sign-on and passkey sessions through", async () => {
+      await expect(mintOn("/callback/google")).resolves.not.toBe(false);
+      await expect(mintOn("/sso/callback/acme")).resolves.not.toBe(false);
+      await expect(mintOn("/passkey/verify-authentication")).resolves.not.toBe(false);
+    });
+
+    /** @scenario "The session opened by a completed reset is not refused by the mark" */
+    it("lets the session a completed reset opens through", async () => {
+      await expect(mintOn("/reset-password")).resolves.not.toBe(false);
     });
   });
 

@@ -1,0 +1,131 @@
+---
+title: OpenRouter Broadcast Integration
+sidebarTitle: OpenRouter Broadcast
+description: Send a trace of every OpenRouter request to LangWatch with OpenRouter Broadcast, with no SDK or code change in your application.
+keywords: openrouter, openrouter broadcast, llm gateway, opentelemetry, otel, otlp, tracing, langwatch
+---
+
+[OpenRouter Broadcast](https://openrouter.ai/docs/guides/features/broadcast) sends a trace of each API request you make through OpenRouter to the observability destinations you configure. Traces are sent after the request completes, so Broadcast adds no latency to your API responses.
+
+LangWatch receives these traces through OpenRouter's generic [OpenTelemetry Collector](https://openrouter.ai/docs/guides/features/broadcast/otel-collector) destination, which exports to any OTLP/HTTP backend. LangWatch is not a named destination in OpenRouter yet, so you configure that generic destination with the LangWatch endpoint and your API key.
+
+<Info>
+This page is for OpenRouter's server-side Broadcast. To trace OpenRouter calls from your own Go code instead, see [OpenRouter (Go)](/integration/go/integrations/openrouter).
+</Info>
+
+## Prerequisites
+
+- An OpenRouter account. Broadcast can be set up for your user or, by an admin, for an organization.
+- A LangWatch API key, from your project settings.
+
+## Setup
+
+<Steps>
+<Step title="Enable Broadcast in OpenRouter">
+
+In OpenRouter, go to [Settings > Observability](https://openrouter.ai/settings/observability) and turn on **Enable Broadcast**.
+
+</Step>
+<Step title="Configure the OpenTelemetry Collector destination">
+
+Click the edit icon next to **OpenTelemetry Collector** and enter:
+
+- **Endpoint**: `https://app.langwatch.ai/api/otel/v1/traces`
+- **Headers**:
+
+```json
+{
+  "Authorization": "Bearer <LANGWATCH_API_KEY>"
+}
+```
+
+Replace `<LANGWATCH_API_KEY>` with your LangWatch API key. OpenRouter encrypts destination credentials before storing them.
+
+**Self-hosted LangWatch:** replace `https://app.langwatch.ai` with the URL of your own instance, for example `https://langwatch.example.com/api/otel/v1/traces`. OpenRouter sends traces from its own servers, so the endpoint must be reachable from the public internet.
+
+</Step>
+<Step title="Test and save">
+
+Click **Test Connection**. OpenRouter only saves the destination when the test passes.
+
+</Step>
+<Step title="Send a test request">
+
+Make a request through OpenRouter:
+
+```bash
+curl https://openrouter.ai/api/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -d '{
+    "model": "openai/gpt-5-mini",
+    "messages": [{ "role": "user", "content": "Hello from OpenRouter" }]
+  }'
+```
+
+</Step>
+<Step title="See the trace in LangWatch">
+
+Open your project in LangWatch. The trace for the request appears in the traces list.
+
+</Step>
+</Steps>
+
+## What OpenRouter sends
+
+According to the [Broadcast documentation](https://openrouter.ai/docs/guides/features/broadcast#trace-data), each trace includes:
+
+- The input messages and the model output, with multimodal content stripped.
+- Token usage: prompt, completion and total tokens.
+- The total cost of the request.
+- Timing: start time, end time and latency.
+- The model slug and the provider that served the request.
+- Whether tools were included in the request and whether tool calls were made.
+
+The OpenTelemetry Collector destination sends these as OTLP/HTTP with JSON encoding. Model, token usage and cost use the GenAI semantic conventions (`gen_ai.*`), and the prompt and completion are on the generation span.
+
+## Sessions, users and metadata
+
+OpenRouter reads these optional fields from the request body and adds them to the trace:
+
+| Request field | Span attribute | Use |
+| --- | --- | --- |
+| `session_id` (or the `x-session-id` header) | `session.id` | Group related requests, such as a conversation or an agent run. Up to 256 characters. |
+| `user` | `user.id` | Associate the trace with an end user. Up to 128 characters. |
+| `trace` | `trace.metadata.*` | Any JSON object of custom metadata. `environment` becomes `trace.metadata.environment`. |
+
+A few keys inside `trace` have a fixed meaning for the OpenTelemetry Collector destination:
+
+| Key | Maps to |
+| --- | --- |
+| `trace_id` | Trace ID. Use the same value across requests to group them into one trace. |
+| `trace_name` | Name of the root span. |
+| `span_name` | Name of intermediate spans. |
+| `generation_name` | Name of the LLM generation span. |
+| `parent_span_id` | Parent span ID, to link the OpenRouter trace to a span from your own tracing. |
+
+Example request body:
+
+```json
+{
+  "model": "openai/gpt-5-mini",
+  "messages": [{ "role": "user", "content": "Hello!" }],
+  "user": "user_12345",
+  "session_id": "session_abc",
+  "trace": {
+    "trace_name": "Chat Handler",
+    "generation_name": "Generate Response",
+    "environment": "staging"
+  }
+}
+```
+
+## Destination options
+
+These OpenRouter settings apply per destination:
+
+- **Privacy Mode** removes the input messages and the output from traces. Tokens, cost, timing, model and custom metadata are still sent.
+- **Sampling rate** sends a share of traces, for example `0.5` for about half. When you send a `session_id`, every trace in a session is kept or dropped together.
+- **API key filtering** sends only traces from the API keys you select, and never from keys you exclude.
+
+Once traces reach LangWatch, your [Data Privacy](/platform/data-privacy) rules apply to them.

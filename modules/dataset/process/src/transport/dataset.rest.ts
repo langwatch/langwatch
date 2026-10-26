@@ -147,6 +147,7 @@ export function createDatasetRest(): Readonly<{
       .get("/", "getApiDataset")
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
+      .withLegacyKeyScope("legacy_project_key_experiments")
       .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestListResponseSchema)
       .withDocs({
@@ -178,6 +179,7 @@ export function createDatasetRest(): Readonly<{
       // still implies `:create` through the RBAC hierarchy, so every role and
       // key that could create a dataset yesterday still can.
       .post("/", "postApiDataset")
+      .keepsRecords()
       .withAudit("dataset.upsert")
       .withInput(datasetRestCreateSchema)
       .withPermission("datasets:create")
@@ -206,6 +208,7 @@ export function createDatasetRest(): Readonly<{
       // Rows live inside a dataset; adding them mutates that dataset —
       // `:update`, not `:create`.
       .post("/:slugOrId/records", "postApiDatasetBySlugOrIdRecords")
+      .keepsRecords()
       .withAudit("datasetRecord.create")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestBatchCreateRecordsSchema)
@@ -228,6 +231,7 @@ export function createDatasetRest(): Readonly<{
       // The legacy spelling of the batch-records route above; same grain, and
       // the same application operation, so the two can never disagree.
       .post("/:datasetSlug/entries", "postApiDatasetBySlugEntries")
+      .keepsRecords()
       .withAudit("datasetRecord.create")
       .withParams(datasetRestSlugParamsSchema)
       .withInput(datasetRestLegacyEntriesSchema)
@@ -249,6 +253,7 @@ export function createDatasetRest(): Readonly<{
       // A dataset is built from a confirmed `dataset_import` file; the bytes never
       // pass through here (ADR-158 §6). Preparation runs in the background.
       .post("/imports", "postApiDatasetImports")
+      .keepsRecords()
       .withAudit("dataset.createFromStoredObject")
       .withInput(datasetRestImportSchema)
       .withPermission("datasets:create")
@@ -263,6 +268,7 @@ export function createDatasetRest(): Readonly<{
       )
 
       .post("/:slugOrId/imports", "postApiDatasetBySlugOrIdImports")
+      .keepsRecords()
       .withAudit("dataset.appendStoredObject")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestAppendImportSchema)
@@ -279,6 +285,7 @@ export function createDatasetRest(): Readonly<{
       // Deprecated, time-boxed exception to "no bytes": the Python SDK still posts
       // files here. Both retire in the next release (ADR-158 §8).
       .post("/upload", "postApiDatasetUpload")
+      .keepsRecords()
       .withAudit("dataset.createFromStoredObject")
       .withMultipart({ fields: datasetRestUploadFieldsSchema, files: { file: { required: true } } })
       .withBodyLimit(uploadBodyLimit)
@@ -298,6 +305,7 @@ export function createDatasetRest(): Readonly<{
       )
 
       .post("/:slugOrId/upload", "postApiDatasetBySlugOrIdUpload")
+      .keepsRecords()
       .withAudit("dataset.appendStoredObject")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withMultipart({
@@ -322,6 +330,7 @@ export function createDatasetRest(): Readonly<{
       // Deprecated, the same time-boxed exception as the /upload pair: the posted
       // file is stored as a dataset attachment. Retires in the next release (ADR-158 §8).
       .post("/attachments", "postApiDatasetAttachments")
+      .keepsRecords()
       .withAudit("dataset.createAttachmentUpload")
       .withQuery(datasetRestAttachmentQuerySchema)
       .withMultipart({
@@ -364,6 +373,7 @@ export function createDatasetRest(): Readonly<{
       // The file's bytes never pass through here: the answer is the signed
       // address they are sent to, within the organization's per-file limit.
       .post("/attachments/uploads", "postApiDatasetAttachmentsUploads")
+      .keepsRecords()
       .withAudit("dataset.createAttachmentUpload")
       .withInput(datasetRestAttachmentUploadSchema)
       .withRateLimit({ requests: ATTACHMENT_UPLOADS_PER_MINUTE, seconds: 60 })
@@ -387,6 +397,7 @@ export function createDatasetRest(): Readonly<{
       .get("/:slugOrId", "getApiDatasetBySlugOrId")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withPermission("datasets:view")
+      .withLegacyKeyScope("legacy_project_key_experiments")
       .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestDetailResponseSchema)
       .withDocs({
@@ -415,6 +426,15 @@ export function createDatasetRest(): Readonly<{
       // record onto the new set, so the shape of the whole dataset follows the
       // payload — that is administering a dataset, which is what `:manage` names.
       .patch("/:slugOrId", "patchApiDatasetBySlugOrId")
+      // New column types re-map every record, which drops the values of a column left out.
+      .withConfirmation({
+        resource: "dataset",
+        action: "edit",
+        idParam: "slugOrId",
+        when: (input) => input.columnTypes !== undefined,
+        name: async ({ app, projectId, id }) =>
+          (await app.findBySlugOrId({ slugOrId: id, projectId }))?.name,
+      })
       .withAudit("dataset.upsert")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestUpdateSchema)
@@ -450,6 +470,13 @@ export function createDatasetRest(): Readonly<{
       .withAudit("dataset.deleteById")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withPermission("datasets:manage")
+      .withConfirmation({
+        resource: "dataset",
+        action: "delete",
+        idParam: "slugOrId",
+        name: async ({ app, projectId, id }) =>
+          (await app.findBySlugOrId({ slugOrId: id, projectId }))?.name,
+      })
       .withOutput(datasetRestArchivedSchema)
       .withDocs({ description: "Archive a dataset (soft-delete)" })
       .handle(async ({ app, input, scope }) =>
@@ -460,6 +487,7 @@ export function createDatasetRest(): Readonly<{
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
+      .withLegacyKeyScope("legacy_project_key_experiments")
       .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestRecordPageSchema)
       .withDocs({
@@ -485,6 +513,7 @@ export function createDatasetRest(): Readonly<{
       .withParams(datasetRestSlugParamsSchema)
       .withQuery(datasetRestPaginationQuerySchema)
       .withPermission("datasets:view")
+      .withLegacyKeyScope("legacy_project_key_experiments")
       .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestRecordPageSchema)
       .withDocs({
@@ -505,6 +534,7 @@ export function createDatasetRest(): Readonly<{
 
       // 201 when the record did not exist yet and was created, 200 when it was updated.
       .patch("/:slugOrId/records/:recordId", "patchApiDatasetBySlugOrIdRecordsByRecordId")
+      .keepsRecords()
       .withAudit("datasetRecord.update")
       .withParams(datasetRestRecordParamsSchema)
       .withInput(datasetRestUpdateRecordSchema)
@@ -528,6 +558,12 @@ export function createDatasetRest(): Readonly<{
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestDeleteRecordsSchema)
       .withPermission("datasets:manage")
+      .withConfirmation({
+        resource: "dataset row",
+        action: "delete",
+        idsField: "recordIds",
+        name: async () => null,
+      })
       .withOutput(datasetRestRecordsDeletedSchema)
       .withDocs({ description: "Delete records from a dataset by IDs" })
       .handle(async ({ app, input, scope }) =>

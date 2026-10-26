@@ -22,7 +22,10 @@ export const experimentRanEventSchema = z.object({
 type ExperimentRanEvent = z.infer<typeof experimentRanEventSchema>;
 export type ExperimentLifecycleEvent = ExperimentRanEvent;
 
-/** Records that a workbench run ended; the same send twice is one event. */
+/**
+ * Records that a workbench run ended; the same send twice is one event. Keyed by the run (its
+ * person and instant), never the project, so one project's runs never queue in a line.
+ */
 export class RecordExperimentRanCommand implements CommandHandler<
   Command<RecordExperimentRanCommandData>,
   ExperimentRanEvent
@@ -38,7 +41,7 @@ export class RecordExperimentRanCommand implements CommandHandler<
     return [
       EventUtils.createEvent<ExperimentRanEvent>({
         aggregateType: EXPERIMENT_LIFECYCLE_AGGREGATE_TYPE,
-        aggregateId: data.projectId,
+        aggregateId: RecordExperimentRanCommand.getAggregateId(data),
         tenantId: createTenantId(command.tenantId),
         type: EXPERIMENT_RAN_EVENT_TYPE,
         version: EXPERIMENT_RAN_EVENT_VERSION,
@@ -51,6 +54,6 @@ export class RecordExperimentRanCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordExperimentRanCommandData): string {
-    return payload.projectId;
+    return `${payload.userId}:${payload.occurredAt}`;
   }
 }

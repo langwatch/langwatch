@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+  # Release PRs refresh every 4 hours, not on every merge: each refresh re-runs
+  # their CI (dev/docs/plans/ci-redesign.md). A merged release PR runs at once.
+  schedule:
+    - cron: "17 */4 * * *"
   workflow_dispatch:
 
 # This one is not hypothetical: 12 of the last 60 runs were still in flight
@@ -49,6 +53,7 @@ permissions:
 
 jobs:
   release-please:
+    if: "github.event_name != 'push' || startsWith(github.event.head_commit.message, 'chore(main): release')"
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -98,7 +103,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         if: steps.app.outputs.branch != ''
         with:
-          node-version: 24
+          node-version: "24.22.1"
       - name: Stamp and commit the manifest
         if: steps.app.outputs.branch != ''
         env:
