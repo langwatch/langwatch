@@ -397,8 +397,9 @@ export function presentLangyToolError({
   title: string;
   errorText: unknown;
   /**
-   * The tool that failed. Only used to tell the sandbox's `gh` apart from the
-   * developer's own — see {@link githubAppNotInstalled}.
+   * The tool that failed. Tells the sandbox's `gh` apart from the developer's
+   * own (see {@link githubAppNotInstalled}), and a `local_*` tool keeps the
+   * CLI's own credential words instead of the sandbox copy.
    */
   toolName?: string;
 }): LangyToolErrorPresentation {
