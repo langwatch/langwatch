@@ -14,6 +14,7 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | ------------------------- | -------------------- | -------- | -------- | ---------- | ----- |
 | `pages/authorize`         | `/authorize`         | –        | –        | –          | –     |
 | `pages/mcp/authorize`     | `/mcp/authorize`     | –        | –        | –          | –     |
+| `pages/connect/docs`      | `/connect/docs`      | –        | –        | –          | –     |
 | `pages/cli/auth`          | `/cli/auth`          | –        | –        | –          | –     |
 | `pages/settings/api-keys` | `/settings/api-keys` | settings | API keys | –          | –     |
 

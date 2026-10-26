@@ -49,10 +49,11 @@ describe("given a browser that installs api-key", () => {
     });
 
     /** @scenario Every key the family claims is served by it */
-    it("names the API keys settings, authorize, MCP authorize and CLI auth screens, and no other", () => {
+    it("names the API keys settings, authorize, MCP authorize, CLI auth and docs connect screens, and no other", () => {
       expect(Object.keys(apiKeyWeb.installation.screens).toSorted()).toEqual([
         "pages/authorize",
         "pages/cli/auth",
+        "pages/connect/docs",
         "pages/mcp/authorize",
         "pages/settings/api-keys",
       ]);

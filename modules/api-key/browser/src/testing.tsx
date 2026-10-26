@@ -1,6 +1,7 @@
 // Test host: abstract class; fake records screen actions (queries, drawers, copies, device flow).
 // Device flow is programmable (four lookup outcomes, two approve outcomes). Not exported.
 
+import type { DocsSessionKeyMinted, DocsSessionMessage } from "@langwatch/api-key-contract";
 import type { UiDrawerToken, UiTokenIdentity } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -26,6 +27,7 @@ import {
   AuthorizeHostProvider,
   type AuthorizeFailureNotice,
   type AuthorizeSessionStatus,
+  type DocsOpener,
   type McpAuthorizeAnswer,
   type McpAuthorizeRequest,
 } from "./model/authorize-host.ts";
@@ -210,13 +212,51 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
       token?: string;
       projectSwitcher?: ReactNode;
       copyFails?: boolean;
+      docsOrigins?: readonly string[];
+      impersonated?: boolean;
+      /** Whether the page was opened as a popup by the docs. */
+      hasOpener?: boolean;
+      docsKey?: DocsSessionKeyMinted | Error;
     } = {},
   ) {
     super();
   }
 
+  /** Every message posted to the opener, with the origin it was addressed to. */
+  readonly posted: { message: DocsSessionMessage; targetOrigin: string }[] = [];
+  readonly docsMints: { projectId: string; docsOrigin: string }[] = [];
+  closed = 0;
+
   scope() {
     return { projectId: this.options.projectId, projectName: void 0 };
+  }
+
+  docsOrigins(): readonly string[] {
+    return this.options.docsOrigins ?? [];
+  }
+
+  actingAsAnother(): boolean {
+    return this.options.impersonated ?? false;
+  }
+
+  docsOpener(): DocsOpener | null {
+    if (this.options.hasOpener === false) return null;
+
+    return { post: (input) => this.posted.push(input) };
+  }
+
+  mintDocsSessionKey(input: { projectId: string; docsOrigin: string }) {
+    this.docsMints.push(input);
+    const answer = this.options.docsKey ?? {
+      token: "sk-lw-docs",
+      expiresAt: "2026-10-26T12:05:00.000Z",
+      project: { id: input.projectId, name: "Checkout" },
+    };
+    return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
+  }
+
+  closeWindow(): void {
+    this.closed += 1;
   }
 
   sessionStatus(): AuthorizeSessionStatus {

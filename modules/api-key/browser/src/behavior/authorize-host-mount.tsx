@@ -4,9 +4,14 @@
  * ARCHITECTURE.md §10.1.
  */
 
-import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
+import {
+  ApiKeyScopeViolationError,
+  publicDocsOrigins,
+  type DocsSessionKeyMinted,
+} from "@langwatch/api-key-contract";
 import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useLent } from "@langwatch/browser-host/lent";
+import { readPublicAppConfig } from "@langwatch/browser/public-config";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
 import type { ProjectSwitcherProps } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
@@ -16,6 +21,7 @@ import { useLocation } from "react-router";
 import {
   AuthorizeHostApi,
   AuthorizeHostProvider,
+  type DocsOpener,
   type AuthorizeFailureNotice,
   type AuthorizeRouteReading,
   type AuthorizeScope,
@@ -48,6 +54,11 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
       replace: (to: string) => void;
       mintProjectToken: (input: { expiresAt: Instant | undefined }) => Promise<string | undefined>;
       Switcher: ComponentType<ProjectSwitcherProps> | undefined;
+      impersonated: boolean;
+      mintDocsSessionKey: (input: {
+        projectId: string;
+        docsOrigin: string;
+      }) => Promise<DocsSessionKeyMinted>;
       succeeded: (notice: AuthorizeSuccessNotice) => void;
       failed: (failure: AuthorizeFailureNotice) => void;
     },
@@ -99,6 +110,30 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
     return authorizeMcpClient(request);
   }
 
+  docsOrigins(): readonly string[] {
+    return docsOriginsOfPage();
+  }
+
+  actingAsAnother(): boolean {
+    return this.deps.impersonated;
+  }
+
+  /** Posts only through `postMessage` with an exact target origin; the popup reads nothing back. */
+  docsOpener(): DocsOpener | null {
+    if (typeof window === "undefined" || !window.opener) return null;
+    const opener = window.opener as Window;
+
+    return { post: ({ message, targetOrigin }) => opener.postMessage(message, targetOrigin) };
+  }
+
+  mintDocsSessionKey(input: { projectId: string; docsOrigin: string }) {
+    return this.deps.mintDocsSessionKey(input);
+  }
+
+  closeWindow(): void {
+    if (typeof window !== "undefined") window.close();
+  }
+
   succeeded(notice: AuthorizeSuccessNotice): void {
     this.deps.succeeded(notice);
   }
@@ -114,6 +149,15 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
     const ok = await writeToClipboard(input.text);
     if (ok) this.deps.succeeded(input.succeeded);
     return ok;
+  }
+}
+
+/** The page config's docs origins; a shell without one registers none, so nothing connects. */
+function docsOriginsOfPage(): readonly string[] {
+  try {
+    return publicDocsOrigins(readPublicAppConfig());
+  } catch {
+    return [];
   }
 }
 
@@ -136,6 +180,9 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
   const { mutateAsync: mintToken, reset: resetMint } = apiKeyApi.apiKey.create.useMutation({
     gcTime: 0,
   });
+  // The docs key is answered once to the opener and never kept in the mutation cache.
+  const { mutateAsync: mintDocsKey, reset: resetDocsMint } =
+    apiKeyApi.apiKey.mintDocsSessionKey.useMutation({ gcTime: 0 });
   const Switcher = useLent(ProjectSwitcherToken);
 
   const host = useMemo(
@@ -172,6 +219,14 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
           }
         },
         Switcher,
+        impersonated: Boolean(sessionActor?.impersonator),
+        mintDocsSessionKey: async (input) => {
+          try {
+            return await mintDocsKey(input);
+          } finally {
+            resetDocsMint();
+          }
+        },
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
       }),
@@ -188,6 +243,8 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
       Switcher,
       mintToken,
       resetMint,
+      mintDocsKey,
+      resetDocsMint,
     ],
   );
 
