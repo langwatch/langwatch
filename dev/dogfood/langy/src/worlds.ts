@@ -16,7 +16,7 @@ export const EXPECTED_TOTAL = PER_HOUR * 24 * DAYS;
 
 const widgetsPath = (project: string) => `/api/v1/projects/${project}/analytics/dashboard-widgets`;
 /** Dashboards boards, project from the key; answers 404 unless release_dashboards is on. */
-const BOARDS_PATH = "/api/v1/boards";
+const BOARDS_PATH = "/api/v1/dashboards";
 const chartsPath = (project: string) => `/api/v1/projects/${project}/analytics/charts`;
 
 type WidgetKind = "count" | "slowest" | "errors";

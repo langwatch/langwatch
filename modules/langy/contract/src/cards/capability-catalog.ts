@@ -217,10 +217,11 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "dashboard widget", plural: "dashboard widgets" },
   },
-  boards: {
+  // `langwatch dashboards`: the Dashboards area's boards; `dashboard` above is Analytics Reports.
+  dashboards: {
     surface: "dashboards",
     digestStrategy: "id-ref",
-    noun: { singular: "board", plural: "boards" },
+    noun: { singular: "dashboard", plural: "dashboards" },
   },
   // `langwatch trigger` is the CLI's word; the product's is automation.
   trigger: {

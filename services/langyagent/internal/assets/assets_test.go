@@ -293,11 +293,11 @@ func TestDashboardWidgetsSkill_TeachesBoardCommands(t *testing.T) {
 		t.Fatalf("read dashboard-widgets skill: %v", err)
 	}
 	for _, want := range []string{
-		"langwatch boards create",
-		"langwatch boards delete <boardId>",
-		"langwatch boards widgets create <boardId>",
+		"langwatch dashboards create",
+		"langwatch dashboards delete <dashboardId>",
+		"langwatch dashboards widgets create <dashboardId>",
 		"Never pick a board for the user",
-		"one option per board from `langwatch boards list`",
+		"one option per board from `langwatch dashboards list`",
 		"Confirm before any delete",
 		"run the command only on Delete",
 		"dashboards_not_released` means it is off: tell the user, do not retry",

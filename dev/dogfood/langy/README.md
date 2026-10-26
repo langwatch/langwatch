@@ -70,7 +70,7 @@ Stack prerequisites (once per stack):
    (haven does this itself only when it manages the database).
 3. Flags `release_langy_enabled`, `release_langy_api_key_turns_enabled` and
    `release_dashboards` on (`/ops/feature-flags`, or the `ops.setFeatureFlag`
-   tRPC mutation). Setup makes its boards at `/api/v1/boards`, which answers
+   tRPC mutation). Setup makes its boards at `/api/v1/dashboards`, which answers
    404 while `release_dashboards` is off.
 4. A model provider for Langy, the simulator and the judge, set as the project
    default through `POST /api/model-defaults`.
@@ -195,7 +195,8 @@ hit. "Fix in" names who closes it.
     the platform's `scenario_…` ids fit today. Fix in: **Langy API** (document
     it on the route).
 13. **B1: Langy cannot see a board's widgets** (a Langy bug). Langy reads a
-    board through the Reports API `GET /api/v1/dashboards/:id`; #8707 (on main,
+    board through the Reports API `GET /api/v1/dashboards/:id` (since 2026-10-26
+    `GET /api/v1/analytics/reports/:reportId`); #8707 (on main,
     not on this branch) hides Dashboards-only boards from it
     (`prisma.dashboard.repository.ts:147`). Even here Langy answered "Release
     review 816422 is empty right now, with no graphs configured" for a board
