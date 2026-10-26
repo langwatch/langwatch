@@ -389,7 +389,7 @@ export function CreateApiKeyDrawer({
   currentTeamId?: string;
   currentProjectId?: string;
   /** The key the form opens filled with, such as a legacy key's replacement; no expiry. */
-  prefill?: CreateApiKeyInput;
+  prefill?: Pick<CreateApiKeyInput, "name" | "description" | "scopeId" | "keyType">;
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
 }) {
