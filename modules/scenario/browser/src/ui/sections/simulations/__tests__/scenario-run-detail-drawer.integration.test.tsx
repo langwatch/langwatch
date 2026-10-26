@@ -15,7 +15,7 @@ import { AgentTestingRunDrawer } from "../../agent-testing/drawers/agent-testing
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
 
 // Trace lends the thread; a synchronous stand-in keeps this suite on the drawer's layout.
-vi.mock("../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ConversationThread: (await import("./stub-conversation-thread.tsx")).StubConversationThread,
 }));

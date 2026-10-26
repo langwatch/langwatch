@@ -1,5 +1,10 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Box, chakra, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import {
+  AiCallFailedError,
+  ModelNotConfiguredError,
+  ModelProviderDisabledError,
+} from "@langwatch/model-provider-contract";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
 import type React from "react";
@@ -14,9 +19,9 @@ import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
  */
 const CONFIGURATION_CODES = new Set([
   "ai_query_provider_error",
-  "ai_call_failed",
-  "model_not_configured",
-  "model_provider_disabled",
+  AiCallFailedError.code,
+  ModelNotConfiguredError.code,
+  ModelProviderDisabledError.code,
 ]);
 
 export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({ error }) => {

@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class RoleDuplicateNameError extends HandledError {
+  static readonly code = "custom_role_name_taken" as const;
   declare readonly code: "custom_role_name_taken";
   constructor(message = "A role with this name already exists") {
     super("custom_role_name_taken", message, {
@@ -12,6 +13,7 @@ export class RoleDuplicateNameError extends HandledError {
 }
 
 export class RoleInUseError extends HandledError {
+  static readonly code = "custom_role_in_use" as const;
   declare readonly code: "custom_role_in_use";
   readonly userCount: number;
   readonly bindingCount: number;
@@ -32,6 +34,7 @@ export class RoleInUseError extends HandledError {
 }
 
 export class RoleNotFoundError extends NotFoundError {
+  static readonly code = "custom_role_not_found" as const;
   declare readonly code: "custom_role_not_found";
   constructor(roleId: string) {
     super("custom_role_not_found", { resource: "Custom role", id: roleId }, { meta: { roleId } });
@@ -40,6 +43,7 @@ export class RoleNotFoundError extends NotFoundError {
 }
 
 export class RoleReservedNameError extends HandledError {
+  static readonly code = "custom_role_name_reserved" as const;
   declare readonly code: "custom_role_name_reserved";
   constructor(message = "Role names starting with 'apikey:' are reserved for system use") {
     super("custom_role_name_reserved", message, { httpStatus: 422 });
@@ -53,6 +57,7 @@ export class RoleReservedNameError extends HandledError {
  * role their organization simply may not hand out.
  */
 export class RoleNotAssignableError extends HandledError {
+  static readonly code = "custom_role_not_assignable" as const;
   declare readonly code: "custom_role_not_assignable";
   constructor(message = "That role cannot be assigned here") {
     super("custom_role_not_assignable", message, { httpStatus: 422 });
@@ -62,6 +67,7 @@ export class RoleNotAssignableError extends HandledError {
 
 /** The team an assignment names does not exist. */
 export class RoleTeamNotFoundError extends NotFoundError {
+  static readonly code = "team_not_found" as const;
   declare readonly code: "team_not_found";
   constructor(teamId: string) {
     super("team_not_found", { resource: "Team", id: teamId }, { meta: { teamId } });
@@ -71,6 +77,7 @@ export class RoleTeamNotFoundError extends NotFoundError {
 
 /** The person is not on the team the role was offered to. */
 export class RoleUserNotTeamMemberError extends HandledError {
+  static readonly code = "team_membership_not_found" as const;
   declare readonly code: "team_membership_not_found";
   constructor(message = "That person is not a member of this team") {
     super("team_membership_not_found", message, { httpStatus: 404 });
@@ -80,6 +87,7 @@ export class RoleUserNotTeamMemberError extends HandledError {
 
 /** `admin`, `member` and `viewer` are fixed: a change or delete is refused, not ignored. */
 export class RoleIsBuiltInError extends HandledError {
+  static readonly code = "role_is_built_in" as const;
   declare readonly code: "role_is_built_in";
   constructor(roleId: string) {
     super("role_is_built_in", "Built-in roles cannot be changed or deleted", {
@@ -92,6 +100,7 @@ export class RoleIsBuiltInError extends HandledError {
 
 /** Nobody writes a role wider than they are: names the permissions the caller lacks. */
 export class RoleExceedsCallerPermissionsError extends HandledError {
+  static readonly code = "role_exceeds_caller_permissions" as const;
   declare readonly code: "role_exceeds_caller_permissions";
   constructor(missingPermissions: readonly string[]) {
     super(

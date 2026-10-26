@@ -97,7 +97,7 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 }));
 
 /** Annotation's lent form, which its own tests cover, stood in by controls that read the state. */
-vi.mock("../../../../../../features/annotation/behavior/lent-annotation-form.tsx", () => {
+vi.mock("@langwatch/annotation-client", async (importOriginal) => {
   function CommentAndScores({ state }: { state: AnnotationFormState }) {
     const scores = state.scores.data ?? [];
     return (
@@ -134,6 +134,7 @@ vi.mock("../../../../../../features/annotation/behavior/lent-annotation-form.tsx
     );
   }
   return {
+    ...(await importOriginal<object>()),
     AnnotateBody: ({ state }: AnnotateBodyProps) => <CommentAndScores state={state} />,
     SuggestBody: ({ state, originalOutput }: SuggestBodyProps) => (
       <>
@@ -149,7 +150,7 @@ vi.mock("../../../../../../features/annotation/behavior/lent-annotation-form.tsx
         <CommentAndScores state={state} />
       </>
     ),
-    FormFooter: ({ state }: AnnotationFormFooterProps) => (
+    AnnotationFormFooter: ({ state }: AnnotationFormFooterProps) => (
       <>
         <button type="button" onClick={state.onCancel}>
           Cancel

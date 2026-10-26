@@ -3,6 +3,16 @@
  * Pure module safe to import from drawer; server classifies and encodes.
  */
 
+import {
+  AgentBusyError,
+  AgentCallFailedError,
+  AgentCallTimeoutError,
+  AgentDisconnectedError,
+  AgentInstanceLostError,
+  AgentOfflineError,
+  AgentPayloadTooLargeError,
+} from "@langwatch/agent-contract";
+
 export const CODING_ASSISTANT_SURFACES_ONLY_NEEDLE = "serves the coding-assistant surfaces only";
 
 export const ScenarioInfraErrorCode = {
@@ -336,37 +346,37 @@ const CONNECTED_AGENT_ENVELOPES: Record<
   string,
   { code: ScenarioInfraErrorCode; message: string; hint: string }
 > = {
-  agent_offline: {
+  [AgentOfflineError.code]: {
     code: ScenarioInfraErrorCode.AgentOffline,
     message: "No process running the connected agent is connected.",
     hint: "Start the process that runs the decorated function, then run again.",
   },
-  agent_call_timeout: {
+  [AgentCallTimeoutError.code]: {
     code: ScenarioInfraErrorCode.AgentCallTimeout,
     message: "The connected agent did not answer a turn before its call budget.",
     hint: "Check the process for slow work, or raise the timeout on the decorated function.",
   },
-  agent_call_failed: {
+  [AgentCallFailedError.code]: {
     code: ScenarioInfraErrorCode.AgentCallFailed,
     message: "The connected agent raised an error on a turn.",
     hint: "The process logs carry the stack of the error the function raised.",
   },
-  agent_disconnected: {
+  [AgentDisconnectedError.code]: {
     code: ScenarioInfraErrorCode.AgentDisconnected,
     message: "The connected agent instance disconnected while it was working on a turn.",
     hint: "Start the process again, then run again. The turn was not sent twice.",
   },
-  agent_instance_lost: {
+  [AgentInstanceLostError.code]: {
     code: ScenarioInfraErrorCode.AgentInstanceLost,
     message: "The instance this conversation was pinned to is no longer connected.",
     hint: "Start the process again, then run again, or turn off sticky on the decorated function.",
   },
-  agent_busy: {
+  [AgentBusyError.code]: {
     code: ScenarioInfraErrorCode.AgentBusy,
     message: "Every instance of the connected agent stayed busy for the whole retry budget.",
     hint: "Raise the concurrency on the decorated function, or connect more instances.",
   },
-  agent_payload_too_large: {
+  [AgentPayloadTooLargeError.code]: {
     code: ScenarioInfraErrorCode.AgentPayloadTooLarge,
     message: "The connected agent answered a turn above the size limit.",
     hint: "Trim the output or the session the function returns, or raise the limit on a self-hosted deployment.",
@@ -407,7 +417,7 @@ function connectedAgentRules(): ClassificationRule[] {
       // The function's own error is the whole point of agent_call_failed;
       // for the other codes the relay's sentence and ours say the same thing.
       const message =
-        code === "agent_call_failed" && remote
+        code === AgentCallFailedError.code && remote
           ? `The connected agent raised: ${remote.slice(0, MAX_GENERIC_MESSAGE_LENGTH)}`
           : envelope.message;
       return { code: envelope.code, message, hint: envelope.hint };

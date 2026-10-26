@@ -358,7 +358,7 @@ export class SsoConnectionStateFoldProjection
     };
   }
 
-  handleIdentityConnectionRegistered(
+  handleIdentityConnectionRegisteredV2(
     event: ConnectionRegisteredEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {

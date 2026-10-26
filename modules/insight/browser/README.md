@@ -4,7 +4,7 @@ The browser half of [insight](../README.md). What a browser installs when it ins
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/insight.web.ts:15` (`defineBrowserModule("insight")`), exported as `insightWeb` at `./declaration`.
+Declared in `src/insight.web.ts:16` (`defineBrowserModule("insight")`), exported as `insightWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -23,7 +23,7 @@ None.
 ## Calls
 
 - `withApi(insightApi)`, tRPC contracts: `insights.*`.
-- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/langy-client`.
+- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/insight-client`, `@langwatch/langy-client`.
 - Lends: `InsightsBellToken`, `InsightsNavCountToken`, `LangyAnswerActionToken`, `BoardHeaderActionToken`.
 - Host APIs it requires: `InsightHostApi`.
 

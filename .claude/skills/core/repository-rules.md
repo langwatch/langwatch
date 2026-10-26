@@ -62,9 +62,13 @@ For whoever is committing:
 - Never `git stash` in a shared checkout. The stash stack is global and a bare
   `stash push` takes every other agent's work with it.
 - Never open a PR or push unless the task says to.
-- Every PR body fills `## Architecture` honestly: tick the box only after reading the sections of
-  `dev/docs/ARCHITECTURE.md` the change touches, and list anything unusual under "Needs a human
-  look" rather than leaving it for the reviewer (the `architecture-section-check` gate fails without it).
+- Every PR body fills `## Architecture`. Under "Decisions no check makes", record each choice no
+  lint rule or enforcer policy decides (a new package or module, a suppression, a new
+  `dev/docs/ARCHITECTURE.md` sentence, a rule switched off): you asked your human, showing 2 or 3
+  options with the sections and patterns behind each, they chose, and the PR adds the rule that
+  encodes it. Never make that choice yourself. List anything unusual under "Needs a human look"
+  rather than leaving it for the reviewer. The `architecture-section-check` gate reads the diff
+  and fails without both.
 - Keep a PR body short: the squash merge makes it the commit message, and
   release-please drops the whole commit from every release when a body line
   starts like `word(` (for example `` `if(count(...)`` ``). Put run-throughs,

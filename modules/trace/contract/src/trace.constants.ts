@@ -157,6 +157,17 @@ export function isStorageAnchoredVersion(version: string | undefined): boolean {
 /** Subscribers skip traces older than this threshold to avoid re-processing during resyncs. */
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
+/** Whether an event at `occurredAtMs` is too old for a subscriber to process at `nowMs`. */
+export function isStaleTraceEvent({
+  occurredAtMs,
+  nowMs,
+}: {
+  occurredAtMs: number;
+  nowMs: number;
+}): boolean {
+  return occurredAtMs < nowMs - STALE_TRACE_THRESHOLD_MS;
+}
+
 /**
  * Span name `/api/track_event` and the tracked-event sync subscriber give
  * synthetic event spans (a thumbs-up, a rating) — not actual execution, so

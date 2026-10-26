@@ -6,6 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
  * a provider, so the copy says so instead of reading as a crash.
  */
 export class EmailProviderNotConfiguredError extends HandledError {
+  static readonly code = "email_provider_not_configured" as const;
   declare readonly code: "email_provider_not_configured";
 
   constructor() {
@@ -23,6 +24,7 @@ export class EmailProviderNotConfiguredError extends HandledError {
  * Pushes go only to those services, so a URL anywhere else is refused at subscribe time.
  */
 export class WebPushEndpointRefusedError extends HandledError {
+  static readonly code = "web_push_endpoint_refused" as const;
   declare readonly code: "web_push_endpoint_refused";
 
   constructor() {

@@ -75,18 +75,28 @@ Annotations live in the normal test files (`*.unit.test.ts`, `*.integration.test
 One `it()` block may carry multiple `@scenario` annotations if it covers several scenarios;
 one scenario may be bound by multiple tests.
 
-The `packages/architecture-enforcer/src/check-feature-parity.ts` script parses every feature file
+The `packages/architecture-enforcer/src/tools/check-feature-parity.ts` script parses every feature file
 and fails CI if any tagged (`@unit` / `@integration` / `@e2e` / `@regression`) scenario
 has no binding. Enforcement is on by default and fails closed — a new feature file
-needs no registration anywhere. The script carries two ratcheted deny-lists instead:
-`LEGACY_UNBOUND` for files whose enforced scenarios are not yet bound, and
-`LEGACY_INERT` for files that yield no enforced scenario at all (usually because
-nothing in them is tagged). Both only shrink; taking a file off either list is the
-ratchet clicking, and a file that stops needing its entry must lose it.
+needs no registration anywhere. Three more things fail the run, each per scenario:
 
-Note what that means for an untagged file: it enforces nothing, so it reports
-`0/0 scenarios bound` and reads as green while binding nothing at all. Tag the
-scenarios, or the spec is decorative.
+- A scenario carrying neither a binding tag nor `@unimplemented`.
+- An `@unimplemented` scenario that cites no tracked issue. Cite it with an
+  `@issue:<number>` (or `@issue-<number>`) tag, or with `#<number>` or an `/issues/<number>`
+  link in a comment line directly above the scenario's tags.
+- A `@scenario` annotation on a scenario with no binding tag. The test looks bound
+  and the gate measures nothing; tag the scenario with the lane its test runs in.
+
+The scenarios that already break those rules are frozen by exact title in
+`packages/architecture-enforcer/src/tools/feature-parity-frozen.json`, which the Node
+script and the Go port (`tools/featureparity`) both read. The list only shrinks: an
+unlisted finding fails the run, and so does a listed entry that no longer applies, so
+fix the scenario and delete its entry in the same change. The script also keeps
+`LEGACY_UNBOUND`, a ratcheted list of files whose enforced scenarios are not yet bound.
+
+Note what that means for an untagged scenario: it is not measured, so a file of
+them reports `0/0 scenarios bound` and reads as green while binding nothing at all.
+Tag the scenarios, or the spec is decorative.
 
 Run locally:
 

@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 
 export class SuiteNotFoundError extends NotFoundError {
+  static readonly code = "suite_not_found" as const;
   declare readonly code: "suite_not_found";
 
   constructor(id: string) {
@@ -10,6 +11,7 @@ export class SuiteNotFoundError extends NotFoundError {
 }
 
 export class SuiteNameTakenError extends HandledError {
+  static readonly code = "suite_name_taken" as const;
   declare readonly code: "suite_name_taken";
 
   constructor(name: string) {
@@ -24,6 +26,7 @@ export class SuiteNameTakenError extends HandledError {
 /** Voice agents are behind the project's release flag (AC29); a run naming a voice target is
  * refused while it is off, so the API cannot bypass the run dialog's own gate. */
 export class VoiceAgentsDisabledError extends HandledError {
+  static readonly code = "voice_agents_disabled" as const;
   declare readonly code: "voice_agents_disabled";
 
   constructor() {
@@ -130,6 +133,7 @@ export class SuiteTestSuiteMembershipManagedError extends ValidationError {
  * The project exists but no organization can be resolved behind it.
  */
 export class OrganizationNotFoundForProjectError extends HandledError {
+  static readonly code = "organization_not_found_for_project" as const;
   declare readonly code: "organization_not_found_for_project";
 
   constructor(projectId: string) {
@@ -155,6 +159,7 @@ export class SuiteAliasRunRefusedError extends HandledError {
 }
 
 export class SuiteFieldIdentifierInvalidError extends HandledError {
+  static readonly code = "suite_field_identifier_invalid" as const;
   declare readonly code: "suite_field_identifier_invalid";
 
   constructor({ identifier }: { identifier: string }) {
@@ -168,6 +173,7 @@ export class SuiteFieldIdentifierInvalidError extends HandledError {
 }
 
 export class SuiteFieldIdentifierDuplicateError extends HandledError {
+  static readonly code = "suite_field_identifier_duplicate" as const;
   declare readonly code: "suite_field_identifier_duplicate";
 
   constructor({ identifier }: { identifier: string }) {
@@ -181,6 +187,7 @@ export class SuiteFieldIdentifierDuplicateError extends HandledError {
 }
 
 export class SuiteEvaluatorNotFoundError extends HandledError {
+  static readonly code = "suite_evaluator_not_found" as const;
   declare readonly code: "suite_evaluator_not_found";
 
   constructor({ evaluatorId }: { evaluatorId: string }) {
@@ -194,6 +201,7 @@ export class SuiteEvaluatorNotFoundError extends HandledError {
 }
 
 export class SuiteEvaluatorMappingInvalidError extends HandledError {
+  static readonly code = "suite_evaluator_mapping_invalid" as const;
   declare readonly code: "suite_evaluator_mapping_invalid";
 
   constructor({
@@ -215,6 +223,7 @@ export class SuiteEvaluatorMappingInvalidError extends HandledError {
 }
 
 export class SuiteFieldInUseError extends HandledError {
+  static readonly code = "suite_field_in_use" as const;
   declare readonly code: "suite_field_in_use";
 
   constructor({ identifier, evaluatorIds }: { identifier: string; evaluatorIds: string[] }) {
@@ -232,6 +241,7 @@ export class SuiteFieldInUseError extends HandledError {
 }
 
 export class SuiteEvaluatorMappingsMissingError extends HandledError {
+  static readonly code = "suite_evaluator_mappings_missing" as const;
   declare readonly code: "suite_evaluator_mappings_missing";
 
   constructor({

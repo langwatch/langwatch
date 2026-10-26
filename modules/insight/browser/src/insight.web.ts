@@ -7,7 +7,8 @@
 import { BoardHeaderActionToken } from "@langwatch/analytics-client";
 import { defineBrowserModule } from "@langwatch/browser";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { InsightsBellToken, InsightsNavCountToken, insightTrpc } from "@langwatch/insight-contract";
+import { InsightsBellToken, InsightsNavCountToken } from "@langwatch/insight-client";
+import { insightTrpc } from "@langwatch/insight-contract";
 import { LangyAnswerActionToken } from "@langwatch/langy-contract";
 
 import { insightApi } from "./behavior/insight-api.ts";

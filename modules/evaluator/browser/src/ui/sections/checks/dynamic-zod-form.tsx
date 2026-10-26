@@ -18,6 +18,7 @@ import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { ModelSelector } from "@langwatch/model-provider-client";
 import { allModelOptions } from "@langwatch/model-provider-contract";
 import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
@@ -34,7 +35,6 @@ import {
 } from "react-hook-form";
 import { type ZodType, z } from "zod";
 
-import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
 import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import { isSettingShownForModel } from "../../../model/instant-eval-only-settings.ts";
 import type { CheckConfigFormData } from "./check-config-form.tsx";

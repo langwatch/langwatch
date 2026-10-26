@@ -112,6 +112,23 @@ export const DEFAULT_CONCURRENCY = 10;
 /** The delay a full agent asks the caller to wait before it tries again. */
 export const BUSY_RETRY_AFTER_MS = 2_000;
 
+/**
+ * The per-call budget for an agent that declared `declared` (milliseconds), or none: the
+ * default when it declared nothing, never above the most an agent may take. The owner decides
+ * the numbers, so a caller asks for the budget and keeps no copy of them.
+ */
+export function callTimeoutMsFor({ declared }: { declared: number | null | undefined }): number {
+  return Math.min(declared ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS);
+}
+
+/**
+ * How long a caller waits before it retries a busy agent: the delay the agent asked for, or
+ * the owner's default when it asked for none or for something unusable.
+ */
+export function busyRetryAfterMsFor({ declared }: { declared: unknown }): number {
+  return typeof declared === "number" && declared > 0 ? declared : BUSY_RETRY_AFTER_MS;
+}
+
 /** The names the SDK sends on every call; never a run parameter. */
 export const TURN_FIELD_NAMES = new Set([
   "messages",

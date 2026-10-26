@@ -4,12 +4,9 @@
  * Spec: specs/server/api-process-plan-allowance.feature
  */
 import { isUpgradeInProgress } from "@langwatch/api";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { type EntitlementApi, PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import { HandledError, isTransientRefusal } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-
-/** Main's `PlanLimitExceededError` code, the one refusal a door lets through to the caller. */
-const PLAN_LIMIT_CODE = "ERR_PLAN_LIMIT";
 
 type TraceIngestAllowanceOptions = Readonly<{
   entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
@@ -18,7 +15,7 @@ type TraceIngestAllowanceOptions = Readonly<{
 
 /** Whether an ingest door's allowance refused the batch with the plan limit. */
 function isPlanLimitRefusal(error: unknown): error is HandledError {
-  return HandledError.isHandled(error) && error.code === PLAN_LIMIT_CODE;
+  return PlanLimitExceededError.is(error);
 }
 
 export class TraceIngestAllowanceService {

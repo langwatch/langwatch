@@ -10,6 +10,7 @@ import { remediation } from "../../langy.error-remediation.ts";
 
 /** No folder answers for this conversation, so a local call has nowhere to run. */
 export class LangyLocalWorkspaceOfflineError extends HandledError {
+  static readonly code = "langy_local_workspace_offline" as const;
   declare readonly code: "langy_local_workspace_offline";
 
   constructor({ conversationId }: { conversationId: string }) {
@@ -34,6 +35,7 @@ export class LangyLocalWorkspaceOfflineError extends HandledError {
  * answer never confirms that a request id someone guessed is real.
  */
 export class LangyLocalRequestInvalidError extends HandledError {
+  static readonly code = "langy_local_request_invalid" as const;
   declare readonly code: "langy_local_request_invalid";
 
   constructor({ requestId }: { requestId?: string } = {}) {
@@ -57,6 +59,7 @@ export class LangyLocalRequestInvalidError extends HandledError {
  * named rather than unknown, because starting it again gets a working one.
  */
 export class LangyLocalRecordUnreadableError extends HandledError {
+  static readonly code = "langy_local_record_unreadable" as const;
   declare readonly code: "langy_local_record_unreadable";
 
   constructor({ reasons }: { reasons?: readonly Error[] } = {}) {
@@ -75,6 +78,7 @@ export class LangyLocalRecordUnreadableError extends HandledError {
 
 /** A record local control wrote — a call, a card, a request, a key binding — that has lapsed. */
 export class LangyLocalRecordNotFoundError extends HandledError {
+  static readonly code = "langy_local_record_not_found" as const;
   declare readonly code: "langy_local_record_not_found";
 
   constructor() {
@@ -89,6 +93,7 @@ export class LangyLocalRecordNotFoundError extends HandledError {
 
 /** The request was real, and its fifteen minutes are over. */
 export class LangyLocalRequestExpiredError extends HandledError {
+  static readonly code = "langy_local_request_expired" as const;
   declare readonly code: "langy_local_request_expired";
 
   constructor({ requestId }: { requestId: string }) {
@@ -108,6 +113,7 @@ export class LangyLocalRequestExpiredError extends HandledError {
 
 /** The permission card went unanswered for its whole budget. */
 export class LangyLocalPermissionTimeoutError extends HandledError {
+  static readonly code = "langy_local_permission_timeout" as const;
   declare readonly code: "langy_local_permission_timeout";
 
   constructor({ waitId, budgetMs }: { waitId: string; budgetMs: number }) {
@@ -127,6 +133,7 @@ export class LangyLocalPermissionTimeoutError extends HandledError {
 
 /** The conversation's model is not on the provider's skip list. */
 export class LangyLocalSkipModelNotAllowedError extends HandledError {
+  static readonly code = "langy_local_skip_model_not_allowed" as const;
   declare readonly code: "langy_local_skip_model_not_allowed";
 
   constructor({ model, provider }: { model: string; provider: string }) {
@@ -146,6 +153,7 @@ export class LangyLocalSkipModelNotAllowedError extends HandledError {
 
 /** The card is no longer waiting: answered, expired, or stopped — which one rides in `meta`. */
 export class LangyWaitExpiredError extends HandledError {
+  static readonly code = "langy_wait_expired" as const;
   declare readonly code: "langy_wait_expired";
 
   constructor({
@@ -189,6 +197,7 @@ export class LangyWaitExpiredError extends HandledError {
 
 /** A bearer the session-key door could not resolve to a key of this project. */
 export class LangySessionKeyInvalidError extends HandledError {
+  static readonly code = "langy_session_key_invalid" as const;
   declare readonly code: "langy_session_key_invalid";
 
   constructor() {
@@ -203,6 +212,7 @@ export class LangySessionKeyInvalidError extends HandledError {
 
 /** A real key with no person behind it, or not the one approving a control request mints. */
 export class LangySessionKeyWrongTypeError extends HandledError {
+  static readonly code = "langy_session_key_wrong_type" as const;
   declare readonly code: "langy_session_key_wrong_type";
 
   constructor() {
@@ -221,6 +231,7 @@ export class LangySessionKeyWrongTypeError extends HandledError {
 
 /** A session key whose conversation is gone: its binding lapsed, or the conversation did. */
 export class LangySessionKeyUnboundError extends HandledError {
+  static readonly code = "langy_session_key_unbound" as const;
   declare readonly code: "langy_session_key_unbound";
 
   constructor({ reason }: { reason: "binding_lapsed" | "conversation_gone" }) {

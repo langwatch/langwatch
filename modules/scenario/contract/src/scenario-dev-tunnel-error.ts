@@ -6,6 +6,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
  * remediation metadata used by both the run result and API error surfaces.
  */
 export class AgentDevTunnelUnreachableError extends HandledError {
+  static readonly code = "agent_dev_tunnel_unreachable" as const;
   declare readonly code: "agent_dev_tunnel_unreachable";
 
   constructor() {

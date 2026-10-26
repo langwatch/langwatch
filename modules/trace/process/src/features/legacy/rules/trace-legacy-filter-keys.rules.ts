@@ -1,4 +1,4 @@
-import { findUnkeyedFilterFields } from "@langwatch/analytics-filters";
+import { findUnkeyedFilterFields } from "@langwatch/analytics-contract/filters";
 import type { FieldViolation } from "@langwatch/api/rest";
 
 /**

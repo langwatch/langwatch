@@ -1,3 +1,4 @@
+import { QueryMemoryExceededError } from "@langwatch/analytics-contract";
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import type { Authorization } from "@langwatch/authorization";
 import {
@@ -3124,7 +3125,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     // `query_memory_exceeded`, wrapping the original in `reasons`.
     if (HandledError.isHandled(error)) {
       return (
-        error.code === "query_memory_exceeded" ||
+        QueryMemoryExceededError.is(error) ||
         (error.reasons ?? []).some((reason) =>
           TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(reason),
         )

@@ -6,6 +6,7 @@ import {
   type ModuleApi,
   type OutputsFromMap,
 } from "@langwatch/api/web";
+import { lentComponent } from "@langwatch/browser-host/lent";
 import type { evaluatorTrpc } from "@langwatch/evaluator-contract";
 import { uiTokens } from "@langwatch/module";
 
@@ -122,3 +123,7 @@ export type StudioEvaluatorEditorProps = {
 
 export const StudioEvaluatorEditorToken =
   uiTokens("evaluator").component<StudioEvaluatorEditorProps>("studioEvaluatorEditor");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const EvaluatorSettingsForm = lentComponent(EvaluatorSettingsFormToken);
+export const StudioEvaluatorEditor = lentComponent(StudioEvaluatorEditorToken);

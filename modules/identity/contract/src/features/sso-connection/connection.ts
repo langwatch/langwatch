@@ -181,7 +181,12 @@ export type SsoIdpMetadata = z.infer<typeof ssoIdpMetadataSchema>;
 
 // ---- events --------------------------------------------------------------
 
-export const CONNECTION_REGISTERED_EVENT_TYPE = "lw.identity.connection_registered" as const;
+/**
+ * Version 2 of the registration: it states an arrival policy. Version 1, stored as
+ * `lw.identity.connection_registered`, is read as this one by the pipeline's upcast.
+ * Spec: modules/identity/specs/sso-connection-legacy-registration.feature
+ */
+export const CONNECTION_REGISTERED_EVENT_TYPE = "lw.identity.connection_registered.v2" as const;
 export const DOMAIN_CLAIMED_EVENT_TYPE = "lw.identity.domain_claimed" as const;
 export const DOMAIN_CLAIM_APPROVED_EVENT_TYPE = "lw.identity.domain_claim_approved" as const;
 export const DOMAIN_CLAIM_REJECTED_EVENT_TYPE = "lw.identity.domain_claim_rejected" as const;
@@ -264,22 +269,7 @@ const connectionRegisteredFieldsSchema = z.object({
   ...sourced,
 });
 
-/**
- * Registrations stored 2026-08-25 to 2026-09-21 carry a boolean `allowsJit` and no
- * `arrivalPolicy`; the log is immutable, so reads upcast them: `true` admits, else the default.
- * Spec: modules/identity/specs/sso-connection-legacy-registration.feature
- */
-function upcastLegacyRegistration(data: unknown): unknown {
-  if (typeof data !== "object" || data === null || Array.isArray(data)) return data;
-  const { allowsJit, ...rest } = data as Record<string, unknown>;
-  if (rest.arrivalPolicy !== undefined && rest.arrivalPolicy !== null) return rest;
-  return { ...rest, arrivalPolicy: allowsJit === true ? "admit" : DEFAULT_SSO_ARRIVAL_POLICY };
-}
-
-const connectionRegisteredPayloadSchemaDefinition = z.preprocess(
-  upcastLegacyRegistration,
-  connectionRegisteredFieldsSchema,
-);
+const connectionRegisteredPayloadSchemaDefinition = connectionRegisteredFieldsSchema;
 export interface ConnectionRegisteredPayloadSchema extends Named<
   typeof connectionRegisteredPayloadSchemaDefinition
 > {}

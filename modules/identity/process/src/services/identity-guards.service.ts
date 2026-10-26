@@ -24,6 +24,7 @@ import {
   userErasureFacts,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
@@ -205,7 +206,7 @@ export class IdentityGuardsService {
 
   private async userHashKeyOrNull({ userId }: { userId: string }): Promise<string | null> {
     const { userHashKey } = await this.heads.getUserHashKey({ userId }).catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "user_not_found") {
+      if (UserNotFoundError.is(error)) {
         return { userHashKey: null };
       }
       throw error;

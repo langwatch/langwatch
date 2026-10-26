@@ -1,10 +1,10 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Badge, Box, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { GuidedOnboardingOffer } from "@langwatch/onboarding-client";
 
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
-import { GuidedOnboardingOffer } from "../../../behavior/lent-guided-onboarding-offer.tsx";
 import { GovernanceHeroGround } from "../../../features/overview/ui/sections/governance-hero-ground.tsx";
 import { GovernanceHero } from "../../../features/overview/ui/sections/governance-hero.tsx";
 import { GovernanceHomeSections } from "../../../features/overview/ui/sections/governance-home-sections.tsx";

@@ -1,4 +1,4 @@
-import type { FilterField } from "@langwatch/analytics-filters";
+import type { FilterField } from "@langwatch/analytics-contract";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";

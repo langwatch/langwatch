@@ -1,5 +1,6 @@
 /** Onboarding UI and hooks lent by token to the spaces, pages and shell that read them. */
 
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 import type { GuidedOnboardingOfferProps, GuidedTourHooks } from "@langwatch/onboarding-contract";
 
@@ -31,3 +32,6 @@ export const GuidedTourStateToken = onboarding.hooks<GuidedTourState>("guidedTou
 export const GuidedPathActiveToken = onboarding.hooks<GuidedPathActive>("guidedPathActive");
 export const FirstTouchAttributionToken =
   onboarding.hooks<FirstTouchAttribution>("firstTouchAttribution");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const GuidedOnboardingOffer = lentComponent(GuidedOnboardingOfferToken);

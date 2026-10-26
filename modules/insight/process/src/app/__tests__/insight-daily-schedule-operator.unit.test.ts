@@ -99,6 +99,7 @@ describe("given schedules that are on and off for two people, and a board a thir
           conversationId: "conversation-1",
         },
         consecutiveSkips: 0,
+        daysUntilOff: 7,
       });
     });
 
@@ -132,6 +133,7 @@ describe("given a schedule a clean-up turned off, and one that is on with 2 skip
         state: "on",
         offReason: null,
         consecutiveSkips: 2,
+        daysUntilOff: 5,
         nextRunAt: schedule.slotOf({ day: 2, userId: OTHER_MEMBER }),
         lastRun: { outcome: "skipped", reason: "no_access" },
       });
@@ -140,6 +142,7 @@ describe("given a schedule a clean-up turned off, and one that is on with 2 skip
         state: "off",
         offReason: "member_removed",
         consecutiveSkips: 0,
+        daysUntilOff: null,
         nextRunAt: null,
         lastRun: null,
       });

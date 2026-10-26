@@ -50,12 +50,14 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({
-  LLMModelDisplay: () => <span>model display</span>,
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ModelDisplay: () => <span>model display</span>,
 }));
 
-vi.mock("../../../../behavior/lent-peers.tsx", () => ({
-  LLMConfigPopover: ({ builtInModels }: { builtInModels?: { label: string }[] }) => (
+vi.mock("@langwatch/prompt-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  LlmConfigPopover: ({ builtInModels }: { builtInModels?: { label: string }[] }) => (
     <ul aria-label="model options">
       {builtInModels?.map((model) => (
         <li key={model.label}>{model.label}</li>

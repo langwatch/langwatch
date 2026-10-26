@@ -1,6 +1,8 @@
 import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { UNKNOWN_ERROR_DESCRIPTION } from "@langwatch/browser-host/errors";
 import { Card } from "@langwatch/design-system/card";
 import { Alert, Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { AlertCircle, Clock } from "lucide-react";
 
 import { locateJsonPathNode } from "../../model/json-path-segments.ts";
@@ -19,17 +21,33 @@ export function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
+/** A failure the test call threw, kept as thrown so its copy resolves where the alert renders. */
+export type ThrownTestFailure = {
+  error: unknown;
+  /** Headline when the registry has no copy for the error. */
+  fallbackTitle: string;
+};
+
+function explanationOfThrown({ error, fallbackTitle }: ThrownTestFailure) {
+  const explanation = explainAnyError(error);
+  return {
+    title: explanation.isRegistered ? explanation.title : fallbackTitle,
+    description: explanation.description || UNKNOWN_ERROR_DESCRIPTION,
+  };
+}
+
 function TestFailure({
   result,
   explainError,
+  thrownFailure,
 }: {
   result: HttpTestResult;
   explainError?: HttpTestErrorExplanation;
+  thrownFailure?: ThrownTestFailure;
 }) {
-  const explanation = explainError?.({
-    errorCode: result.errorCode,
-    error: result.error,
-  }) ?? {
+  const explanation = (thrownFailure
+    ? explanationOfThrown(thrownFailure)
+    : explainError?.({ errorCode: result.errorCode, status: result.status })) ?? {
     title: "The request failed",
     description: void 0,
   };
@@ -41,16 +59,11 @@ function TestFailure({
       </Alert.Indicator>
       <Alert.Content>
         <Alert.Title>{explanation.title}</Alert.Title>
-        <Alert.Description>
-          <VStack align="start" gap={1}>
-            {explanation.description && <Text fontSize="sm">{explanation.description}</Text>}
-            {result.error && (
-              <Text fontFamily="mono" fontSize="xs" color="fg.muted">
-                {result.error /* no-raw-error-toast-ok */}
-              </Text>
-            )}
-          </VStack>
-        </Alert.Description>
+        {explanation.description && (
+          <Alert.Description>
+            <Text fontSize="sm">{explanation.description}</Text>
+          </Alert.Description>
+        )}
       </Alert.Content>
     </Alert.Root>
   );
@@ -59,10 +72,13 @@ function TestFailure({
 export function HttpTestResponseDisplay({
   result,
   explainError,
+  thrownFailure,
   outputPath,
 }: {
   result: HttpTestResult;
   explainError?: HttpTestErrorExplanation;
+  /** Set when the call threw rather than returning a result; its copy wins over `explainError`. */
+  thrownFailure?: ThrownTestFailure;
   /** The JSONPath whose node is marked in the response body. */
   outputPath?: string;
 }) {
@@ -101,7 +117,9 @@ export function HttpTestResponseDisplay({
         </Card>
       )}
 
-      {!result.success && <TestFailure result={result} explainError={explainError} />}
+      {!result.success && (
+        <TestFailure result={result} explainError={explainError} thrownFailure={thrownFailure} />
+      )}
 
       {result.warnings && result.warnings.length > 0 && (
         <Alert.Root status="warning">

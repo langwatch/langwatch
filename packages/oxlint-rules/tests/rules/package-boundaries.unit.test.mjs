@@ -10,7 +10,6 @@ const workspace = createFixtureWorkspace({
         contract: {},
         process: {},
         browser: { exports: ["./declaration"] },
-        "query-language": {},
         client: {},
       },
     },
@@ -19,7 +18,6 @@ const workspace = createFixtureWorkspace({
         contract: {},
         process: { exports: [".", "./testing"] },
         browser: { exports: ["./declaration", "./surfaces/project-picker"] },
-        "query-language": {},
       },
     },
     scenario: {
@@ -65,7 +63,6 @@ function ids(filename, code) {
 const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 const SERVICE_TEST = "modules/agent/process/src/services/__tests__/agent.integration.test.ts";
 const BROWSER = "modules/agent/browser/src/behavior/agent-list.ts";
-const LIBRARY = "modules/agent/query-language/src/parse.ts";
 
 describe("given package-boundaries", () => {
   describe("when a browser package imports another module's browser package", () => {
@@ -203,61 +200,14 @@ describe("given package-boundaries", () => {
     });
   });
 
-  describe("when a module library imports a runtime or an implementation package", () => {
-    /** @scenario "A module library importing a runtime or implementation is reported as libraryRuntime" */
-    it("reports libraryRuntime for node, react, framework and implementation packages", () => {
-      for (const specifier of [
-        "node:fs",
-        "react",
-        "@langwatch/process",
-        "@langwatch/agent-process",
-        "@langwatch/agent-browser/declaration",
-        "@langwatch/project-contract",
-      ]) {
-        expect(ids(LIBRARY, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
-      }
-    });
-
+  describe("when a module client imports react or a browser runtime", () => {
     /** @scenario "A module client may take react for generic hooks and nothing else of the browser" */
     it("lets a module client import react, and still reports react-dom and chakra", () => {
       const client = "modules/agent/client/src/use-agents.ts";
       expect(ids(client, 'import { useMemo } from "react";')).toEqual([]);
-      expect(ids(LIBRARY, 'import { useMemo } from "react";')).toEqual(["libraryRuntime"]);
       for (const specifier of ["react-dom", "@chakra-ui/react", "@langwatch/browser"]) {
         expect(ids(client, `import { x } from "${specifier}";`)).toEqual(["clientRuntime"]);
       }
-    });
-
-    /** @scenario "A module library importing its own contract and other libraries is left alone" */
-    it("leaves its own contract, another library and a framework-free package alone", () => {
-      const code = [
-        'import type { Agent } from "@langwatch/agent-contract";',
-        'import { parse } from "@langwatch/project-query-language";',
-        'import { z } from "zod";',
-      ].join("\n");
-
-      expect(report(LIBRARY, code)).toEqual([]);
-    });
-  });
-
-  describe("when a package imports a module library", () => {
-    /** @scenario "Process, browser and application code may import any module's library" */
-    it("leaves process, browser and application imports alone", () => {
-      const code = 'import { parse } from "@langwatch/project-query-language";';
-
-      for (const filename of [SERVICE, BROWSER, "apps/api/src/main.ts"]) {
-        expect(report(filename, code)).toEqual([]);
-      }
-    });
-
-    /** @scenario "A contract importing its module's library is reported as contractRuntime" */
-    it("reports contractRuntime when the contract imports it", () => {
-      expect(
-        ids(
-          "modules/agent/contract/src/agent.commands.ts",
-          'import { parse } from "@langwatch/agent-query-language";',
-        ),
-      ).toEqual(["contractRuntime"]);
     });
   });
 

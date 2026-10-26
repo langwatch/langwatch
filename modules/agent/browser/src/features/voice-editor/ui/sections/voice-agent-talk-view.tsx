@@ -1,7 +1,7 @@
 import { Button, VStack } from "@langwatch/design-system/primitives";
+import { TalkToItPanel } from "@langwatch/scenario-client/lent";
 import { ArrowLeft } from "lucide-react";
 
-import { TalkToItPanel } from "../../behavior/lent-talk-to-it-panel.tsx";
 import type { VoiceAgentEditor } from "../../behavior/use-voice-agent-editor.ts";
 
 /** The call panel scenario lends, handed the draft as it stands (no save first). */

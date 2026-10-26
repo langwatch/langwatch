@@ -1,3 +1,4 @@
+import { EvaluatorExecutionError } from "@langwatch/evaluation-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 
 export type EvaluatorDomainErrorExplanation = {
@@ -19,7 +20,7 @@ export function explainEvaluatorDomainError(
   domain: SerializedHandledError,
 ): EvaluatorDomainErrorExplanation | null {
   switch (domain.kind) {
-    case "evaluator_execution_error": {
+    case EvaluatorExecutionError.code: {
       const status = domain.meta.httpStatus;
       if (status !== 401 && status !== 403) return null;
 

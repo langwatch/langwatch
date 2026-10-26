@@ -14,6 +14,7 @@ const LWQL_WORKBENCH_FLAG = "release_lwql_workbench";
  * Langy's skill stop retrying and reach for `chart`.
  */
 export class CustomChartPlaygroundNotEnabledError extends HandledError {
+  static readonly code = "custom_chart_playground_not_enabled" as const;
   declare readonly code: "custom_chart_playground_not_enabled";
 
   constructor() {
@@ -35,6 +36,7 @@ export class CustomChartPlaygroundNotEnabledError extends HandledError {
  * as {@link SavedWorkbenchChartNotFoundError}, applied to this id space.
  */
 export class DashboardWidgetNotFoundError extends HandledError {
+  static readonly code = "dashboard_widget_not_found" as const;
   declare readonly code: "dashboard_widget_not_found";
 
   constructor() {
@@ -52,6 +54,7 @@ export class DashboardWidgetNotFoundError extends HandledError {
  * it to the customer would file a real defect as routine noise.
  */
 export class DashboardWidgetDefinitionInvalidError extends HandledError {
+  static readonly code = "dashboard_widget_definition_invalid" as const;
   declare readonly code: "dashboard_widget_definition_invalid";
 
   constructor(widgetId: string, options: { reasons?: readonly Error[] } = {}) {

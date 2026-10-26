@@ -32,50 +32,50 @@ checkOne(name: PlatformHealthCheckName, query: PlatformHealthCheckInput): Promis
 
 |             |                                                  |
 | ----------- | ------------------------------------------------ |
-| Declared at | `src/transport/platform-health-probe.rest.ts:34` |
+| Declared at | `src/transport/platform-health-probe.rest.ts:64` |
 | Base URL    | none: each route's path is its address           |
 | Addressing  | literal                                          |
 | Credential  | project                                          |
 
 #### `GET /api/health/collector` · `probeCollectorHealth`
 
-Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:39`.
+Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:69`.
 
 Answers at `/api/health/collector`.
 
 ```typescript
 type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
-// Response: inline, src/transport/platform-health-probe.rest.ts:42
+// Response: inline, src/transport/platform-health-probe.rest.ts:72
 type Response = unknown;
 ```
 
 #### `GET /api/health/evaluations` · `probeEvaluationsHealth`
 
-Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:48`.
+Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:82`.
 
 Answers at `/api/health/evaluations`.
 
 ```typescript
 type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
-// Response: inline, src/transport/platform-health-probe.rest.ts:51
+// Response: inline, src/transport/platform-health-probe.rest.ts:85
 type Response = unknown;
 ```
 
 #### `GET /api/health/processor` · `probeProcessorHealth`
 
-Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:57`.
+Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:95`.
 
 Answers at `/api/health/processor`.
 
 ```typescript
 type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
-// Response: inline, src/transport/platform-health-probe.rest.ts:60
+// Response: inline, src/transport/platform-health-probe.rest.ts:98
 type Response = unknown;
 ```
 
 #### `GET /api/health/triggers` · `probeTriggersHealth`
 
-Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:66`.
+Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:108`.
 
 Answers at `/api/health/triggers`.
 
@@ -86,26 +86,26 @@ interface Query {
   workflowId?: string;
 }
 type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
-// Response: inline, src/transport/platform-health-probe.rest.ts:70
+// Response: inline, src/transport/platform-health-probe.rest.ts:112
 type Response = unknown;
 ```
 
 #### `GET /api/health/workflows` · `probeWorkflowsHealth`
 
-Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:83`.
+Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:127`.
 
 Answers at `/api/health/workflows`.
 
 ```typescript
 type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:76
 type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
-// Response: inline, src/transport/platform-health-probe.rest.ts:87
+// Response: inline, src/transport/platform-health-probe.rest.ts:131
 type Response = unknown;
 ```
 
 #### `GET /api/health/scenarios` · `probeScenariosHealth`
 
-Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:100`.
+Public: a project key presented as X-Auth-Token or Authorization: Bearer is resolved by the probe itself, as main's did, and forwarded to the canaries it runs. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:146`.
 
 Answers at `/api/health/scenarios`.
 
@@ -115,7 +115,7 @@ interface Query {
   runPlanId?: string;
 }
 type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
-// Response: inline, src/transport/platform-health-probe.rest.ts:104
+// Response: inline, src/transport/platform-health-probe.rest.ts:150
 type Response = unknown;
 ```
 
@@ -123,19 +123,19 @@ type Response = unknown;
 
 |             |                                                   |
 | ----------- | ------------------------------------------------- |
-| Declared at | `src/transport/platform-health-probe.rest.ts:120` |
+| Declared at | `src/transport/platform-health-probe.rest.ts:168` |
 | Base URL    | none: each route's path is its address            |
 | Addressing  | literal                                           |
 | Credential  | project                                           |
 
 #### `GET /api/health/langy` · `probeLangyHealth`
 
-Permission `langy:create`. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:126`.
+Permission `langy:create`. Hidden from the OpenAPI document. Declared at `src/transport/platform-health-probe.rest.ts:174`.
 
 Answers at `/api/health/langy`.
 
 ```typescript
-// Response: inline, src/transport/platform-health-probe.rest.ts:128
+// Response: inline, src/transport/platform-health-probe.rest.ts:176
 type Response = unknown;
 ```
 
@@ -204,8 +204,8 @@ None: platform-health declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf            | Environment variable            | Declared at                                   |
 | ------ | --------------- | ------------------------------- | --------------------------------------------- |
-| secret | `probeApiKey`   | `PLATFORM_HEALTH_PROBE_API_KEY` | `src/app/platform-health.app.ts:70`           |
-| secret | `apiKey`        | `PLATFORM_HEALTH_API_KEY`       | `src/app/platform-health.app.ts:71`           |
+| secret | `probeApiKey`   | `PLATFORM_HEALTH_PROBE_API_KEY` | `src/app/platform-health.app.ts:71`           |
+| secret | `apiKey`        | `PLATFORM_HEALTH_API_KEY`       | `src/app/platform-health.app.ts:72`           |
 | config | `publicBaseUrl` | `BASE_HOST`                     | `../contract/src/platform-health.config.ts:4` |
 
 <!-- readme:generated:end -->

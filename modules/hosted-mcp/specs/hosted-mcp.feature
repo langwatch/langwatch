@@ -129,3 +129,85 @@ Feature: Hosted MCP answers main's root paths on the api process
     When nothing else is sent for 20 seconds
     Then the stream carries a keepalive comment
     And the session keeps counting against its key's session limit
+
+  # The endpoint decides each answer as data; the raw HTTP door alone writes it (Alex, 2026-10-20).
+
+  @unit
+  Scenario: The endpoint answers a request without touching the response
+    Given a hosted MCP endpoint
+    When it is asked about "/mcp/health" as plain values
+    Then it answers 200 with status "ok" and the CORS headers, as data
+
+  @unit
+  Scenario: A client that leaves before its answer is decided is still logged
+    Given a client that disconnects while the endpoint is still deciding its answer
+    When the answer is decided
+    Then the access log line is written with the status the response closed on
+
+  @unit
+  Scenario: The endpoint names the access log fields beside its answer
+    Given a hosted MCP endpoint
+    When it answers a request carrying a session id and a user agent
+    Then it returns the method, path, client and session id with the answer
+    And it leaves the status and the duration for the door to add
+
+  @unit
+  Scenario: A stream answer is data: the SDK transport and the session key
+    Given a hosted MCP endpoint whose project key is live
+    When an authenticated initialize request opens a session
+    Then the answer is a stream holding only the SDK transport, the session key and the body
+
+  @unit
+  Scenario: The door drives a stream through the session runner it was handed
+    Given the session runner the endpoint gives the door where it is composed
+    When the door runs a stream's work through it
+    Then the work runs as that session's key
+
+  @unit
+  Scenario: A stream that fails to start keeps its unbuffered header
+    Given a hosted MCP endpoint whose session server fails to start
+    When an authenticated initialize request arrives
+    Then the answer is a 500 that still tells proxies not to buffer
+
+  @unit
+  Scenario: A preflight on an MCP path answers with the CORS headers alone
+    Given a hosted MCP endpoint
+    When an OPTIONS request reaches "/mcp"
+    Then the answer is an empty 200 carrying the CORS headers
+
+  @unit
+  Scenario: An unknown path or method is refused in the endpoint's own shape
+    Given a hosted MCP endpoint
+    When a request names a path or a method the endpoint does not serve
+    Then the answer is the 404 or the 405 in the endpoint's error shape
+
+  @unit
+  Scenario: A request without a bearer is told where to sign in
+    Given a hosted MCP endpoint
+    When an initialize request arrives with no bearer
+    Then the answer is a 401 naming the protected resource metadata in WWW-Authenticate
+
+  @unit
+  Scenario: A failure while deciding answers in the endpoint's shape rather than rejecting
+    Given a hosted MCP endpoint whose body read fails
+    When a request that reads its body arrives
+    Then the answer is a 500 "Internal server error"
+
+  @unit
+  Scenario: A body past the cap is refused before it is parsed
+    Given a request whose body passed the size cap
+    When the endpoint reads it
+    Then the answer is the 413 "Request body too large"
+
+  @unit
+  Scenario: A rate-limited refusal says when to retry
+    Given a refusal that carries a retry delay
+    When the endpoint answers it
+    Then the answer carries Retry-After
+
+  @unit
+  Scenario: The client address is the one the process resolved, never a header
+    Given a request with forwarding headers and a socket peer
+    When the endpoint reads the client address
+    Then it is the address the process resolved through its trusted proxies, else the socket peer
+    And no forwarding header is read by the endpoint itself

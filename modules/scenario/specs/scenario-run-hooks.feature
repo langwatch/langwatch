@@ -61,7 +61,7 @@ Feature: Scenario run hooks: setup and teardown
       Then no turn is called
       And teardown was called once
 
-    @integration @unimplemented
+    @integration @unimplemented @issue:8894
     Scenario: Teardown after a failed setup receives the partial state
       Given a setup that fails after reporting partial state
       Then the teardown call carries that partial state
@@ -71,7 +71,7 @@ Feature: Scenario run hooks: setup and teardown
       Given a setup that does not answer within its timeout
       Then teardown was called once
 
-    @integration @unimplemented
+    @integration @unimplemented @issue:8894
     Scenario: Teardown runs when the run is cancelled
       Given a run cancelled during the turns
       Then teardown was called once
@@ -83,14 +83,14 @@ Feature: Scenario run hooks: setup and teardown
       Then teardown was attempted before the result line was written
 
     # Decided in principle. The mechanism is open.
-    @integration @unimplemented
+    @integration @unimplemented @issue:8894
     Scenario: A killed child gets a fallback teardown from the parent worker
       Given a child process killed after setup
       When the parent worker sees the child die
       Then the parent worker runs a teardown with the last known state
       And the run records the hook as run by the fallback
 
-    @integration @unimplemented
+    @integration @unimplemented @issue:8894
     Scenario: A killed child that never finished setup gets no fallback teardown call without state
       Given a child killed before setup answered
       When the parent worker sees the child die
@@ -187,19 +187,19 @@ Feature: Scenario run hooks: setup and teardown
       Given a scenario with no hook timeout
       Then the setup and teardown timeouts are 60 seconds
 
-    @unit @unimplemented
+    @unit @unimplemented @issue:8894
     Scenario: A scenario sets its own hook timeout
       Given a scenario that sets a 120 second hook timeout
       Then the setup and teardown timeouts are 120 seconds
 
-    @unit @unimplemented
+    @unit @unimplemented @issue:8894
     Scenario: A hook timeout is never longer than the child's lifetime
       Given a scenario that sets a hook timeout above the child's lifetime
       Then the scenario is refused with a message naming the limit
 
   Rule: Where hooks run
 
-    @unit @unimplemented
+    @unit @unimplemented @issue:8894
     Scenario Outline: Surfaces other than a scenario run never call hooks
       Given a connected agent that declares both hooks
       When it is called from <surface>
@@ -262,7 +262,7 @@ Feature: Scenario run hooks: setup and teardown
       Then the run does not show "No hooks"
       And the run offers no "Rerun and keep data"
 
-    @unit @unimplemented
+    @unit @unimplemented @issue:8894
     Scenario: Keep data is never saved to a plan
       Given a run started with "Rerun and keep data"
       When the person saves the run into a plan

@@ -1,3 +1,11 @@
+import {
+  SecretDuplicateError,
+  SecretLimitReachedError,
+  SecretNotFoundError,
+  SecretReservedNameError,
+  SecretUnreadableError,
+} from "@langwatch/secret-contract";
+
 /** Kept means no action can ever make the move possible; anything an operator can fix is held. */
 export type AgentCredentialKeptReason =
   | "project_not_found"
@@ -18,17 +26,17 @@ export type AgentCredentialOutcome = { agentId: string; projectId: string; reaso
 /** Keyed by handled code, compared by value: a peer's error may have crossed a boundary. */
 const KEPT_REASON_BY_CODE: Readonly<Record<string, AgentCredentialKeptReason>> = {
   // A secret write resolves the project's team to attribute it; an orphan project has none.
-  secret_not_found: "project_not_found",
+  [SecretNotFoundError.code]: "project_not_found",
   agent_not_found: "agent_not_found",
   // Names derive from the agent's immutable id and the reserved list is code.
-  secret_name_reserved: "secret_name_reserved",
+  [SecretReservedNameError.code]: "secret_name_reserved",
 };
 
 const HELD_REASON_BY_CODE: Readonly<Record<string, AgentCredentialHeldReason>> = {
   authenticated_actor_required: "project_has_no_member",
-  secret_limit_reached: "secret_limit_reached",
-  secret_unreadable: "secret_unreadable",
-  secret_already_exists: "secret_name_taken",
+  [SecretLimitReachedError.code]: "secret_limit_reached",
+  [SecretUnreadableError.code]: "secret_unreadable",
+  [SecretDuplicateError.code]: "secret_name_taken",
 };
 
 /** The handled code an error carries; an unhandled one carries none. */

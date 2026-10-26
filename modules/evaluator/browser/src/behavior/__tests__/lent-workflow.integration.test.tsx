@@ -6,12 +6,12 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
-import { HoverableBigTextToken } from "@langwatch/workflow-client";
+import { HoverableBigText, HoverableBigTextToken } from "@langwatch/workflow-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { HoverableBigText, RedactedField } from "../lent-workflow.tsx";
+import { RedactedField } from "../lent-workflow.tsx";
 
 const workflowLends = uiDeclarations([
   {

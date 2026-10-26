@@ -13,7 +13,7 @@ import {
   type InstantEvalShorthandInput,
 } from "@langwatch/instant-eval-contract";
 import type { Instant } from "@langwatch/time";
-import type { LangWatchQLTraceFilter } from "@langwatch/trace-contract";
+import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";
 
 import {
   type CompiledInstantEvalFilter,
@@ -141,7 +141,7 @@ export function compileInstantEvalFilter({
   try {
     return compile({ filter });
   } catch (error) {
-    if (error instanceof HandledError && error.code === "filter_parse_error") {
+    if (error instanceof HandledError && FilterParseError.is(error)) {
       throw new InstantEvalQueryInvalidError({
         reason: `That filter could not be read: ${error.message}`,
         fields: ["filter"],

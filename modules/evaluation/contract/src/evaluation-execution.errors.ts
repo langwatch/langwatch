@@ -6,6 +6,7 @@ import {
 } from "@langwatch/handled-error";
 
 export class TraceNotEvaluatableError extends HandledError {
+  static readonly code = "trace_not_evaluatable" as const;
   declare readonly code: "trace_not_evaluatable";
 
   constructor(traceId: string, options: { reasons?: readonly Error[] } = {}) {
@@ -24,6 +25,7 @@ export class TraceNotEvaluatableError extends HandledError {
  * {@link EvaluatorExecutionError} (fault is customer's) to allow actionable messages.
  */
 export class EvaluatorInputTooLargeError extends HandledError {
+  static readonly code = "evaluator_input_too_large" as const;
   declare readonly code: "evaluator_input_too_large";
 
   constructor(options: HandledErrorOptions = {}) {
@@ -42,6 +44,7 @@ export class EvaluatorInputTooLargeError extends HandledError {
 }
 
 export class EvaluatorExecutionError extends HandledError {
+  static readonly code = "evaluator_execution_error" as const;
   declare readonly code: "evaluator_execution_error";
 
   /** `httpStatus` 503 with `retryable` marks an evaluator service that is not up yet. */
@@ -64,6 +67,7 @@ export class EvaluatorExecutionError extends HandledError {
  * `meta` names the raw field so the client can show user-facing text, not the wire id.
  */
 export class EvaluatorMissingFieldError extends HandledError {
+  static readonly code = "evaluator_missing_field" as const;
   declare readonly code: "evaluator_missing_field";
 
   constructor(field: string, evaluatorName: string, options: { reasons?: readonly Error[] } = {}) {
@@ -81,6 +85,7 @@ export class EvaluatorMissingFieldError extends HandledError {
 }
 
 export class EvaluatorNotFoundError extends NotFoundError {
+  static readonly code = "evaluator_not_found" as const;
   declare readonly code: "evaluator_not_found";
 
   constructor(evaluatorType: string, options: { reasons?: readonly Error[] } = {}) {

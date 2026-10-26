@@ -1,5 +1,6 @@
 /** Dataset UI lent by token to the modules that pick, create, edit and sync datasets (§10.1). */
 
+import { lentComponent } from "@langwatch/browser-host/lent";
 import type { DatasetColumn, DatasetColumns } from "@langwatch/dataset-contract";
 import { uiTokens } from "@langwatch/module";
 import type { ReactNode } from "react";
@@ -95,3 +96,9 @@ export const AddOrEditDatasetRoutedDrawerToken =
   tokens.drawer<AddOrEditDatasetDrawerProps>("addOrEditDataset");
 export const SelectDatasetDrawerToken = tokens.drawer<UiSelectDatasetDrawerProps>("selectDataset");
 export const UploadCsvDrawerToken = tokens.drawer<UiUploadCsvDrawerProps>("uploadCSV");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const DatasetEditorTable = lentComponent(DatasetEditorTableToken);
+export const DatasetPickerList = lentComponent(DatasetPickerListToken);
+export const AddOrEditDatasetDrawer = lentComponent(AddOrEditDatasetDrawerToken);
+export const DatasetRecordSync = lentComponent(DatasetRecordSyncToken);

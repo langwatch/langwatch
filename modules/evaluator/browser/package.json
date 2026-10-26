@@ -22,7 +22,6 @@
     "@hookform/resolvers": "catalog:",
     "@langwatch/analytics-client": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
-    "@langwatch/analytics-filters": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-client": "workspace:*",
     "@langwatch/browser": "workspace:*",

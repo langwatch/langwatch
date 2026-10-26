@@ -20,7 +20,6 @@ import {
   revisionOf,
   targetApi,
 } from "./census.ts";
-import { collectRawColours } from "./raw-colours.ts";
 
 const ROOT = path.resolve(PACKAGE_ROOT, "../..");
 const CONSUMER_DIRS = ["apps", "modules", "enterprise", "packages"];
@@ -50,7 +49,6 @@ export type Adoption = {
   >;
   debt: {
     directChakra: Debt;
-    rawColour: Debt;
     paletteStep: Debt;
     handRolledTable: Debt;
     shapeDrift: Debt;
@@ -178,9 +176,6 @@ export function collectAdoption(): Adoption {
           pattern: "from [\"']@(chakra-ui|emotion)/",
           paths: [...SOURCE_GLOBS, ...NOT_CONSUMER],
         }),
-      }),
-      rawColour: debtFrom({
-        lines: collectRawColours(),
       }),
       paletteStep: debtFrom({
         lines: grep({

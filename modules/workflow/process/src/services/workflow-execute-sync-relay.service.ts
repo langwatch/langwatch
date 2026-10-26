@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ExecuteSyncRelayEvent } from "@langwatch/workflow-contract";
+import type { ExecuteSyncRelayAnswer, ExecuteSyncRelayEvent } from "@langwatch/workflow-contract";
 
 import type { WorkflowNlpRuntime } from "../app/workflow.app.ts";
 import {
@@ -34,7 +34,7 @@ export class WorkflowExecuteSyncRelayService {
     projectId: string;
     event: ExecuteSyncRelayEvent;
     signal: AbortSignal;
-  }): Promise<Response> {
+  }): Promise<ExecuteSyncRelayAnswer> {
     try {
       const answer = await this.options.runtime.dispatch({
         projectId,
@@ -43,15 +43,16 @@ export class WorkflowExecuteSyncRelayService {
         signal,
         timeoutMs: this.options.turnCeilingMs,
       });
-      return new Response(await answer.text(), { status: answer.status });
+      const body = await answer.text();
+      return { kind: "engine", status: answer.status, body };
     } catch (error) {
       if (error instanceof NlpInvokeTimeoutError) {
         logger.warn({ projectId }, "scenario execute_sync exceeded the platform turn ceiling");
-        return Response.json({ error: "The engine did not answer in time" }, { status: 504 });
+        return { kind: "refused", status: 504, error: "The engine did not answer in time" };
       }
       // The child is gone; answering keeps a stopped run out of the error log.
       if (error instanceof NlpInvokeAbortedError) {
-        return Response.json({ error: "The caller went away" }, { status: 408 });
+        return { kind: "refused", status: 408, error: "The caller went away" };
       }
       throw error;
     }

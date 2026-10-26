@@ -4,8 +4,10 @@
  * @see specs/ai-gateway/governance/cli-login.feature
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type { CliDeviceCodeRecord } from "../services/cli-device-session.service.ts";
 
@@ -46,14 +48,11 @@ export function posted(raw: string): unknown {
 
 /** Each directory read's own not-found code, and nothing else. */
 export function isPersonOrOrganizationGone(error: unknown): boolean {
-  return (
-    HandledError.isHandled(error) &&
-    (error.code === "user_not_found" || error.code === "organization_not_found")
-  );
+  return UserNotFoundError.is(error) || OrganizationNotFoundError.is(error);
 }
 
 export function isProjectGone(error: unknown): boolean {
-  return HandledError.isHandled(error) && error.code === "project_not_found";
+  return ProjectNotFoundError.is(error);
 }
 
 /** A JSON body this family writes itself, exactly as its clients read it. */

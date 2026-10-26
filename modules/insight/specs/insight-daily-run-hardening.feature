@@ -241,6 +241,7 @@ Feature: The daily insights run before a wider rollout
       When the operator's list is read
       Then the first reads off with the reason and no next run
       And the second reads on with 2 skipped days and the slot its process has armed
+      And the second says 5 more skipped days turn it off, and the first says nothing is left to turn off
 
     @unit
     Scenario: A schedule that lost its wake reads on with no next run

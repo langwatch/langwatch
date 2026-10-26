@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 /** This deployment names no collector, so browser telemetry has nowhere to go. */
 export class RumIngestDisabledError extends HandledError {
+  static readonly code = "rum_ingest_disabled" as const;
   declare readonly code: "rum_ingest_disabled";
 
   constructor() {
@@ -15,6 +16,7 @@ export class RumIngestDisabledError extends HandledError {
 
 /** The report is over the byte cap or the span cap. */
 export class RumPayloadTooLargeError extends HandledError {
+  static readonly code = "rum_payload_too_large" as const;
   declare readonly code: "rum_payload_too_large";
 
   constructor(message = "Payload too large") {
@@ -25,6 +27,7 @@ export class RumPayloadTooLargeError extends HandledError {
 
 /** The report is not an OTLP/JSON trace export this door can walk. */
 export class RumPayloadInvalidError extends HandledError {
+  static readonly code = "rum_payload_invalid" as const;
   declare readonly code: "rum_payload_invalid";
 
   constructor() {
@@ -35,6 +38,7 @@ export class RumPayloadInvalidError extends HandledError {
 
 /** The caller's bucket, or the whole door's, is spent for this minute. */
 export class RumRateLimitedError extends HandledError {
+  static readonly code = "rum_rate_limited" as const;
   declare readonly code: "rum_rate_limited";
 
   constructor() {

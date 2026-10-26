@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   foldSkipStreak,
   isLastSkippedDay,
+  skippedDaysUntilOff,
   NO_SKIP_STREAK,
   restartSkipStreak,
   scheduledRunId,
@@ -141,5 +142,15 @@ describe("given a scheduled run that ends skipped", () => {
     expect(isLastSkippedDay({ skippedDaysBefore: 5 })).toBe(false);
     expect(isLastSkippedDay({ skippedDaysBefore: 6 })).toBe(true);
     expect(isLastSkippedDay({ skippedDaysBefore: 9 })).toBe(true);
+  });
+});
+
+describe("given a schedule that is on", () => {
+  describe("when the days left before it turns off are counted", () => {
+    it("answers 7 with no skipped day, 1 after 6, and never below 0", () => {
+      expect(skippedDaysUntilOff({ consecutiveSkips: 0 })).toBe(7);
+      expect(skippedDaysUntilOff({ consecutiveSkips: 6 })).toBe(1);
+      expect(skippedDaysUntilOff({ consecutiveSkips: 9 })).toBe(0);
+    });
   });
 });

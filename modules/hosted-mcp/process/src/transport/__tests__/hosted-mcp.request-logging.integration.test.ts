@@ -3,7 +3,7 @@
 // process's Hono stack, so they never reached the access log, the metrics or
 // the traces the rest of the deployment produces. A broken integration was
 // invisible: nothing recorded that the request had happened at all.
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import { createServer, type Server } from "node:http";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -46,7 +46,11 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
-import type { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
+import type {
+  McpClientAddressSource,
+  ResolvedMcpClientAddressService,
+} from "../../services/resolved-mcp-client-address.service.ts";
+import { answerMcpExchange } from "../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 class LoggingProjectLookup implements Pick<
@@ -69,8 +73,8 @@ class AlwaysGranted implements Pick<AuthzMcpSessionGrantService, "stillGranted">
 }
 
 class LoopbackAddress implements Pick<ResolvedMcpClientAddressService, "clientIp"> {
-  clientIp(request: IncomingMessage): string {
-    return request.socket.remoteAddress ?? "127.0.0.1";
+  clientIp(request: McpClientAddressSource): string {
+    return request.clientAddress ?? "127.0.0.1";
   }
 }
 
@@ -189,7 +193,9 @@ describe("Feature: MCP request logging", () => {
       address: new LoopbackAddress(),
       baseHost: "https://app.langwatch.ai",
     });
-    server = createServer((req, res) => handler.handleRequest(req, res));
+    server = createServer((request, response) =>
+      answerMcpExchange({ endpoint: handler, runner: handler.sessionRunner, request, response }),
+    );
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     baseUrl = `http://127.0.0.1:${portOf(server)}`;
   });

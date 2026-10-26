@@ -8,11 +8,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Trace's lent menu reaches a skill-prompt query these scenarios never open;
 // only its trigger's own label and ordering are asserted.
-vi.mock("../../../../../behavior/lent-peers.tsx", () => ({
+vi.mock("@langwatch/navigation-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   InlineCommandPalette: ({ placeholder }: { placeholder: string }) => (
     <input placeholder="ask" aria-label={placeholder} />
   ),
+}));
+vi.mock("@langwatch/onboarding-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   GuidedOnboardingOffer: () => null,
+}));
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   AgentActionsMenu: ({ trigger }: { trigger: React.ReactNode }) => trigger,
 }));
 

@@ -8,10 +8,10 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { HStack, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { SetupWithAgentButton } from "@langwatch/trace-client";
 import { Activity, Plus, Shield } from "lucide-react";
 import { useState } from "react";
 
-import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
 import { monitorApi } from "../../behavior/monitor-api.ts";
 import { useOnlineEvaluations } from "../../behavior/use-online-evaluations.ts";
 import { useMonitorHost } from "../../model/monitor-host.ts";

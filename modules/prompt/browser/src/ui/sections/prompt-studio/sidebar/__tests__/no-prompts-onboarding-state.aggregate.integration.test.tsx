@@ -26,7 +26,8 @@ vi.mock("../../../../../model/prompt-host.ts", () => ({
   usePromptHost: () => ({ requestUpgrade: vi.fn() }),
 }));
 
-vi.mock("../../../../../behavior/lent-setup-with-agent-button.tsx", () => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   SetupWithAgentButton: () => null,
 }));
 

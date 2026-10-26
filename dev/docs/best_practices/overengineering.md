@@ -125,7 +125,7 @@ Before adding an abstraction, and when reviewing one:
 ## What this is not
 
 It is not an argument for fewer files, or for putting everything in one class.
-Trace's canonicalisers (`modules/trace/process/src/services/*-canonicaliser.service.ts`)
+Trace's canonicalisers (`packages/span-normalisation/src/**/*Canonicaliser.ts`)
 are sixteen files, one per vendor, and that is correct: the set is open and its
 members vary independently. `DatasetStorage` has three implementations and earns
 its interface.

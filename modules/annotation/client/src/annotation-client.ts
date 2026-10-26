@@ -11,6 +11,7 @@ import {
   type ModuleApi,
   type OutputsFromMap,
 } from "@langwatch/api/web";
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 
 type AnnotationApiMap = ContractApiMap<typeof annotationScoreTrpc> &
@@ -48,3 +49,8 @@ export const AnnotateBodyToken =
 export const SuggestBodyToken = uiTokens("annotation").component<SuggestBodyProps>("suggestBody");
 export const AnnotationFormFooterToken =
   uiTokens("annotation").component<AnnotationFormFooterProps>("annotationFormFooter");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const AnnotateBody = lentComponent(AnnotateBodyToken);
+export const AnnotationFormFooter = lentComponent(AnnotationFormFooterToken);
+export const SuggestBody = lentComponent(SuggestBodyToken);

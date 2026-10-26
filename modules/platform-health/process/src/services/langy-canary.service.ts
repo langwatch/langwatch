@@ -12,6 +12,7 @@ import {
   type LangyCanaryOutcome,
   type LangyCanaryResult,
 } from "../rules/langy-canary.rules.ts";
+import type { LangyProbeAnswer } from "../rules/probe-answers.rules.ts";
 import { deriveProbeCause } from "../rules/probe-cause.rules.ts";
 
 const logger = createLogger("langwatch:langy-canary");
@@ -27,13 +28,6 @@ const REAL_CLOCK: LangyCanaryClock = {
   now: () => nowInstant().epochMilliseconds,
   budgetMs: LANGY_CANARY_BUDGET_MS,
 };
-
-/** Hono's own 404, byte-for-byte what an unmounted path returns: a dark surface reveals nothing. */
-const darkNotFound = (): Response =>
-  new Response("404 Not Found", {
-    status: 404,
-    headers: { "Content-Type": "text/plain;charset=UTF-8" },
-  });
 
 function abortedPromise(signal: AbortSignal): Promise<{ aborted: true }> {
   return new Promise((resolve) => {
@@ -63,9 +57,9 @@ export class LangyCanaryService {
     return new LangyCanaryService(options.langy, options.clock ?? REAL_CLOCK);
   }
 
-  async probe(key: LangyKeyCaller): Promise<Response> {
+  async probe(key: LangyKeyCaller): Promise<LangyProbeAnswer> {
     const caller = await this.langy.getRestCaller({ ...key, surface: "turns" });
-    if (caller.dark) return darkNotFound();
+    if (caller.dark) return { kind: "dark" };
 
     const session = await this.langy.getRestActor({ userId: caller.userId });
     logger.info({ projectId: caller.projectId, userId: session.user.id }, "Running Langy canary");
@@ -73,10 +67,7 @@ export class LangyCanaryService {
     const checkId = generate("langycanary").toString();
     const result = await this.#singleFlight({ projectId: caller.projectId, session, checkId });
     const { status, body } = langyCanaryAnswer(result);
-    return new Response(JSON.stringify(body), {
-      status,
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-    });
+    return { kind: "canary", status, body };
   }
 
   #singleFlight(input: {

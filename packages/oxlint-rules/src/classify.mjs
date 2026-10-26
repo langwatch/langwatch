@@ -33,7 +33,7 @@ const PRISMA_REPOSITORY_SEAM = new RegExp(
   `^(?:enterprise/)?modules/[^/]+/process/src/${FEATURE_PREFIX}repositories/prisma/.+\\.repository\\.ts$`,
 );
 const MODULE_PACKAGE = /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser)(?:\/|$)/;
-const LIBRARY_SOURCE = /^((?:enterprise\/)?modules\/([^/]+)\/[^/]+)\/(.+)$/;
+const CLIENT_SOURCE = /^((?:enterprise\/)?modules\/([^/]+)\/client)\/(.+)$/;
 const MODULE_ROLES = ["contract", "process", "browser"];
 const PROCESS_LAYERS = new Set([
   "services",
@@ -64,7 +64,7 @@ const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
 
 const classificationCache = new Map();
 const modulePackageCache = new Map();
-const libraryRootCache = new Map();
+const clientRootCache = new Map();
 const featureLayoutPackageCache = new Map();
 // Every rule classifies the same file in turn: the last answer is checked before a key is built.
 let last;
@@ -128,7 +128,7 @@ function classifyPath(cwd, filename) {
   const workspacePath = workspacePathOf(cwd, filename);
   const isTest = TEST_FILE.test(workspacePath) || TEST_DIRECTORY.test(workspacePath);
   const modulePackage = workspacePath.match(MODULE_PACKAGE);
-  const library = modulePackage ? undefined : libraryPackageOf(cwd, workspacePath);
+  const client = modulePackage ? undefined : clientPackageOf(cwd, workspacePath);
   const base = {
     enterprise: false,
     feature: undefined,
@@ -139,8 +139,8 @@ function classifyPath(cwd, filename) {
     isTest,
     kind: undefined,
     layer: undefined,
-    module: modulePackage?.[2] ?? library?.module,
-    moduleEnterprise: Boolean(modulePackage?.[1]) || Boolean(library?.enterprise),
+    module: modulePackage?.[2] ?? client?.module,
+    moduleEnterprise: Boolean(modulePackage?.[1]) || Boolean(client?.enterprise),
     relative: undefined,
     role: "other",
     sourcePath: undefined,
@@ -151,16 +151,16 @@ function classifyPath(cwd, filename) {
   const feature = workspacePath.match(FEATURE_SOURCE);
   if (feature) return featureClassification({ base, feature });
 
-  if (library && PACKAGE_SOURCE_OR_TESTS.test(library.relative)) {
+  if (client && PACKAGE_SOURCE_OR_TESTS.test(client.relative)) {
     return {
       ...base,
-      enterprise: library.enterprise,
-      feature: library.module,
-      kind: "library",
-      relative: library.relative,
-      role: library.role,
-      sourcePath: library.relative.startsWith("src/")
-        ? library.relative.slice("src/".length)
+      enterprise: client.enterprise,
+      feature: client.module,
+      kind: "client",
+      relative: client.relative,
+      role: "client",
+      sourcePath: client.relative.startsWith("src/")
+        ? client.relative.slice("src/".length)
         : undefined,
     };
   }
@@ -256,27 +256,26 @@ function frameworkClassification({ base, framework }) {
   };
 }
 
-/** A module's portable library: any other package folder in the module (ARCHITECTURE.md §3). */
-function libraryPackageOf(cwd, workspacePath) {
-  const match = workspacePath.match(LIBRARY_SOURCE);
-  if (!match || !libraryRootsOf(cwd).has(match[1])) return undefined;
+/** A module's client package: its derived hooks and lent tokens (ARCHITECTURE.md §3.4). */
+function clientPackageOf(cwd, workspacePath) {
+  const match = workspacePath.match(CLIENT_SOURCE);
+  if (!match || !clientRootsOf(cwd).has(match[1])) return undefined;
 
   return {
     enterprise: workspacePath.startsWith("enterprise/"),
     module: match[2],
     relative: match[3],
-    role: match[1].endsWith("/client") ? "client" : "library",
   };
 }
 
-function libraryRootsOf(cwd) {
-  const cached = libraryRootCache.get(cwd);
+function clientRootsOf(cwd) {
+  const cached = clientRootCache.get(cwd);
   if (cached) return cached;
   const roots = new Set();
   for (const pkg of modulePackages(cwd).values()) {
-    if (pkg.role === "library" || pkg.role === "client") roots.add(pkg.root);
+    if (pkg.role === "client") roots.add(pkg.root);
   }
-  libraryRootCache.set(cwd, roots);
+  clientRootCache.set(cwd, roots);
 
   return roots;
 }
@@ -343,6 +342,9 @@ function readModulePackage({ cwd, moduleRoot, folder }) {
   const root = `${moduleRoot}/${folder}`;
   const manifestPath = join(cwd, root, "package.json");
   if (!existsSync(manifestPath)) return undefined;
+  const role = packageRoleOf(folder);
+  // Any other folder is no module package: the enforcer refuses it as a feature-layout violation.
+  if (role === undefined) return undefined;
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
   return {
@@ -350,22 +352,22 @@ function readModulePackage({ cwd, moduleRoot, folder }) {
     exports: new Set(Object.keys(manifest.exports ?? {})),
     module: moduleRoot.slice(moduleRoot.lastIndexOf("/") + 1),
     name: manifest.name,
-    role: packageRoleOf(folder),
+    role,
     root,
   };
 }
 
-/** `client` is its own role (§3.4, §10.1; Alex, 2026-10-06); any other folder is a library. */
+/** `client` is its own role (§3.4, §10.1; Alex, 2026-10-06); any other folder has no role. */
 function packageRoleOf(folder) {
   if (MODULE_ROLES.includes(folder)) return folder;
 
-  return folder === "client" ? "client" : "library";
+  return folder === "client" ? "client" : undefined;
 }
 
 /**
  * Every module package in the workspace by package name: the catalogue's roots
- * plus both module trees, one package per folder that has a package.json; a
- * folder outside the four roles is a `library`.
+ * plus both module trees, one package per folder that has a package.json and
+ * one of the four roles.
  */
 export function modulePackages(cwd) {
   const cached = modulePackageCache.get(cwd);
@@ -397,7 +399,7 @@ export function modulePackageOf(cwd, specifier) {
 export function resetClassificationCache() {
   classificationCache.clear();
   modulePackageCache.clear();
-  libraryRootCache.clear();
+  clientRootCache.clear();
   featureLayoutPackageCache.clear();
   last = undefined;
 }

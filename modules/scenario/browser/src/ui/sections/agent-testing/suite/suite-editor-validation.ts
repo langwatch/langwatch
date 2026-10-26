@@ -13,6 +13,13 @@ import {
   type SuiteFieldDefinition,
   suiteFieldDefinitionSchema,
 } from "@langwatch/scenario-contract";
+import {
+  SuiteEvaluatorMappingInvalidError,
+  SuiteEvaluatorNotFoundError,
+  SuiteFieldIdentifierDuplicateError,
+  SuiteFieldIdentifierInvalidError,
+  SuiteFieldInUseError,
+} from "@langwatch/suite-contract";
 
 import type {
   SuiteDraft,
@@ -83,8 +90,8 @@ export function placeServerRefusal({
   const message = describeError({ error });
   const identifier = typeof handled.meta.identifier === "string" ? handled.meta.identifier : "";
   switch (handled.code) {
-    case "suite_field_identifier_invalid":
-    case "suite_field_identifier_duplicate": {
+    case SuiteFieldIdentifierInvalidError.code:
+    case SuiteFieldIdentifierDuplicateError.code: {
       const at = draft.fields.findIndex((row) => row.identifier.trim() === identifier);
       if (at < 0) return { ...draft, fieldsError: message };
       return {
@@ -92,10 +99,10 @@ export function placeServerRefusal({
         fields: draft.fields.map((row, index) => (index === at ? { ...row, error: message } : row)),
       };
     }
-    case "suite_field_in_use":
+    case SuiteFieldInUseError.code:
       return { ...draft, showFields: true, fieldsError: message };
-    case "suite_evaluator_mapping_invalid":
-    case "suite_evaluator_not_found":
+    case SuiteEvaluatorMappingInvalidError.code:
+    case SuiteEvaluatorNotFoundError.code:
       return { ...draft, evaluatorsError: message };
     default:
       return null;

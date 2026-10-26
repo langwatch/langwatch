@@ -1,4 +1,6 @@
+import { HttpConfigEditor } from "@langwatch/agent-client";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { OutputsSection, VariablesSection } from "@langwatch/prompt-client";
 import type {
   AgentComponent,
   Component,
@@ -13,8 +15,6 @@ import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useHttpTest } from "../../../../behavior/agents/http/index.ts";
-import { HttpConfigEditor } from "../../../../behavior/lent-agent.tsx";
-import { OutputsSection, VariablesSection } from "../../../../behavior/lent-prompt.tsx";
 import { useGetDatasetData } from "../../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { LiquidConditionEditor } from "../../../elements/code/liquid-condition-editor.tsx";

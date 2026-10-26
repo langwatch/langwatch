@@ -1,6 +1,9 @@
-import { LANGY_SESSION_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
+import {
+  ApiKeyNotFoundError,
+  LANGY_SESSION_API_KEY_NAME,
+  type ApiKeyApi,
+} from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
 import {
   langyCandidatePermissions,
   type LangyCredentialSession,
@@ -8,6 +11,7 @@ import {
   langyUnattendedPermissions,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
 import type { LangyDeleteConfirmationRepository } from "../../../repositories/langy-delete-confirmation.repository.ts";
@@ -116,7 +120,7 @@ export class LangySessionKeyService extends LangySessionKey {
   async mint(input: LangySessionKeyMintInput): Promise<{ token: string; apiKeyId: string }> {
     const ceiling = input.ceiling ?? "full";
     const scope = await this.repository.getProjectScope(input.projectId).catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "project_not_found") return null;
+      if (ProjectNotFoundError.is(error)) return null;
       throw error;
     });
     const permissions =
@@ -192,7 +196,7 @@ export class LangySessionKeyService extends LangySessionKey {
     projectId: string;
   }): Promise<LangySessionKeyRevocation> {
     const key = await this.repository.getById(input).catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "api_key_not_found") return null;
+      if (ApiKeyNotFoundError.is(error)) return null;
       throw error;
     });
     if (!key) {

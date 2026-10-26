@@ -1,5 +1,10 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import { AddOrEditDatasetRoutedDrawerToken, UploadCsvDrawerToken } from "@langwatch/dataset-client";
+import {
+  AddOrEditDatasetRoutedDrawerToken,
+  UploadCsvDrawerToken,
+  DatasetEditorTable,
+  DatasetPickerList,
+} from "@langwatch/dataset-client";
 import {
   datasetColumnsSchema,
   type DatasetColumns,
@@ -20,8 +25,6 @@ import { ArrowLeft, Database, Plus, Upload } from "lucide-react";
 import type React from "react";
 import { useRef, useState } from "react";
 
-import { DatasetEditorTable } from "../../../behavior/optimization_studio/lent-dataset-editor-table.tsx";
-import { DatasetPickerList } from "../../../behavior/optimization_studio/lent-dataset-picker-list.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import {
   datasetColumnsToFields,

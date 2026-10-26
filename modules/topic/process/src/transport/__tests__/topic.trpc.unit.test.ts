@@ -25,6 +25,7 @@ const ACTOR_ID = "test-user-id";
 
 /** The refusal a deployment raises when it composed no clustering scheduler. */
 class NoClusteringSchedulerError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor() {

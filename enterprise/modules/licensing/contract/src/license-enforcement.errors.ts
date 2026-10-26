@@ -9,6 +9,7 @@ import { LIMIT_TYPE_LABELS } from "./license-limit-labels.ts";
  * HTTP/tRPC errors by the router layer.
  */
 export class LimitExceededError extends HandledError {
+  static readonly code = "resource_limit_exceeded" as const;
   declare readonly code: "resource_limit_exceeded";
 
   constructor(

@@ -1,5 +1,4 @@
 import {
-  LEGACY_PROJECT_KEY_LOG_WINDOW_MS,
   LEGACY_PROJECT_KEY_LOGGER_NAME,
   legacyProjectKeyUseLines,
   legacyProjectKeyUseSpanAttributes,
@@ -15,6 +14,9 @@ import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observ
 import { isAggregateProjectKind, type ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import { trace } from "@opentelemetry/api";
+
+/** One legacy key line per project, route, permission and kind per minute in this process. */
+const LEGACY_KEY_LOG_WINDOW_MS = 60_000;
 
 /** What the legacy key lines name the hosted MCP as; it asks no permission. */
 const HOSTED_MCP_ROUTE = "MCP /mcp";
@@ -37,7 +39,7 @@ export class ProjectMcpProjectLookupService {
   readonly #featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   readonly #logger: Pick<Logger, "info" | "warn">;
   /** One legacy key line per project per window in this process. */
-  readonly #window = createWarnThrottle(LEGACY_PROJECT_KEY_LOG_WINDOW_MS);
+  readonly #window = createWarnThrottle(LEGACY_KEY_LOG_WINDOW_MS);
 
   private constructor(
     projects: ProjectApi,

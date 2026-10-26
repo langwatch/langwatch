@@ -31,9 +31,7 @@ const datasetQuery = api.dataset.getById.useQuery(
 ```
 
 Reference: `modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`
-(the `getById` poll). The
-functional-`refetchInterval` idiom mirrors
-`modules/trace/browser/src/ui/sections/explorer/hooks/use-trace-facets.ts`, where the same form drives a
+(the `getById` poll). The same functional-`refetchInterval` form also drives a
 cold-miss backoff poll that stops as soon as the payload settles. Read the
 interval from `data`, not from React state — the scheduler reads it outside the
 render cycle.
@@ -125,7 +123,6 @@ User-facing copy describes what the customer gets, never how the work is done
 
 - Poll + banner + retry + read-gate:
   `modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`
-- Functional `refetchInterval` idiom: `modules/trace/browser/src/ui/sections/explorer/hooks/use-trace-facets.ts`
 - `Alert` banner in use: `modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx`
 - Gated dependent read: `modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx`
 - Server not-ready refusal: `DatasetNotReadyError` in `modules/dataset/contract/src/dataset.errors.ts`

@@ -1,8 +1,8 @@
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { ModelSelector } from "@langwatch/model-provider-client";
 import { allModelOptions } from "@langwatch/model-provider-contract";
 
-import { ModelSelector } from "../../../../behavior/lent-model-provider.tsx";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { useLlmConfigPopoverState } from "../../../../features/model-selection/behavior/use-llm-config-popover-state.ts";
 import { type LLMConfigValues } from "../../../../model/llm-config-values.types.ts";

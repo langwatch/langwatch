@@ -19,6 +19,7 @@
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b"
   },
   "dependencies": {
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/module": "workspace:*"
   },
   "devDependencies": {

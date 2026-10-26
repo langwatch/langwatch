@@ -1,5 +1,4 @@
 import {
-  LEGACY_PROJECT_KEY_LOG_WINDOW_MS,
   LEGACY_PROJECT_KEY_LOGGER_NAME,
   LegacyProjectKeyIngestionOnlyError,
   legacyProjectKeyUseLines,
@@ -13,9 +12,13 @@ import { deriveRunActor } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 import { trace } from "@opentelemetry/api";
 
+import type { ProjectKeyedProbeAnswer } from "../rules/probe-answers.rules.ts";
 import { canaryAnswer, MAX_CANARY_QUERY_PARAM_LENGTH } from "../rules/scenario-canary.rules.ts";
 import type { ScenarioCanaryService } from "./scenario-canary.service.ts";
 import type { SubsystemProbeOutcome, SubsystemProbeService } from "./subsystem-probe.service.ts";
+
+/** One legacy key line per project, route, permission and kind per minute in this process. */
+const LEGACY_KEY_LOG_WINDOW_MS = 60_000;
 
 /**
  * Who a probe's key acts as: its project, and the key and its owner when it is an API key.
@@ -39,16 +42,12 @@ type ProbeCallerResolver = (
   input: Readonly<{ token: string; projectId: string | null }>,
 ) => Promise<ProbeCaller | null>;
 
-const json = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...headers },
-  });
+/** An answer before the door decides whether it may be cached. */
+type ProbeBody = Readonly<{ status: number; body: unknown }>;
 
-/** A monitor must see each canary run's real result, so no canary answer is cacheable. */
-const NO_STORE = { "Cache-Control": "no-store" };
+const json = (status: number, body: unknown): ProbeBody => ({ status, body });
 
-const answerOf = (outcome: SubsystemProbeOutcome): Response =>
+const answerOf = (outcome: SubsystemProbeOutcome): ProbeBody =>
   outcome.ok
     ? json(200, { status: outcome.status, body: outcome.body })
     : json(outcome.httpStatus, { message: outcome.message });
@@ -63,7 +62,7 @@ export class ProjectKeyedProbeService {
   readonly #scenarioCanary: ScenarioCanaryService;
   readonly #legacyKeyLogger: LegacyKeyLogger;
   /** One legacy key line per project and probe per window in this process. */
-  readonly #legacyKeyWindow = createWarnThrottle(LEGACY_PROJECT_KEY_LOG_WINDOW_MS);
+  readonly #legacyKeyWindow = createWarnThrottle(LEGACY_KEY_LOG_WINDOW_MS);
 
   private constructor(options: {
     probes: SubsystemProbeService;
@@ -86,14 +85,12 @@ export class ProjectKeyedProbeService {
     return new ProjectKeyedProbeService(options);
   }
 
-  async probe(request: ProjectKeyedProbeRequest): Promise<Response> {
+  async probe(request: ProjectKeyedProbeRequest): Promise<ProjectKeyedProbeAnswer> {
     const answer = await this.#answer(request);
-    if (request.check !== "scenarios") return answer;
-    for (const [name, value] of Object.entries(NO_STORE)) answer.headers.set(name, value);
-    return answer;
+    return { ...answer, noStore: request.check === "scenarios" };
   }
 
-  async #answer(request: ProjectKeyedProbeRequest): Promise<Response> {
+  async #answer(request: ProjectKeyedProbeRequest): Promise<ProbeBody> {
     const { authorization } = request.headers;
     const authToken =
       request.headers["x-auth-token"] ??
@@ -157,7 +154,7 @@ export class ProjectKeyedProbeService {
   }: {
     caller: ProbeCaller;
     requested: string | undefined;
-  }): Promise<Response> {
+  }): Promise<ProbeBody> {
     const runPlanId = requested?.trim();
     if (runPlanId && runPlanId.length > MAX_CANARY_QUERY_PARAM_LENGTH) {
       return json(400, { message: "runPlanId query parameter is invalid." });

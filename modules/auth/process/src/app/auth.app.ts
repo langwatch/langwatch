@@ -127,6 +127,7 @@ import {
 import { CliDeviceSessionService } from "../features/cli-device/services/cli-device-session.service.ts";
 import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.repository.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
+import type { AuthHandshakeAnswer } from "../rules/auth-handshake-answer.rules.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
 import { providerAccountIssuer } from "../rules/provider-account-issuer.rules.ts";
@@ -857,7 +858,7 @@ export class AuthModule implements AuthApiContract {
     return this.#door.revokeSessionFromCookies(input);
   }
 
-  betterAuthHandshake(request: Request): Promise<Response> {
+  betterAuthHandshake(request: Request): Promise<AuthHandshakeAnswer> {
     return this.#door.betterAuthHandshake(request);
   }
 

@@ -32,6 +32,7 @@ const renderRefusal: ErrorHandler = (error, c) => {
 };
 
 class SourceDisabledError extends HandledError {
+  static readonly code = "source_disabled" as const;
   declare readonly code: "source_disabled";
 
   constructor() {

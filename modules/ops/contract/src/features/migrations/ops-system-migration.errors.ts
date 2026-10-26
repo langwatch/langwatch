@@ -6,6 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
 /** Rollback refused when another migration's state depends on this one;
  * rolling the floor back flips writes to the legacy path while reads stay elsewhere. */
 export class MigrationRollbackBlockedByDependentError extends HandledError {
+  static readonly code = "migration_rollback_blocked_by_dependent" as const;
   declare readonly code: "migration_rollback_blocked_by_dependent";
 
   constructor({
@@ -37,6 +38,7 @@ export class MigrationRollbackBlockedByDependentError extends HandledError {
  * the cohort). Nothing to flip, so pinning `rolled_back` would strand it.
  */
 export class MigrationRollbackCutoverNotStartedError extends HandledError {
+  static readonly code = "migration_rollback_cutover_not_started" as const;
   declare readonly code: "migration_rollback_cutover_not_started";
 
   constructor() {
@@ -56,6 +58,7 @@ export class MigrationRollbackCutoverNotStartedError extends HandledError {
  */
 
 export class MigrationEnrollmentAlreadyExistsError extends HandledError {
+  static readonly code = "migration_enrollment_already_exists" as const;
   declare readonly code: "migration_enrollment_already_exists";
 
   constructor({ migrationName }: { migrationName: string }) {
@@ -71,6 +74,7 @@ export class MigrationEnrollmentAlreadyExistsError extends HandledError {
 }
 
 export class MigrationEnrollmentNotFoundError extends HandledError {
+  static readonly code = "migration_enrollment_not_found" as const;
   declare readonly code: "migration_enrollment_not_found";
 
   constructor({ migrationName }: { migrationName: string }) {
@@ -89,6 +93,7 @@ export class MigrationEnrollmentNotFoundError extends HandledError {
  * would tell the operator they had paced something they had not.
  */
 export class MigrationEnrolledAutomaticallyError extends HandledError {
+  static readonly code = "migration_enrolled_automatically" as const;
   declare readonly code: "migration_enrolled_automatically";
 
   constructor({ migrationName }: { migrationName: string }) {
@@ -104,6 +109,7 @@ export class MigrationEnrolledAutomaticallyError extends HandledError {
 
 /** A migration name nothing registered answers to. */
 export class MigrationUnknownError extends HandledError {
+  static readonly code = "migration_unknown" as const;
   declare readonly code: "migration_unknown";
 
   constructor() {
@@ -121,6 +127,7 @@ export class MigrationUnknownError extends HandledError {
  * truth; bypassing it would run an unenrolled organization anyway.
  */
 export class MigrationRunRequiresEnrollmentError extends HandledError {
+  static readonly code = "migration_run_requires_enrollment" as const;
   declare readonly code: "migration_run_requires_enrollment";
 
   constructor({ migrationName }: { migrationName: string }) {
@@ -139,6 +146,7 @@ export class MigrationRunRequiresEnrollmentError extends HandledError {
  * operator's action is simply to retry once that pass concludes.
  */
 export class MigrationPassAlreadyRunningError extends HandledError {
+  static readonly code = "migration_pass_already_running" as const;
   declare readonly code: "migration_pass_already_running";
 
   constructor() {
@@ -157,6 +165,7 @@ export class MigrationPassAlreadyRunningError extends HandledError {
  * declaration, and a targeted run must not become the bypass.
  */
 export class MigrationNotAvailableOnInstallationError extends HandledError {
+  static readonly code = "migration_not_available_on_installation" as const;
   declare readonly code: "migration_not_available_on_installation";
 
   constructor() {
@@ -171,6 +180,7 @@ export class MigrationNotAvailableOnInstallationError extends HandledError {
 
 /** An enrollment naming an organization id that does not exist. */
 export class MigrationEnrollmentOrganizationNotFoundError extends HandledError {
+  static readonly code = "organization_not_found" as const;
   declare readonly code: "organization_not_found";
 
   constructor() {
@@ -188,6 +198,7 @@ export class MigrationEnrollmentOrganizationNotFoundError extends HandledError {
  * migration's own report, which requires the record to exist.
  */
 export class MigrationStateNotFoundError extends HandledError {
+  static readonly code = "migration_state_not_found" as const;
   declare readonly code: "migration_state_not_found";
 
   constructor() {
@@ -200,6 +211,7 @@ export class MigrationStateNotFoundError extends HandledError {
 }
 
 export class MigrationDrainProofRequiresMigratedError extends HandledError {
+  static readonly code = "migration_drain_proof_requires_migrated" as const;
   declare readonly code: "migration_drain_proof_requires_migrated";
 
   constructor({ status }: { status: string }) {

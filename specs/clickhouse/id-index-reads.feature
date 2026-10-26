@@ -193,7 +193,7 @@ Feature: A lookup by id reads only the partitions its id index names
     When its summary and spans are read with no time given
     Then each read is bounded to the partitions the index names
 
-  @integration @unimplemented
+  @integration @unimplemented @issue:8898
   Scenario: the browser opens a trace by id alone
     Given a trace drawer opened from a link that carries no time
     When the drawer loads

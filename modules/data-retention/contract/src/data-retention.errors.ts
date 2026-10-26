@@ -4,6 +4,7 @@ import type { RetroactiveMutationProgress } from "./data-retention.ts";
 
 /** The scope a retention override was aimed at is not there to hang one on. */
 export class ScopeTargetNotFoundError extends HandledError {
+  static readonly code = "data_retention_scope_target_not_found" as const;
   declare readonly code: "data_retention_scope_target_not_found";
 
   constructor(message = "That retention scope no longer exists.") {
@@ -18,6 +19,7 @@ export class ScopeTargetNotFoundError extends HandledError {
  * stop the named updates.
  */
 export class RetroactiveMutationInProgressError extends HandledError {
+  static readonly code = "data_retention_mutation_in_progress" as const;
   declare readonly code: "data_retention_mutation_in_progress";
 
   constructor(readonly blocked: RetroactiveMutationProgress[]) {
@@ -36,6 +38,7 @@ export class RetroactiveMutationInProgressError extends HandledError {
 
 /** Per-scope retention is a paid capability; a free organization has none. */
 export class RetentionNotOnPlanError extends HandledError {
+  static readonly code = "data_retention_not_on_plan" as const;
   declare readonly code: "data_retention_not_on_plan";
 
   constructor() {
@@ -48,6 +51,7 @@ export class RetentionNotOnPlanError extends HandledError {
 
 /** The length asked for is under the floor this plan sells. */
 export class RetentionLengthBelowPlanMinimumError extends HandledError {
+  static readonly code = "data_retention_length_below_plan_minimum" as const;
   declare readonly code: "data_retention_length_below_plan_minimum";
 
   constructor(readonly minimumDays: number) {
@@ -62,6 +66,7 @@ export class RetentionLengthBelowPlanMinimumError extends HandledError {
 
 /** The length asked for is not one of the lengths this plan offers. */
 export class RetentionLengthNotOnPlanError extends HandledError {
+  static readonly code = "data_retention_length_not_on_plan" as const;
   declare readonly code: "data_retention_length_not_on_plan";
 
   constructor() {
@@ -76,6 +81,7 @@ export class RetentionLengthNotOnPlanError extends HandledError {
 
 /** The caller may not write a retention override at the tier they aimed at. */
 export class ScopeWriteForbiddenError extends HandledError {
+  static readonly code = "data_retention_scope_write_forbidden" as const;
   declare readonly code: "data_retention_scope_write_forbidden";
 
   constructor(
@@ -93,6 +99,7 @@ export class ScopeWriteForbiddenError extends HandledError {
 
 /** Keeping data forever is a platform capability, not a customer tier. */
 export class RetentionDisableForbiddenError extends HandledError {
+  static readonly code = "data_retention_disable_forbidden" as const;
   declare readonly code: "data_retention_disable_forbidden";
 
   constructor() {

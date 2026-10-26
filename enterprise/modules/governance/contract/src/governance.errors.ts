@@ -36,6 +36,7 @@ export class IngestionSourceNotFoundError extends NotFoundError {
 }
 
 export class IngestionSourceCapReachedError extends HandledError {
+  static readonly code = "ingestion_source_cap_reached" as const;
   declare readonly code: "ingestion_source_cap_reached";
 
   constructor(max: number) {
@@ -54,6 +55,7 @@ export class IngestionSourceCapReachedError extends HandledError {
  * demands the key name a member.
  */
 export class UserBoundCallerRequiredError extends HandledError {
+  static readonly code = "user_token_required" as const;
   declare readonly code: "user_token_required";
 
   constructor() {
@@ -78,6 +80,7 @@ export class UserBoundCallerRequiredError extends HandledError {
  * a sign-in away.
  */
 export class IngestionKeyWorkspaceMissingError extends HandledError {
+  static readonly code = "ingestion_key_workspace_missing" as const;
   declare readonly code: "ingestion_key_workspace_missing";
 
   constructor() {
@@ -99,6 +102,7 @@ export class IngestionKeyWorkspaceMissingError extends HandledError {
  * session to parent a key to, or a source type no published template names.
  */
 export class IngestionKeySourceNotAllowedError extends HandledError {
+  static readonly code = "ingestion_key_source_not_allowed" as const;
   declare readonly code: "ingestion_key_source_not_allowed";
 
   constructor(sourceType: string) {
@@ -120,6 +124,7 @@ export class IngestionKeySourceNotAllowedError extends HandledError {
  * person's key reads the same way, so the answer never confirms one exists.
  */
 export class IngestionKeyNotFoundError extends HandledError {
+  static readonly code = "ingestion_key_not_found" as const;
   declare readonly code: "ingestion_key_not_found";
 
   constructor(apiKeyId: string) {
@@ -137,6 +142,7 @@ export class IngestionKeyNotFoundError extends HandledError {
  * under it would outlive the next cascade. The device signs in again instead.
  */
 export class IngestionKeySessionRevokedError extends HandledError {
+  static readonly code = "ingestion_key_session_revoked" as const;
   declare readonly code: "ingestion_key_session_revoked";
 
   constructor() {
@@ -158,6 +164,7 @@ export class IngestionKeySessionRevokedError extends HandledError {
  * the old ones. Retrying is safe, and `meta.survivors` names the holdouts.
  */
 export class IngestionKeyRevokeIncompleteError extends HandledError {
+  static readonly code = "ingestion_key_revoke_incomplete" as const;
   declare readonly code: "ingestion_key_revoke_incomplete";
 
   constructor(survivors: readonly string[]) {
@@ -219,6 +226,7 @@ export class DiscoveredPersonNotFoundError extends Error {
 
 /** The suggestion is gone — confirmed already, or replaced by a later pass (ADR-128 §12). */
 export class IdentityMatchSuggestionNotFoundError extends NotFoundError {
+  static readonly code = "identity_match_suggestion_not_found" as const;
   declare readonly code: "identity_match_suggestion_not_found";
 
   constructor(suggestionId: string) {
@@ -232,6 +240,7 @@ export class IdentityMatchSuggestionNotFoundError extends NotFoundError {
 
 /** The person already holds an open link; also what a 23505 on the one-open-link index maps to. */
 export class IdentityAlreadyLinkedError extends HandledError {
+  static readonly code = "identity_already_linked" as const;
   declare readonly code: "identity_already_linked";
 
   constructor(discoveredPersonId: string) {
@@ -246,6 +255,7 @@ export class IdentityAlreadyLinkedError extends HandledError {
 
 /** An erased person may never carry an account again — the last guard on a stale queue click. */
 export class IdentityErasedError extends HandledError {
+  static readonly code = "identity_erased" as const;
   declare readonly code: "identity_erased";
 
   constructor(discoveredPersonId: string) {
@@ -263,6 +273,7 @@ export class IdentityErasedError extends HandledError {
  * was reached, so no outcome is coming later. `reason` rides in meta for the log.
  */
 export class AgentListingUnavailableError extends HandledError {
+  static readonly code = "agent_listing_unavailable" as const;
   declare readonly code: "agent_listing_unavailable";
 
   constructor(reason: "event_sourcing_disabled" | "no_governance_project") {
@@ -280,6 +291,7 @@ export class AgentListingUnavailableError extends HandledError {
  * refusal for both, so the answer never confirms that some other source id exists.
  */
 export class IngestionSourceUnauthorizedError extends HandledError {
+  static readonly code = "ingestion_source_unauthorized" as const;
   declare readonly code: "ingestion_source_unauthorized";
 
   constructor() {
@@ -293,6 +305,7 @@ export class IngestionSourceUnauthorizedError extends HandledError {
 
 /** One caller sent more to the push receivers than the window allows; it retries after the wait. */
 export class IngestionRateLimitedError extends HandledError {
+  static readonly code = "ingestion_rate_limited" as const;
   declare readonly code: "ingestion_rate_limited";
 
   constructor({ retryAfterSec }: { retryAfterSec: number }) {
@@ -312,6 +325,7 @@ export class IngestionRateLimitedError extends HandledError {
 
 /** The source's type is not served at the path it was sent to. */
 export class IngestionWrongEndpointError extends HandledError {
+  static readonly code = "ingestion_wrong_endpoint" as const;
   declare readonly code: "ingestion_wrong_endpoint";
 
   constructor(description: string) {
@@ -322,6 +336,7 @@ export class IngestionWrongEndpointError extends HandledError {
 
 /** Not all of the request was taken; the exporter resends it whole and what was taken dedupes. */
 export class IngestionReceiverUnavailableError extends HandledError {
+  static readonly code = "ingestion_receiver_unavailable" as const;
   declare readonly code: "ingestion_receiver_unavailable";
 
   constructor() {

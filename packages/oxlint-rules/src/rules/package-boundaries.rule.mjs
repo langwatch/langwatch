@@ -150,8 +150,6 @@ function runtimeFinding(file, specifier) {
   if (file.role === "contract" && (node || server || browser)) return "contractRuntime";
   if (file.role === "browser" && (node || server)) return "browserImportsProcess";
   if (file.role === "process" && browser) return "processImportsBrowser";
-  const runtime = node || server || browser;
-  if (file.role === "library" && runtime) return "libraryRuntime";
   if (file.role === "client") return clientRuntimeFinding({ node, server, browser, specifier });
 
   return undefined;
@@ -163,14 +161,6 @@ function clientRuntimeFinding({ node, server, browser, specifier }) {
   if (browser && !CLIENT_BROWSER_RUNTIME.test(specifier)) return "clientRuntime";
 
   return undefined;
-}
-
-/** A library takes its own module's contract and other libraries, nothing else (§2). */
-function libraryDirectionFinding(file, target) {
-  if (target.role === "library") return undefined;
-  if (target.role === "contract" && target.module === file.module) return undefined;
-
-  return "libraryRuntime";
 }
 
 /** A client takes its own contract only; only browser code reads a client (§3.4, §10.1). */
@@ -192,7 +182,6 @@ function directionFinding(file, target) {
   const client = clientDirectionFinding(file, target);
   if (client) return client;
   if (file.role === "client" || target.role === "client") return undefined;
-  if (file.role === "library") return libraryDirectionFinding(file, target);
   if (file.role === "contract" && target.role !== "contract") return "contractRuntime";
   if (file.role === "browser" && target.role === "process") return "browserImportsProcess";
   if (file.role === "process" && target.role === "browser") return "processImportsBrowser";
@@ -250,8 +239,7 @@ function peerData(target) {
 }
 
 function crossModuleFinding({ file, target, subpath, node }) {
-  const isPortable =
-    target.role === "contract" || target.role === "library" || target.role === "client";
+  const isPortable = target.role === "contract" || target.role === "client";
   if (isPortable || target.module === file.module) return undefined;
   if (isTestSeam(file, subpath, target) || isPeerInstallation({ file, target, subpath, node })) {
     return undefined;
@@ -420,11 +408,6 @@ export const boundaryRule = defineRule({
       what: "`{{specifier}}` is an enterprise module's implementation, and this is core code.",
       why: "Core builds and runs without enterprise code, which is licensed apart and installed only when entitled.",
       fix: "Depend on that module's peer `*Api` from its contract instead; the enterprise module installs like any other and the process resolves the peer (ARCHITECTURE.md §11).",
-    },
-    libraryRuntime: {
-      what: "`{{specifier}}` is a runtime, framework or another package's implementation, and this is a module's portable, framework-free library.",
-      why: "Process and browser both import a module library, so a runtime import ties it to one side.",
-      fix: "Import only this module's contract, other module libraries and framework-free packages here; move the code that needs `{{specifier}}` into the module's process or browser package.",
     },
     clientRuntime: {
       what: "`{{specifier}}` is a runtime, store, component or another package's implementation, and this is a module's client package.",

@@ -40,6 +40,7 @@ export const authzProblemSchema: AuthzProblemSchema = authzProblemSchemaDefiniti
 export type AuthzProblem = z.infer<typeof authzProblemSchema>;
 
 export class GrantValidationError extends HandledError {
+  static readonly code = "grant_validation_failed" as const;
   declare readonly code: "grant_validation_failed";
 
   constructor(message: string, meta: Record<string, unknown> = {}) {
@@ -49,6 +50,7 @@ export class GrantValidationError extends HandledError {
 }
 
 export class DuplicateGrantError extends HandledError {
+  static readonly code = "role_binding_already_exists" as const;
   declare readonly code: "role_binding_already_exists";
 
   constructor(meta: Record<string, unknown> = {}) {
@@ -63,6 +65,7 @@ export class DuplicateGrantError extends HandledError {
 
 /** A grant asked to end at a moment already passed: 422, like the family's other input refusals. */
 export class GrantExpiryInPastError extends HandledError {
+  static readonly code = "grant_expiry_in_past" as const;
   declare readonly code: "grant_expiry_in_past";
 
   constructor(meta: Record<string, unknown> = {}) {
@@ -76,6 +79,7 @@ export class GrantExpiryInPastError extends HandledError {
 }
 
 export class RoleBindingNotFoundError extends NotFoundError {
+  static readonly code = "role_binding_not_found" as const;
   declare readonly code: "role_binding_not_found";
 
   constructor(bindingId: string) {
@@ -92,6 +96,7 @@ export class RoleBindingNotFoundError extends NotFoundError {
 
 /** A project, team or organization id that names no live scope. */
 export class AuthzScopeNotFoundError extends NotFoundError {
+  static readonly code = "authz_scope_not_found" as const;
   declare readonly code: "authz_scope_not_found";
 
   constructor(ids: { projectId?: string; teamId?: string; organizationId?: string }) {
@@ -104,6 +109,7 @@ export class AuthzScopeNotFoundError extends NotFoundError {
 }
 
 export class RoleBindingPrincipalInvalidError extends HandledError {
+  static readonly code = "role_binding_principal_invalid" as const;
   declare readonly code: "role_binding_principal_invalid";
 
   constructor() {
@@ -117,6 +123,7 @@ export class RoleBindingPrincipalInvalidError extends HandledError {
 }
 
 export class GroupNotInOrganizationError extends HandledError {
+  static readonly code = "group_not_in_organization" as const;
   declare readonly code: "group_not_in_organization";
 
   constructor(groupId: string) {
@@ -129,6 +136,7 @@ export class GroupNotInOrganizationError extends HandledError {
 }
 
 export class ApiKeyNotInOrganizationError extends HandledError {
+  static readonly code = "api_key_not_in_organization" as const;
   declare readonly code: "api_key_not_in_organization";
 
   constructor(apiKeyId: string) {
@@ -141,6 +149,7 @@ export class ApiKeyNotInOrganizationError extends HandledError {
 }
 
 export class ScopeNotInOrganizationError extends HandledError {
+  static readonly code = "scope_not_in_organization" as const;
   declare readonly code: "scope_not_in_organization";
 
   constructor(scopeType: string) {
@@ -153,6 +162,7 @@ export class ScopeNotInOrganizationError extends HandledError {
 }
 
 export class CustomRoleIdRequiredError extends HandledError {
+  static readonly code = "custom_role_id_required" as const;
   declare readonly code: "custom_role_id_required";
 
   constructor() {
@@ -164,6 +174,7 @@ export class CustomRoleIdRequiredError extends HandledError {
 }
 
 export class CustomRoleNotAssignableError extends HandledError {
+  static readonly code = "custom_role_not_assignable" as const;
   declare readonly code: "custom_role_not_assignable";
 
   constructor(customRoleId: string) {
@@ -176,6 +187,7 @@ export class CustomRoleNotAssignableError extends HandledError {
 }
 
 export class OrgExclusivePermissionScopeError extends HandledError {
+  static readonly code = "org_exclusive_permission_scope" as const;
   declare readonly code: "org_exclusive_permission_scope";
 
   constructor(permission: string, scopeType: string) {
@@ -189,6 +201,7 @@ export class OrgExclusivePermissionScopeError extends HandledError {
 }
 
 export class AuthzPersonalWorkspaceNotManagedHereError extends HandledError {
+  static readonly code = "personal_workspace_not_managed_here" as const;
   declare readonly code: "personal_workspace_not_managed_here";
 
   constructor(ownerName?: string | null) {
@@ -206,6 +219,7 @@ export class AuthzPersonalWorkspaceNotManagedHereError extends HandledError {
 }
 
 export class AuthzLiteMemberViewerOnlyError extends HandledError {
+  static readonly code = "lite_member_viewer_only" as const;
   declare readonly code: "lite_member_viewer_only";
 
   constructor(scopeName?: string | null) {
@@ -220,6 +234,7 @@ export class AuthzLiteMemberViewerOnlyError extends HandledError {
 
 /** A role on anything shared was asked for somebody on a Developer seat (ADR-171). */
 export class AuthzDeveloperSeatNoSharedAccessError extends HandledError {
+  static readonly code = "developer_seat_no_shared_access" as const;
   declare readonly code: "developer_seat_no_shared_access";
 
   constructor(scopeName?: string | null) {
@@ -253,6 +268,7 @@ export class BindingMissingError extends Error {
 }
 
 export class OffboardIncompleteError extends HandledError {
+  static readonly code = "offboard_incomplete" as const;
   declare readonly code: "offboard_incomplete";
 
   constructor(meta: Record<string, unknown> = {}) {
@@ -266,6 +282,7 @@ export class OffboardIncompleteError extends HandledError {
 }
 
 export class AuthzLedgerUnavailableError extends HandledError {
+  static readonly code = "authz_ledger_unavailable" as const;
   declare readonly code: "authz_ledger_unavailable";
 
   constructor() {
@@ -284,6 +301,7 @@ export class AuthzLedgerUnavailableError extends HandledError {
  * e.g. minting an API key. `fault: "platform"` — a lagging fold is ours.
  */
 export class AuthzGrantNotConfirmedError extends HandledError {
+  static readonly code = "authz_grant_not_confirmed" as const;
   declare readonly code: "authz_grant_not_confirmed";
 
   /** `retryable` only where a retry waits on the same write, never where it would write again. */
@@ -298,6 +316,7 @@ export class AuthzGrantNotConfirmedError extends HandledError {
 }
 
 export class AuthzRoleDuplicateNameError extends HandledError {
+  static readonly code = "custom_role_name_taken" as const;
   declare readonly code: "custom_role_name_taken";
 
   constructor(message = "A role with this name already exists") {
@@ -312,6 +331,7 @@ export class AuthzRoleDuplicateNameError extends HandledError {
 // ── `/api/grants`: the successor family's own codes, `<resource>_<condition>` ──
 
 export class GrantNotFoundError extends NotFoundError {
+  static readonly code = "grant_not_found" as const;
   declare readonly code: "grant_not_found";
 
   constructor(grantId: string) {
@@ -322,6 +342,7 @@ export class GrantNotFoundError extends NotFoundError {
 
 /** The principal is not in the organization; one code for users, groups and API keys. */
 export class GrantPrincipalNotFoundError extends HandledError {
+  static readonly code = "grant_principal_not_found" as const;
   declare readonly code: "grant_principal_not_found";
 
   constructor(meta: { principalType: string; principalId: string }) {
@@ -334,6 +355,7 @@ export class GrantPrincipalNotFoundError extends HandledError {
 }
 
 export class GrantRoleNotFoundError extends HandledError {
+  static readonly code = "grant_role_not_found" as const;
   declare readonly code: "grant_role_not_found";
 
   constructor(roleId: string) {
@@ -346,6 +368,7 @@ export class GrantRoleNotFoundError extends HandledError {
 }
 
 export class GrantScopeNotFoundError extends HandledError {
+  static readonly code = "grant_scope_not_found" as const;
   declare readonly code: "grant_scope_not_found";
 
   constructor(meta: { scopeType: string; scopeId: string }) {
@@ -359,6 +382,7 @@ export class GrantScopeNotFoundError extends HandledError {
 
 /** The role carries a permission that only takes effect at organization scope. */
 export class GrantScopeNotAllowedError extends HandledError {
+  static readonly code = "grant_scope_not_allowed" as const;
   declare readonly code: "grant_scope_not_allowed";
 
   constructor(meta: { permission: string; scopeType: string }) {
@@ -371,6 +395,7 @@ export class GrantScopeNotAllowedError extends HandledError {
 }
 
 export class GrantScopePersonalWorkspaceError extends HandledError {
+  static readonly code = "grant_scope_personal_workspace" as const;
   declare readonly code: "grant_scope_personal_workspace";
 
   constructor(meta: { scopeId: string }) {
@@ -385,6 +410,7 @@ export class GrantScopePersonalWorkspaceError extends HandledError {
 
 /** The organization already holds as many grants as it may. */
 export class GrantLimitReachedError extends HandledError {
+  static readonly code = "grant_limit_reached" as const;
   declare readonly code: "grant_limit_reached";
 
   constructor(limit: number) {
@@ -398,6 +424,7 @@ export class GrantLimitReachedError extends HandledError {
 
 /** Nobody grants more than they hold at that scope: names what the caller lacks. */
 export class GrantExceedsCallerPermissionsError extends HandledError {
+  static readonly code = "grant_exceeds_caller_permissions" as const;
   declare readonly code: "grant_exceeds_caller_permissions";
 
   constructor(missingPermissions: readonly string[]) {
@@ -412,6 +439,7 @@ export class GrantExceedsCallerPermissionsError extends HandledError {
 
 /** Nobody grants the platform-operator role to themselves, on any deployment. */
 export class PlatformOperatorSelfGrantError extends HandledError {
+  static readonly code = "platform_operator_self_grant" as const;
   declare readonly code: "platform_operator_self_grant";
 
   constructor(meta: { userId: string }) {
@@ -425,6 +453,7 @@ export class PlatformOperatorSelfGrantError extends HandledError {
 
 /** Revoking this grant would leave the installation with no platform operator. */
 export class PlatformOperatorLastHolderError extends HandledError {
+  static readonly code = "platform_operator_last_holder" as const;
   declare readonly code: "platform_operator_last_holder";
 
   constructor(meta: { grantId: string; userId: string }) {
@@ -439,6 +468,7 @@ export class PlatformOperatorLastHolderError extends HandledError {
 
 /** A platform permission (`ops:*`) belongs to the platform-operator grant, never a custom role. */
 export class PlatformPermissionNotAssignableError extends HandledError {
+  static readonly code = "platform_permission_not_assignable" as const;
   declare readonly code: "platform_permission_not_assignable";
 
   constructor(meta: { permissions: readonly string[] }) {

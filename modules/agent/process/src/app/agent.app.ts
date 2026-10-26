@@ -34,8 +34,7 @@ import {
   AgentSourcePermissionDeniedError,
   AgentOwnerOnlyError,
   connectedAgentSelectability,
-  DEFAULT_CALL_TIMEOUT_MS,
-  MAX_CALL_TIMEOUT_MS,
+  callTimeoutMsFor,
   type AgentCallInput,
   type AgentCallContext,
   type DispatchAgent,
@@ -459,7 +458,7 @@ export class AgentModule implements AgentApi {
         id: agent.id,
         name: agent.name,
         environment: agent.environment ?? null,
-        timeoutMs: Math.min(agent.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+        timeoutMs: callTimeoutMsFor({ declared: agent.config.timeoutMs }),
         isSticky: agent.config.sticky ?? false,
       },
       call: {

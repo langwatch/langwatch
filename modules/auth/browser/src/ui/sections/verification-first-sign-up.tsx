@@ -1,6 +1,7 @@
 import { isSafeReturnToPath, type SignUpEnrollment } from "@langwatch/auth-contract";
 import { HStack, Text } from "@langwatch/design-system/primitives";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
@@ -15,7 +16,6 @@ import type { FrontDoorDepth } from "../../model/ground-palette.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
 import { JOIN_BEFORE_CREATE_PATH } from "../../model/join-before-create.ts";
 import { readLastUsedMethodId, rememberPendingMethod } from "../../model/last-used-method.ts";
-import { readHandledError } from "../../model/read-handled-error.ts";
 import { useTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
@@ -116,7 +116,7 @@ async function requestSignUpLink({
     // Not a refusal, a wrong door: the address has an account, so the screen
     // turns into the way into it rather than telling somebody to start again
     // somewhere else.
-    if (readHandledError(failure)?.code === "email_already_registered") {
+    if (EmailAlreadyRegisteredError.is(failure)) {
       onAlreadyRegistered(email);
       await decide({ identifier: email });
     }

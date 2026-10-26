@@ -33,7 +33,11 @@ import {
   formatUnknownAnnotations,
   isEntryModule,
   isInert,
-  isPartiallyTagged,
+  compareFrozenScenarios,
+  findAnnotationsOnUntaggedScenarios,
+  formatAnnotationsOnUntagged,
+  formatFrozenScenarioFailures,
+  parseFeatureSource,
 } from "../src/tools/check-feature-parity.ts";
 
 let root = "";
@@ -552,56 +556,191 @@ describe("isFollowedByTestCall", () => {
   });
 });
 
-describe("isPartiallyTagged", () => {
-  const enforcedScenario = {
-    title: "t",
-    tags: ["@unit"],
-    line: 1,
-    bindings: [],
-  };
+describe("compareFrozenScenarios", () => {
+  describe("given a file whose older untagged scenario is frozen", () => {
+    describe("when a new untagged scenario lands in the same file", () => {
+      /** @scenario "A new untagged scenario fails even in a file whose older ones are frozen" */
+      it("reports the new one and tolerates the frozen one", () => {
+        const { fresh, stale } = compareFrozenScenarios({
+          observed: [
+            { feature: "specs/a.feature", title: "Old", line: 3 },
+            { feature: "specs/a.feature", title: "New", line: 9 },
+          ],
+          frozen: { "specs/a.feature": ["Old"] },
+        });
 
-  describe("given a file with enforced scenarios and untagged ones alongside", () => {
-    describe("when the floor is applied", () => {
-      it("reports the file as partially tagged", () => {
-        // This is the `15/15 bound` lie on a file holding 27 scenarios:
-        // the 12 untagged ones are invisible to the bound count.
+        expect(fresh).toEqual([{ feature: "specs/a.feature", title: "New", line: 9 }]);
+        expect(stale).toEqual([]);
+      });
+    });
+
+    describe("when the same title appears twice but is frozen once", () => {
+      it("reports the second copy", () => {
+        const { fresh } = compareFrozenScenarios({
+          observed: [
+            { feature: "specs/a.feature", title: "Twin", line: 3 },
+            { feature: "specs/a.feature", title: "Twin", line: 9 },
+          ],
+          frozen: { "specs/a.feature": ["Twin"] },
+        });
+
+        expect(fresh).toEqual([{ feature: "specs/a.feature", title: "Twin", line: 9 }]);
+      });
+    });
+  });
+
+  describe("given a frozen scenario that has since been tagged", () => {
+    describe("when the gate compares", () => {
+      /** @scenario "A frozen scenario that no longer breaks the rule must leave the list" */
+      it("reports the entry as stale", () => {
+        const { fresh, stale } = compareFrozenScenarios({
+          observed: [],
+          frozen: { "specs/a.feature": ["Now tagged"] },
+        });
+
+        expect(fresh).toEqual([]);
+        expect(stale).toEqual([{ feature: "specs/a.feature", title: "Now tagged" }]);
+      });
+    });
+  });
+});
+
+describe("findAnnotationsOnUntaggedScenarios", () => {
+  const binding = (file: string, title: string) => ({ title, ref: { file, line: 12 } });
+  const scenario = (title: string, tags: string[]) => ({
+    feature: "specs/a.feature",
+    scenario: { title, tags, line: 7 },
+  });
+
+  describe("given an integration test bound to a scenario tagged only @bdd", () => {
+    describe("when the gate looks for annotations on untagged scenarios", () => {
+      /** @scenario "An annotation on a scenario with no binding tag fails, naming the scenario and the missing tag" */
+      it("names the test, the scenario and the missing tag", () => {
+        const found = findAnnotationsOnUntaggedScenarios({
+          bindings: [binding("modules/x/__tests__/y.integration.test.ts", "Prose only")],
+          scenarios: [scenario("Prose only", ["@bdd"])],
+        });
+
+        expect(found).toEqual([
+          {
+            title: "Prose only",
+            ref: { file: "modules/x/__tests__/y.integration.test.ts", line: 12 },
+            scenario: { feature: "specs/a.feature", title: "Prose only", line: 7 },
+            missingTag: "@integration",
+            parked: false,
+          },
+        ]);
+
+        const text = formatAnnotationsOnUntagged(found).join("\n");
+
+        expect(text).toContain(
+          'modules/x/__tests__/y.integration.test.ts:12 @scenario "Prose only"',
+        );
+        expect(text).toContain("binds specs/a.feature:7, which is missing @integration");
+      });
+    });
+  });
+
+  describe("given a unit test bound to an @unimplemented scenario", () => {
+    describe("when the gate formats the finding", () => {
+      /** @scenario "An annotation on an @unimplemented scenario says to replace the tag" */
+      it("tells the author to replace @unimplemented with the lane tag", () => {
+        const found = findAnnotationsOnUntaggedScenarios({
+          bindings: [binding("modules/x/y.unit.test.ts", "Parked")],
+          scenarios: [scenario("Parked", ["@unimplemented"])],
+        });
+
+        expect(formatAnnotationsOnUntagged(found).join("\n")).toContain(
+          "Replace @unimplemented with @unit",
+        );
+      });
+    });
+  });
+
+  describe("given a test bound to a scenario tagged @unit", () => {
+    describe("when the gate looks for annotations on untagged scenarios", () => {
+      /** @scenario "An annotation on a tagged scenario is not reported" */
+      it("reports nothing", () => {
         expect(
-          isPartiallyTagged({
-            scenarios: [enforcedScenario],
-            untaggedScenarios: 12,
+          findAnnotationsOnUntaggedScenarios({
+            bindings: [binding("modules/x/y.unit.test.ts", "Tagged")],
+            scenarios: [scenario("Tagged", ["@unit"])],
           }),
-        ).toBe(true);
+        ).toEqual([]);
       });
     });
   });
+});
 
-  describe("given a file whose scenarios are all untagged", () => {
-    describe("when the floor is applied", () => {
-      it("leaves the file to the inert floor instead", () => {
-        // Inert and partial must not overlap: one file, one list, one fix.
-        expect(isPartiallyTagged({ scenarios: [], untaggedScenarios: 20 })).toBe(false);
-        expect(isInert({ scenarios: [], totalScenarios: 20 })).toBe(true);
+describe("parseFeatureSource", () => {
+  describe("given @unimplemented scenarios citing issues in each accepted form", () => {
+    describe("when the gate reads the feature file", () => {
+      /** @scenario "An @unimplemented scenario cites its issue by tag or by the comment directly above" */
+      it("credits the tag and the adjacent comment, not a comment a blank line away", () => {
+        const scenarios = parseFeatureSource(
+          [
+            "Feature: F",
+            "",
+            "  @unit @unimplemented @issue:1234",
+            "  Scenario: By tag",
+            "    Given x",
+            "",
+            "  # Tracked by #1234.",
+            "  @unit @unimplemented",
+            "  Scenario: By comment",
+            "    Given x",
+            "",
+            "  # Tracked by #1234.",
+            "",
+            "  @unit @unimplemented",
+            "  Scenario: Comment too far",
+            "    Given x",
+          ].join("\n"),
+        );
+
+        expect(scenarios.map((s) => [s.title, s.citesIssue])).toEqual([
+          ["By tag", true],
+          ["By comment", true],
+          ["Comment too far", false],
+        ]);
+
+        const featureTagged = parseFeatureSource(
+          ["@issue:1234", "Feature: F", "  @unimplemented", "  Scenario: Inherited"].join("\n"),
+        );
+
+        expect(featureTagged[0]?.citesIssue).toBe(true);
       });
     });
   });
+});
 
-  describe("given a fully tagged file", () => {
-    describe("when the floor is applied", () => {
-      it("does not report the file as partially tagged", () => {
-        expect(
-          isPartiallyTagged({
-            scenarios: [enforcedScenario],
-            untaggedScenarios: 0,
-          }),
-        ).toBe(false);
-      });
-    });
-  });
+describe("formatFrozenScenarioFailures", () => {
+  describe("given one finding of each kind", () => {
+    describe("when the gate formats its findings", () => {
+      /** @scenario "Every parity finding says what to do instead" */
+      it("tells each one what to do instead", () => {
+        const text = formatFrozenScenarioFailures({
+          untagged: {
+            fresh: [{ feature: "specs/a.feature", title: "Bare", line: 4 }],
+            stale: [{ feature: "specs/a.feature", title: "Gone" }],
+          },
+          unimplementedWithoutIssue: {
+            fresh: [{ feature: "specs/b.feature", title: "Parked", line: 8 }],
+            stale: [],
+          },
+        }).join("\n");
 
-  describe("given a file that declares no scenarios at all", () => {
-    describe("when the floor is applied", () => {
-      it("does not report the file as partially tagged", () => {
-        expect(isPartiallyTagged({ scenarios: [], untaggedScenarios: 0 })).toBe(false);
+        expect(text).toContain('specs/a.feature:4 "Bare"');
+        expect(text).toContain("Tag it @unit / @integration / @e2e / @regression and bind a test");
+        expect(text).toContain("tag it @unimplemented with an @issue:<number> tag, or delete it");
+        expect(text).toContain('specs/b.feature:8 "Parked"');
+        expect(text).toContain(
+          "Add an @issue:<number> tag to it, or a comment line directly above its tags naming #<number>.",
+        );
+        expect(text).toContain(
+          'remove them from "untagged" in packages/architecture-enforcer/src/tools/feature-parity-frozen.json',
+        );
+        expect(text).toContain('specs/a.feature "Gone"');
       });
     });
   });

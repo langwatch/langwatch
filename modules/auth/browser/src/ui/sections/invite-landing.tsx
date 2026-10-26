@@ -1,5 +1,10 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  InviteAlreadyAcceptedError,
+  InviteExpiredError,
+  InviteWrongAccountError,
+} from "@langwatch/organization-contract";
 import { useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
@@ -67,9 +72,7 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
  * explained itself would let someone learn which organizations exist by guessing codes.
  */
 function InviteDeadEnd({ error, inviteCode }: { error: unknown; inviteCode: string }) {
-  const code = readHandledError(error)?.code;
-
-  if (code === "invite_expired") {
+  if (InviteExpiredError.is(error)) {
     return <ExpiredInvite error={error} inviteCode={inviteCode} />;
   }
 
@@ -243,10 +246,10 @@ function ConfirmAndJoin({
 
   // Signed in as somebody else is the one failure with a way out rather than
   // a retry, so it replaces the join button instead of sitting above it.
-  const wrongAccount = readHandledError(accept.error)?.code === "invite_wrong_account";
+  const wrongAccount = InviteWrongAccountError.is(accept.error);
   // Already spent (an SSO sign-in applies a matching invitation itself) is
   // the outcome they wanted: go in, as a fresh join would.
-  const alreadyAccepted = readHandledError(accept.error)?.code === "invite_already_accepted";
+  const alreadyAccepted = InviteAlreadyAcceptedError.is(accept.error);
   useEffect(() => {
     if (alreadyAccepted) hardRedirect("/");
   }, [alreadyAccepted]);

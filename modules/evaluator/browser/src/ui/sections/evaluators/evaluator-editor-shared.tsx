@@ -28,6 +28,7 @@ import {
   evaluatorSettingsSchemaFor,
   getEvaluatorDefaultSettings,
 } from "@langwatch/evaluator-contract";
+import { ComparisonConfigForm } from "@langwatch/experiment-client";
 import type {
   ComparisonEvaluatorConfig,
   LocalEvaluatorConfig,
@@ -43,7 +44,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, FormProvider, type UseFormReturn, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
-import { ComparisonConfigForm } from "../../../behavior/lent-peers.tsx";
 import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";

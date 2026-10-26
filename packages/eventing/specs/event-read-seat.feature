@@ -65,6 +65,22 @@ Feature: One event is read by id through a narrow seat beside the event store
       When another tenant, or an empty aggregate id, asks the seat for a stream
       Then no event is answered
 
+  Rule: The seat answers stored types as the current ones (Alex, 2026-10-20)
+
+    @unit
+    Scenario: A stored type is read through the seat as the current type
+      Given a pipeline that upcasts a stored event type, and renamed its aggregate type
+      And the event log holds an event under the stored type and the stored aggregate type
+      When the process's read seat is asked for that aggregate's stream, or for the event by id
+      Then the event is answered under the current type and aggregate type, its data transformed
+
+    @unit
+    Scenario: An upcast that yields an invalid current event fails the seat read
+      Given a pipeline whose upcast yields a payload its current schema refuses
+      And the event log holds an event under the stored type
+      When the process's read seat is asked for that aggregate's stream, or for the event by id
+      Then the read fails, and no unvalidated event is answered
+
   Rule: A producer composes the seat beside its refusing store
 
     @integration

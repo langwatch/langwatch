@@ -10,6 +10,7 @@ import {
 } from "./index.ts";
 
 class TestError extends HandledError {
+  static readonly code = "test_error" as const;
   declare readonly code: "test_error";
 
   constructor(
@@ -273,10 +274,15 @@ describe("HandledError.is", () => {
     expect(NotFoundError.is(new TestError())).toBe(false);
   });
 
-  it("stays subclass-specific across a duplicated module evaluation", async () => {
+  it("matches a duplicated module evaluation's error by the class's static code", async () => {
     const duplicate = await duplicatedHandledError("test_error", "gone");
-    expect(TestError.is(duplicate)).toBe(false);
+    expect(TestError.is(duplicate)).toBe(true);
     expect(duplicate.code).toBe("test_error");
+  });
+
+  it("stays instance-only for a class without a static code", async () => {
+    const duplicate = await duplicatedHandledError("test_error", "gone");
+    expect(NotFoundError.is(duplicate)).toBe(false);
   });
 });
 

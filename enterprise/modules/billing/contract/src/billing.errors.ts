@@ -8,6 +8,7 @@ export { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
 /** Billing requires an email; 422 validates the account field, not auth. */
 export class UserEmailRequiredError extends HandledError {
+  static readonly code = "billing_customer_email_required" as const;
   declare readonly code: "billing_customer_email_required";
 
   constructor() {
@@ -26,6 +27,7 @@ export class UserEmailRequiredError extends HandledError {
  * `subscription_sync_failed` copy says ("catches up on its own; reload").
  */
 export class CustomerCreationRaceError extends HandledError {
+  static readonly code = "subscription_sync_failed" as const;
   declare readonly code: "subscription_sync_failed";
 
   constructor() {
@@ -40,6 +42,7 @@ export class CustomerCreationRaceError extends HandledError {
 
 /** Plan has no configured price on our side; 5xx because our catalog is incomplete. */
 export class InvalidPlanError extends HandledError {
+  static readonly code = "billing_plan_price_missing" as const;
   declare readonly code: "billing_plan_price_missing";
 
   constructor(plan: string) {
@@ -54,6 +57,7 @@ export class InvalidPlanError extends HandledError {
 
 /** Seat billing not configured; platform fault, not provider. */
 export class SeatBillingUnavailableError extends HandledError {
+  static readonly code = "seat_billing_unavailable" as const;
   declare readonly code: "seat_billing_unavailable";
 
   constructor() {
@@ -67,6 +71,7 @@ export class SeatBillingUnavailableError extends HandledError {
 
 /** No active subscription when one was expected; drift with the provider. */
 export class NoActiveSubscriptionError extends HandledError {
+  static readonly code = "subscription_sync_failed" as const;
   declare readonly code: "subscription_sync_failed";
 
   constructor() {
@@ -80,6 +85,7 @@ export class NoActiveSubscriptionError extends HandledError {
 
 /** Subscription unlinked from provider; never catches up on its own. */
 export class SubscriptionNotLinkedError extends HandledError {
+  static readonly code = "subscription_not_linked" as const;
   declare readonly code: "subscription_not_linked";
 
   constructor() {
@@ -96,6 +102,7 @@ export class SubscriptionNotLinkedError extends HandledError {
  * silently billing the wrong plan.
  */
 export class AmbiguousSubscriptionError extends HandledError {
+  static readonly code = "subscription_ambiguous" as const;
   declare readonly code: "subscription_ambiguous";
 
   constructor(count: number) {
@@ -113,6 +120,7 @@ export class AmbiguousSubscriptionError extends HandledError {
  * it becomes a different bill. Reopening produces a fresh quote.
  */
 export class QuoteExpiredError extends HandledError {
+  static readonly code = "billing_quote_expired" as const;
   declare readonly code: "billing_quote_expired";
 
   constructor() {
@@ -127,6 +135,7 @@ export class QuoteExpiredError extends HandledError {
 
 /** Missing subscription line item; drift with the provider one level in. */
 export class SubscriptionItemNotFoundError extends HandledError {
+  static readonly code = "subscription_sync_failed" as const;
   declare readonly code: "subscription_sync_failed";
 
   constructor(item: string) {
@@ -141,6 +150,7 @@ export class SubscriptionItemNotFoundError extends HandledError {
 
 /** Unbillable seat count; 422 puts validation on the seat input. */
 export class InvalidSeatCountError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor(count: number) {
@@ -158,6 +168,7 @@ export class InvalidSeatCountError extends HandledError {
 
 /** Failed to create the pending subscription record; checkout never started. */
 export class SubscriptionCreationFailedError extends HandledError {
+  static readonly code = "subscription_sync_failed" as const;
   declare readonly code: "subscription_sync_failed";
 
   constructor() {
@@ -172,6 +183,7 @@ export class SubscriptionCreationFailedError extends HandledError {
 
 /** Billing event for unknown subscription; webhook-side drift. */
 export class SubscriptionRecordNotFoundError extends HandledError {
+  static readonly code = "subscription_sync_failed" as const;
   declare readonly code: "subscription_sync_failed";
 
   constructor(identifier: string) {
@@ -188,6 +200,7 @@ export class SubscriptionRecordNotFoundError extends HandledError {
  * Provider rejected the request; our config error, not a blip or timeout.
  */
 export class UsageReportFailedError extends HandledError {
+  static readonly code = "usage_report_failed" as const;
   declare readonly code: "usage_report_failed";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -205,6 +218,7 @@ export class UsageReportFailedError extends HandledError {
  * half a subscription.
  */
 export class UnsupportedBillingCurrencyError extends HandledError {
+  static readonly code = "billing_currency_unsupported" as const;
   declare readonly code: "billing_currency_unsupported";
 
   constructor() {
@@ -222,6 +236,7 @@ export class UnsupportedBillingCurrencyError extends HandledError {
  * operator action to restore.
  */
 export class BillingCustomerDeletedError extends HandledError {
+  static readonly code = "billing_customer_deleted" as const;
   declare readonly code: "billing_customer_deleted";
 
   constructor() {
@@ -238,6 +253,7 @@ export class BillingCustomerDeletedError extends HandledError {
  * configuration errors.
  */
 export class BillingProviderUnavailableError extends HandledError {
+  static readonly code = "billing_provider_unavailable" as const;
   declare readonly code: "billing_provider_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {

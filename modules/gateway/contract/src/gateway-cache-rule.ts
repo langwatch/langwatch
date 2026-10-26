@@ -108,6 +108,7 @@ export type GatewayCacheRuleCursor = {
 };
 
 export class GatewayCacheRuleNotFoundError extends HandledError {
+  static readonly code = "gateway_cache_rule_not_found" as const;
   declare readonly code: "gateway_cache_rule_not_found";
 
   constructor() {

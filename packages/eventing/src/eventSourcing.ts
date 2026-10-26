@@ -61,7 +61,9 @@ import {
   laneAliasTargetKeys,
   readAliasedBody,
 } from "./upcast/laneAlias.ts";
+import { upcastEventReadSeat } from "./upcast/upcastEventReadSeat.ts";
 import { upcastEventStore } from "./upcast/upcastEventStore.ts";
+import { pipelineUpcastsOf } from "./upcast/upcastReplayEventSource.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
 
@@ -189,7 +191,15 @@ export class EventSourcing {
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
     this._eventStore = options.eventStore;
-    this._eventReadSeat = options.eventReadSeat;
+    // Every reader sees current shapes: the seat reads through the registered pipelines' upcasts.
+    this._eventReadSeat =
+      options.eventReadSeat === undefined
+        ? undefined
+        : upcastEventReadSeat({
+            seat: options.eventReadSeat,
+            upcasts: () => pipelineUpcastsOf(this.definitions),
+            parseEvent: (value) => this.parseRegisteredEvent(value),
+          });
     this._queueFactory = options.queueFactory;
     this._queueName = options.queueName ?? "event-sourcing/jobs";
     this._consumersEnabled = options.consumersEnabled ?? true;

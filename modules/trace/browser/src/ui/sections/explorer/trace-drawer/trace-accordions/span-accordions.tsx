@@ -551,10 +551,8 @@ function exceptionsSection(ctx: SpanSectionContext): ReactNode {
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Title whiteSpace="pre-wrap">
-                {
-                  ctx.detail.error
-                    .message /* no-raw-error-toast-ok: the span's own recorded exception */
-                }
+                {/* The span's own recorded exception: the customer's data, not our copy. */}
+                {ctx.detail.error.message}
               </Alert.Title>
             </Alert.Content>
           </Alert.Root>

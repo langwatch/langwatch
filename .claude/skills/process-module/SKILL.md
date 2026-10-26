@@ -59,7 +59,8 @@ refuses a missing store by name.
    `{ repository, evaluators: Pick<EvaluatorApi, "getById">, generateId }`
    through `static create(options)` with a private constructor
    (`services/monitor.service.ts`). A service never opens a channel, a client
-   or a store itself.
+   or a store itself. A metric instrument is a field of an injected
+   `<subject>-metrics.service.ts` class, never created at module scope.
 2. **A repository interface sits at the top of `repositories/`; backends below.**
    Only `repositories/prisma/**` names Prisma, through
    `PrismaRepository.for("Monitor")`. Every project-model query carries

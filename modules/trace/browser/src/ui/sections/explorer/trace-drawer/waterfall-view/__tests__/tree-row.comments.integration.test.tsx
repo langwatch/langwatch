@@ -22,10 +22,10 @@ vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
       permission === "annotations:manage" ? mocks.canManage : true,
   }),
 }));
-vi.mock(
-  "../../../../../../features/annotation/behavior/lent-annotation-form.tsx",
-  () => import("../../../../__tests__/lent-annotation-form.stand-in.tsx"),
-);
+vi.mock("@langwatch/annotation-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../__tests__/annotation-form.stand-in.tsx")),
+}));
 
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({

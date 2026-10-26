@@ -1,0 +1,25 @@
+{
+  "record": "dev/docs/ARCHITECTURE.md §17, a { code, message } failure built in module contract or process code carries the code and its meta, never customer sentence copy; the words live in the presentation registry keyed by code (Alex, 2026-10-20). Shrink-only: lower a count in the change that removes the finding.",
+  "findings": {
+    "modules/analytics/contract/src/visualization/vega-lite-fields.ts": 1,
+    "modules/analytics/process/src/rules/langwatch-ql-query-walk.rules.ts": 9,
+    "modules/analytics/process/src/services/langwatch-ql-diagnostics.service.ts": 2,
+    "modules/analytics/process/src/services/langwatch-ql-validation.service.ts": 4,
+    "modules/auth/process/src/channels/http/http.better-auth.channel.ts": 5,
+    "modules/auth/process/src/channels/http/http.credential-session-guard.channel.ts": 1,
+    "modules/auth/process/src/channels/http/http.passkey-sign-up.channel.ts": 7,
+    "modules/auth/process/src/transport/auth.rest.ts": 1,
+    "modules/experiment/contract/src/workbench/actions/transforms/helpers.ts": 3,
+    "modules/identity/process/src/features/sso-arrival/rules/sso-migration.rules.ts": 6,
+    "modules/identity/process/src/features/sso-arrival/services/sso-migration-finalization.service.ts": 2,
+    "modules/identity/process/src/services/better-auth-identity-routing.service.ts": 1,
+    "modules/langy/process/src/features/local-control/services/langy-local-session-lifecycle.service.ts": 1,
+    "modules/langy/process/src/features/local-control/services/langy-local-session.service.ts": 5,
+    "modules/langy/process/src/rules/langy-local-control-connect.rules.ts": 1,
+    "modules/scenario/contract/src/features/execution/scenario-infra-error.ts": 15,
+    "modules/scenario/contract/src/features/run/scenario-run-parameter.error.ts": 7,
+    "modules/trace/contract/src/explorer/actions/transforms/time-range.ts": 2,
+    "modules/trace/contract/src/explorer/actions/transforms/view.ts": 2,
+    "modules/webhook/contract/src/webhook-request.ts": 6
+  }
+}

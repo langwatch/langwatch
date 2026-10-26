@@ -83,6 +83,10 @@ export interface ChartQueryError {
   readonly code: string;
   readonly title: string;
   readonly message: string;
+  /** What the code's registry copy reads (a parameter name, a handled error's meta). */
+  readonly meta?: Readonly<Record<string, unknown>>;
+  /** The error id the server attached, the one technical detail a reader is offered. */
+  readonly traceId?: string;
   /** Set when the same request is expected to succeed shortly; the hook retries it. */
   readonly retryable?: boolean;
   /**

@@ -9,11 +9,9 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
-import { SetupWithAgentButtonToken } from "@langwatch/trace-client";
+import { SetupWithAgentButtonToken, SetupWithAgentButton } from "@langwatch/trace-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-
-import { SetupWithAgentButton } from "../lent-setup-with-agent-button.tsx";
 
 const traceLendsTheMenu = uiDeclarations([
   {

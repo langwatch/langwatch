@@ -34,8 +34,9 @@ vi.mock("../../../../../behavior/onboarding-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/lent-edit-model-provider-form.tsx", () => ({
-  LentEditModelProviderForm: ({
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  EditModelProviderForm: ({
     onSaved,
   }: {
     onSaved: (saved: { chatModel?: string; apiKey?: string }) => Promise<void>;

@@ -20,6 +20,7 @@ export const AGENT_CHAT_TIMEOUT_MS = 120_000;
  * `at-capacity` error frame). Purely transient: retrying later succeeds.
  */
 export class LangyAgentAtCapacityError extends HandledError {
+  static readonly code = "langy_agent_at_capacity" as const;
   declare readonly code: "langy_agent_at_capacity";
 
   constructor() {
@@ -37,6 +38,7 @@ export class LangyAgentAtCapacityError extends HandledError {
  * only has to send the message again.
  */
 export class LangyAgentSessionLostError extends HandledError {
+  static readonly code = "langy_agent_session_lost" as const;
   declare readonly code: "langy_agent_session_lost";
 
   constructor() {
@@ -54,6 +56,7 @@ export class LangyAgentSessionLostError extends HandledError {
  * a fault, and not a blanket pre-flight: most turns never touch GitHub and must not be stopped.
  */
 export class LangyGithubNotConnectedError extends HandledError {
+  static readonly code = "langy_github_not_connected" as const;
   declare readonly code: "langy_github_not_connected";
 
   constructor() {
@@ -70,6 +73,7 @@ export class LangyGithubNotConnectedError extends HandledError {
  * organization's GitHub App installation — the clone/push 404'd.
  */
 export class LangyGithubRepoNotAccessibleError extends HandledError {
+  static readonly code = "langy_github_repo_not_accessible" as const;
   declare readonly code: "langy_github_repo_not_accessible";
 
   constructor() {
@@ -89,6 +93,7 @@ export class LangyGithubRepoNotAccessibleError extends HandledError {
  * The manager could not START a worker for this turn (`worker_spawn_failed`).
  */
 export class LangyWorkerSpawnFailedError extends HandledError {
+  static readonly code = "langy_worker_spawn_failed" as const;
   declare readonly code: "langy_worker_spawn_failed";
 
   constructor() {
@@ -106,6 +111,7 @@ export class LangyWorkerSpawnFailedError extends HandledError {
  * for it.
  */
 export class LangyWorkerStoppedError extends HandledError {
+  static readonly code = "langy_worker_stopped" as const;
   declare readonly code: "langy_worker_stopped";
 
   constructor() {
@@ -123,6 +129,7 @@ export class LangyWorkerStoppedError extends HandledError {
  * deterministically — typically its LLM call was rejected by the provider or gateway.
  */
 export class LangyAgentErroredError extends HandledError {
+  static readonly code = "langy_agent_errored" as const;
   declare readonly code: "langy_agent_errored";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -140,6 +147,7 @@ export class LangyAgentErroredError extends HandledError {
 
 /** The turn blew the `AGENT_CHAT_TIMEOUT_MS` budget (AbortSignal.timeout). */
 export class LangyTurnTimeoutError extends HandledError {
+  static readonly code = "langy_turn_timeout" as const;
   declare readonly code: "langy_turn_timeout";
 
   constructor(timeoutMs: number) {
@@ -158,6 +166,7 @@ export class LangyTurnTimeoutError extends HandledError {
  * message-identical to the string the drain path used to pass to `failTurn`.
  */
 export class LangyWorkerRestartingError extends HandledError {
+  static readonly code = "langy_worker_restarting" as const;
   declare readonly code: "langy_worker_restarting";
 
   constructor() {

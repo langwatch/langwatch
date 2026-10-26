@@ -3,8 +3,7 @@ import {
   AgentTestRefusedError,
   AgentOwnerOnlyError,
   connectedAgentSelectability,
-  DEFAULT_CALL_TIMEOUT_MS,
-  MAX_CALL_TIMEOUT_MS,
+  callTimeoutMsFor,
 } from "@langwatch/agent-contract";
 import type {
   AgentApi,
@@ -73,9 +72,21 @@ type AgentTestServiceOptions = {
   turns: AgentTestTurnChild;
   /** The operator's nlpgo deadlines a code or workflow agent's turn answers inside. */
   nlpTimeouts: AgentTestTurnJob["nlpTimeouts"];
-  /** The platform's call-budget ceiling every kind of agent answers inside. */
-  maxCallTimeoutMs: number;
 };
+
+/** Agent's call budget for this agent: the timeout its config declares, where its kind has one. */
+function callBudgetMsOf(agent: AgentWithFields): number {
+  const config: unknown = agent.config;
+  const declared =
+    typeof config === "object" &&
+    config !== null &&
+    "timeoutMs" in config &&
+    typeof config.timeoutMs === "number"
+      ? config.timeoutMs
+      : null;
+
+  return callTimeoutMsFor({ declared });
+}
 
 /** The deadlines the child can carry: JSON has no NaN, and an unset one takes the default there. */
 function usableTimeouts({
@@ -266,7 +277,7 @@ export class AgentTestService {
         executeSyncRoute: prefetch.data.executeSyncRoute,
         parameters: input.params ?? {},
         message: input.message,
-        timeoutMs: this.options.maxCallTimeoutMs,
+        timeoutMs: callBudgetMsOf(input.agent),
         nlpTimeouts: usableTimeouts(this.options.nlpTimeouts),
       },
       environment: { labels: prefetch.data.scenario.labels, telemetry: prefetch.telemetry },
@@ -297,7 +308,7 @@ export class AgentTestService {
         id: input.agent.id,
         name: input.agent.name,
         environment: input.agent.environment ?? null,
-        timeoutMs: Math.min(config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+        timeoutMs: callTimeoutMsFor({ declared: config.timeoutMs }),
         isSticky: config.sticky ?? false,
       },
       call: {

@@ -19,12 +19,12 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { isOnPlatformSet, ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { isSuiteSetId } from "@langwatch/suite-contract";
+import { SetupWithAgentButton } from "@langwatch/trace-client";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { type ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
 import { scenarioContextChip } from "../../../behavior/langy/langy-context-chips.ts";
-import { SetupWithAgentButton } from "../../../behavior/lent-trace.tsx";
 import { useScenarios } from "../../../behavior/scenarios/use-scenarios.ts";
 import { useAutoExpansion } from "../../../behavior/suite/use-auto-expansion.ts";
 import { useRunHistoryStore } from "../../../behavior/suite/use-run-history-store.ts";

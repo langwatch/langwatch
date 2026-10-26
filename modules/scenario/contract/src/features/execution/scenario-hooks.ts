@@ -8,7 +8,16 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 /** A hook's default budget, when the scenario sets none. */
-export const DEFAULT_HOOK_TIMEOUT_MS = 60_000;
+const DEFAULT_HOOK_TIMEOUT_MS = 60_000;
+
+/**
+ * How long a hook may take (milliseconds): the budget the run declared, or the owner's default
+ * when it declared none. The owner decides the number, so a caller asks for the budget and keeps
+ * no copy of it.
+ */
+export function hookTimeoutMsFor({ declared }: { declared: number | undefined }): number {
+  return declared ?? DEFAULT_HOOK_TIMEOUT_MS;
+}
 
 /**
  * How one hook ended. `skipped` is on purpose (the run kept its data); `not_run` is an accident,

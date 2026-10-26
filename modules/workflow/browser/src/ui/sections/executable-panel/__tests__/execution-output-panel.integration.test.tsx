@@ -13,7 +13,8 @@ vi.mock("../../../../behavior/use-field-redaction.ts", () => ({
 vi.mock("../../../../model/workflow-host.ts", () => ({
   useWorkflowHost: () => ({ hasPermission: () => false }),
 }));
-vi.mock("../../../../behavior/lent-trace.tsx", () => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   RenderInputOutput: ({ value }: { value: unknown }) => <span>{String(value)}</span>,
 }));
 

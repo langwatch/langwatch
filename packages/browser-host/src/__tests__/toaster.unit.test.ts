@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { UiFailureNotice, UiSuccessNotice } from "../capabilities.ts";
+import {
+  type UiFailureNotice,
+  type UiSuccessNotice,
+  UNAVAILABLE_UI_FEEDBACK,
+} from "../capabilities.ts";
 import { setUiFeedbackHost, toaster } from "../toaster.ts";
 
 function recordingHost() {
@@ -89,6 +93,21 @@ describe("toaster", () => {
 
       expect(() => toaster.create({ title: "Couldn't save", type: "error" })).not.toThrow();
       expect(warn).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the mounted host is the unavailable stand-in", () => {
+    /** @scenario A report with no working feedback host is logged, never thrown */
+    it.each([
+      ["an error", { title: "Couldn't copy", type: "error" as const }],
+      ["a success", { title: "Copied", type: "success" as const }],
+      ["a warning", { title: "Heads up", type: "warning" as const }],
+    ])("warns and drops %s rather than throwing", (_name, toast) => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      setUiFeedbackHost(UNAVAILABLE_UI_FEEDBACK);
+
+      expect(() => toaster.create(toast)).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.any(String), toast.title);
     });
   });
 });

@@ -20,6 +20,7 @@ export type ContractArchiveEntry = z.infer<typeof contractArchiveEntrySchema>;
 
 /** A contract step whose archive could not be made and checked: the drop must not run. */
 export class ContractArchiveError extends HandledError {
+  static readonly code = "contract_archive_failed" as const;
   declare readonly code: "contract_archive_failed";
 
   constructor({ step, table, reason }: { step: string; table: string; reason: string }) {

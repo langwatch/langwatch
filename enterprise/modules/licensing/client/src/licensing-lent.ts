@@ -1,5 +1,6 @@
 /** What licensing lends to screens it does not own, by token (ARCHITECTURE.md §10.1). */
 
+import { lentComponent } from "@langwatch/browser-host/lent";
 import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 import { uiTokens } from "@langwatch/module";
 
@@ -29,3 +30,6 @@ export type UpgradeModalActions = {
 };
 
 export const UpgradeModalToken = uiTokens("licensing").hooks<UpgradeModalActions>("upgradeModal");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const ResourceLimitRow = lentComponent(ResourceLimitRowToken);

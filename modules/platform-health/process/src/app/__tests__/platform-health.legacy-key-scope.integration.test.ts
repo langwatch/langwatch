@@ -118,7 +118,7 @@ describe("a legacy project key on the project-keyed health probes", () => {
         await scenarios(),
       ]) {
         expect(response.status).toBe(403);
-        expect(await response.json()).toMatchObject({ code: "legacy_project_key_ingestion_only" });
+        expect(response.body).toMatchObject({ code: "legacy_project_key_ingestion_only" });
       }
       expect(canaries.requests()).toEqual([]);
     });

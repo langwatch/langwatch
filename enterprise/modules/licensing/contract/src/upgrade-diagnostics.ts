@@ -77,6 +77,21 @@ export const upgradeDiagnosticsAvailabilitySchema: UpgradeDiagnosticsAvailabilit
   upgradeDiagnosticsAvailabilitySchemaDefinition;
 export type UpgradeDiagnosticsAvailability = z.infer<typeof upgradeDiagnosticsAvailabilitySchema>;
 
+/** Whether this install can send a bundle, the instance it sends as, and the operator's opt-out. */
+const upgradeDiagnosticsSettingsSchemaDefinition = z.object({
+  ...upgradeDiagnosticsAvailabilitySchemaDefinition.shape,
+  /** Null where the install never minted an identity row. */
+  instanceId: z.string().nullable(),
+  /** The operator switched off sending a failed step's diagnostics automatically. */
+  optOut: z.boolean(),
+});
+export interface UpgradeDiagnosticsSettingsSchema extends Named<
+  typeof upgradeDiagnosticsSettingsSchemaDefinition
+> {}
+export const upgradeDiagnosticsSettingsSchema: UpgradeDiagnosticsSettingsSchema =
+  upgradeDiagnosticsSettingsSchemaDefinition;
+export type UpgradeDiagnosticsSettings = z.infer<typeof upgradeDiagnosticsSettingsSchema>;
+
 /** Cloud admin's list of one instance's reports, by the instance row it opened. */
 const findUpgradeDiagnosticsInputSchemaDefinition = z.object({ instanceRowId: z.string().min(1) });
 export interface FindUpgradeDiagnosticsInputSchema extends Named<

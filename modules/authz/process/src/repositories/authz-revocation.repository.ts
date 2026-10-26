@@ -6,12 +6,6 @@ const logger = createLogger("langwatch:authz:revocation");
 
 export type AuthzRevocationReason = "revocation" | "offboard";
 
-/** Writes that bypassed the group queue, labelled by cause; the name is an external interface. */
-export const authzDirectProjectionWriteTotal = counter({
-  name: "langwatch_authz_direct_projection_write_total",
-  description: "Authorization projection writes that bypassed the group queue, by cause",
-});
-
 export type AuthzRevocationMark = {
   organizationId: string;
   grantIds: string[];
@@ -24,6 +18,12 @@ export type AuthzRevocationMark = {
  * never moves an earlier mark. Every backing counts the write it makes outside the queue.
  */
 export abstract class AuthzRevocationRepository {
+  /** Writes that bypassed the group queue, labelled by cause; the name is an external interface. */
+  private readonly directProjectionWrites = counter({
+    name: "langwatch_authz_direct_projection_write_total",
+    description: "Authorization projection writes that bypassed the group queue, by cause",
+  });
+
   async enforceGrantRevocation({
     organizationId,
     grantIds,
@@ -39,7 +39,7 @@ export abstract class AuthzRevocationRepository {
   }): Promise<void> {
     if (grantIds.length === 0) return;
 
-    authzDirectProjectionWriteTotal.inc({ reason });
+    this.directProjectionWrites.inc({ reason });
     logger.info(
       { organizationId, reason, grantCount: grantIds.length },
       "authz read model written directly, bypassing the queue",

@@ -20,7 +20,8 @@ vi.mock("../../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: projectRef.current, projectId: projectRef.current.id }),
 }));
 
-vi.mock("../../../../../behavior/lent-trace.tsx", () => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   ConversationThread: () => <div data-testid="conversation-thread" />,
 }));
 

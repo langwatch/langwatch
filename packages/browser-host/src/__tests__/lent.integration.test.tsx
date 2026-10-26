@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { UiHostServicesContextProvider } from "../capabilities.ts";
 import { type UiDeclarations, type UiLend, uiDeclarations } from "../declarations.ts";
-import { Lent, useLent, useLentAll, useLentHooks } from "../lent.ts";
+import { Lent, lentComponent, useLent, useLentAll, useLentHooks } from "../lent.ts";
 import { createUiHostServicesFromHost } from "../testing.ts";
 
 const Peek = uiTokens("trace").component<{ traceId: string }>("traceIdPeek");
@@ -101,5 +101,52 @@ describe("hooks lent by token", () => {
     const { result } = renderHook(() => useLentHooks(Tour), { wrapper: within(declarations) });
 
     expect(result.current).toBe(value);
+  });
+});
+
+describe("a ready component made from a lent token", () => {
+  const PeekCard = lentComponent(Peek);
+
+  describe("when its owner lends it", () => {
+    /** @scenario A client's ready component renders what its owner lent */
+    it("renders it with the props it was given", async () => {
+      const Component = ({ traceId }: { traceId: string }) => <p>peek {traceId}</p>;
+      const declarations = uiDeclarations([
+        lendsOf("trace", [{ token: Peek, load: () => Promise.resolve({ default: Component }) }]),
+      ]);
+
+      render(<PeekCard traceId="t2" />, { wrapper: within(declarations) });
+
+      expect(await screen.findByText("peek t2")).toBeDefined();
+    });
+  });
+
+  describe("when nobody lends it", () => {
+    /** @scenario A ready component draws its fallback while nothing is lent */
+    it("draws nothing", () => {
+      const { container } = render(<PeekCard traceId="t2" />, {
+        wrapper: within(uiDeclarations([])),
+      });
+
+      expect(container.innerHTML).toBe("");
+    });
+
+    /** @scenario A ready component draws its fallback while nothing is lent */
+    it("draws the fallback made from its props when it has one", () => {
+      const WithFallback = lentComponent(Peek, {
+        fallback: ({ traceId }) => <i>no peek {traceId}</i>,
+      });
+
+      render(<WithFallback traceId="t3" />, { wrapper: within(uiDeclarations([])) });
+
+      expect(screen.getByText("no peek t3")).toBeDefined();
+    });
+  });
+
+  describe("when it is named", () => {
+    /** @scenario A ready component is named after its token */
+    it("carries the token key as its display name", () => {
+      expect(PeekCard.displayName).toBe("Lent(trace.traceIdPeek)");
+    });
   });
 });

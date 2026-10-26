@@ -54,3 +54,11 @@ export function restartSkipStreak({ slot }: SkipStreak): SkipStreak {
 export function isLastSkippedDay({ skippedDaysBefore }: { skippedDaysBefore: number }): boolean {
   return skippedDaysBefore + 1 >= INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF;
 }
+
+/**
+ * How many more skipped scheduled days in a row turn a schedule that is on off. Never below
+ * zero: a streak already at the limit is the day that turns it off.
+ */
+export function skippedDaysUntilOff({ consecutiveSkips }: { consecutiveSkips: number }): number {
+  return Math.max(0, INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF - consecutiveSkips);
+}

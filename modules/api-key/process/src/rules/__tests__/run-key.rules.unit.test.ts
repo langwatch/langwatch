@@ -3,10 +3,10 @@
  *
  * @see modules/workflow/specs/workflow-service.feature
  */
-import { RUN_KEY_LIFETIME_MS } from "@langwatch/api-key-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  RUN_KEY_LIFETIME_MS,
   RUN_KEY_REUSE_MARGIN_MS,
   isRunKeyReusable,
   missingRunPermissions,
@@ -47,6 +47,16 @@ describe("isRunKeyReusable", () => {
     expect(at(LAMBDA_FLOOR_MS)).toBe(true);
     expect(at(LAMBDA_FLOOR_MS - 1)).toBe(false);
   });
+
+  /** @scenario "A dispatch never holds a key that lapses before the dispatch can end" */
+  it("hands a caller asking for a fresh key only one with a full lifetime left", () => {
+    const nowMs = 1_000_000;
+    const at = (left: number) =>
+      isRunKeyReusable({ expiresAtMs: nowMs + left, nowMs, minRemainingMs: "fresh" });
+
+    expect(at(RUN_KEY_LIFETIME_MS)).toBe(true);
+    expect(at(RUN_KEY_LIFETIME_MS - 1)).toBe(false);
+  });
 });
 
 describe("runKeyLifetimeMs", () => {
@@ -60,6 +70,11 @@ describe("runKeyLifetimeMs", () => {
     expect(runKeyLifetimeMs(RUN_KEY_LIFETIME_MS)).toBe(
       RUN_KEY_LIFETIME_MS + RUN_KEY_REUSE_MARGIN_MS,
     );
+  });
+
+  /** @scenario "A dispatch never holds a key that lapses before the dispatch can end" */
+  it("gives a fresh key a full lifetime plus the reuse window", () => {
+    expect(runKeyLifetimeMs("fresh")).toBe(RUN_KEY_LIFETIME_MS + RUN_KEY_REUSE_MARGIN_MS);
   });
 });
 

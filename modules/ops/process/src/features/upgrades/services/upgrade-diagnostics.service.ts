@@ -18,10 +18,7 @@ import {
 
 type Licensing = Pick<
   LicensingApi,
-  | "findInstanceIdentity"
-  | "getUpgradeDiagnosticsAvailability"
-  | "sendUpgradeDiagnostics"
-  | "setUpgradeDiagnosticsOptOut"
+  "getUpgradeDiagnosticsSettings" | "sendUpgradeDiagnostics" | "setUpgradeDiagnosticsOptOut"
 >;
 
 /**
@@ -46,30 +43,27 @@ export class UpgradeDiagnosticsService {
 
   /** The bundle as it would be sent; an unknown step is refused as `upgrade_not_found`. */
   async getBundle({ id }: { id: string }): Promise<UpgradeDiagnosticsBundle> {
-    const [step, [identity]] = await Promise.all([
+    const [step, settings] = await Promise.all([
       this.deps.ledger.getStep({ id }),
-      this.deps.licensing.findInstanceIdentity(),
+      this.deps.licensing.getUpgradeDiagnosticsSettings(),
     ]);
     return upgradeDiagnosticsOf({
       step,
-      deployment: { ...this.deps.deployment, instanceId: identity?.instanceId ?? null },
+      deployment: { ...this.deps.deployment, instanceId: settings.instanceId },
       generatedAt: this.deps.now?.() ?? nowInstant().toString(),
     });
   }
 
   async getAvailability(): Promise<OpsUpgradeDiagnosticsAvailability> {
-    const [availability, [identity]] = await Promise.all([
-      this.deps.licensing.getUpgradeDiagnosticsAvailability(),
-      this.deps.licensing.findInstanceIdentity(),
-    ]);
-    const optedOut = this.deps.automaticDisabled || (identity?.upgradeDiagnosticsOptOut ?? false);
-    return { ...availability, automatic: availability.available && !optedOut };
+    const { available, reason, optOut } = await this.deps.licensing.getUpgradeDiagnosticsSettings();
+    const optedOut = this.deps.automaticDisabled || optOut;
+    return { available, reason, automatic: available && !optedOut };
   }
 
   /** The operator's switch for automatic sending, apart from the environment variable. */
   async getAutoSend(): Promise<UpgradeDiagnosticsAutoSend> {
-    const [identity] = await this.deps.licensing.findInstanceIdentity();
-    return { enabled: !(identity?.upgradeDiagnosticsOptOut ?? false) };
+    const { optOut } = await this.deps.licensing.getUpgradeDiagnosticsSettings();
+    return { enabled: !optOut };
   }
 
   async setAutoSend({ enabled }: { enabled: boolean }): Promise<UpgradeDiagnosticsAutoSend> {

@@ -223,6 +223,7 @@ function contractCases(backend: Backend): void {
         offReason: "skipped_days",
         settings: null,
         consecutiveSkips: 0,
+        daysUntilOff: null,
       });
       expect(await backend.repositories().dailySchedules.findDecided({ take: 2 })).toHaveLength(2);
     });

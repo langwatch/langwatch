@@ -16,6 +16,7 @@ import { useFrameDiagnostic } from "../../../../behavior/use-frame-diagnostic.ts
 import { useWidgetQueryRecords } from "../../../../behavior/use-widget-query-records.ts";
 import { usePublishWidgetCompleteness } from "../../../../behavior/widget-completeness-sink.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { explainChartQueryError } from "../../../../model/dashboard-widget/chart-query-error-copy.ts";
 import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
 import { withheldWords } from "../../../../model/dashboard-widget/widget-access.ts";
 import {
@@ -232,7 +233,13 @@ function faceInPlaceOfChart({
     case "no_access":
       return <NoAccessFace missingGates={face.missingGates} />;
     case "failed":
-      return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
+      return (
+        <WidgetFailedFace
+          name={name}
+          message={explainChartQueryError(face.error).description}
+          onRetry={onRetry}
+        />
+      );
     case "no_traffic":
       return <WidgetNoTrafficFace unit={face.unit} />;
     case "missing":

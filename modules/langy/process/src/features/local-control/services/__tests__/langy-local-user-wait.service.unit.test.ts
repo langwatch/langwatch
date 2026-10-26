@@ -555,3 +555,30 @@ describe("given a card in the turn's pending set that cannot be read", () => {
     await expect(brokenService.listPending({ conversationId, turnId })).rejects.toThrow(outage);
   });
 });
+
+describe("given a card looked up by id", () => {
+  describe("when its key has expired", () => {
+    it("finds nothing rather than raising", async () => {
+      expect(await service.findWait("wait_gone")).toBeUndefined();
+    });
+  });
+
+  describe("when its stored blob no longer decodes", () => {
+    it("still raises, since corruption is not absence", async () => {
+      const question = await startQuestion();
+      await store.set(waitKey(question.waitId), "not json", 60);
+
+      await expect(service.findWait(question.waitId)).rejects.toMatchObject({
+        code: "langy_local_record_unreadable",
+      });
+    });
+  });
+
+  describe("when it is stored", () => {
+    it("finds it", async () => {
+      const question = await startQuestion();
+
+      expect(await service.findWait(question.waitId)).toMatchObject({ waitId: question.waitId });
+    });
+  });
+});

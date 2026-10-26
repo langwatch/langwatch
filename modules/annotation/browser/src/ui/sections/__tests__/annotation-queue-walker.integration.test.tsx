@@ -86,7 +86,8 @@ vi.mock("../annotation-queue-layout.tsx", () => ({
   default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("../../../behavior/lent-trace.tsx", () => ({
+vi.mock("@langwatch/trace-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   AnnotationQueueConversation: ({
     traceId,
     conversationId,

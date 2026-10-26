@@ -30,7 +30,7 @@ function makeSchedule(overrides: Partial<OpsInsightSchedule> = {}): OpsInsightSc
     lastRunOutcome: "skipped",
     lastRunReason: "no_access",
     consecutiveSkips: 2,
-    skippedDaysBeforeOff: 7,
+    daysUntilOff: 5,
     ...overrides,
   };
 }
@@ -63,6 +63,7 @@ describe("InsightSchedulesContentView", () => {
         offReason: "skipped_days",
         nextRunAt: null,
         consecutiveSkips: 7,
+        daysUntilOff: null,
       }),
       makeSchedule({
         id: "schedule-3",
@@ -73,6 +74,7 @@ describe("InsightSchedulesContentView", () => {
         lastRunOutcome: "filed",
         lastRunReason: null,
         consecutiveSkips: 0,
+        daysUntilOff: null,
       }),
     ];
 
@@ -86,21 +88,21 @@ describe("InsightSchedulesContentView", () => {
       expect(on.getByText("around 09:00 Europe/Amsterdam")).toBeTruthy();
       expect(on.getByText("Skipping")).toBeTruthy();
       expect(on.getByText(/skipped · no_access/)).toBeTruthy();
-      expect(on.getByText("2 of 7")).toBeTruthy();
+      expect(on.getByText("2 skipped, off after 5 more")).toBeTruthy();
       expect(on.queryByText("not armed")).toBeNull();
 
       const turnedOff = rowOf("Costs");
       expect(turnedOff.getByText("Grace Hopper")).toBeTruthy();
       expect(turnedOff.getByText("Turned off")).toBeTruthy();
       expect(turnedOff.getByText("skipped too many days in a row")).toBeTruthy();
-      expect(turnedOff.getByText("7 of 7")).toBeTruthy();
+      expect(turnedOff.getByText("7 skipped")).toBeTruthy();
       expect(turnedOff.getByText("none")).toBeTruthy();
 
       const off = rowOf("Latency");
       expect(off.getByText("Alan Turing")).toBeTruthy();
       expect(off.getByText("Off")).toBeTruthy();
       expect(off.getByText(/filed/)).toBeTruthy();
-      expect(off.getByText("0 of 7")).toBeTruthy();
+      expect(off.getByText("0 skipped")).toBeTruthy();
     });
 
     it("lists the schedule that is on before the ones that are off", () => {

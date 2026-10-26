@@ -18,6 +18,7 @@ function violationMeta(violations: readonly LangWatchQLViolation[]): Record<stri
 
 /** The submitted text is not valid ClickHouse SQL. */
 export class LangWatchQLUnparseableError extends HandledError {
+  static readonly code = "lwql_unparseable" as const;
   declare readonly code: "lwql_unparseable";
 
   constructor(
@@ -37,6 +38,7 @@ export class LangWatchQLUnparseableError extends HandledError {
 
 /** The query parses, but the LangWatchQL policy refuses it. */
 export class LangWatchQLNotPermittedError extends HandledError {
+  static readonly code = "lwql_not_permitted" as const;
   declare readonly code: "lwql_not_permitted";
 
   constructor(

@@ -9,6 +9,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
  * identity)—administrator can enable.
  */
 export class LangWatchQLNotEnabledError extends HandledError {
+  static readonly code = "lwql_not_enabled" as const;
   declare readonly code: "lwql_not_enabled";
 
   constructor() {
@@ -30,6 +31,7 @@ export class LangWatchQLNotEnabledError extends HandledError {
  * driver error rides in `reasons` for the logs only. `customer` fault, 413.
  */
 export class LangWatchQLResultTooLargeError extends HandledError {
+  static readonly code = "lwql_result_too_large" as const;
   declare readonly code: "lwql_result_too_large";
 
   constructor(maxResultBytes: number, options: { reasons?: readonly Error[] } = {}) {
@@ -49,6 +51,7 @@ export class LangWatchQLResultTooLargeError extends HandledError {
  * ({@link LangWatchQLProvisioningIncompleteError}).
  */
 export class LangWatchQLUnavailableError extends HandledError {
+  static readonly code = "lwql_unavailable" as const;
   declare readonly code: "lwql_unavailable";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -71,6 +74,7 @@ export class LangWatchQLUnavailableError extends HandledError {
  * that fails closed.
  */
 export class LangWatchQLUnknownIdentifierError extends HandledError {
+  static readonly code = "lwql_unknown_identifier" as const;
   declare readonly code: "lwql_unknown_identifier";
 
   constructor({
@@ -108,6 +112,7 @@ export class LangWatchQLUnknownIdentifierError extends HandledError {
  * The refusal echoes the query, so it rides in `reasons` for the logs only.
  */
 export class LangWatchQLInvalidQueryError extends HandledError {
+  static readonly code = "lwql_invalid_query" as const;
   declare readonly code: "lwql_invalid_query";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -126,6 +131,7 @@ export class LangWatchQLInvalidQueryError extends HandledError {
  * admin issue.
  */
 export class LangWatchQLProvisioningIncompleteError extends HandledError {
+  static readonly code = "lwql_provisioning_incomplete" as const;
   declare readonly code: "lwql_provisioning_incomplete";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -149,6 +155,7 @@ export class LangWatchQLProvisioningIncompleteError extends HandledError {
  * `UNKNOWN_QUERY_PARAMETER`, reaching the caller as an unknown 500 for a one-edit fix.
  */
 export class LangWatchQLParameterMissingError extends HandledError {
+  static readonly code = "lwql_parameter_missing" as const;
   declare readonly code: "lwql_parameter_missing";
 
   constructor(
@@ -177,6 +184,7 @@ export class LangWatchQLParameterMissingError extends HandledError {
  * reached the caller as an unknown 500 for a one-edit fix (WEB-18301).
  */
 export class LangWatchQLParameterInvalidError extends HandledError {
+  static readonly code = "lwql_parameter_invalid" as const;
   declare readonly code: "lwql_parameter_invalid";
 
   constructor({
@@ -226,6 +234,7 @@ function suppliedParameterSentence(supplied: readonly string[]): string {
  * granularity); refused to prevent silent discard.
  */
 export class LangWatchQLReservedParameterSuppliedError extends HandledError {
+  static readonly code = "lwql_reserved_parameter_supplied" as const;
   declare readonly code: "lwql_reserved_parameter_supplied";
 
   constructor(
@@ -249,6 +258,7 @@ export class LangWatchQLReservedParameterSuppliedError extends HandledError {
  * shared validator.
  */
 export class LangWatchQLReservedParameterTypeError extends HandledError {
+  static readonly code = "lwql_reserved_parameter_type" as const;
   declare readonly code: "lwql_reserved_parameter_type";
 
   constructor(
@@ -286,6 +296,7 @@ export type LangWatchQLGranularityFault =
  * validator.
  */
 export class LangWatchQLReservedGranularityTypeError extends HandledError {
+  static readonly code = "lwql_granularity_parameter_type" as const;
   declare readonly code: "lwql_granularity_parameter_type";
 
   constructor({
@@ -318,6 +329,7 @@ export class LangWatchQLReservedGranularityTypeError extends HandledError {
  * auto-coarsens, workbench/REST refuse.
  */
 export class LangWatchQLGranularityTooFineError extends HandledError {
+  static readonly code = "lwql_granularity_too_fine" as const;
   declare readonly code: "lwql_granularity_too_fine";
 
   constructor({
@@ -352,6 +364,7 @@ export class LangWatchQLGranularityTooFineError extends HandledError {
  * so bucket budget is computable.
  */
 export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError {
+  static readonly code = "lwql_granularity_requires_window" as const;
   declare readonly code: "lwql_granularity_requires_window";
 
   constructor({
@@ -387,6 +400,7 @@ export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError 
  * burns is invoiced to the project.
  */
 export class LangWatchQLRateLimitedError extends HandledError {
+  static readonly code = "lwql_rate_limited" as const;
   declare readonly code: "lwql_rate_limited";
 
   constructor(input: { retryAfterSeconds?: number | undefined }) {
@@ -498,6 +512,7 @@ export class LangWatchQLShadowedViewError extends HandledError {
  * query: the same request succeeds moments later, so it is retryable.
  */
 export class LangWatchQLBusyError extends HandledError {
+  static readonly code = "lwql_busy" as const;
   declare readonly code: "lwql_busy";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {

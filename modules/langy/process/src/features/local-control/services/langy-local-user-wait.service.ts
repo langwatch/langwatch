@@ -342,6 +342,20 @@ export class UserWaitService {
     return lookup.value;
   }
 
+  /**
+   * The stored wait, or undefined once its key has expired. A blob that no longer decodes still
+   * raises: corruption is not absence.
+   */
+  async findWait(waitId: string): Promise<StoredUserWait | undefined> {
+    const lookup = await this.waits.find(waitId);
+    if (lookup.kind === "miss") return undefined;
+    if (lookup.kind === "unreadable") {
+      throw new LangyLocalRecordUnreadableError({ reasons: lookup.reasons });
+    }
+
+    return lookup.value;
+  }
+
   /** The wait, with its budget applied: a card past its time reads expired. */
   private async readSettlingExpiry(waitId: string): Promise<StoredUserWait | null> {
     const wait = await this.getWait(waitId).catch((error: unknown) => {

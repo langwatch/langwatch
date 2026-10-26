@@ -7,6 +7,7 @@ export type UserAvatarUnreadableReason = "invalid_data_url" | "empty" | "content
 export abstract class UserAvatarValidationError extends HandledError {}
 
 export class UserAvatarTooLargeError extends UserAvatarValidationError {
+  static readonly code = "avatar_image_too_large" as const;
   declare readonly code: "avatar_image_too_large";
 
   constructor() {
@@ -20,6 +21,7 @@ export class UserAvatarTooLargeError extends UserAvatarValidationError {
 }
 
 export class UserAvatarTypeUnsupportedError extends UserAvatarValidationError {
+  static readonly code = "avatar_image_type_unsupported" as const;
   declare readonly code: "avatar_image_type_unsupported";
 
   constructor(mediaType: string) {
@@ -37,6 +39,7 @@ export class UserAvatarTypeUnsupportedError extends UserAvatarValidationError {
 }
 
 export class UserAvatarUnreadableError extends UserAvatarValidationError {
+  static readonly code = "avatar_image_unreadable" as const;
   declare readonly code: "avatar_image_unreadable";
 
   constructor(reason: UserAvatarUnreadableReason, message: string) {
@@ -50,6 +53,7 @@ export class UserAvatarUnreadableError extends UserAvatarValidationError {
 }
 
 export class UserAvatarRateLimitedError extends HandledError {
+  static readonly code = "avatar_rate_limited" as const;
   declare readonly code: "avatar_rate_limited";
 
   constructor() {
@@ -62,6 +66,7 @@ export class UserAvatarRateLimitedError extends HandledError {
 }
 
 export class EmailAlreadyRegisteredError extends HandledError {
+  static readonly code = "email_already_registered" as const;
   declare readonly code: "email_already_registered";
 
   constructor() {
@@ -75,6 +80,7 @@ export class EmailAlreadyRegisteredError extends HandledError {
 
 /** An ownerless modern key answers for nobody, so it can read no rollup. */
 export class PersonalUsageServiceKeyUnsupportedError extends HandledError {
+  static readonly code = "personal_usage_service_key_unsupported" as const;
   declare readonly code: "personal_usage_service_key_unsupported";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -93,6 +99,7 @@ export class PersonalUsageServiceKeyUnsupportedError extends HandledError {
 }
 
 export class PersonalProjectKeyRequiredError extends HandledError {
+  static readonly code = "personal_project_key_required" as const;
   declare readonly code: "personal_project_key_required";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -111,6 +118,7 @@ export class PersonalProjectKeyRequiredError extends HandledError {
 }
 
 export class PersonalUsageKeyMismatchError extends HandledError {
+  static readonly code = "personal_usage_key_mismatch" as const;
   declare readonly code: "personal_usage_key_mismatch";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -130,6 +138,7 @@ export class PersonalUsageKeyMismatchError extends HandledError {
 
 /** The password does not live here: the deployment's identity provider holds it. */
 export class UserPasswordAuthUnavailableError extends HandledError {
+  static readonly code = "password_auth_not_available" as const;
   declare readonly code: "password_auth_not_available";
 
   constructor() {
@@ -143,6 +152,7 @@ export class UserPasswordAuthUnavailableError extends HandledError {
 
 /** A credential outlives the session that set it, so every attempt is metered. */
 export class UserPasswordAttemptsThrottledError extends HandledError {
+  static readonly code = "password_attempts_throttled" as const;
   declare readonly code: "password_attempts_throttled";
 
   constructor() {
@@ -160,6 +170,7 @@ export class UserPasswordAttemptsThrottledError extends HandledError {
  * that refusal is what keeps a stolen session from minting a lasting credential.
  */
 export class UserPasswordAlreadySetError extends HandledError {
+  static readonly code = "password_already_set" as const;
   declare readonly code: "password_already_set";
 
   constructor() {
@@ -173,6 +184,7 @@ export class UserPasswordAlreadySetError extends HandledError {
 
 /** There is no stored password to replace. */
 export class UserPasswordNotSetError extends HandledError {
+  static readonly code = "password_not_set" as const;
   declare readonly code: "password_not_set";
 
   constructor() {
@@ -186,6 +198,7 @@ export class UserPasswordNotSetError extends HandledError {
 
 /** The current password did not match the stored one. */
 export class UserPasswordIncorrectError extends HandledError {
+  static readonly code = "invalid_credentials" as const;
   declare readonly code: "invalid_credentials";
 
   constructor() {
@@ -199,6 +212,7 @@ export class UserPasswordIncorrectError extends HandledError {
 
 /** Removing the last sign-in method would leave the account with no way in. */
 export class UserLastAuthenticationMethodError extends HandledError {
+  static readonly code = "last_authentication_method" as const;
   declare readonly code: "last_authentication_method";
 
   constructor() {
@@ -211,6 +225,7 @@ export class UserLastAuthenticationMethodError extends HandledError {
 }
 
 export class UserLinkedAccountNotFoundError extends NotFoundError {
+  static readonly code = "linked_account_not_found" as const;
   declare readonly code: "linked_account_not_found";
 
   constructor(accountId: string) {
@@ -221,6 +236,7 @@ export class UserLinkedAccountNotFoundError extends NotFoundError {
 
 /** The caller asked for a personal rollup inside an organization they do not belong to. */
 export class UserNotOrganizationMemberError extends HandledError {
+  static readonly code = "user_not_in_organization" as const;
   declare readonly code: "user_not_in_organization";
 
   constructor(organizationId: string) {
@@ -239,6 +255,7 @@ export class UserNotOrganizationMemberError extends HandledError {
  * Without it, `setOwnFirstPassword` would open single-sign-on/passkey-only accounts.
  */
 export class ImpersonationCannotChangeCredentialsError extends HandledError {
+  static readonly code = "impersonation_cannot_change_credentials" as const;
   declare readonly code: "impersonation_cannot_change_credentials";
 
   constructor() {
@@ -252,6 +269,7 @@ export class ImpersonationCannotChangeCredentialsError extends HandledError {
 }
 
 export class UserAccountAccessDeniedError extends HandledError {
+  static readonly code = "forbidden" as const;
   declare readonly code: "forbidden";
 
   constructor() {
@@ -265,6 +283,7 @@ export class UserAccountAccessDeniedError extends HandledError {
 
 /** The budget-increase request could not be handed to the mail gateway. */
 export class UserBudgetRequestNotDeliveredError extends HandledError {
+  static readonly code = "notification_delivery_error" as const;
   declare readonly code: "notification_delivery_error";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -278,6 +297,7 @@ export class UserBudgetRequestNotDeliveredError extends HandledError {
 }
 
 export class UserNotFoundError extends NotFoundError {
+  static readonly code = "user_not_found" as const;
   declare readonly code: "user_not_found";
 
   constructor(userId: string) {
@@ -291,6 +311,7 @@ export class UserNotFoundError extends NotFoundError {
  * existence to authenticated callers on the platform.
  */
 export class UserAvatarNotFoundError extends NotFoundError {
+  static readonly code = "avatar_not_found" as const;
   declare readonly code: "avatar_not_found";
 
   constructor(id: string) {
@@ -305,6 +326,7 @@ export class UserAvatarNotFoundError extends NotFoundError {
  * capability is missing.
  */
 export class UserCapabilityUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {
@@ -319,6 +341,7 @@ export class UserCapabilityUnavailableError extends HandledError {
 
 /** Deactivating the last active platform operator would leave the installation with none. */
 export class UserLastPlatformOperatorError extends HandledError {
+  static readonly code = "user_last_platform_operator" as const;
   declare readonly code: "user_last_platform_operator";
 
   constructor(userId: string) {

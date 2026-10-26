@@ -1,3 +1,4 @@
+import { InviteAlreadyAcceptedError } from "@langwatch/organization-contract";
 import { z } from "zod";
 
 /** Recognised message for already-accepted invitations; must sync with server. */
@@ -8,7 +9,7 @@ export const INVITE_ALREADY_ACCEPTED_MESSAGE = "Invite was already accepted" as 
  * error travels as its CODE, not its sentence — so both spellings are
  * recognised: the sentence for the old door, the code for the annotated runtime.
  */
-export const INVITE_ALREADY_ACCEPTED_CODE = "invite_already_accepted" as const;
+export const INVITE_ALREADY_ACCEPTED_CODE = InviteAlreadyAcceptedError.code;
 
 /** Whether a refusal means the invitation had already been spent. */
 export function isInviteAlreadyAccepted(message: string | undefined | null): boolean {

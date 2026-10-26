@@ -37,6 +37,7 @@ export type HotelBotReply = z.infer<typeof hotelBotReplySchema>;
 
 /** The demo hotel bot turns away about half its calls on purpose, so the project shows failures. */
 export class HotelBotDeclinedError extends HandledError {
+  static readonly code = "demo_bot_declined" as const;
   declare readonly code: "demo_bot_declined";
 
   constructor() {

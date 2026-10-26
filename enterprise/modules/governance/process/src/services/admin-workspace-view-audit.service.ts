@@ -6,8 +6,11 @@ import {
   type RecordWorkspaceViewResult,
   recordWorkspaceViewInputSchema,
 } from "@langwatch/enterprise-governance-contract";
-import { HandledError } from "@langwatch/handled-error";
-import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  type OrganizationTeam,
+  TeamNotFoundError,
+} from "@langwatch/organization-contract";
 import {
   isAggregateProjectKind,
   PROJECT_KIND,
@@ -155,7 +158,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
       const team = await this.options.teams.getTeam({ organizationId, teamId: targetTeamId });
       return [team];
     } catch (error) {
-      if (HandledError.isHandled(error) && error.code === "team_not_found") return [];
+      if (TeamNotFoundError.is(error)) return [];
       throw error;
     }
   }

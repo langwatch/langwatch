@@ -34,7 +34,7 @@ Feature: The organization identity surface - how everybody here signs in
   # Every scenario below is @unimplemented because THIS SURFACE DOES NOT EXIST
   # YET. The header talks as if the organization identity page were live; it is
   # not. Tagging a scenario @unit/@integration now would report a binding with
-  # no code behind it, so the file stays on `LEGACY_INERT` until the surface is
+  # no code behind it, so the file stays inert until the surface is
   # built. The audit that pointed here (B15) is right that the file reads green
   # while binding nothing — that is because there is nothing to bind, not
   # because a built behaviour was left untested.
@@ -85,7 +85,7 @@ Feature: The organization identity surface - how everybody here signs in
   #
   # Each scenario names the tag it becomes; the implementation that builds the
   # surface swaps the tag, adds the `@scenario "<title>"` annotation, and
-  # DELETES THE `LEGACY_INERT` ENTRY for this file in the same change. Priority
+  # DELETES ITS ENTRIES in feature-parity-frozen.json in the same change. Priority
   # order when that happens: the four tenancy guards — :78, :85, :92, :164.
 
   Background:

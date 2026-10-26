@@ -6,7 +6,7 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   WEBHOOK_HEADER_VALUE_KEPT,
-  WEBHOOK_PREVIOUS_SECRET_TTL_MS,
+  previousSecretExpiresAtMs,
   webhookMethodSchema,
 } from "@langwatch/webhook-contract";
 import { z } from "zod";
@@ -250,8 +250,9 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
     return {
       signingSecretEncrypted: triggers.sealSecret({ plain: submitted }),
       previousSigningSecretEncrypted: existing?.signingSecretEncrypted,
-      previousSigningSecretExpiresAt:
-        nowInstant().epochMilliseconds + WEBHOOK_PREVIOUS_SECRET_TTL_MS,
+      previousSigningSecretExpiresAt: previousSecretExpiresAtMs({
+        rotatedAtMs: nowInstant().epochMilliseconds,
+      }),
     };
   }
 

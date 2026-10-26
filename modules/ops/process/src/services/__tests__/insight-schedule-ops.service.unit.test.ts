@@ -30,6 +30,7 @@ const schedule = (
     conversationId: null,
   },
   consecutiveSkips: 2,
+  daysUntilOff: 5,
   ...over,
 });
 
@@ -99,18 +100,29 @@ describe("given daily insight schedules in several projects", () => {
           lastRunOutcome: "skipped",
           lastRunReason: "no_access",
           consecutiveSkips: 2,
-          skippedDaysBeforeOff: 7,
+          daysUntilOff: 5,
         },
       ]);
     });
 
     /** @scenario "A schedule that is off is listed with why, and with no next run" */
     it("lists a schedule the system turned off with its reason and no next run", async () => {
-      const off = schedule({ state: "off", offReason: "skipped_days", nextRunAt: null });
+      const off = schedule({
+        state: "off",
+        offReason: "skipped_days",
+        nextRunAt: null,
+        daysUntilOff: null,
+      });
       const { service } = makeService({ rows: [off] });
 
       expect(await service.list({})).toMatchObject([
-        { on: false, offReason: "skipped_days", nextRunAt: null, consecutiveSkips: 2 },
+        {
+          on: false,
+          offReason: "skipped_days",
+          nextRunAt: null,
+          consecutiveSkips: 2,
+          daysUntilOff: null,
+        },
       ]);
     });
 

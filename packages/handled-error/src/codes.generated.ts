@@ -713,11 +713,31 @@ export const nodeErrorCodes = {
   /**
    * @source services/nlpgo/app/engine/engine.go
    */
+  http_connection_refused: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  http_dns_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
   http_error: { service: "nlpgo" },
   /**
    * @source services/nlpgo/app/engine/engine.go
    */
   http_executor_unavailable: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  http_invalid_response: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  http_timeout: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  http_tls_error: { service: "nlpgo" },
   /**
    * @source services/nlpgo/app/engine/engine.go
    */

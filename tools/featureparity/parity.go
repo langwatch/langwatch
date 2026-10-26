@@ -37,6 +37,10 @@ type Report struct {
 	TotalScenarios         int
 	UnimplementedScenarios int
 	UntaggedScenarios      int
+	// Untagged carry neither a binding tag nor @unimplemented.
+	Untagged []Scenario
+	// UnimplementedWithoutIssue are parked scenarios citing no tracked issue.
+	UnimplementedWithoutIssue []Scenario
 }
 
 // InertReport is a feature file with scenarios but none enforced.
@@ -44,14 +48,6 @@ type InertReport struct {
 	Feature        string
 	TotalScenarios int
 	Unimplemented  int
-}
-
-// PartialReport is a feature file where some scenarios are enforced and some untagged.
-type PartialReport struct {
-	Feature        string
-	TotalScenarios int
-	Enforced       int
-	Untagged       int
 }
 
 // LegacyReport is a feature file's bound and unbound counts, with the unbound titles.
@@ -66,30 +62,26 @@ type LegacyReport struct {
 // Analysis is everything the check worked out; report, verdict and JSON are
 // three views of it.
 type Analysis struct {
-	Enforced      []Report
-	Legacy        []LegacyReport
-	Inert         []InertReport
-	ExemptInert   []InertReport
-	NewInert      []InertReport
-	Partial       []PartialReport
-	ExemptPartial []PartialReport
-	NewPartial    []PartialReport
-	StaleLegacy   []LegacyReport
-	StaleInert    []string
-	StalePartial  []string
-	Unknown       []Binding
-	ListErrors    []string
+	Enforced                  []Report
+	Legacy                    []LegacyReport
+	Inert                     []InertReport
+	Untagged                  FrozenVerdict
+	UnimplementedWithoutIssue FrozenVerdict
+	AnnotationsOnUntagged     AnnotationVerdict
+	StaleLegacy               []LegacyReport
+	Unknown                   []Binding
+	ListErrors                []string
 }
 
-// Lists are the roots and ratcheted lists a run is judged against.
+// Lists are the roots and the ratcheted list a run is judged against.
 type Lists struct {
 	TSRoots, BatsRoots, ShellRoots, GoRoots, PythonRoots []string
-	LegacyUnbound, LegacyInert, LegacyPartial            []string
+	LegacyUnbound                                        []string
 }
 
-// DefaultLists are the Node tool's configured roots and lists.
+// DefaultLists are the Node tool's configured roots and list.
 func DefaultLists() Lists {
-	return Lists{tsTestRoots, batsTestRoots, shellTestRoots, goTestRoots, pythonTestRoots, legacyUnbound, legacyInert, legacyPartial}
+	return Lists{tsTestRoots, batsTestRoots, shellTestRoots, goTestRoots, pythonTestRoots, legacyUnbound}
 }
 
 func has(tags []string, want func(string) bool) bool { return slices.ContainsFunc(tags, want) }
@@ -99,9 +91,20 @@ func isBoundTag(t string) bool { return boundTags[t] }
 func isUnimplemented(t string) bool { return t == unimplemented }
 
 func buildReport(feature string, all []Scenario, byTitle map[string][]BindingRef) Report {
-	r := Report{Feature: feature, Scenarios: []AnnotatedScenario{}, Unbound: []Scenario{}, TotalScenarios: len(all)}
+	r := Report{Feature: feature, Scenarios: []AnnotatedScenario{}, Unbound: []Scenario{}, TotalScenarios: len(all),
+		Untagged: []Scenario{}, UnimplementedWithoutIssue: []Scenario{}}
 	for _, s := range all {
-		if !r.countTags(s) {
+		bound, parked := has(s.Tags, isBoundTag), has(s.Tags, isUnimplemented)
+		if parked {
+			r.UnimplementedScenarios++
+			if !s.CitesIssue {
+				r.UnimplementedWithoutIssue = append(r.UnimplementedWithoutIssue, s)
+			}
+		}
+		if !bound && !parked {
+			r.Untagged = append(r.Untagged, s)
+		}
+		if !bound || parked {
 			continue
 		}
 		binds := byTitle[s.Title]
@@ -110,32 +113,14 @@ func buildReport(feature string, all []Scenario, byTitle map[string][]BindingRef
 		}
 		r.Scenarios = append(r.Scenarios, AnnotatedScenario{Scenario: s, Bindings: binds})
 	}
+	r.UntaggedScenarios = len(r.Untagged)
 	return r
-}
-
-// countTags counts s as parked or untagged, and reports whether it is enforced:
-// bound by a level tag and not parked.
-func (r *Report) countTags(s Scenario) bool {
-	bound, parked := has(s.Tags, isBoundTag), has(s.Tags, isUnimplemented)
-	if parked {
-		r.UnimplementedScenarios++
-	}
-	if !bound && !parked {
-		r.UntaggedScenarios++
-	}
-	return bound && !parked
 }
 
 func isInert(r Report) bool { return r.TotalScenarios > 0 && len(r.Scenarios) == 0 }
 
-func isPartiallyTagged(r Report) bool { return len(r.Scenarios) > 0 && r.UntaggedScenarios > 0 }
-
 func toInert(r Report) InertReport {
 	return InertReport{r.Feature, r.TotalScenarios, r.UnimplementedScenarios}
-}
-
-func toPartial(r Report) PartialReport {
-	return PartialReport{r.Feature, r.TotalScenarios, len(r.Scenarios), r.UntaggedScenarios}
 }
 
 func toLegacy(r Report) LegacyReport {
@@ -175,20 +160,7 @@ func validateExemptionList(repo string, list exemptionList, all []string) []stri
 }
 
 func validateLists(repo string, l Lists, all []string) []string {
-	var errs []string
-	for _, list := range []struct {
-		name    string
-		entries []string
-	}{{"LEGACY_UNBOUND", l.LegacyUnbound}, {"LEGACY_PARTIAL", l.LegacyPartial}} {
-		for _, e := range list.entries {
-			if slices.Contains(l.LegacyInert, e) {
-				errs = append(errs, e+" is listed in LEGACY_INERT and "+list.name+" — the first says the file enforces nothing, the second says it enforces something, keep the one that matches the file and delete the other")
-			}
-		}
-	}
-	errs = append(errs, validateExemptionList(repo, exemptionList{"LEGACY_UNBOUND", l.LegacyUnbound}, all)...)
-	errs = append(errs, validateExemptionList(repo, exemptionList{"LEGACY_INERT", l.LegacyInert}, all)...)
-	return append(errs, validateExemptionList(repo, exemptionList{"LEGACY_PARTIAL", l.LegacyPartial}, all)...)
+	return validateExemptionList(repo, exemptionList{"LEGACY_UNBOUND", l.LegacyUnbound}, all)
 }
 
 // readSource reads a file as a string without copying it: the bytes are
@@ -245,6 +217,10 @@ func Analyze(repo string, l Lists) (Analysis, error) {
 	if err != nil {
 		return Analysis{}, err
 	}
+	frozen, err := loadFrozen(repo)
+	if err != nil {
+		return Analysis{}, err
+	}
 	run := &analysis{lists: l, features: features, a: Analysis{ListErrors: validateLists(repo, l, features)}}
 
 	var bindings []Binding
@@ -255,10 +231,41 @@ func Analyze(repo string, l Lists) (Analysis, error) {
 
 	run.a.Unknown = unknownBindings(bindings, scenarios)
 	all := run.addReports(scenarios, bindingsByTitle(bindings))
-	inertSeen := run.addInert()
-	partialSeen := run.addPartial(all)
-	run.addStale(inertSeen, partialSeen)
+	run.a.Inert = []InertReport{}
+	for i := range all {
+		if isInert(all[i]) {
+			run.a.Inert = append(run.a.Inert, toInert(all[i]))
+		}
+	}
+	// Per scenario, across every file, legacy ones included: a listed file can
+	// no longer hide a new untagged scenario behind its older ones.
+	run.a.Untagged = compareFrozen(refsOf(all, func(r Report) []Scenario { return r.Untagged }), frozen.Untagged)
+	run.a.UnimplementedWithoutIssue = compareFrozen(refsOf(all, func(r Report) []Scenario { return r.UnimplementedWithoutIssue }), frozen.UnimplementedWithoutIssue)
+	var declared []DeclaredScenario
+	for i, f := range features {
+		for _, s := range scenarios[i] {
+			declared = append(declared, DeclaredScenario{f, s})
+		}
+	}
+	run.a.AnnotationsOnUntagged = frozenAnnotations(findAnnotationsOnUntagged(bindings, declared), frozen.AnnotatedUntagged)
+	// Every legacy entry must still have an unbound scenario.
+	for _, r := range run.a.Legacy {
+		if r.Unbound == 0 {
+			run.a.StaleLegacy = append(run.a.StaleLegacy, r)
+		}
+	}
 	return run.a, nil
+}
+
+// refsOf names the scenarios pick selects from each report.
+func refsOf(reports []Report, pick func(Report) []Scenario) []ScenarioRef {
+	refs := []ScenarioRef{}
+	for i := range reports {
+		for _, s := range pick(reports[i]) {
+			refs = append(refs, ScenarioRef{reports[i].Feature, s.Title, s.Line})
+		}
+	}
+	return refs
 }
 
 // analysis is one Analyze over its feature files, judged by its lists.
@@ -307,66 +314,4 @@ func (run *analysis) addReports(scenarios [][]Scenario, byTitle map[string][]Bin
 		}
 	}
 	return all
-}
-
-// addInert files each enforced report that enforces nothing, exempt or new,
-// and answers the features it filed.
-func (run *analysis) addInert() map[string]bool {
-	inertSeen := map[string]bool{}
-	for _, r := range run.a.Enforced {
-		if !isInert(r) {
-			continue
-		}
-		ir := toInert(r)
-		run.a.Inert = append(run.a.Inert, ir)
-		inertSeen[r.Feature] = true
-		if slices.Contains(run.lists.LegacyInert, r.Feature) {
-			run.a.ExemptInert = append(run.a.ExemptInert, ir)
-		} else {
-			run.a.NewInert = append(run.a.NewInert, ir)
-		}
-	}
-	return inertSeen
-}
-
-// addPartial files each partially tagged report, exempt or new, and answers
-// the features it filed.
-func (run *analysis) addPartial(all []Report) map[string]bool {
-	partialSeen := map[string]bool{}
-	for _, r := range all {
-		if !isPartiallyTagged(r) {
-			continue
-		}
-		pr := toPartial(r)
-		run.a.Partial = append(run.a.Partial, pr)
-		partialSeen[r.Feature] = true
-		if slices.Contains(run.lists.LegacyPartial, r.Feature) {
-			run.a.ExemptPartial = append(run.a.ExemptPartial, pr)
-		} else {
-			run.a.NewPartial = append(run.a.NewPartial, pr)
-		}
-	}
-	return partialSeen
-}
-
-// addStale files the list entries that no longer describe their file.
-func (run *analysis) addStale(inertSeen, partialSeen map[string]bool) {
-	for _, r := range run.a.Legacy {
-		if r.Unbound == 0 {
-			run.a.StaleLegacy = append(run.a.StaleLegacy, r)
-		}
-	}
-	run.a.StaleInert = staleEntries(run.lists.LegacyInert, run.features, inertSeen)
-	run.a.StalePartial = staleEntries(run.lists.LegacyPartial, run.features, partialSeen)
-}
-
-// staleEntries is each listed feature that exists but was not seen.
-func staleEntries(listed, features []string, seen map[string]bool) []string {
-	var stale []string
-	for _, f := range listed {
-		if slices.Contains(features, f) && !seen[f] {
-			stale = append(stale, f)
-		}
-	}
-	return stale
 }

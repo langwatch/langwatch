@@ -1,4 +1,9 @@
 import {
+  AnnotateBody,
+  AnnotationFormFooter as FormFooter,
+  SuggestBody,
+} from "@langwatch/annotation-client";
+import {
   readAnnotationScoreOptions,
   type AnnotationFormState,
   describeAnnotationAnchor,
@@ -10,11 +15,6 @@ import {
   type AnnotationDraft,
   useAnnotationDraftStore,
 } from "../../../../../features/annotation/behavior/annotation-draft.store.ts";
-import {
-  AnnotateBody,
-  FormFooter,
-  SuggestBody,
-} from "../../../../../features/annotation/behavior/lent-annotation-form.tsx";
 import { useAnnotationMutations } from "./use-annotation-form.ts";
 
 interface AnnotationEditorCardProps {

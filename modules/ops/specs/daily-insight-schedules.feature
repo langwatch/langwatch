@@ -46,7 +46,7 @@ Feature: The operator's list of daily insight schedules
       When the operator opens the list
       Then each row names the project, the board and the owner
       And says whether it is on, off, or turned off and why
-      And shows the next run, how the last run ended and why, and the skipped days out of 7
+      And shows the next run, how the last run ended and why, the skipped days and how many more turn it off
 
     @integration
     Scenario: A schedule that is on with no next run is marked

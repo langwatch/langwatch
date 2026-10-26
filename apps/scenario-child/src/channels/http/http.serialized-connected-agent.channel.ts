@@ -4,7 +4,7 @@
  * turn to the relay route with the project key.
  */
 
-import { BUSY_RETRY_AFTER_MS, type CallKind } from "@langwatch/agent-contract";
+import { busyRetryAfterMsFor, type CallKind } from "@langwatch/agent-contract";
 import type { Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
@@ -369,5 +369,7 @@ async function failureOf(response: {
 
 function retryAfterMsOf(header: string | null): number {
   const seconds = Number(header);
-  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : BUSY_RETRY_AFTER_MS;
+  return busyRetryAfterMsFor({
+    declared: Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined,
+  });
 }

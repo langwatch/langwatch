@@ -3,8 +3,7 @@ import {
   isAzureEvaluatorType,
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
-import { HandledError } from "@langwatch/handled-error";
-import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import { MonitorNotFoundError, type MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 
@@ -65,7 +64,7 @@ export class EvaluationExecutionPreparationService {
         id: data.evaluatorId,
       });
     } catch (error) {
-      if (!(error instanceof HandledError && error.code === "monitor_not_found")) throw error;
+      if (!MonitorNotFoundError.is(error)) throw error;
       logger.warn(
         { tenantId: data.tenantId, evaluatorId: data.evaluatorId },
         "Monitor not found — skipping evaluation",

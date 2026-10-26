@@ -6,6 +6,7 @@ import { HandledError, NotFoundError, remediation } from "@langwatch/handled-err
  * retry-after is theirs to wait out.
  */
 export class ScenarioGenerateRateLimitedError extends HandledError {
+  static readonly code = "scenario_generate_rate_limited" as const;
   declare readonly code: "scenario_generate_rate_limited";
 
   constructor(input: { retryAfterSeconds?: number | undefined }) {
@@ -22,6 +23,7 @@ export class ScenarioGenerateRateLimitedError extends HandledError {
 }
 
 export class ScenarioNotFoundError extends HandledError {
+  static readonly code = "scenario_not_found" as const;
   declare readonly code: "scenario_not_found";
 
   constructor(readonly scenarioId: string) {
@@ -35,6 +37,7 @@ export class ScenarioNotFoundError extends HandledError {
 }
 
 export class ScenarioTestSuiteNotFoundError extends HandledError {
+  static readonly code = "scenario_test_suite_not_found" as const;
   declare readonly code: "scenario_test_suite_not_found";
 
   constructor(testSuiteId?: string) {
@@ -48,6 +51,7 @@ export class ScenarioTestSuiteNotFoundError extends HandledError {
 }
 
 export class ScenarioTestSuiteSlugUnavailableError extends HandledError {
+  static readonly code = "scenario_folder_slug_unavailable" as const;
   declare readonly code: "scenario_folder_slug_unavailable";
 
   constructor(testSuiteName: string) {
@@ -61,6 +65,7 @@ export class ScenarioTestSuiteSlugUnavailableError extends HandledError {
 }
 
 export class ScenarioStaleVersionError extends HandledError {
+  static readonly code = "scenario_stale_version" as const;
   declare readonly code: "scenario_stale_version";
 
   constructor(currentVersion: number) {
@@ -74,6 +79,7 @@ export class ScenarioStaleVersionError extends HandledError {
 }
 
 export class ScenarioVersionNotFoundError extends NotFoundError {
+  static readonly code = "scenario_version_not_found" as const;
   declare readonly code: "scenario_version_not_found";
 
   constructor(scenarioId: string, version: number) {
@@ -94,6 +100,7 @@ export class ScenarioVersionNotFoundError extends NotFoundError {
  * known 404 instead of a generic 500.
  */
 export class SimulationRunNotFoundError extends NotFoundError {
+  static readonly code = "simulation_run_not_found" as const;
   declare readonly code: "simulation_run_not_found";
 
   constructor(scenarioRunId: string) {
@@ -109,6 +116,7 @@ export class SimulationRunNotFoundError extends NotFoundError {
 }
 
 export class ScenarioTargetNotFoundError extends NotFoundError {
+  static readonly code = "scenario_target_not_found" as const;
   declare readonly code: "scenario_target_not_found";
 
   constructor(input: { targetType: string; referenceId: string }) {
@@ -125,6 +133,7 @@ export class ScenarioTargetNotFoundError extends NotFoundError {
 
 /** A peer call omitted the archive scope the REST schema makes mandatory. */
 export class ScenarioEventArchiveScopeError extends HandledError {
+  static readonly code = "scenario_event_archive_scope_invalid" as const;
   declare readonly code: "scenario_event_archive_scope_invalid";
 
   constructor() {
@@ -142,6 +151,7 @@ export class ScenarioEventArchiveScopeError extends HandledError {
 
 /** The batch a set of simulation runs was started as, which this project does not hold. */
 export class BatchRunNotFoundError extends NotFoundError {
+  static readonly code = "batch_run_not_found" as const;
   declare readonly code: "batch_run_not_found";
 
   constructor(batchRunId: string) {
@@ -155,6 +165,7 @@ export class BatchRunNotFoundError extends NotFoundError {
 }
 
 export class ScenarioReservedSetIdError extends HandledError {
+  static readonly code = "scenario_reserved_set_id" as const;
   declare readonly code: "scenario_reserved_set_id";
 
   constructor() {
@@ -173,6 +184,7 @@ export class ScenarioReservedSetIdError extends HandledError {
  * all the caller's to fix, answered at the status the surface always used.
  */
 export class ScenarioRunRejectedError extends HandledError {
+  static readonly code = "scenario_run_rejected" as const;
   declare readonly code: "scenario_run_rejected";
 
   constructor(message: string, options: { reasons?: readonly Error[] } = {}) {
@@ -188,6 +200,7 @@ export class ScenarioRunRejectedError extends HandledError {
 // Thrown when a scenario has a field value the test suite doesn't declare.
 // Lists on meta so editor shows refused vs. declared names for typo visibility.
 export class ScenarioFieldUnknownError extends HandledError {
+  static readonly code = "scenario_field_unknown" as const;
   declare readonly code: "scenario_field_unknown";
 
   constructor({ identifiers, declared }: { identifiers: string[]; declared: string[] }) {
@@ -212,6 +225,7 @@ export class ScenarioFieldUnknownError extends HandledError {
  * @see specs/scenarios/scenario-fields.feature
  */
 export class ScenarioFieldTypeInvalidError extends HandledError {
+  static readonly code = "scenario_field_type_invalid" as const;
   declare readonly code: "scenario_field_type_invalid";
 
   constructor({ identifier, type }: { identifier: string; type: string }) {
@@ -226,6 +240,7 @@ export class ScenarioFieldTypeInvalidError extends HandledError {
 
 /** Refuses decryption without the deployment key before a provider receives invalid credentials. */
 export class ScenarioSecretsUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor() {
@@ -244,6 +259,7 @@ export class ScenarioSecretsUnavailableError extends HandledError {
  * run is written under it, so a stale or forged row id cannot create a run.
  */
 export class VoiceAgentNotFoundError extends HandledError {
+  static readonly code = "agent_not_found" as const;
   declare readonly code: "agent_not_found";
   constructor() {
     super("agent_not_found", "The voice agent was not found in this project", {
@@ -255,6 +271,7 @@ export class VoiceAgentNotFoundError extends HandledError {
 
 /** The provider has no finished record for this conversation yet. */
 export class VoiceCallRecordNotReadyError extends NotFoundError {
+  static readonly code = "voice_call_record_not_ready" as const;
   declare readonly code: "voice_call_record_not_ready";
   constructor({ conversationId }: { conversationId: string }) {
     super(
@@ -294,6 +311,7 @@ export class ScenarioGenerationTimedOutError extends HandledError {
  * rather than a bare crash, so the caller is told which half is missing.
  */
 export class ScenarioSimulationWritesUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {

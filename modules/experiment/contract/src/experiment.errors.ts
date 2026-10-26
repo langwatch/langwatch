@@ -2,6 +2,7 @@ import { formatDatasetByteLimit, formatDatasetRowLimit } from "@langwatch/datase
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 export class ExperimentNotFoundError extends NotFoundError {
+  static readonly code = "experiment_not_found" as const;
   declare readonly code: "experiment_not_found";
 
   constructor(id: string, options: { reasons?: readonly Error[] } = {}) {
@@ -18,6 +19,7 @@ export class ExperimentNotFoundError extends NotFoundError {
 }
 
 export class ExperimentDspyStepNotFoundError extends NotFoundError {
+  static readonly code = "dspy_step_not_found" as const;
   declare readonly code: "dspy_step_not_found";
 
   constructor(stepId: string, options: { reasons?: readonly Error[] } = {}) {
@@ -34,6 +36,7 @@ export class ExperimentDspyStepNotFoundError extends NotFoundError {
 }
 
 export class ExperimentRunNotFoundError extends NotFoundError {
+  static readonly code = "run_not_found" as const;
   declare readonly code: "run_not_found";
 
   constructor(runId: string, options: { reasons?: readonly Error[] } = {}) {
@@ -50,6 +53,7 @@ export class ExperimentRunNotFoundError extends NotFoundError {
 }
 
 export class ExperimentWorkbenchUnauthorizedError extends HandledError {
+  static readonly code = "unauthorized" as const;
   declare readonly code: "unauthorized";
 
   constructor() {
@@ -62,6 +66,7 @@ export class ExperimentWorkbenchUnauthorizedError extends HandledError {
 }
 
 export class ExperimentWorkbenchForbiddenError extends HandledError {
+  static readonly code = "forbidden" as const;
   declare readonly code: "forbidden";
 
   constructor() {
@@ -74,6 +79,7 @@ export class ExperimentWorkbenchForbiddenError extends HandledError {
 }
 
 export class ExperimentRunLoopUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   /** `process` names the process that composed no loop, as the retired refusal did. */
@@ -88,6 +94,7 @@ export class ExperimentRunLoopUnavailableError extends HandledError {
 }
 
 export class InvalidExperimentConfigurationError extends HandledError {
+  static readonly code = "invalid_experiment_configuration" as const;
   declare readonly code: "invalid_experiment_configuration";
 
   constructor(slug: string) {
@@ -101,6 +108,7 @@ export class InvalidExperimentConfigurationError extends HandledError {
 }
 
 export class ExperimentTypeMismatchError extends HandledError {
+  static readonly code = "experiment_type_mismatch" as const;
   declare readonly code: "experiment_type_mismatch";
 
   constructor() {
@@ -113,6 +121,7 @@ export class ExperimentTypeMismatchError extends HandledError {
 }
 
 export class StaleWorkbenchStateError extends HandledError {
+  static readonly code = "experiment_stale_workbench_state" as const;
   declare readonly code: "experiment_stale_workbench_state";
 
   constructor({
@@ -138,6 +147,7 @@ export class StaleWorkbenchStateError extends HandledError {
 }
 
 export class WorkbenchMissingReferenceError extends HandledError {
+  static readonly code = "experiment_workbench_missing_reference" as const;
   declare readonly code: "experiment_workbench_missing_reference";
 
   constructor({ refType, refId }: { refType: string; refId: string }) {
@@ -151,6 +161,7 @@ export class WorkbenchMissingReferenceError extends HandledError {
 }
 
 export class InvalidWorkbenchStateError extends HandledError {
+  static readonly code = "experiment_invalid_workbench_state" as const;
   declare readonly code: "experiment_invalid_workbench_state";
 
   constructor({ issues }: { issues: readonly { path: string; message: string }[] }) {
@@ -164,6 +175,7 @@ export class InvalidWorkbenchStateError extends HandledError {
 }
 
 export class ExperimentVersionNotFoundError extends NotFoundError {
+  static readonly code = "experiment_version_not_found" as const;
   declare readonly code: "experiment_version_not_found";
 
   constructor({ experimentId, version }: { experimentId: string; version: number }) {
@@ -180,6 +192,7 @@ export class ExperimentVersionNotFoundError extends NotFoundError {
 
 /** The workflow an experiment writes its versions into is gone, or it never had one. */
 export class ExperimentWorkflowNotFoundError extends NotFoundError {
+  static readonly code = "experiment_workflow_not_found" as const;
   declare readonly code: "experiment_workflow_not_found";
 
   constructor(experimentId: string) {
@@ -196,6 +209,7 @@ export class ExperimentWorkflowNotFoundError extends NotFoundError {
 
 /** The wizard has no stored setup, graph or evaluator yet, so there is no monitor to publish. */
 export class ExperimentNotReadyForMonitorError extends HandledError {
+  static readonly code = "experiment_not_ready_for_monitor" as const;
   declare readonly code: "experiment_not_ready_for_monitor";
 
   constructor(experimentId: string) {
@@ -210,6 +224,7 @@ export class ExperimentNotReadyForMonitorError extends HandledError {
 
 /** A lookup that named neither the experiment's id nor its slug. */
 export class ExperimentIdOrSlugRequiredError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor() {
@@ -223,6 +238,7 @@ export class ExperimentIdOrSlugRequiredError extends HandledError {
 
 /** The caller may not manage evaluations in a second project the declared check never covered. */
 export class ExperimentPermissionDeniedError extends HandledError {
+  static readonly code = "permission_denied" as const;
   declare readonly code: "permission_denied";
 
   constructor({ permission, message }: { permission: string; message: string }) {
@@ -259,6 +275,7 @@ export class ExperimentEvaluationInputError extends HandledError {
 
 /** A saved dataset has more rows than one run reads. */
 export class ExperimentDatasetTooManyRowsError extends HandledError {
+  static readonly code = "experiment_dataset_too_many_rows" as const;
   declare readonly code: "experiment_dataset_too_many_rows";
 
   constructor({ rowCount, maxRows }: { rowCount: number; maxRows: number }) {
@@ -274,6 +291,7 @@ export class ExperimentDatasetTooManyRowsError extends HandledError {
 
 /** A saved dataset's rows total more bytes than one run holds. */
 export class ExperimentDatasetTooLargeToRunError extends HandledError {
+  static readonly code = "experiment_dataset_too_large_to_run" as const;
   declare readonly code: "experiment_dataset_too_large_to_run";
 
   constructor({ maxBytes }: { maxBytes: number }) {
@@ -289,6 +307,7 @@ export class ExperimentDatasetTooLargeToRunError extends HandledError {
 
 /** The dataset's row count moved while the run was reading it, so the run would be short. */
 export class ExperimentDatasetChangedDuringReadError extends HandledError {
+  static readonly code = "experiment_dataset_changed_during_read" as const;
   declare readonly code: "experiment_dataset_changed_during_read";
 
   constructor({ rowCount, rowsRead }: { rowCount: number; rowsRead: number }) {

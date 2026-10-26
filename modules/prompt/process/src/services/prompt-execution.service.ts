@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { DatasetNotReadyError } from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PromptPlaygroundNotPermittedError,
@@ -23,13 +24,6 @@ import { handleEngineEvent, llmErrorOf } from "../rules/prompt-execution-stream.
 import type { PromptExecuteBoundsService } from "./prompt-execute-bounds.service.ts";
 
 const logger = createLogger("langwatch:prompt-playground");
-
-/** The handled CODE an error carries, or nothing. */
-function findHandledCode(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
-  const code = (error as { code: unknown }).code;
-  return typeof code === "string" ? code : undefined;
-}
 
 function executionEvents(
   run: (send: (event: PlaygroundStreamEvent) => void, isAborted: () => boolean) => Promise<void>,
@@ -180,9 +174,7 @@ export class PromptExecutionService {
       });
     } catch (error) {
       // A dataset still normalising is a client precondition, not a fault.
-      // Matched on the handled CODE: the dataset feature's own class is in
-      // another feature's server package, which this one may not name.
-      if (findHandledCode(error) === "dataset_not_ready") {
+      if (DatasetNotReadyError.is(error)) {
         throw error;
       }
       // A node with no model is fixable in the editor, not a server fault.

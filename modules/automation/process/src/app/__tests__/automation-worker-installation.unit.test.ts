@@ -1,5 +1,8 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import type { AnnotationApi } from "@langwatch/annotation-contract";
+import {
+  AnnotationAnnotatorReferenceInvalidError,
+  type AnnotationApi,
+} from "@langwatch/annotation-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -470,9 +473,7 @@ describe("given a memory-tier worker settling a match end to end", () => {
         entitlement: planWithCeiling(10),
         annotation: createApiFixture<AnnotationApi>({
           queueTraces: async () => {
-            throw Object.assign(new Error("annotator"), {
-              code: "annotation_annotator_reference_invalid",
-            });
+            throw new AnnotationAnnotatorReferenceInvalidError("annotator");
           },
         }),
       });

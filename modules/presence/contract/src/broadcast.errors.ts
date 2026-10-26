@@ -1,6 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 export class BroadcasterNotActiveError extends HandledError {
+  static readonly code = "broadcaster_not_active" as const;
   declare readonly code: "broadcaster_not_active";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -19,6 +20,7 @@ export class BroadcasterNotActiveError extends HandledError {
  * separates them: a published session is removed by the person publishing it.
  */
 export class PresenceSessionNotOwnedError extends HandledError {
+  static readonly code = "insufficient_permissions" as const;
   declare readonly code: "insufficient_permissions";
 
   constructor() {

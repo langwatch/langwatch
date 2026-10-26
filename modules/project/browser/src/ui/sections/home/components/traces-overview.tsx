@@ -1,4 +1,4 @@
-import type { CustomGraphProps } from "@langwatch/analytics-client";
+import { CustomGraph, type CustomGraphProps } from "@langwatch/analytics-client";
 import {
   Box,
   chakra,
@@ -12,7 +12,6 @@ import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 
-import { CustomGraph } from "../../../../behavior/lent-peers.tsx";
 import { analyticsMetrics } from "../../../../model/analytics/analytics-registry.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { Link } from "../../../../ui/elements/app-link.tsx";

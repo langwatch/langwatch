@@ -15,6 +15,7 @@ type DashboardValidationErrorSource = Readonly<{
 
 /** A dashboard the project does not have. */
 export class DashboardNotFoundError extends HandledError {
+  static readonly code = "dashboard_not_found" as const;
   declare readonly code: "dashboard_not_found";
 
   constructor(projectId: string) {
@@ -31,6 +32,7 @@ export class DashboardNotFoundError extends HandledError {
  * board there, so not-found would be a lie; the owning project alone edits it.
  */
 export class DashboardReadOnlyHereError extends HandledError {
+  static readonly code = "dashboard_read_only_here" as const;
   declare readonly code: "dashboard_read_only_here";
 
   constructor(projectId: string) {
@@ -44,6 +46,7 @@ export class DashboardReadOnlyHereError extends HandledError {
 
 /** A change of scope by anyone but the board's author; a project administrator is refused too. */
 export class DashboardScopeAuthorOnlyError extends HandledError {
+  static readonly code = "dashboard_scope_author_only" as const;
   declare readonly code: "dashboard_scope_author_only";
 
   constructor() {
@@ -56,6 +59,7 @@ export class DashboardScopeAuthorOnlyError extends HandledError {
 
 /** A Dashboards-area procedure called while `release_dashboards` is off for the project. */
 export class DashboardsNotEnabledError extends HandledError {
+  static readonly code = "dashboards_not_enabled" as const;
   declare readonly code: "dashboards_not_enabled";
 
   constructor() {
@@ -68,6 +72,7 @@ export class DashboardsNotEnabledError extends HandledError {
 
 /** A graph the project does not have. */
 export class GraphNotFoundError extends HandledError {
+  static readonly code = "graph_not_found" as const;
   declare readonly code: "graph_not_found";
 
   constructor(projectId: string) {
@@ -82,6 +87,7 @@ export class GraphNotFoundError extends HandledError {
  * refusal — predates this contract; reconciling would change a published status.
  */
 export class DashboardReorderUnknownIdsError extends HandledError {
+  static readonly code = "dashboard_reorder_unknown_ids" as const;
   declare readonly code: "dashboard_reorder_unknown_ids";
 
   constructor(readonly missingIds: readonly string[]) {
@@ -95,6 +101,7 @@ export class DashboardReorderUnknownIdsError extends HandledError {
 
 /** A saved view the project — or the caller — does not have. */
 export class SavedViewNotFoundError extends HandledError {
+  static readonly code = "saved_view_not_found" as const;
   declare readonly code: "saved_view_not_found";
 
   constructor() {
@@ -105,6 +112,7 @@ export class SavedViewNotFoundError extends HandledError {
 
 /** A reorder naming saved views that are not there. */
 export class SavedViewReorderUnknownIdsError extends HandledError {
+  static readonly code = "saved_view_reorder_unknown_ids" as const;
   declare readonly code: "saved_view_reorder_unknown_ids";
 
   constructor(readonly missingIds: readonly string[]) {
@@ -117,6 +125,7 @@ export class SavedViewReorderUnknownIdsError extends HandledError {
 }
 
 export class SavedWorkbenchChartNotFoundError extends HandledError {
+  static readonly code = "saved_workbench_chart_not_found" as const;
   declare readonly code: "saved_workbench_chart_not_found";
 
   constructor() {
@@ -130,6 +139,7 @@ export class SavedWorkbenchChartNotFoundError extends HandledError {
 }
 
 export class SavedWorkbenchChartAlreadyExistsError extends HandledError {
+  static readonly code = "saved_workbench_chart_already_exists" as const;
   declare readonly code: "saved_workbench_chart_already_exists";
 
   constructor() {
@@ -143,6 +153,7 @@ export class SavedWorkbenchChartAlreadyExistsError extends HandledError {
 }
 
 export class SavedWorkbenchChartDashboardNotFoundError extends HandledError {
+  static readonly code = "saved_workbench_chart_dashboard_not_found" as const;
   declare readonly code: "saved_workbench_chart_dashboard_not_found";
 
   constructor() {
@@ -163,6 +174,7 @@ export type SavedWorkbenchChartSpecificationRefusal = Readonly<{
 }>;
 
 export class SavedWorkbenchChartSpecificationRefusedError extends HandledError {
+  static readonly code = "saved_workbench_chart_specification_refused" as const;
   declare readonly code: "saved_workbench_chart_specification_refused";
 
   constructor(errors: readonly SavedWorkbenchChartSpecificationRefusal[]) {
@@ -188,6 +200,7 @@ export class SavedWorkbenchChartSpecificationRefusedError extends HandledError {
 
 /** A widget definition the service refuses to write; the stored one stays. */
 export class DashboardWidgetDefinitionRefusedError extends HandledError {
+  static readonly code = "dashboard_widget_definition_refused" as const;
   declare readonly code: "dashboard_widget_definition_refused";
 
   constructor(widgetId: string, options: { reasons?: readonly Error[] } = {}) {
@@ -202,6 +215,7 @@ export class DashboardWidgetDefinitionRefusedError extends HandledError {
 }
 
 export class SavedWorkbenchChartDefinitionInvalidError extends HandledError {
+  static readonly code = "saved_workbench_chart_definition_invalid" as const;
   declare readonly code: "saved_workbench_chart_definition_invalid";
 
   constructor(

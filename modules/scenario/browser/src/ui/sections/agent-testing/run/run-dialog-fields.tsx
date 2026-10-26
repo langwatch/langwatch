@@ -5,7 +5,7 @@
  */
 
 import { Box, chakra, VStack } from "@langwatch/design-system/primitives";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { SuiteEvaluatorMappingsMissingError } from "@langwatch/suite-contract";
 import { useEffect, useRef } from "react";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
@@ -147,7 +147,7 @@ function RunDialogNotices({ form }: { form: RunDialogForm }) {
       {inlineError != null && (
         <Box ref={alert} data-testid="run-dialog-error">
           <HandledErrorAlert error={inlineError} fallbackTitle="Couldn't start the run" />
-          {readHandledError(inlineError)?.code === "suite_evaluator_mappings_missing" && (
+          {SuiteEvaluatorMappingsMissingError.is(inlineError) && (
             <chakra.button
               type="button"
               marginTop={1}

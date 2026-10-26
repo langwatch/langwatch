@@ -35,6 +35,7 @@ export interface ObjectBackend {
 
 /** The storage root refused a write (EACCES/EPERM/EROFS): a deployment fault an operator fixes. */
 export class StorageNotWritableError extends HandledError {
+  static readonly code = "storage_not_writable" as const;
   declare readonly code: "storage_not_writable";
 
   constructor() {

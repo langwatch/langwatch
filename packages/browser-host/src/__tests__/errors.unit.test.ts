@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { UiFailureNotice, UiSuccessNotice } from "../capabilities.ts";
+import {
+  type UiFailureNotice,
+  type UiSuccessNotice,
+  UNAVAILABLE_UI_FEEDBACK,
+} from "../capabilities.ts";
 import {
   applyHandledErrorToForm,
   describeError,
@@ -55,14 +59,39 @@ describe("showErrorToast", () => {
 
       expect(failed[0]?.fallbackTitle).toBe("Something went wrong");
     });
+
+    it("keeps a failure only its action clears on screen", () => {
+      const { failed, host } = recordingHost();
+      setUiFeedbackHost(host);
+
+      showErrorToast({ error: new Error("x"), fallbackTitle: "Model unavailable", sticky: true });
+
+      expect(failed[0]?.sticky).toBe(true);
+    });
   });
 
   describe("when no feedback host is mounted", () => {
-    it("warns and drops the report rather than throwing", () => {
+    /** @scenario A report with no working feedback host is logged, never thrown */
+    it("warns with the failure's title and does not throw", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      expect(() => showErrorToast({ error: new Error("boom") })).not.toThrow();
-      expect(warn).toHaveBeenCalled();
+      expect(() =>
+        showErrorToast({ error: new Error("boom"), fallbackTitle: "Model unavailable" }),
+      ).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.any(String), "Model unavailable");
+    });
+  });
+
+  describe("when the mounted host is the unavailable stand-in", () => {
+    /** @scenario A report with no working feedback host is logged, never thrown */
+    it("warns with the failure's title and does not throw", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      setUiFeedbackHost(UNAVAILABLE_UI_FEEDBACK);
+
+      expect(() =>
+        showErrorToast({ error: new Error("boom"), fallbackTitle: "Model unavailable" }),
+      ).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.any(String), "Model unavailable");
     });
   });
 });

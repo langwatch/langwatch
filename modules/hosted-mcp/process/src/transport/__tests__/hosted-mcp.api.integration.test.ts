@@ -30,6 +30,7 @@ import type {
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
 import { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
+import { answerMcpExchange } from "../mcp-endpoint.rest.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 function stringField(body: unknown, key: string): string {
@@ -365,7 +366,12 @@ beforeAll(async () => {
   });
   server = createServer((req, res) => {
     edge.handleIncoming(req);
-    handler.handleRequest(req, res);
+    answerMcpExchange({
+      endpoint: handler,
+      runner: handler.sessionRunner,
+      request: req,
+      response: res,
+    });
   });
 
   await new Promise<void>((done) => {

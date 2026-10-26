@@ -7,6 +7,7 @@ import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
 import { UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
 
+import { clipboardUnavailableError } from "../toaster";
 import { BrowserUiFeedback, resolveUiFailureCopy, type UiToaster } from "../ui-feedback";
 
 type RecordedToast = Parameters<UiToaster["create"]>[0];
@@ -38,6 +39,50 @@ const trpcFailure = (code: string, payload: Record<string, unknown> = {}) => ({
 
 /** A headline no registry entry could ever produce, so its survival is a miss. */
 const SENTINEL_TITLE = "ZZ screen fallback ZZ";
+
+describe("given a copy the browser refused", () => {
+  describe("when the screen reports it through the toaster shim", () => {
+    /** @scenario A browser-side refusal is worded by the registry */
+    it("words it from the clipboard_unavailable code, not the screen's headline", () => {
+      const copy = resolveUiFailureCopy({
+        error: clipboardUnavailableError(),
+        fallbackTitle: "Failed to copy",
+      });
+
+      expect(copy.title).toBe("Couldn't copy to your clipboard");
+      expect(copy.description).toMatch(/copy it by hand/);
+    });
+  });
+
+  describe("when a provider-disabled failure offers a swap", () => {
+    /** @scenario A failure keeps the one fix the screen offered */
+    it("words the scope and the alternate from meta, and runs the action once", () => {
+      const { toaster, toasts } = recordingToaster();
+      let swapped = 0;
+
+      BrowserUiFeedback.create(toaster).failed({
+        error: {
+          code: "model_default_provider_disabled",
+          httpStatus: 0,
+          meta: {
+            model: "openai/gpt-5-mini",
+            scope: "project",
+            providerKey: "openai",
+            alternateScope: "organization",
+            alternateModel: "azure/gpt-5-mini",
+          },
+        },
+        fallbackTitle: "Model unavailable",
+        action: { label: "Use organization default", run: () => (swapped += 1) },
+      });
+
+      expect(toasts[0]?.description).toContain("The organization default (azure/gpt-5-mini)");
+      expect(toasts[0]?.action?.label).toBe("Use organization default");
+      toasts[0]?.action?.onClick();
+      expect(swapped).toBe(1);
+    });
+  });
+});
 
 describe("given a failure a screen hands over", () => {
   describe("when it carries a code the registry knows", () => {
@@ -231,6 +276,7 @@ describe("given a failure a screen hands over", () => {
       });
     });
 
+    /** @scenario A failure keeps the one fix the screen offered */
     it("keeps the registry's words AND the one way out the screen offered", () => {
       const { toaster, toasts } = recordingToaster();
       let taken = 0;
@@ -255,6 +301,34 @@ describe("given a failure a screen hands over", () => {
       expect(taken).toBe(1);
     });
 
+    /** @scenario A failure stays up only when the reader must act on it */
+    it("stays up until dismissed when the screen marks the failure sticky", () => {
+      const { toaster, toasts } = recordingToaster();
+
+      BrowserUiFeedback.create(toaster).failed({
+        error: trpcFailure("not_found"),
+        fallbackTitle: "Model unavailable",
+        action: { label: "Use organization default", run: () => {} },
+        sticky: true,
+      });
+
+      expect(toasts[0]?.duration).toBe(Number.POSITIVE_INFINITY);
+    });
+
+    /** @scenario A failure stays up only when the reader must act on it */
+    it("leaves the duration to the host when the failure is not marked sticky", () => {
+      const { toaster, toasts } = recordingToaster();
+
+      BrowserUiFeedback.create(toaster).failed({
+        error: trpcFailure("not_found"),
+        fallbackTitle: "Couldn't copy",
+        sticky: false,
+      });
+
+      expect(toasts[0]?.duration).toBe(12_000);
+    });
+
+    /** @scenario A failure keeps the one fix the screen offered */
     it("offers no action at all for a failure that has no way out", () => {
       const { toaster, toasts } = recordingToaster();
 

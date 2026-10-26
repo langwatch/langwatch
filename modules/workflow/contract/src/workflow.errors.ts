@@ -2,6 +2,7 @@ import { formatDatasetByteLimit } from "@langwatch/dataset-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 export class WorkflowNotFoundError extends HandledError {
+  static readonly code = "workflow_not_found" as const;
   declare readonly code: "workflow_not_found";
   constructor(
     readonly workflowId: string,
@@ -44,6 +45,7 @@ export class WorkflowDslValidationError extends Error {
 }
 
 export class WorkflowVersionRequiredError extends HandledError {
+  static readonly code = "workflow_version_required" as const;
   declare readonly code: "workflow_version_required";
 
   constructor() {
@@ -57,6 +59,7 @@ export class WorkflowVersionRequiredError extends HandledError {
 
 /** The execution engine rejected an otherwise valid Workflow dispatch. */
 export class WorkflowExecutionFailedError extends HandledError {
+  static readonly code = "workflow_execution_failed" as const;
   declare readonly code: "workflow_execution_failed";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
@@ -71,6 +74,7 @@ export class WorkflowExecutionFailedError extends HandledError {
 
 /** A dispatched Studio LLM node must name its model. */
 export class LlmModelNotSetError extends HandledError {
+  static readonly code = "llm_model_not_set" as const;
   declare readonly code: "llm_model_not_set";
   readonly cause = "LLM_MODEL_NOT_SET" as const;
 
@@ -88,6 +92,7 @@ export class LlmModelNotSetError extends HandledError {
 
 /** A dispatched Studio LLM node names a provider the project has not set up or has switched off. */
 export class WorkflowModelProviderUnavailableError extends HandledError {
+  static readonly code = "workflow_model_provider_unavailable" as const;
   declare readonly code: "workflow_model_provider_unavailable";
 
   constructor({ provider, disabled }: { provider: string; disabled: boolean }) {
@@ -108,6 +113,7 @@ export class WorkflowModelProviderUnavailableError extends HandledError {
  * 401, not 403: the status this refusal has answered since shipping.
  */
 export class WorkflowPermissionDeniedError extends HandledError {
+  static readonly code = "permission_denied" as const;
   declare readonly code: "permission_denied";
 
   constructor({ permission, message }: { permission: string; message: string }) {
@@ -122,6 +128,7 @@ export class WorkflowPermissionDeniedError extends HandledError {
 
 /** A Studio door reached with no signed-in caller. */
 export class WorkflowCallerUnauthenticatedError extends HandledError {
+  static readonly code = "unauthorized" as const;
   declare readonly code: "unauthorized";
 
   constructor() {
@@ -135,6 +142,7 @@ export class WorkflowCallerUnauthenticatedError extends HandledError {
 
 /** A Studio event the server cannot accept: not a valid event document, or an unknown type. */
 export class WorkflowStudioEventInvalidError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor(message = "Invalid body") {
@@ -145,6 +153,7 @@ export class WorkflowStudioEventInvalidError extends HandledError {
 
 /** Optimization ran on DSPy, which the engine dropped; stop events still pass. */
 export class WorkflowOptimizationRemovedError extends HandledError {
+  static readonly code = "workflow_optimization_removed" as const;
   declare readonly code: "workflow_optimization_removed";
 
   constructor() {
@@ -159,6 +168,7 @@ export class WorkflowOptimizationRemovedError extends HandledError {
 
 /** The workflow was never copied from anywhere, so there is nothing to sync from. */
 export class WorkflowNotACopyError extends HandledError {
+  static readonly code = "workflow_not_a_copy" as const;
   declare readonly code: "workflow_not_a_copy";
 
   constructor() {
@@ -171,6 +181,7 @@ export class WorkflowNotACopyError extends HandledError {
 }
 
 export class WorkflowHasNoLatestVersionError extends HandledError {
+  static readonly code = "workflow_has_no_latest_version" as const;
   declare readonly code: "workflow_has_no_latest_version";
 
   constructor() {
@@ -183,6 +194,7 @@ export class WorkflowHasNoLatestVersionError extends HandledError {
 }
 
 export class WorkflowHasNoCopiesError extends HandledError {
+  static readonly code = "workflow_has_no_copies" as const;
   declare readonly code: "workflow_has_no_copies";
 
   constructor() {
@@ -195,6 +207,7 @@ export class WorkflowHasNoCopiesError extends HandledError {
 }
 
 export class WorkflowNoCopiesSelectedError extends HandledError {
+  static readonly code = "workflow_no_copies_selected" as const;
   declare readonly code: "workflow_no_copies_selected";
 
   constructor() {
@@ -208,6 +221,7 @@ export class WorkflowNoCopiesSelectedError extends HandledError {
 
 /** A saved dataset's rows total more bytes than one Studio run reads. */
 export class WorkflowDatasetTooLargeToRunError extends HandledError {
+  static readonly code = "workflow_dataset_too_large_to_run" as const;
   declare readonly code: "workflow_dataset_too_large_to_run";
 
   constructor({ maxBytes, totalRows }: { maxBytes: number; totalRows: number }) {

@@ -26,6 +26,7 @@ export {
 } from "./serialized-handled-error.ts";
 export { TRANSIENT_REFUSAL_CODES, isTransientRefusal } from "./handled-error.ts";
 export type {
+  HandledErrorCarrier,
   HandledErrorOptions,
   HerrEnvelope,
   TraceLinks,

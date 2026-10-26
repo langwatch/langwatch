@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 export class GithubNotConnectedError extends NotFoundError {
+  static readonly code = "github_not_connected" as const;
   declare readonly code: "github_not_connected";
 
   constructor(organizationId: string) {
@@ -9,6 +10,7 @@ export class GithubNotConnectedError extends NotFoundError {
 }
 
 export class GithubPullRequestNotMappedError extends NotFoundError {
+  static readonly code = "github_pr_not_mapped" as const;
   declare readonly code: "github_pr_not_mapped";
 
   constructor(input: { repositoryFullName: string; prNumber: number }) {
@@ -39,6 +41,7 @@ export class GithubInstallationConflictError extends Error {
 }
 
 export class GithubInstallationSuspendedError extends HandledError {
+  static readonly code = "github_installation_suspended" as const;
   declare readonly code: "github_installation_suspended";
 
   constructor(input: { accountLogin: string }, options: { reasons?: readonly Error[] } = {}) {
@@ -52,6 +55,7 @@ export class GithubInstallationSuspendedError extends HandledError {
 }
 
 export class GithubRepositoryNotAccessibleError extends HandledError {
+  static readonly code = "github_repo_not_accessible" as const;
   declare readonly code: "github_repo_not_accessible";
 
   constructor(input: { repositoryFullName: string }, options: { reasons?: readonly Error[] } = {}) {
@@ -65,6 +69,7 @@ export class GithubRepositoryNotAccessibleError extends HandledError {
 }
 
 export class GithubApiRateLimitedError extends HandledError {
+  static readonly code = "github_rate_limited" as const;
   declare readonly code: "github_rate_limited";
 
   constructor(
@@ -107,6 +112,7 @@ export class GithubInstallationNotFromFlowError extends Error {
  * reported account is the only ownership evidence; a mismatch is refused.
  */
 export class GithubInstallationAccountMismatchError extends HandledError {
+  static readonly code = "github_installation_account_mismatch" as const;
   declare readonly code: "github_installation_account_mismatch";
 
   readonly installationId: string;
@@ -130,6 +136,7 @@ export class GithubInstallationAccountMismatchError extends HandledError {
  * organization to a non-member.
  */
 export class GithubOrganizationMembershipRequiredError extends HandledError {
+  static readonly code = "forbidden" as const;
   declare readonly code: "forbidden";
 
   constructor() {

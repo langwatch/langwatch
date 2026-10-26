@@ -3,14 +3,14 @@
  * for that conversation (ADR-128). The platform holds it here, per thread,
  */
 
-import { SESSION_MAX_BYTES } from "@langwatch/agent-contract";
+import { AgentPayloadTooLargeError, SESSION_MAX_BYTES } from "@langwatch/agent-contract";
 import { AgentAdapter } from "@langwatch/scenario";
 
 /** The marker the failure classifier reads a refused session by. */
 export const SESSION_TOO_LARGE_PREFIX = "Agent session too large";
 
 /** The handled error code a refused session is reported under. */
-export const SESSION_TOO_LARGE_CODE = "agent_payload_too_large";
+export const SESSION_TOO_LARGE_CODE = AgentPayloadTooLargeError.code;
 
 /**
  * The agent answered with a session above the cap. The message carries the

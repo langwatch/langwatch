@@ -1,4 +1,5 @@
-import { availableFilters, type FilterField } from "@langwatch/analytics-filters";
+import type { FilterField } from "@langwatch/analytics-contract";
+import { availableFilters } from "@langwatch/analytics-contract/filters";
 import { usePeriodSelector } from "@langwatch/browser-host/period-selector";
 import { readUiStorage } from "@langwatch/browser-host/storage";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";

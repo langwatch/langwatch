@@ -1,6 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 export class EvaluationRestExperimentNotFoundError extends HandledError {
+  static readonly code = "not_found" as const;
   declare readonly code: "not_found";
 
   constructor(slug: string) {
@@ -30,6 +31,7 @@ export class EvaluationTraceNotEvaluatableError extends Error {
 
 /** One SDK batch of results is larger than the organization accepts in one request. */
 export class EvaluationLogResultsTooLargeError extends HandledError {
+  static readonly code = "evaluation_log_results_too_large" as const;
   declare readonly code: "evaluation_log_results_too_large";
 
   constructor({ maxBytes }: { maxBytes: number }) {
@@ -49,6 +51,7 @@ export class EvaluationLogResultsTooLargeError extends HandledError {
  * Spec: modules/evaluation/specs/evaluation-service.feature
  */
 export class EvaluationReportUnavailableError extends HandledError {
+  static readonly code = "evaluation_report_unavailable" as const;
   declare readonly code: "evaluation_report_unavailable";
 
   constructor() {

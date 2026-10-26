@@ -6,7 +6,14 @@
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import {
+  InstantEvalClassifierNotConfiguredError,
+  InstantEvalNotEnabledError,
+} from "@langwatch/instant-eval-contract";
+import {
+  InstantEvalClassifierUnavailableError,
+  InstantEvalFreeBudgetExhaustedError,
+} from "@langwatch/instant-eval-judge-contract";
 import {
   type ExplorerInstantEvalEstimate,
   type ExplorerInstantEvalOptInAccess,
@@ -35,16 +42,10 @@ const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
  * while the flag read is in flight can come back `not_enabled`, which is the model popover too.
  */
 function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
-  const handled = readHandledError(error);
-  if (!handled) return null;
-  if (handled.code === "instant_eval_free_budget_exhausted") return { kind: "budget" };
-  if (
-    handled.code === "instant_eval_not_enabled" ||
-    handled.code === "instant_eval_classifier_not_configured" ||
-    handled.code === "instant_eval_classifier_unavailable"
-  ) {
-    return { kind: "model" };
-  }
+  if (InstantEvalFreeBudgetExhaustedError.is(error)) return { kind: "budget" };
+  if (InstantEvalNotEnabledError.is(error)) return { kind: "model" };
+  if (InstantEvalClassifierNotConfiguredError.is(error)) return { kind: "model" };
+  if (InstantEvalClassifierUnavailableError.is(error)) return { kind: "model" };
   return null;
 }
 

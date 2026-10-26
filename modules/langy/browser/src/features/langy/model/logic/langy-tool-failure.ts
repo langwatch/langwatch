@@ -4,6 +4,12 @@
  *      "A failure keeps its structure all the way to the card"
  */
 import {
+  ApiKeyNotOwnedError,
+  ApiKeyPermissionDeniedError,
+  ApiKeyScopeViolationError,
+} from "@langwatch/api-key-contract";
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
+import {
   type CliErrorDocumentRead,
   type LangWatchHandledErrorShape,
   isTerminalFailure,
@@ -153,10 +159,10 @@ function humanPermission(permission: unknown): string | undefined {
 /**
  * The codes that mean "your credential does not carry this".
  */
-const ACCESS_DENIAL_CODES = new Set([
-  "api_key_permission_denied",
-  "api_key_not_owned",
-  "api_key_scope_violation",
+const ACCESS_DENIAL_CODES = new Set<string>([
+  ApiKeyPermissionDeniedError.code,
+  ApiKeyNotOwnedError.code,
+  ApiKeyScopeViolationError.code,
   // The CLI's own status-derived codes, for a 401/403 that carried no body.
   "unauthorized",
   "forbidden",
@@ -165,7 +171,7 @@ const ACCESS_DENIAL_CODES = new Set([
 /**
  * The codes that mean "your plan does not include any more of these".
  */
-const PLAN_LIMIT_CODES = new Set(["resource_limit_exceeded"]);
+const PLAN_LIMIT_CODES = new Set<string>([LimitExceededError.code]);
 
 const normalizedCode = (domain: LangWatchHandledErrorShape): string =>
   domain.code.trim().toLowerCase();

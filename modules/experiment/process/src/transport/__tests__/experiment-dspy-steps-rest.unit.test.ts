@@ -36,6 +36,7 @@ const BATCH_STEP = {
 
 /** The key ceiling as the credential port raises it; this module may not import its owner. */
 class KeyCeilingDenied extends HandledError {
+  static readonly code = "api_key_permission_denied" as const;
   declare readonly code: "api_key_permission_denied";
 
   constructor(permission: string) {

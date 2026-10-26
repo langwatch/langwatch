@@ -9,6 +9,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 /** The invoicing side of connected billing runs on LangWatch Cloud alone. */
 export class ConnectedBillingUnavailableError extends HandledError {
+  static readonly code = "connected_billing_unavailable" as const;
   declare readonly code: "connected_billing_unavailable";
 
   constructor() {
@@ -27,6 +28,7 @@ export class ConnectedBillingUnavailableError extends HandledError {
  * invoiced. `licenseCommitUsd` is what the license says.
  */
 export class ConnectedBillingCommitMismatchError extends HandledError {
+  static readonly code = "connected_billing_commit_mismatch" as const;
   declare readonly code: "connected_billing_commit_mismatch";
 
   constructor(licenseCommitUsd: number) {
@@ -41,6 +43,7 @@ export class ConnectedBillingCommitMismatchError extends HandledError {
 
 /** No billing account: finance invoices this customer by hand. */
 export class ConnectedBillingNotOnboardedError extends HandledError {
+  static readonly code = "connected_billing_not_onboarded" as const;
   declare readonly code: "connected_billing_not_onboarded";
 
   constructor() {

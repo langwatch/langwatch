@@ -6,6 +6,10 @@
 
 import type { Authorization } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
+import {
+  ModelNotConfiguredError,
+  ModelProviderDisabledError,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   combineQueries,
@@ -84,8 +88,8 @@ interface RouteContext {
  * call: none set at any scope, or one set whose provider is switched off.
  */
 const MODEL_UNAVAILABLE_CODES: readonly string[] = [
-  "model_not_configured",
-  "model_provider_disabled",
+  ModelNotConfiguredError.code,
+  ModelProviderDisabledError.code,
 ];
 
 /** Which of the two model problems this failure is, and the code it carried. */

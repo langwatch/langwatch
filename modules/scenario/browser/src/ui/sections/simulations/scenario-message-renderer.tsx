@@ -1,8 +1,8 @@
 import type { SimulationMessage } from "@langwatch/scenario-contract";
+import { ConversationThread } from "@langwatch/trace-client";
 import { type DisplayPart, flattenMessages } from "@langwatch/trace-contract/conversation";
 import { useMemo } from "react";
 
-import { ConversationThread } from "../../../behavior/lent-trace.tsx";
 import { useSequentialAudioPlayback } from "../../../behavior/use-sequential-audio-playback.ts";
 import type { StreamingMessage } from "../../../behavior/use-simulation-streaming-state.ts";
 import type { NextSpeaker } from "../../elements/next-speaker.ts";

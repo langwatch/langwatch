@@ -8,6 +8,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 export class ConnectLicenseTokenMalformedError extends HandledError {
+  static readonly code = "connect_license_token_malformed" as const;
   declare readonly code: "connect_license_token_malformed";
 
   constructor() {
@@ -20,6 +21,7 @@ export class ConnectLicenseTokenMalformedError extends HandledError {
 }
 
 export class ConnectLicenseNotRegisteredError extends HandledError {
+  static readonly code = "connect_license_not_registered" as const;
   declare readonly code: "connect_license_not_registered";
 
   constructor() {
@@ -32,6 +34,7 @@ export class ConnectLicenseNotRegisteredError extends HandledError {
 }
 
 export class ConnectLicenseRevokedError extends HandledError {
+  static readonly code = "connect_license_revoked" as const;
   declare readonly code: "connect_license_revoked";
 
   constructor() {
@@ -44,6 +47,7 @@ export class ConnectLicenseRevokedError extends HandledError {
 }
 
 export class ConnectLicenseExpiredError extends HandledError {
+  static readonly code = "connect_license_expired" as const;
   declare readonly code: "connect_license_expired";
 
   constructor() {
@@ -56,6 +60,7 @@ export class ConnectLicenseExpiredError extends HandledError {
 }
 
 export class ConnectWrongInstanceError extends HandledError {
+  static readonly code = "connect_wrong_instance" as const;
   declare readonly code: "connect_wrong_instance";
 
   constructor() {
@@ -69,6 +74,7 @@ export class ConnectWrongInstanceError extends HandledError {
 
 /** The licence's managed key is still being provisioned; a retry soon succeeds (C3B-PENDING-CODE). */
 export class ConnectCredentialPendingError extends HandledError {
+  static readonly code = "connect_credential_pending" as const;
   declare readonly code: "connect_credential_pending";
 
   constructor() {
@@ -82,6 +88,7 @@ export class ConnectCredentialPendingError extends HandledError {
 
 /** A sync carries a version and two whole, non-negative seat counts, and nothing else. */
 export class LicenseSyncPayloadInvalidError extends HandledError {
+  static readonly code = "validation_error" as const;
   declare readonly code: "validation_error";
 
   constructor() {
@@ -94,6 +101,7 @@ export class LicenseSyncPayloadInvalidError extends HandledError {
 }
 
 export class LicenseSyncRateLimitedError extends HandledError {
+  static readonly code = "rate_limited" as const;
   declare readonly code: "rate_limited";
 
   constructor() {

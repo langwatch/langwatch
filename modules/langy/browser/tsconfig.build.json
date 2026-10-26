@@ -96,6 +96,9 @@
       "path": "../../experiment/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
@@ -112,6 +115,9 @@
     },
     {
       "path": "../../automation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../api-key/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"

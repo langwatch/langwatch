@@ -12,6 +12,7 @@ export const promptProblemSchema: PromptProblemSchema = promptProblemSchemaDefin
 export type PromptProblem = z.infer<typeof promptProblemSchema>;
 
 export class PromptNotFoundError extends HandledError {
+  static readonly code = "prompt_not_found" as const;
   declare readonly code: "prompt_not_found";
 
   constructor(message = "Prompt not found") {
@@ -27,6 +28,7 @@ export class PromptNotFoundError extends HandledError {
  * Raised by persistence, where the copy link actually lives.
  */
 export class PromptNotACopyError extends HandledError {
+  static readonly code = "prompt_not_a_copy" as const;
   declare readonly code: "prompt_not_a_copy";
 
   constructor() {
@@ -74,6 +76,7 @@ export class PromptTagProtectedError extends Error {
  * that took the write names the scope in the message a caller reads.
  */
 export class PromptHandleTakenError extends HandledError {
+  static readonly code = "prompt_handle_taken" as const;
   declare readonly code: "prompt_handle_taken";
 
   constructor(message = "Prompt handle already exists") {
@@ -90,6 +93,7 @@ export class PromptHandleTakenError extends HandledError {
  * unattributed 500, where a restore owes the caller a conflict it can act on.
  */
 export class PromptVersionConflictError extends HandledError {
+  static readonly code = "prompt_version_conflict" as const;
   declare readonly code: "prompt_version_conflict";
 
   constructor() {
@@ -109,6 +113,7 @@ export class PromptHandleGenerationError extends Error {
   }
 }
 export class PromptSystemPromptConflictError extends HandledError {
+  static readonly code = "prompt_system_prompt_conflict" as const;
   declare readonly code: "prompt_system_prompt_conflict";
 
   constructor(message = "System prompt and prompt cannot be set at the same time") {
@@ -121,6 +126,7 @@ export class PromptSystemPromptConflictError extends HandledError {
 }
 
 export class PromptSystemPromptRequiredError extends HandledError {
+  static readonly code = "prompt_system_prompt_required" as const;
   declare readonly code: "prompt_system_prompt_required";
 
   constructor(message = "Prompt or system message is required.") {
@@ -137,6 +143,7 @@ export class PromptSystemPromptRequiredError extends HandledError {
  * is theirs to wait out.
  */
 export class PromptExecuteRateLimitedError extends HandledError {
+  static readonly code = "prompt_execute_rate_limited" as const;
   declare readonly code: "prompt_execute_rate_limited";
 
   constructor(input: { retryAfterSeconds?: number | undefined }) {
@@ -158,6 +165,7 @@ export class PromptExecuteRateLimitedError extends HandledError {
  * dropped messages in a bill later.
  */
 export class PromptMessagesTooManyError extends HandledError {
+  static readonly code = "prompt_messages_too_many" as const;
   declare readonly code: "prompt_messages_too_many";
 
   constructor(maxMessages: number) {
@@ -179,6 +187,7 @@ export class PromptMessagesTooManyError extends HandledError {
  * project, or who does not exist. Session-derived authors are never checked.
  */
 export class PromptAuthorUnknownError extends HandledError {
+  static readonly code = "prompt_author_unknown" as const;
   declare readonly code: "prompt_author_unknown";
 
   constructor(authorId: string) {
@@ -197,6 +206,7 @@ export class PromptAuthorUnknownError extends HandledError {
  * framework's.
  */
 export class PromptPlaygroundSignInRequiredError extends HandledError {
+  static readonly code = "unauthorized" as const;
   declare readonly code: "unauthorized";
 
   constructor() {
@@ -214,6 +224,7 @@ export class PromptPlaygroundSignInRequiredError extends HandledError {
  * credit on a visitor's run.
  */
 export class PromptPlaygroundNotPermittedError extends HandledError {
+  static readonly code = "insufficient_permissions" as const;
   declare readonly code: "insufficient_permissions";
 
   constructor() {
@@ -227,6 +238,7 @@ export class PromptPlaygroundNotPermittedError extends HandledError {
 
 /** The caller may not change this prompt, e.g. an organization prompt owned by another project. */
 export class PromptModifyNotPermittedError extends HandledError {
+  static readonly code = "insufficient_permissions" as const;
   declare readonly code: "insufficient_permissions";
 
   constructor(message = "You don't have permission to modify this prompt") {
@@ -240,6 +252,7 @@ export class PromptModifyNotPermittedError extends HandledError {
 
 /** The read-only prompt process deliberately has no execution engine or workflow peer. */
 export class PromptPlaygroundUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor() {
@@ -252,6 +265,7 @@ export class PromptPlaygroundUnavailableError extends HandledError {
 }
 
 export class CrossOriginRefusedError extends HandledError {
+  static readonly code = "cross_origin_refused" as const;
   declare readonly code: "cross_origin_refused";
 
   constructor() {
@@ -264,6 +278,7 @@ export class CrossOriginRefusedError extends HandledError {
 }
 
 export class PromptTagInvalidError extends HandledError {
+  static readonly code = "prompt_tag_invalid" as const;
   declare readonly code: "prompt_tag_invalid";
 
   constructor(message: string) {
@@ -273,6 +288,7 @@ export class PromptTagInvalidError extends HandledError {
 }
 
 export class PromptTagTakenError extends HandledError {
+  static readonly code = "prompt_tag_conflict" as const;
   declare readonly code: "prompt_tag_conflict";
 
   constructor(message: string) {
@@ -282,6 +298,7 @@ export class PromptTagTakenError extends HandledError {
 }
 
 export class PromptTagProtectedRefusalError extends HandledError {
+  static readonly code = "prompt_tag_protected" as const;
   declare readonly code: "prompt_tag_protected";
 
   constructor(message: string) {
@@ -291,6 +308,7 @@ export class PromptTagProtectedRefusalError extends HandledError {
 }
 
 export class PromptHasNoCopiesError extends HandledError {
+  static readonly code = "prompt_has_no_copies" as const;
   declare readonly code: "prompt_has_no_copies";
 
   constructor() {
@@ -303,6 +321,7 @@ export class PromptHasNoCopiesError extends HandledError {
 }
 
 export class PromptNoCopiesSelectedError extends HandledError {
+  static readonly code = "prompt_no_copies_selected" as const;
   declare readonly code: "prompt_no_copies_selected";
 
   constructor() {
@@ -329,6 +348,7 @@ export {
 
 /** No such tag in the organization's catalog. */
 export class PromptTagMissingError extends NotFoundError {
+  static readonly code = "prompt_tag_not_found" as const;
   declare readonly code: "prompt_tag_not_found";
 
   constructor(name: string) {

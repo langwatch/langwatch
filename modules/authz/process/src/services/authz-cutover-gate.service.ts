@@ -7,13 +7,6 @@ import { PerOrganizationCachedGateService } from "./per-organization-cached-gate
 
 export const ENGINE_GATE_CACHE_TTL_MS = 60_000;
 
-/** The metric name is an external interface; dashboards and alerts read it. */
-export const authzEngineGateReadFailuresTotal = counter({
-  name: "authz_engine_gate_read_failures_total",
-  description:
-    "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
-});
-
 type AuthzCutoverGateOptions = {
   repository: AuthzCutoverRepository;
   logger?: Logger;
@@ -28,6 +21,12 @@ type AuthzCutoverGateOptions = {
 export class AuthzCutoverGateService {
   private readonly cache: PerOrganizationCachedGateService;
   private readonly logger: Logger;
+  /** The metric name is an external interface; dashboards and alerts read it. */
+  private readonly readFailures = counter({
+    name: "authz_engine_gate_read_failures_total",
+    description:
+      "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
+  });
 
   static create(options: AuthzCutoverGateOptions): AuthzCutoverGateService {
     return new AuthzCutoverGateService(options);
@@ -101,6 +100,6 @@ export class AuthzCutoverGateService {
       { organizationId, error, ttlMs: ENGINE_GATE_CACHE_TTL_MS },
       "could not read the authz migration state; compatibility migration completion remains unknown until the cache expires",
     );
-    authzEngineGateReadFailuresTotal.inc();
+    this.readFailures.inc();
   }
 }

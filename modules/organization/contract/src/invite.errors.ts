@@ -20,6 +20,7 @@ export const INVITE_NOT_READY_MESSAGE = "Invite is not ready to be accepted" as 
  * provisioning tool can treat the conflict as already-done.
  */
 export class DuplicateInviteError extends HandledError {
+  static readonly code = "duplicate_invite" as const;
   declare readonly code: "duplicate_invite";
 
   constructor(email: string) {
@@ -38,6 +39,7 @@ export class DuplicateInviteError extends HandledError {
  * pending invite row beside the membership it duplicated.
  */
 export class AlreadyOrganizationMemberError extends HandledError {
+  static readonly code = "already_organization_member" as const;
   declare readonly code: "already_organization_member";
 
   constructor(email: string) {
@@ -52,6 +54,7 @@ export class AlreadyOrganizationMemberError extends HandledError {
 
 /** Already accepted invites redirect to the organization, not an error page. */
 export class InviteAlreadyAcceptedError extends HandledError {
+  static readonly code = "invite_already_accepted" as const;
   declare readonly code: "invite_already_accepted";
 
   constructor() {
@@ -68,6 +71,7 @@ export class InviteAlreadyAcceptedError extends HandledError {
  * something else - an approval, or a payment - so it cannot be spent yet.
  */
 export class InviteNotReadyForAcceptanceError extends HandledError {
+  static readonly code = "invite_not_ready" as const;
   declare readonly code: "invite_not_ready";
 
   constructor() {
@@ -80,6 +84,7 @@ export class InviteNotReadyForAcceptanceError extends HandledError {
 }
 
 export class InviteExpiredError extends HandledError {
+  static readonly code = "invite_expired" as const;
   declare readonly code: "invite_expired";
 
   constructor() {
@@ -91,6 +96,7 @@ export class InviteExpiredError extends HandledError {
 }
 
 export class InviteNotFoundError extends HandledError {
+  static readonly code = "invite_not_found" as const;
   declare readonly code: "invite_not_found";
 
   constructor(message = "Invitation not found or is not waiting for approval") {
@@ -105,6 +111,7 @@ export class InviteNotFoundError extends HandledError {
  * provisioning tool believe the team membership was granted.
  */
 export class TeamNotInOrganizationError extends HandledError {
+  static readonly code = "team_not_in_organization" as const;
   declare readonly code: "team_not_in_organization";
 
   constructor(teamId: string) {
@@ -122,6 +129,7 @@ export class TeamNotInOrganizationError extends HandledError {
  * exactly that.
  */
 export class InviteWrongAccountError extends HandledError {
+  static readonly code = "invite_wrong_account" as const;
   declare readonly code: "invite_wrong_account";
 
   constructor(invitedHint: string) {
@@ -139,6 +147,7 @@ export class InviteWrongAccountError extends HandledError {
  * are throttled, and both land here.
  */
 export class InviteThrottledError extends HandledError {
+  static readonly code = "invite_throttled" as const;
   declare readonly code: "invite_throttled";
 
   constructor(retryAfterSeconds: number) {
@@ -157,6 +166,7 @@ export class InviteThrottledError extends HandledError {
  * reset the counter. `fault: "customer"` — the batch is theirs, and so is the wait.
  */
 export class InvitesRateLimitedError extends HandledError {
+  static readonly code = "invites_rate_limited" as const;
   declare readonly code: "invites_rate_limited";
 
   constructor(retryAfterSeconds: number) {

@@ -760,6 +760,7 @@ export class IdentityPasskeyNotRecognizedError extends PasskeyCommandRefusedErro
  * is unavailable due to deployment configuration.
  */
 export class IdentityCapabilityUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {
@@ -808,6 +809,7 @@ export class IdentityEngineUnavailableError extends HandledError {
 export const IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE = "identity_unsupported_storage_query";
 
 export class IdentityUnsupportedStorageQueryError extends HandledError {
+  static readonly code = "identity_unsupported_storage_query" as const;
   declare readonly code: "identity_unsupported_storage_query";
 
   constructor(detail: string) {
@@ -974,6 +976,7 @@ export class SsoExistingAccountUnconfirmedError extends SsoAssertionRefusedError
 /** The organization's directory turned this person off: their own provider vouched for them,
  *  so saying so names nobody else. */
 export class SsoMemberDeactivatedError extends SsoAssertionRefusedError {
+  static readonly code = "sso_member_deactivated" as const;
   declare readonly code: "sso_member_deactivated";
 
   constructor() {

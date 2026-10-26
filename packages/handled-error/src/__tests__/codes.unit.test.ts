@@ -50,6 +50,8 @@ const RELAYED_META_CODES = new Set(["missing_provider"]);
  * Codes MINTED IN THE BROWSER, by narrowing a code we were already given.
  */
 const CLIENT_MINTED_CODES = new Set([
+  // Minted by the dashboard frame bridge when a widget passes the in-flight query cap.
+  "dashboard_widget_query_overloaded",
   "langy_codex_plan_limit",
   // Thrown by the open workbench page, not by a handled error anywhere in
   // these trees: the page refuses an agent's action when the server already
@@ -63,6 +65,13 @@ const CLIENT_MINTED_CODES = new Set([
   // Thrown by browser-host's `openDrawer` for a drawer name no installed module
   // declares (`BrowserDrawerUndeclaredError`, a plain Error, so the scan cannot see it).
   "browser_drawer_undeclared",
+  // Minted by browser-host's `clipboardUnavailableError()` when the browser refuses a copy to
+  // the clipboard (no clipboard API, or the page may not write). The scan cannot see it: the
+  // file declaring the literal does not import `@langwatch/handled-error`.
+  "clipboard_unavailable",
+  // Minted by model-provider's provider-disabled toast, which the browser raises with the
+  // scope, model and alternate default in `meta`; no server error carries it.
+  "model_default_provider_disabled",
   // Same shape, from `promoteModelUnavailableError`: the gateway's
   // `model_provider_not_bound` tells whoever configures a virtual key to bind
   // a provider to it or drop the prefix from the model name. In the panel the
@@ -191,7 +200,6 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
   "annotation_queue_not_found",
   "annotation_score_not_found",
   "batching_not_supported",
-  "dashboard_widget_query_not_found",
   "invalid_agent_config",
   "nlp_lambda_fleet_not_composed",
   "payload_too_large",

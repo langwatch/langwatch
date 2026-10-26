@@ -181,7 +181,7 @@ describe("the directory's status band", () => {
 
 describe("given a plan that does not carry directory sync", () => {
   it("says it is an Enterprise feature rather than that the read failed", () => {
-    state.readError = { data: { error: { code: "enterprise_plan_required" } } };
+    state.readError = { data: { error: { code: "enterprise_plan_required", httpStatus: 402 } } };
     renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
     expect(screen.getByText("Directory sync on Enterprise")).toBeInTheDocument();

@@ -4,7 +4,8 @@
  * endpoints.
  */
 
-import { availableFilters, type FilterField } from "@langwatch/analytics-filters";
+import type { FilterField } from "@langwatch/analytics-contract";
+import { availableFilters } from "@langwatch/analytics-contract/filters";
 import { reloadingWriteOptions } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";

@@ -3,7 +3,7 @@
  * green when the unseen news skews good, red otherwise; nothing at zero.
  */
 
-import type { InsightsNavCountProps } from "@langwatch/insight-contract";
+import type { InsightsNavCountProps } from "@langwatch/insight-client";
 
 import { useInsightInbox } from "../../behavior/use-insight-inbox.ts";
 import { UnreadPill } from "../elements/unread-pill.tsx";

@@ -8,18 +8,21 @@
  * dev/docs/TESTING_PHILOSOPHY.md. Without this check, feature files can drift
  * into documentation that nobody verifies.
  *
- * Polarity: enforce-all by default, and fail closed. Two ratcheted deny-lists
- * carry the migration debt, and both only ever shrink:
+ * Polarity: enforce-all by default, and fail closed. The migration debt is
+ * carried by lists that only ever shrink:
  *
  *   - `LEGACY_UNBOUND` — files with enforced-but-unbound scenarios.
- *   - `LEGACY_INERT`   — files that yield NO enforced scenario at all, because
- *                        nothing in them is tagged. Without this list such a
- *                        file reports `0/0 scenarios bound · ✓ all bound` and
- *                        passes, which is an assertion of coverage that does
- *                        not exist. Any file that becomes inert and is not on
- *                        the list is a hard failure.
+ *   - `feature-parity-frozen.json` — the exact `(file, scenario title)` pairs
+ *     that were untagged, or `@unimplemented` without a tracked issue, when
+ *     tolerance moved from files to scenarios. Any other untagged scenario
+ *     fails, and so does a listed pair that has since been fixed. A file whose
+ *     scenarios are all untagged would otherwise report `0/0 scenarios bound ·
+ *     ✓ all bound` and pass, an assertion of coverage that does not exist.
  *
- * Shrinking both lists toward zero is the work tracked by #3338.
+ * It also fails an `@scenario` annotation whose scenario carries no binding
+ * tag: the test looks bound while the gate measures nothing.
+ *
+ * Shrinking the lists toward zero is the work tracked by #3338.
  *
  * Usage:
  *   pnpm check:feature-parity              # exit 1 if any enforced unbound
@@ -307,9 +310,8 @@ const LEGACY_UNBOUND: string[] = [
   // `@integration` tag is bound. Most of its scenarios carry no tag at all and
   // so are invisible to this gate: `sdks/typescript/specs/cli/daemon.feature`,
   // for one, has 35 scenarios of which 2 are enforced and none are
-  // @unimplemented. `LEGACY_INERT` below catches a file where that count falls
-  // to zero; it does NOT catch a partially-tagged file like that one. Tagging
-  // the remainder is still outstanding.
+  // @unimplemented. Its untagged scenarios are frozen by title in
+  // feature-parity-frozen.json; tagging the remainder is still outstanding.
   //
   // The consolidated Langy/home corpus landed while feature parity was already
   // enforce-all, but its tests predate @scenario bindings. Keep the debt
@@ -329,530 +331,40 @@ const LEGACY_UNBOUND: string[] = [
 ];
 
 /**
- * Feature files that contain scenarios but yield ZERO enforced ones, because nothing in them is
- * tagged `@unit` / `@integration` / `@e2e` / `@regression`. This is the gate's oldest blind
- * spot.
+ * The scenarios the gate tolerates, one exact `(feature file, scenario title)`
+ * pair at a time. Both lists only ever shrink: a scenario that is not listed and
+ * breaks the rule fails the run, and a listed one that no longer breaks it (it
+ * was tagged, given an issue, renamed or deleted) fails the run until its entry
+ * is removed. Tolerance used to be granted per file, which let a new untagged
+ * scenario in a listed file pass unseen.
+ *
+ *   - `untagged`: scenarios carrying neither a binding tag nor `@unimplemented`.
+ *   - `unimplementedWithoutIssue`: `@unimplemented` scenarios that cite no
+ *     tracked issue (see `ISSUE_TAG_RE`).
+ *   - `annotatedUntagged`: `@scenario` annotations, keyed by the test file that
+ *     carries them, whose scenario carries no binding tag.
  */
-const LEGACY_INERT: string[] = [
-  // 2026-09-30 port of #7532: design-only specs for ADRs 161-163, every
-  // scenario @unimplemented until the ADR is accepted and built.
-  "modules/authz/specs/access-reviews.feature",
-  "modules/authz/specs/agent-principals.feature",
-  "modules/authz/specs/authz-passports.feature",
-  // 2026-09-06 core-logic audit: these five ship ahead of the tests that
-  // would bind them (packages/architecture-enforcer's unspecced-core report),
-  // every scenario @unimplemented on purpose. Remove each entry with its
-  // first real binding.
-  "specs/agents/create-workflow-agent.feature",
-  "specs/agents/workflow-agent-editor.feature",
-  "specs/ai-gateway/budgets-principal-cascade.feature",
-  "specs/ai-gateway/cache-control-rules.feature",
-  "specs/ai-gateway/caching-passthrough.feature",
-  "specs/ai-gateway/cli-integrations.feature",
-  "specs/ai-gateway/cli-virtualkeys.feature",
-  "specs/ai-gateway/epic.feature",
-  "specs/ai-gateway/governance/activity-monitor.feature",
-  "specs/ai-gateway/governance/anomaly-detection.feature",
-  "specs/ai-gateway/governance/architecture-invariants.feature",
-  "specs/ai-gateway/governance/birds-eye-dashboard-v2.feature",
-  "specs/ai-gateway/governance/c3-alert-dispatch.feature",
-  "specs/ai-gateway/governance/cli-deep-links.feature",
-  "specs/ai-gateway/governance/cli-ingest-debug.feature",
-  "specs/ai-gateway/governance/cli-tool-mode-policy.feature",
-  "specs/ai-gateway/governance/compliance-baseline.feature",
-  "specs/ai-gateway/governance/event-log-durability.feature",
-  "specs/ai-gateway/governance/feature-flag-gating.feature",
-  "specs/ai-gateway/governance/folds.feature",
-  "specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature",
-  "specs/ai-gateway/governance/guardrails-project-scope.feature",
-  "specs/ai-gateway/governance/ingestion-attribution.feature",
-  "specs/ai-gateway/governance/my-settings.feature",
-  "specs/ai-gateway/governance/no-spy-mode.feature",
-  "specs/ai-gateway/governance/personal-keys.feature",
-  "specs/ai-gateway/governance/personal-project-ingest-via-template.feature",
-  "specs/ai-gateway/governance/personal-workspace-features.feature",
-  "specs/ai-gateway/governance/receiver-auth-rate-limit.feature",
-  "specs/ai-gateway/governance/receiver-shapes.feature",
-  "specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature",
-  "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
-  "specs/ai-gateway/governance/self-hosted-setup.feature",
-  "specs/ai-gateway/governance/template-cross-bind-guard.feature",
-  "specs/ai-gateway/governance/template-ottl-principal-guard.feature",
-  "specs/ai-gateway/governance/vk-config-bundle.feature",
-  "specs/ai-gateway/governance/vk-personal-scope.feature",
-  "specs/ai-gateway/governance/vk-scope-inheritance.feature",
-  "specs/ai-gateway/health-checks.feature",
-  "specs/ai-gateway/license-gate-governance.feature",
-  "specs/ai-gateway/prometheus-metrics.feature",
-  "specs/ai-gateway/rate-limits.feature",
-  "specs/ai-gateway/rbac-legacy-admin-fallback.feature",
-  "specs/ai-gateway/self-hosting/gateway-finds-its-control-plane.feature",
-  "specs/ai-gateway/self-hosting/personal-keys-deployment.feature",
-  "specs/ai-gateway/semantic-caching.feature",
-  "specs/ai-gateway/trace-propagation.feature",
-  "specs/ai-gateway/wrapper-e2e/claude.feature",
-  "specs/ai-gateway/wrapper-e2e/codex.feature",
-  "specs/ai-gateway/wrapper-e2e/cursor.feature",
-  "specs/ai-gateway/wrapper-e2e/gemini.feature",
-  "specs/ai-gateway/wrapper-e2e/opencode.feature",
-  "specs/ai-governance/cli-wrappers/request-increase.feature",
-  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
-  "specs/ai-governance/dogfood-seed/scope-runner.feature",
-  "specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
-  "specs/ai-governance/ingestion-sources/native-receiver-lift.feature",
-  "specs/ai-governance/no-spy-mode/no-spy-mode.feature",
-  "specs/ai-governance/personal-portal/coding-assistant-tile.feature",
-  "specs/ai-governance/personal-portal/external-tool-tile.feature",
-  "specs/ai-governance/personal-portal/model-provider-tile.feature",
-  "specs/ai-governance/personal-portal/portal-grid.feature",
-  "specs/ai-governance/personal-portal/tool-catalog-scoping.feature",
-  "specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature",
-  "specs/ai-governance/puller-framework/copilot-studio-reference.feature",
-  "specs/ai-governance/puller-framework/event-sourced-process-scheduling.feature",
-  "specs/ai-governance/puller-framework/http-custom-byo-admin-ui.feature",
-  "specs/ai-governance/puller-framework/http-polling.feature",
-  "specs/ai-governance/puller-framework/puller-adapter-contract.feature",
-  "specs/ai-governance/sessions/admin-max-ttl.feature",
-  "specs/ai-governance/sessions/personal-sessions.feature",
-  "specs/ai-governance/sessions/sessions-inventory.feature",
-  "specs/analytics/posthog-cost-control.feature",
-  "specs/auth/auth-signin-flows.feature",
-  "specs/automations/dispatch-timing.feature",
-  "specs/automations/spam-prevention.feature",
-  "specs/batch-evaluation-results/experiment-cost-folding.feature",
-  "specs/batch-evaluation-results/run-comparison.feature",
-  "specs/batch-evaluation-results/target-metadata-api.feature",
-  "specs/ci/no-docker-integration-tests.feature",
-  "specs/ci/pr-impact-map.feature",
-  "specs/claude/drive-pr.feature",
-  "specs/claude/telemetry-turn-bounding.feature",
-  "specs/coding-agent/personal-usage.feature",
-  "specs/components/code-block-editor.feature",
-  "specs/data-retention/data-size-metering.feature",
-  "specs/data-retention/monitoring.feature",
-  "specs/data-retention/trace-pinning.feature",
-  "specs/data-retention/ttl-activation.feature",
-  "specs/data-retention/visibility-window-teaser-redaction.feature",
-  "specs/dependencies/supply-chain-age-gates.feature",
-  "specs/evaluations/experiments-online-evaluations-separation.feature",
-  "specs/evaluators/create-workflow-evaluator.feature",
-  "specs/evaluators/evaluator-error-propagation.feature",
-  "specs/evaluators/satisfaction-score-migration.feature",
-  "specs/evaluators/thread-eval-skips-without-thread-id.feature",
-  "specs/evaluators/workflow-evaluator-editor.feature",
-  "packages/eventing/specs/deduplication-strategy.feature",
-  "packages/eventing/specs/fold-projection.feature",
-  "packages/eventing/specs/pipeline-model.feature",
-  "packages/eventing/specs/process-roles.feature",
-  "packages/eventing/specs/redis-fold-cache.feature",
-  "packages/group-queue/specs/payload-envelope.feature",
-  "specs/automations/dispatch-error-contract.feature",
-  "specs/billing/global-projections.feature",
-  "specs/experiments-v3/autosave-status.feature",
-  "specs/experiments-v3/dataset-inline-editing.feature",
-  "specs/experiments-v3/evaluation-creation-entrypoints.feature",
-  "specs/experiments-v3/evaluator-configuration.feature",
-  "specs/experiments-v3/evaluator-mappings.feature",
-  "specs/experiments-v3/execution-controls.feature",
-  "specs/experiments-v3/http-agent-support.feature",
-  "specs/experiments-v3/per-dataset-mappings.feature",
-  "specs/experiments-v3/runner-configuration.feature",
-  "specs/experiments-v3/table-display.feature",
-  "specs/experiments-v3/undo-redo.feature",
-  "specs/features/agent-cli.feature",
-  "specs/features/annotation-cli.feature",
-  "specs/features/dashboard-cli.feature",
-  "specs/features/dataset-python-sdk.feature",
-  "specs/features/devtools/issue-creation-skill.feature",
-  "specs/features/devtools/orchestrator-bug-fix-workflow.feature",
-  "specs/features/devtools/worktree-creation.feature",
-  "specs/features/evaluation-cli.feature",
-  "specs/features/graph-cli.feature",
-  "specs/features/model-provider-cli.feature",
-  "specs/features/onboarding/primary-use-setting.feature",
-  "specs/features/prompt-versions-cli.feature",
-  "specs/features/secret-cli.feature",
-  "specs/features/suites/footer-to-header-migration.feature",
-  "specs/features/suites/inline-add-target-and-scenario-buttons.feature",
-  "specs/features/suites/sidebar-summary-status.feature",
-  "specs/features/suites/simulation-run-status-consistency.feature",
-  "specs/features/suites/suite-run-confirmation-modal.feature",
-  "specs/features/suites/suite-sidebar-status-summary.feature",
-  "specs/features/suites/suite-url-nesting.feature",
-  "specs/features/suites/suite-url-routing.feature",
-  "specs/features/suites/trace-role-cost-accumulation.feature",
-  "specs/features/suites/unified-run-view-layout.feature",
-  "specs/features/suites/unified-sidebar-list-items.feature",
-  "specs/features/tag-management.feature",
-  "specs/features/trace-cli.feature",
-  "specs/features/trigger-cli.feature",
-  "specs/features/workflow-cli.feature",
-  "specs/home/onboarding-progress-ui.feature",
-  "specs/home/voice-agents-home-banner.feature",
-  // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
-  // specs ship ahead of the code, and the PR that builds each surface binds its
-  // file as it lands. Remove each entry with its first binding.
+const FROZEN_SCENARIOS_FILE = join(__dirname, "feature-parity-frozen.json");
+const FROZEN_SCENARIOS_RELATIVE =
+  "packages/architecture-enforcer/src/tools/feature-parity-frozen.json";
 
-  // PLANNED, NOT YET BUILT (ADR-135). Every scenario is @unimplemented because
-  // the dispatch-and-read write path does not exist yet — tagging them now
-  // would report bindings that are not there. Each scenario names the tag it
-  // becomes; the implementation swaps them and DELETES THIS ENTRY. If this
-  // line is still here when the change is called done, the change is not done.
-  "specs/identity/one-decision-per-write.feature",
-  "specs/identity/org-admin-identity-surface.feature",
-  "specs/langy/langy-agent-service-conventions.feature",
-  "specs/langy/langy-baseline.feature",
-  "specs/langy/langy-command-bar-activation.feature",
-  "specs/langy/langy-context-awareness.feature",
-  "specs/langy/langy-empty-state-suggestions.feature",
-  "specs/langy/langy-panel-fold-motion.feature",
-  "specs/langy/langy-selfhost-install.feature",
-  "specs/langy/langy-session-key-lifecycle.feature",
-  "specs/langy/langy-shutdown-handoff.feature",
-  "specs/langy/langy-workbench-sidebar.feature",
-  "specs/langy/langy-worker-isolation.feature",
-  "specs/licensing/dual-pricing-model.feature",
-  "specs/licensing/enforcement-hono-api.feature",
-  "specs/licensing/license-lifecycle-e2e.feature",
-  "specs/licensing/license-status-ui.feature",
-  "specs/licensing/usage-page-navigation.feature",
-  "specs/mcp-server/analytics-tool.feature",
-  "specs/mcp-server/api-key-tools.feature",
-  "specs/mcp-server/experiment-results-tool.feature",
-  "specs/mcp-server/project-api-key-tools.feature",
-  "specs/mcp-server/project-tools.feature",
-  "specs/mcp-server/scenario-tool-formatters.feature",
-  "specs/model-config/anthropic-empty-content.feature",
-  "specs/model-config/litellm-reasoning-params.feature",
-  "specs/model-config/model-parameter-display.feature",
-  "specs/model-config/model-selector-ux.feature",
-  "specs/model-config/unified-reasoning-ui.feature",
-  "specs/model-providers/custom-model-max-tokens.feature",
-  "specs/model-providers/default-provider.feature",
-  "specs/monitors/evaluation-trigger-skips-derived-and-stale-traces.feature",
-  "specs/monitors/guardrails-api-compatibility.feature",
-  "specs/monitors/monitor-execution-backend.feature",
-  "specs/monitors/monitor-trace-mappings.feature",
-  "specs/monitors/new-evaluation-menu.feature",
-  "specs/monitors/replicate-monitor-to-project.feature",
-  "specs/monitors/workflow-evaluator-checktype.feature",
-  "specs/monitors/workflow-evaluator-mappings.feature",
-  "specs/nlp-go/dataset-block.feature",
-  "specs/nlp-go/http-block.feature",
-  "specs/nlp-go/proxy.feature",
-  "specs/nlp-go/python-removal.feature",
-  "specs/nlp-go/remove-execute-evaluation.feature",
-  "specs/nlp-go/tracing-parity.feature",
-  "specs/npx-installer/01-bootstrap.feature",
-  "specs/npx-installer/02-predeps.feature",
-  "specs/npx-installer/04-validation.feature",
-  "specs/npx-installer/05-publish.feature",
-  "specs/npx-installer/06-langy.feature",
-  "specs/observability/browser-rum-trace-correlation.feature",
-  "specs/ops/dashboard-latency.feature",
-  "specs/ops/dejaview-impersonation-access.feature",
-  "specs/ops/local-observability-stack.feature",
-  "specs/ops/production-bundle-integrity.feature",
-  "specs/otlp/canonical-log-ingestion.feature",
-  "specs/projects/project-list-refresh.feature",
-  "specs/prompts/custom-prompt-tags.feature",
-  "specs/prompts/liquid-template-support.feature",
-  "specs/prompts/open-existing-prompt-from-trace.feature",
-  "specs/prompts/open-trace-in-playground.feature",
-  "specs/prompts/prompt-selection-drawer.feature",
-  "specs/prompts/structured-outputs-streaming.feature",
-  "specs/prompts/unified-defaults.feature",
-  "specs/python-sdk/async-experiment-parallelism.feature",
-  "specs/python-sdk/experiment-print-summary.feature",
-  "specs/scenarios/ai-create-modal.feature",
-  "specs/scenarios/internal-scenario-namespace.feature",
-  "specs/scenarios/internal-set-namespace.feature",
-  "specs/scenarios/provider-setup-link-from-warnings.feature",
-  "specs/scenarios/scenario-bulk-actions.feature",
-  "specs/scenarios/scenario-deferred-persistence.feature",
-  "specs/scenarios/scenario-deletion.feature",
-  "specs/scenarios/scenario-drawer-close-on-save.feature",
-  "specs/scenarios/scenario-editor-new-agent-flow.feature",
-  "specs/scenarios/scenario-library.feature",
-  // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
-  // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these
-  // are bindable: annotate the suite's test functions with `# @scenario` and
-  // drop the file from this list. Until someone does, the scenarios are all
-  // @e2e @unimplemented and the file yields nothing to enforce.
-  "specs/security/helm-strict-admission.feature",
-  "specs/security/ingress-internal-path-block.feature",
-  "specs/security/org-level-tenancy-enforcement.feature",
-  "specs/security/tenant-aware-egress-isolation.feature",
-  "specs/server/metrics-collection.feature",
-  "specs/settings/decompose-model-provider-form-hook.feature",
-  "specs/settings/settings-table-responsiveness.feature",
-  // The voice epic's two contract journeys (#7978). Both describe the whole
-  // user journey end to end and neither is built yet, so both scenarios are
-  // @unimplemented and the files are inert by design. They leave this list
-  // when the journeys have e2e tests bound to them.
-  "specs/simulation-testing/voice-agents/testing-elevenlabs-convai.feature",
-  "specs/simulation-testing/voice-agents/testing-phone-agents.feature",
-  "specs/setup/docker-dev-worktree-isolation.feature",
-  "specs/setup/simplified-setup.feature",
-  "specs/skills/agent-insight-skills.feature",
-  "specs/skills/docs-skills-directory.feature",
-  "specs/skills/onboarding-skills-architecture.feature",
-  "specs/skills/platform-integration.feature",
-  "specs/skills/prompt-compiler.feature",
-  "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
-  "specs/suites/simulations-performance.feature",
-  "specs/trace-drawer/attribute-table.feature",
-  "specs/trace-drawer/eval-chips-in-header.feature",
-  "specs/trace-drawer/playground-affordance.feature",
-  "specs/trace-processing/oversized-trace-lighter-processing.feature",
-  "specs/traces-v2/accessibility.feature",
-  "specs/traces-v2/attribute-value-readability.feature",
-  "specs/traces-v2/column-configuration.feature",
-  "specs/traces-v2/conditional-formatting.feature",
-  "specs/traces-v2/conversation-context-turn-counts.feature",
-  "specs/traces-v2/conversation-message-expand.feature",
-  "specs/traces-v2/editable-trace-name-alignment.feature",
-  "specs/traces-v2/facet-perspectives.feature",
-  "modules/trace/specs/flame-graph.feature",
-  "specs/traces-v2/io-pretty-markdown.feature",
-  "specs/traces-v2/lens-preset-groups.feature",
-  "specs/traces-v2/light-mode-contrast.feature",
-  "specs/traces-v2/live-tail.feature",
-  "specs/traces-v2/metadata-facet.feature",
-  "specs/traces-v2/model-chip-interactive-card.feature",
-  "specs/traces-v2/multiplayer-presence.feature",
-  "specs/traces-v2/prompt-facets.feature",
-  "specs/traces-v2/prompt-integration.feature",
-  "specs/traces-v2/skill-invocation-highlight.feature",
-  "specs/traces-v2/span-list.feature",
-  "specs/traces-v2/span-reference-jump-to-trace.feature",
-  "specs/traces-v2/span-view.feature",
-  "specs/traces-v2/tour-visibility-and-persistence.feature",
-  "specs/traces-v2/trace-drawer-panes.feature",
-  "specs/traces-v2/trace-header-full-content-resolution.feature",
-  "specs/traces-v2/trace-peek.feature",
-  "specs/traces-v2/trace-view.feature",
-  "specs/traces-v2/view-analytics.feature",
-  "specs/traces-v2/view-system.feature",
-  "specs/traces-v2/visualizations.feature",
-  "specs/traces/evaluation-history-grouping.feature",
-  "specs/traces/openinference-token-ingest.feature",
-  "specs/traces/pagination-controls.feature",
-  "specs/traces/rag-contexts-read-deserialization.feature",
-  "specs/traces/rest-collector-span-dedup.feature",
-  "specs/traces/span-attribute-unicode-sanitisation.feature",
-  "specs/traces/trace-export.feature",
-  "specs/traces/trace-io-extraction.feature",
-  "modules/trace/specs/vertex-adk-canonicalisation.feature",
-  "specs/triggers/event-sourced-graph-triggers.feature",
-  "specs/typescript-sdk/cli-docs.feature",
-  "specs/typescript-sdk/cli-projects-api-keys.feature",
-  "specs/typescript-sdk/prompt-tags.feature",
-  "specs/variables-ui/prompt-editor-drawer-mappings.feature",
-  "specs/workflows/studio-drawer-migration.feature",
-  "specs/workflows/studio-evaluator-node-drawer.feature",
-  "specs/workflows/studio-evaluator-sidebar.feature",
-  "specs/workflows/studio-llm-node-drawer.feature",
-  "specs/workflows/studio-local-state.feature",
-  "specs/workflows/studio-usage-limits.feature",
-];
+export interface FrozenScenarios {
+  untagged: Record<string, string[]>;
+  unimplementedWithoutIssue: Record<string, string[]>;
+  annotatedUntagged: Record<string, string[]>;
+}
 
-/** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
-const LEGACY_PARTIAL: string[] = [
-  // Reason: left LEGACY_INERT when evaluator get gained name resolution; its
-  // scenarios are enforced. The other CLI scenarios stay untagged.
-  "specs/evaluators/evaluator-cli.feature",
-  // Reason: left LEGACY_INERT when monitor get gained name resolution; its
-  // scenarios are enforced. The other CLI scenarios stay untagged.
-  "specs/features/monitor-cli.feature",
-  // Reason: left LEGACY_INERT when the launcher's place beside an open drawer
-  // was bound (#8588). The peek scenarios are still planned and stay untagged.
-  "specs/langy/langy-peek-dock.feature",
-  // Reason: left LEGACY_INERT when the grouping relabel scenario was bound.
-  // The other grouping scenarios describe the engine and stay untagged.
-  "specs/traces-v2/grouping-engine.feature",
-  // Reason: left LEGACY_INERT when sub-cent costs stopped reading as zero;
-  // the "Cost formatting" rule is enforced. The pills, duration, token and
-  // span tab rules are described here and stay untagged.
-  "specs/traces-v2/metrics.feature",
-  // Reason: left LEGACY_INERT when the CLI gained the traces.count alias
-  // and the unknown-metric refusal, which its three new scenarios enforce.
-  // The six older scenarios describe the query presets and stay untagged.
-  "specs/features/analytics-cli.feature",
-  // Reason: left LEGACY_INERT when deep links started carrying the partition
-  // hint; the "Deep links carry the partition hint" rule is enforced. The
-  // rest of the drawer shell is described here and tested elsewhere, untagged.
-  "specs/traces-v2/trace-drawer-shell.feature",
-  "sdks/typescript/specs/cli/daemon.feature",
-  // Reason: the gateway half of this file is still unwritten and stays
-  // @unimplemented. It left LEGACY_INERT because the trail now enforces one
-  // real scenario - that a signed-in caller cannot fill it with refusals -
-  // and a file enforcing something is no longer inert.
-  "specs/audit-log/audit-log.feature",
-  // Reason: arrived from main already partially tagged (#7778 self-mapped
-  // Azure deployments on the dispatch path). Its six untagged scenarios
-  // describe gateway endpoint derivation, which this branch does not own.
-  "specs/ai-gateway/azure-endpoint-from-api-base.feature",
-  "specs/ai-gateway/budgets.feature",
-  "specs/ai-gateway/cli-token-revoke-on-deactivation.feature",
-  "specs/ai-gateway/custom-provider-base-url.feature",
-  "specs/ai-gateway/gateway-service.feature",
-  "specs/ai-gateway/governance/admin-routing-policies.feature",
-  "specs/ai-gateway/governance/admin-trace-access.feature",
-  // Reason: W-11 tagged and bound the webhook_endpoint destination scenarios
-  // and retired its LEGACY_INERT entry. The fifteen untagged scenarios
-  // describe the existing rule surface and were not audited by that lane.
-  "specs/ai-gateway/governance/anomaly-rules.feature",
-  "specs/ai-gateway/governance/budget-exceeded.feature",
-  "specs/ai-gateway/governance/cli-login.feature",
-  "specs/ai-gateway/governance/departments.feature",
-  "specs/ai-gateway/governance/ingest-api-key-lifecycle.feature",
-  "specs/ai-gateway/governance/ingestion-sources.feature",
-  "specs/ai-gateway/governance/ingestion-templates-catalog.feature",
-  "specs/ai-gateway/governance/my-usage-dashboard.feature",
-  // Reason: #7960 tagged and bound the four scenarios the devices tab now
-  // answers, and retired its LEGACY_INERT entry. The eight untagged ones
-  // describe the org-wide max-session-duration policy and the admin sessions
-  // widget, neither of which is built, and the bulk revoke of every
-  // credential class at once, which is.
-  "specs/ai-gateway/governance/sessions-and-devices.feature",
-  // Reason: #8041 tagged and bound two scenarios (opaque id placement on
-  // export, and the drop of an opaque email beside a user id) and retired
-  // its LEGACY_INERT entry. The eleven untagged scenarios describe the wider
-  // SIEM export surface and were not audited by that issue.
-  "specs/ai-gateway/governance/siem-export.feature",
-  "specs/ai-gateway/governance/ui-contract.feature",
-  "specs/ai-gateway/model-provider-scoping.feature",
-  "specs/ai-gateway/openai-param-compat.feature",
-  "specs/ai-gateway/payload-capture.feature",
-  "specs/ai-gateway/policy-rules.feature",
-  "specs/ai-gateway/span-shape.feature",
-  "specs/ai-gateway/virtual-keys.feature",
-  "specs/ai-governance/cli-onboarding/login-unified.feature",
-  "specs/ai-governance/cli-wrappers/cli-mints-ingest-key.feature",
-  "specs/ai-governance/cli-wrappers/latest-login-wins.feature",
-  // Reason: #7960 tagged and bound the scenario for logout retiring the
-  // ingest keys its session minted, and retired the file's LEGACY_INERT
-  // entry. The twenty-one untagged ones describe the rest of what logout
-  // unwires locally, settings.json, the plugin, the codex blocks and the
-  // shell rc, which that change did not touch.
-  "specs/ai-governance/cli-wrappers/logout.feature",
-  "specs/ai-governance/cli-wrappers/shell-rc-persistence.feature",
-  "specs/ai-governance/personal-portal/admin-catalog-editor.feature",
-  "specs/ai-governance/personal-portal/tool-catalog-rbac.feature",
-  "specs/ai-governance/puller-framework/s3-polling.feature",
-  "specs/analytics/dashboard-rest-api.feature",
-  "specs/analytics/event-sourced-analytics-materialization.feature",
-  "specs/automations/authoring-drawer.feature",
-  "specs/automations/process-manager-dispatch.feature",
-  "specs/ci/path-filters.feature",
-  // Reason: reached this branch from main already partially tagged, and its
-  // eight untagged scenarios describe the CI comment bot, which this branch
-  // does not own. Tagging them @unimplemented would claim the behaviour is
-  // unbuilt when it ships today; the honest statement is that it is untagged
-  // and unmeasured. For the CI owners to bind or park.
-  "specs/ci/pr-token-usage.feature",
-  "specs/clickhouse/windowed-read-fallback.feature",
-  "specs/coding-agent/cache-write-ttl-pricing.feature",
-  "specs/coding-agent/terminal-view.feature",
-  // Reason: left LEGACY_INERT before this branch's scenario binding. Its own
-  // four are now tagged and bound; six predate it and describe retention
-  // stamping it doesn't own — two need pipeline assertions, one needs a
-  // ClickHouse MATERIALIZED-column test, one is an absence invariant, and the
-  // trace-pipeline pair is proven only for event_log. Each needs a test, not a tag.
-  "specs/data-retention/ingestion-stamping.feature",
-  // Left LEGACY_INERT once this branch tagged the three event-log-category
-  // scenarios (selection, rate limiting, parallel mutations) to
-  // `retroactiveUpdate.unit.test.ts`. The seven untagged predate this
-  // branch: the UI/progress-card side (dialog, progress, kill-mutation) and
-  // the immediate-vs-retroactive stamping contract, which this branch does not own.
-  "specs/data-retention/retroactive-update.feature",
-  "specs/datasets/add-to-dataset-span-mapping.feature",
-  "specs/dependencies/zod-first-schema-source-of-truth.feature",
-  "packages/group-queue/specs/payload-cost.feature",
-  "packages/group-queue/specs/payload-store-content-addressed.feature",
-  "packages/group-queue/specs/poison-group-park-guard.feature",
-  "packages/eventing/specs/projection-replay.feature",
-  "packages/group-queue/specs/work-conserving-fair-dispatch.feature",
-  "specs/experiments-v3/mapping-auto-inference.feature",
-  "specs/experiments-v3/mapping-validation.feature",
-  "specs/experiments/comparison.feature",
-  "specs/features/dataset-cli.feature",
-  "specs/features/scenario-cli.feature",
-  "specs/features/simulation-runs-cli.feature",
-  "specs/langevals-staging/staged-payload.feature",
-  // Reason: arrived from main already partially tagged (#7879). Its seven
-  // untagged scenarios describe langy card taxonomy, not owned here.
-  "specs/langy/langy-card-taxonomy.feature",
-  "specs/langy/langy-choice-questions.feature",
-  "specs/langy/langy-composer-feedback-and-cards.feature",
-  // Reason: arrived from main already partially tagged (#7879). Its ten
-  // untagged scenarios describe langy conversation titling, not owned here.
-  "specs/langy/langy-conversation-title.feature",
-  "specs/langy/langy-deploy-hardening.feature",
-  "specs/langy/langy-derived-cards.feature",
-  "specs/langy/langy-dogfood-scenarios.feature",
-  "specs/langy/langy-panel-layout.feature",
-  "specs/langy/langy-projection-independent-reactions.feature",
-  "specs/langy/langy-prompt-optimization-entrypoints.feature",
-  "specs/langy/langy-session-key.feature",
-  "specs/licensing/oss-experimentation-uncapped.feature",
-  "specs/model-providers/codex-account-provider.feature",
-  "specs/model-providers/credential-validation.feature",
-  "specs/model-providers/onboarding-flow.feature",
-  "specs/model-providers/provider-configuration.feature",
-  "specs/model-providers/provider-deletion.feature",
-  // Reason: left LEGACY_INERT when the providers table's page width was bound
-  // (langwatch/tasks#963). The @visual and @unimplemented scenarios stay as they were.
-  "specs/model-providers/provider-list.feature",
-  "specs/model-providers/scope-and-multi-instance.feature",
-  "specs/monitors/online-evaluator-loop-prevention.feature",
-  "specs/navigation/shared-section-navigation-layout.feature",
-  // Reason: left LEGACY_INERT when npx ran api and worker as one apps/backend
-  // process and nlpgo with the ai-gateway as one Go process (Alex, 2026-10-10);
-  // those four scenarios are enforced. The older orchestration ones stay untagged.
-  "specs/npx-installer/03-services.feature",
-  "specs/npx-installer/07-lean-install.feature",
-  // Reason: arrived partially tagged when #7932 added three @unit metric
-  // scenarios and retired its LEGACY_INERT entry. The eight untagged ones
-  // describe alert rules, their delivery and dashboards, which ADR-054 keeps
-  // in a separate infrastructure repository, so their status cannot be
-  // established here. Per-scenario audit tracked by #8024.
-  "specs/observability/process-substrate-alerting.feature",
-  "specs/ops/internal-feature-flags.feature",
-  "specs/optimization-studio/component-execution.feature",
-  "specs/otlp/canonical-metric-ingestion.feature",
-  "specs/prompts/editing-modes.feature",
-  "specs/prompts/locked-input-variable.feature",
-  "specs/queue-pausing/queue-pausing.feature",
-  "specs/rbac/scoped-role-bindings.feature",
-  // Reason: arrived from main already partially tagged (#3698 structured
-  // error surfacing for the serialized code-agent adapter). Its one
-  // untagged scenario belongs to the scenarios tree, not owned here.
-  "specs/scenarios/scenario-infra-error-surfacing.feature",
-  // Reason: same as specs/ci/pr-token-usage.feature — arrived from main
-  // already partially tagged. Its two untagged scenarios describe the skill
-  // testing harness, which this branch does not own.
-  "specs/skills/skills-testing.feature",
-  "specs/suites/suite-model-selection.feature",
-  "modules/topic/specs/event-sourced-scheduling.feature",
-  // Reason: the first-trace poll scenario is the one the Trace Explorer
-  // binds; the other scenarios describe the onboarding journey, which no
-  // test on this branch is tagged against.
-  "specs/traces-v2/onboarding-empty-state.feature",
-  "specs/traces-v2/annotations.feature",
-  "specs/traces-v2/bulk-actions.feature",
-  "specs/traces-v2/code-block-language-fallback.feature",
-  "specs/traces-v2/conversation-turn-ledger.feature",
-  "specs/traces-v2/data-layer.feature",
-  "specs/traces-v2/evaluations.feature",
-  "specs/traces-v2/evaluator-filter-label.feature",
-  "specs/traces-v2/filter-bar-interactions.feature",
-  "specs/traces-v2/message-translation.feature",
-  "specs/traces-v2/numeric-facet-modes.feature",
-  "specs/traces-v2/search.feature",
-  "specs/traces/saved-views.feature",
-];
+function loadFrozenScenarios(): FrozenScenarios {
+  const parsed = JSON.parse(
+    readFileSync(FROZEN_SCENARIOS_FILE, "utf8"),
+  ) as Partial<FrozenScenarios>;
+
+  return {
+    untagged: parsed.untagged ?? {},
+    unimplementedWithoutIssue: parsed.unimplementedWithoutIssue ?? {},
+    annotatedUntagged: parsed.annotatedUntagged ?? {},
+  };
+}
 
 const TEST_FILE_RE = /\.(?:test|spec)\.(?:tsx?|mjs)$/;
 const BATS_FILE_RE = /\.bats$/;
@@ -871,10 +383,27 @@ const BOUND_TAGS = new Set(["@unit", "@integration", "@e2e", "@regression"]);
  */
 const UNIMPLEMENTED_TAG = "@unimplemented";
 
+/**
+ * How an `@unimplemented` scenario names its tracking issue: an `@issue:1234` (or `@issue-1234`)
+ * tag on it or its feature, or a `#1234` / `.../issues/1234` reference in the comment lines
+ * directly above its tags. A blank line ends "directly above".
+ */
+const ISSUE_TAG_RE = /^@issue[:-]\d+$/;
+const ISSUE_REFERENCE_RE = /(?:^|[^\w&])#\d+\b|\/issues\/\d+\b/;
+
 interface Scenario {
   title: string;
   tags: string[];
   line: number;
+  /** Whether an issue is cited for it, by tag or by the comment directly above. */
+  citesIssue?: boolean;
+}
+
+/** A scenario named by where it lives, for the frozen lists and their verdicts. */
+export interface ScenarioRef {
+  feature: string;
+  title: string;
+  line?: number;
 }
 
 interface BindingRef {
@@ -896,10 +425,13 @@ interface Report {
   unimplementedScenarios: number;
   /**
    * Neither a lane tag nor `@unimplemented` — unmeasured and invisible to
-   * the bound count. A file with these next to enforced scenarios reads
-   * `N/N bound` while saying nothing about them; see `isPartiallyTagged`.
+   * the bound count. Each one fails the run unless `untagged` in the frozen
+   * list names it.
    */
   untaggedScenarios: number;
+  untagged: Scenario[];
+  /** `@unimplemented` scenarios that cite no tracked issue. */
+  unimplementedWithoutIssue: Scenario[];
 }
 
 /** A feature file that declares scenarios but no ENFORCED ones. */
@@ -908,14 +440,6 @@ interface InertReport {
   totalScenarios: number;
   /** Of those, how many are explicitly parked as `@unimplemented`. */
   unimplemented: number;
-}
-
-/** A feature file that enforces some scenarios while others carry no tag. */
-interface PartialReport {
-  feature: string;
-  totalScenarios: number;
-  enforced: number;
-  untagged: number;
 }
 
 interface LegacyReport {
@@ -939,7 +463,10 @@ export interface CollectedBinding {
 const GHERKIN_BODY_PREFIXES = ["Given", "When", "Then", "And", "But", "|"] as const;
 
 function parseFeature(absPath: string): Scenario[] {
-  const raw = readFileSync(absPath, "utf8");
+  return parseFeatureSource(readFileSync(absPath, "utf8"));
+}
+
+export function parseFeatureSource(raw: string): Scenario[] {
   const lines = raw.split("\n");
   const scenarios: Scenario[] = [];
   // Tags preceding the `Feature:` line apply to every scenario in the file
@@ -947,12 +474,22 @@ function parseFeature(absPath: string): Scenario[] {
   let featureTags: string[] = [];
   let featureSeen = false;
   let pendingTags: string[] = [];
+  // The comment lines directly above the next scenario, read for an issue reference.
+  let pendingComments: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? "";
     const trimmed = line.trim();
 
-    if (trimmed.startsWith("#") || trimmed === "") continue;
+    if (trimmed === "") {
+      pendingComments = [];
+      continue;
+    }
+
+    if (trimmed.startsWith("#")) {
+      pendingComments.push(trimmed);
+      continue;
+    }
 
     if (trimmed.startsWith("@")) {
       const lineTags = trimmed.split(/\s+/).filter((t) => t.startsWith("@"));
@@ -963,6 +500,7 @@ function parseFeature(absPath: string): Scenario[] {
     if (!featureSeen && trimmed.startsWith("Feature:")) {
       featureTags = pendingTags;
       pendingTags = [];
+      pendingComments = [];
       featureSeen = true;
       continue;
     }
@@ -970,16 +508,23 @@ function parseFeature(absPath: string): Scenario[] {
     const scenarioMatch = trimmed.match(/^Scenario(?:\s+Outline)?:\s*(.+)$/);
 
     if (scenarioMatch) {
+      const tags = [...featureTags, ...pendingTags];
+
       scenarios.push({
         title: scenarioMatch[1]!.trim(),
-        tags: [...featureTags, ...pendingTags],
+        tags,
         line: i + 1,
+        citesIssue:
+          tags.some((t) => ISSUE_TAG_RE.test(t)) ||
+          pendingComments.some((c) => ISSUE_REFERENCE_RE.test(c)),
       });
 
       pendingTags = [];
+      pendingComments = [];
       continue;
     }
 
+    pendingComments = [];
     // A step or table row keeps the pending tags; anything else drops them.
     if (!GHERKIN_BODY_PREFIXES.some((prefix) => trimmed.startsWith(prefix))) pendingTags = [];
   }
@@ -1709,14 +1254,18 @@ function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
   return byTitle;
 }
 
+function isEnforcedScenario(s: Scenario): boolean {
+  return s.tags.some((t) => BOUND_TAGS.has(t)) && !s.tags.includes(UNIMPLEMENTED_TAG);
+}
+
+function isUntaggedScenario(s: Scenario): boolean {
+  return !s.tags.some((t) => BOUND_TAGS.has(t)) && !s.tags.includes(UNIMPLEMENTED_TAG);
+}
+
 function buildReport(featureRelPath: string, bindingsByTitle: Map<string, BindingRef[]>): Report {
   const absFeature = resolve(REPO_ROOT, featureRelPath);
   const allScenarios = parseFeature(absFeature);
-
-  const scenarios = allScenarios.filter(
-    (s) => s.tags.some((t) => BOUND_TAGS.has(t)) && !s.tags.includes(UNIMPLEMENTED_TAG),
-  );
-
+  const scenarios = allScenarios.filter(isEnforcedScenario);
   const unbound: Scenario[] = [];
 
   const annotated: AnnotatedScenario[] = scenarios.map((s) => {
@@ -1726,42 +1275,216 @@ function buildReport(featureRelPath: string, bindingsByTitle: Map<string, Bindin
     return { ...s, bindings: binds };
   });
 
+  const untagged = allScenarios.filter(isUntaggedScenario);
+
   return {
     feature: featureRelPath,
     scenarios: annotated,
     unbound,
     totalScenarios: allScenarios.length,
     unimplementedScenarios: allScenarios.filter((s) => s.tags.includes(UNIMPLEMENTED_TAG)).length,
-    untaggedScenarios: allScenarios.filter(
-      (s) => !s.tags.some((t) => BOUND_TAGS.has(t)) && !s.tags.includes(UNIMPLEMENTED_TAG),
-    ).length,
+    untaggedScenarios: untagged.length,
+    untagged,
+    unimplementedWithoutIssue: allScenarios.filter(
+      (s) => s.tags.includes(UNIMPLEMENTED_TAG) && !s.citesIssue,
+    ),
   };
 }
 
 /**
  * The floor under the `0/0 · ✓ all bound` trap: a file that declares scenarios
- * and enforces none of them. Callers decide whether a given file is tolerated
- * (`LEGACY_INERT`) or fatal.
+ * and enforces none of them. Printed as what it is; whether it fails is decided
+ * per scenario (an untagged one must be frozen, a parked one must cite an issue).
  */
 export function isInert(r: Pick<Report, "scenarios" | "totalScenarios">): boolean {
   return r.totalScenarios > 0 && r.scenarios.length === 0;
 }
 
 /**
- * File with some enforced scenarios and untagged ones (reads as N/N bound while untagged
- * invisible); disjoint from `isInert`
+ * Compares today's rule-breaking scenarios with the frozen pairs that tolerate them, counting
+ * titles (a title held twice is listed twice). `fresh` breaks the rule unlisted; `stale` is
+ * listed but no longer breaks it, and must leave the list.
  */
-export function isPartiallyTagged(r: Pick<Report, "scenarios" | "untaggedScenarios">): boolean {
-  return r.scenarios.length > 0 && r.untaggedScenarios > 0;
+export function compareFrozenScenarios({
+  observed,
+  frozen,
+}: {
+  observed: readonly ScenarioRef[];
+  frozen: Readonly<Record<string, readonly string[]>>;
+}): { fresh: ScenarioRef[]; stale: ScenarioRef[] } {
+  const remaining = new Map<string, number>();
+  const keyOf = (feature: string, title: string) => `${feature}\u0000${title}`;
+
+  for (const [feature, titles] of Object.entries(frozen)) {
+    for (const title of titles) {
+      const key = keyOf(feature, title);
+      remaining.set(key, (remaining.get(key) ?? 0) + 1);
+    }
+  }
+
+  const fresh: ScenarioRef[] = [];
+
+  for (const ref of observed) {
+    const key = keyOf(ref.feature, ref.title);
+    const left = remaining.get(key) ?? 0;
+
+    if (left > 0) remaining.set(key, left - 1);
+    else fresh.push(ref);
+  }
+
+  const stale: ScenarioRef[] = [];
+
+  for (const [feature, titles] of Object.entries(frozen)) {
+    for (const title of titles) {
+      const key = keyOf(feature, title);
+      const left = remaining.get(key) ?? 0;
+
+      if (left > 0) {
+        remaining.set(key, left - 1);
+        stale.push({ feature, title });
+      }
+    }
+  }
+
+  return { fresh, stale };
 }
 
-function toPartialReport(r: Report): PartialReport {
-  return {
-    feature: r.feature,
-    totalScenarios: r.totalScenarios,
-    enforced: r.scenarios.length,
-    untagged: r.untaggedScenarios,
-  };
+/** An `@scenario` annotation whose scenario carries no binding tag, so binds nothing. */
+export interface AnnotationOnUntagged {
+  title: string;
+  ref: BindingRef;
+  scenario: ScenarioRef;
+  missingTag: string;
+  /** The scenario is parked as `@unimplemented` although a test now binds it. */
+  parked: boolean;
+}
+
+/**
+ * The tag a test's own file says its scenario is missing: the lane it runs in,
+ * read from its name, and `@unit` when the name says nothing.
+ */
+export function laneTagForTest(testFile: string): string {
+  if (/\.integration\.|\/integration\//.test(testFile)) return "@integration";
+  if (/\.e2e\.|\/e2e\//.test(testFile)) return "@e2e";
+  if (/\.regression\./.test(testFile)) return "@regression";
+  if (/\.scenario\.test\./.test(testFile)) return "@e2e";
+
+  return "@unit";
+}
+
+/**
+ * Annotations naming a scenario none of whose declarations carries a binding
+ * tag. The test looks bound and the gate measures nothing: the scenario is
+ * invisible to the bound count however many tests point at it.
+ */
+export function findAnnotationsOnUntaggedScenarios({
+  bindings,
+  scenarios,
+}: {
+  bindings: readonly CollectedBinding[];
+  scenarios: readonly { feature: string; scenario: Scenario }[];
+}): AnnotationOnUntagged[] {
+  const byTitle = new Map<string, { feature: string; scenario: Scenario }[]>();
+
+  for (const entry of scenarios) {
+    const list = byTitle.get(entry.scenario.title);
+
+    if (list) list.push(entry);
+    else byTitle.set(entry.scenario.title, [entry]);
+  }
+
+  const found: AnnotationOnUntagged[] = [];
+
+  for (const b of bindings) {
+    const declared = byTitle.get(b.title);
+
+    if (!declared) continue;
+    const isBound = declared.some(({ scenario }) => scenario.tags.some((t) => BOUND_TAGS.has(t)));
+    if (isBound) continue;
+
+    const first = declared[0]!;
+
+    found.push({
+      title: b.title,
+      ref: b.ref,
+      scenario: { feature: first.feature, title: b.title, line: first.scenario.line },
+      missingTag: laneTagForTest(b.ref.file),
+      parked: first.scenario.tags.includes(UNIMPLEMENTED_TAG),
+    });
+  }
+
+  return found;
+}
+
+export function formatAnnotationsOnUntagged(found: readonly AnnotationOnUntagged[]): string[] {
+  if (found.length === 0) return [];
+
+  const lines = [`\nAnnotations binding a scenario that carries no binding tag:`];
+
+  for (const a of found) {
+    lines.push(`  ✗ ${a.ref.file}:${a.ref.line} @scenario "${a.title}"`);
+
+    lines.push(
+      a.parked
+        ? `      binds ${a.scenario.feature}:${a.scenario.line}, which is @unimplemented and missing ${a.missingTag}. Replace @unimplemented with ${a.missingTag} (the lane the test runs in), or remove the annotation.`
+        : `      binds ${a.scenario.feature}:${a.scenario.line}, which is missing ${a.missingTag}. Add ${a.missingTag} (the lane the test runs in) to that scenario, or remove the annotation.`,
+    );
+  }
+
+  return lines;
+}
+
+export function formatFrozenScenarioFailures({
+  untagged,
+  unimplementedWithoutIssue,
+  annotatedUntagged = [],
+}: {
+  untagged: { fresh: readonly ScenarioRef[]; stale: readonly ScenarioRef[] };
+  unimplementedWithoutIssue: { fresh: readonly ScenarioRef[]; stale: readonly ScenarioRef[] };
+  /** Stale `annotatedUntagged` entries; fresh ones print via `formatAnnotationsOnUntagged`. */
+  annotatedUntagged?: readonly ScenarioRef[];
+}): string[] {
+  const lines: string[] = [];
+
+  if (untagged.fresh.length > 0) {
+    lines.push(`\nScenarios carrying no binding tag:`);
+
+    for (const s of untagged.fresh) {
+      lines.push(`  ✗ ${s.feature}:${s.line} "${s.title}"`);
+
+      lines.push(
+        `      Tag it @unit / @integration / @e2e / @regression and bind a test with /** @scenario "${s.title}" */, tag it @unimplemented with an @issue:<number> tag, or delete it.`,
+      );
+    }
+  }
+
+  if (unimplementedWithoutIssue.fresh.length > 0) {
+    lines.push(`\n@unimplemented scenarios citing no tracked issue:`);
+
+    for (const s of unimplementedWithoutIssue.fresh) {
+      lines.push(`  ✗ ${s.feature}:${s.line} "${s.title}"`);
+
+      lines.push(
+        `      Add an @issue:<number> tag to it, or a comment line directly above its tags naming #<number>.`,
+      );
+    }
+  }
+
+  for (const [list, stale] of [
+    ["untagged", untagged.stale],
+    ["unimplementedWithoutIssue", unimplementedWithoutIssue.stale],
+    ["annotatedUntagged", annotatedUntagged],
+  ] as const) {
+    if (stale.length === 0) continue;
+
+    lines.push(
+      `\nFrozen entries that no longer apply (remove them from "${list}" in ${FROZEN_SCENARIOS_RELATIVE}):`,
+    );
+
+    for (const s of stale) lines.push(`  ✗ ${s.feature} "${s.title}"`);
+  }
+
+  return lines;
 }
 
 function toInertReport(r: Report): InertReport {
@@ -1872,7 +1595,7 @@ function printInertSummary(reports: InertReport[]): void {
 
   const invisible = reports.reduce((s, r) => s + r.totalScenarios, 0);
   const parked = reports.reduce((s, r) => s + r.unimplemented, 0);
-  console.log(`\nInert (no enforced scenarios — tolerated via LEGACY_INERT):`);
+  console.log(`\nInert (no enforced scenarios):`);
 
   console.log(
     `  ${reports.length} file(s) hold ${invisible} scenario(s) this check cannot see` +
@@ -1880,23 +1603,8 @@ function printInertSummary(reports: InertReport[]): void {
   );
 
   console.log(
-    `  Tag them @unit/@integration to measure them, or @unimplemented to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.`,
+    `  Tag them @unit/@integration to measure them, or @unimplemented with an issue to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.`,
   );
-}
-
-function printNewInert(reports: InertReport[]): void {
-  if (reports.length === 0) return;
-
-  console.log(`\nFeature files that enforce no scenario at all:`);
-
-  for (const r of reports) {
-    console.log(`  ✗ ${r.feature}`);
-    console.log(`      ${describeInert(r)}`);
-
-    console.log(
-      `      Tag the scenarios @unit / @integration / @e2e / @regression and bind them, or add this file to LEGACY_INERT with a reason.`,
-    );
-  }
 }
 
 /**
@@ -1990,71 +1698,66 @@ function validateExemptionList({
 interface ParityAnalysis {
   enforced: Report[];
   legacy: LegacyReport[];
-  /** Inert files, whether excused or not — a count worth printing on its own. */
+  /** Files that enforce no scenario at all, printed so the blind spot stays visible. */
   inert: InertReport[];
-  /** Inert files LEGACY_INERT excuses, and so still tolerated. */
-  exemptInert: InertReport[];
-  /** Inert files nobody has excused. Fatal. */
-  newInert: InertReport[];
-  /** Partially-tagged files, whether excused or not. */
-  partial: PartialReport[];
-  /** Partially-tagged files LEGACY_PARTIAL excuses, and so still tolerated. */
-  exemptPartial: PartialReport[];
-  /** Partially-tagged files nobody has excused. Fatal. */
-  newPartial: PartialReport[];
+  /** Untagged scenarios against the frozen `untagged` pairs. */
+  untagged: { fresh: ScenarioRef[]; stale: ScenarioRef[]; tolerated: number };
+  /** `@unimplemented` scenarios citing no issue against the frozen pairs. */
+  unimplementedWithoutIssue: { fresh: ScenarioRef[]; stale: ScenarioRef[]; tolerated: number };
+  /** Annotations on untagged scenarios; `fresh` are the ones not frozen. */
+  annotationsOnUntagged: {
+    fresh: AnnotationOnUntagged[];
+    stale: ScenarioRef[];
+    tolerated: number;
+  };
   /** Entries that no longer belong on their list, and must leave it. Fatal. */
   staleLegacy: LegacyReport[];
-  staleInert: string[];
-  stalePartial: string[];
   unknownAnnotations: UnknownAnnotation[];
   listErrors: string[];
 }
 
-/**
- * `LEGACY_INERT` means NO enforced scenario; `LEGACY_UNBOUND`/`LEGACY_PARTIAL`
- * mean some do. A file on the inert list and either other is always a
- * mistake two branches can each make without conflicting — this catches it before main does.
- */
-function validateNoCrossListEntries(): string[] {
-  const inert = new Set(LEGACY_INERT);
-
-  return [
-    { name: "LEGACY_UNBOUND", entries: LEGACY_UNBOUND },
-    { name: "LEGACY_PARTIAL", entries: LEGACY_PARTIAL },
-  ].flatMap(({ name, entries }) =>
-    entries
-      .filter((entry) => inert.has(entry))
-      .map(
-        (entry) =>
-          `${entry} is listed in LEGACY_INERT and ${name} — the first says the file enforces nothing, the second says it enforces something, keep the one that matches the file and delete the other`,
-      ),
+function refsOf(reports: readonly Report[], pick: (r: Report) => Scenario[]): ScenarioRef[] {
+  return reports.flatMap((r) =>
+    pick(r).map((s) => ({ feature: r.feature, title: s.title, line: s.line })),
   );
 }
 
-function validateAllExemptionLists(allFeatures: string[]): string[] {
-  return [
-    ...validateNoCrossListEntries(),
-    ...validateExemptionList({
-      name: "LEGACY_UNBOUND",
-      entries: LEGACY_UNBOUND,
-      allFeatures,
-    }),
-    ...validateExemptionList({
-      name: "LEGACY_INERT",
-      entries: LEGACY_INERT,
-      allFeatures,
-    }),
-    ...validateExemptionList({
-      name: "LEGACY_PARTIAL",
-      entries: LEGACY_PARTIAL,
-      allFeatures,
-    }),
-  ];
+function withTolerated(
+  observed: readonly ScenarioRef[],
+  frozen: Readonly<Record<string, readonly string[]>>,
+): { fresh: ScenarioRef[]; stale: ScenarioRef[]; tolerated: number } {
+  const { fresh, stale } = compareFrozenScenarios({ observed, frozen });
+
+  return { fresh, stale, tolerated: observed.length - fresh.length };
+}
+
+function frozenAnnotations({
+  found,
+  frozen,
+}: {
+  found: AnnotationOnUntagged[];
+  frozen: Readonly<Record<string, readonly string[]>>;
+}): ParityAnalysis["annotationsOnUntagged"] {
+  const observed = found.map((a) => ({ feature: a.ref.file, title: a.title, line: a.ref.line }));
+  const { fresh, stale } = compareFrozenScenarios({ observed, frozen });
+  const freshKeys = new Set(fresh.map((r) => `${r.feature}:${r.line}`));
+
+  return {
+    fresh: found.filter((a) => freshKeys.has(`${a.ref.file}:${a.ref.line}`)),
+    stale,
+    tolerated: found.length - fresh.length,
+  };
 }
 
 function analyzeParity(): ParityAnalysis {
   const allFeatures = discoverFeatureFiles();
-  const listErrors = validateAllExemptionLists(allFeatures);
+  const frozen = loadFrozenScenarios();
+
+  const listErrors = validateExemptionList({
+    name: "LEGACY_UNBOUND",
+    entries: LEGACY_UNBOUND,
+    allFeatures,
+  });
 
   const bindings = [
     ...collectAllBindings(DEFAULT_TEST_ROOTS),
@@ -2066,13 +1769,11 @@ function analyzeParity(): ParityAnalysis {
 
   const bindingsByTitle = indexByTitle(bindings);
 
-  const allKnownTitles = new Set<string>();
+  const declared = allFeatures.flatMap((feature) =>
+    parseFeature(resolve(REPO_ROOT, feature)).map((scenario) => ({ feature, scenario })),
+  );
 
-  for (const f of allFeatures) {
-    for (const s of parseFeature(resolve(REPO_ROOT, f))) {
-      allKnownTitles.add(s.title);
-    }
-  }
+  const allKnownTitles = new Set(declared.map(({ scenario }) => scenario.title));
 
   const unknownAnnotations: UnknownAnnotation[] = bindings
     .filter((b) => !allKnownTitles.has(b.title))
@@ -2094,37 +1795,27 @@ function analyzeParity(): ParityAnalysis {
     }
   }
 
-  // Inert floor. A file that declares scenarios and enforces none of them is a
-  // failure unless it was already in that state when the floor was introduced.
-  const inertSet = new Set(LEGACY_INERT);
-  const inert = enforced.filter(isInert).map(toInertReport);
-  const inertFeatures = new Set(inert.map((r) => r.feature));
-
-  // Partial floor, same shape: a file that enforces some scenarios and leaves
-  // others untagged is a failure unless it was already in that state when the
-  // floor was introduced. Runs against ALL reports (not just enforced) so that
-  // legacy-unbound files cannot silently gain untagged scenarios — the same
-  // hidden-scenario hole this floor exists to close.
-  const partialSet = new Set(LEGACY_PARTIAL);
-  const partial = allReports.filter(isPartiallyTagged).map(toPartialReport);
-  const partialFeatures = new Set(partial.map((r) => r.feature));
-
   return {
     enforced,
     legacy,
-    inert,
-    exemptInert: inert.filter((r) => inertSet.has(r.feature)),
-    newInert: inert.filter((r) => !inertSet.has(r.feature)),
-    partial,
-    exemptPartial: partial.filter((r) => partialSet.has(r.feature)),
-    newPartial: partial.filter((r) => !partialSet.has(r.feature)),
+    inert: allReports.filter(isInert).map(toInertReport),
+    // Per scenario, across every file, legacy ones included: a listed file can
+    // no longer hide a new untagged scenario behind its older ones.
+    untagged: withTolerated(
+      refsOf(allReports, (r) => r.untagged),
+      frozen.untagged,
+    ),
+    unimplementedWithoutIssue: withTolerated(
+      refsOf(allReports, (r) => r.unimplementedWithoutIssue),
+      frozen.unimplementedWithoutIssue,
+    ),
+    annotationsOnUntagged: frozenAnnotations({
+      found: findAnnotationsOnUntaggedScenarios({ bindings, scenarios: declared }),
+      frozen: frozen.annotatedUntagged,
+    }),
     // Legacy-list hygiene: every entry must still have at least one unbound
     // scenario. If a file is fully bound, it must be removed from the list.
     staleLegacy: legacy.filter((r) => r.unbound === 0),
-    // Ratchet hygiene: an entry that is no longer inert has been fixed, and
-    // must leave the list so it can never silently regress.
-    staleInert: LEGACY_INERT.filter((f) => allFeatures.includes(f) && !inertFeatures.has(f)),
-    stalePartial: LEGACY_PARTIAL.filter((f) => allFeatures.includes(f) && !partialFeatures.has(f)),
     unknownAnnotations,
     listErrors,
   };
@@ -2148,9 +1839,17 @@ function printParityReport(a: ParityAnalysis): void {
   for (const r of a.enforced) printEnforcedReport(r);
 
   printLegacySummary(a.legacy);
-  printInertSummary(a.exemptInert);
-  printNewInert(a.newInert);
+  printInertSummary(a.inert);
   printUnknownAnnotations(a.unknownAnnotations);
+  for (const line of formatAnnotationsOnUntagged(a.annotationsOnUntagged.fresh)) console.log(line);
+
+  for (const line of formatFrozenScenarioFailures({
+    untagged: a.untagged,
+    unimplementedWithoutIssue: a.unimplementedWithoutIssue,
+    annotatedUntagged: a.annotationsOnUntagged.stale,
+  })) {
+    console.log(line);
+  }
 }
 
 /**
@@ -2178,33 +1877,32 @@ function fatalReasons(a: ParityAnalysis): string[] {
     );
   }
 
-  if (a.newInert.length > 0) {
+  if (a.annotationsOnUntagged.fresh.length > 0) {
     reasons.push(
-      `${a.newInert.length} file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)`,
+      `${a.annotationsOnUntagged.fresh.length} @scenario annotation(s) bind a scenario carrying no binding tag — tag the scenario with the lane its test runs in`,
     );
   }
 
-  if (a.staleInert.length > 0) {
+  if (a.untagged.fresh.length > 0) {
     reasons.push(
-      `${a.staleInert.length} file(s) in LEGACY_INERT now enforce scenarios — remove them from the list: ${a.staleInert.join(
-        ", ",
-      )}`,
+      `${a.untagged.fresh.length} scenario(s) carry no binding tag — tag them @unit/@integration/@e2e/@regression and bind them, tag them @unimplemented with an issue, or delete them`,
     );
   }
 
-  if (a.newPartial.length > 0) {
+  if (a.unimplementedWithoutIssue.fresh.length > 0) {
     reasons.push(
-      `${a.newPartial.length} file(s) mix enforced scenarios with untagged ones — tag the untagged scenarios (@unit/@integration/@e2e/@regression, or @unimplemented for a tracked gap), delete them, or add the file to LEGACY_PARTIAL with a reason: ${a.newPartial
-        .map((r) => `${r.feature} (${r.untagged} untagged)`)
-        .join(", ")}`,
+      `${a.unimplementedWithoutIssue.fresh.length} @unimplemented scenario(s) cite no tracked issue — add an @issue:<number> tag or a #<number> comment directly above`,
     );
   }
 
-  if (a.stalePartial.length > 0) {
+  const stale =
+    a.untagged.stale.length +
+    a.unimplementedWithoutIssue.stale.length +
+    a.annotationsOnUntagged.stale.length;
+
+  if (stale > 0) {
     reasons.push(
-      `${a.stalePartial.length} file(s) in LEGACY_PARTIAL are now fully tagged — remove them from the list: ${a.stalePartial.join(
-        ", ",
-      )}`,
+      `${stale} frozen scenario entr(y/ies) no longer apply — remove them from ${FROZEN_SCENARIOS_RELATIVE}`,
     );
   }
 
@@ -2229,19 +1927,21 @@ function printOkSummary(a: ParityAnalysis): void {
     );
   }
 
-  if (a.exemptInert.length > 0) {
-    const invisible = a.exemptInert.reduce((s, r) => s + r.totalScenarios, 0);
-
+  if (a.untagged.tolerated > 0) {
     console.log(
-      `    ${a.exemptInert.length} file(s) exempted via LEGACY_INERT enforce nothing at all — ${invisible} scenario(s) are invisible to this check.`,
+      `    ${a.untagged.tolerated} untagged scenario(s) tolerated by name in ${FROZEN_SCENARIOS_RELATIVE}, invisible to this check.`,
     );
   }
 
-  if (a.exemptPartial.length > 0) {
-    const untagged = a.exemptPartial.reduce((s, r) => s + r.untagged, 0);
-
+  if (a.unimplementedWithoutIssue.tolerated > 0) {
     console.log(
-      `    ${a.exemptPartial.length} partially-tagged file(s) exempted via LEGACY_PARTIAL — ${untagged} scenario(s) untagged and unmeasured beside their enforced ones.`,
+      `    ${a.unimplementedWithoutIssue.tolerated} @unimplemented scenario(s) citing no issue tolerated by name in the same file.`,
+    );
+  }
+
+  if (a.annotationsOnUntagged.tolerated > 0) {
+    console.log(
+      `    ${a.annotationsOnUntagged.tolerated} @scenario annotation(s) on a scenario with no binding tag tolerated by name in the same file.`,
     );
   }
 }
@@ -2259,12 +1959,10 @@ function main(): void {
           unknownAnnotations: analysis.unknownAnnotations,
           listErrors: analysis.listErrors,
           staleLegacy: analysis.staleLegacy.map((r) => r.feature),
-          inert: analysis.exemptInert,
-          newInert: analysis.newInert,
-          staleInert: analysis.staleInert,
-          partial: analysis.exemptPartial,
-          newPartial: analysis.newPartial,
-          stalePartial: analysis.stalePartial,
+          inert: analysis.inert,
+          untagged: analysis.untagged,
+          unimplementedWithoutIssue: analysis.unimplementedWithoutIssue,
+          annotationsOnUntagged: analysis.annotationsOnUntagged,
         },
         null,
         2,

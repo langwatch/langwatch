@@ -1,9 +1,8 @@
 import { StatTileGrid } from "@langwatch/design-system/stat-tile";
+import { ResourceLimitRow } from "@langwatch/enterprise-licensing-client";
 import { LIMIT_TYPE_DISPLAY_LABELS, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { UsageStats } from "@langwatch/entitlement-contract";
 import type { ReactNode } from "react";
-
-import { ResourceLimitRow } from "../../../behavior/lent-resource-limit-row.tsx";
 
 /** Resource keys that can be displayed in the limits component */
 export type ResourceKey =

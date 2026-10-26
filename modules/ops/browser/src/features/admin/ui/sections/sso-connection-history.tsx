@@ -1,6 +1,7 @@
 import { ActivityTimeline } from "@langwatch/design-system/activity-timeline";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Box, Skeleton, Text } from "@langwatch/design-system/primitives";
+import { CONNECTION_REGISTERED_EVENT_TYPE } from "@langwatch/identity-contract";
 import {
   Circle,
   CircleCheck,
@@ -22,7 +23,7 @@ import {
 import { api } from "../../../../behavior/ops-api.ts";
 
 const EVENT_ICONS: Record<string, LucideIcon> = {
-  "lw.identity.connection_registered": Plus,
+  [CONNECTION_REGISTERED_EVENT_TYPE]: Plus,
   "lw.identity.domain_claimed": Globe,
   "lw.identity.domain_claim_approved": CircleCheck,
   "lw.identity.domain_claim_rejected": CircleMinus,

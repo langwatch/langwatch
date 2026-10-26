@@ -1,5 +1,5 @@
-import type { PreconditionField } from "@langwatch/analytics-contract";
-import { availableFilters, type FilterField } from "@langwatch/analytics-filters";
+import type { FilterField, PreconditionField } from "@langwatch/analytics-contract";
+import { availableFilters } from "@langwatch/analytics-contract/filters";
 import type { CheckPreconditionFields, CheckPreconditionRule } from "@langwatch/trace-contract";
 
 import {

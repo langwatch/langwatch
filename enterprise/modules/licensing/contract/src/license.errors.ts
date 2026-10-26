@@ -13,6 +13,7 @@ import { LICENSE_ERRORS } from "./license-constants.ts";
  * of this module.
  */
 export class OrganizationNotFoundError extends HandledError {
+  static readonly code = "organization_not_found" as const;
   declare readonly code: "organization_not_found";
 
   constructor() {
@@ -30,6 +31,7 @@ export class OrganizationNotFoundError extends HandledError {
  * naming which one only helps a prober confirm the shape was right.
  */
 export class LicenseKeyInvalidError extends HandledError {
+  static readonly code = "license_key_invalid" as const;
   declare readonly code: "license_key_invalid";
 
   constructor() {
@@ -43,6 +45,7 @@ export class LicenseKeyInvalidError extends HandledError {
 
 /** The license verifies, but its expiry date has passed. */
 export class LicenseExpiredError extends HandledError {
+  static readonly code = "license_expired" as const;
   declare readonly code: "license_expired";
 
   constructor() {
@@ -60,6 +63,7 @@ export class LicenseExpiredError extends HandledError {
  * codes above: this is the *issuer's* key, not the customer's licence.
  */
 export class LicenseSigningKeyNotPemError extends HandledError {
+  static readonly code = "license_signing_key_not_pem" as const;
   declare readonly code: "license_signing_key_not_pem";
 
   constructor() {
@@ -81,6 +85,7 @@ export class LicenseSigningKeyNotPemError extends HandledError {
 
 /** The signing key is passphrase-protected, so signing cannot use it as-is. */
 export class LicenseSigningKeyEncryptedError extends HandledError {
+  static readonly code = "license_signing_key_encrypted" as const;
   declare readonly code: "license_signing_key_encrypted";
 
   constructor() {
@@ -102,6 +107,7 @@ export class LicenseSigningKeyEncryptedError extends HandledError {
  * (names internals/key material) so only this error's code reaches the client.
  */
 export class LicenseSigningFailedError extends HandledError {
+  static readonly code = "license_signing_failed" as const;
   declare readonly code: "license_signing_failed";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {

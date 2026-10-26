@@ -10,6 +10,7 @@ import type { ScimError } from "./scim.contract.ts";
  * every one of them reading as an unattributed 500.
  */
 export class ScimProtocolError extends HandledError {
+  static readonly code = "scim_protocol_refusal" as const;
   declare readonly code: "scim_protocol_refusal";
 
   constructor(readonly response: ScimError) {
@@ -29,6 +30,7 @@ export class ScimProtocolError extends HandledError {
  * idempotent for a provisioning tool either way.
  */
 export class ScimTokenNotFoundError extends NotFoundError {
+  static readonly code = "scim_token_not_found" as const;
   declare readonly code: "scim_token_not_found";
 
   constructor(tokenId: string) {
@@ -44,6 +46,7 @@ export class ScimTokenNotFoundError extends NotFoundError {
 }
 
 export class ScimConnectionRequiredError extends HandledError {
+  static readonly code = "scim_connection_required" as const;
   declare readonly code: "scim_connection_required";
 
   constructor() {
@@ -58,6 +61,7 @@ export class ScimConnectionRequiredError extends HandledError {
 
 /** A token an administrator chose is shorter than a minted one is worth. */
 export class ScimTokenTooShortError extends HandledError {
+  static readonly code = "scim_token_too_short" as const;
   declare readonly code: "scim_token_too_short";
 
   constructor(minimum: number) {
@@ -72,6 +76,7 @@ export class ScimTokenTooShortError extends HandledError {
 
 /** A chosen value some token already hashes to; generic so it confirms nothing about its holder. */
 export class ScimTokenUnavailableError extends HandledError {
+  static readonly code = "scim_token_unavailable" as const;
   declare readonly code: "scim_token_unavailable";
 
   constructor() {
@@ -85,6 +90,7 @@ export class ScimTokenUnavailableError extends HandledError {
 }
 
 export class ScimConnectionNotFoundError extends NotFoundError {
+  static readonly code = "scim_connection_not_found" as const;
   declare readonly code: "scim_connection_not_found";
 
   constructor(connectionId: string) {
@@ -100,6 +106,7 @@ export class ScimConnectionNotFoundError extends NotFoundError {
 }
 
 export class ScimWriteOutsideConnectionError extends HandledError {
+  static readonly code = "scim_write_outside_connection" as const;
   declare readonly code: "scim_write_outside_connection";
 
   constructor(meta: { userId?: string } = {}) {
@@ -114,6 +121,7 @@ export class ScimWriteOutsideConnectionError extends HandledError {
 
 /** The named apply is not a dead letter: it is still being retried, or never failed. */
 export class ScimApplyNotRetiredError extends HandledError {
+  static readonly code = "scim_apply_not_retired" as const;
   declare readonly code: "scim_apply_not_retired";
 
   constructor(meta: { connectionId?: string } = {}) {
@@ -131,6 +139,7 @@ export class ScimApplyNotRetiredError extends HandledError {
  * left to resend; a removal is fully described by the person and organization.
  */
 export class ScimApplyNotRedrivableError extends HandledError {
+  static readonly code = "scim_apply_not_redrivable" as const;
   declare readonly code: "scim_apply_not_redrivable";
 
   constructor(meta: { op?: string } = {}) {
@@ -146,6 +155,7 @@ export class ScimApplyNotRedrivableError extends HandledError {
 /** No sync folded for this connection in this organization yet; a foreign
  *  organization's sync reads the same, so the difference is no oracle. */
 export class ScimSyncNotFoundError extends NotFoundError {
+  static readonly code = "scim_sync_not_found" as const;
   declare readonly code: "scim_sync_not_found";
 
   constructor(scimSyncId: string) {
@@ -160,6 +170,7 @@ export class ScimSyncNotFoundError extends NotFoundError {
 
 /** A directory capability this deployment did not compose, such as its event log. */
 export class ScimCapabilityUnavailableError extends HandledError {
+  static readonly code = "service_unavailable" as const;
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {

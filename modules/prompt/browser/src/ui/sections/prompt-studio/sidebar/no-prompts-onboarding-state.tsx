@@ -2,9 +2,9 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, Button, Center } from "@langwatch/design-system/primitives";
 import { AggregateReadOnlyNotice } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
+import { SetupWithAgentButton } from "@langwatch/trace-client";
 import { LuSparkles } from "react-icons/lu";
 
-import { SetupWithAgentButton } from "../../../../behavior/lent-setup-with-agent-button.tsx";
 import { useCreateDraftPrompt } from "../../../../behavior/use-create-draft-prompt.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 

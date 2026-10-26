@@ -21,6 +21,7 @@
   "dependencies": {
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/module": "workspace:*"
   },
   "devDependencies": {

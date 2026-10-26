@@ -3,6 +3,7 @@
  * member's starred dashboards it lends the other products' sidebars (§10.1).
  */
 
+import { lentComponent } from "@langwatch/browser-host/lent";
 import { uiTokens } from "@langwatch/module";
 
 /**
@@ -20,3 +21,7 @@ export type StarredDashboardsProps = Record<string, never>;
 /** Draws nothing unless the member has starred a dashboard in the project in scope. */
 export const StarredDashboardsToken =
   uiTokens("analytics").component<StarredDashboardsProps>("starredDashboards");
+
+/** The tokens above as ready components: a borrower imports these and writes no wrapper (§10.1). */
+export const SavedDashboards = lentComponent(SavedDashboardsToken);
+export const StarredDashboards = lentComponent(StarredDashboardsToken);

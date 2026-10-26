@@ -8,6 +8,11 @@ export const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"] as const;
 export const WEBHOOK_HEADER_VALUE_KEPT = "__kept__";
 /** How long a rolled-off signing secret keeps signing and verifying after a rotation. */
 export const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** When a secret rolled off at `rotatedAtMs` stops signing and verifying, in epoch milliseconds. */
+export function previousSecretExpiresAtMs({ rotatedAtMs }: { rotatedAtMs: number }): number {
+  return rotatedAtMs + WEBHOOK_PREVIOUS_SECRET_TTL_MS;
+}
 export const webhookMethodSchema = z.enum(WEBHOOK_METHODS);
 export type WebhookMethod = z.infer<typeof webhookMethodSchema>;
 

@@ -2,14 +2,14 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
+import { ModelDisplay as LLMModelDisplay } from "@langwatch/model-provider-client";
 import { allModelOptions } from "@langwatch/model-provider-contract";
+import { LlmConfigPopover as LLMConfigPopover } from "@langwatch/prompt-client";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
 
-import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
-import { LLMConfigPopover } from "../../../behavior/lent-peers.tsx";
 import { useInstantEvalJudgeModels } from "../../../behavior/use-instant-eval-judge-models.ts";
 import { useModelSelection } from "../../../behavior/use-model-selection.ts";
 import { toInternalKey } from "../prompt/llm-parameters/parameter-config.ts";

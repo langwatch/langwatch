@@ -1,6 +1,7 @@
 import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
@@ -26,7 +27,6 @@ import {
 } from "../../model/last-used-method.ts";
 import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels.ts";
 import { shouldStartPasskeyOnArrival } from "../../model/method-ranking.ts";
-import { readHandledError } from "../../model/read-handled-error.ts";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
 import { signInGreeting } from "../../model/sign-in-greeting.ts";
 import {
@@ -428,7 +428,7 @@ function NoAccountYet({
       await requestVerification.mutateAsync({ email });
       onAwaitingConfirmation(email);
     } catch (failure) {
-      if (readHandledError(failure)?.code === "email_already_registered") {
+      if (EmailAlreadyRegisteredError.is(failure)) {
         onAddressAlreadyRegistered();
       }
     }

@@ -13,7 +13,9 @@ import { createFixtureWorkspace } from "../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: {
-    agent: { roles: { contract: {}, process: {}, browser: {}, "query-language": {} } },
+    agent: {
+      roles: { contract: {}, process: {}, browser: {}, client: {}, "query-language": {} },
+    },
   },
 });
 
@@ -88,10 +90,10 @@ const CASES = [
     expected: { role: "process", layer: "channels", module: "agent", moduleEnterprise: false },
   },
   {
-    path: "modules/agent/query-language/src/parse.ts",
+    path: "modules/agent/client/src/parse.ts",
     expected: {
-      role: "library",
-      kind: "library",
+      role: "client",
+      kind: "client",
       feature: "agent",
       module: "agent",
       relative: "src/parse.ts",
@@ -99,6 +101,11 @@ const CASES = [
       layer: undefined,
       strictSource: undefined,
     },
+  },
+  {
+    // No library kind: a folder outside the four roles is unclassified (the enforcer refuses it).
+    path: "modules/agent/query-language/src/parse.ts",
+    expected: { role: "other", kind: undefined, feature: undefined },
   },
   {
     path: "modules/agent/specs/agent.feature",
@@ -216,11 +223,7 @@ describe("given the one classification every rule gates on", () => {
           pkg: { enterprise: true, module: "sso", role: "process" },
           subpath: "./testing",
         });
-        expect(modulePackageOf(fixture.cwd, "@langwatch/trace-query-language")?.pkg).toMatchObject({
-          module: "trace",
-          role: "library",
-          root: "modules/trace/query-language",
-        });
+        expect(modulePackageOf(fixture.cwd, "@langwatch/trace-query-language")).toBeUndefined();
         expect(modulePackageOf(fixture.cwd, "zod")).toBeUndefined();
         expect(
           [...modulePackages(fixture.cwd).keys()].toSorted((a, b) => a.localeCompare(b)),
@@ -228,7 +231,6 @@ describe("given the one classification every rule gates on", () => {
           "@langwatch/enterprise-sso-process",
           "@langwatch/trace-browser",
           "@langwatch/trace-contract",
-          "@langwatch/trace-query-language",
         ]);
       } finally {
         fixture.cleanup();

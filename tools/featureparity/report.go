@@ -112,20 +112,17 @@ func FatalReasons(a Analysis) []string {
 		reasons = append(reasons, fmt.Sprintf("%d fully-bound file(s) still in LEGACY_UNBOUND — remove them from the list: %s",
 			len(a.StaleLegacy), joinMap(a.StaleLegacy, func(r LegacyReport) string { return r.Feature })))
 	}
-	if len(a.NewInert) > 0 {
-		reasons = append(reasons, fmt.Sprintf("%d file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)", len(a.NewInert)))
+	if n := len(a.AnnotationsOnUntagged.Fresh); n > 0 {
+		reasons = append(reasons, fmt.Sprintf("%d @scenario annotation(s) bind a scenario carrying no binding tag — tag the scenario with the lane its test runs in", n))
 	}
-	if len(a.StaleInert) > 0 {
-		reasons = append(reasons, fmt.Sprintf("%d file(s) in LEGACY_INERT now enforce scenarios — remove them from the list: %s",
-			len(a.StaleInert), strings.Join(a.StaleInert, ", ")))
+	if n := len(a.Untagged.Fresh); n > 0 {
+		reasons = append(reasons, fmt.Sprintf("%d scenario(s) carry no binding tag — tag them @unit/@integration/@e2e/@regression and bind them, tag them @unimplemented with an issue, or delete them", n))
 	}
-	if len(a.NewPartial) > 0 {
-		reasons = append(reasons, fmt.Sprintf("%d file(s) mix enforced scenarios with untagged ones — tag the untagged scenarios (@unit/@integration/@e2e/@regression, or @unimplemented for a tracked gap), delete them, or add the file to LEGACY_PARTIAL with a reason: %s",
-			len(a.NewPartial), joinMap(a.NewPartial, func(r PartialReport) string { return fmt.Sprintf("%s (%d untagged)", r.Feature, r.Untagged) })))
+	if n := len(a.UnimplementedWithoutIssue.Fresh); n > 0 {
+		reasons = append(reasons, fmt.Sprintf("%d @unimplemented scenario(s) cite no tracked issue — add an @issue:<number> tag or a #<number> comment directly above", n))
 	}
-	if len(a.StalePartial) > 0 {
-		reasons = append(reasons, fmt.Sprintf("%d file(s) in LEGACY_PARTIAL are now fully tagged — remove them from the list: %s",
-			len(a.StalePartial), strings.Join(a.StalePartial, ", ")))
+	if n := len(a.Untagged.Stale) + len(a.UnimplementedWithoutIssue.Stale) + len(a.AnnotationsOnUntagged.Stale); n > 0 {
+		reasons = append(reasons, fmt.Sprintf("%d frozen scenario entr(y/ies) no longer apply — remove them from %s", n, frozenRelative))
 	}
 	if len(a.ListErrors) > 0 {
 		reasons = append(reasons, fmt.Sprintf("%d exemption-list error(s)", len(a.ListErrors)))
@@ -170,15 +167,20 @@ func PrintReport(w io.Writer, a Analysis) {
 	for _, l := range FormatFailureBanner(FatalReasons(a)) {
 		fmt.Fprintln(w, l)
 	}
-	for _, r := range a.Enforced {
-		printEnforced(w, r)
+	for i := range a.Enforced {
+		printEnforced(w, a.Enforced[i])
 	}
 
 	printLegacy(w, a)
-	printExemptInert(w, a)
-	printNewInert(w, a)
+	printInert(w, a)
 
 	for _, l := range FormatUnknownAnnotations(a.Unknown) {
+		fmt.Fprintln(w, l)
+	}
+	for _, l := range FormatAnnotationsOnUntagged(a.AnnotationsOnUntagged.Fresh) {
+		fmt.Fprintln(w, l)
+	}
+	for _, l := range FormatFrozenFailures(a) {
 		fmt.Fprintln(w, l)
 	}
 }
@@ -199,32 +201,91 @@ func printLegacy(w io.Writer, a Analysis) {
 	fmt.Fprintln(w, "\n  Shrink this list by binding scenarios, flagging @unimplemented, or removing stale scenarios. See dev/docs/TESTING_PHILOSOPHY.md.")
 }
 
-// printExemptInert prints the LEGACY_INERT files and the scenarios they hide.
-func printExemptInert(w io.Writer, a Analysis) {
-	if len(a.ExemptInert) == 0 {
+// printInert prints the files that enforce no scenario, so the blind spot stays visible.
+func printInert(w io.Writer, a Analysis) {
+	if len(a.Inert) == 0 {
 		return
 	}
-	parked := sum(a.ExemptInert, func(r InertReport) int { return r.Unimplemented })
+	parked := sum(a.Inert, func(r InertReport) int { return r.Unimplemented })
 	tail := "."
 	if parked > 0 {
 		tail = fmt.Sprintf(" (%d of them parked as @unimplemented).", parked)
 	}
-	fmt.Fprintln(w, "\nInert (no enforced scenarios — tolerated via LEGACY_INERT):")
-	fmt.Fprintf(w, "  %d file(s) hold %d scenario(s) this check cannot see%s\n", len(a.ExemptInert),
-		sum(a.ExemptInert, func(r InertReport) int { return r.TotalScenarios }), tail)
-	fmt.Fprintln(w, "  Tag them @unit/@integration to measure them, or @unimplemented to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.")
+	fmt.Fprintln(w, "\nInert (no enforced scenarios):")
+	fmt.Fprintf(w, "  %d file(s) hold %d scenario(s) this check cannot see%s\n", len(a.Inert),
+		sum(a.Inert, func(r InertReport) int { return r.TotalScenarios }), tail)
+	fmt.Fprintln(w, "  Tag them @unit/@integration to measure them, or @unimplemented with an issue to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.")
 }
 
-// printNewInert prints each feature file that enforces no scenario.
-func printNewInert(w io.Writer, a Analysis) {
-	if len(a.NewInert) == 0 {
-		return
+// FormatAnnotationsOnUntagged lists the annotations that bind a scenario with no binding tag.
+func FormatAnnotationsOnUntagged(found []AnnotationOnUntagged) []string {
+	if len(found) == 0 {
+		return nil
 	}
-	fmt.Fprintln(w, "\nFeature files that enforce no scenario at all:")
-	for _, r := range a.NewInert {
-		fmt.Fprintf(w, "  ✗ %s\n      %s\n", r.Feature, describeInert(r))
-		fmt.Fprintln(w, "      Tag the scenarios @unit / @integration / @e2e / @regression and bind them, or add this file to LEGACY_INERT with a reason.")
+	lines := []string{"\nAnnotations binding a scenario that carries no binding tag:"}
+	for _, a := range found {
+		lines = append(lines, fmt.Sprintf("  ✗ %s:%d @scenario %s", a.Ref.File, a.Ref.Line, quoted(a.Title)))
+		if a.Parked {
+			lines = append(lines, fmt.Sprintf("      binds %s:%d, which is @unimplemented and missing %s. Replace @unimplemented with %s (the lane the test runs in), or remove the annotation.", a.Scenario.Feature, a.Scenario.Line, a.MissingTag, a.MissingTag))
+		} else {
+			lines = append(lines, fmt.Sprintf("      binds %s:%d, which is missing %s. Add %s (the lane the test runs in) to that scenario, or remove the annotation.", a.Scenario.Feature, a.Scenario.Line, a.MissingTag, a.MissingTag))
+		}
 	}
+	return lines
+}
+
+// quoted wraps s in double quotes verbatim, with no escaping, so the text
+// matches the Node tool's output byte for byte (%q would escape).
+func quoted(s string) string { return "\"" + s + "\"" }
+
+// FormatFrozenFailures lists the scenarios the frozen file does not cover and
+// the frozen entries that no longer apply.
+func FormatFrozenFailures(a Analysis) []string {
+	var lines []string
+	lines = append(lines, formatFreshUntagged(a.Untagged.Fresh)...)
+	lines = append(lines, formatFreshUnimplemented(a.UnimplementedWithoutIssue.Fresh)...)
+	for _, stale := range []struct {
+		list string
+		refs []ScenarioRef
+	}{{"untagged", a.Untagged.Stale}, {"unimplementedWithoutIssue", a.UnimplementedWithoutIssue.Stale}, {"annotatedUntagged", a.AnnotationsOnUntagged.Stale}} {
+		lines = append(lines, formatStale(stale.list, stale.refs)...)
+	}
+	return lines
+}
+
+func formatFreshUntagged(fresh []ScenarioRef) []string {
+	if len(fresh) == 0 {
+		return nil
+	}
+	lines := []string{"\nScenarios carrying no binding tag:"}
+	for _, s := range fresh {
+		lines = append(lines, fmt.Sprintf("  ✗ %s:%d %s", s.Feature, s.Line, quoted(s.Title)),
+			fmt.Sprintf("      Tag it @unit / @integration / @e2e / @regression and bind a test with /** @scenario %s */, tag it @unimplemented with an @issue:<number> tag, or delete it.", quoted(s.Title)))
+	}
+	return lines
+}
+
+func formatFreshUnimplemented(fresh []ScenarioRef) []string {
+	if len(fresh) == 0 {
+		return nil
+	}
+	lines := []string{"\n@unimplemented scenarios citing no tracked issue:"}
+	for _, s := range fresh {
+		lines = append(lines, fmt.Sprintf("  ✗ %s:%d %s", s.Feature, s.Line, quoted(s.Title)),
+			"      Add an @issue:<number> tag to it, or a comment line directly above its tags naming #<number>.")
+	}
+	return lines
+}
+
+func formatStale(list string, refs []ScenarioRef) []string {
+	if len(refs) == 0 {
+		return nil
+	}
+	lines := []string{fmt.Sprintf("\nFrozen entries that no longer apply (remove them from %s in %s):", quoted(list), frozenRelative)}
+	for _, s := range refs {
+		lines = append(lines, fmt.Sprintf("  ✗ %s %s", s.Feature, quoted(s.Title)))
+	}
+	return lines
 }
 
 func printOK(w io.Writer, a Analysis) {
@@ -234,12 +295,13 @@ func printOK(w io.Writer, a Analysis) {
 		fmt.Fprintf(w, "    %d unbound scenario(s) tolerated in %d legacy file(s).\n",
 			sum(a.Legacy, func(r LegacyReport) int { return r.Unbound }), len(a.Legacy))
 	}
-	if len(a.ExemptInert) > 0 {
-		fmt.Fprintf(w, "    %d file(s) exempted via LEGACY_INERT enforce nothing at all — %d scenario(s) are invisible to this check.\n",
-			len(a.ExemptInert), sum(a.ExemptInert, func(r InertReport) int { return r.TotalScenarios }))
+	if a.Untagged.Tolerated > 0 {
+		fmt.Fprintf(w, "    %d untagged scenario(s) tolerated by name in %s, invisible to this check.\n", a.Untagged.Tolerated, frozenRelative)
 	}
-	if len(a.ExemptPartial) > 0 {
-		fmt.Fprintf(w, "    %d partially-tagged file(s) exempted via LEGACY_PARTIAL — %d scenario(s) untagged and unmeasured beside their enforced ones.\n",
-			len(a.ExemptPartial), sum(a.ExemptPartial, func(r PartialReport) int { return r.Untagged }))
+	if a.UnimplementedWithoutIssue.Tolerated > 0 {
+		fmt.Fprintf(w, "    %d @unimplemented scenario(s) citing no issue tolerated by name in the same file.\n", a.UnimplementedWithoutIssue.Tolerated)
+	}
+	if a.AnnotationsOnUntagged.Tolerated > 0 {
+		fmt.Fprintf(w, "    %d @scenario annotation(s) on a scenario with no binding tag tolerated by name in the same file.\n", a.AnnotationsOnUntagged.Tolerated)
 	}
 }

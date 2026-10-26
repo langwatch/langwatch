@@ -25,12 +25,13 @@ import {
   StatTileSkeleton,
 } from "@langwatch/design-system/stat-tile";
 import { useProductAccent } from "@langwatch/design-system/use-product-accent";
-import type {
-  ClusteringErrorCode,
-  TopicClusteringRunHistoryEntry,
-  TopicClusteringStatus,
-  TopicClusteringRunMode,
-  TopicClusteringSkipReason,
+import {
+  CLUSTERING_ERROR_CODES,
+  type ClusteringErrorCode,
+  type TopicClusteringRunHistoryEntry,
+  type TopicClusteringStatus,
+  type TopicClusteringRunMode,
+  type TopicClusteringSkipReason,
 } from "@langwatch/topic-contract";
 
 import { topicApi } from "../../behavior/topic-api.ts";
@@ -54,17 +55,17 @@ function copyFor<K extends string, V>(
 const CLUSTERING_FAILURE_GUIDANCE: Partial<
   Record<ClusteringErrorCode, { title: string; description: string }>
 > = {
-  model_not_configured: {
+  [CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED]: {
     title: "No model is set up for topic clustering",
     description:
       "Choose a default model and embeddings for topic clustering in Settings → Model Providers → Default Models, then run it again.",
   },
-  model_provider_auth: {
+  [CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH]: {
     title: "Your model provider rejected the credentials",
     description:
       "Check the API key for your topic clustering model in Settings → Model Providers, then run topic clustering again.",
   },
-  model_provider_quota: {
+  [CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA]: {
     title: "Your model provider refused the request",
     description:
       "This usually means the account is out of quota or credit. Check your limits and billing with the provider, then run topic clustering again.",

@@ -1,4 +1,5 @@
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
+import { StudioPromptEditor } from "@langwatch/prompt-client";
 import {
   type Component,
   type Field,
@@ -11,7 +12,6 @@ import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { StudioPromptEditor } from "../../../../behavior/lent-prompt.tsx";
 import { useSmartSetNode } from "../../../../behavior/use-smart-set-node.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {

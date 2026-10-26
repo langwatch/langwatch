@@ -1,9 +1,10 @@
-import type { IncomingMessage } from "node:http";
+import type { McpDoorRequest } from "@langwatch/hosted-mcp-contract";
 
-import { ClientAddress } from "@langwatch/api/policy";
+/** What a caller's address is read from: the address the door resolved for the request. */
+export type McpClientAddressSource = Pick<McpDoorRequest, "clientAddress">;
 
 /**
- * The address the process resolved for this raw request (ClientAddress), else its socket peer.
+ * The address the process resolved for this request (ClientAddress), else its socket peer.
  * No forwarding header is read here. 'unknown' when neither exists, so the limiter fails safe.
  */
 export class ResolvedMcpClientAddressService {
@@ -13,7 +14,7 @@ export class ResolvedMcpClientAddressService {
     return new ResolvedMcpClientAddressService();
   }
 
-  clientIp(request: IncomingMessage): string {
-    return ClientAddress.resolvedFor(request) ?? request.socket.remoteAddress ?? "unknown";
+  clientIp(request: McpClientAddressSource): string {
+    return request.clientAddress ?? "unknown";
   }
 }
