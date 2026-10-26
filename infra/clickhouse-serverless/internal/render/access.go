@@ -107,8 +107,8 @@ type accessControlImprovements struct {
 // else. Pointing the store at Keeper makes one create reach every replica,
 // and makes a replica rebuilt or rejoined later pick the functions up at
 // boot — which an ON CLUSTER broadcast, writing each local store at the
-// moment it runs, would not. The app reads system.server_settings to confirm
-// this path is set before relying on it.
+// moment it runs, would not. The app reads system.zookeeper for this node to
+// confirm the store is in Keeper before relying on it (ADR-136).
 const serverUserDefinedZooKeeperPath = "/clickhouse/user_defined"
 
 // renderAccessControl writes access-control.yaml, unconditionally (no LWQL

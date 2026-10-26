@@ -4,13 +4,21 @@
  * @see specs/lwql/api.feature
  */
 
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
+import { nowInstant } from "@langwatch/time";
 
 import { lwqlAppFunctionNames } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
-import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import {
+  APP_FUNCTION_KEEPER_STORE_PATH,
+  APP_FUNCTION_REPLICA_WAIT_MS,
+  canProvisionAppFunctions,
+  type SplitAppFunction,
+} from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
@@ -21,6 +29,7 @@ import {
   type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
 import type {
@@ -162,40 +171,54 @@ export function fillLwqlProjectKeys({
   });
 }
 
-/** The replica layout that decides whether a `CREATE FUNCTION` reaches every replica. */
-async function readAppFunctionLayout(repository: LangWatchQLProvisioningRepository) {
-  const [replicas, setting] = await Promise.all([
-    repository.queryRows(
-      "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
-    ),
-    repository.queryRows(
-      "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
-    ),
-  ]);
-  return {
-    maxTotalReplicas: Number(replicas[0]?.max_total_replicas ?? "0") || 0,
-    userDefinedZookeeperPath: typeof setting[0]?.value === "string" ? setting[0].value : "",
-  };
+/**
+ * False where the probe could not read the layout. A failed cross-replica read does not
+ * return false: the probe falls back to this server plus Keeper and warns.
+ */
+async function appFunctionsProvisionable(
+  store: ClickHouseLangWatchQLAppFunctionStoreRepository,
+): Promise<boolean> {
+  const [probe] = await store.findProbe();
+  if (probe === undefined) return false;
+  if (canProvisionAppFunctions(probe)) return true;
+  logger.error(
+    { maxTotalReplicas: probe.maxTotalReplicas, keeperPath: APP_FUNCTION_KEEPER_STORE_PATH },
+    `lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and not every replica keeps its SQL functions in Keeper at ${APP_FUNCTION_KEEPER_STORE_PATH}, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path to ${APP_FUNCTION_KEEPER_STORE_PATH} in the server config on every replica and redeploy; LangWatchQL app functions stay refused until then`,
+  );
+  return false;
 }
 
-async function appFunctionsProvisionable(
-  repository: LangWatchQLProvisioningRepository,
-): Promise<boolean> {
-  try {
-    const probe = await readAppFunctionLayout(repository);
-    if (canProvisionAppFunctions(probe)) return true;
-    logger.error(
-      { maxTotalReplicas: probe.maxTotalReplicas },
-      "lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and no user_defined_zookeeper_path, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path in the server config and redeploy; LangWatchQL app functions stay refused until then",
-    );
-    return false;
-  } catch (error) {
-    logger.error(
-      { error: clickHouseErrorSummary(error) },
-      "lwql self-provisioning could not read the replica layout from system.replicas and system.server_settings; the app functions are left out until it can",
-    );
-    return false;
+/** The stable code and message an alert matches when a created function split across replicas. */
+export const APP_FUNCTION_SPLIT_CODE = "lwql_app_functions_split";
+const APP_FUNCTION_SPLIT_MESSAGE =
+  "lwql app functions did not reach every ClickHouse replica and the Keeper function store after CREATE FUNCTION";
+
+/**
+ * After the create, waits briefly for the Keeper watch, then fails the step where a
+ * function is missing from a host or Keeper or differs between hosts: a replica keeping
+ * functions on local disk is caught here, since names alone cannot tell it apart. ADR-136.
+ */
+export async function verifyAppFunctionsOnEveryReplica({
+  findSplit,
+  waitMs = APP_FUNCTION_REPLICA_WAIT_MS,
+  pollMs = 500,
+}: {
+  findSplit: () => Promise<SplitAppFunction[]>;
+  waitMs?: number;
+  pollMs?: number;
+}): Promise<void> {
+  const deadline = nowInstant().epochMilliseconds + waitMs;
+  let split = await findSplit();
+  while (split.length > 0 && nowInstant().epochMilliseconds < deadline) {
+    await sleep(pollMs);
+    split = await findSplit();
   }
+  if (split.length === 0) return;
+  logger.error(
+    { code: APP_FUNCTION_SPLIT_CODE, functions: split, keeperPath: APP_FUNCTION_KEEPER_STORE_PATH },
+    APP_FUNCTION_SPLIT_MESSAGE,
+  );
+  throw Object.assign(new Error(APP_FUNCTION_SPLIT_MESSAGE), { code: APP_FUNCTION_SPLIT_CODE });
 }
 
 /**
@@ -233,7 +256,7 @@ async function withSelfProvisionLock<T>({
   });
 }
 
-/** Inventory, app-function probe, SQL-mode guard, then the statements; the key map is a step's. */
+/** The key map is a separate step's, not part of this ClickHouse half. */
 async function convergeClickHouse({
   repository,
   source,
@@ -253,7 +276,11 @@ async function convergeClickHouse({
   only: readonly string[] | undefined;
 }): Promise<void> {
   const configStoreEntities = await repository.inventoryConfigStore({ names });
-  const includeAppFunctions = await appFunctionsProvisionable(repository);
+  const functionStore = ClickHouseLangWatchQLAppFunctionStoreRepository.overAdmin({
+    admin: repository,
+    cluster: source.CLICKHOUSE_CLUSTER,
+  });
+  const includeAppFunctions = await appFunctionsProvisionable(functionStore);
   const mode = selfProvisioning.accessModelMode({ source });
   if (mode === "sql") {
     await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
@@ -276,6 +303,11 @@ async function convergeClickHouse({
       { skippedCount: result.skipped.length },
       "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
     );
+  }
+  if (includeAppFunctions) {
+    await verifyAppFunctionsOnEveryReplica({
+      findSplit: () => functionStore.findSplitAppFunctions({ names: lwqlAppFunctionNames() }),
+    });
   }
 }
 
@@ -474,7 +506,10 @@ async function readPostgresGaps({
   }
 }
 
-/** App functions are expected only where a `CREATE FUNCTION` reaches every replica. */
+/**
+ * App functions are expected only where a `CREATE FUNCTION` reaches every replica. An unreadable
+ * or unprovisionable layout expects none: converge would not create them either.
+ */
 async function expectedAppFunctions({
   repository,
   held,
@@ -484,13 +519,18 @@ async function expectedAppFunctions({
 }): Promise<readonly string[]> {
   const declared = lwqlAppFunctionNames();
   if (declared.every((name) => held.includes(name))) return declared;
-  return canProvisionAppFunctions(await readAppFunctionLayout(repository)) ? declared : [];
+  const store = ClickHouseLangWatchQLAppFunctionStoreRepository.overAdmin({
+    admin: repository,
+    cluster: undefined,
+  });
+  const [probe] = await store.findProbe();
+  return probe !== undefined && canProvisionAppFunctions(probe) ? declared : [];
 }
 
 /**
- * Which app-owned objects are absent, from catalog reads only: the key map, engine tables, views
- * and app functions in ClickHouse, the approved views and their grant in PostgreSQL. Columns are
- * the deploy's, never compared. Throws when ClickHouse cannot be read.
+ * Which app-owned objects are absent, from catalog reads only: ClickHouse key map, tables, views
+ * and app functions; PostgreSQL approved views and grant. Columns are the deploy's, never
+ * compared. Throws when ClickHouse cannot be read; the app-function probe does not throw.
  */
 export async function findLwqlAppOwnedDrift({
   database,
@@ -509,7 +549,10 @@ export async function findLwqlAppOwnedDrift({
         relations,
         functions: lwqlAppFunctionNames(),
       });
-      const functions = await expectedAppFunctions({ repository, held: found.functions });
+      const functions = await expectedAppFunctions({
+        repository,
+        held: found.functions,
+      });
       return selfProvisioning.findDrift({ names, relations, functions, found });
     },
   });
