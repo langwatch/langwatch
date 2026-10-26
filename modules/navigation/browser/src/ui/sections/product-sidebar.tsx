@@ -334,15 +334,19 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 /**
- * The one Insights entry, in the Dashboards menu's bottom block just above Settings.
- * Hidden until `release_insights` answers on, and on an aggregate project, which files no
- * insight; the unread pill is the one insight lends.
+ * The one Insights entry, in every product menu's bottom block just above Settings.
+ * Hidden until `release_insights` and `release_dashboards` answer on (the page lives in
+ * Dashboards and is closed without it), and on an aggregate project, which files no insight;
+ * the unread pill is the one insight lends.
  * @see modules/insight/specs/insight-inbox.feature
  */
 function InsightsMenuLink({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
-  const { enabled, isLoading } = host.featureFlag(FrontendFlags.release_insights);
-  if (isLoading || !enabled || !host.hasPermission("analytics:view")) return null;
+  const insights = host.featureFlag(FrontendFlags.release_insights);
+  const dashboards = host.featureFlag(FrontendFlags.release_dashboards);
+  if (insights.isLoading || !insights.enabled) return null;
+  if (dashboards.isLoading || !dashboards.enabled) return null;
+  if (!host.hasPermission("analytics:view")) return null;
   if (isAggregateProjectKind(host.project()?.kind)) return null;
   const destination = projectScopedDestination({
     path: projectNavItems.insights.path,
@@ -522,7 +526,9 @@ export function SidebarContent({
           showExpanded={showExpanded}
           shouldIncludeSettingsLink={surface !== "settings"}
           productPinned={
-            surface === "dashboards" ? <InsightsMenuLink showExpanded={showExpanded} /> : null
+            surface === "settings" || surface === "admin" ? null : (
+              <InsightsMenuLink showExpanded={showExpanded} />
+            )
           }
         />
       </Box>

@@ -81,12 +81,14 @@ function renderSidebar({
   pathname,
   permissions = ["analytics:view"],
   insightsOn = false,
+  dashboardsOn = true,
   project = PROJECT,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "settings";
   pathname: string;
   permissions?: string[];
   insightsOn?: boolean;
+  dashboardsOn?: boolean;
   project?: NavigationProject;
 }) {
   declarations.current = analyticsLends;
@@ -97,7 +99,7 @@ function renderSidebar({
         pathname,
         permissions,
         flags: {
-          release_dashboards: { enabled: true, isLoading: false },
+          release_dashboards: { enabled: dashboardsOn, isLoading: false },
           release_insights: { enabled: insightsOn, isLoading: false },
         },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
@@ -195,11 +197,30 @@ describe("the Insights entry", () => {
       );
     });
 
-    /** @scenario "The LLM Ops side menu holds no Insights entry" */
-    it("is not in the LLM Ops sidebar", async () => {
-      renderSidebar({ surface: "llm-ops", pathname: "/demo", insightsOn: true });
+    /** @scenario "Every product's side menu holds the Insights entry above Settings" */
+    it.each([
+      { surface: "llm-ops" as const, pathname: "/demo" },
+      { surface: "gateway" as const, pathname: "/gateway/virtual-keys" },
+    ])("sits just above Settings in the $surface sidebar too", async ({ surface, pathname }) => {
+      renderSidebar({
+        surface,
+        pathname,
+        insightsOn: true,
+        permissions: ["analytics:view", "organization:view"],
+      });
 
-      await screen.findByRole("link", { name: "Analytics" });
+      const entry = await screen.findByRole("link", { name: "Insights" });
+      expect(screen.getAllByRole("link", { name: /Insights/ })).toHaveLength(1);
+      const bottom = within(screen.getByTestId("sidebar-bottom-block"));
+      const links = bottom.getAllByRole("link");
+      expect(links[links.indexOf(entry) + 1]).toBe(bottom.getByRole("link", { name: "Settings" }));
+    });
+
+    /** @scenario "The Settings side menu holds no Insights entry" */
+    it("is not in the Settings sidebar", async () => {
+      renderSidebar({ surface: "settings", pathname: "/settings", insightsOn: true });
+
+      await screen.findByRole("button", { name: "Quick Search" });
       expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
   });
@@ -210,6 +231,21 @@ describe("the Insights entry", () => {
       renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
 
       await screen.findByTestId("saved-dashboards");
+      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
+    });
+  });
+
+  describe("given release_insights on but release_dashboards off", () => {
+    /** @scenario "The side menu shows no Insights entry while the flag is off" */
+    it("draws no Insights entry, because the Insights page is closed", async () => {
+      renderSidebar({
+        surface: "llm-ops",
+        pathname: "/demo",
+        insightsOn: true,
+        dashboardsOn: false,
+      });
+
+      await screen.findByRole("button", { name: "Quick Search" });
       expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
   });

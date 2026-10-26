@@ -383,9 +383,10 @@ Feature: The insights inbox
       And it is back in their Inbox folder
 
   Rule: The Insights entry in the side menu
-    Insights lives in the Dashboards product: one entry, at the bottom of the Dashboards side
-    menu just above Settings (above Support for a member who cannot see Settings), with the
-    grey unread pill. No other product's menu carries a second one.
+    Every product's side menu carries one Insights entry, at the bottom just above Settings
+    (above Support for a member who cannot see Settings), with the grey unread pill. The
+    Insights page itself lives in the Dashboards product, so the entry shows only while
+    release_dashboards is on too. Settings and the Admin console are no product and carry none.
 
     @integration
     Scenario: The Dashboards side menu holds the one Insights entry with its unread count
@@ -395,9 +396,15 @@ Feature: The insights inbox
       And the entry is marked current on the Insights page
 
     @integration
-    Scenario: The LLM Ops side menu holds no Insights entry
-      Given the release_insights flag is on and a member with analytics:view
-      When they look at the LLM Ops side menu
+    Scenario: Every product's side menu holds the Insights entry above Settings
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      When they look at the LLM Ops or the Gateway side menu
+      Then it holds one Insights entry at the bottom, just above Settings, with the unread pill
+
+    @integration
+    Scenario: The Settings side menu holds no Insights entry
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      When they look at the Settings side menu
       Then it holds no Insights entry
 
     @integration
@@ -416,7 +423,7 @@ Feature: The insights inbox
 
     @integration
     Scenario: The side menu shows no Insights entry while the flag is off
-      Given the release_insights flag is off, or a member without analytics:view
+      Given the release_insights or the release_dashboards flag is off, or a member without analytics:view
       When they look at the Dashboards side menu
       Then it holds no Insights entry
 
