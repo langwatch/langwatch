@@ -6,7 +6,7 @@ The server half of [coding-agent](../README.md). Coding-agent observability: ses
 
 ## Installation
 
-`defineProcessModule("coding-agent").withRepositories(codingAgentRepositories).withApi(CodingAgentModule).withTransports(codingAgentRest, codingAgentRollupRest, codingAgentV1Rest, codingAgentTrpcTransport).withEventing(codingAgentEventing).provideMiddlewareContext(…).withIdIndexes(CODING_AGENT_ID_INDEXES, …)`, `src/coding-agent.module.ts:21`.
+`defineProcessModule("coding-agent").withRepositories(codingAgentRepositories).withApi(CodingAgentModule).withTransports(codingAgentRest, codingAgentRollupRest, codingAgentV1Rest, codingAgentTrpcTransport).withEventing(codingAgentEventing).withEventing(codingAgentProjectMilestonesEventing).provideMiddlewareContext(…).withIdIndexes(CODING_AGENT_ID_INDEXES, …)`, `src/coding-agent.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -166,13 +166,13 @@ Authenticated: authentication is the organization key; the authorization is the 
 Answers at `/api/v1/coding-agent/pull-request-usage`.
 
 ```typescript
-// Query: pullRequestUsageQuerySchema, src/rules/pull-request-usage-wire.rules.ts:73
+// Query: pullRequestUsageQuerySchema, src/rules/pull-request-usage-wire.rules.ts:75
 interface Query {
   repository: string;
   pullRequest: number;
   host?: string;
 }
-type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pull-request-usage-wire.rules.ts:46
+type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pull-request-usage-wire.rules.ts:48
 ```
 
 ### `codingAgentRest`
@@ -194,11 +194,11 @@ Permission `traces:view`. Declared at `src/transport/coding-agent.rest.ts:68`.
 Answers at `/api/coding-agent/sessions/:sessionId/events`, `/api/v1/coding-agent/sessions/:sessionId/events`; also, undocumented, `/api/coding-agent/2026-08-07/sessions/:sessionId/events`, `/api/v1/coding-agent/2026-08-07/sessions/:sessionId/events`, `/api/coding-agent/latest/sessions/:sessionId/events`, `/api/v1/coding-agent/latest/sessions/:sessionId/events`.
 
 ```typescript
-// Params: codingAgentSessionEventsRestParamsSchema, ../contract/src/coding-agent.ts:353
+// Params: codingAgentSessionEventsRestParamsSchema, ../contract/src/coding-agent.ts:357
 interface Params {
   sessionId: string;
 }
-// Query: codingAgentSessionEventsRestQuerySchema, ../contract/src/coding-agent.ts:398
+// Query: codingAgentSessionEventsRestQuerySchema, ../contract/src/coding-agent.ts:402
 interface Query {
   limit?: number;
   kinds?: string;
@@ -206,7 +206,7 @@ interface Query {
   to?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof codingAgentSessionEventsRestResponseSchema>; // ../contract/src/coding-agent.ts:408
+type Response = z.infer<typeof codingAgentSessionEventsRestResponseSchema>; // ../contract/src/coding-agent.ts:412
 ```
 
 ### `codingAgentRollupRest`
@@ -227,8 +227,8 @@ Permission `traces:view`. Declared at `src/transport/coding-agent.rest.ts:95`.
 Answers at `/api/coding-agent/pull-request-usage`.
 
 ```typescript
-type Query = z.infer<typeof pullRequestUsageQuerySchema>; // src/rules/pull-request-usage-wire.rules.ts:73
-type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pull-request-usage-wire.rules.ts:46
+type Query = z.infer<typeof pullRequestUsageQuerySchema>; // src/rules/pull-request-usage-wire.rules.ts:75
+type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pull-request-usage-wire.rules.ts:48
 ```
 
 ## tRPC transport
@@ -256,7 +256,7 @@ interface Input {
   fromMs?: number;
   toMs?: number;
 }
-// Output: codingAgentUsageTotalsSchema, ../contract/src/coding-agent.ts:482
+// Output: codingAgentUsageTotalsSchema, ../contract/src/coding-agent.ts:486
 interface Output {
   sessionCount: number;
   costUsd: number;
@@ -287,7 +287,7 @@ interface Input {
 
 // codingAgents.pullRequestUsage
 type Input = z.infer<typeof codingAgentTrpcProjectScopeSchema>; // ../contract/src/coding-agent-trpc.schemas.ts:15
-type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:867
+type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:876
 
 // codingAgents.pullRequestDetail
 // Input: codingAgentTrpcPullRequestDetailInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:63
@@ -297,7 +297,7 @@ interface Input {
   repositoryFullName: string;
   prNumber: number;
 }
-type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:776
+type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:785
 
 // codingAgents.session
 // Input: inline, ../contract/src/coding-agent.trpc.ts:58
@@ -329,23 +329,32 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `coding_agent_processing` (aggregate `coding_agent_session`)
 
-Declared at `src/eventing/coding-agent-processing.pipeline.ts:142`. Events: `spanFactsContributedEventSchema`, `logFactsContributedEventSchema`, `metricFactsContributedEventSchema`.
+Declared at `src/eventing/coding-agent-processing.pipeline.ts:150`. Events: `spanFactsContributedEventSchema`, `logFactsContributedEventSchema`, `metricFactsContributedEventSchema`.
 
 | Kind                       | Name                                                                                           | Handles                                                                   | Declared at                                            |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------ |
-| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:240` |
-| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:246` |
-| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:252` |
-| subscriber                 | `codingAgentCostDrift`                                                                         | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:184` |
-| peer subscriber            | `codingAgentSpanFactsDispatch`                                                                 | `lw.obs.trace.span_received` from [trace](../../trace/README.md)          | `src/eventing/coding-agent-processing.pipeline.ts:192` |
-| peer subscriber            | `codingAgentLogFactsDispatch`                                                                  | `lw.obs.log.record_received` from [log](../../log/README.md)              | `src/eventing/coding-agent-processing.pipeline.ts:212` |
-| peer subscriber            | `codingAgentMetricFactsDispatch`                                                               | `lw.obs.metric.data_point_received` from [metric](../../metric/README.md) | `src/eventing/coding-agent-processing.pipeline.ts:224` |
-| ClickHouse fold projection | `≈ CodingAgentSessionFoldProjection.create({ store: sessionStore, traceCanonicalisation: dep…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:153` |
-| ClickHouse map projection  | `≈ CodingAgentTraceSessionsMapProjection.create({ store: EventingCodingAgentTraceSessionAppe…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:160` |
-| ClickHouse map projection  | `≈ SessionMetricSeriesMapProjection.create({ store: EventingSessionMetricSeriesAppendService…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:168` |
-| ClickHouse map projection  | `≈ CodingAgentSessionEventsMapProjection.create({ store: EventingCodingAgentSessionEventsApp…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:176` |
-| lane aliases               | `≈ MAIN_FACTS_DISPATCH_ALIASES`                                                                | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:236` |
-| projection subscriber      | `pullRequestMapping`                                                                           | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:262` |
+| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:249` |
+| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:255` |
+| command                    | –                                                                                              | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:261` |
+| subscriber                 | `codingAgentCostDrift`                                                                         | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:193` |
+| peer subscriber            | `codingAgentSpanFactsDispatch`                                                                 | `lw.obs.trace.span_received` from [trace](../../trace/README.md)          | `src/eventing/coding-agent-processing.pipeline.ts:201` |
+| peer subscriber            | `codingAgentLogFactsDispatch`                                                                  | `lw.obs.log.record_received` from [log](../../log/README.md)              | `src/eventing/coding-agent-processing.pipeline.ts:221` |
+| peer subscriber            | `codingAgentMetricFactsDispatch`                                                               | `lw.obs.metric.data_point_received` from [metric](../../metric/README.md) | `src/eventing/coding-agent-processing.pipeline.ts:233` |
+| ClickHouse fold projection | `≈ CodingAgentSessionFoldProjection.create({ store: sessionStore, traceCanonicalisation: dep…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:161` |
+| ClickHouse map projection  | `≈ CodingAgentTraceSessionsMapProjection.create({ store: EventingCodingAgentTraceSessionAppe…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:168` |
+| ClickHouse map projection  | `≈ SessionMetricSeriesMapProjection.create({ store: EventingSessionMetricSeriesAppendService…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:176` |
+| ClickHouse map projection  | `≈ CodingAgentSessionEventsMapProjection.create({ store: EventingCodingAgentSessionEventsApp…` | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:184` |
+| lane aliases               | `≈ MAIN_FACTS_DISPATCH_ALIASES`                                                                | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:245` |
+| projection subscriber      | `pullRequestMapping`                                                                           | –                                                                         | `src/eventing/coding-agent-processing.pipeline.ts:271` |
+
+### Pipeline `coding_agent_project_milestones` (aggregate `coding_agent_project_milestone`)
+
+Declared at `src/eventing/coding-agent-project-milestones.pipeline.ts:18`. Events: `codingAgentSessionStoredEventSchema`.
+
+| Kind      | Name                  | Handles | Declared at                                                   |
+| --------- | --------------------- | ------- | ------------------------------------------------------------- |
+| command   | `recordSessionStored` | –       | `src/eventing/coding-agent-project-milestones.pipeline.ts:23` |
+| retention | `≈ retention`         | –       | `src/eventing/coding-agent-project-milestones.pipeline.ts:24` |
 
 ## Configuration
 

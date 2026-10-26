@@ -23,7 +23,7 @@ name: gateway-matrix
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
 #     PRs don't pay the ~$0.07 cost)
-#   - Nightly cron (catches drift in shared provider infra)
+#   - Nightly, called from nightly.yml (catches drift in shared provider infra)
 #   - Manual workflow_dispatch (with optional provider-tag override)
 # Fork PRs without secrets: the per-job guard skips the live run
 # cleanly so external contributors don't see a phantom CI red.
@@ -56,9 +56,9 @@ on:
       - "modules/gateway/**"
       - "charts/gateway/**"
       - ".github/workflows/gateway-matrix.yaml"
-  schedule:
-    # 04:00 UTC daily — quiet provider tier, runs while EMEA is asleep
-    - cron: "0 4 * * *"
+  # Nightly: the nightly suite (.github/workflows/nightly.yml, 01:00 UTC) calls
+  # this with its secrets inherited. It owns the schedule.
+  workflow_call:
 
 permissions:
   contents: read
@@ -88,6 +88,11 @@ jobs:
   matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # id-token lets the Bedrock step assume the matrix role by OIDC.
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
     # Four exemptions, mirrored by the concurrency group above.
     # Drafts, for cost discipline. Forks, because GitHub strips secrets
     # on `pull_request` from them, so a live-credential matrix can only
@@ -134,8 +139,7 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.MATRIX_GEMINI_API_KEY }}
       AZURE_OPENAI_ENDPOINT: ${{ secrets.MATRIX_AZURE_OPENAI_ENDPOINT }}
       AZURE_OPENAI_API_KEY: ${{ secrets.MATRIX_AZURE_OPENAI_API_KEY }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.MATRIX_AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.MATRIX_AWS_SECRET_ACCESS_KEY }}
+      # Bedrock credentials come from the AWS credentials steps below.
       AWS_DEFAULT_REGION: eu-central-1
       VERTEX_PROJECT: langwatch
       VERTEX_LOCATION: us-central1
@@ -203,6 +207,38 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Bedrock cells. Both steps export the session into the job environment,
+      # which the gateway started below inherits. The gateway signs a Bedrock
+      # call with the virtual key's own access key when its credential carries
+      # one, and falls back to the AWS default credential chain (these
+      # variables) when it carries none, so the session only reaches Bedrock
+      # once TEST_VK_BEDROCK's credential is keyless. The role trusts this
+      # workflow on pull requests and on main, and can only invoke models.
+      # Setting the MATRIX_AWS_ROLE_ARN repository variable switches to it;
+      # the stored-key step goes after.
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ vars.MATRIX_AWS_ROLE_ARN != '' }}
+        # A refused assumption fails only the Bedrock cells, not the matrix.
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: eu-central-1
+          role-to-assume: ${{ vars.MATRIX_AWS_ROLE_ARN }}
+          role-session-name: gateway-matrix-${{ github.run_id }}
+          # The job runs for up to 30 minutes; leave headroom.
+          role-duration-seconds: 3600
+
+      - name: Configure AWS credentials (stored key, until MATRIX_AWS_ROLE_ARN is set)
+        if: ${{ vars.MATRIX_AWS_ROLE_ARN == '' }}
+        # Before this step existed a missing key only failed the Bedrock
+        # cells; keep it that way rather than failing the whole matrix.
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: eu-central-1
+          aws-access-key-id: ${{ secrets.MATRIX_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MATRIX_AWS_SECRET_ACCESS_KEY }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:

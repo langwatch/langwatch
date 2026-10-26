@@ -2,11 +2,13 @@ import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  // This suite shares module-level singletons across files — the capability
-  // host, the feedback host, the posthog client — so a shared worker lets one
-  // file's state decide another's result. The failing SET changed between
-  // identical runs, which is how it was found. Correctness over speed here.
-  isolate: "all",
+  // Only the files that mock modules run isolated (testing-speed.md). The rest
+  // share a worker and its jsdom window, so a test that changes a global
+  // (navigator, document, a module singleton) puts it back afterwards.
+  isolate: true,
+  // The isolated files get a fresh module registry and jsdom window in a worker
+  // that loads jsdom once, instead of a process each (ADR-184).
+  isolateIn: "vm-context",
   test: {
     fsModuleCache: true,
     environment: "jsdom",

@@ -114,8 +114,8 @@ describe("codexRestrictions", () => {
     });
   });
 
-  it("leaves unrestricted providers untouched on every feature", () => {
-    for (const feature of allFeatures()) {
+  it("leaves unrestricted providers untouched on every chat feature", () => {
+    for (const feature of allFeatures().filter((f) => f.role !== "INSTANT_EVALS")) {
       expect(
         isModelAllowedForFeature({
           modelId: "openai/gpt-5-mini",
@@ -123,6 +123,20 @@ describe("codexRestrictions", () => {
         }),
       ).toBe(true);
     }
+  });
+
+  it("keeps the Instant Evals feature to decision models, and decision models to it", () => {
+    const featureKey = "instant_eval.judge";
+    expect(isModelAllowedForFeature({ modelId: "openai/gpt-5-mini", featureKey })).toBe(false);
+    expect(isModelAllowedForFeature({ modelId: "openai/decisions:gpt-6-luna", featureKey })).toBe(
+      true,
+    );
+    expect(
+      isModelAllowedForFeature({
+        modelId: "openai/decisions:gpt-6-luna",
+        featureKey: "prompt.create_default",
+      }),
+    ).toBe(false);
   });
 
   describe("given the FAST features that execute outside the AI gateway", () => {

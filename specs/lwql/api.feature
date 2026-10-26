@@ -428,6 +428,14 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And the caller receives zero rows, because the row policy decides the answer
 
   @integration
+  Scenario: A group project reads every member through a PostgreSQL-resident view
+    Given a PG-resident table is mapped into ClickHouse through the server-side named collection
+    And the restricted identity carries the key hashes of tenant-a and tenant-b
+    When it reads the LangWatchQL view over the mapped table
+    Then it receives every row of tenant-a and every row of tenant-b
+    And the statement PostgreSQL received bounds the read to the range spanning both tenants
+
+  @integration
   Scenario: A duplicate key-map row does not break a PostgreSQL-resident read
     Given the key map holds two rows carrying the caller's key hash
     And the restricted identity carries tenant-a's valid key-hash context
@@ -1122,6 +1130,72 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a full converge runs again, and then a check's converge of one engine table
     Then both succeed, each engine table replaced under the views that read it
     And every view still answers
+
+  # Issue #8858: ClickHouse builds each PostgreSQL engine table's connection pool once, at
+  # CREATE or ATTACH, so a reloaded named collection never reaches it. Each engine table's
+  # COMMENT carries a fingerprint of the collection values it was built on, and a table whose
+  # fingerprint is not the current one is drift. A config store can load the new collection
+  # after a converge has run, so a table is stamped only once two reads show ClickHouse holds
+  # the app's values: one through the collection, one with the app's own values (the reader
+  # role has one password, so both succeeding means the collection carries the app's).
+  @unit
+  Scenario: An engine table carries a fingerprint of the named collection's values, never the password
+    Given the PostgreSQL host, port, database, reader and password the app renders into the named collection
+    When an engine table is stamped with them
+    Then its comment carries a short fingerprint of those values
+    And the same values always give the same fingerprint
+    And a changed password, or any other changed value, gives a different one
+    And the comment never contains the password
+
+  @unit
+  Scenario: The reconvergence check rebuilds an engine table built on other credentials
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And an engine table's comment carries another credential fingerprint, or none as a table from before #8858 does
+    When the reconvergence check runs
+    Then it names that engine table as drift
+    And once ClickHouse is shown to hold the app's values it replaces that table and the views over it, stamped
+    And the task gates a sql-mode check the same way, so the next check finds that table converged
+
+  @unit
+  Scenario: No engine table is rebuilt until ClickHouse holds the app's collection values
+    Given an engine table built on other credentials
+    When a read through the named collection fails, or a read with the app's own values does not authenticate
+    Then the check leaves that engine table in place, logs at warn which read failed with no secret, and fails the converge
+    And it still creates an absent engine table, unstamped
+    And a deploy's converge replaces the engine tables unstamped, so a later check rebuilds them
+    And a sql-mode deploy stamps them unprobed only once its own batch rewrote the collection, and reads first where that rewrite was skipped
+    And the next check reads again
+
+  # A replica that has not loaded the new collection would build its copy of a replaced table on
+  # the old values, so on a cluster (CLICKHOUSE_CLUSTER, set by the chart past one replica) each
+  # read runs on every replica.
+  @unit
+  Scenario: The credential reads cover every replica of a cluster
+    Given CLICKHOUSE_CLUSTER names the ClickHouse cluster
+    When the check reads through the named collection and with the app's own values
+    Then each read runs on every replica of that cluster and reads no row
+    And it passes only when every replica passes
+    And with no cluster named each read runs on the server the app reaches
+
+  # The first failure's time is kept in Redis, shared by every worker, so the alert does not wait
+  # for one worker to run several checks in a row.
+  @unit
+  Scenario: A collection that stays unconfirmed alerts 15 minutes after the first failed check
+    Given a check left engine tables on their old credentials because the reads did not pass
+    When later checks find the same, on any worker
+    Then each logs a warning until a check runs 15 minutes or more after the first, which logs the ClickHouse alert at error with its error_signature
+    And while it holds the alert repeats hourly, like any other failed converge
+    And a check that converges the tables starts the clock again
+    And a PostgreSQL failure in the same checks leaves the clock running
+
+  @integration
+  Scenario: A rotated reader password reaches the engine tables without a ClickHouse restart
+    Given a rendered install on a ClickHouse cluster whose engine tables were built on the reader's first password
+    When the password changes and a deploy converges before ClickHouse loads the new collection
+    Then the check leaves the engine tables in place while the collection still holds the old password
+    And once the collection holds the new password the check rebuilds them, stamped
+    And they answer after every reader connection is ended, so no pool keeps the old password
+    And a worker still on the old password rebuilds nothing
 
   @e2e
   Scenario: A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage

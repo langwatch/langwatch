@@ -8,6 +8,7 @@ import { createServer, type Server } from "node:http";
 
 import { RawHttpHost, RawHttpProtocol, WebSocketHost } from "@langwatch/api";
 import { type NodeHandler, TransportSelection } from "@langwatch/api/hosting";
+import { ClientAddress } from "@langwatch/api/policy";
 import { createLogger } from "@langwatch/observability";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -56,9 +57,15 @@ function mcpDoor(): RawHttpProtocol<EndpointApp> {
     prefixes: MAIN_METADATA_SUBTREES,
     open: (app) => ({
       handle: ({ request, response }) => {
-        response
-          .writeHead(200, { "Content-Type": "application/json" })
-          .end(JSON.stringify({ door: app.name, path: request.url }));
+        response.writeHead(200, { "Content-Type": "application/json" }).end(
+          JSON.stringify({
+            door: app.name,
+            path: request.url,
+            ...(request.headers["x-forwarded-for"]
+              ? { caller: ClientAddress.resolvedFor(request) ?? null }
+              : {}),
+          }),
+        );
       },
       close: async () => {
         closed.push(app.name);
@@ -75,6 +82,7 @@ function servedSurface({ doors }: { doors: RawHttpHost }): NodeHandler {
     bundle: void 0,
     instanceAdmin: bearerDoor({ name: "instance-admin", token: void 0 }),
     trustedProxies: void 0,
+    trustCloudflare: false,
     executionProxyBaseUrl: void 0,
     publicBaseUrl: void 0,
     production: false,
@@ -138,6 +146,18 @@ describe("main's hosted MCP root paths", () => {
       const path = "/.well-known/oauth-protected-resource/elsewhere";
       const response = await fetch(`${origin}${path}`);
       expect(await response.json()).toEqual({ door: "hosted-mcp", path });
+    });
+
+    /** @scenario "A raw door ahead of the router reads the resolved address" */
+    it("stamps the resolved address before the door runs, ignoring a forged header", async () => {
+      const response = await fetch(`${origin}/mcp/health`, {
+        headers: { "x-forwarded-for": "198.51.100.9", "cf-connecting-ip": "198.51.100.10" },
+      });
+      expect(await response.json()).toEqual({
+        door: "hosted-mcp",
+        path: "/mcp/health",
+        caller: "127.0.0.1",
+      });
     });
 
     it("leaves a path the door does not claim to the routes", async () => {

@@ -140062,6 +140062,7 @@ type GetApiCodingAgentPullRequestUsageResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		ModelBreakdown []struct {
+			AiUnits             *float32 `json:"aiUnits"`
 			CacheCreationTokens float32  `json:"cacheCreationTokens"`
 			CacheReadTokens     float32  `json:"cacheReadTokens"`
 			CostUsd             *float32 `json:"costUsd"`
@@ -148514,6 +148515,7 @@ type GetPullRequestUsageResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		ModelBreakdown []struct {
+			AiUnits             *float32 `json:"aiUnits"`
 			CacheCreationTokens float32  `json:"cacheCreationTokens"`
 			CacheReadTokens     float32  `json:"cacheReadTokens"`
 			CostUsd             *float32 `json:"costUsd"`
@@ -153808,6 +153810,11 @@ type GetApiModelDefaultsResponse struct {
 				Scope  *string `json:"scope"`
 				Source string  `json:"source"`
 			} `json:"FAST"`
+			INSTANTEVALS *struct {
+				Model  string  `json:"model"`
+				Scope  *string `json:"scope"`
+				Source string  `json:"source"`
+			} `json:"INSTANT_EVALS"`
 		} `json:"effective"`
 		Scope struct {
 			OrganizationId   *string `json:"organizationId"`
@@ -154156,6 +154163,11 @@ type GetApiMonitorsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]struct {
+		// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+		AutoPausedAt *string `json:"autoPausedAt"`
+
+		// AutoPausedReason Why the monitor paused itself.
+		AutoPausedReason  *string                                        `json:"autoPausedReason"`
 		CheckType         string                                         `json:"checkType"`
 		CreatedAt         string                                         `json:"createdAt"`
 		Enabled           bool                                           `json:"enabled"`
@@ -154203,6 +154215,11 @@ type PostApiMonitorsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
+		// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+		AutoPausedAt *string `json:"autoPausedAt"`
+
+		// AutoPausedReason Why the monitor paused itself.
+		AutoPausedReason  *string                                         `json:"autoPausedReason"`
 		CheckType         string                                          `json:"checkType"`
 		CreatedAt         string                                          `json:"createdAt"`
 		Enabled           bool                                            `json:"enabled"`
@@ -154287,6 +154304,11 @@ type GetApiMonitorsByIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+		AutoPausedAt *string `json:"autoPausedAt"`
+
+		// AutoPausedReason Why the monitor paused itself.
+		AutoPausedReason  *string                                            `json:"autoPausedReason"`
 		CheckType         string                                             `json:"checkType"`
 		CreatedAt         string                                             `json:"createdAt"`
 		Enabled           bool                                               `json:"enabled"`
@@ -154338,6 +154360,11 @@ type PatchApiMonitorsByIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+		AutoPausedAt *string `json:"autoPausedAt"`
+
+		// AutoPausedReason Why the monitor paused itself.
+		AutoPausedReason  *string                                              `json:"autoPausedReason"`
 		CheckType         string                                               `json:"checkType"`
 		CreatedAt         string                                               `json:"createdAt"`
 		Enabled           bool                                                 `json:"enabled"`
@@ -169170,6 +169197,7 @@ func ParseGetApiCodingAgentPullRequestUsageResponse(rsp *http.Response) (*GetApi
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			ModelBreakdown []struct {
+				AiUnits             *float32 `json:"aiUnits"`
 				CacheCreationTokens float32  `json:"cacheCreationTokens"`
 				CacheReadTokens     float32  `json:"cacheReadTokens"`
 				CostUsd             *float32 `json:"costUsd"`
@@ -178864,6 +178892,7 @@ func ParseGetPullRequestUsageResponse(rsp *http.Response) (*GetPullRequestUsageR
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			ModelBreakdown []struct {
+				AiUnits             *float32 `json:"aiUnits"`
 				CacheCreationTokens float32  `json:"cacheCreationTokens"`
 				CacheReadTokens     float32  `json:"cacheReadTokens"`
 				CostUsd             *float32 `json:"costUsd"`
@@ -184101,6 +184130,11 @@ func ParseGetApiModelDefaultsResponse(rsp *http.Response) (*GetApiModelDefaultsR
 					Scope  *string `json:"scope"`
 					Source string  `json:"source"`
 				} `json:"FAST"`
+				INSTANTEVALS *struct {
+					Model  string  `json:"model"`
+					Scope  *string `json:"scope"`
+					Source string  `json:"source"`
+				} `json:"INSTANT_EVALS"`
 			} `json:"effective"`
 			Scope struct {
 				OrganizationId   *string `json:"organizationId"`
@@ -184575,6 +184609,11 @@ func ParseGetApiMonitorsResponse(rsp *http.Response) (*GetApiMonitorsResponse, e
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest []struct {
+			// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+			AutoPausedAt *string `json:"autoPausedAt"`
+
+			// AutoPausedReason Why the monitor paused itself.
+			AutoPausedReason  *string                                        `json:"autoPausedReason"`
 			CheckType         string                                         `json:"checkType"`
 			CreatedAt         string                                         `json:"createdAt"`
 			Enabled           bool                                           `json:"enabled"`
@@ -184618,6 +184657,11 @@ func ParsePostApiMonitorsResponse(rsp *http.Response) (*PostApiMonitorsResponse,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
+			// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+			AutoPausedAt *string `json:"autoPausedAt"`
+
+			// AutoPausedReason Why the monitor paused itself.
+			AutoPausedReason  *string                                         `json:"autoPausedReason"`
 			CheckType         string                                          `json:"checkType"`
 			CreatedAt         string                                          `json:"createdAt"`
 			Enabled           bool                                            `json:"enabled"`
@@ -184700,6 +184744,11 @@ func ParseGetApiMonitorsByIdResponse(rsp *http.Response) (*GetApiMonitorsByIdRes
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+			AutoPausedAt *string `json:"autoPausedAt"`
+
+			// AutoPausedReason Why the monitor paused itself.
+			AutoPausedReason  *string                                            `json:"autoPausedReason"`
 			CheckType         string                                             `json:"checkType"`
 			CreatedAt         string                                             `json:"createdAt"`
 			Enabled           bool                                               `json:"enabled"`
@@ -184753,6 +184802,11 @@ func ParsePatchApiMonitorsByIdResponse(rsp *http.Response) (*PatchApiMonitorsByI
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+			AutoPausedAt *string `json:"autoPausedAt"`
+
+			// AutoPausedReason Why the monitor paused itself.
+			AutoPausedReason  *string                                              `json:"autoPausedReason"`
 			CheckType         string                                               `json:"checkType"`
 			CreatedAt         string                                               `json:"createdAt"`
 			Enabled           bool                                                 `json:"enabled"`

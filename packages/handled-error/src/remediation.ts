@@ -43,6 +43,14 @@ const registry = {
     ],
   },
 
+  // ---- identity ----
+  identity_password_reset_required: {
+    tips: [
+      "This password may no longer be used; request a reset link from the forgot-password screen and choose a new password",
+      "Signing in through single sign-on, a social provider or a passkey is not affected",
+    ],
+  },
+
   // ---- dataset storage ----
   private_dataplane_unavailable: {
     tips: [
@@ -303,6 +311,12 @@ const registry = {
   },
   api_key_permission_denied: {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  legacy_project_key_ingestion_only: {
+    tips: [
+      "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
+    ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   api_key_permission_not_delegable: {

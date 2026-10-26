@@ -8,6 +8,7 @@ import { cloudClassifierKeyOf } from "../../rules/instant-eval-judge-cloud-key.r
 import { classifierApiKey } from "../instant-eval-classifier.channel.ts";
 import type { InstantEvalJudgeChannels } from "../instant-eval-judge.channels.ts";
 import { HttpInstantEvalClassifierChannel } from "./http.instant-eval-classifier.channel.ts";
+import { HttpInstantEvalDecisionModelChannel } from "./http.instant-eval-decision-model.channel.ts";
 
 /** Classify calls go to LangWatch's classifier with its key, where LangWatch runs the install. */
 export class HttpInstantEvalJudgeChannels {
@@ -32,6 +33,6 @@ export class HttpInstantEvalJudgeChannels {
         ...(config.classifierModel ? { model: config.classifierModel } : {}),
       });
     });
-    return { classifier };
+    return { classifier, decisionModels: HttpInstantEvalDecisionModelChannel.create() };
   }
 }

@@ -24,7 +24,11 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { ZodType } from "zod";
 
-import { CONNECT_KEY_KINDS, CONNECT_PERMISSION } from "../rules/agent-connect-caller.rules.ts";
+import {
+  CONNECT_KEY_KINDS,
+  CONNECT_LEGACY_KEY_SCOPE,
+  CONNECT_PERMISSION,
+} from "../rules/agent-connect-caller.rules.ts";
 import {
   type AgentConnectRefusal,
   connectRefusalOf,
@@ -116,6 +120,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       .withInput(agentConnectRegisterInputSchema)
       .withCredential("project", { keyKinds: CONNECT_KEY_KINDS })
       .withPermission(CONNECT_PERMISSION)
+      .withLegacyKeyScope(CONNECT_LEGACY_KEY_SCOPE)
       .withResponse("protocol", {
         produces: JSON_MEDIA_TYPE,
         because: BECAUSE,
@@ -146,6 +151,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       .withQuery(agentConnectPollQuerySchema)
       .withCredential("project", { keyKinds: CONNECT_KEY_KINDS })
       .withPermission(CONNECT_PERMISSION)
+      .withLegacyKeyScope(CONNECT_LEGACY_KEY_SCOPE)
       .withResponse("protocol", {
         produces: JSON_MEDIA_TYPE,
         because: BECAUSE,
@@ -174,6 +180,7 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       .withInput(agentConnectFramesInputSchema)
       .withCredential("project", { keyKinds: CONNECT_KEY_KINDS })
       .withPermission(CONNECT_PERMISSION)
+      .withLegacyKeyScope(CONNECT_LEGACY_KEY_SCOPE)
       .withResponse("protocol", {
         produces: JSON_MEDIA_TYPE,
         because: BECAUSE,

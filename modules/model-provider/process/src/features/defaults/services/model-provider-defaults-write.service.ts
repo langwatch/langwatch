@@ -11,6 +11,7 @@ import {
 } from "@langwatch/model-provider-contract";
 
 import type { ModelDefaultRepository } from "../../../repositories/model-default.repository.ts";
+import type { ModelProviderDecisionModelService } from "../../../services/model-provider-decision-model.service.ts";
 import type { ModelProviderScopeService } from "../../../services/model-provider-scope.service.ts";
 import type { ModelProviderWriteAuthorizationService } from "../../../services/model-provider-write-authorization.service.ts";
 import type { ModelProviderIdService } from "../../../services/prefixed-model-provider-id.service.ts";
@@ -22,6 +23,8 @@ type ModelProviderDefaultsWriteOptions = {
   writeAuthorization: ModelProviderWriteAuthorizationService;
   ids: ModelProviderIdService;
   scopes: ModelProviderScopeService;
+  /** Refuses an own decision model for an organization without the flag (ADR-182 decision 4). */
+  decisionModels: Pick<ModelProviderDecisionModelService, "assertMayStore">;
 };
 
 export class ModelProviderDefaultsWriteService {
@@ -46,6 +49,7 @@ export class ModelProviderDefaultsWriteService {
     }
 
     const organizationId = await this.options.scopes.getOrganizationIdForScope(parsed.scope);
+    await this.options.decisionModels.assertMayStore({ organizationId, config });
     await this.options.defaults.set({
       id: this.options.ids.generate({ type: "default" }),
       organizationId,
@@ -97,6 +101,11 @@ export class ModelProviderDefaultsWriteService {
     }
 
     const organizationId = await this.options.scopes.getOrganizationIdForScopes(scopes);
+    await this.options.decisionModels.assertMayStore({
+      organizationId,
+      config,
+      ...(existing ? { stored: existing.config } : {}),
+    });
 
     return this.options.defaults.save({
       id: parsed.id ?? this.options.ids.generate({ type: "default" }),
