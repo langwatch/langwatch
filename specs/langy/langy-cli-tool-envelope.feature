@@ -166,6 +166,15 @@ Feature: Langy recognises its own CLI behind a shell tool call
       When Langy's tool call is refused because the caller's access does not cover it
       Then the card says the access does not cover the action
 
+    # 401 (unauthorized) and missing_api_key are Langy's own sandbox key, which
+    # the reader cannot see or fix. 403 (forbidden) stays the reader's access.
+    @unit
+    Scenario: Langy's own refused credential reads as an internal error
+      When Langy's tool call fails because Langy's own key is missing or refused
+      Then the card says Langy hit an internal error
+      And it never says the reader lacks access
+      And it never tells the reader to sign in or set a key
+
     @unit
     Scenario: A refusal on the same status for a different reason keeps its own words
       When Langy's tool call is refused on the same status for a reason that is not about access

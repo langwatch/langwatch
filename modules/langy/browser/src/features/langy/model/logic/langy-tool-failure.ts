@@ -157,10 +157,15 @@ const ACCESS_DENIAL_CODES = new Set([
   "api_key_permission_denied",
   "api_key_not_owned",
   "api_key_scope_violation",
-  // The CLI's own status-derived codes, for a 401/403 that carried no body.
-  "unauthorized",
+  // The CLI's own status-derived code, for a 403 that carried no body.
   "forbidden",
 ]);
+
+/**
+ * The codes that mean Langy's own sandbox key was missing or refused: an
+ * internal failure, never the reader's access and never theirs to sign in to.
+ */
+const SANDBOX_CREDENTIAL_CODES = new Set(["missing_api_key", "unauthorized"]);
 
 /**
  * The codes that mean "your plan does not include any more of these".
@@ -172,6 +177,9 @@ const normalizedCode = (domain: LangWatchHandledErrorShape): string =>
 
 const isAccessDenial = (domain: LangWatchHandledErrorShape): boolean =>
   ACCESS_DENIAL_CODES.has(normalizedCode(domain));
+
+const isSandboxCredentialFailure = (domain: LangWatchHandledErrorShape): boolean =>
+  SANDBOX_CREDENTIAL_CODES.has(normalizedCode(domain));
 
 const asCount = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
@@ -227,6 +235,16 @@ function describeFailure(domain: LangWatchHandledErrorShape): {
   const limit = readPlanLimit(domain);
   if (limit) {
     return { message: limitSentence(limit), limit, remediationApplies: false };
+  }
+
+  if (isSandboxCredentialFailure(domain)) {
+    // The CLI's own text and tips say "run langwatch login": true on a laptop,
+    // a dead end in a sandbox the reader cannot open.
+    return {
+      message: "Langy hit an internal error and couldn't complete this step.",
+      detail: "This is on our side, not your access. There is nothing for you to set up.",
+      remediationApplies: false,
+    };
   }
 
   if (isAccessDenial(domain)) {

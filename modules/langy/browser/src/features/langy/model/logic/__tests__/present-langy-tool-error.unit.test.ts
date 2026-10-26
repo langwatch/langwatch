@@ -78,7 +78,7 @@ describe("presentLangyToolError", () => {
     it("still says the access does not cover it, with no invented detail", () => {
       const presentation = present(
         failureDocument({
-          code: "unauthorized",
+          code: "forbidden",
           message: "Forbidden",
           httpStatus: 403,
           meta: {},
@@ -87,6 +87,49 @@ describe("presentLangyToolError", () => {
       );
       expect(presentation.message).toBe("This action isn't available to you in this project.");
       expect(presentation.message).not.toContain("API key");
+    });
+  });
+
+  // A 401 is Langy's own short-lived key refused, not the reader's access.
+  describe.each([
+    {
+      code: "unauthorized",
+      message: "Unauthorized",
+      httpStatus: 401,
+      suggestions: [
+        "Check that your API key is still valid — run `langwatch login` to re-authenticate",
+      ],
+    },
+    {
+      code: "missing_api_key",
+      message: "Not logged in and LANGWATCH_API_KEY is not set. Sign in with `langwatch login`.",
+      httpStatus: 0,
+      suggestions: ["Run `langwatch login` to authenticate"],
+    },
+  ])("given Langy's own credential failed with $code", (error) => {
+    const failure = failureDocument({
+      ...error,
+      meta: {},
+      isHandled: true,
+      docUrl: "https://docs.langwatch.ai/platform/api-keys",
+    });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("says Langy hit an internal error", () => {
+      expect(present(failure).message).toBe(
+        "Langy hit an internal error and couldn't complete this step.",
+      );
+    });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("never says the reader lacks access or tells them to sign in", () => {
+      const presentation = present(failure);
+      const shown = [presentation.message, presentation.detail, ...(presentation.tips ?? [])].join(
+        " ",
+      );
+      expect(shown).not.toMatch(/manages access|isn't available to you|log ?in|sign in|api key/i);
+      expect(presentation.tips).toBeUndefined();
+      expect(presentation.docsUrl).toBeUndefined();
     });
   });
 
