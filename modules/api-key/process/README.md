@@ -375,19 +375,19 @@ listOrganizationMembers(input: { organizationId: string }, by: ApiKeyManagementC
 | Declared at | `src/transport/api-key-docs-session.rest.ts:23`  |
 | Base URL    | `/api/docs-session`, twin `/api/v1/docs-session` |
 | Addressing  | dated                                            |
-| Credential  | api_key                                          |
+| Credential  | project                                          |
 | Versions    | `2026-08-07`                                     |
 
 #### `DELETE /` · `revokeDocsSession`
 
 Disconnect a docs session
 
-Authenticated: The presenting key is the only thing this route touches, so holding it is the whole authority. Declared at `src/transport/api-key-docs-session.rest.ts:28`.
+Authenticated: The presenting key is the only thing this route touches, so holding it is the whole authority. Credential `project`. Declared at `src/transport/api-key-docs-session.rest.ts:27`.
 
 Answers at `/api/docs-session`, `/api/v1/docs-session`; also, undocumented, `/api/docs-session/2026-08-07`, `/api/v1/docs-session/2026-08-07`, `/api/docs-session/latest`, `/api/v1/docs-session/latest`.
 
 ```typescript
-// Response: docsSessionRevokedSchema, ../contract/src/api-key.docs-session.ts:128
+// Response: docsSessionRevokedSchema, ../contract/src/api-key.docs-session.ts:131
 interface Response {
   revoked: true;
 }
@@ -721,10 +721,11 @@ interface Input {
   projectId: string;
   docsOrigin: string;
 }
-// Output: docsSessionKeyMintedSchema, ../contract/src/api-key.docs-session.ts:44
+// Output: docsSessionKeyMintedSchema, ../contract/src/api-key.docs-session.ts:46
 interface Output {
   token: string;
   expiresAt: string;
+  expiresIn: number;
   project: {
     id: string;
     name: string;

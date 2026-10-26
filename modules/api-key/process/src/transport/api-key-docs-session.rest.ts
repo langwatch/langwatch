@@ -23,9 +23,11 @@ const THE_KEY_REVOKES_ITSELF =
 export const apiKeyDocsSessionRest = defineRestRouter(ApiKeyApi)
   .withNamespace("docs-session")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("api_key")
 
   .delete("/", "revokeDocsSession")
+  // A docs session key is a project API key; the project door tells kinds apart, so no Langy
+  // key passes.
+  .withCredential("project", { keyKinds: ["api_key"] })
   .withAccess(anyAuthenticated({ reason: THE_KEY_REVOKES_ITSELF }))
   .withOutput(docsSessionRevokedSchema)
   .withDocs({
@@ -37,6 +39,6 @@ export const apiKeyDocsSessionRest = defineRestRouter(ApiKeyApi)
   })
   .withMiddlewareContext(docsSessionPresentedKey)
   .withAudit("management.api-key.revoke-docs-session")
-  .withoutConfirmation("A docs session key revokes only itself")
+  .withoutConfirmation("Only a project API key passes; a docs session key revokes only itself")
   .handle(({ app }, presented) => app.revokeDocsSessionKeys({ apiKeyId: presented.apiKeyId }))
   .build();

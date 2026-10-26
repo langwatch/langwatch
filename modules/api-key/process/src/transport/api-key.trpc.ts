@@ -114,7 +114,9 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
 
     // ADR-185: the docs consent page's Allow. The member must see the project they hand on;
     // the key then holds what they hold there, capped by their live grants on every request.
+    // An aggregate is no one project to act in, so the door refuses it there.
     .procedure("mintDocsSessionKey")
+    .refusedOnAggregate()
     .withMiddlewareContext(browserSessionWindowContext)
     .mintsCredential("project:view")
     .withPermission("project:view", { via: "projectId" })

@@ -53,7 +53,7 @@ export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
         };
       },
       docsSessionPresentedKey: (request) => ({
-        apiKeyId: keyCredentialOfDoor({ door: "api_key", request }).apiKeyId,
+        apiKeyId: keyCredentialOfDoor({ door: "project", request }).apiKeyId,
       }),
     })
     .withEventing(apiKeyEventing);

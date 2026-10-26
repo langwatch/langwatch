@@ -18,14 +18,10 @@ import {
 } from "@langwatch/api-key-contract";
 import type { AuthzGrantCaller } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import { fromDate } from "@langwatch/time";
 import type { z } from "zod";
 
-import type {
-  ApiKeyCreateRecord,
-  ApiKeyRepository,
-  StoredApiKey,
-} from "../repositories/api-key.repository.ts";
+import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import { createRecord } from "../rules/api-key-record.rules.ts";
 import { ApiKeyBindingValidationService } from "./api-key-binding-validation.service.ts";
 import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
@@ -475,37 +471,4 @@ export class ApiKeyLifecycleService {
 
     return this.bindings.attachOne(row);
   }
-}
-
-/** The stored row a create writes: disabled until its grants land, then activated. */
-function createRecord({
-  parsed,
-  lookupId,
-  hashedSecret,
-  grants,
-}: {
-  parsed: z.output<typeof createApiKeyInputSchema>;
-  lookupId: string;
-  hashedSecret: string;
-  grants: ApiKeyScope[];
-}): ApiKeyCreateRecord {
-  return {
-    name: parsed.name,
-    description: parsed.description ?? null,
-    lookupId,
-    hashedSecret,
-    permissionMode: parsed.permissionMode ?? "default",
-    userId: parsed.userId ?? null,
-    createdByUserId: parsed.createdByUserId ?? null,
-    createdByDeviceLabel: parsed.createdByDeviceLabel ?? null,
-    parentApiKeyId: parsed.parentApiKeyId ?? null,
-    organizationId: parsed.organizationId,
-    expiresAt: parsed.expiresAt ? fromDate(parsed.expiresAt) : null,
-    ingestSourceType: parsed.ingestSourceType ?? null,
-    ingestionTemplateId: parsed.ingestionTemplateId ?? null,
-    isSystemManaged: parsed.isSystemManaged ?? false,
-    createdByBrowserSessionId: parsed.createdByBrowserSessionId ?? null,
-    startsDisabled: true,
-    grants,
-  };
 }
