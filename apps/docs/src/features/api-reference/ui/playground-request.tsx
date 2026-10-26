@@ -13,6 +13,7 @@ import { Eye, EyeOff } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
+import { docsAppOrigin } from "../../../config.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { paramKey } from "../model/codegen.ts";
 import type { Operation, Parameter, Scheme } from "../model/operation.ts";
@@ -144,7 +145,8 @@ function AuthField({
       }}
     >
       <summary>API key · {scheme.type === "apiKey" ? scheme.name : "Authorization"}</summary>
-      <Flex gap="2" marginTop="1">
+      {docsAppOrigin ? <SessionControls /> : null}
+      <Flex gap="2" marginTop="1" data-docs-manual-key="">
         <Input
           id="pg-auth"
           size="sm"
@@ -182,6 +184,42 @@ function AuthField({
     </chakra.details>
   );
 }
+/**
+ * Connecting with the reader's own account (ADR-185). The playground island runs the popup
+ * flow and fills the status; until it does, only the button shows.
+ */
+function SessionControls() {
+  return (
+    <Flex className="docs-session" direction="column" gap="1" marginY="2" data-docs-session="">
+      <Flex gap="2" alignItems="center" wrap="wrap">
+        <Button type="button" size="sm" variant="outline" data-docs-session-connect="">
+          Use my LangWatch account
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          colorPalette="gray"
+          data-docs-session-disconnect=""
+          hidden
+        >
+          Disconnect
+        </Button>
+      </Flex>
+      <Text
+        as="output"
+        aria-live="polite"
+        margin="0"
+        fontSize="12px"
+        color="fg.muted"
+        data-docs-session-status=""
+      >
+        Or paste an API key below.
+      </Text>
+    </Flex>
+  );
+}
+
 function SendActions({
   mutating,
   jsonOnly,

@@ -4,11 +4,13 @@ import type { Root } from "react-dom/client";
 import { z } from "zod/mini";
 
 import { generateExample, liveRequest } from "../model/codegen.ts";
+import { connectedRequest } from "../model/docs-session.ts";
 import { operationSchema } from "../model/operation-schema.ts";
 import type { Operation } from "../model/operation.ts";
 import { requestErrorOutcome } from "../model/playground-outcome.ts";
 import type { Outcome } from "../model/playground-outcome.ts";
 import { validateRequest } from "../model/request-validation.ts";
+import { currentSession } from "./docs-session.ts";
 import {
   editManualKey,
   fieldValue,
@@ -18,6 +20,7 @@ import {
   updateExamples,
 } from "./playground-dom.ts";
 import { ResponseView } from "./response-view.tsx";
+import { afterResponse, showSession } from "./session-controls.ts";
 
 function PlaygroundRuntime({ operation }: { operation: Operation }) {
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
@@ -31,11 +34,14 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
   );
   const send = async () => {
     const state = requestState({ operation });
-    const key = fieldValue({ id: "pg-auth" });
+    const session = currentSession();
+    const key = session ? session.token : fieldValue({ id: "pg-auth" });
     const errors = validateRequest({ operation, state, key });
     showErrors({ errors });
     if (Object.keys(errors).length) return;
-    const request = liveRequest({ operation, state, key });
+    const request = session
+      ? connectedRequest({ operation, state, session })
+      : liveRequest({ operation, state, key });
     pending.current?.abort();
     const abort = new AbortController();
     pending.current = abort;
@@ -54,6 +60,7 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
       });
       const body = await response.text();
       if (abort.signal.aborted) return;
+      if (session) afterResponse({ status: response.status, session });
       setOutcome({
         kind: "response",
         status: response.status,
@@ -97,6 +104,7 @@ function activate() {
     document.querySelector("[data-docs-playground]")?.append(container);
     root = createRoot(container);
     root.render(<PlaygroundRuntime operation={data.operation} />);
+    showSession();
   }
   setFormOpen({
     open: document.getElementById("try-it-button")?.getAttribute("aria-expanded") !== "true",

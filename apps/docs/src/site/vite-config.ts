@@ -42,13 +42,22 @@ export function createViteConfig({
   sourceRoot = docsRoot,
   outDir = "dist",
   basePath = "",
-}: { sourceRoot?: string; outDir?: string; basePath?: string } = {}): InlineConfig {
+  appOrigin = "none",
+}: {
+  sourceRoot?: string;
+  outDir?: string;
+  basePath?: string;
+  appOrigin?: string;
+} = {}): InlineConfig {
   let operationSlugs: Record<string, string> | undefined;
   const openapiBySlug = () => (operationSlugs ??= openapiPages({ docsRoot: sourceRoot }));
   return {
     root: appRoot,
     base: `${basePath}/`,
-    define: { __DOCS_BASE_PATH__: JSON.stringify(basePath) },
+    define: {
+      __DOCS_BASE_PATH__: JSON.stringify(basePath),
+      __DOCS_APP_ORIGIN__: JSON.stringify(appOrigin),
+    },
     publicDir: "public",
     plugins: [
       browserRuntimePlugin(),

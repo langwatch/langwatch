@@ -3266,3 +3266,9 @@ html[data-docs-theme-change]::view-transition-new(root) {
   line-height: 19px;
   color: var(--chakra-colors-fg-muted);
 }
+
+/* The playground's connect controls toggle with `hidden`, over Chakra's display classes. */
+:is([data-docs-session], [data-docs-manual-key]) [hidden],
+[data-docs-manual-key][hidden] {
+  display: none !important;
+}

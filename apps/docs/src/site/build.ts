@@ -17,7 +17,7 @@ import { createViteConfig } from "./vite-config.ts";
 /* Client build, then an SSR bundle of prerender.ts that renders every page into the client
    output and versions them by content. The bundle lives in this build's own temporary
    directory; a node_modules link there lets its external imports (react, shiki) resolve. */
-const { outDir, basePath, renderWorkers, renderCache } = readBuildOptions();
+const { outDir, basePath, appOrigin, renderWorkers, renderCache } = readBuildOptions();
 const run = promisify(execFile);
 const renderCacheDir = path.join(cacheRoot, "docs-site/render");
 const records = buildRecords({ cacheDir: path.join(cacheRoot, "docs-site/builds") });
@@ -27,7 +27,7 @@ const fingerprint = renderCache
       docsRoot,
       outDir,
       /* The public VITE_ settings a client build inlines. */
-      options: { basePath, environment: loadEnv("production", appRoot, "VITE_") },
+      options: { basePath, appOrigin, environment: loadEnv("production", appRoot, "VITE_") },
     })
   : null;
 if (fingerprint && (await records.isCurrent({ fingerprint, outDir }))) {
@@ -39,13 +39,17 @@ if (fingerprint && (await records.isCurrent({ fingerprint, outDir }))) {
 
 async function buildSite() {
   await assertMaterializedAssets({ docsRoot, publicRoot });
-  await build({ ...createViteConfig({ outDir, basePath }), configFile: false, logLevel: "warn" });
+  await build({
+    ...createViteConfig({ outDir, basePath, appOrigin }),
+    configFile: false,
+    logLevel: "warn",
+  });
   await withTemporaryDirectory({
     parent: tmpdir(),
     prefix: "docs-prerender-",
     run: async (ssrDir) => {
       await symlink(path.join(appRoot, "node_modules"), path.join(ssrDir, "node_modules"), "dir");
-      const config = createViteConfig({ basePath });
+      const config = createViteConfig({ basePath, appOrigin });
       const bundle = await build({
         ...config,
         configFile: false,

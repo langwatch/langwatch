@@ -28,6 +28,16 @@ const basePath = z
   })
   .transform((value) => value.replace(/\/$/, ""));
 
+/* `--app-origin` names the app the playground connects to (ADR-185): `self` when the docs are
+   served from the app's own origin (haven, a same-host install), `none` for no connection. */
+const appOrigin = z.union(
+  [
+    z.enum(["self", "none"]),
+    z.url({ protocol: /^https?$/ }).transform((value) => new URL(value).origin),
+  ],
+  { error: "an app origin is self, none or an http(s) URL, e.g. https://app.langwatch.ai" },
+);
+
 const renderWorkers = z.coerce.number().int().min(1);
 
 export function readBuildOptions({ args = process.argv.slice(2) }: { args?: string[] } = {}) {
@@ -36,6 +46,7 @@ export function readBuildOptions({ args = process.argv.slice(2) }: { args?: stri
     options: {
       "out-dir": { type: "string" },
       "base-path": { type: "string" },
+      "app-origin": { type: "string" },
       "render-workers": { type: "string" },
       "no-render-cache": { type: "boolean" },
     },
@@ -43,6 +54,7 @@ export function readBuildOptions({ args = process.argv.slice(2) }: { args?: stri
   return {
     outDir: path.resolve(values["out-dir"] ?? "dist"),
     basePath: basePath.parse(values["base-path"] ?? ""),
+    appOrigin: appOrigin.parse(values["app-origin"] ?? "https://app.langwatch.ai"),
     renderWorkers:
       values["render-workers"] === undefined
         ? undefined

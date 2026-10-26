@@ -7,3 +7,10 @@ export const docsBasePath: string =
   typeof __DOCS_BASE_PATH__ === "string"
     ? __DOCS_BASE_PATH__
     : (import.meta.env?.BASE_URL ?? "/").replace(/\/$/, "");
+/* createViteConfig defines the app the playground connects to (ADR-185), from `--app-origin`. */
+declare const __DOCS_APP_ORIGIN__: string | undefined;
+/** The app's origin, "self" for the origin serving the docs, or "" for no connection. */
+export const docsAppOrigin: string =
+  typeof __DOCS_APP_ORIGIN__ === "string" && __DOCS_APP_ORIGIN__ !== "none"
+    ? __DOCS_APP_ORIGIN__
+    : "";
