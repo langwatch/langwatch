@@ -133,6 +133,27 @@ describe("presentLangyToolError", () => {
     });
   });
 
+  describe("given a missing key on the developer's own machine", () => {
+    /** @scenario "A missing key on the developer's own machine keeps the CLI's own words" */
+    it("keeps the CLI's sentence and next steps for a local tool", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "local_bash",
+        errorText: failureDocument({
+          code: "missing_api_key",
+          message: "Not logged in and LANGWATCH_API_KEY is not set.",
+          httpStatus: 0,
+          meta: {},
+          isHandled: true,
+          suggestions: ["Run `langwatch login` to authenticate"],
+        }),
+      });
+
+      expect(presentation.message).toBe("Not logged in and LANGWATCH_API_KEY is not set.");
+      expect(presentation.tips).toEqual(["Run `langwatch login` to authenticate"]);
+    });
+  });
+
   // The failure the user hit: a free-plan scenario limit, rendered as
   // "Your access in this project doesn't cover this action."
   describe("given a plan limit the platform refused on", () => {

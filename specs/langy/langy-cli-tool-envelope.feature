@@ -176,6 +176,12 @@ Feature: Langy recognises its own CLI behind a shell tool call
       And it never tells the reader to sign in or set a key
 
     @unit
+    Scenario: A missing key on the developer's own machine keeps the CLI's own words
+      When a tool call in the shared local folder fails because no API key is set
+      Then the card says what the CLI said
+      And it keeps the CLI's next steps
+
+    @unit
     Scenario: A refusal on the same status for a different reason keeps its own words
       When Langy's tool call is refused on the same status for a reason that is not about access
       Then the card says what the platform said
