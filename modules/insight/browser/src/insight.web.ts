@@ -22,7 +22,8 @@ export const insightWeb = defineBrowserModule("insight")
       path: "/:project/insights",
       within: "project",
       label: "Insights",
-      flags: [FrontendFlags.release_insights],
+      // The page lives in the Dashboards product, so it is closed while either flag is off.
+      flags: [FrontendFlags.release_insights, FrontendFlags.release_dashboards],
       requires: "analytics:view",
       load: () => import("./ui/sections/insights.screen.tsx"),
     },
