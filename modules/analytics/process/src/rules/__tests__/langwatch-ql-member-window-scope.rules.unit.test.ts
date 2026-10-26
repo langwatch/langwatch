@@ -164,6 +164,18 @@ describe("scopeLangWatchQL with member windows", () => {
       expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: [modifier] });
     });
 
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it("refuses SAMPLE on a subquery over a narrowed view", () => {
+      const refusal = captureRefusal(() =>
+        scope({
+          sql: "SELECT count() FROM (SELECT * FROM traces) AS q SAMPLE 0.5",
+          memberWindows: [WHOLE_A, DATED_B],
+        }),
+      );
+
+      expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: ["SAMPLE"] });
+    });
+
     /** @scenario "A WITH name spelt like a narrowed view is refused" */
     it.each([
       [
@@ -280,6 +292,18 @@ describe("scopeLangWatchQL with member windows", () => {
       expect(scope({ sql, memberWindows: [WHOLE_A] })).toBe(sql);
     });
 
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it("refuses FINAL on a subquery, though the statement is not rewritten", () => {
+      const refusal = captureRefusal(() =>
+        scope({
+          sql: "SELECT count() FROM (SELECT * FROM traces) FINAL",
+          memberWindows: [WHOLE_A],
+        }),
+      );
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+    });
+
     it("refuses FINAL on a PostgreSQL-resident view, which the store rejects", () => {
       const refusal = captureRefusal(() =>
         scope({ sql: `SELECT count() FROM ${POSTGRES_VIEW.name} FINAL`, memberWindows: [WHOLE_A] }),
@@ -321,6 +345,31 @@ describe("scopeLangWatchQL with member windows", () => {
       expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: [modifier] });
     });
 
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it.each([
+      [
+        "FINAL",
+        "over a Postgres view",
+        `SELECT count() FROM (SELECT * FROM ${POSTGRES_VIEW.name}) FINAL`,
+      ],
+      [
+        "SAMPLE",
+        "over a ClickHouse view",
+        "SELECT count() FROM (SELECT * FROM traces) AS q SAMPLE 0.5",
+      ],
+      [
+        "FINAL",
+        "nested in another",
+        "SELECT count() FROM (SELECT * FROM (SELECT * FROM traces) FINAL)",
+      ],
+    ])("refuses %s on a subquery %s instead of sending it", (modifier, _case, sql) => {
+      const refusal = captureRefusal(() => scope({ sql }));
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+      expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: [modifier] });
+    });
+
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
     it("leaves FINAL on a ClickHouse view in place, since the store accepts it", () => {
       const sql = "SELECT count() FROM traces FINAL";
 

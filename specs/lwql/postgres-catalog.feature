@@ -233,3 +233,11 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       When an instant-eval pass runs a statement that reads a Postgres view with FINAL
       Then the pass is refused saying FINAL and SAMPLE cannot be used on this read
       And no statement reaches the store
+
+    # FINAL or SAMPLE on a subquery means nothing, whatever it reads; on a view as written,
+    # a ClickHouse-resident view still takes FINAL.
+    @unit
+    Scenario: FINAL or SAMPLE on a subquery is refused with a clear message
+      When ana runs a statement that writes FINAL or SAMPLE on a subquery, over any view or nested
+      Then the run is refused saying FINAL and SAMPLE cannot be used on this read
+      And FINAL written directly on a ClickHouse-resident view still runs

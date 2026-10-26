@@ -146,6 +146,24 @@ describe("LangWatchQLService.executePass", () => {
       expect(executor.requests).toEqual([]);
     });
 
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it("refuses FINAL on a subquery, reaching no database", async () => {
+      const executor = new RecordingExecutor();
+
+      const refusal = await refusalOf(
+        serviceOver(executor).executePass({
+          project: PROJECT,
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+          sql: "SELECT count() FROM (SELECT TraceId FROM analytics.traces) FINAL",
+          pass: { kind: "count", limit: 10 },
+          isInstantEvalsEnabled: true,
+        }),
+      );
+
+      expect(codeOf(refusal)).toBe("lwql_table_modifier_unsupported");
+      expect(executor.requests).toEqual([]);
+    });
+
     /** @scenario "A pass re-validates its statement with the full policy" */
     it("refuses a caller's own wrapper holding eval in a subquery, reaching no database", async () => {
       const executor = new RecordingExecutor();
