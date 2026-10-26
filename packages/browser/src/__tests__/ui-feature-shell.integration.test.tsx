@@ -549,6 +549,43 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       });
     });
 
+    describe("given an operator starts impersonating a customer", () => {
+      /** @scenario "An impersonated session mirrors nothing and wipes the store" */
+      it("removes every mirrored read and writes none of the customer's", async () => {
+        const store = memoryStore();
+        store.entries.set("lw-query:operator_1:mine", {});
+        const host = new QueryClient();
+        host.setQueryData(TEST_SESSION_QUERY_KEY, {
+          cacheKey: SEALING_KEY,
+          previousCacheKey: null,
+        });
+        const impersonated = new (class extends StubSession {
+          override currentUser() {
+            return {
+              ...super.currentUser(),
+              impersonator: { id: "operator_1", email: "operator@example.com" },
+            };
+          }
+        })();
+        const shell = createUiFeatureShell({
+          sessionQueryKey: TEST_SESSION_QUERY_KEY,
+          apis: [tieredBinding()],
+          capabilities: {},
+          transport: createUiFeatureApiClient(),
+          session: () => ({ session: impersonated, scope: new StubScope() }),
+          queryStore: store,
+        });
+
+        renderShell(shell, <div />, host);
+        host.setQueryData(orgGraph, ["org"]);
+        host.setQueryData(member, { id: "u" });
+
+        await waitFor(() => expect(store.entries.has("lw-query:operator_1:mine")).toBe(false));
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        expect(store.entries.size).toBe(0);
+      });
+    });
+
     describe("given the session read carried no cache key", () => {
       /** @scenario "Without a key nothing is mirrored" */
       it("writes nothing to the store", async () => {

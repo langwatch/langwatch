@@ -62,12 +62,22 @@ export function storedQueryKey({
 
 const memory = new Map<string, unknown>();
 
-/** IndexedDB where it works; otherwise (private mode, SSR, jsdom) this document's memory. */
+/** The browser refusing a write for space: the site's quota or the disk is full. */
+export function isOutOfSpace(error: unknown): boolean {
+  if (!(error instanceof DOMException)) return false;
+  return error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED";
+}
+
+/**
+ * IndexedDB where it works; otherwise (private mode, SSR, jsdom) this document's memory. A write
+ * refused for space is the caller's to answer: memory would hide it, so nothing is ever shed.
+ */
 async function viaIndexedDb<T>({ idb, mem }: { idb: () => Promise<T>; mem: () => T }): Promise<T> {
   if (!hasIndexedDb()) return mem();
   try {
     return await idb();
-  } catch {
+  } catch (error) {
+    if (isOutOfSpace(error)) throw error;
     return mem();
   }
 }
@@ -123,7 +133,7 @@ type UiSealedQuery = Readonly<{
 
 /** What one user's mirror may hold on this device; a row over `maxRowBytes` is never written. */
 export const UI_QUERY_MIRROR_BUDGET: UiQueryMirrorBudget = {
-  maxBytes: 25 * 1024 * 1024,
+  maxBytes: 100 * 1024 * 1024,
   maxRows: 500,
   maxRowBytes: 2 * 1024 * 1024,
 };
@@ -256,17 +266,47 @@ function learnManifest(context: SealContext): Promise<void> {
   return context.learned;
 }
 
-/** Removes the least recently read rows until the mirror is back within its budget. */
-async function evictToBudget(context: SealContext): Promise<void> {
+/**
+ * Removes the least recently read rows but `key` until a row of `bytes` fits beside the rest
+ * within `budget`; the row `key` names is being replaced, so it never counts.
+ */
+async function makeRoom({
+  context,
+  key,
+  bytes,
+  budget,
+}: {
+  context: SealContext;
+  key: string;
+  bytes: number;
+  budget: Pick<UiQueryMirrorBudget, "maxBytes" | "maxRows">;
+}): Promise<void> {
   await learnManifest(context);
-  const { manifest, budget } = context;
-  let bytes = [...manifest.values()].reduce((sum, entry) => sum + entry.bytes, 0);
-  const coldestFirst = [...manifest].toSorted(([, a], [, b]) => a.readAt - b.readAt);
-  for (const [key, entry] of coldestFirst) {
-    if (manifest.size <= budget.maxRows && bytes <= budget.maxBytes) return;
-    bytes -= entry.bytes;
-    await removeRow({ context, key });
+  const others = [...context.manifest].filter(([held]) => held !== key);
+  let rows = others.length;
+  let held = others.reduce((sum, [, entry]) => sum + entry.bytes, 0);
+  const coldestFirst = others.toSorted(([, a], [, b]) => a.readAt - b.readAt);
+  for (const [coldKey, entry] of coldestFirst) {
+    if (rows + 1 <= budget.maxRows && held + bytes <= budget.maxBytes) return;
+    rows -= 1;
+    held -= entry.bytes;
+    await removeRow({ context, key: coldKey });
   }
+}
+
+/** Keeps half the rows other than `key`: the room a write refused for space retries in. */
+function halfOfTheRest({
+  context,
+  key,
+  bytes,
+}: {
+  context: SealContext;
+  key: string;
+  bytes: number;
+}): Pick<UiQueryMirrorBudget, "maxBytes" | "maxRows"> {
+  const others = [...context.manifest].filter(([held]) => held !== key);
+  const held = others.reduce((sum, [, entry]) => sum + entry.bytes, 0);
+  return { maxRows: Math.floor(others.length / 2) + 1, maxBytes: Math.floor(held / 2) + bytes };
 }
 
 /** Seals and writes one row under this epoch's key; one too large is removed, not written. */
@@ -291,9 +331,22 @@ async function sealRow({
   }
   const sealed = await sealQuery({ cipher, key, plain });
   const bytes = sealed.sealed.byteLength;
-  await context.store.put(key, { ...sealed, bytes, readAt });
+  const row = { ...sealed, bytes, readAt };
+  await makeRoom({ context, key, bytes, budget: context.budget });
+  try {
+    await context.store.put(key, row);
+  } catch (error) {
+    if (!isOutOfSpace(error)) throw error;
+    // The browser's limit came first. Shed the coldest half once; still full, keep nothing.
+    await makeRoom({ context, key, bytes, budget: halfOfTheRest({ context, key, bytes }) });
+    try {
+      await context.store.put(key, row);
+    } catch {
+      await removeRow({ context, key });
+      return;
+    }
+  }
   context.manifest.set(key, { bytes, readAt, flushedReadAt: readAt });
-  await evictToBudget(context);
 }
 
 /** A row only last epoch's key opens is re-sealed under this one, in the background. */

@@ -6,7 +6,8 @@
 
 import { trpcQueryKey } from "@langwatch/api/web";
 import { hashKey, QueryClient, QueryObserver, type QueryKey } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import type * as IdbKeyval from "idb-keyval";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { UiCachePlan } from "../query/cache-tiers.ts";
 import {
@@ -19,6 +20,20 @@ import {
   type UiStoredQuery,
   type UiQueryStore,
 } from "../query/query-persistence.ts";
+
+/** Whether idb-keyval's write refuses for space, as a full site's IndexedDB does. */
+const idbWrites = vi.hoisted(() => ({ refuse: false }));
+vi.mock("idb-keyval", async (importOriginal) => {
+  const real = await importOriginal<typeof IdbKeyval>();
+  return {
+    ...real,
+    set: async (...args: Parameters<typeof real.set>) => {
+      if (idbWrites.refuse)
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      return real.set(...args);
+    },
+  };
+});
 
 // The session read is in the plan on purpose: it is excluded by key, whatever the plan says.
 const DECLARED = ["organization.getAll", "organization.getMemberById", "auth.session"];
@@ -557,6 +572,73 @@ describe("sealedUiQueryStore budget", () => {
   });
 });
 
+describe("sealedUiQueryStore on a browser out of space", () => {
+  const row = (data: unknown): UiStoredQuery => ({
+    queryKey: orgGraph,
+    data,
+    updatedAt: 1,
+    schemaHash: "schema-1",
+  });
+  const outOfSpace = () => new DOMException("The quota has been exceeded.", "QuotaExceededError");
+  /** A disk that refuses the next `refusals` writes for space, the way a full site does. */
+  const fullDisk = () => {
+    const disk = memoryStore();
+    const refusing = { refusals: 0 };
+    const put = disk.put;
+    disk.put = async (key, value) => {
+      if (refusing.refusals > 0) {
+        refusing.refusals -= 1;
+        throw outOfSpace();
+      }
+      await put(key, value);
+    };
+    return { disk, refusing };
+  };
+  const mirror = (store: UiQueryStore<unknown>, clock: { at: number }) =>
+    sealedUiQueryStore({
+      store,
+      cacheKey: KEY_1,
+      previousCacheKey: void 0,
+      budget: { maxBytes: 1_000_000, maxRows: 10, maxRowBytes: 10_000 },
+      now: () => clock.at,
+    });
+
+  describe("given the browser refuses a write for space once", () => {
+    /** @scenario "A write the browser refuses for space sheds the coldest half and retries once" */
+    it("removes the least recently read half of the rows and keeps the new one", async () => {
+      const { disk, refusing } = fullDisk();
+      const clock = { at: 1 };
+      const store = mirror(disk, clock);
+      for (const name of ["a", "b", "c", "d"]) {
+        await store.put(`lw-query:alice:${name}`, row(name));
+        clock.at += 1;
+      }
+
+      refusing.refusals = 1;
+      await store.put("lw-query:alice:e", row("e"));
+
+      expect([...disk.entries.keys()].toSorted()).toEqual([
+        "lw-query:alice:c",
+        "lw-query:alice:d",
+        "lw-query:alice:e",
+      ]);
+    });
+  });
+
+  describe("given the browser refuses every write for space", () => {
+    /** @scenario "A disk that stays full drops the row without breaking the page" */
+    it("resolves without throwing and mirrors nothing", async () => {
+      const { disk, refusing } = fullDisk();
+      refusing.refusals = Number.POSITIVE_INFINITY;
+
+      await expect(mirror(disk, { at: 1 }).put("lw-query:alice:a", row("a"))).resolves.toBe(
+        undefined,
+      );
+      expect(disk.entries.size).toBe(0);
+    });
+  });
+});
+
 describe("indexedDbQueryStore", () => {
   describe("given IndexedDB is unavailable", () => {
     /** @scenario "Without IndexedDB the cache lives in memory" */
@@ -568,6 +650,23 @@ describe("indexedDbQueryStore", () => {
       expect(await indexedDbQueryStore.get("lw-query:alice:x")).toEqual(entry);
       await indexedDbQueryStore.delete("lw-query:alice:x");
       expect(await indexedDbQueryStore.get("lw-query:alice:x")).toBeUndefined();
+    });
+  });
+
+  describe("given IndexedDB refuses a write for space", () => {
+    afterEach(() => {
+      idbWrites.refuse = false;
+      vi.unstubAllGlobals();
+    });
+
+    it("reports it to the caller rather than hiding the row in memory", async () => {
+      vi.stubGlobal("indexedDB", {});
+      idbWrites.refuse = true;
+      const entry: UiStoredQuery = { queryKey: ["a"], data: 1, updatedAt: 1, schemaHash: "s" };
+
+      await expect(indexedDbQueryStore.put("lw-query:alice:x", entry)).rejects.toMatchObject({
+        name: "QuotaExceededError",
+      });
     });
   });
 });

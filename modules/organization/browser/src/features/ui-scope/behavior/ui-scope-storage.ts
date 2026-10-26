@@ -54,10 +54,9 @@ export function readUiScopeMemory(storage: Storage): UiScopeMemory {
 }
 
 /**
- * Performs the writes a resolution asked for, and tells the document —
- * already guarded, so this loop never broadcasts a no-op. A write the
- * browser refuses (its quota for the site is full) is skipped: the memory
- * is a convenience, and this runs in an effect, so a throw takes the page.
+ * Performs the writes a resolution asked for, and tells the document (already guarded, so never
+ * a no-op). A write the browser refuses for space is skipped: the memory is a convenience, and
+ * this runs in an effect, so a throw would take the page.
  */
 export function writeUiScopeSelection({
   writes,

@@ -2927,7 +2927,9 @@ query is mirrored, one sealed row per query keyed by user and query hash (sealin
 where IndexedDB is unavailable). A read stays in memory only when it is over the per-row cap or on
 the named exclusion list for very high-traffic reads (`UI_QUERY_MIRROR_EXCLUDED` in
 `@langwatch/browser-host/cache-tiers`); there is no opt-in. Each user's mirror is LRU-bounded
-(25 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out.
+(100 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out,
+room made before a write. A write the browser refuses for space sheds the coldest half and retries
+once, then drops the row. An impersonated session wipes the mirror and writes nothing to it.
 A row carries its read's schema hash: a digest of the contract's input and output schemas and an
 optional `revision: n`, bumped when a read's meaning changes and its shape does not
 (`schemaHashOf`, `@langwatch/module`). The browser takes the hash from the contract it was
