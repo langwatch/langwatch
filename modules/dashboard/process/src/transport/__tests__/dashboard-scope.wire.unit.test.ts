@@ -30,6 +30,7 @@ import {
   FULLY_PERMITTED,
 } from "../../app/__tests__/dashboard.fixture.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
+import { dashboardsReleased } from "../board.rest.ts";
 import { boardTrpcTransport } from "../board.trpc.ts";
 import {
   dashboardWidgetCallerSource,
@@ -151,7 +152,10 @@ function credentialDoors(app: DashboardApi, projectId: string, actor: Actor | nu
   const families = [
     { under: "/analytics/dashboard-widgets", hono: mount(dashboardWidgetRest, WIDGET_CONTEXT) },
     { under: "/analytics/charts", hono: mount(savedWorkbenchChartRest, CHART_CONTEXT) },
-    { under: "/api/dashboards", hono: mount(dashboardRest) },
+    {
+      under: "/api/dashboards",
+      hono: mount(dashboardRest, [bindMiddlewareContext(dashboardsReleased, () => false)]),
+    },
     { under: "/api/graphs", hono: mount(graphRest) },
   ];
 
