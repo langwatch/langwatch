@@ -21,8 +21,8 @@ const isNotFound = (error: unknown): boolean =>
   (error instanceof Error && "httpStatus" in error && error.httpStatus === 404);
 
 /**
- * /api/v1/boards first, so no deprecation warning; it answers 404 while Dashboards is off (or on
- * a server without it), and only then the project-path list, which answers either way.
+ * /api/v1/dashboards first; it answers 404 while Dashboards is off (or on a server without it),
+ * and only then the project-path list, which answers either way.
  */
 async function listBoards(): Promise<{ data: (BoardListItem | DashboardBoard)[] }> {
   try {

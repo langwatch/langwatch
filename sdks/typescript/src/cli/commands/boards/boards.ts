@@ -9,7 +9,7 @@ import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 
 /**
- * `langwatch boards`: the Dashboards boards of the key's project, over /api/v1/boards. Each
+ * `langwatch dashboards`: the Dashboards boards of the key's project, over /api/v1/dashboards. Each
  * command returns its result for the output port to render (utils/output.ts).
  */
 export const listBoardsCommand = async (): Promise<CommandResult | void> => {
@@ -27,7 +27,7 @@ export const listBoardsCommand = async (): Promise<CommandResult | void> => {
         console.log();
         if (boards.length === 0) {
           console.log(chalk.gray("No boards found. Create one with:"));
-          console.log(chalk.cyan('  langwatch boards create "My board"'));
+          console.log(chalk.cyan('  langwatch dashboards create "My board"'));
           return;
         }
         formatTable({

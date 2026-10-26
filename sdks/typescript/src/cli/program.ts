@@ -2093,9 +2093,10 @@ function registerDashboardCommands(program: Command): void {
 }
 
 function registerBoardCommands(program: Command): void {
-  // Dashboards boards over /api/v1/boards; the project comes from the API key.
+  // Dashboards boards over /api/v1/dashboards; the project comes from the API key. The
+  // Analytics Reports dashboards stay on `langwatch dashboard`.
   const boardCmd = program
-    .command("boards")
+    .command("dashboards")
     .description("Manage Dashboards boards and the widgets on them");
   const format = (command: Command) =>
     command.option("-f, --format <format>", "Output format: table (default) or json", "table");

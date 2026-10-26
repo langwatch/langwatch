@@ -192,7 +192,7 @@ export class LangWatch {
   readonly agents: AgentsApiService;
   readonly annotations: AnnotationsApiService;
   readonly dashboards: DashboardsApiService;
-  /** Dashboards boards and their widgets, over /api/v1/boards. */
+  /** Dashboards boards and their widgets, over /api/v1/dashboards. */
   readonly boards: BoardsApiService;
   readonly modelProviders: ModelProvidersApiService;
   readonly analytics: AnalyticsApiService;

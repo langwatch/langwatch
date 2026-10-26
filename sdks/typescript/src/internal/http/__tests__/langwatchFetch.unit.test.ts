@@ -657,7 +657,7 @@ describe("langwatchFetch", () => {
       }
       expect(headersOf(calls[1]!).get("x-auth-token")).toBe("sk-lw-secret");
       expect(headersOf(calls[2]!).get("x-auth-token")).toBe("sk-lw-secret");
-      expect(LANGWATCH_API_VERSION).toBe("2026-08-07");
+      expect(LANGWATCH_API_VERSION).toBe("2026-10-26");
     });
 
     /** @scenario A caller that names its own API version keeps it */

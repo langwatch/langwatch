@@ -1,5 +1,5 @@
 /**
- * The `langwatch boards` command tree, read off the live commander program.
+ * The `langwatch dashboards` command tree, read off the live commander program.
  * Spec: modules/dashboard/specs/dashboards-v2.feature (AC199s)
  */
 import type { Command } from "commander";
@@ -13,11 +13,11 @@ import { isOutputAware } from "../../../utils/output";
 const child = (parent: Command | undefined, name: string) =>
   parent?.commands.find((command) => command.name() === name);
 
-describe("the langwatch boards command group", () => {
-  /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
+describe("the langwatch dashboards command group", () => {
+  /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
   it("offers board and widget verbs, each speaking the output contract", async () => {
     const { buildProgram } = await import("../../../program.js");
-    const boards = child(buildProgram(), "boards");
+    const boards = child(buildProgram(), "dashboards");
     const widgets = child(boards, "widgets");
     const leaves = [
       ...["list", "get", "create", "update", "delete"].map((verb) => child(boards, verb)),

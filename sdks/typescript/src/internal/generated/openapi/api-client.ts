@@ -257,6 +257,43 @@ export interface paths {
         patch: operations["patchApiTriggersById"];
         trace?: never;
     };
+    "/api/v1/analytics/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all dashboards for the project with graph counts */
+        get: operations["getApiV1AnalyticsReports"];
+        put?: never;
+        /** @description Create a new dashboard */
+        post: operations["postApiV1AnalyticsReports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/reports/{reportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a dashboard by its id, including its graphs */
+        get: operations["getApiV1AnalyticsReportsByReportId"];
+        put?: never;
+        post?: never;
+        /** @description Delete a dashboard and its graphs (hard delete, cascade) */
+        delete: operations["deleteApiV1AnalyticsReportsByReportId"];
+        options?: never;
+        head?: never;
+        /** @description Rename a dashboard */
+        patch: operations["patchApiV1AnalyticsReportsByReportId"];
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/analytics/dashboard-widgets": {
         parameters: {
             query?: never;
@@ -351,6 +388,86 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboardId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a board
+         * @description Returns one Dashboards board.
+         */
+        get: operations["getApiDashboardsByDashboardId"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a board
+         * @description Deletes a board together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted board's id and name.
+         */
+        delete: operations["deleteApiDashboardsByDashboardId"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a board
+         * @description Changes a board's name or description; a field the body leaves out keeps its value, and a null description clears it.
+         */
+        patch: operations["patchApiDashboardsByDashboardId"];
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboardId}/widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a board's widgets
+         * @description Lists the widgets on one board, each with its React source and named queries.
+         */
+        get: operations["getApiDashboardsByDashboardIdWidgets"];
+        put?: never;
+        /**
+         * Create a widget on a board
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this board at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.
+         */
+        post: operations["postApiDashboardsByDashboardIdWidgets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboardId}/widgets/{widgetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a widget on a board
+         * @description Returns one widget on this board with its React source and named queries.
+         */
+        get: operations["getApiDashboardsByDashboardIdWidgetsByWidgetId"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a widget on a board
+         * @description Deletes one widget on this board. Answers 204 with no body.
+         */
+        delete: operations["deleteApiDashboardsByDashboardIdWidgetsByWidgetId"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a widget on a board
+         * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.
+         */
+        patch: operations["patchApiDashboardsByDashboardIdWidgetsByWidgetId"];
         trace?: never;
     };
     "/api/v1/projects/{projectId}/analytics/boards": {
@@ -4859,6 +4976,186 @@ export interface operations {
             };
         };
     };
+    getApiV1AnalyticsReports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            order: number;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            platformUrl: string;
+                            graphCount: number;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postApiV1AnalyticsReports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        order: number;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1AnalyticsReportsByReportId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        order: number;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        platformUrl: string;
+                        graphs: {
+                            gridColumn: number;
+                            gridRow: number;
+                            colSpan: number;
+                            rowSpan: number;
+                            id: string;
+                            projectId: string;
+                            name: string;
+                            graph: {
+                                [key: string]: unknown;
+                            };
+                            filters: {
+                                [key: string]: unknown;
+                            } | null;
+                            dashboardId: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1AnalyticsReportsByReportId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                    };
+                };
+            };
+        };
+    };
+    patchApiV1AnalyticsReportsByReportId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        order: number;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
     getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
         parameters: {
             query?: never;
@@ -6369,6 +6666,1653 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    getApiDashboardsByDashboardId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The board */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        /** @enum {string} */
+                        scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+                        createdById: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    deleteApiDashboardsByDashboardId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The board was deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    patchApiDashboardsByDashboardId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The updated board */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        /** @enum {string} */
+                        scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+                        createdById: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    getApiDashboardsByDashboardIdWidgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The board's widgets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            definition: {
+                                version: number;
+                                code: string;
+                                queries: {
+                                    name: string;
+                                    sql: string;
+                                    parameters?: {
+                                        name: string;
+                                        /** @enum {string} */
+                                        type: "string" | "number" | "boolean";
+                                        default?: string | number | boolean;
+                                    }[];
+                                }[];
+                                description?: string;
+                                prompt?: string;
+                                source?: {
+                                    /** @constant */
+                                    kind: "catalogue";
+                                    catalogueId: string;
+                                } | {
+                                    /** @constant */
+                                    kind: "langy";
+                                } | {
+                                    /** @constant */
+                                    kind: "code";
+                                } | {
+                                    /** @constant */
+                                    kind: "api";
+                                };
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                            platformUrl: string;
+                            dashboardId: string | null;
+                            gridColumn: number;
+                            gridRow: number;
+                            colSpan: number;
+                            rowSpan: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    postApiDashboardsByDashboardIdWidgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    code: string;
+                    queries: {
+                        name: string;
+                        sql: string;
+                        parameters?: {
+                            name: string;
+                            /** @enum {string} */
+                            type: "string" | "number" | "boolean";
+                            default?: string | number | boolean;
+                        }[];
+                    }[];
+                    description?: string;
+                    prompt?: string;
+                    source?: {
+                        /** @constant */
+                        kind: "catalogue";
+                        catalogueId: string;
+                    } | {
+                        /** @constant */
+                        kind: "langy";
+                    } | {
+                        /** @constant */
+                        kind: "code";
+                    } | {
+                        /** @constant */
+                        kind: "api";
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The widget was saved on the board */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                            description?: string;
+                            prompt?: string;
+                            source?: {
+                                /** @constant */
+                                kind: "catalogue";
+                                catalogueId: string;
+                            } | {
+                                /** @constant */
+                                kind: "langy";
+                            } | {
+                                /** @constant */
+                                kind: "code";
+                            } | {
+                                /** @constant */
+                                kind: "api";
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    getApiDashboardsByDashboardIdWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The widget */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                            description?: string;
+                            prompt?: string;
+                            source?: {
+                                /** @constant */
+                                kind: "catalogue";
+                                catalogueId: string;
+                            } | {
+                                /** @constant */
+                                kind: "langy";
+                            } | {
+                                /** @constant */
+                                kind: "code";
+                            } | {
+                                /** @constant */
+                                kind: "api";
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No Dashboards board with this id, or no widget with this id on that board */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    deleteApiDashboardsByDashboardIdWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description The widget was deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No Dashboards board with this id, or no widget with this id on that board */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    patchApiDashboardsByDashboardIdWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    code?: string;
+                    queries?: {
+                        name: string;
+                        sql: string;
+                        parameters?: {
+                            name: string;
+                            /** @enum {string} */
+                            type: "string" | "number" | "boolean";
+                            default?: string | number | boolean;
+                        }[];
+                    }[];
+                    description?: string;
+                    source?: {
+                        /** @constant */
+                        kind: "catalogue";
+                        catalogueId: string;
+                    } | {
+                        /** @constant */
+                        kind: "langy";
+                    } | {
+                        /** @constant */
+                        kind: "code";
+                    } | {
+                        /** @constant */
+                        kind: "api";
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The updated widget */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                            description?: string;
+                            prompt?: string;
+                            source?: {
+                                /** @constant */
+                                kind: "catalogue";
+                                catalogueId: string;
+                            } | {
+                                /** @constant */
+                                kind: "langy";
+                            } | {
+                                /** @constant */
+                                kind: "code";
+                            } | {
+                                /** @constant */
+                                kind: "api";
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No Dashboards board with this id, or no widget with this id on that board */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

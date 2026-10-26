@@ -49,7 +49,7 @@ const noop = () => {
   // suppresses output during tests
 };
 
-/** What /api/v1/boards answers while Dashboards is off for the key's project. */
+/** What /api/v1/dashboards answers while Dashboards is off for the key's project. */
 const notReleased = () =>
   new LangWatchHandledError({
     handled: {
@@ -87,8 +87,8 @@ describe("listDashboardWidgetBoardsCommand()", () => {
   });
 
   describe("when the project has Dashboards boards", () => {
-    /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
-    it("reads /api/v1/boards, tables each one's name, id and widget count, and warns of nothing", async () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
+    it("reads /api/v1/dashboards, tables each one's name, id and widget count, and writes nothing to stderr", async () => {
       const boards = [
         { id: "board_1", name: "Latency", widgetCount: 3 },
         { id: "board_2", name: "Cost", widgetCount: 0 },
@@ -126,8 +126,8 @@ describe("listDashboardWidgetBoardsCommand()", () => {
     });
   });
 
-  describe("when /api/v1/boards answers 404, as while Dashboards is off", () => {
-    /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
+  describe("when /api/v1/dashboards answers 404, as while Dashboards is off", () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
     it("lists the boards from the project-path list instead", async () => {
       const boards = [{ id: "board_1", name: "Latency", widgetCount: 3 }];
       mockListBoards.mockRejectedValue(notReleased());
@@ -140,8 +140,8 @@ describe("listDashboardWidgetBoardsCommand()", () => {
     });
   });
 
-  describe("when /api/v1/boards fails any other way", () => {
-    /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
+  describe("when /api/v1/dashboards fails any other way", () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
     it("reports that failure and asks nothing else", async () => {
       const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
       mockListBoards.mockRejectedValue(

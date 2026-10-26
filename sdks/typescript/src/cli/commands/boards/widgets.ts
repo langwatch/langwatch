@@ -26,7 +26,7 @@ const definitionOf = (flags: DefinitionFlags) => {
   }
 };
 
-/** `langwatch boards widgets list <boardId>`: the widgets on one board. */
+/** `langwatch dashboards widgets list <boardId>`: the widgets on one board. */
 export const listBoardWidgetsCommand = async (boardId: string): Promise<CommandResult | void> => {
   await resolveCredentials();
   const spinner = createSpinner(`Fetching widgets on board "${boardId}"...`).start();
