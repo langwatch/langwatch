@@ -55,7 +55,9 @@ export function readUiScopeMemory(storage: Storage): UiScopeMemory {
 
 /**
  * Performs the writes a resolution asked for, and tells the document —
- * already guarded, so this loop never broadcasts a no-op.
+ * already guarded, so this loop never broadcasts a no-op. A write the
+ * browser refuses (its quota for the site is full) is skipped: the memory
+ * is a convenience, and this runs in an effect, so a throw takes the page.
  */
 export function writeUiScopeSelection({
   writes,
@@ -68,7 +70,11 @@ export function writeUiScopeSelection({
 }): void {
   for (const write of writes) {
     const key = WRITE_KEYS[write.key];
-    storage.setItem(key, JSON.stringify(write.value));
+    try {
+      storage.setItem(key, JSON.stringify(write.value));
+    } catch {
+      continue;
+    }
     broadcast?.(key);
   }
 }
