@@ -1451,15 +1451,15 @@
             ]
           },
           {
-            "group": "Dashboards",
+            "group": "Reports",
             "pages": [
-              "api-reference/dashboards/overview",
-              "api-reference/dashboards/list-dashboards",
-              "api-reference/dashboards/create-dashboards",
-              "api-reference/dashboards/get-dashboards",
-              "api-reference/dashboards/put-update-reorder-reorder",
-              "api-reference/dashboards/update-dashboards",
-              "api-reference/dashboards/delete-dashboards"
+              "api-reference/reports/overview",
+              "api-reference/reports/list-reports",
+              "api-reference/reports/create-reports",
+              "api-reference/reports/get-reports",
+              "api-reference/reports/update-reorder",
+              "api-reference/reports/update-reports",
+              "api-reference/reports/delete-reports"
             ]
           },
           {
@@ -1782,7 +1782,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1792948808",
+      "source": "/ci/cache/busted/1793023749",
       "destination": "/introduction"
     },
     {
@@ -2244,6 +2244,34 @@
     {
       "source": "/better-agents/overview",
       "destination": "/skills/directory"
+    },
+    {
+      "source": "/api-reference/dashboards/overview",
+      "destination": "/api-reference/reports/overview"
+    },
+    {
+      "source": "/api-reference/dashboards/list-dashboards",
+      "destination": "/api-reference/reports/list-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/create-dashboards",
+      "destination": "/api-reference/reports/create-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/get-dashboards",
+      "destination": "/api-reference/reports/get-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/put-update-reorder-reorder",
+      "destination": "/api-reference/reports/update-reorder"
+    },
+    {
+      "source": "/api-reference/dashboards/update-dashboards",
+      "destination": "/api-reference/reports/update-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/delete-dashboards",
+      "destination": "/api-reference/reports/delete-reports"
     }
   ]
 }

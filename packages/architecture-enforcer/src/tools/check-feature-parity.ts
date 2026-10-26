@@ -265,6 +265,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The README link checker, for the same reason: specs/ci/readme-link-check.feature
   // describes what CI asserts about the README, and only these Go tests assert it.
   "tools/linkcheck",
+  // The ECR chart push: which package it pushes and which digest it reports
+  // for the deploy to pin (specs/ci/publish-prerelease-charts-to-ecr.feature).
+  "tools/chartpush",
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",

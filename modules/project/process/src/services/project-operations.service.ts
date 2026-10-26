@@ -11,6 +11,7 @@ import {
   type ProjectLegacyKeyStatus,
   type AggregateRule,
 } from "@langwatch/project-contract";
+import { toDate } from "@langwatch/time";
 
 import type {
   ProjectStorageSettings,
@@ -26,7 +27,13 @@ import type { ProjectService } from "./project.service.ts";
 /** The four project operations these use cases orchestrate, and nothing else. */
 export type ProjectOperationsDirectory = Pick<
   ProjectService,
-  "create" | "findWithTeam" | "update" | "archive" | "getById" | "rotateLegacyApiKey"
+  | "create"
+  | "findWithTeam"
+  | "update"
+  | "archive"
+  | "getById"
+  | "rotateLegacyApiKey"
+  | "findLegacyApiKeyLastUsedAt"
 >;
 
 type ProjectOperationsDependencies = Readonly<{
@@ -194,8 +201,12 @@ export class ProjectOperationsService {
     input: Readonly<{ projectId: string }>,
   ): Promise<ProjectLegacyKeyStatus> {
     const project = await this.dependencies.projects.getById(input.projectId);
+    if (isLegacyKeyRevoked(project.apiKey)) return { present: false, lastUsedAt: null };
+    const lastUsedAt = await this.dependencies.projects.findLegacyApiKeyLastUsedAt({
+      projectId: input.projectId,
+    });
 
-    return { present: !isLegacyKeyRevoked(project.apiKey) };
+    return { present: true, lastUsedAt: lastUsedAt && toDate(lastUsedAt) };
   }
 
   /** Idempotent: a project with no legacy key is left with a fresh unusable one. */

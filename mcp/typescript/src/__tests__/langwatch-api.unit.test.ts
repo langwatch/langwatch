@@ -46,6 +46,20 @@ describe("langwatch-api", () => {
     });
   }
 
+  describe("given any request to the LangWatch API", () => {
+    /** @scenario The MCP server names the API version on every request */
+    it("names the server's API version", async () => {
+      const { getTraceById, LANGWATCH_API_VERSION } = await import("../langwatch-api.ts");
+      mockJsonResponse({});
+
+      await getTraceById("trace_1");
+
+      const [, calledOptions] = mockFetch.mock.calls[0]!;
+      expect(calledOptions.headers["X-API-Version"]).toBe(LANGWATCH_API_VERSION);
+      expect(LANGWATCH_API_VERSION).toBe("2026-10-26");
+    });
+  });
+
   describe("searchTraces()", () => {
     it("sends POST to /api/v1/traces/search with format digest by default", async () => {
       const { searchTraces } = await import("../langwatch-api.ts");
