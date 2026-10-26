@@ -4772,6 +4772,11 @@ model ApiKey {
   /// by a customer create; rows before the column stay false.
   isSystemManaged Boolean @default(false)
 
+  /// The browser session that minted a docs session key (ADR-185), so signing
+  /// out of that session revokes it. NULL for every other key. Unindexed:
+  /// sign-out filters by the indexed `userId` first.
+  createdByBrowserSessionId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
   // DELIBERATELY UNINDEXED: the Langy session-key reaper sweeps on

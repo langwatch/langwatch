@@ -335,6 +335,12 @@ const registry = {
     tips: ["Bind the key to the teams or projects it works with instead of the whole organization"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  docs_origin_not_registered: {
+    tips: [
+      "Open the playground from a documentation site this installation registers, or paste an API key instead",
+      "A self-hosted installation registers more documentation sites in its configuration",
+    ],
+  },
   api_key_reserved_name: {
     tips: [
       "This name is reserved for keys LangWatch manages on your behalf; pick a different name",

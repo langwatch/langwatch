@@ -327,6 +327,36 @@ export class ApiKeyLifecycleService {
       throw new ApiKeyAlreadyRevokedError(input.id);
     }
 
+    return this.retire({ existing, input });
+  }
+
+  /**
+   * Retires a key the platform minted for itself, which no customer path may touch: the same
+   * steps as `revoke`, past its system-managed guard. Answers false for one already gone.
+   */
+  async revokeSystemManaged(input: {
+    id: string;
+    organizationId: string;
+    callerUserId: string | null;
+    cause: ApiKeyRevocationCause;
+  }): Promise<boolean> {
+    const existing = await this.repository.findByIdInOrganization(input);
+    if (!existing || !existing.isSystemManaged || existing.revokedAt) return false;
+
+    await this.retire({
+      existing: await this.bindings.attachOne(existing),
+      input: { ...input, callerIsAdmin: true, cascadeToChildren: false },
+    });
+    return true;
+  }
+
+  private async retire({
+    existing,
+    input,
+  }: {
+    existing: StoredApiKey;
+    input: RevokeApiKeyInput;
+  }): Promise<ApiKey> {
     // The row first, then the shared answer, then the grants: a failure part-way leaves a key
     // that is refused, never one that is live with its grants gone.
     const cause = input.cause ?? "user";
@@ -474,6 +504,7 @@ function createRecord({
     ingestSourceType: parsed.ingestSourceType ?? null,
     ingestionTemplateId: parsed.ingestionTemplateId ?? null,
     isSystemManaged: parsed.isSystemManaged ?? false,
+    createdByBrowserSessionId: parsed.createdByBrowserSessionId ?? null,
     startsDisabled: true,
     grants,
   };

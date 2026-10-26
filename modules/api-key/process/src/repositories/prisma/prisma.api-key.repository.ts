@@ -243,6 +243,26 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       select: { id: true, userId: true, organizationId: true },
     });
   }
+  async findLiveBySessions(input: {
+    userId: string;
+    name: string;
+    browserSessionIds: readonly string[];
+  }): Promise<{ id: string; organizationId: string }[]> {
+    if (input.browserSessionIds.length === 0) return [];
+    return this.database.$queryRaw<{ id: string; organizationId: string }[]>`
+      ${skipTenantCheck({
+        // One person's own keys across their organizations, bounded by the indexed userId.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT "id", "organizationId"
+        FROM "ApiKey"
+       WHERE "userId" = ${input.userId}
+         AND "name" = ${input.name}
+         AND "isSystemManaged" = true
+         AND "revokedAt" IS NULL
+         AND "createdByBrowserSessionId" = ANY(${[...input.browserSessionIds]})
+    `;
+  }
   async sweepElapsedLoginKeys(input: {
     before: Instant;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
