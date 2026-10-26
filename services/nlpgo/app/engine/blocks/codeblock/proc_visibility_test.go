@@ -4,6 +4,7 @@ package codeblock_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -452,12 +453,14 @@ func TestCodeBlock_ABootThatFailsAfterwardsLeavesNoChannelBehind(t *testing.T) {
 
 // boundChannels counts the payload channel sockets this process holds. They
 // are in the abstract namespace, where the kernel lists them by name with a
-// leading @.
+// leading @ and no path, and the whole namespace is listed at once: the name
+// carries the pid that bound it, which is what keeps another test binary's
+// channels out of the count.
 func boundChannels(t *testing.T) int {
 	t.Helper()
 	listed, err := os.ReadFile("/proc/net/unix")
 	require.NoError(t, err)
-	return strings.Count(string(listed), "@nlpgo-codeblock-")
+	return strings.Count(string(listed), fmt.Sprintf("@nlpgo-codeblock-%d-", os.Getpid()))
 }
 
 // waitForSpooledPid reads the pid out of the spool file once the execution

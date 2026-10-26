@@ -69,12 +69,8 @@ func (c *payloadChannel) channelEnv() []string {
 	return []string{payloadChannelEnvVar + "=" + c.name}
 }
 
-// serve answers for as long as the socket is open. An accept can fail for a
-// reason that passes, descriptors running out being the likely one, and giving
-// up on it would leave every later execution waiting for a payload that never
-// arrives, so only a closed listener ends this.
-// close gives up the socket, which also ends the accept loop. Only a boot
-// that fails after the channel is bound needs it: an executor that was built
+// close gives up the socket, which also ends the accept loop. Only a boot that
+// fails after the channel is bound needs it: an executor that was built
 // answers for as long as the process does.
 func (c *payloadChannel) close() {
 	if c == nil {
@@ -83,6 +79,10 @@ func (c *payloadChannel) close() {
 	_ = c.listener.Close()
 }
 
+// serve answers for as long as the socket is open. An accept can fail for a
+// reason that passes, descriptors running out being the likely one, and giving
+// up on it would leave every later execution waiting for a payload that never
+// arrives, so only a closed listener ends this.
 func (c *payloadChannel) serve() {
 	for {
 		conn, err := c.listener.AcceptUnix()
