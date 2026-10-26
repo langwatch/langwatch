@@ -3,12 +3,7 @@
  * This file only exports the Chakra UI `system` — the app shell (providers,
  * routing, NProgress) lives in `@langwatch/ui`'s `ui/sections`.
  */
-import {
-  defineConfig,
-  defineRecipe,
-  defineSlotRecipe,
-  type SlotRecipeConfig,
-} from "@chakra-ui/react";
+import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 
 import { colorSystem } from "../color-mode/color-system.ts";
 import { alertSlotRecipe, deepeningMesh, statusMesh } from "./alert.recipe.ts";
@@ -64,8 +59,7 @@ const badgeGlass = {
   ].join(", "),
 };
 
-/** Tokens, text styles and global styles: everything but the recipes. */
-export const designSystemFoundation = defineConfig({
+export const designSystemConfig = defineConfig({
   globalCss: {
     body: {
       background: "bg.page",
@@ -743,168 +737,6 @@ export const designSystemFoundation = defineConfig({
         },
       },
     },
-  },
-});
-
-export const buttonRecipeOverride = defineRecipe({
-  base: {
-    fontWeight: 600,
-    borderRadius: "lg",
-  },
-  variants: {
-    variant: {
-      solid: {
-        _hover: {
-          bg: "colorPalette.hover",
-        },
-      },
-      outline: {
-        boxShadow: "2xs",
-        borderColor: "border",
-        color: "fg",
-        _hover: {
-          backgroundColor: "bg.hover",
-          boxShadow: "inset 0 -2px 5px 0px rgba(0, 0, 0, 0.03)",
-        },
-        _expanded: {
-          backgroundColor: "bg.hover",
-        },
-      },
-      ghost: {
-        color: "fg",
-        _hover: {
-          backgroundColor: "bg.hover",
-        },
-        _expanded: {
-          backgroundColor: "bg.hover",
-        },
-      },
-    },
-    size: {
-      xs: {
-        h: "6",
-        minW: "6",
-        textStyle: "xs",
-        px: "1.5",
-        gap: "1",
-        _icon: {
-          flexShrink: 0,
-          width: "auto",
-          height: "auto",
-        },
-      },
-      sm: {
-        h: "8",
-        minW: "8",
-        px: "2.5",
-        textStyle: "bodySm",
-        _icon: {
-          flexShrink: 1,
-          width: "auto",
-          height: "auto",
-          maxWidth: "16px",
-          maxHeight: "16px",
-        },
-      },
-      md: {
-        _icon: {
-          flexShrink: 1,
-          width: "auto",
-          height: "auto",
-          maxWidth: "20px",
-          maxHeight: "20px",
-        },
-      },
-    },
-  },
-  defaultVariants: {
-    size: "sm",
-  },
-});
-
-export const inputRecipeOverride = defineRecipe({
-  base: {
-    borderRadius: "lg",
-  },
-  variants: {
-    variant: {
-      subtle: { bg: "bg.control", borderColor: "border.control" },
-      outline: {
-        bg: "bg.control",
-        borderColor: "border.control",
-      },
-      flushed: {
-        borderRadius: "none",
-        borderBottomColor: "border.control",
-      },
-    },
-    size: {
-      xs: {
-        "--input-height": "sizes.7",
-      },
-      sm: {
-        "--input-height": "sizes.8",
-      },
-    },
-  },
-});
-
-export const menuSlotRecipeOverride = defineSlotRecipe({
-  slots: ["item", "content"],
-  base: { content: optionListContent, item: optionItemRecipe.base },
-  variants: {
-    size: optionListSizes,
-    variant: {
-      subtle: { item: optionItemRecipe.base },
-      solid: { item: optionItemRecipe.base },
-    },
-  },
-});
-
-export const dialogSlotRecipeOverride: SlotRecipeConfig = defineSlotRecipe({
-  slots: ["content", "header"],
-  base: {
-    header: {
-      pt: "4",
-      pb: "3",
-    },
-    body: {
-      pt: "3",
-    },
-    title: {
-      textStyle: "sectionTitle",
-    },
-    // A dialog panel is opaque: the blur behind it is the backdrop's, never the panel's.
-    content: {
-      background: "bg.overlay",
-      border: "1px solid",
-      borderColor: "border.card",
-      borderRadius: "lg",
-      boxShadow: "lg",
-      "& button[data-variant=solid], & button[data-variant=outline]": {
-        boxShadow: "md",
-      },
-      "& input, & textarea, & select": {
-        boxShadow: "xs",
-      },
-    },
-  },
-  variants: {
-    size: {
-      "5xl": {
-        content: { maxWidth: "5xl" },
-      },
-      "6xl": {
-        content: { maxWidth: "6xl" },
-      },
-    },
-  },
-});
-
-export const designSystemConfig = defineConfig({
-  ...designSystemFoundation,
-  theme: {
-    ...designSystemFoundation.theme,
     recipes: {
       sectionNavigationRail: sectionNavigationRailRecipe,
       skeleton: defineRecipe({
@@ -948,7 +780,81 @@ export const designSystemConfig = defineConfig({
           paddingX: 4,
         },
       }),
-      button: buttonRecipeOverride,
+      button: defineRecipe({
+        base: {
+          fontWeight: 600,
+          borderRadius: "lg",
+        },
+        variants: {
+          variant: {
+            solid: {
+              _hover: {
+                bg: "colorPalette.hover",
+              },
+            },
+            outline: {
+              boxShadow: "2xs",
+              borderColor: "border",
+              color: "fg",
+              _hover: {
+                backgroundColor: "bg.hover",
+                boxShadow: "inset 0 -2px 5px 0px rgba(0, 0, 0, 0.03)",
+              },
+              _expanded: {
+                backgroundColor: "bg.hover",
+              },
+            },
+            ghost: {
+              color: "fg",
+              _hover: {
+                backgroundColor: "bg.hover",
+              },
+              _expanded: {
+                backgroundColor: "bg.hover",
+              },
+            },
+          },
+          size: {
+            xs: {
+              h: "6",
+              minW: "6",
+              textStyle: "xs",
+              px: "1.5",
+              gap: "1",
+              _icon: {
+                flexShrink: 0,
+                width: "auto",
+                height: "auto",
+              },
+            },
+            sm: {
+              h: "8",
+              minW: "8",
+              px: "2.5",
+              textStyle: "bodySm",
+              _icon: {
+                flexShrink: 1,
+                width: "auto",
+                height: "auto",
+                maxWidth: "16px",
+                maxHeight: "16px",
+              },
+            },
+            md: {
+              _icon: {
+                flexShrink: 1,
+                width: "auto",
+                height: "auto",
+                maxWidth: "20px",
+                maxHeight: "20px",
+              },
+            },
+          },
+        },
+        defaultVariants: {
+          size: "sm",
+        },
+      }),
       separator: defineRecipe({
         variants: {
           orientation: {
@@ -963,7 +869,32 @@ export const designSystemConfig = defineConfig({
           },
         },
       }),
-      input: inputRecipeOverride,
+      input: defineRecipe({
+        base: {
+          borderRadius: "lg",
+        },
+        variants: {
+          variant: {
+            subtle: { bg: "bg.control", borderColor: "border.control" },
+            outline: {
+              bg: "bg.control",
+              borderColor: "border.control",
+            },
+            flushed: {
+              borderRadius: "none",
+              borderBottomColor: "border.control",
+            },
+          },
+          size: {
+            xs: {
+              "--input-height": "sizes.7",
+            },
+            sm: {
+              "--input-height": "sizes.8",
+            },
+          },
+        },
+      }),
       textarea: defineRecipe({
         base: {
           borderRadius: "md",
@@ -1224,7 +1155,17 @@ export const designSystemConfig = defineConfig({
           },
         },
       }),
-      menu: menuSlotRecipeOverride,
+      menu: defineSlotRecipe({
+        slots: ["item", "content"],
+        base: { content: optionListContent, item: optionItemRecipe.base },
+        variants: {
+          size: optionListSizes,
+          variant: {
+            subtle: { item: optionItemRecipe.base },
+            solid: { item: optionItemRecipe.base },
+          },
+        },
+      }),
       combobox: defineSlotRecipe({
         slots: ["item", "content"],
         base: { content: optionListContent, item: optionItemRecipe.base },
@@ -1392,7 +1333,45 @@ export const designSystemConfig = defineConfig({
           },
         },
       }),
-      dialog: dialogSlotRecipeOverride,
+      dialog: defineSlotRecipe({
+        slots: ["content", "header"],
+        base: {
+          header: {
+            pt: "4",
+            pb: "3",
+          },
+          body: {
+            pt: "3",
+          },
+          title: {
+            textStyle: "sectionTitle",
+          },
+          // A dialog panel is opaque: the blur behind it is the backdrop's, never the panel's.
+          content: {
+            background: "bg.overlay",
+            border: "1px solid",
+            borderColor: "border.card",
+            borderRadius: "lg",
+            boxShadow: "lg",
+            "& button[data-variant=solid], & button[data-variant=outline]": {
+              boxShadow: "md",
+            },
+            "& input, & textarea, & select": {
+              boxShadow: "xs",
+            },
+          },
+        },
+        variants: {
+          size: {
+            "5xl": {
+              content: { maxWidth: "5xl" },
+            },
+            "6xl": {
+              content: { maxWidth: "6xl" },
+            },
+          },
+        },
+      }),
       select: defineSlotRecipe({
         slots: ["trigger", "content", "item"],
         base: {

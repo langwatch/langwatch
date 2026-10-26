@@ -23,7 +23,6 @@ export function publishedEntries(): { subpath: string; source: string }[] {
 /** Entry points that render nothing a story could show, each with the reason. */
 export const NOT_RENDERED: Record<string, string> = {
   "./provider": "mounted around every story by the preview",
-  "./system-provider": "the core of ./provider, so every story already mounts it",
   "./testing": "the test harness, not a screen element",
   "./color-mode": "documented by Foundations/Colour and Foundations/Tokens",
 };
