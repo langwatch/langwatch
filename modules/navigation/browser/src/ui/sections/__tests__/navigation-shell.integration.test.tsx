@@ -334,7 +334,7 @@ describe("an address naming a product whose release flag is off", () => {
     };
 
     /** @scenario "AC1b A Dashboards address with the flag off is a 404 with no Dashboards sidebar" */
-    it.each(["/demo/dashboards", "/demo/dashboards/agent-flight-deck", "/demo/insights"])(
+    it.each(["/demo/dashboards", "/demo/dashboards/agent-flight-deck"])(
       "draws the not-found page at %s with no product sidebar around it",
       (pathname) => {
         renderShell({
@@ -351,6 +351,25 @@ describe("an address naming a product whose release flag is off", () => {
         expect(screen.queryByTestId("page-body")).toBeNull();
       },
     );
+
+    /** @scenario "The Insights page is a 404 while release_dashboards is off" */
+    it("draws the not-found page at /demo/insights with no product sidebar around it", () => {
+      renderShell({
+        readings: {
+          pathname: "/demo/insights",
+          permissions: [...(BASE_READINGS.permissions ?? []), "analytics:view"],
+          flags: {
+            ...dashboardsOff,
+            release_insights: { enabled: true, isLoading: false },
+          },
+          notFound: <div data-testid="not-found" />,
+        },
+      });
+
+      expect(screen.getByTestId("not-found")).toBeInTheDocument();
+      expect(screen.queryByTestId("product-sidebar")).toBeNull();
+      expect(screen.queryByTestId("page-body")).toBeNull();
+    });
 
     it("still draws a project page in its chrome", () => {
       renderShell({ readings: { pathname: "/demo/traces", flags: dashboardsOff } });

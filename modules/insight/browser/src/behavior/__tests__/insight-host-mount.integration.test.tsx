@@ -52,7 +52,7 @@ function EnabledReader() {
   return <span data-testid="enabled">{String(useInsightHost().isEnabled())}</span>;
 }
 
-function renderWithFlags(answers: Readonly<Record<string, boolean>>) {
+function renderWithFlags(answers: Readonly<Record<string, boolean | undefined>>) {
   const flags = { flag: ({ name }: { name: string }) => answers[name] };
   const capabilities: UiHostServices = createUiHostServicesFromHost(
     { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
@@ -76,8 +76,11 @@ describe("given the insight host mounted over the project in scope", () => {
       { insights: true, dashboards: true, enabled: "true" },
       { insights: true, dashboards: false, enabled: "false" },
       { insights: false, dashboards: true, enabled: "false" },
+      { insights: false, dashboards: undefined, enabled: "false" },
+      { insights: true, dashboards: undefined, enabled: "undefined" },
+      { insights: undefined, dashboards: true, enabled: "undefined" },
     ])(
-      "reports Insights on only with both on (insights $insights, dashboards $dashboards)",
+      "reports Insights on only with both on, off once either is off, unknown while one has not answered (insights $insights, dashboards $dashboards)",
       ({ insights, dashboards, enabled }) => {
         renderWithFlags({ release_insights: insights, release_dashboards: dashboards });
 

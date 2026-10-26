@@ -407,6 +407,13 @@ Feature: The insights inbox
       And with both flags on the bell is there
 
     @integration
+    Scenario: The Insights page is a 404 while release_dashboards is off
+      Given the release_insights flag is on and the release_dashboards flag is off
+      And a member with analytics:view
+      When they open the Insights page by its address
+      Then it answers not-found, with no product side menu around it
+
+    @integration
     Scenario: The side menu shows no Insights entry while the flag is off
       Given the release_insights flag is off, or a member without analytics:view
       When they look at the Dashboards side menu

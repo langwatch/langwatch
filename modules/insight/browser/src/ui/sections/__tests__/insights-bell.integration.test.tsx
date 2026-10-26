@@ -9,7 +9,6 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { insightsReleased } from "../../../model/insight-host.ts";
 import { insightEntry, renderWithInsightHost, StubInsightHost } from "../../../testing.tsx";
 import { InsightsBell } from "../insights-bell.tsx";
 
@@ -87,14 +86,13 @@ describe("given release_insights on and 2 unseen insights in the inbox", () => {
   describe("when release_dashboards is off", () => {
     /** @scenario "Insights shows nothing while release_dashboards is off" */
     it("shows no bell, because the Insights page is closed", async () => {
-      const enabled = insightsReleased({ insights: true, dashboards: false });
+      // The host-mount test covers how the two flags make this false.
       const { host } = renderWithInsightHost({
         element: <InsightsBell />,
-        host: new StubInsightHost({ enabled }),
+        host: new StubInsightHost({ enabled: false }),
         answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
       });
 
-      expect(enabled).toBe(false);
       await Promise.resolve();
       expect(screen.queryByRole("button", { name: "Inbox: new insights" })).not.toBeInTheDocument();
       expect(host.navigations).toEqual([]);
@@ -104,14 +102,12 @@ describe("given release_insights on and 2 unseen insights in the inbox", () => {
   describe("when release_dashboards is on too", () => {
     /** @scenario "Insights shows nothing while release_dashboards is off" */
     it("shows the bell with the unread count", async () => {
-      const enabled = insightsReleased({ insights: true, dashboards: true });
       renderWithInsightHost({
         element: <InsightsBell />,
-        host: new StubInsightHost({ enabled }),
+        host: new StubInsightHost({ enabled: true }),
         answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
       });
 
-      expect(enabled).toBe(true);
       expect(
         await screen.findByRole("button", { name: "Inbox: new insights" }),
       ).toBeInTheDocument();
