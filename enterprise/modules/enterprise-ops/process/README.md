@@ -6,7 +6,7 @@ The server half of [enterprise-ops](../README.md). Operator views over Enterpris
 
 ## Installation
 
-`defineProcessModule("enterprise-ops").withApi(EnterpriseOpsModule).withTransports(licenseRegistryTrpcTransport, selfHostedInstancesTrpcTransport)`, `src/enterprise-ops.module.ts:8`.
+`defineProcessModule("enterprise-ops").withApi(EnterpriseOpsModule).withTransports(licenseRegistryTrpcTransport, selfHostedInstancesTrpcTransport, selfHostedNoticesTrpcTransport)`, `src/enterprise-ops.module.ts:9`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The operator views over enterprise subjects (ARCHITECTURE.md section 3): each op admits Cloud admin staff through OpsApi, then forwards to the owner's Api.
 
-Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:27`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:30`; nothing else in this package is public.
 
 #### `listIssuedLicenses`
 
@@ -126,6 +126,36 @@ A five-minute link to one bundle: the sensitive read, so it asks `ops:manage`.
 
 ```typescript
 getUpgradeDiagnosticsDownload(input: { id: string; operator: OpsOperator | null; }): Promise<UpgradeDiagnosticsDownload>;
+```
+
+#### `findSelfHostedNotices`
+
+```typescript
+findSelfHostedNotices(input: { operator: OpsOperator | null }): Promise<SelfHostedNoticeView[]>;
+```
+
+#### `createSelfHostedNotice`
+
+```typescript
+createSelfHostedNotice(input: CreateSelfHostedNoticeInput & { operator: OpsOperator | null }): Promise<SelfHostedNoticeView>;
+```
+
+#### `updateSelfHostedNotice`
+
+```typescript
+updateSelfHostedNotice(input: UpdateSelfHostedNoticeInput & { operator: OpsOperator | null }): Promise<SelfHostedNoticeView>;
+```
+
+#### `publishSelfHostedNotice`
+
+```typescript
+publishSelfHostedNotice(input: { id: string; operator: OpsOperator | null; }): Promise<SelfHostedNoticeView>;
+```
+
+#### `withdrawSelfHostedNotice`
+
+```typescript
+withdrawSelfHostedNotice(input: { id: string; operator: OpsOperator | null; }): Promise<SelfHostedNoticeView>;
 ```
 
 ## REST transport
@@ -328,6 +358,61 @@ interface Output {
   url: string;
   expiresAt: string;
 }
+```
+
+### `selfHostedNotices`
+
+Contract `../contract/src/self-hosted-notice.trpc.ts:15`, router `src/transport/self-hosted-notice.trpc.ts:14`.
+
+| Procedure                    | Kind     | Gate                             | Input                               | Output                       |
+| ---------------------------- | -------- | -------------------------------- | ----------------------------------- | ---------------------------- |
+| `selfHostedNotices.getAll`   | query    | Platform permission `ops:view`   | inline                              | inline                       |
+| `selfHostedNotices.create`   | mutation | Platform permission `ops:manage` | `createSelfHostedNoticeInputSchema` | `selfHostedNoticeViewSchema` |
+| `selfHostedNotices.update`   | mutation | Platform permission `ops:manage` | `updateSelfHostedNoticeInputSchema` | `selfHostedNoticeViewSchema` |
+| `selfHostedNotices.publish`  | mutation | Platform permission `ops:manage` | `selfHostedNoticeIdInputSchema`     | `selfHostedNoticeViewSchema` |
+| `selfHostedNotices.withdraw` | mutation | Platform permission `ops:manage` | `selfHostedNoticeIdInputSchema`     | `selfHostedNoticeViewSchema` |
+
+```typescript
+// selfHostedNotices.getAll
+// Input: inline, ../contract/src/self-hosted-notice.trpc.ts:17
+type Input = unknown;
+// Output: z.array(selfHostedNoticeViewSchema) (inline, ../contract/src/self-hosted-notice.trpc.ts:18)
+
+// selfHostedNotices.create
+// Input: createSelfHostedNoticeInputSchema, ../../licensing/contract/src/self-hosted-notice.ts:37
+interface Input {
+  severity: "info" | "warning" | "security";
+  title: string;
+  body: string;
+  url: string | null;
+  fixedIn: string | null;
+  expiresAt: string | null;
+}
+type Output = z.infer<typeof selfHostedNoticeViewSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:78
+
+// selfHostedNotices.update
+// Input: updateSelfHostedNoticeInputSchema, ../../licensing/contract/src/self-hosted-notice.ts:48
+interface Input {
+  id: string;
+  severity: "info" | "warning" | "security";
+  title: string;
+  body: string;
+  url: string | null;
+  fixedIn: string | null;
+  expiresAt: string | null;
+}
+type Output = z.infer<typeof selfHostedNoticeViewSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:78
+
+// selfHostedNotices.publish
+// Input: selfHostedNoticeIdInputSchema, ../../licensing/contract/src/self-hosted-notice.ts:56
+interface Input {
+  id: string;
+}
+type Output = z.infer<typeof selfHostedNoticeViewSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:78
+
+// selfHostedNotices.withdraw
+type Input = z.infer<typeof selfHostedNoticeIdInputSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:56
+type Output = z.infer<typeof selfHostedNoticeViewSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:78
 ```
 
 ## Sockets

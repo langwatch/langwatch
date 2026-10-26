@@ -10,6 +10,7 @@ import {
   langWatchQLPassSchema,
   type LangWatchQLEvalGate,
   type LangWatchQLExecuteInput,
+  type LangWatchQLMemberScope,
   type LangWatchQLPassInput,
   type LangWatchQLProjectSetExecuteInput,
   type LangWatchQLProtections,
@@ -27,6 +28,7 @@ import type {
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
+import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import {
   langWatchQLMissingParameters,
@@ -275,6 +277,8 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       awaitingTimeWindow: validation.awaitingTimeWindow,
     });
+    // A pass is not scoped, so the FINAL/SAMPLE refusal runs here too.
+    assertNoUnsupportedTableModifiers({ sql, views: this.views, database: this.deps.database });
 
     const { executor } = this.deps;
     if (!executor) {
@@ -314,9 +318,12 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
     excludeOrigins = [],
+    memberWindows,
     isInstantEvalsEnabled,
     signal,
-  }: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
+  }: LangWatchQLProjectSetExecuteInput &
+    LangWatchQLEvalGate &
+    LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
     const validation = this.validate({
       projectId: projectIds.join(",") || "(none)",
@@ -364,6 +371,7 @@ export class LangWatchQLService {
       granularity,
       tenantCapability,
       excludeOrigins,
+      ...(memberWindows ? { memberWindows } : {}),
       ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
     });
@@ -375,6 +383,7 @@ export class LangWatchQLService {
       database: this.deps.database,
       views: this.views,
       excludeOrigins,
+      ...(memberWindows ? { memberWindows } : {}),
       timeWindow: followedWindow,
       granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
     });

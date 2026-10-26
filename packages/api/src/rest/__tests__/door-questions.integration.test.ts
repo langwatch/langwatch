@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { authorizationPort } from "../../__tests__/api-double.ts";
+import { anyAuthenticated } from "../../access/access.ts";
 import {
   KeyKindRefusedError,
   OrganizationInvalidCredentialsError,
@@ -536,6 +537,79 @@ describe("a route that reads the key its door resolved", () => {
     expect(() => route.withCredential("browser", { key: true } as never)).toThrow(
       /"browser" door, which resolves none/,
     );
+  });
+});
+
+describe("a route that names legacy key scopes", () => {
+  function base() {
+    return defineRestRouter(DoorsApi)
+      .withNamespace("legacy-scopes")
+      .withVersion(VERSION)
+      .post("/connect", "run")
+      .keepsRecords();
+  }
+  const told: (readonly string[] | undefined)[] = [];
+  const door: RestIdentity = {
+    authenticate: ({ request, legacyKeyScopes }) => {
+      told.push(legacyKeyScopes);
+      recordProjectCredential(request, {
+        type: "legacyProjectKey",
+        project: {
+          id: "project-1",
+          name: "Project",
+          slug: "project",
+          teamId: "team-1",
+          organizationId: "org-1",
+          isPersonal: false,
+          ownerUserId: null,
+          kind: "application",
+        },
+      });
+      return { actor: null, scope: { tier: "project", id: "project-1" } };
+    },
+    identify: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
+    legacyKeyScopes: ["scope_a", "scope_b"],
+  };
+
+  /** @scenario "A route tells the project door the legacy key scopes it names" */
+  it("tells the door the scopes it names and refuses misplaced or unknown ones at mount", async () => {
+    const router = base()
+      .withPermission("scenarios:manage")
+      .withLegacyKeyScope("scope_a", "scope_b")
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+
+    const answer = await mount(router, door).request(`/api/legacy-scopes/${VERSION}/connect`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-auth-token": "legacy" },
+      body: "{}",
+    });
+
+    expect(answer.status).toBe(200);
+    expect(told.at(-1)).toEqual(["scope_a", "scope_b"]);
+
+    const unknown = base()
+      .withPermission("scenarios:manage")
+      .withLegacyKeyScope("scope_c")
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+    expect(() => mount(unknown, door)).toThrow(/unknown legacy key scopes: scope_c/);
+
+    const identifiedOnly = base()
+      .withAccess(anyAuthenticated({ reason: "a test route that only identifies the caller" }))
+      .withLegacyKeyScope("scope_a")
+      .withOutput(z.object({ ran: z.boolean() }))
+      .withoutAudit("test route")
+      .handle(() => ({ ran: true }))
+      .build()
+      .router();
+    expect(() => mount(identifiedOnly, door)).toThrow(/names a legacy key scope/);
   });
 });
 

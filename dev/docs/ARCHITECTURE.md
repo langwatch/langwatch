@@ -1911,7 +1911,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
   `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
   the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
-- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout. Keys created on main keep main's access and new projects get no legacy key (Alex, 2026-10-09): a legacy project key or an ownerless API key reads its own project's traces on an own-only proof the door mints as the internal actor `api.rest.ownerless-project-key`; an unattended run key on a proof-bearing route answers 403.
+- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout. New projects get no legacy key (Alex, 2026-10-09). A legacy key is ingestion-only (`traces:create`) plus the routes that name a scope flag listing its project (`withLegacyKeyScope`, `LEGACY_PROJECT_KEY_SCOPE_FLAGS`); beyond that it is report-only by default, refused with 403 on a project in `legacy_project_key_scope_enforced`, and unrestricted on a project in `legacy_project_key_full_access` (spec: modules/auth/specs/legacy-project-key-scope.feature). A legacy project key or an ownerless API key reads its own project's traces on an own-only proof the door mints as the internal actor `api.rest.ownerless-project-key`; an unattended run key on a proof-bearing route answers 403.
   It migrates to an `ApiKey` row, hashed and valid until revoked, listed masked and revoke-only under a
   replace-by-deadline banner. The CLI and MCP mint a fresh key instead, a CLI login replacing that device's previous
   one, and a new project gets no customer-facing project key (Alex, 2026-09-30). No engine and no internal caller
@@ -2128,7 +2128,7 @@ each owner's events, which carry ids and the non-personal, point-in-time facts; 
 personal data: where a signal needs some it carries the id (and a revision), and nurturing reads the value from
 `UserApi` at delivery and never stores it. Only the email and name leave, to Customer.io, once at sign-up; each
 identify sends only the traits that signal changes, once per source event.
-With no owner-to-nurturing edges, its `nurturing -> user` read closes no construction or package-import cycle, and the ratchet baseline
+With no owner-to-nurturing edges, its `nurturing -> user` and `nurturing -> organization` reads close no construction or package-import cycle, and the ratchet baseline
 carries no exception for it (Alex, 2026-09-29).
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
@@ -2985,6 +2985,15 @@ The connect upstream reaches gateway as licensing's `connect_upstream_set` / `co
 naming only the organization; on set, gateway pulls `{ baseUrl, token, instanceId }` from
 `LicensingApi.findConnectUpstream` and seals the token itself; licensing alone derives the token, including the
 instance-wide `LANGWATCH_LICENSE_KEY` fallback (Alex, 2026-10-10, PC-G2-CONNECT-TOKEN; supersedes C3b D2).
+
+**Self-hosted notices ride the usage report reply** (Alex, 2026-10-21/22). Licensing owns the
+`SelfHostedNotice` table and its `*Api` operations; staff write, publish and withdraw them through
+enterprise-ops (`ops:view` reads, `ops:manage` writes, audited like the license registry); saas adds the
+published, unexpired notices to its usage report reply, only when there are some. The install's ops keeps
+them beside the latest release, hides one its running release fixes, and `DISABLE_LANGWATCH_NOTICES` opts
+out. Notices are public text: any install that reports receives them, so none is gated on a known
+instance. Specs: `enterprise/modules/licensing/specs/self-hosted-notices.feature`,
+`modules/ops/specs/self-hosted-notices.feature`.
 
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`

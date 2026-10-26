@@ -17,6 +17,7 @@ import {
 } from "@langwatch/user-contract";
 import { z } from "zod";
 
+import { appPageSchema } from "./auth-lifecycle.events.ts";
 import {
   browserSessionInventoryEntrySchema,
   browserSessionsEndedSchema,
@@ -94,6 +95,11 @@ export const authTrpc = defineTrpcContract("auth")
   .mutation("endBrowserSession")
   .withInput(endBrowserSessionInputSchema)
   .withOutput(browserSessionsEndedSchema)
+
+  /** Announces that the caller opened an app page; the browser session decides if it counts. */
+  .mutation("recordPageOpened")
+  .withInput(z.object({ page: appPageSchema }))
+  .withOutput(z.void())
 
   /** The caller's own password doors, moved from `user.*` with their wire (D-A1U-4). */
   .mutation("setPassword")

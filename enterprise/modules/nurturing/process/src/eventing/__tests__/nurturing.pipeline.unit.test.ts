@@ -115,6 +115,7 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     usageReportReceived: (input) => delivery.deliverUsageReport(input),
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
+    codingSessionsStored: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
@@ -255,7 +256,7 @@ describe("nurturing's userCreated peer subscriber", () => {
         traits: {
           email: "jane@example.com",
           name: "Jane Doe",
-          createdAt: new Date(1_000).toISOString(),
+          createdAt: 1,
         },
       });
     });
