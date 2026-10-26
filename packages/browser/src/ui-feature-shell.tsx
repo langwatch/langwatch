@@ -173,29 +173,6 @@ const useUnavailableUiSession: UiSessionSource = () => ({
   scope: UNAVAILABLE_UI_SCOPE,
 });
 
-/** How many passes an impersonation's wipe gets before it gives up, a second apart and more. */
-const WIPE_ATTEMPTS = 3;
-
-/** Wipes the mirror once the last mirror's writes have landed, retrying a pass that failed. */
-async function wipeMirror({
-  store,
-  after,
-}: {
-  store: UiQueryStore<unknown>;
-  after: Promise<void>;
-}): Promise<void> {
-  await after;
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      await clearPersistedUiQueries({ store });
-      return;
-    } catch (error) {
-      if (attempt >= WIPE_ATTEMPTS) throw error;
-      await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
-    }
-  }
-}
-
 /**
  * Mirrors the planned reads onto the sealed disk and syncs tabs. The stop it returns settles once
  * the writes already under way have landed; none starts after it.
@@ -360,7 +337,9 @@ export function createUiFeatureShell({
       if (!userId) return;
       const store = queryStore ?? indexedDbQueryStore;
       if (impersonating) {
-        void wipeMirror({ store, after: lastMirrorLanded.current }).catch(() => void 0);
+        void lastMirrorLanded.current
+          .then(() => clearPersistedUiQueries({ store }))
+          .catch(() => void 0);
       }
       const stop = startQueryMirror({
         queryClient,

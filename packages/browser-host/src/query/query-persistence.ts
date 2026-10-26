@@ -254,9 +254,16 @@ type SealContext = {
   closed: boolean;
 };
 
-/** Runs `step` after every write before it; a closed store's step never runs. */
-function inTurn(context: SealContext, step: () => Promise<void>): Promise<void> {
-  const turn = context.writes.then(() => (context.closed ? void 0 : step()));
+/**
+ * Runs `step` after every write before it, so removals and writes land in the order asked. A
+ * closed store's write never runs; a removal still does, since skipping one would keep a row.
+ */
+function inTurn(
+  context: SealContext,
+  step: () => Promise<void>,
+  { evenClosed = false }: { evenClosed?: boolean } = {},
+): Promise<void> {
+  const turn = context.writes.then(() => (context.closed && !evenClosed ? void 0 : step()));
   context.writes = turn.catch(() => void 0);
   return turn;
 }
@@ -346,23 +353,21 @@ async function sealRow({
   const sealed = await sealQuery({ cipher, key, plain });
   const bytes = sealed.sealed.byteLength;
   const row = { ...sealed, bytes, readAt };
-  await inTurn(context, async () => {
-    await makeRoom({ context, key, bytes, budget: context.budget });
+  await makeRoom({ context, key, bytes, budget: context.budget });
+  try {
+    await context.store.put(key, row);
+  } catch (error) {
+    if (!isOutOfSpace(error)) throw error;
+    // The browser's limit came first. Shed the coldest half once; still full, keep nothing.
+    await makeRoom({ context, key, bytes, budget: halfOfTheRest({ context, key, bytes }) });
     try {
       await context.store.put(key, row);
-    } catch (error) {
-      if (!isOutOfSpace(error)) throw error;
-      // The browser's limit came first. Shed the coldest half once; still full, keep nothing.
-      await makeRoom({ context, key, bytes, budget: halfOfTheRest({ context, key, bytes }) });
-      try {
-        await context.store.put(key, row);
-      } catch {
-        await removeRow({ context, key });
-        return;
-      }
+    } catch {
+      await removeRow({ context, key });
+      return;
     }
-    context.manifest.set(key, { bytes, readAt, flushedReadAt: readAt });
-  });
+  }
+  context.manifest.set(key, { bytes, readAt, flushedReadAt: readAt });
 }
 
 /** A row only last epoch's key opens is re-sealed under this one, in the background. */
@@ -382,7 +387,9 @@ async function openWithPrevious({
     await removeRow({ context, key });
     return;
   }
-  void sealRow({ context, key, value: aged, readAt: entry.readAt }).catch(() => void 0);
+  void inTurn(context, () => sealRow({ context, key, value: aged, readAt: entry.readAt })).catch(
+    () => void 0,
+  );
   return aged;
 }
 
@@ -462,8 +469,8 @@ export function sealedUiQueryStore({
   };
   return {
     get: (key) => openRow({ context, key }),
-    put: (key, value) => sealRow({ context, key, value, readAt: now() }),
-    delete: (key) => removeRow({ context, key }),
+    put: (key, value) => inTurn(context, () => sealRow({ context, key, value, readAt: now() })),
+    delete: (key) => inTurn(context, () => removeRow({ context, key }), { evenClosed: true }),
     keys: () => store.keys(),
     touch: (key) => touchReadAt({ context, key }),
     close: () => {

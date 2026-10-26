@@ -563,6 +563,42 @@ describe("sealedUiQueryStore budget", () => {
     });
   });
 
+  describe("given the store is closed after a write has reached the disk", () => {
+    it("settles only once that write has landed", async () => {
+      const disk = memoryStore();
+      const started = { put: false };
+      disk.put = async (key, value) => {
+        started.put = true;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        disk.entries.set(key, value);
+      };
+      const store = mirror(disk, { at: 1 });
+
+      void store.put("lw-query:alice:a", row("a"));
+      await vi.waitFor(() => expect(started.put).toBe(true));
+      await store.close();
+
+      expect([...disk.entries.keys()]).toEqual(["lw-query:alice:a"]);
+    });
+  });
+
+  describe("given a removal asked for after a write still queued", () => {
+    it("removes the row rather than letting the write put it back", async () => {
+      const disk = memoryStore();
+      disk.put = async (key, value) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        disk.entries.set(key, value);
+      };
+      const store = mirror(disk, { at: 1 });
+
+      const written = store.put("lw-query:alice:a", row("a"));
+      const removed = store.delete("lw-query:alice:a");
+      await Promise.all([written, removed]);
+
+      expect(disk.entries.size).toBe(0);
+    });
+  });
+
   describe("given the store is closed while a write is under way", () => {
     it("writes nothing once the close has settled", async () => {
       const disk = memoryStore();
