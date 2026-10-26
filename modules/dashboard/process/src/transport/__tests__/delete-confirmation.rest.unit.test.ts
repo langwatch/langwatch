@@ -232,7 +232,7 @@ describe("a Langy key's delete card for a record on its owner's Only me board", 
   });
 });
 
-describe("a Langy key's delete card for a widget at /api/v1/boards/{boardId}/widgets/{widgetId}", () => {
+describe("a Langy key's delete card for a widget at /api/v1/dashboards/{dashboardId}/widgets/{widgetId}", () => {
   /**
    * @scenario "The card reads the item through the path the delete acts on"
    * @scenario "AC199p Split: a board's widgets are a sub-resource of the board"
@@ -255,7 +255,7 @@ describe("a Langy key's delete card for a widget at /api/v1/boards/{boardId}/wid
         projectId: PROJECT,
         id: widget.id,
         ownerUserId: null,
-        input: { boardId, widgetId: widget.id },
+        input: { dashboardId: boardId, widgetId: widget.id },
       });
 
     expect({

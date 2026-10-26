@@ -1,7 +1,7 @@
 /**
- * The Dashboards area's boards under `/api/v1/projects/:projectId/analytics/boards`, read-only.
- * Superseded by `/api/v1/boards`: deprecated for a key whose project has Dashboards switched on
- * (dashboards-v2.feature AC199r). Analytics Reports boards stay on `/api/v1/dashboards`.
+ * The Dashboards area's boards under `/api/v1/projects/:projectId/analytics/boards`, read-only:
+ * the boards a widget can be added to. `/api/v1/dashboards` manages them with the project taken
+ * from the key; Analytics Reports boards are on `/api/v1/analytics/reports`.
  */
 import {
   apiErrorSchema,
@@ -20,7 +20,7 @@ import {
 } from "@langwatch/dashboard-contract";
 
 import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
-import { BOARDS_SUCCESSOR, boardResource, dashboardsReleased } from "./board.rest.ts";
+import { boardResource } from "./board.rest.ts";
 
 /** The tags every operation in this file carries in the published document. */
 const BOARD_TAGS = ["Analytics / LangWatchQL"];
@@ -44,7 +44,6 @@ export const boardProjectRest = defineRestRouter(DashboardApi)
   .withNamespace("project-analytics-boards")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
-  .withDeprecated({ successor: BOARDS_SUCCESSOR, when: dashboardsReleased })
 
   .get("/api/v1/projects/:projectId/analytics/boards", "getApiV1ProjectsByProjectIdAnalyticsBoards")
   .withSharedPath(PROJECT_ANALYTICS)
@@ -54,7 +53,7 @@ export const boardProjectRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "List Dashboards boards",
     description:
-      "Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports boards are listed by /api/v1/dashboards instead.",
+      "Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports boards are listed by /api/v1/analytics/reports instead.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,

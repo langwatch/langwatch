@@ -1,6 +1,6 @@
 /**
- * The addresses, methods and permissions the Dashboards boards REST families publish:
- * `/api/v1/boards` with its widgets, and the read-only project-path family it supersedes.
+ * The addresses, methods and permissions the boards REST families publish: the Dashboards
+ * boards at `/api/v1/dashboards` with their widgets, and the Reports boards under analytics.
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
@@ -13,35 +13,35 @@ const routesOf = (declaration: {
   routes: readonly { method: string; path: string; permission?: unknown }[];
 }) => declaration.routes.map((route) => [route.method, route.path, route.permission]);
 
-describe("given the /api/v1/boards family", () => {
+describe("given the /api/v1/dashboards family", () => {
   const declaration = boardRest.router();
 
   describe("when its routes are read", () => {
     /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */
-    it("serves the boards and their widgets in the boards namespace, each asking its permission", () => {
+    it("serves the boards and their widgets in the dashboards namespace, each asking its permission", () => {
       expect({
         namespace: declaration.namespace,
         addressing: declaration.addressing,
         routes: routesOf(declaration),
       }).toEqual({
-        namespace: "boards",
+        namespace: "dashboards",
         addressing: "dated",
         routes: [
           ["get", "/", "analytics:view"],
           ["post", "/", "analytics:create"],
-          ["get", "/:boardId", "analytics:view"],
-          ["patch", "/:boardId", "analytics:update"],
-          ["delete", "/:boardId", "analytics:delete"],
-          ["get", "/:boardId/widgets", "analytics:view"],
-          ["post", "/:boardId/widgets", "analytics:create"],
-          ["get", "/:boardId/widgets/:widgetId", "analytics:view"],
-          ["patch", "/:boardId/widgets/:widgetId", "analytics:update"],
-          ["delete", "/:boardId/widgets/:widgetId", "analytics:delete"],
+          ["get", "/:dashboardId", "analytics:view"],
+          ["patch", "/:dashboardId", "analytics:update"],
+          ["delete", "/:dashboardId", "analytics:delete"],
+          ["get", "/:dashboardId/widgets", "analytics:view"],
+          ["post", "/:dashboardId/widgets", "analytics:create"],
+          ["get", "/:dashboardId/widgets/:widgetId", "analytics:view"],
+          ["patch", "/:dashboardId/widgets/:widgetId", "analytics:update"],
+          ["delete", "/:dashboardId/widgets/:widgetId", "analytics:delete"],
         ],
       });
     });
 
-    /** @scenario "AC199q Split: /api/v1/boards is not there while Dashboards is off" */
+    /** @scenario "AC199q Split: /api/v1/dashboards is not there while Dashboards is off" */
     it("asks every route whether Dashboards is released for the key's project", () => {
       expect(
         declaration.routes.every((route) =>
@@ -52,22 +52,37 @@ describe("given the /api/v1/boards family", () => {
   });
 });
 
-describe("given the routes /api/v1/boards supersedes", () => {
-  /** @scenario "AC199r Split: the Reports boards API points to /api/v1/boards once Dashboards is on" */
-  it("deprecates them for /api/v1/boards only where Dashboards is released", () => {
-    expect(
-      [dashboardRest.router(), boardProjectRest.router()].map(({ deprecated }) => ({
-        successor: deprecated?.successor,
-        when: deprecated?.when?.name,
-      })),
-    ).toEqual([
-      { successor: "/api/v1/boards", when: "dashboardsReleased" },
-      { successor: "/api/v1/boards", when: "dashboardsReleased" },
-    ]);
+describe("given the Analytics Reports boards family", () => {
+  const declaration = dashboardRest.router();
+
+  /** @scenario "AC199r Split: the Reports boards answer at /api/v1/analytics/reports" */
+  it("serves them under /api/v1/analytics/reports, in analytics' namespace for good", () => {
+    expect({
+      addressing: declaration.addressing,
+      v1Twin: declaration.v1Twin,
+      routes: routesOf(declaration),
+      owners: declaration.routes.map((route) => route.sharedPath?.owner),
+    }).toEqual({
+      addressing: "literal",
+      v1Twin: false,
+      routes: [
+        ["get", "/api/v1/analytics/reports", "analytics:view"],
+        ["post", "/api/v1/analytics/reports", "analytics:create"],
+        ["put", "/api/v1/analytics/reports/reorder", "analytics:update"],
+        ["get", "/api/v1/analytics/reports/:reportId", "analytics:view"],
+        ["patch", "/api/v1/analytics/reports/:reportId", "analytics:update"],
+        ["delete", "/api/v1/analytics/reports/:reportId", "analytics:manage"],
+      ],
+      owners: Array(6).fill("analytics"),
+    });
   });
 
-  /** @scenario "AC199r Split: the Reports boards API points to /api/v1/boards once Dashboards is on" */
-  it("keeps the project-path family read-only", () => {
+  /** @scenario "AC199r Split: the Reports boards answer at /api/v1/analytics/reports" */
+  it("carries no deprecation, and neither does the project-path family", () => {
+    expect([declaration.deprecated, boardProjectRest.router().deprecated]).toEqual([
+      undefined,
+      undefined,
+    ]);
     expect(routesOf(boardProjectRest.router())).toEqual([
       ["get", "/api/v1/projects/:projectId/analytics/boards", "analytics:view"],
       ["get", "/api/v1/projects/:projectId/analytics/boards/:boardId", "analytics:view"],

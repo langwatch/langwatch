@@ -57,35 +57,20 @@ function restDeclarations(
 }
 
 /**
- * A refusing binding for every middleware context the installed families name: on a route, or
- * as the `when` of a family's deprecation, which no route need name and the mount asks for too.
- */
-export function describedMiddlewareContexts(
-  modules: readonly InstalledModule[] = processModules,
-): { middlewareContext: string; resolve: () => never }[] {
-  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
-
-  for (const declaration of restDeclarations(modules)) {
-    const when = declaration.deprecated?.when;
-    const named = [
-      ...declaration.routes.flatMap((route) => route.middleware ?? []),
-      ...(when ? [when] : []),
-    ];
-
-    for (const declared of named) {
-      contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
-    }
-  }
-
-  return [...contexts.values()];
-}
-
-/**
  * The REST application the api mounts, built from the declarations alone: no process boots,
  * no store opens, and a handler that ran would refuse.
  */
 export function describedRestApplication(modules: readonly InstalledModule[] = processModules) {
   const declarations = restDeclarations(modules);
+  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
+
+  for (const declaration of declarations) {
+    for (const route of declaration.routes) {
+      for (const declared of route.middleware ?? []) {
+        contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
+      }
+    }
+  }
 
   const rest = RestHost.create({
     identities: {
@@ -99,7 +84,7 @@ export function describedRestApplication(modules: readonly InstalledModule[] = p
     audit: { record: async () => {} },
     idempotency: refuse,
     rateLimiter: { check: refuse },
-    middlewareContext: describedMiddlewareContexts(modules) as never,
+    middlewareContext: [...contexts.values()] as never,
     entitlements: { holds: refuse },
     authz: undecided,
   });

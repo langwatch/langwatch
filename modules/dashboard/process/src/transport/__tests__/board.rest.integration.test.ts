@@ -1,6 +1,7 @@
 /**
- * `/api/v1/boards` and the routes it supersedes, over the real dashboard application and memory
- * repositories. The project comes from the key; `release_dashboards` is read per request.
+ * `/api/v1/dashboards` and the Reports boards at `/api/v1/analytics/reports`, over the real
+ * dashboard application and memory repositories. The project comes from the key;
+ * `release_dashboards` is read per request.
  * @see modules/dashboard/specs/dashboards-v2.feature
  * @see specs/analytics/dashboard-rest-api.feature
  * @vitest-environment node
@@ -19,7 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
 import { boardProjectRest } from "../board-project.rest.ts";
-import { boardRest, boardsReleased, dashboardsReleased, releasedOrRefused } from "../board.rest.ts";
+import { boardRest, boardsReleased, releasedOrRefused } from "../board.rest.ts";
 import {
   dashboardWidgetCallerSource,
   dashboardWidgetRest,
@@ -97,9 +98,6 @@ async function projectWithBothBoards({
       middlewareContext: [
         bindMiddlewareContext(dashboardWidgetUrl, () => `${BASE}/dashboards`),
         bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
-        bindMiddlewareContext(dashboardsReleased, () =>
-          released === "unreadable" ? Promise.reject(new Error("flag service down")) : released,
-        ),
         bindMiddlewareContext(boardsReleased, () =>
           released === "unreadable"
             ? Promise.reject(new Error("flag service down"))
@@ -109,10 +107,10 @@ async function projectWithBothBoards({
       onError: canonicalErrorResponse,
     });
   const doors = {
-    boards: mount(boardRest.router()),
+    dashboards: mount(boardRest.router()),
     projectBoards: mount(boardProjectRest.router()),
     widgets: mount(dashboardWidgetRest.router()),
-    dashboards: mount(dashboardRest.router()),
+    reports: mount(dashboardRest.router()),
   };
 
   const send = async (
@@ -138,7 +136,8 @@ async function projectWithBothBoards({
   return { app, reports, board, widget, send, cards };
 }
 
-const BOARDS = "/api/v1/boards";
+const BOARDS = "/api/v1/dashboards";
+const REPORTS = "/api/v1/analytics/reports";
 const PROJECT_BOARDS = `/api/v1/projects/${PROJECT}/analytics/boards`;
 const ids = (json: { data?: { id: string }[] } | undefined) => json?.data?.map(({ id }) => id);
 const refusal = (answer: { status: number; json?: { code?: string } }) => ({
@@ -147,12 +146,12 @@ const refusal = (answer: { status: number; json?: { code?: string } }) => ({
 });
 
 describe("given a Reports board and a Dashboards board holding a widget", () => {
-  describe("when an API key lists and reads /api/v1/boards", () => {
+  describe("when an API key lists and reads /api/v1/dashboards", () => {
     /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
     it("lists only the Dashboards board, with its widget count and address", async () => {
       const { board, send } = await projectWithBothBoards();
 
-      const listed = await send("boards", BOARDS);
+      const listed = await send("dashboards", BOARDS);
 
       expect(listed).toMatchObject({
         status: 200,
@@ -178,8 +177,8 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
       const { reports, board, send } = await projectWithBothBoards();
 
       const [read, refused] = await Promise.all([
-        send("boards", `${BOARDS}/${board.id}`),
-        send("boards", `${BOARDS}/${reports.id}`),
+        send("dashboards", `${BOARDS}/${board.id}`),
+        send("dashboards", `${BOARDS}/${reports.id}`),
       ]);
 
       expect({
@@ -192,10 +191,10 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
     });
 
     /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
-    it("keeps /api/v1/dashboards on the Reports board alone", async () => {
+    it("keeps /api/v1/analytics/reports on the Reports board alone", async () => {
       const { reports, send } = await projectWithBothBoards();
 
-      const listed = await send("dashboards", "/api/v1/dashboards");
+      const listed = await send("reports", REPORTS);
 
       expect(ids(listed.json)).toEqual([reports.id]);
     });
@@ -206,7 +205,7 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
     it("places it on the Dashboards board and answers the Reports board as not found", async () => {
       const { reports, board, send } = await projectWithBothBoards();
       const createOn = (boardId: string) =>
-        send("boards", `${BOARDS}/${boardId}/widgets`, {
+        send("dashboards", `${BOARDS}/${boardId}/widgets`, {
           method: "POST",
           body: { name: "Spans", code: CODE, queries: [] },
         });
@@ -229,10 +228,10 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
     it("answers 201 with the board, lists it with no widgets and renames it", async () => {
       const { send } = await projectWithBothBoards();
 
-      const created = await send("boards", BOARDS, { method: "POST", body: { name: "Fresh" } });
+      const created = await send("dashboards", BOARDS, { method: "POST", body: { name: "Fresh" } });
       const boardId = created.json?.id;
-      const listed = await send("boards", BOARDS);
-      const renamed = await send("boards", `${BOARDS}/${boardId}`, {
+      const listed = await send("dashboards", BOARDS);
+      const renamed = await send("dashboards", `${BOARDS}/${boardId}`, {
         method: "PATCH",
         body: { name: "Renamed", description: "Weekly" },
       });
@@ -260,7 +259,10 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
     it("refuses a rename naming nothing", async () => {
       const { board, send } = await projectWithBothBoards();
 
-      const refused = await send("boards", `${BOARDS}/${board.id}`, { method: "PATCH", body: {} });
+      const refused = await send("dashboards", `${BOARDS}/${board.id}`, {
+        method: "PATCH",
+        body: {},
+      });
 
       expect(refused.status).toBe(422);
     });
@@ -270,9 +272,9 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
       const { board, send } = await projectWithBothBoards();
       const path = `${BOARDS}/${board.id}`;
 
-      const deleted = await send("boards", path, { method: "DELETE" });
-      const read = await send("boards", path);
-      const deletedAgain = await send("boards", path, { method: "DELETE" });
+      const deleted = await send("dashboards", path, { method: "DELETE" });
+      const read = await send("dashboards", path);
+      const deletedAgain = await send("dashboards", path, { method: "DELETE" });
       const widgets = await send(
         "widgets",
         `/api/v1/projects/${PROJECT}/analytics/dashboard-widgets`,
@@ -312,10 +314,10 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
 
       const refused = await Promise.all(
         [reports.id, foreign.id, mine.id].map((id) =>
-          send("boards", `${BOARDS}/${id}`, { method: "DELETE" }),
+          send("dashboards", `${BOARDS}/${id}`, { method: "DELETE" }),
         ),
       );
-      const reportsBoards = await send("dashboards", "/api/v1/dashboards");
+      const reportsBoards = await send("reports", REPORTS);
 
       expect(refused.map(refusal)).toEqual([
         { status: 404, code: "dashboard_not_found" },
@@ -331,7 +333,7 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
     it("records them as its author, at Only me, starred for them", async () => {
       const { app, send } = await projectWithBothBoards({ actor: MEMBER });
 
-      const created = await send("boards", BOARDS, {
+      const created = await send("dashboards", BOARDS, {
         method: "POST",
         body: { name: MY_DASHBOARD_NAME },
       });
@@ -364,8 +366,8 @@ describe("given two Dashboards boards, one holding a widget", () => {
     const { board, other, widget, send } = await twoBoards();
 
     const [onBoard, onOther] = await Promise.all([
-      send("boards", `${BOARDS}/${board.id}/widgets`),
-      send("boards", `${BOARDS}/${other.id}/widgets`),
+      send("dashboards", `${BOARDS}/${board.id}/widgets`),
+      send("dashboards", `${BOARDS}/${other.id}/widgets`),
     ]);
 
     expect({ onBoard: ids(onBoard.json), onOther: ids(onOther.json) }).toEqual({
@@ -379,15 +381,15 @@ describe("given two Dashboards boards, one holding a widget", () => {
     const { other, send } = await twoBoards();
     const widgets = `${BOARDS}/${other.id}/widgets`;
 
-    const created = await send("boards", widgets, {
+    const created = await send("dashboards", widgets, {
       method: "POST",
       body: { name: "Latency", code: CODE, queries: [] },
     });
     const path = `${widgets}/${created.json?.id}`;
-    const read = await send("boards", path);
-    const updated = await send("boards", path, { method: "PATCH", body: { name: "P95" } });
-    const deleted = await send("boards", path, { method: "DELETE" });
-    const after = await send("boards", path);
+    const read = await send("dashboards", path);
+    const updated = await send("dashboards", path, { method: "PATCH", body: { name: "P95" } });
+    const deleted = await send("dashboards", path, { method: "DELETE" });
+    const after = await send("dashboards", path);
 
     expect({
       created: {
@@ -414,11 +416,11 @@ describe("given two Dashboards boards, one holding a widget", () => {
     const wrong = `${BOARDS}/${other.id}/widgets/${widget.id}`;
 
     const answers = await Promise.all([
-      send("boards", wrong),
-      send("boards", wrong, { method: "PATCH", body: { name: "Moved" } }),
-      send("boards", wrong, { method: "DELETE" }),
+      send("dashboards", wrong),
+      send("dashboards", wrong, { method: "PATCH", body: { name: "Moved" } }),
+      send("dashboards", wrong, { method: "DELETE" }),
     ]);
-    const still = await send("boards", `${BOARDS}/${board.id}/widgets/${widget.id}`);
+    const still = await send("dashboards", `${BOARDS}/${board.id}/widgets/${widget.id}`);
 
     expect(answers.map(refusal)).toEqual([
       { status: 404, code: "dashboard_widget_not_found" },
@@ -438,7 +440,7 @@ describe("given two Dashboards boards, one holding a widget", () => {
 
     const refused = await Promise.all(
       [foreign.id, "missing-board"].map((id) =>
-        send("boards", `${BOARDS}/${id}/widgets`, {
+        send("dashboards", `${BOARDS}/${id}/widgets`, {
           method: "POST",
           body: { name: "Nope", code: CODE, queries: [] },
         }),
@@ -453,23 +455,23 @@ describe("given two Dashboards boards, one holding a widget", () => {
 });
 
 describe("given Dashboards is switched off for the key's project", () => {
-  /** @scenario "AC199q Split: /api/v1/boards is not there while Dashboards is off" */
-  it("answers every /api/v1/boards route 404 and writes nothing", async () => {
+  /** @scenario "AC199q Split: /api/v1/dashboards is not there while Dashboards is off" */
+  it("answers every /api/v1/dashboards route 404 and writes nothing", async () => {
     const { app, board, widget, send } = await projectWithBothBoards({ released: false });
     const widgetPath = `${BOARDS}/${board.id}/widgets/${widget.id}`;
     const body = { name: "Nope", code: CODE, queries: [] };
 
     const answers = await Promise.all([
-      send("boards", BOARDS),
-      send("boards", BOARDS, { method: "POST", body: { name: "Nope" } }),
-      send("boards", `${BOARDS}/${board.id}`),
-      send("boards", `${BOARDS}/${board.id}`, { method: "PATCH", body: { name: "Nope" } }),
-      send("boards", `${BOARDS}/${board.id}`, { method: "DELETE" }),
-      send("boards", `${BOARDS}/${board.id}/widgets`),
-      send("boards", `${BOARDS}/${board.id}/widgets`, { method: "POST", body }),
-      send("boards", widgetPath),
-      send("boards", widgetPath, { method: "PATCH", body: { name: "Nope" } }),
-      send("boards", widgetPath, { method: "DELETE" }),
+      send("dashboards", BOARDS),
+      send("dashboards", BOARDS, { method: "POST", body: { name: "Nope" } }),
+      send("dashboards", `${BOARDS}/${board.id}`),
+      send("dashboards", `${BOARDS}/${board.id}`, { method: "PATCH", body: { name: "Nope" } }),
+      send("dashboards", `${BOARDS}/${board.id}`, { method: "DELETE" }),
+      send("dashboards", `${BOARDS}/${board.id}/widgets`),
+      send("dashboards", `${BOARDS}/${board.id}/widgets`, { method: "POST", body }),
+      send("dashboards", widgetPath),
+      send("dashboards", widgetPath, { method: "PATCH", body: { name: "Nope" } }),
+      send("dashboards", widgetPath, { method: "DELETE" }),
     ]);
     const boards = await app.findBoards({ projectId: PROJECT });
     const widgets = await app.listDashboardWidgets({ projectId: PROJECT });
@@ -485,10 +487,10 @@ describe("given Dashboards is switched off for the key's project", () => {
   });
 });
 
-describe("given a Langy session key deleting at /api/v1/boards", () => {
+describe("given a Langy session key deleting at /api/v1/dashboards", () => {
   describe("when Dashboards is switched off for the key's project", () => {
     /**
-     * @scenario "AC199q Split: /api/v1/boards is not there while Dashboards is off"
+     * @scenario "AC199q Split: /api/v1/dashboards is not there while Dashboards is off"
      * @scenario "A route the project cannot reach refuses a Langy key before any card"
      */
     it("answers 404 dashboards_not_released before any card, and reads no name", async () => {
@@ -499,8 +501,8 @@ describe("given a Langy session key deleting at /api/v1/boards", () => {
       });
 
       const answers = await Promise.all([
-        send("boards", `${BOARDS}/${board.id}`, { method: "DELETE" }),
-        send("boards", `${BOARDS}/${board.id}/widgets/${widget.id}`, { method: "DELETE" }),
+        send("dashboards", `${BOARDS}/${board.id}`, { method: "DELETE" }),
+        send("dashboards", `${BOARDS}/${board.id}/widgets/${widget.id}`, { method: "DELETE" }),
       ]);
 
       expect(answers.map(refusal)).toEqual([
@@ -518,7 +520,7 @@ describe("given a Langy session key deleting at /api/v1/boards", () => {
     it("asks for the click on a card naming the board, then deletes it", async () => {
       const { board, send, cards } = await projectWithBothBoards({ langy: true, actor: MEMBER });
 
-      const deleted = await send("boards", `${BOARDS}/${board.id}`, { method: "DELETE" });
+      const deleted = await send("dashboards", `${BOARDS}/${board.id}`, { method: "DELETE" });
 
       expect({ status: deleted.status, cards }).toEqual({
         status: 200,
@@ -528,73 +530,60 @@ describe("given a Langy session key deleting at /api/v1/boards", () => {
   });
 });
 
-describe("given the routes /api/v1/boards supersedes", () => {
-  const SUPERSEDED = [
-    ["dashboards", "/api/v1/dashboards"],
-    ["dashboards", "/api/dashboards"],
-    ["projectBoards", PROJECT_BOARDS],
-  ] as const;
+describe("given the Reports boards at /api/v1/analytics/reports", () => {
+  const deprecationHeaders = (answer: { headers: Headers }) =>
+    ["Deprecation", "Link", "Sunset"].map((name) => answer.headers.get(name));
 
-  /**
-   * @scenario "AC199r Split: the Reports boards API points to /api/v1/boards once Dashboards is on"
-   * @scenario "The dashboards API is deprecated where Dashboards is switched on"
-   */
-  it("answers as before with Deprecation and Link headers, and no Sunset, while Dashboards is on", async () => {
-    const { reports, board, send } = await projectWithBothBoards();
+  /** @scenario "AC199r Split: the Reports boards answer at /api/v1/analytics/reports" */
+  it("lists, creates, reorders, reads, renames and deletes them, Dashboards on or off", async () => {
+    for (const released of [true, false]) {
+      const { reports, board, send } = await projectWithBothBoards({ released });
 
-    const answers = await Promise.all(SUPERSEDED.map(([door, path]) => send(door, path)));
+      const listed = await send("reports", REPORTS);
+      const created = await send("reports", REPORTS, { method: "POST", body: { name: "Costs" } });
+      const id = created.json?.id as string;
+      const reordered = await send("reports", `${REPORTS}/reorder`, {
+        method: "PUT",
+        body: { dashboardIds: [id, reports.id] },
+      });
+      const read = await send("reports", `${REPORTS}/${id}`);
+      const renamed = await send("reports", `${REPORTS}/${id}`, {
+        method: "PATCH",
+        body: { name: "Spend" },
+      });
+      const deleted = await send("reports", `${REPORTS}/${id}`, { method: "DELETE" });
+      const dashboardsBoard = await send("reports", `${REPORTS}/${board.id}`);
+      const answers = [listed, created, reordered, read, renamed, deleted];
 
-    expect(
-      answers.map((answer) => ({
-        status: answer.status,
-        ids: ids(answer.json),
-        deprecation: answer.headers.get("Deprecation"),
-        link: answer.headers.get("Link"),
-        sunset: answer.headers.get("Sunset"),
-      })),
-    ).toEqual(
-      [[reports.id], [reports.id], [board.id]].map((listed) => ({
-        status: 200,
-        ids: listed,
-        deprecation: "true",
-        link: '</api/v1/boards>; rel="successor-version"',
-        sunset: null,
-      })),
-    );
+      expect({
+        statuses: answers.map(({ status }) => status),
+        listed: ids(listed.json),
+        read: read.json?.id,
+        renamed: renamed.json?.name,
+        deleted: deleted.json,
+        dashboardsBoard: refusal(dashboardsBoard),
+        headers: answers.map(deprecationHeaders),
+      }).toEqual({
+        statuses: [200, 201, 200, 200, 200, 200],
+        listed: [reports.id],
+        read: id,
+        renamed: "Spend",
+        deleted: { id, name: "Spend" },
+        dashboardsBoard: { status: 404, code: "dashboard_not_found" },
+        headers: answers.map(() => [null, null, null]),
+      });
+    }
   });
 
-  /**
-   * @scenario "AC199r Split: the Reports boards API points to /api/v1/boards once Dashboards is on"
-   * @scenario "The dashboards API is unchanged where Dashboards is switched off"
-   */
-  it("answers as before with no Deprecation or Link header while Dashboards is off", async () => {
-    const { reports, send } = await projectWithBothBoards({ released: false });
+  /** @scenario "AC199r Split: the Reports boards answer at /api/v1/analytics/reports" */
+  it("leaves the project-path boards read without deprecation headers", async () => {
+    const { board, send } = await projectWithBothBoards();
 
-    const answers = await Promise.all(SUPERSEDED.map(([door, path]) => send(door, path)));
+    const listed = await send("projectBoards", PROJECT_BOARDS);
 
-    expect(
-      answers.map((answer) => ({
-        status: answer.status,
-        deprecation: answer.headers.get("Deprecation"),
-        link: answer.headers.get("Link"),
-      })),
-    ).toEqual(SUPERSEDED.map(() => ({ status: 200, deprecation: null, link: null })));
-    expect(ids(answers[0]?.json)).toEqual([reports.id]);
-  });
-
-  /** @scenario "The dashboards API keeps answering when the rollout flag cannot be read" */
-  it("answers as before with no Deprecation or Link header when the flag cannot be read", async () => {
-    const { reports, send } = await projectWithBothBoards({ released: "unreadable" });
-
-    const answers = await Promise.all(SUPERSEDED.map(([door, path]) => send(door, path)));
-
-    expect(
-      answers.map((answer) => ({
-        status: answer.status,
-        deprecation: answer.headers.get("Deprecation"),
-        link: answer.headers.get("Link"),
-      })),
-    ).toEqual(SUPERSEDED.map(() => ({ status: 200, deprecation: null, link: null })));
-    expect(ids(answers[0]?.json)).toEqual([reports.id]);
+    expect({ ids: ids(listed.json), headers: deprecationHeaders(listed) }).toEqual({
+      ids: [board.id],
+      headers: [null, null, null],
+    });
   });
 });

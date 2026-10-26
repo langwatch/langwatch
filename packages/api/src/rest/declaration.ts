@@ -197,12 +197,6 @@ export type RestDeprecation = Readonly<{
   /** The path of the family or route that replaces this one. */
   readonly successor: string;
   readonly notice?: string;
-  /**
-   * Deprecated only for a request this context answers true for, read after the door from the
-   * credential alone; such a family is not published as deprecated. Whole family only. A context
-   * that throws, even a refusal on purpose, cannot decide: a warning is logged, no headers sent.
-   */
-  readonly when?: MiddlewareContext<string, z.ZodBoolean>;
 }>;
 
 /** A path in another module's namespace: retired by its `deprecate` plan, or `permanent` (§8). */
@@ -1303,7 +1297,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   }
 
   /** Marks this one route superseded, whatever the family declared. */
-  withDeprecated(deprecated: Omit<RestDeprecation, "when">): RouteBuilder<Api, S> {
+  withDeprecated(deprecated: RestDeprecation): RouteBuilder<Api, S> {
     return new RouteBuilder<Api, S>({
       router: this.router,
       method: this.method,
@@ -2046,13 +2040,13 @@ class RestTransportRouter<
     return this;
   }
 
-  /** Marks every route of the family superseded by `successor`; `when` makes it per request. */
-  withDeprecated<When extends MiddlewareContext<string, z.ZodBoolean> = never>(
-    deprecated: RestDeprecation & Readonly<{ when?: When }>,
-  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session, Named, Needs | When> {
+  /** Marks every route of the family superseded by `successor`. */
+  withDeprecated(
+    deprecated: RestDeprecation,
+  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session, Named, Needs> {
     this.deprecated = deprecated;
 
-    return this as RestTransportRouter<Api, Door, StrictJsonSchemas, Session, Named, Needs | When>;
+    return this;
   }
 
   /** The inert declaration a feature installer retains and a process mounts. */

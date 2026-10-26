@@ -23,12 +23,6 @@ Feature: The OpenAPI document is generated from the route declarations and never
       When the generator mounts their REST declarations
       Then its route table is the one the booted api serves
 
-    @unit
-    Scenario: The generator mounts a family deprecated per request
-      Given a family deprecated when a context no route of it names answers true
-      When the generator mounts it
-      Then the mount succeeds and carries the family's routes
-
     @integration
     Scenario: The api serves the generated document
       Given the booted api

@@ -66,7 +66,7 @@ export class DashboardsNotEnabledError extends HandledError {
   }
 }
 
-/** `/api/v1/boards` while `release_dashboards` is off for the key's project: as if absent. */
+/** `/api/v1/dashboards` while `release_dashboards` is off for the key's project: as if absent. */
 export class DashboardsNotReleasedError extends HandledError {
   declare readonly code: "dashboards_not_released";
 

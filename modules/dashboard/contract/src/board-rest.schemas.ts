@@ -1,5 +1,5 @@
 /**
- * The Dashboards boards REST wire shapes: `/api/v1/boards` and its widgets, and the deprecated
+ * The Dashboards boards REST wire shapes: `/api/v1/dashboards` and its widgets, and the
  * `/api/v1/projects/:projectId/analytics/boards` reads.
  */
 import type { Named } from "@langwatch/module";
@@ -55,9 +55,9 @@ const boardParamsSchemaDefinition = z.object({
 export interface BoardParamsSchema extends Named<typeof boardParamsSchemaDefinition> {}
 export const boardParamsSchema: BoardParamsSchema = boardParamsSchemaDefinition;
 
-// -- `/api/v1/boards`: the project comes from the key, never the path ---------
+// -- `/api/v1/dashboards`: the project comes from the key, never the path -----
 
-const boardIdParamsSchemaDefinition = z.object({ boardId: dashboardIdSchema });
+const boardIdParamsSchemaDefinition = z.object({ dashboardId: dashboardIdSchema });
 export interface BoardIdParamsSchema extends Named<typeof boardIdParamsSchemaDefinition> {}
 export const boardIdParamsSchema: BoardIdParamsSchema = boardIdParamsSchemaDefinition;
 

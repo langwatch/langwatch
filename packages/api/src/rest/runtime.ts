@@ -799,24 +799,6 @@ function contextBindings<Api>({
     }
   }
 
-  const when = declaration.deprecated?.when;
-
-  // Asked right after the door, before any input is parsed; a header context has no binding.
-  if (when?.source) {
-    throw new Error(
-      `REST family "${declaration.namespace}" is deprecated when "${when.name}" says so, which ` +
-        `reads the request's ${when.source}; a deprecation is asked before either is read, so ` +
-        "its context must read the credential alone",
-    );
-  }
-
-  if (when && !bound.has(when.name)) {
-    throw new Error(
-      `REST family "${declaration.namespace}" is deprecated when "${when.name}" says so, ` +
-        "and its module provides no value for it",
-    );
-  }
-
   return bound;
 }
 
@@ -850,8 +832,7 @@ function routeStack<Api>({
 }): MiddlewareHandler[] {
   const limit = route.bodyLimit;
   const family = declaration.namespace;
-  const deprecation = deprecationStages({ route, declaration, ports, contexts });
-  const deprecated = deprecation.published;
+  const deprecated = route.deprecated ?? declaration.deprecated;
   // An any-method route publishes no operation, because it has none: one
   // handler stands behind every method the path can be sent. A family behind a
   // browser session publishes none either - no API client can present a
@@ -904,21 +885,17 @@ function routeStack<Api>({
           }),
         ]
       : []),
-    ...deprecation.beforeDoor,
+    // Ahead of everything that can refuse: a deprecated endpoint's answer says
+    // so whether it succeeded or not.
+    ...(deprecated
+      ? [deprecatedAlias(deprecated), deprecationLog({ route, family, deprecated, ports })]
+      : []),
     // The door answers before the cap drains a byte (main's order), unless it signs over the
     // body: then the capped bytes are read once, exactly as sent, and it verifies those.
     // The media type is asked after the door either way (E9): a missing credential answers 401.
     ...(doorReadsBody(route)
-      ? [...cap, ...raw, door, ...deprecation.afterDoor, ...media, ...refused]
-      : [
-          door,
-          ...deprecation.afterDoor,
-          ...credentialContexts({ route, contexts }),
-          ...media,
-          ...refused,
-          ...cap,
-          ...raw,
-        ]),
+      ? [...cap, ...raw, door, ...media, ...refused]
+      : [door, ...credentialContexts({ route, contexts }), ...media, ...refused, ...cap, ...raw]),
     ...(route.multipart
       ? [
           multipartMiddleware({
@@ -1117,116 +1094,6 @@ function refusedMediaTypeMiddleware({
 
     await next();
   };
-}
-
-/**
- * Where a route's deprecation runs. A plain one goes ahead of everything that can refuse and is
- * published; one asked `when` goes right after the door, which it needs, and is not published.
- */
-function deprecationStages<Api>({
-  route,
-  declaration,
-  ports,
-  contexts,
-}: {
-  route: RestTransportRoute<Api>;
-  declaration: RestTransportDeclaration<Api>;
-  ports: RestRuntimeMembers;
-  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
-}): {
-  published?: RestDeprecation;
-  beforeDoor: MiddlewareHandler[];
-  afterDoor: MiddlewareHandler[];
-} {
-  const deprecated = route.deprecated ?? declaration.deprecated;
-  const family = declaration.namespace;
-
-  if (!deprecated) return { beforeDoor: [], afterDoor: [] };
-
-  const { when } = deprecated;
-
-  if (when) {
-    const afterDoor = conditionalDeprecation({
-      route,
-      family,
-      deprecated: { ...deprecated, when },
-      ports,
-      contexts,
-    });
-
-    return { beforeDoor: [], afterDoor: [afterDoor] };
-  }
-
-  return {
-    published: deprecated,
-    beforeDoor: [deprecatedAlias(deprecated), deprecationLog({ route, family, deprecated, ports })],
-    afterDoor: [],
-  };
-}
-
-/**
- * A family deprecated `when` its context says so: asked after the door, since the answer
- * depends on who is calling, and before anything that can refuse, so a refusal carries it too.
- */
-function conditionalDeprecation<Api>({
-  route,
-  family,
-  deprecated,
-  ports,
-  contexts,
-}: {
-  route: RestTransportRoute<Api>;
-  family: string;
-  deprecated: RestDeprecation & { when: NonNullable<RestDeprecation["when"]> };
-  ports: RestRuntimeMembers;
-  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
-}): MiddlewareHandler {
-  const headers = deprecatedAlias(deprecated);
-  const log = deprecationLog({ route, family, deprecated, ports });
-
-  return async (context, next) => {
-    const applies = await deprecationApplies({
-      route: route as RestTransportRoute<unknown>,
-      declared: deprecated.when,
-      contexts,
-      context,
-    });
-
-    if (applies !== true) {
-      await next();
-
-      return;
-    }
-
-    await headers(context, async () => {
-      await log(context, next);
-    });
-  };
-}
-
-/** The logger a deprecation that could not be decided is reported through. */
-const deprecationLogger = createLogger("langwatch:api:deprecation");
-
-/**
- * A deprecation is a warning, never a gate: when its context cannot be resolved the route
- * answers as if it were not deprecated, so a flag or database fault cannot take it down.
- */
-async function deprecationApplies(input: {
-  route: RestTransportRoute<unknown>;
-  declared: MiddlewareContext;
-  contexts: ReadonlyMap<string, MiddlewareContextBinding>;
-  context: Context;
-}): Promise<unknown> {
-  try {
-    return await resolveBoundContext(input);
-  } catch (error) {
-    deprecationLogger.warn(
-      { error, operation: input.route.operation, context: input.declared.name },
-      "deprecation context failed to resolve; answering without deprecation headers",
-    );
-
-    return false;
-  }
 }
 
 /**
@@ -2587,9 +2454,9 @@ function requireAuthorize(door: RestIdentity): NonNullable<RestIdentity["authori
 }
 
 /**
- * The declared middleware context, in declaration order, each parsed by its schema. Resolved
- * after the access decision, so a refused request asks the process for nothing; the exception is
- * a family's deprecation `when`, asked after the door, before the permission (ADR 003 §4).
+ * The declared middleware context, in declaration order, each parsed by the schema that
+ * declared it. Resolved after the access decision, so a refused request never
+ * asks the process for anything.
  */
 async function resolveContexts({
   route,

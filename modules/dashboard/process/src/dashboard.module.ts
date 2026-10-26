@@ -60,12 +60,8 @@ export const dashboardProcessModule: PublishedProcessModule<
       app.dashboardWidgetPlatformUrl({
         projectSlug: projectCredentialOfRequest(request).project.slug,
       }),
-    // `release_dashboards` for the key's project, asked on each request: /api/v1/boards answers
-    // only while it is on, and the routes it supersedes are deprecated only then.
-    dashboardsReleased: (request, { dependencies }) =>
-      dependencies.analytics.isDashboardsEnabled({
-        projectId: projectCredentialOfRequest(request).project.id,
-      }),
+    // `release_dashboards` for the key's project, asked on each request: /api/v1/dashboards
+    // answers only while it is on.
     boardsReleased: async (request, { dependencies }) =>
       releasedOrRefused(
         await dependencies.analytics.isDashboardsEnabled({

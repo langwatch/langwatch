@@ -77,32 +77,13 @@ asks of every Redis consumer.
 
 ### 4. Deprecation needs no port
 
-A plain `.withDeprecated(notice)` marks the operation `deprecated: true` in the
+`.withDeprecated(notice)` marks the operation `deprecated: true` in the
 OpenAPI document with the notice in its description — on every dated mount
 the registration serves, so SDK generators surface it per version — and adds
 `Deprecation` plus `X-API-Deprecation-Notice` response headers, set in the
 same `finally` as the version headers so errors carry them too. It is the
 soft counterpart of `withdraw()`: deprecated still answers and warns;
 withdrawn answers 410.
-
-#### A deprecation asked per request
-
-`.withDeprecated({ successor, when })` on a family deprecates it only for a
-request whose `when` context answers true: a family superseded behind a
-release flag is deprecated for a project that has the successor, and for no
-other. The answer depends on the caller, so:
-
-- it is not in the published document; the operation is not marked
-  `deprecated`, on any dated mount;
-- it is asked right after the door, which it needs, and before the permission,
-  validation and the handler, so their refusals carry the headers too. A 401
-  from the door carries none;
-- the context reads the credential alone. One that reads the body or a header
-  is refused at mount, and so is one the module does not provide;
-- it fails open. A context that throws, a refusal on purpose included, is
-  logged as a warning and the request is answered with no deprecation headers.
-  A deprecation is a warning, never a gate, so a flag fault cannot take the
-  route down.
 
 ### 5. Service-level defaults follow the chain's own rule
 
@@ -135,8 +116,7 @@ own once.
 - The package gains two interfaces and no runtime dependencies; tests use
   in-memory ports, the app ships the Redis adapters once.
 - A capability's presence is visible in the chain, the mount report and —
-  for deprecation — the published document, except a deprecation asked per
-  request (§4), which only its answers carry.
+  for deprecation — the published document.
 - Build-time failure on a missing port keeps "declared but not wired" out of
   production.
 - Future capabilities follow the same shape: chain call, port if a substrate

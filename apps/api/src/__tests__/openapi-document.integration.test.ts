@@ -15,11 +15,11 @@ import type { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
-  describedMiddlewareContexts,
   describedRestApplication,
   generateOpenApiDocument,
   writeOpenApiDocument,
 } from "../openapi-document.ts";
+import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
 const METHODS = ["get", "head", "post", "put", "patch", "delete"] as const;
@@ -48,6 +48,20 @@ async function bootedApi() {
     authorize: refuse,
     authorizePlatform: refuse,
   };
+  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
+  for (const module of processModules) {
+    for (const transport of module.transports ?? []) {
+      if (transport.protocol !== "rest") continue;
+      const declaration = transport.router() as {
+        routes: readonly { middleware?: readonly { name: string }[] }[];
+      };
+      for (const route of declaration.routes) {
+        for (const declared of route.middleware ?? []) {
+          contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
+        }
+      }
+    }
+  }
 
   let rest: RestHost | undefined;
   const { runtime } = await bootApi({
@@ -65,7 +79,7 @@ async function bootedApi() {
         audit: { record: async () => {} },
         idempotency: refuse,
         rateLimiter: { check: refuse },
-        middlewareContext: describedMiddlewareContexts() as never,
+        middlewareContext: [...contexts.values()] as never,
         entitlements: { holds: refuse },
       });
       const mountNothing = { mount: () => {} };
@@ -97,6 +111,28 @@ describe("the OpenAPI document generated from the installed declarations", () =>
   /** @scenario "The generator mounts exactly the route table the api serves" */
   it("mounts exactly the REST route table the booted api serves", () => {
     expect(routeTable(describedRestApplication())).toEqual(routeTable(booted.rest.app));
+  });
+
+  /** @scenario "AC199r Split: the Reports boards answer at /api/v1/analytics/reports" */
+  it("serves the Reports boards beside the timeseries query, and no /api/v1/boards", () => {
+    const { paths } = generated as OpenApiDocument;
+    const operations = (path: string) => METHODS.filter((method) => paths[path]?.[method]);
+
+    expect({
+      timeseries: operations("/api/v1/analytics"),
+      reports: operations("/api/v1/analytics/reports"),
+      reorder: operations("/api/v1/analytics/reports/reorder"),
+      report: operations("/api/v1/analytics/reports/{reportId}"),
+      dashboards: operations("/api/v1/dashboards"),
+      boards: Object.keys(paths).filter((path) => path.startsWith("/api/v1/boards")),
+    }).toEqual({
+      timeseries: ["post"],
+      reports: ["get", "post"],
+      reorder: ["put"],
+      report: ["get", "patch", "delete"],
+      dashboards: ["get", "post"],
+      boards: [],
+    });
   });
 
   /** @scenario "The api serves the generated document" */
