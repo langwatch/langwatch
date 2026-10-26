@@ -9,7 +9,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithApiKeyHost } from "../../../testing.tsx";
-import type { CreateApiKeyInput } from "../../../model/api-key-permissions.ts";
+import type { CreateApiKeyInput } from "../../../model/api-key-form.ts";
 import { CreateApiKeyDrawer } from "../create-api-key-drawer.tsx";
 
 const { state } = vi.hoisted(() => ({
