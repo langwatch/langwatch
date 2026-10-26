@@ -141,8 +141,8 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     @integration
     Scenario: Revoking the legacy key says an API key takes its place
       Given "ada" chose Revoke on the legacy key row of project "alpha"
-      Then a dialog "Revoke the legacy project key?" says the key stops working within seconds
-      And it says a new API key for project "alpha" is created and shown once
+      Then a dialog "Revoke the legacy project key?" says they next create a new API key for project "alpha", shown once
+      And it says the legacy key stops working within seconds once that key is created
 
     @integration
     Scenario: Revoke waits until the reader's roles are known
@@ -157,9 +157,24 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the dialog's Revoke is unavailable and says their access could not be checked
 
     @integration
-    Scenario: Revoking the legacy key swaps it for an API key
+    Scenario: Confirming the legacy key revoke opens the create drawer filled in
       Given "ada" chose Revoke on the legacy key row of project "alpha"
       When they confirm
+      Then the create drawer opens with the name "Project API Key", full access to project "alpha" and no expiry
+      And no API key is created yet
+      And the legacy key of project "alpha" is not revoked
+
+    @integration
+    Scenario: Closing the drawer keeps the legacy key
+      Given "ada" confirmed Revoke on the legacy key row of project "alpha"
+      When they close the create drawer without creating a key
+      Then no API key is created
+      And the legacy key of project "alpha" still works
+
+    @integration
+    Scenario: Revoking the legacy key swaps it for an API key
+      Given "ada" confirmed Revoke on the legacy key row of project "alpha"
+      When they create the key from the drawer
       Then an API key "Project API Key" is created with full access to project "alpha" and no expiry
       And its token is shown once
       And the legacy key of project "alpha" is revoked
@@ -169,21 +184,21 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     @integration
     Scenario: A failed create leaves the legacy key working
       Given "ada" confirmed Revoke on the legacy key row of project "alpha"
-      When the new API key cannot be created
+      When the new API key cannot be created from the drawer
       Then the legacy key of project "alpha" is not revoked
       And an error says the key could not be created
 
     @integration
     Scenario: A failed revoke after the swap still shows the new key
       Given "ada" confirmed Revoke on the legacy key row of project "alpha"
-      When the new API key is created but the revoke fails
+      When the new API key is created from the drawer but the revoke fails
       Then the new token is still shown once
       And an error says the legacy key still works and can be revoked again from its row
 
     @integration
     Scenario: A project admin's swap gets a personal key with their role
       Given "pat" administers the team that owns project "alpha" but not the organization
-      When "pat" confirms Revoke on the legacy key row of project "alpha"
+      When "pat" confirms Revoke on the legacy key row of project "alpha" and creates the key from the drawer
       Then a personal API key with the Admin role on project "alpha" is created
       And the legacy key of project "alpha" is revoked
 
@@ -191,7 +206,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
     Scenario: A swap whose new key could not send traces keeps the legacy key
       Given a reader who can manage project "alpha" holds no role on it that sends traces
       When they confirm Revoke on the legacy key row of project "alpha"
-      Then no API key is created
+      Then the create drawer does not open and no API key is created
       And the legacy key of project "alpha" is not revoked
       And an error says their role cannot create a key that sends traces
 

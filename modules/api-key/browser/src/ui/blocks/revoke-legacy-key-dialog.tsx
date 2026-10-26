@@ -9,19 +9,17 @@ const ACCESS_PROBLEM = {
 
 /**
  * Revoking the legacy project key swaps it for an API key on the same project,
- * so the reader is told up front that a new key is coming and the old one dies.
+ * so the reader is told up front that they create the new key and the old one dies.
  */
 export function RevokeLegacyKeyDialog({
   open,
   projectName,
-  isRevoking,
   access,
   onClose,
   onConfirm,
 }: {
   open: boolean;
   projectName: string | undefined;
-  isRevoking: boolean;
   /** Whether the reader's roles are known, which decide the new key's type and role. */
   access: "loading" | "failed" | "ready";
   onClose: () => void;
@@ -34,20 +32,18 @@ export function RevokeLegacyKeyDialog({
       title="Revoke the legacy project key?"
       size="md"
       role="alertdialog"
-      busy={isRevoking}
       primaryAction={{
         label: "Revoke",
         danger: true,
-        loading: isRevoking,
         onClick: onConfirm,
         disabledReason: ACCESS_PROBLEM[access],
         "data-testid": "legacy-key-revoke-confirm",
       }}
     >
       <Text>
-        The legacy key stops working within seconds. We create a new API key for{" "}
-        {projectName ?? "this project"} and show it to you once. Put it wherever the legacy key was
-        used.
+        Next you create a new API key for {projectName ?? "this project"}, which we show to you
+        once. Once it is created, the legacy key stops working within seconds. Put the new key
+        wherever the legacy key was used.
       </Text>
     </Dialog>
   );
