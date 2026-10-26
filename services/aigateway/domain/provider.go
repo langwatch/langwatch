@@ -75,6 +75,7 @@ var knownProviderFamilies = map[string]struct{}{
 	"groq":                  {},
 	"cerebras":              {},
 	"deepseek":              {},
+	"doubleword":            {},
 	"voyage":                {},
 	"custom":                {},
 	"elevenlabs":            {},

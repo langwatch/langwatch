@@ -40,30 +40,58 @@ Feature: Public REST is a first-class API surface
     And v2 does not alias v1
     And a registered date or latest may follow the service name
 
-  @versioning @unimplemented
+  # Bound through the dated runtime and the REST host (2026-10-26): a header pins a dated family
+  # by re-answering the request at its dated address, so both answer through one path.
+  @versioning @integration
   Scenario: An omitted date version defaults to latest
     When neither the URL nor X-API-Version names a date version
     Then the newest endpoint registration answers
     And the response reports latest
 
-  @versioning @unimplemented
+  @versioning @integration
   Scenario: A header can pin the optional date version
     When X-API-Version names a real date and the URL omits it
     Then the latest registration on or before that date answers
     And it is byte-identical to the same endpoint selected by a dated URL
 
-  @versioning @unimplemented
+  @versioning @integration
   Scenario: URL and header disagreement fails
     When a dated URL and X-API-Version name different versions
     Then the response is 400 api_version_conflict
     And neither source silently takes precedence
 
-  @versioning @unimplemented
+  @versioning @integration
+  Scenario: A URL naming latest or preview is answered there whatever the header pins
+    When the URL names latest or preview and X-API-Version names a real date
+    Then the registration the URL names answers
+    And it is not refused as a conflict
+
+  @versioning @integration
+  Scenario: A header leaves a path the dated family does not serve to the route that does
+    Given a literal or shared-path route answers beneath a dated family's base
+    When X-API-Version names a real date
+    Then that route answers as it does without the header
+    And a dated family on the shared path answers at its own dated address
+
+  @versioning @integration
   Scenario: Invalid and unavailable header versions differ
     When X-API-Version is neither latest nor a real calendar date
     Then the response is 400 invalid_api_version
     When it is a date before the service existed
     Then the response is 404
+
+  @versioning @integration
+  Scenario: A registration superseded at a later date keeps only its own dates
+    Given a namespace registered at one date and superseded at a later one by a new family
+    When a caller pins a date from the first registration up to the day before the later one
+    Then the first registration answers
+    When a caller pins the later date or after, or names no date
+    Then the new family answers
+
+  @versioning @integration
+  Scenario: A header on a family that is not dated changes nothing
+    When X-API-Version names a real date on a route that is not dated
+    Then the route answers exactly as without the header
 
   @openapi @unimplemented
   Scenario: Every supported address is documented

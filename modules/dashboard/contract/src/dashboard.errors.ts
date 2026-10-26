@@ -66,6 +66,16 @@ export class DashboardsNotEnabledError extends HandledError {
   }
 }
 
+/** `/api/v1/dashboards` while `release_dashboards` is off for the key's project: as if absent. */
+export class DashboardsNotReleasedError extends HandledError {
+  declare readonly code: "dashboards_not_released";
+
+  constructor() {
+    super("dashboards_not_released", "Not found", { httpStatus: 404, fault: "customer" });
+    this.name = "DashboardsNotReleasedError";
+  }
+}
+
 /** A graph the project does not have. */
 export class GraphNotFoundError extends HandledError {
   declare readonly code: "graph_not_found";

@@ -9,14 +9,14 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
-import type * as Observability from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { SuiteApi } from "@langwatch/suite-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { MemorySubsystemProbeChannel } from "../../channels/memory/memory.subsystem-probe.channel.ts";
 import { PlatformHealthModule } from "../platform-health.app.ts";
@@ -25,21 +25,6 @@ const LEGACY_KEY = "legacy-project-key";
 const FULL_ACCESS = "legacy_project_key_full_access";
 const ENFORCED = "legacy_project_key_scope_enforced";
 
-const lines = vi.hoisted(() => [] as { fields: Record<string, unknown>; message: string }[]);
-
-vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual: typeof Observability = await importOriginal();
-  const record = (fields: Record<string, unknown>, message: string) =>
-    void lines.push({ fields, message });
-
-  return {
-    ...actual,
-    createLogger: (name: string) =>
-      name === "langwatch:legacy-project-key"
-        ? { ...actual.createLogger(name), info: record, warn: record }
-        : actual.createLogger(name),
-  };
-});
 const PROJECT = {
   id: "project-1",
   name: "Project",
@@ -52,6 +37,7 @@ const PROJECT = {
 };
 
 async function probes({ enabled }: { enabled: readonly string[] }) {
+  const { logger, lines } = createTestLogger();
   const canaries = MemorySubsystemProbeChannel.create({
     answer: () => new Response(JSON.stringify({ passed: true }), { status: 200 }),
   });
@@ -75,10 +61,12 @@ async function probes({ enabled }: { enabled: readonly string[] }) {
     resources: { own: () => void 0, ownService: () => void 0 },
     channels: { canaries },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    legacyKeyLogger: logger,
   });
 
   return {
     canaries,
+    lines,
     probe: (check: "collector" | "evaluations" | "processor") =>
       app.probeWithProjectKey({ check, headers: { "x-auth-token": LEGACY_KEY }, signal: void 0 }),
     scenarios: () =>
@@ -94,16 +82,16 @@ describe("a legacy project key on the project-keyed health probes", () => {
   describe("when its project is on no flag", () => {
     /** @scenario "The health probes run for an unenforced project's legacy key and log it" */
     it("runs a probe other than the collector and logs it outside its scopes", async () => {
-      lines.length = 0;
-      const { probe, canaries } = await probes({ enabled: [] });
+      const { probe, canaries, lines } = await probes({ enabled: [] });
 
       const response = await probe("evaluations");
 
       expect(response.status).toBe(200);
       expect(canaries.requests()).toHaveLength(1);
-      expect(lines[0]).toMatchObject({
-        message: "legacy project key outside its scopes",
-        fields: { projectId: "project-1", route: "GET /api/health/evaluations", enforced: false },
+      expect(lines.findLine("warn", "legacy project key outside its scopes")).toMatchObject({
+        projectId: "project-1",
+        route: "GET /api/health/evaluations",
+        enforced: false,
       });
       expect(JSON.stringify(lines)).not.toContain(LEGACY_KEY);
     });

@@ -17,8 +17,14 @@ import type { RateLimiter } from "../ports.ts";
 import type { ReadBudget } from "../read-budget.ts";
 import { allRegisteredRoutes } from "../route-registry.ts";
 import {
+  API_VERSION_HEADER,
+  basePathOf,
+  canonicalV1Path,
   claimsNoPrefix,
   middlewareScopesOf,
+  datedRoutePattern,
+  pinnedVersionPath,
+  type DatedFamilyRoutes,
   routeScopesOf,
   type MountableRestApp,
 } from "./addressing.ts";
@@ -128,7 +134,43 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   private readonly prefixes: ClaimedPrefix[] = [];
   private readonly unclaimed: UnclaimedAddress[] = [];
 
-  private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {}
+  /** Each dated family's base, its `/api/v1` twin and its routes: where `X-API-Version` pins. */
+  private readonly datedFamilies: DatedFamilyRoutes[] = [];
+
+  private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {
+    // Ahead of every family: a pinned request is answered again at its dated address, so the
+    // header and a dated URL select through the one path (public-rest.feature).
+    this.app.use("*", async (context, next) => {
+      let pinned: string | null;
+
+      try {
+        pinned = this.pinnedAddressOf({
+          method: context.req.method,
+          path: context.req.path,
+          header: context.req.header(API_VERSION_HEADER),
+        });
+      } catch (error) {
+        return canonicalErrorResponse(error, context);
+      }
+
+      if (pinned === null) return next();
+
+      const url = new URL(context.req.raw.url);
+      url.pathname = pinned;
+
+      return this.app.fetch(new Request(url, context.req.raw), context.env);
+    });
+  }
+
+  /**
+   * The dated address a request naming `X-API-Version` is answered at, or null where it was sent:
+   * only a route of a dated family mounted so far is pinned (public-rest.feature).
+   */
+  pinnedAddressOf(
+    request: Readonly<{ method: string; path: string; header: string | undefined }>,
+  ): string | null {
+    return pinnedVersionPath({ ...request, datedFamilies: this.datedFamilies });
+  }
 
   /**
    * One declared family. Every credential kind opens for each mount: a ROUTE
@@ -142,6 +184,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   ): MountableRestApp {
     const declaration = transport as RestTransportDeclaration<unknown>;
     this.claimNamespace(declaration);
+    this.noteDatedBase(declaration);
     const identities: Partial<Record<RestDoorCredential, RestDoor>> = {
       ...this.options.identities,
       ...(this.options.bearers
@@ -213,6 +256,25 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
    */
   assertEveryRouteDeclared(): void {
     assertEveryRouteDeclared({ app: this.app, registry: allRegisteredRoutes() });
+  }
+
+  /**
+   * A dated family answers a pinned version at its dated addresses, a family wholly on another's
+   * shared path included; a literal route beneath its base has none and is left alone.
+   */
+  private noteDatedBase(declaration: RestTransportDeclaration<unknown>): void {
+    if (declaration.addressing !== "dated") return;
+
+    const base = basePathOf(declaration);
+    const twin = declaration.v1Twin ? canonicalV1Path(base) : null;
+    const routes = declaration.routes.map((route) => ({
+      method: route.method,
+      pattern: datedRoutePattern(route.path),
+    }));
+
+    for (const each of twin ? [base, twin] : [base]) {
+      this.datedFamilies.push({ base: each, routes });
+    }
   }
 
   /**

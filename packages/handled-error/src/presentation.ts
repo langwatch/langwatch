@@ -532,7 +532,7 @@ const presentations = {
   lwql_table_modifier_unsupported: {
     title: "FINAL and SAMPLE can't be used here",
     describe: () =>
-      "This read keeps each project to its own dates, and that can't be combined with FINAL or SAMPLE. The datasets already keep one row per item, so remove them and run it again.",
+      "FINAL and SAMPLE can't be used on this read or on a subquery. The datasets already keep one row per item, so remove them and run it again.",
   },
   lwql_view_shadowed: {
     title: "A WITH name repeats a view's name",
@@ -664,6 +664,11 @@ const presentations = {
   dashboards_not_enabled: {
     title: "Dashboards aren't switched on here",
     describe: () => "This project doesn't have Dashboards enabled yet.",
+  },
+  dashboards_not_released: {
+    title: "The Dashboards API isn't available here",
+    describe: () =>
+      "Dashboards isn't switched on for this project yet. Analytics Reports boards are at /api/v1/analytics/reports.",
   },
   insight_not_found: {
     title: "Insight not found",
@@ -6504,6 +6509,14 @@ function listLabels(labels: string[]): string {
 }
 
 /**
+ * What to do about an HTTP 402. The status comes from a provider whose account
+ * ran out of credit and also from the AI gateway when an organization budget is
+ * spent, so the advice names both. Shared so every surface says the same thing.
+ */
+export const OUT_OF_CREDIT_ADVICE =
+  "Check the provider's billing and your gateway budget, then try again.";
+
+/**
  * Body copy for a node failure that carries the upstream's HTTP status.
  *
  * `meta.upstreamStatus` is attached by Workflow's node-error contract mapper
@@ -6531,6 +6544,9 @@ function describeUpstreamStatus({
   const status = error.meta.upstreamStatus;
   if (typeof status !== "number") return whenAbsent;
   if (status === 401 || status === 403) return whenRejected;
+  if (status === 402) {
+    return `Its account has no credit or budget left. ${OUT_OF_CREDIT_ADVICE}`;
+  }
   if (status === 429) return "It's rate limiting us. Try again shortly.";
   if (status >= 500) return "It's having trouble. Try again in a moment.";
   return whenOther;

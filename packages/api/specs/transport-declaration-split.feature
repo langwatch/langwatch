@@ -461,11 +461,12 @@ Feature: Transport declaration split
 
   @integration
   Scenario: A route tells the project door the legacy key scopes it names
-    Given a route behind the project door that asks a permission names legacy key scope flags with withLegacyKeyScope
+    Given a route behind the project door names legacy key scope flags as an option of the permission it asks, withPermission(permission, { legacyKey })
     When a caller presents a key
     Then the door is told the route's permission and the scope flags it names
     And a door that lists its known scope flags refuses, at mount, a route naming another
-    And a route naming scope flags behind another door, or one that asks no permission before the body, is refused at mount
+    And a route that asks no permission, or whose input chooses it, has nowhere to name a flag, so the mistake fails the typecheck
+    And a route naming scope flags behind another door, or one that asks its plan before its permission, is refused at mount
 
   @integration
   Scenario: A permission behind the CLI token door is asked of the token's person at its organization
