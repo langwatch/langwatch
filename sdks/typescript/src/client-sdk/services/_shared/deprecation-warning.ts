@@ -17,7 +17,12 @@ export function warnOnceIfDeprecated({
 }): void {
   if (!response?.headers.get("Deprecation") || warned.has(message)) return;
   warned.add(message);
-  process.stderr.write(`${message}\n`);
+  // `process` is absent on edge and browser runtimes.
+  if (typeof process !== "undefined" && process.stderr?.write) {
+    process.stderr.write(`${message}\n`);
+  } else {
+    console.warn(message);
+  }
 }
 
 /** Forgets which warnings were written; for tests only. */
