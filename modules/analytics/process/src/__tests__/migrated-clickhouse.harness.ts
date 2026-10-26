@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from "node:timers/promises";
+
 /**
  * A ClickHouse endpoint on the *shipped* migrations, not a hand DDL transcription, so tests read
  * the schema production actually deploys. One endpoint name is shared across every suite here --
@@ -275,6 +277,50 @@ export async function releaseMigratedCaches(client: ClickHouseClient): Promise<v
     await client.command({ query: `SYSTEM DROP ${cache}` }).catch(ignoreUnsupported);
   }
   await client.command({ query: "SYSTEM JEMALLOC PURGE" }).catch(ignoreUnsupported);
+}
+
+const QUIET_POLLS = 3;
+const QUIET_POLL_MS = 1_000;
+
+/**
+ * Waits until the endpoint's database runs no merge or mutation and `tables` hold no outdated
+ * part, then releases caches. The server limit counts whole-process RSS, so a seed or a capped
+ * query must not share it with background work or unloaded-but-still-held parts.
+ */
+export async function waitForQuietMigratedServer({
+  client,
+  tables,
+  timeoutMs = 120_000,
+}: {
+  client: ClickHouseClient;
+  tables: readonly string[];
+  timeoutMs?: number;
+}): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (let quietPolls = 0; quietPolls < QUIET_POLLS;) {
+    if (Date.now() > deadline) {
+      throw new Error(
+        `ClickHouse still merging, mutating or holding old parts after ${timeoutMs} ms`,
+      );
+    }
+    const [row] = await (
+      await client.query({
+        query: `
+          SELECT
+            (SELECT count() FROM system.merges WHERE database = currentDatabase())
+            + (SELECT count() FROM system.mutations WHERE database = currentDatabase() AND NOT is_done)
+            + (SELECT count() FROM system.parts
+               WHERE database = currentDatabase() AND NOT active AND has({tables:Array(String)}, table))
+            AS busy
+        `,
+        query_params: { tables },
+        format: "JSONEachRow",
+      })
+    ).json<{ busy: string }>();
+    quietPolls = Number(row?.busy) === 0 ? quietPolls + 1 : 0;
+    await sleep(QUIET_POLL_MS);
+  }
+  await releaseMigratedCaches(client);
 }
 
 /** A server built without JIT or jemalloc has no such cache to release, which is not a failure. */
