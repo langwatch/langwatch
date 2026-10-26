@@ -383,7 +383,7 @@ describe("scopeLangWatchQL with member windows", () => {
     });
 
     it("returns a statement that does not parse unchanged, for the validator to refuse", () => {
-      const sql = "SELECT count( FROM";
+      const sql = "SELECT count( FROM traces FINAL";
 
       expect(scope({ sql })).toBe(sql);
     });
