@@ -45,15 +45,18 @@ The user's `import dspy` resolves to the bundled fake_dspy stub (which
 provides only Module + Prediction + Signature + InputField +
 OutputField + Predict). The real dspy package is NOT in the
 subprocess image — see fake_dspy.py for the one-customer-deep
-rationale.
+rationale. The stub arrives as source in the payload and is built as a
+module in memory: neither it nor this runner is ever written to the
+filesystem, so the executed code has no copy of either to rewrite.
 
 Wire shape (stdin):
     {
-      "code":    "<python source>",
-      "inputs":  {"name": value, ...},
-      "outputs": ["name", ...],
-      "secrets": {"NAME": "value", ...},
-      "params":  {"NAME": value, ...}
+      "code":      "<python source>",
+      "inputs":    {"name": value, ...},
+      "outputs":   ["name", ...],
+      "secrets":   {"NAME": "value", ...},
+      "params":    {"NAME": value, ...},
+      "dspy_stub": "<python source of the dspy stand-in>"
     }
 
 The optional `secrets` map is the project's decrypted secrets (rides on
@@ -90,21 +93,69 @@ import inspect
 import io
 import json
 import os
+import re
 import sys
 import time
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
-# Inject fake_dspy as the user-visible `dspy` module BEFORE any user
-# code is exec'd. We resolve it by file path so the runner stays
-# importable when invoked directly (sys.path = [cwd] only) without a
-# package context. The runner ships next to fake_dspy.py.
-_RUNNER_DIR = os.path.dirname(os.path.abspath(__file__))
-if _RUNNER_DIR not in sys.path:
-    sys.path.insert(0, _RUNNER_DIR)
-import fake_dspy  # noqa: E402 — must come after sys.path manipulation
-sys.modules.setdefault("dspy", fake_dspy)
+# nlpgo passes this runner as source on the command line, so the
+# interpreter puts the working directory first on sys.path — and that
+# directory is the one user code can write. Drop it (and any relative
+# entry that resolves to it) before anything is imported, so no import
+# can be answered by a file the executed code planted. PYTHONPATH keeps
+# its place: it is how the runtime images reach the curated sandbox
+# libraries.
+_WORK_DIR = os.getcwd()
+sys.path[:] = [
+    entry for entry in sys.path
+    if entry not in ("", ".", _WORK_DIR) and os.path.abspath(entry) != _WORK_DIR
+]
+
+# The `dspy` stand-in arrives in the payload as source, not as a file
+# next to the runner, for the same reason the runner itself does. It is
+# built as a module in memory and registered before any user code runs.
+fake_dspy = None
+
+
+def install_dspy_stub(source):
+    """Build the bundled dspy stand-in from source and register it."""
+    global fake_dspy
+    module = ModuleType("fake_dspy")
+    module.__dict__["__name__"] = "fake_dspy"
+    exec(compile(source, "<fake_dspy>", "exec"), module.__dict__)
+    fake_dspy = module
+    sys.modules["fake_dspy"] = module
+    sys.modules.setdefault("dspy", module)
+    return module
+
+
+# The runner is compiled from source nlpgo passes on the command line, so its
+# frames carry the interpreter's placeholder filename rather than a path. They
+# are dropped from what the customer is shown: they say nothing about why the
+# customer's code failed, and the frame that named a path used to point at the
+# directory the runner ran from.
+_RUNNER_FILENAME = (lambda: None).__code__.co_filename
+_RUNNER_FRAME = re.compile(
+    r'^  File "%s", line \d+.*\n(?:    .*\n)?' % re.escape(_RUNNER_FILENAME),
+    re.MULTILINE,
+)
+_USER_CODE_FILENAME = "<code-block>"
+
+
+def format_user_traceback() -> str:
+    """Format the current exception, without the runner's own frames.
+
+    Formatted as text and filtered, rather than rebuilt from the frame list,
+    so a chained exception keeps its "During handling of the above" section.
+    Left whole when no user frame is in it: a failure inside the runner still
+    reports where it happened.
+    """
+    text = traceback.format_exc()
+    if '"%s"' % _USER_CODE_FILENAME not in text:
+        return text
+    return _RUNNER_FRAME.sub("", text)
 
 
 def main() -> int:
@@ -122,6 +173,16 @@ def main() -> int:
             "traceback": "",
         })
         return 1
+
+    stub_source = payload.get("dspy_stub")
+    if not stub_source:
+        write_result(result_path, error={
+            "type": "ProtocolError",
+            "message": "payload carries no dspy_stub source",
+            "traceback": "",
+        })
+        return 1
+    install_dspy_stub(stub_source)
 
     code = payload.get("code", "")
     inputs = payload.get("inputs", {}) or {}
@@ -173,7 +234,7 @@ def main() -> int:
         error = {
             "type": type(exc).__name__,
             "message": str(exc),
-            "traceback": traceback.format_exc(),
+            "traceback": format_user_traceback(),
         }
 
     elapsed_ms = int((time.perf_counter() - started) * 1000)
