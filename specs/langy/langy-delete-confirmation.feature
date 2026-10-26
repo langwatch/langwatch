@@ -82,6 +82,20 @@ Feature: Removing something with Langy needs a confirmation click
     Then the request reaches the route's own answer for a missing item
     And no card is shown
 
+  @integration
+  Scenario: A route the project cannot reach refuses a Langy key before any card
+    Given a delete route that is not there for the key's project, as a feature switched off
+    When Langy deletes through it
+    Then the route's own refusal is the answer
+    And no card is shown and no item name is read
+
+  @unit
+  Scenario: The card reads the item through the path the delete acts on
+    Given an item reached through a parent named in the path
+    When Langy deletes it through a parent that does not hold it
+    Then no card is shown
+    And the delete answers that the item is not found
+
   @unit
   Scenario: The card names the item on one short line
     Given an evaluator whose name runs over many lines and characters

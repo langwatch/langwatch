@@ -1116,6 +1116,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then it answers 201 with the widget, placed on that board
     And the key reads, updates and deletes it at /api/v1/boards/{boardId}/widgets/{widgetId}
     And a widget read, updated or deleted through the other board's path is not found
+    And a Langy session key deleting it through the other board's path is shown no card for it
     And a widget created under a Reports board, another project's board or a missing board is
       refused with dashboard_not_found
 
@@ -1124,6 +1125,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given Dashboards is switched off for the API key's project
     When the key calls any /api/v1/boards route, its widget routes included
     Then it answers 404, and nothing is read or written
+    And a Langy session key deleting a board or a widget there gets the same 404, before any
+      confirmation card is shown or any board name is read
 
   @integration
   Scenario: AC199r Split: the Reports boards API points to /api/v1/boards once Dashboards is on
