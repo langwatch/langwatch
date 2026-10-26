@@ -75,3 +75,16 @@ Feature: Langy minimal worker
     When they are compared with the origins the platform stamps
     Then the prompt names all of them and invents none
     And an origin the prompt never learned cannot silently return zero rows
+
+  # Langy's CLI runs in its own sandbox on a provisioned key, yet when a call
+  # failed it told the user to sign in, which they cannot do (issue #8770). A
+  # credential failure is Langy's internal error; a permission refusal is the
+  # user's missing access, and the two stay apart.
+  @unit
+  Scenario: The prompt reports a sandbox credential failure as an internal error
+    When the prompt asset is checked
+    Then on missing_api_key or "Not logged in" it tells Langy to report an
+      internal error naming the read or write that failed
+    And it forbids telling the user to sign in or claiming Langy has no CLI
+    And it names an unauthorized refusal as a permission refusal, not an
+      internal error

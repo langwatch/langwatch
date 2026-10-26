@@ -17,7 +17,7 @@ This skill answers one question with the user's own data: at what context size d
 
 <CliInstall />
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
 
 <CliSetup />
 

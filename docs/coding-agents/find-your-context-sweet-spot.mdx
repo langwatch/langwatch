@@ -68,7 +68,7 @@ This skill answers one question with the user's own data: at what context size d
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 

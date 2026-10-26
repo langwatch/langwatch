@@ -17,7 +17,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 <CliInstall />
 
-Personal coding-agent usage needs `langwatch login --device` on a laptop; skip it when `LANGWATCH_API_KEY` is set, because that key is the sign-in; a team or application project needs `--project <slug>` on the read commands.
+Personal coding-agent usage needs `langwatch login --device` on a laptop; a project key in `LANGWATCH_API_KEY` stands in for that login only for its own project. A team or application project needs `--project <slug>` on the read commands, which a project key refuses for any project but its own, so reaching one still needs `langwatch login --device`.
 
 <CliSetup />
 

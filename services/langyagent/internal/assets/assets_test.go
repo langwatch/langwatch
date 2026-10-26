@@ -86,6 +86,32 @@ func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
 	}
 }
 
+// Langy's CLI runs in its own sandbox, so a credential failure is Langy's to
+// report, never the user's to fix by signing in; a permission refusal is the
+// user's missing access and must not be dressed up as an internal error.
+//
+// @scenario "The prompt reports a sandbox credential failure as an internal error"
+func TestAgentsTemplate_ReportsSandboxCredentialFailureAsInternalError(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	for _, phrase := range []string{
+		"`missing_api_key` or \"Not logged in\" is your sandbox credential",
+		"never tell them to sign in",
+		"never claim you lack the CLI or tools",
+		"say you hit an internal error, name the read or write that failed",
+		"`unauthorized` is a permission refusal: name the access they lack",
+	} {
+		if !strings.Contains(tmpl, phrase) {
+			t.Errorf("AGENTS.md failure rule never says %q", phrase)
+		}
+	}
+	if strings.Contains(tmpl, "`unauthorized` or \"Not logged in\"") {
+		t.Errorf("AGENTS.md groups unauthorized with the sandbox credential failures, so a permission refusal reads as an internal error")
+	}
+}
+
 // The prompt has a byte budget so it cannot silently grow back into a rule
 // pile. It once reached 52,795 bytes by accreting one rule per observed
 // failure. A fix that needs the ceiling raised is a fix at the wrong layer:
