@@ -131,6 +131,17 @@ function featureClassification({ base, feature }) {
   return classification;
 }
 
+/** An app's source: a composition root's, or an app built of features; undefined for neither. */
+function applicationClassification({ base, cwd, workspacePath }) {
+  const application = workspacePath.match(APPLICATION_SOURCE);
+  if (!application) return undefined;
+  const placed = { ...base, relative: `src/${application[2]}`, sourcePath: application[2] };
+  if (APPLICATION_ROOTS.has(application[1])) return { ...placed, kind: "application" };
+
+  const appFeatures = appFeatureSourceOf({ app: application[1], cwd, sourcePath: application[2] });
+  return appFeatures ? { ...placed, appFeatures, kind: "app-features" } : undefined;
+}
+
 function classifyPath(cwd, filename) {
   const workspacePath = workspacePathOf(cwd, filename);
   const isTest = TEST_FILE.test(workspacePath) || TEST_DIRECTORY.test(workspacePath);
@@ -173,32 +184,8 @@ function classifyPath(cwd, filename) {
     };
   }
 
-  const application = workspacePath.match(APPLICATION_SOURCE);
-  if (application && APPLICATION_ROOTS.has(application[1])) {
-    return {
-      ...base,
-      kind: "application",
-      relative: `src/${application[2]}`,
-      sourcePath: application[2],
-    };
-  }
-
-  if (application) {
-    const appFeatures = appFeatureSourceOf({
-      app: application[1],
-      cwd,
-      sourcePath: application[2],
-    });
-    if (appFeatures) {
-      return {
-        ...base,
-        appFeatures,
-        kind: "app-features",
-        relative: `src/${application[2]}`,
-        sourcePath: application[2],
-      };
-    }
-  }
+  const application = applicationClassification({ base, cwd, workspacePath });
+  if (application) return application;
 
   const composition = workspacePath.match(ENTERPRISE_COMPOSITION_SOURCE);
   if (composition) {

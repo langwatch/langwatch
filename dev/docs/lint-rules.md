@@ -119,43 +119,43 @@ Messages:
 
 - `dependencyCycle`
   - what: The declared feature graph has a cycle: {{cycle}}.
-  - fix: Move the shared types or constants into the lower feature's `model/` and drop the upward edge from package.json.
+  - fix: Move the shared types or constants into the lower feature's `model/` and drop the upward edge from package.json. See the `repo-tree` skill.
   - why: Features that need each other are one feature, or share a piece that belongs lower down.
 - `entryShape`
   - what: A feature entry holds something other than a named re-export of its own layer.
-  - fix: Write only `export { name } from "./<layer>/<file>.ts"` lines here and move code into the layer folder.
+  - fix: Write only `export { name } from "./<layer>/<file>.ts"` lines here and move code into the layer folder. See the `repo-tree` skill.
   - why: `features/<name>/<layer>.ts` names the layer's public surface and nothing else.
 - `internalReach`
   - what: This file reaches into {{to}} (`{{specifier}}`).
-  - fix: Re-export the symbol from `features/{{feature}}/{{layer}}.ts` and import it from that entry.
+  - fix: Re-export the symbol from `features/{{feature}}/{{layer}}.ts` and import it from that entry. See the `repo-tree` skill.
   - why: A feature's files are its own; other features and the composition see only its layer entries.
 - `layerCrossing`
   - what: This {{fromLayer}} file of {{fromFeature}} imports {{to}} (`{{specifier}}`).
-  - fix: Move what both sides need into the lower layer's `model/` and import it from there.
+  - fix: Move what both sides need into the lower layer's `model/` and import it from there. See the `repo-tree` skill.
   - why: model takes model; ui takes model and ui; compile and browser take model and their own layer, never ui.
 - `leafReachesUp`
   - what: Shared code imports {{to}} (`{{specifier}}`).
-  - fix: Move the shared piece into `lib/`, or move this code into the feature that needs it.
+  - fix: Move the shared piece into `lib/`, or move this code into the feature that needs it. See the `repo-tree` skill.
   - why: `lib/` and the top-level files are leaves every place imports; a leaf naming a feature drags it everywhere.
 - `ownEntry`
   - what: This file imports its own feature's entry (`{{specifier}}`).
-  - fix: Import the file the entry re-exports directly.
+  - fix: Import the file the entry re-exports directly. See the `repo-tree` skill.
   - why: An entry re-exports the feature's files; importing it from inside builds a cycle through the entry.
 - `reachesComposition`
   - what: A feature imports the composition (`{{specifier}}`).
-  - fix: Move what the feature needs into its own `model/` or into `lib/`, and pass anything the composition owns in as a parameter.
+  - fix: Move what the feature needs into its own `model/` or into `lib/`, and pass anything the composition owns in as a parameter. See the `repo-tree` skill.
   - why: The composition (app/, site/, browser/) assembles features; a feature that names it loops back on itself.
 - `undeclaredDependency`
   - what: Feature {{fromFeature}} imports feature {{feature}}, which it does not declare (`{{specifier}}`).
-  - fix: Add "{{feature}}" to `langwatch.features.{{fromFeature}}` in the app's package.json, or move the code so the import is not needed.
+  - fix: Add "{{feature}}" to `langwatch.features.{{fromFeature}}` in the app's package.json, or move the code so the import is not needed. See the `repo-tree` skill.
   - why: The app's package.json declares every edge between features, so the graph stays acyclic and reviewable.
 - `undeclaredFeature`
   - what: Feature `{{feature}}` is not declared in the app's package.json.
-  - fix: Add `"{{feature}}": [<the features it imports>]` to `langwatch.features` in the app's package.json.
+  - fix: Add `"{{feature}}": [<the features it imports>]` to `langwatch.features` in the app's package.json. See the `repo-tree` skill.
   - why: The declared feature graph is what the dependency check reads; an undeclared feature escapes it.
 - `unknownPlace`
   - what: `{{folder}}` is no place in the app-features layout.
-  - fix: Move the file into `features/<name>/<model|compile|ui|browser>/`, `lib/` or the composition folder that uses it.
+  - fix: Move the file into `features/<name>/<model|compile|ui|browser>/`, `lib/` or the composition folder that uses it. See the `repo-tree` skill.
   - why: A file sits in a feature layer or entry, `lib/`, `src/` itself, or the composition: app/, site/, browser/, testing/.
 
 ## `langwatch/authz-members-required`

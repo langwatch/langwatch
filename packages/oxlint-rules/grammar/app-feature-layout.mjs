@@ -107,7 +107,7 @@ function normalise(path) {
   return parts.join("/");
 }
 
-/** The path below `src/` a relative module specifier lands on; undefined for a package or an asset. */
+/** The path below `src/` a relative module specifier lands on; undefined for a package or asset. */
 export function appTargetPath({ sourcePath, specifier }) {
   if (!specifier.startsWith(".")) return undefined;
   const path = specifier.split("?")[0];
