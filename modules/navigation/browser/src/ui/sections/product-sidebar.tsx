@@ -60,6 +60,11 @@ import { UsageIndicator } from "./usage-indicator.tsx";
 
 export type SidebarSurface = ProductId | "settings" | "admin";
 
+/** Settings and the Admin console: no product, so a back row and no product-pinned entry. */
+function isDetour(surface: SidebarSurface): boolean {
+  return surface === "settings" || surface === "admin";
+}
+
 /** The sidebar a page outside every product draws: the Admin console on /ops, else Settings. */
 export function detourSurface(pathname: string): SidebarSurface {
   return isAdminShellRoute(pathname) ? "admin" : "settings";
@@ -110,10 +115,9 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
 }
 
 /**
- * The pinned utility block at the bottom of every sidebar: usage, Settings,
- * Support and the theme control, with a product's own pinned entry just
- * above Settings. The Settings sidebar drops its own entry since the top bar
- * already names it.
+ * The pinned block at the bottom of every sidebar: usage, Settings, Support and the theme
+ * control, with a product's own pinned entry just above Settings. The Settings sidebar drops
+ * its own entry since the top bar already names it.
  */
 function SidebarBottomBlock({
   showExpanded,
@@ -334,10 +338,9 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 /**
- * The one Insights entry, in every product menu's bottom block just above Settings.
- * Hidden until `release_insights` and `release_dashboards` answer on (the page lives in
- * Dashboards and is closed without it), and on an aggregate project, which files no insight;
- * the unread pill is the one insight lends.
+ * The one Insights entry, in every product menu's bottom block just above Settings. Hidden
+ * until `release_insights` and `release_dashboards` answer on (the page lives in Dashboards),
+ * and on an aggregate project, which files no insight; the unread pill is lent by insight.
  * @see modules/insight/specs/insight-inbox.feature
  */
 function InsightsMenuLink({ showExpanded }: { showExpanded: boolean }) {
@@ -465,7 +468,7 @@ export function SidebarContent({
         <QuickSearchMenuItem showLabel={showExpanded} />
       </Box>
 
-      {(surface === "settings" || surface === "admin") && (
+      {isDetour(surface) && (
         <Box
           data-testid="sidebar-back-row"
           width="full"
@@ -526,9 +529,7 @@ export function SidebarContent({
           showExpanded={showExpanded}
           shouldIncludeSettingsLink={surface !== "settings"}
           productPinned={
-            surface === "settings" || surface === "admin" ? null : (
-              <InsightsMenuLink showExpanded={showExpanded} />
-            )
+            isDetour(surface) ? null : <InsightsMenuLink showExpanded={showExpanded} />
           }
         />
       </Box>

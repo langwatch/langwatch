@@ -10,9 +10,9 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key                   | URL                  | Within  | Label    | Permission       | Flags                              |
-| -------------------------- | -------------------- | ------- | -------- | ---------------- | ---------------------------------- |
-| `pages/[project]/insights` | `/:project/insights` | project | Insights | `analytics:view` | ≈ `FrontendFlags.release_insights` |
+| Page key                   | URL                  | Within  | Label    | Permission       | Flags                                                                    |
+| -------------------------- | -------------------- | ------- | -------- | ---------------- | ------------------------------------------------------------------------ |
+| `pages/[project]/insights` | `/:project/insights` | project | Insights | `analytics:view` | ≈ `FrontendFlags.release_insights`, ≈ `FrontendFlags.release_dashboards` |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 

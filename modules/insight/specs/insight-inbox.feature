@@ -398,13 +398,13 @@ Feature: The insights inbox
     @integration
     Scenario: Every product's side menu holds the Insights entry above Settings
       Given the release_insights and release_dashboards flags are on and a member with analytics:view
-      When they look at the LLM Ops or the Gateway side menu
+      When they look at the LLM Ops, Gateway or Me side menu
       Then it holds one Insights entry at the bottom, just above Settings, with the unread pill
 
     @integration
-    Scenario: The Settings side menu holds no Insights entry
+    Scenario: The Settings and Admin side menus hold no Insights entry
       Given the release_insights and release_dashboards flags are on and a member with analytics:view
-      When they look at the Settings side menu
+      When they look at the Settings or the Admin console side menu
       Then it holds no Insights entry
 
     @integration
@@ -424,7 +424,7 @@ Feature: The insights inbox
     @integration
     Scenario: The side menu shows no Insights entry while the flag is off
       Given the release_insights or the release_dashboards flag is off, or a member without analytics:view
-      When they look at the Dashboards side menu
+      When they look at any product's side menu
       Then it holds no Insights entry
 
     @integration

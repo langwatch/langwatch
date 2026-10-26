@@ -84,7 +84,7 @@ function renderSidebar({
   dashboardsOn = true,
   project = PROJECT,
 }: {
-  surface: "llm-ops" | "dashboards" | "gateway" | "settings";
+  surface: "llm-ops" | "dashboards" | "gateway" | "me" | "settings" | "admin";
   pathname: string;
   permissions?: string[];
   insightsOn?: boolean;
@@ -201,6 +201,7 @@ describe("the Insights entry", () => {
     it.each([
       { surface: "llm-ops" as const, pathname: "/demo" },
       { surface: "gateway" as const, pathname: "/gateway/virtual-keys" },
+      { surface: "me" as const, pathname: "/me" },
     ])("sits just above Settings in the $surface sidebar too", async ({ surface, pathname }) => {
       renderSidebar({
         surface,
@@ -214,11 +215,15 @@ describe("the Insights entry", () => {
       const bottom = within(screen.getByTestId("sidebar-bottom-block"));
       const links = bottom.getAllByRole("link");
       expect(links[links.indexOf(entry) + 1]).toBe(bottom.getByRole("link", { name: "Settings" }));
+      expect(await within(entry).findByTestId("insights-nav-count")).toHaveTextContent("3");
     });
 
-    /** @scenario "The Settings side menu holds no Insights entry" */
-    it("is not in the Settings sidebar", async () => {
-      renderSidebar({ surface: "settings", pathname: "/settings", insightsOn: true });
+    /** @scenario "The Settings and Admin side menus hold no Insights entry" */
+    it.each([
+      { surface: "settings" as const, pathname: "/settings" },
+      { surface: "admin" as const, pathname: "/ops" },
+    ])("is not in the $surface sidebar", async ({ surface, pathname }) => {
+      renderSidebar({ surface, pathname, insightsOn: true });
 
       await screen.findByRole("button", { name: "Quick Search" });
       expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
