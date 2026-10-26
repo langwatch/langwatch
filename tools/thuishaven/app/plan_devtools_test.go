@@ -120,7 +120,8 @@ func TestDocsLaneBuildsAndMountsTheDocsOnTheApp(t *testing.T) {
 	}
 	for _, want := range []string{
 		"build-status.ts --out-dir", "&& exit 0;",
-		"--filter @langwatch/docs-site build --out-dir \"$n\" --base-path /docs",
+		"--filter @langwatch/docs-site build --out-dir \"$n\" --base-path /docs --app-origin self",
+		"build-status.ts --out-dir \"$d\" --base-path /docs --app-origin self && exit 0;",
 		"mv \"$n\" \"$d\"", filepath.Join(repo, docsOutDir),
 		"docs-mount", " 45173 /docs http://127.0.0.1:45100 'app.test.langwatch.localhost'",
 		"serving the last good build'; } & exec ",

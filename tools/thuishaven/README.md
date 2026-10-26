@@ -69,12 +69,13 @@ Three more are there only when the worktree asked for them (`haven up
 | `mail-room.<slug>.langwatch.localhost`     | The mail studio — every message previewed          |
 | `app.<slug>.langwatch.localhost/docs/`     | The docs site, built and served by haven (`+docs`) |
 
-The docs lane builds `apps/docs` with `--base-path /docs` (skipped when its content check
+The docs lane builds `apps/docs` with `--base-path /docs --app-origin self` (skipped when its content check
 finds the last build current) and serves it natively from Go. With the lane on,
 `app.<slug>` routes to that mount, which hands every other path (websockets and streams too)
 to the app unchanged; `docs.<slug>` serves the same build and sends its root to `/docs/`.
 Production stays at the root of docs.langwatch.ai; hot reload while writing is
-`pnpm --filter @langwatch/docs-site dev`.
+`pnpm --filter @langwatch/docs-site dev`. `--app-origin self` points the playground's
+"Use my LangWatch account" at the app on the same origin (ADR-185).
 
 `haven up --only docs` runs the docs site alone, with no stack at all (no app, api, worker,
 databases, migrations or simulators): the build and the mount at `app.<slug>/docs/` and

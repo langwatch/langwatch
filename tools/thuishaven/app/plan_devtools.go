@@ -65,6 +65,11 @@ const DocsPackage = "@langwatch/docs-site"
 // Production stays at the root of docs.langwatch.ai; only haven's build takes it.
 const DocsBasePath = "/docs"
 
+// DocsAppOrigin tells the docs build that the app is the origin the docs are served
+// from, which is true under haven (app.<slug>.langwatch.localhost/docs). The API
+// playground connects to that app with the reader's account (ADR-185).
+const DocsAppOrigin = "self"
+
 // docsOutDir is haven's docs build, beside the production dist/ and ignored with
 // node_modules, so a CI-shaped `pnpm build` never collides with it.
 const docsOutDir = "apps/docs/node_modules/.cache/haven-docs"
@@ -75,9 +80,10 @@ const docsOutDir = "apps/docs/node_modules/.cache/haven-docs"
 // half-written tree. Unchanged pages come from the build's render cache.
 func docsBuildShell(repoDir string) string {
 	d := shQuote(filepath.Join(repoDir, docsOutDir))
+	options := " --base-path " + DocsBasePath + " --app-origin " + DocsAppOrigin
 	return "d=" + d + "; n=$d.next.$$; o=$d.old.$$; " +
-		"node apps/docs/src/site/build-status.ts --out-dir \"$d\" --base-path " + DocsBasePath + " && exit 0; " +
-		"rm -rf \"$n\"; pnpm --silent --filter " + DocsPackage + " build --out-dir \"$n\" --base-path " + DocsBasePath +
+		"node apps/docs/src/site/build-status.ts --out-dir \"$d\"" + options + " && exit 0; " +
+		"rm -rf \"$n\"; pnpm --silent --filter " + DocsPackage + " build --out-dir \"$n\"" + options +
 		" && { ! test -d \"$d\" || mv \"$d\" \"$o\"; } && mv \"$n\" \"$d\" && rm -rf \"$o\""
 }
 
