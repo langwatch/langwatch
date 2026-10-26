@@ -73,3 +73,22 @@ Feature: Dashboard REST API
     When I call GET /api/dashboards/:id
     And I call GET /api/dashboards
     Then the list's graphCount for that dashboard equals the number of graphs in the detail response
+
+  # Dashboards boards moved to /api/v1/boards (owner, 2026-10-26). This API keeps
+  # answering Reports boards either way; only the headers depend on the flag,
+  # read for the key's project on each request. It is a warning, never a block.
+  @integration
+  Scenario: The dashboards API is deprecated where Dashboards is switched on
+    Given release_dashboards is on for the API key's project
+    When I call GET /api/v1/dashboards or GET /api/dashboards
+    Then I receive the Reports boards as before
+    And the response carries "Deprecation: true"
+    And the response carries a Link header naming /api/v1/boards with rel="successor-version"
+    And the response carries no Sunset header
+
+  @integration
+  Scenario: The dashboards API is unchanged where Dashboards is switched off
+    Given release_dashboards is off for the API key's project
+    When I call GET /api/v1/dashboards
+    Then I receive the Reports boards as before
+    And the response carries no Deprecation and no Link header
