@@ -21,7 +21,7 @@ const { state } = vi.hoisted(() => ({
     keys: [] as Record<string, unknown>[],
     members: [] as Record<string, unknown>[],
     createToken: "sk-lw-mintedtokenvalue0001",
-    legacyKey: undefined as { present: boolean } | undefined,
+    legacyKey: undefined as { present: boolean; lastUsedAt: string | null } | undefined,
   },
 }));
 
@@ -29,6 +29,8 @@ const mutations = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   revoke: vi.fn(),
+  revokeLegacy: vi.fn(),
+  invalidateLegacy: vi.fn(),
 }));
 
 vi.mock("../../../behavior/api-key-api.ts", () => ({
@@ -36,6 +38,7 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
     useUtils: () => ({
       apiKey: { list: { invalidate: vi.fn() } },
       organization: { getAll: { invalidate: vi.fn() } },
+      project: { getLegacyKeyStatus: { invalidate: mutations.invalidateLegacy } },
     }),
     apiKey: {
       list: { useQuery: () => ({ data: state.keys, isLoading: false }) },
@@ -83,6 +86,16 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
       getLegacyKeyStatus: {
         useQuery: (_input: unknown, options?: { enabled?: boolean }) => ({
           data: options?.enabled ? state.legacyKey : void 0,
+        }),
+      },
+      revokeProjectApiKey: {
+        useMutation: () => ({
+          isPending: false,
+          mutate: (input: unknown, handlers: { onSuccess: () => void }) => {
+            mutations.revokeLegacy(input);
+            state.legacyKey = { present: false, lastUsedAt: null };
+            handlers.onSuccess();
+          },
         }),
       },
     },
@@ -190,6 +203,8 @@ beforeEach(() => {
   state.legacyKey = void 0;
   mutations.create.mockClear();
   mutations.revoke.mockClear();
+  mutations.revokeLegacy.mockClear();
+  mutations.invalidateLegacy.mockClear();
 });
 
 afterEach(() => cleanup());
@@ -387,79 +402,106 @@ describe("given keys bound at different scopes", () => {
   });
 });
 
-describe("given the legacy project key exists", () => {
-  describe("when the reader can manage the project", () => {
-    /** @scenario The legacy project key can no longer be found on the keys page */
-    /** @scenario The legacy key is not listed on the keys page */
-    it("shows no project key row, and offers no copy or rotation control", () => {
-      renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
-      expect(screen.queryByText("Project API Key")).toBeNull();
-      expect(screen.queryByRole("button", { name: "Copy secret key" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "Rotate Project API Key" })).toBeNull();
-    });
-  });
-});
+const LIVE_LEGACY_KEY = { present: true, lastUsedAt: "2026-10-25T12:00:00.000Z" };
+const ADMIN = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
 
 describe("given the project still has a legacy key", () => {
   describe("when an organization admin opens the keys page", () => {
-    /** @scenario A banner tells an admin that legacy project keys are going away */
-    it("warns that legacy project keys are going away and offers no action", () => {
-      state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
-      state.legacyKey = { present: true };
+    /** @scenario The legacy key is listed as a row an admin can revoke */
+    /** @scenario The legacy project key can only be revoked from the keys page */
+    it("lists it with a Legacy badge, its project and last use, and offers Revoke only", async () => {
+      const user = userEvent.setup();
+      state.members = ADMIN;
+      state.legacyKey = LIVE_LEGACY_KEY;
       renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
 
-      const banner = screen.getByTestId("legacy-project-key-banner");
-      expect(banner).toHaveTextContent("Legacy project keys are going away");
-      expect(banner).toHaveTextContent("Use personal access tokens instead.");
-      expect(within(banner).getByRole("button", { name: "Create an API key" })).toBeInTheDocument();
+      const row = screen.getByTestId("legacy-key-row");
+      expect(within(row).getByText("Legacy")).toBeInTheDocument();
+      expect(within(row).getByText("Web App")).toBeInTheDocument();
+      expect(within(row).queryByText("Never used")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Copy secret key" })).toBeNull();
+      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
+      const actions = await screen.findAllByRole("menuitem");
+      expect(actions.map((action) => action.textContent)).toEqual(["Revoke"]);
     });
 
-    it("shows no banner once the legacy key is gone", () => {
-      state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
-      state.legacyKey = { present: false };
+    it("lists it even when the organization has no other key", () => {
+      state.members = ADMIN;
+      state.legacyKey = { present: true, lastUsedAt: null };
       renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
 
-      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
+      expect(screen.queryByTestId("api-keys-empty")).toBeNull();
+      expect(
+        within(screen.getByTestId("legacy-key-row")).getByText("Never used"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when the admin revokes it", () => {
+    /** @scenario Revoking the legacy key asks for the project name */
+    /** @scenario A revoked legacy key leaves the list */
+    it("asks for the project name, then revokes it and refreshes the status", async () => {
+      const user = userEvent.setup();
+      state.members = ADMIN;
+      state.legacyKey = LIVE_LEGACY_KEY;
+      const host = new FakeApiKeyHost();
+      renderWithApiKeyHost(<ApiKeysScreen />, host);
+
+      await user.click(screen.getByRole("button", { name: "Actions for the legacy project key" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Revoke" }));
+
+      expect(await screen.findByText("Revoke the legacy project key?")).toBeInTheDocument();
+      const confirm = () => screen.getByTestId("legacy-key-revoke-confirm");
+      await user.type(screen.getByTestId("legacy-key-revoke-name"), "Web Ap");
+      expect(confirm()).toBeDisabled();
+      await user.type(screen.getByTestId("legacy-key-revoke-name"), "p");
+      await waitFor(() => expect(confirm()).toBeEnabled());
+      await user.click(confirm());
+
+      expect(mutations.revokeLegacy).toHaveBeenCalledWith({ projectId: "proj-1" });
+      expect(mutations.invalidateLegacy).toHaveBeenCalled();
+      expect(host.successes).toContainEqual({ title: "Legacy project key revoked" });
     });
   });
 
   describe("when a reader who cannot manage the project opens the keys page", () => {
-    /** @scenario A reader who cannot manage the project sees no banner and no error */
-    it("never asks for the status, so shows no banner and no error", () => {
+    /** @scenario A reader who cannot manage the project sees no legacy row and no error */
+    it("never asks for the status, so shows no legacy row and no error", () => {
       state.members = [];
-      // The status would show a banner if it were read; the fake answers only an enabled read.
-      state.legacyKey = { present: true };
+      // The status would show a row if it were read; the fake answers only an enabled read.
+      state.legacyKey = LIVE_LEGACY_KEY;
       renderWithApiKeyHost(
         <ApiKeysScreen />,
         new FakeApiKeyHost({ grants: new Set(["organization:view"]) }),
       );
 
-      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
+      expect(screen.queryByTestId("legacy-key-row")).toBeNull();
       expect(screen.queryByRole("alert")).toBeNull();
     });
   });
 
   describe("when a project admin who is not an organization admin opens the keys page", () => {
-    /** @scenario A banner tells an admin that legacy project keys are going away */
-    it("shows the banner, since the server answered the status read", () => {
+    it("lists the row, since the server answered the status read", () => {
       state.members = [];
-      state.legacyKey = { present: true };
+      state.legacyKey = LIVE_LEGACY_KEY;
       renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
 
-      expect(screen.getByTestId("legacy-project-key-banner")).toBeInTheDocument();
+      expect(screen.getByTestId("legacy-key-row")).toBeInTheDocument();
     });
   });
 });
 
 describe("given the project never had a legacy key", () => {
   describe("when an organization admin opens the keys page", () => {
-    /** @scenario A project that never had a legacy key shows no banner */
-    it("reads the status as absent and shows no banner", () => {
-      state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
-      state.legacyKey = { present: false };
+    /** @scenario A project that never had a legacy key shows no legacy row */
+    it("reads the status as absent and shows no legacy row", () => {
+      state.members = ADMIN;
+      state.legacyKey = { present: false, lastUsedAt: null };
       renderWithApiKeyHost(<ApiKeysScreen />, new FakeApiKeyHost());
 
-      expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
+      expect(screen.queryByTestId("legacy-key-row")).toBeNull();
       expect(screen.queryByRole("alert")).toBeNull();
     });
   });

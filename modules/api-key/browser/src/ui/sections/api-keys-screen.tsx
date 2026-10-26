@@ -30,7 +30,7 @@ import { Key, Plus } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
-import { useLegacyKeyPresent } from "../../behavior/use-legacy-key-status.ts";
+import { type LegacyKeyStatus, useLegacyKey } from "../../behavior/use-legacy-key-status.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
 import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
 import {
@@ -41,8 +41,8 @@ import {
   type ScopeFilterValue,
 } from "../../model/api-key-scope-filter.ts";
 import { IngestionKeysSection } from "../blocks/ingestion-keys-section.tsx";
-import { LegacyProjectKeyBanner } from "../blocks/legacy-project-key-banner.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";
+import { RevokeLegacyKeyDialog } from "../blocks/revoke-legacy-key-dialog.tsx";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./create-api-key-drawer.tsx";
 import { EditApiKeyDrawer } from "./edit-api-key-drawer.tsx";
 import { TokenCreatedDialog } from "./token-created-dialog.tsx";
@@ -247,6 +247,95 @@ function ApiKeyTableRow({
   );
 }
 
+/** The project's legacy key as a row: it can only be revoked, never read or rotated (ADR-002). */
+function LegacyKeyTableRow({
+  legacyKey,
+  projectId,
+  projectName,
+  onRevoke,
+}: {
+  legacyKey: LegacyKeyStatus;
+  projectId: string;
+  projectName: string | undefined;
+  onRevoke: () => void;
+}) {
+  return (
+    <ListTable.Row data-testid="legacy-key-row">
+      <ListTable.Cell>
+        <HStack align="start">
+          <Box paddingTop={1} color="fg.muted" flexShrink={0}>
+            <Key size={14} />
+          </Box>
+          <VStack align="start" gap={0} minWidth={0}>
+            <HStack gap={2} maxWidth="full" minWidth={0}>
+              <Text textStyle="label" flex={1} minWidth={0} truncate>
+                Project key
+              </Text>
+              <Badge size="sm" colorPalette="orange" flexShrink={0}>
+                Legacy
+              </Badge>
+            </HStack>
+            <Text textStyle="caption" color="fg.muted" maxWidth="full" lineClamp={2}>
+              Replace it with a new key, then revoke it.
+            </Text>
+          </VStack>
+        </HStack>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <IdText value="sk-lw-…" label="secret key prefix" copyable={false} />
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <VStack align="start" gap={0}>
+          <EmptyValue label="No owner" />
+          <Text textStyle="caption" color="fg.muted">
+            Project key
+          </Text>
+        </VStack>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <ProviderScopeChips
+          size="xs"
+          scopes={[{ scopeType: "PROJECT", scopeId: projectId, name: projectName }]}
+        />
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <PermissionBadge permissionMode="all" />
+      </ListTable.Cell>
+      <ListTable.Cell nowrap>
+        {legacyKey.lastUsedAt ? (
+          <FormattedDate value={legacyKey.lastUsedAt} display="relative" />
+        ) : (
+          <EmptyValue label="Never used" />
+        )}
+      </ListTable.Cell>
+      <ListTable.ActionCell>
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-label="Actions for the legacy project key"
+              data-testid="legacy-key-actions"
+            >
+              <MoreVerticalIcon size={14} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item
+              value="revoke"
+              color="fg.error"
+              data-testid="legacy-key-revoke"
+              onClick={onRevoke}
+            >
+              Revoke
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      </ListTable.ActionCell>
+    </ListTable.Row>
+  );
+}
+
 export default function ApiKeysScreen() {
   const host = useApiKeyHost();
   const scope = host.scope();
@@ -263,10 +352,11 @@ export default function ApiKeysScreen() {
   // An empty member list is how the page knows the reader is not an
   // organization admin: the procedure answers `[]` for everybody else.
   const isAdmin = (orgMembers.data?.length ?? 0) > 0;
-  const hasLegacyKey = useLegacyKeyPresent({
+  const legacyKey = useLegacyKey({
     projectId: scope.projectId,
     canManageProject: host.hasPermission("project:manage"),
   });
+  const revokeLegacyMutation = apiKeyApi.project.revokeProjectApiKey.useMutation();
   const createMutation = apiKeyApi.apiKey.create.useMutation();
   const updateMutation = apiKeyApi.apiKey.update.useMutation();
   const revokeMutation = apiKeyApi.apiKey.revoke.useMutation();
@@ -278,6 +368,7 @@ export default function ApiKeysScreen() {
   const [newKeyInput, setNewKeyInput] = useState<CreateApiKeyInput | null>(null);
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
+  const [isRevokingLegacyKey, setIsRevokingLegacyKey] = useState(false);
 
   // The scopes the reader can see: the filter's options, and the names the
   // per-row chips resolve their ids to.
@@ -429,6 +520,22 @@ export default function ApiKeysScreen() {
     );
   };
 
+  const handleRevokeLegacyKey = () => {
+    if (!scope.projectId) return;
+    revokeLegacyMutation.mutate(
+      { projectId: scope.projectId },
+      {
+        onSuccess: () => {
+          setIsRevokingLegacyKey(false);
+          host.succeeded({ title: "Legacy project key revoked" });
+          void queryClient.project.getLegacyKeyStatus.invalidate();
+        },
+        onError: (error) =>
+          host.failed({ error, fallbackTitle: "Couldn't revoke the legacy project key" }),
+      },
+    );
+  };
+
   const getScopeBadge = (apiKeyRow: ApiKeyRow) => {
     return (
       <ProviderScopeChips
@@ -465,11 +572,9 @@ export default function ApiKeysScreen() {
           them in the browser or other client-side code.
         </Text>
 
-        {hasLegacyKey && <LegacyProjectKeyBanner onCreateKey={onCreateOpen} />}
-
         <VStack gap={8} width="full" align="stretch">
           {/* Personal + service keys (ingestSourceType == null); the page heading titles them. */}
-          {!isLoadingKeys && serviceApiKeys.length === 0 ? (
+          {!isLoadingKeys && serviceApiKeys.length === 0 && !legacyKey ? (
             <NoDataInfoBlock
               title="No API keys"
               description="Create one to get started."
@@ -501,6 +606,14 @@ export default function ApiKeysScreen() {
               </ListTable.Header>
               <ListTable.Body>
                 {isLoadingKeys && <ListTable.LoadingRows rows={3} columns={KEY_COLUMNS} />}
+                {legacyKey && scope.projectId && (
+                  <LegacyKeyTableRow
+                    legacyKey={legacyKey}
+                    projectId={scope.projectId}
+                    projectName={scope.projectName}
+                    onRevoke={() => setIsRevokingLegacyKey(true)}
+                  />
+                )}
                 {filteredKeys.map((apiKey) => (
                   <ApiKeyTableRow
                     key={apiKey.id}
@@ -512,7 +625,7 @@ export default function ApiKeysScreen() {
                   />
                 ))}
 
-                {!isLoadingKeys && filteredKeys.length === 0 && (
+                {!isLoadingKeys && filteredKeys.length === 0 && !legacyKey && (
                   <NoMatchingKeysRow
                     onClearFilters={() => handleScopeFilterChange({ kind: "all" })}
                   />
@@ -577,6 +690,14 @@ export default function ApiKeysScreen() {
           isRevoking={revokeMutation.isPending}
           onCancel={() => setApiKeyToRevoke(null)}
           onConfirm={handleRevoke}
+        />
+
+        <RevokeLegacyKeyDialog
+          open={isRevokingLegacyKey}
+          projectName={scope.projectName ?? "revoke"}
+          isRevoking={revokeLegacyMutation.isPending}
+          onClose={() => setIsRevokingLegacyKey(false)}
+          onConfirm={handleRevokeLegacyKey}
         />
       </VStack>
     </>

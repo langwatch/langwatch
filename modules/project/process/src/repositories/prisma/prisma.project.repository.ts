@@ -816,6 +816,14 @@ export class PrismaProjectRepository
     });
   }
 
+  async findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null> {
+    const row = await this.prisma.project.findUnique({
+      where: { id: input.projectId },
+      select: { legacyApiKeyLastUsedAt: true },
+    });
+    return row?.legacyApiKeyLastUsedAt ? fromDate(row.legacyApiKeyLastUsedAt) : null;
+  }
+
   async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
     const result = await this.prisma.project.updateMany({
       where: { id: input.projectId, archivedAt: null },

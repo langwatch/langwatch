@@ -89,10 +89,20 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And the row holds a hash of the key and a masked hint, never the key itself
 
     @integration
-    Scenario: The legacy key is not listed on the keys page
+    Scenario: The legacy key is listed as a row an admin can revoke
+      Given project "alpha" still has a live legacy key
       When "ada" opens the API keys of project "alpha"
-      Then no row shows the legacy project key
+      Then a row "Project key" with a "Legacy" badge is listed, scoped to project "alpha"
+      And it shows when the key was last used
+      And its only action is Revoke
       And no control copies or rotates it
+
+    @integration
+    Scenario: The legacy key status answers when the key was last used
+      Given the legacy key of project "alpha" authenticated a request
+      When the legacy key status of project "alpha" is read
+      Then it answers present with the time of that use
+      And once the key is revoked it answers absent with no time
 
     @integration
     Scenario: A revoked legacy key is refused
@@ -101,53 +111,31 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And a trace sent with the old key is refused
 
     @integration
-    Scenario: A banner tells an admin that legacy project keys are going away
-      Given project "alpha" still has a live legacy key
-      When "ada" opens the API keys of project "alpha"
-      Then a warning banner titled "Legacy project keys are going away" says to use personal access tokens instead
-      And the banner offers no action
-
-    @integration
-    Scenario: A reader who cannot manage the project sees no banner and no error
+    Scenario: A reader who cannot manage the project sees no legacy row and no error
       Given project "alpha" still has a live legacy key
       When "max" opens the API keys of project "alpha"
       Then the legacy key status is not read
-      And no banner and no error is shown
+      And no legacy row and no error is shown
 
     @integration
-    Scenario: A project that never had a legacy key shows no banner
+    Scenario: A project that never had a legacy key shows no legacy row
       Given project "gamma" was created after project keys were retired, so it never had a legacy key
       When "ada" opens the API keys of project "gamma"
       Then the legacy key status answers absent
-      And no banner is shown
+      And no legacy row is shown
 
-    @unimplemented
-    Scenario: The banner offers to revoke the project key
-      Given project "alpha" still has a live legacy key
-      When "ada" opens the API keys of project "alpha"
-      Then the banner says that once revoked the key stops working for good and cannot be restored
-      And the banner offers "Revoke project key..."
+    @integration
+    Scenario: Revoking the legacy key asks for the project name
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      Then a dialog "Revoke the legacy project key?" says the key stops working at once and cannot be restored
+      And "Revoke for good" stays disabled until she types "alpha" exactly
 
-    @unimplemented
-    Scenario: Revoking the project key takes two confirmations
-      Given "ada" chose "Revoke project key..."
-      Then a dialog "Revoke the project key?" offers Cancel and Continue
-      When she chooses Continue
-      Then a second step asks her to type the project name to confirm
-      And "Revoke for good" stays disabled until she types the project name exactly
-
-    @unimplemented
-    Scenario: A name that does not match keeps the revoke disabled
-      Given "ada" is on the second step of revoking the project key of "alpha"
-      When she types "alph"
-      Then "Revoke for good" is disabled
-
-    @unimplemented
-    Scenario: A revoked project key hides the banner
-      Given "ada" typed the exact project name on the second step
+    @integration
+    Scenario: A revoked legacy key leaves the list
+      Given "ada" typed "alpha" in the revoke dialog
       When she chooses "Revoke for good"
-      Then a toast says "Project key revoked"
-      And the banner is gone
+      Then a toast says "Legacy project key revoked"
+      And the legacy key row is gone
 
     @unit
     Scenario: A new project gets no customer-facing project key

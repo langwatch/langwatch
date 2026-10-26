@@ -16,7 +16,15 @@ type BorrowedProcedures = {
   project: {
     /** Whether the project still has its legacy key; project admins only, others are refused. */
     getLegacyKeyStatus: {
-      query: { input: { projectId: string }; output: { present: boolean } };
+      query: {
+        input: { projectId: string };
+        output: { present: boolean; lastUsedAt: string | null };
+      };
+    };
+
+    /** Revokes the legacy project key for good; project admins only. */
+    revokeProjectApiKey: {
+      mutation: { input: { projectId: string }; output: { revoked: true } };
     };
 
     /**
