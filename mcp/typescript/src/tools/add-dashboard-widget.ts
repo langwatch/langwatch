@@ -1,15 +1,10 @@
 /**
- * The `add_dashboard_widget` MCP tool: create, then place, as the platform's own write path
- * does. The dashboard is checked first so a typo leaves no unplaced widget behind, and a
- * failed placement deletes the widget it just created.
+ * The `add_dashboard_widget` MCP tool: one create under the board's own path,
+ * `POST /api/v1/boards/{boardId}/widgets`, which places the widget as it saves it. The board
+ * is checked first so a typo names the id the agent passed.
  */
 
-import {
-  assignDashboardWidgetToDashboard,
-  createDashboardWidget,
-  deleteDashboardWidget,
-} from "../langwatch-api-dashboard-widgets.js";
-import { getCurrentProject } from "../langwatch-api-projects.js";
+import { createBoardWidget } from "../langwatch-api-boards.js";
 import { assertDashboardExists } from "./dashboard-exists.js";
 import {
   type DashboardWidgetQueriesInput,
@@ -26,34 +21,14 @@ export interface AddDashboardWidgetParams {
 export async function handleAddDashboardWidget(params: AddDashboardWidgetParams): Promise<string> {
   const queries = normalizeDashboardWidgetQueries({ queries: params.queries });
 
-  const project = await getCurrentProject();
-  await assertDashboardExists({ projectId: project.id, dashboardId: params.dashboardId });
+  await assertDashboardExists({ dashboardId: params.dashboardId });
 
-  const widget = await createDashboardWidget({
-    projectId: project.id,
+  const widget = await createBoardWidget({
+    boardId: params.dashboardId,
     name: params.name,
     code: params.code,
     queries,
   });
-
-  try {
-    await assignDashboardWidgetToDashboard({
-      projectId: project.id,
-      widgetId: widget.id,
-      dashboardId: params.dashboardId,
-    });
-  } catch (error) {
-    // The widget now exists but is not on the dashboard we promised — never
-    // leave it dangling because the dashboard vanished between the check
-    // above and this call.
-    await deleteDashboardWidget({
-      projectId: project.id,
-      widgetId: widget.id,
-    }).catch(() => {
-      // Best-effort cleanup; the assign error below is what the caller needs.
-    });
-    throw error;
-  }
 
   return [
     `Widget "${params.name}" created and added to dashboard "${params.dashboardId}".`,

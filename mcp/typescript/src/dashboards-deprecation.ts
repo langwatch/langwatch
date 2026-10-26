@@ -1,0 +1,38 @@
+/**
+ * The one warning a process gives when `/api/v1/dashboards` answers with a `Deprecation` header:
+ * once to stderr when first seen, and once appended to a dashboards tool's result. The route
+ * keeps working. Spec: modules/dashboard/specs/dashboards-v2.feature AC199s.
+ */
+
+export const DASHBOARDS_DEPRECATION_NOTE =
+  "Note: /api/v1/dashboards is deprecated for this project; use list_dashboard_boards and the other board tools (/api/v1/boards).";
+
+let seen = false;
+let surfaced = false;
+
+/** Records a response's deprecation; only `/api/v1/dashboards` answers count. */
+export function noteDashboardsDeprecation({
+  path,
+  headers,
+}: {
+  path: string;
+  headers: Headers | undefined;
+}): void {
+  if (seen || !path.startsWith("/api/v1/dashboards")) return;
+  if (!headers?.get("Deprecation")) return;
+  seen = true;
+  process.stderr.write(`${DASHBOARDS_DEPRECATION_NOTE}\n`);
+}
+
+/** The tool's text, with the note appended the first time one was seen and not yet shown. */
+export function withDashboardsDeprecationNote(text: string): string {
+  if (!seen || surfaced) return text;
+  surfaced = true;
+  return `${text}\n\n${DASHBOARDS_DEPRECATION_NOTE}`;
+}
+
+/** Test seam: forget what this process has seen and shown. */
+export function resetDashboardsDeprecation(): void {
+  seen = false;
+  surfaced = false;
+}

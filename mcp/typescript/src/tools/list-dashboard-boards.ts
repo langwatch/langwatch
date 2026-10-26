@@ -4,11 +4,9 @@
  */
 
 import { listBoards } from "../langwatch-api-boards.js";
-import { getCurrentProject } from "../langwatch-api-projects.js";
 
 export async function handleListDashboardBoards(): Promise<string> {
-  const project = await getCurrentProject();
-  const { data: boards } = await listBoards({ projectId: project.id });
+  const { data: boards } = await listBoards();
 
   if (boards.length === 0) {
     return "No dashboards found in this project. Create one in the Dashboards area first.";

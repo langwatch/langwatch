@@ -44,21 +44,6 @@ export interface DashboardWidget {
   rowSpan: number;
 }
 
-/** Saves a new widget, unplaced (not yet on any dashboard). */
-export async function createDashboardWidget(params: {
-  projectId: string;
-  name: string;
-  code: string;
-  queries: DashboardWidgetQueryInput[];
-}): Promise<DashboardWidget> {
-  const { projectId, ...data } = params;
-  return makeRequest(
-    "POST",
-    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/dashboard-widgets`,
-    data,
-  ) as Promise<DashboardWidget>;
-}
-
 /** Reads one widget; a widget in another project answers 404. */
 export async function getDashboardWidget(params: {
   projectId: string;
@@ -85,28 +70,4 @@ export async function updateDashboardWidget(params: {
     `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/dashboard-widgets/${encodeURIComponent(widgetId)}`,
     data,
   ) as Promise<DashboardWidget>;
-}
-
-/** Places an existing widget on a dashboard, at the next free row. */
-export async function assignDashboardWidgetToDashboard(params: {
-  projectId: string;
-  widgetId: string;
-  dashboardId: string;
-}): Promise<DashboardWidget> {
-  return makeRequest(
-    "POST",
-    `/api/v1/projects/${encodeURIComponent(params.projectId)}/analytics/dashboard-widgets/${encodeURIComponent(params.widgetId)}/dashboard`,
-    { dashboardId: params.dashboardId },
-  ) as Promise<DashboardWidget>;
-}
-
-/** Deletes a widget. Used to undo a create when placing it fails. */
-export async function deleteDashboardWidget(params: {
-  projectId: string;
-  widgetId: string;
-}): Promise<void> {
-  await makeRequest(
-    "DELETE",
-    `/api/v1/projects/${encodeURIComponent(params.projectId)}/analytics/dashboard-widgets/${encodeURIComponent(params.widgetId)}`,
-  );
 }

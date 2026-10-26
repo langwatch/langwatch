@@ -6,14 +6,12 @@ import { LangWatchApiError } from "../langwatch-api.js";
  * agent's typo, or the id of an Analytics Reports board, fails before any widget is written.
  */
 export async function assertDashboardExists({
-  projectId,
   dashboardId,
 }: {
-  projectId: string;
   dashboardId: string;
 }): Promise<void> {
   try {
-    await getBoard({ projectId, boardId: dashboardId });
+    await getBoard({ boardId: dashboardId });
   } catch (error) {
     if (error instanceof LangWatchApiError && error.status === 404) {
       throw new Error(

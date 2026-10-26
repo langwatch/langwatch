@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.ts";
+import { withDashboardsDeprecationNote } from "./dashboards-deprecation.ts";
 import { fetchDocumentation } from "./documentation-fetch.ts";
 import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.ts";
 import {
@@ -1331,7 +1332,9 @@ function registerDashboardTools(server: McpServer): void {
       requireApiKey();
       const { handleListDashboards } = await import("./tools/list-dashboards.ts");
       return {
-        content: [{ type: "text", text: await handleListDashboards() }],
+        content: [
+          { type: "text", text: withDashboardsDeprecationNote(await handleListDashboards()) },
+        ],
       };
     }),
   );
@@ -1346,7 +1349,9 @@ function registerDashboardTools(server: McpServer): void {
       requireApiKey();
       const { handleGetDashboard } = await import("./tools/get-dashboard.ts");
       return {
-        content: [{ type: "text", text: await handleGetDashboard(params) }],
+        content: [
+          { type: "text", text: withDashboardsDeprecationNote(await handleGetDashboard(params)) },
+        ],
       };
     }),
   );
@@ -1361,7 +1366,12 @@ function registerDashboardTools(server: McpServer): void {
       requireApiKey();
       const { handleCreateDashboard } = await import("./tools/create-dashboard.ts");
       return {
-        content: [{ type: "text", text: await handleCreateDashboard(params) }],
+        content: [
+          {
+            type: "text",
+            text: withDashboardsDeprecationNote(await handleCreateDashboard(params)),
+          },
+        ],
       };
     }),
   );
@@ -1376,7 +1386,12 @@ function registerDashboardTools(server: McpServer): void {
       requireApiKey();
       const { handleDeleteDashboard } = await import("./tools/delete-dashboard.ts");
       return {
-        content: [{ type: "text", text: await handleDeleteDashboard(params) }],
+        content: [
+          {
+            type: "text",
+            text: withDashboardsDeprecationNote(await handleDeleteDashboard(params)),
+          },
+        ],
       };
     }),
   );
@@ -1396,7 +1411,9 @@ function registerDashboardTools(server: McpServer): void {
         content: [
           {
             type: "text",
-            text: `Dashboard "${result.name}" renamed successfully (ID: ${result.id}).`,
+            text: withDashboardsDeprecationNote(
+              `Dashboard "${result.name}" renamed successfully (ID: ${result.id}).`,
+            ),
           },
         ],
       };
@@ -1494,6 +1511,87 @@ function registerDashboardTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleUpdateDashboardWidget(params) }],
       };
+    }),
+  );
+
+  registerDashboardBoardTools(server);
+}
+
+/** Board CRUD and a board's widgets, over `/api/v1/boards` (the project comes from the key). */
+function registerDashboardBoardTools(server: McpServer): void {
+  const boardId = z.string().describe("The board's ID, as list_dashboard_boards lists it");
+  const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
+
+  server.tool(
+    "get_dashboard_board",
+    "Reads one board in the Dashboards area: its name, scope, description and address.",
+    { boardId },
+    withToolLogging("get_dashboard_board", async (params) => {
+      requireApiKey();
+      const { handleGetDashboardBoard } = await import("./tools/dashboard-boards.js");
+      return text(await handleGetDashboardBoard(params));
+    }),
+  );
+
+  server.tool(
+    "create_dashboard_board",
+    "Creates an empty board in the Dashboards area. Add widgets to it with add_dashboard_widget.",
+    { name: z.string().describe("The board's name") },
+    withToolLogging("create_dashboard_board", async (params) => {
+      requireApiKey();
+      const { handleCreateDashboardBoard } = await import("./tools/dashboard-boards.js");
+      return text(await handleCreateDashboardBoard(params));
+    }),
+  );
+
+  server.tool(
+    "rename_dashboard_board",
+    "Changes a Dashboards board's name and/or description; a field left out keeps its value.",
+    {
+      boardId,
+      name: z.string().optional().describe("The board's new name"),
+      description: z.string().optional().describe("The board's new description"),
+    },
+    withToolLogging("rename_dashboard_board", async (params) => {
+      requireApiKey();
+      const { handleRenameDashboardBoard } = await import("./tools/dashboard-boards.js");
+      return text(await handleRenameDashboardBoard(params));
+    }),
+  );
+
+  server.tool(
+    "delete_dashboard_board",
+    "Deletes a Dashboards board together with the widgets on it. This cannot be undone.",
+    { boardId },
+    withToolLogging("delete_dashboard_board", async (params) => {
+      requireApiKey();
+      const { handleDeleteDashboardBoard } = await import("./tools/dashboard-boards.js");
+      return text(await handleDeleteDashboardBoard(params));
+    }),
+  );
+
+  server.tool(
+    "list_board_widgets",
+    "Lists the custom widgets on one Dashboards board, with each widget's ID and query names.",
+    { boardId },
+    withToolLogging("list_board_widgets", async (params) => {
+      requireApiKey();
+      const { handleListBoardWidgets } = await import("./tools/dashboard-boards.js");
+      return text(await handleListBoardWidgets(params));
+    }),
+  );
+
+  server.tool(
+    "delete_dashboard_widget",
+    "Deletes one custom widget from a Dashboards board. A widget on another board is not found.",
+    {
+      boardId,
+      widgetId: z.string().describe("The widget's ID, as list_board_widgets lists it"),
+    },
+    withToolLogging("delete_dashboard_widget", async (params) => {
+      requireApiKey();
+      const { handleDeleteDashboardWidget } = await import("./tools/dashboard-boards.js");
+      return text(await handleDeleteDashboardWidget(params));
     }),
   );
 }

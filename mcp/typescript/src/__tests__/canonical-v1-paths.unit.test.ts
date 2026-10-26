@@ -18,7 +18,7 @@ const SERVER_SRC = resolve(__dirname, "..");
  * (packages/api/adrs/002 section 1). Everything else keeps its bare address.
  */
 const V1_FAMILIES = new Set(
-  `agent-cache analytics annotations api-keys bug-reports coding-agent dashboards dataset dspy
+  `agent-cache analytics annotations api-keys boards bug-reports coding-agent dashboards dataset dspy
    evaluations evaluators events experiment experiments governance graphs groups guardrails langy me
    model-defaults model-providers monitors optimization organization organizations playground
    prompts role-bindings roles scenario-events scenarios scim-tokens simulation-runs suites
