@@ -15,14 +15,22 @@ function browserDocument() {
 }
 
 describe("given a browser that installs api-key", () => {
-  describe("when the kernel renders with only a transport supplied", () => {
-    it("installs the module", async () => {
+  describe("when the kernel renders with a transport and the page's config supplied", () => {
+    /** The api process writes an "api-key" slice; a browser that refused it never booted. */
+    it("installs the module and projects the docs origins it claims", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
         .withModules([hostServiceFakes(), apiKeyWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
+        .withInjectedConfig(() => ({
+          process: { mode: "test", deployment: "self-hosted", nlp: true },
+          "api-key": { docsOrigins: ["https://docs.example.test"] },
+        }))
         .render();
 
       expect(installed.modules).toContain(apiKeyWeb);
+      expect(installed.config).toEqual({
+        "api-key": { docsOrigins: ["https://docs.example.test"] },
+      });
     });
   });
 

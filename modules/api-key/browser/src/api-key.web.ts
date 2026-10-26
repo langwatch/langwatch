@@ -4,9 +4,11 @@
  * screens (project authorize, MCP authorize, docs connect).
  */
 
+import { apiKeyWebConfigSchema } from "@langwatch/api-key-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 
 export const apiKeyWeb = defineBrowserModule("api-key")
+  .withConfig({ "api-key": apiKeyWebConfigSchema }, (slices) => slices["api-key"])
   .withHosts({
     requires: ["ApiKeyHostApi", "AuthorizeHostApi"],
     mounts: {
