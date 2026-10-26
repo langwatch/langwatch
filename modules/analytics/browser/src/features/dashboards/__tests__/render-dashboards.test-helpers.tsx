@@ -57,30 +57,35 @@ export type FrameInit = { dashboardContext: ChartFrameDashboardContext };
 export function recordWidgetFrames() {
   const inits: FrameInit[] = [];
   const contexts: ChartFrameDashboardContext[] = [];
+  const perFrame = new Map<HTMLIFrameElement, ChartFrameDashboardContext>();
   const prototype = HTMLIFrameElement.prototype;
   const real = Object.getOwnPropertyDescriptor(prototype, "contentWindow");
   const windows = new WeakMap<HTMLIFrameElement, Pick<Window, "postMessage">>();
   Object.defineProperty(prototype, "contentWindow", {
     configurable: true,
     get(this: HTMLIFrameElement) {
-      const recorded =
-        windows.get(this) ??
-        ({
-          postMessage: (message: unknown, _origin?: unknown, transfer?: readonly unknown[]) => {
-            inits.push(message as FrameInit);
-            contexts.push((message as FrameInit).dashboardContext);
-            const port = transfer?.[0] as MessagePort | undefined;
-            if (port) {
-              port.onmessage = ({ data }: MessageEvent<Partial<FrameInit>>) => {
-                if (data.dashboardContext) contexts.push(data.dashboardContext);
-              };
-            }
-          },
-        } as Pick<Window, "postMessage">);
-      windows.set(this, recorded);
-      return recorded;
+      return windows.get(this) ?? recordFor(this);
     },
   });
+  const recordFor = (frame: HTMLIFrameElement) => {
+    const recorded = {
+      postMessage: (message: unknown, _origin?: unknown, transfer?: readonly unknown[]) => {
+        inits.push(message as FrameInit);
+        contexts.push((message as FrameInit).dashboardContext);
+        perFrame.set(frame, (message as FrameInit).dashboardContext);
+        const port = transfer?.[0] as MessagePort | undefined;
+        if (port) {
+          port.onmessage = ({ data }: MessageEvent<Partial<FrameInit>>) => {
+            if (!data.dashboardContext) return;
+            contexts.push(data.dashboardContext);
+            perFrame.set(frame, data.dashboardContext);
+          };
+        }
+      },
+    } as Pick<Window, "postMessage">;
+    windows.set(frame, recorded);
+    return recorded;
+  };
   return {
     /** Tells every widget frame on the page it loaded, and answers what each was sent. */
     loadAll: (frames: readonly HTMLElement[]) => {
@@ -89,6 +94,8 @@ export function recordWidgetFrames() {
     },
     /** The context the frames were last handed, at load or as a change after it. */
     lastContext: () => contexts.at(-1),
+    /** The context each widget frame was last handed, one per frame. */
+    latestContexts: () => [...perFrame.values()],
     restore: () => {
       if (real) Object.defineProperty(prototype, "contentWindow", real);
     },

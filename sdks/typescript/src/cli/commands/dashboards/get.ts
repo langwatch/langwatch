@@ -1,12 +1,23 @@
 import chalk from "chalk";
 
-import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
-import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
+import {
+  DashboardWidgetsApiError,
+  DashboardWidgetsApiService,
+} from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+import {
+  DashboardsApiError,
+  DashboardsApiService,
+} from "@/client-sdk/services/dashboards/dashboards-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+
+const isNotFound = (error: unknown): boolean =>
+  (error instanceof DashboardsApiError && error.status === 404) ||
+  (error instanceof DashboardWidgetsApiError && error.status === 404) ||
+  (error instanceof Error && "httpStatus" in error && error.httpStatus === 404);
 
 /**
  * Returns the dashboard rather than printing it: the output port renders it in
@@ -21,9 +32,13 @@ export const getDashboardCommand = async (id: string): Promise<CommandResult | v
   try {
     const dashboard = await service.get(id).catch(async (error: unknown) => {
       // The Reports API never holds a Dashboards board, so its 404 is not final.
-      const board = await new DashboardWidgetsApiService().getBoard(id).catch(() => null);
-      if (!board) throw error;
-      return { ...board, graphs: [] };
+      if (!isNotFound(error)) throw error;
+      try {
+        return { ...(await new DashboardWidgetsApiService().getBoard(id)), graphs: [] };
+      } catch (boardError) {
+        // Only the board route's own 404 means "neither area holds it".
+        throw isNotFound(boardError) ? error : boardError;
+      }
     });
 
     spinner.succeed(`Found dashboard "${dashboard.name}"`);

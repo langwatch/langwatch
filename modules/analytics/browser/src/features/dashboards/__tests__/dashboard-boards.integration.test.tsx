@@ -834,8 +834,11 @@ describe("a member's board", () => {
         try {
           openBoard({ server: boardWithTwoWidgets(), query: { range: "24h" } });
           frames.loadAll(await screen.findAllByTitle("Custom chart"));
-          const before = frames.lastContext()!.timeWindow;
-          expect(before.end).toBe(Date.UTC(2026, 8, 28, 12, 1));
+          const before = frames.latestContexts().map(({ timeWindow }) => timeWindow);
+          expect(before.map(({ end }) => end)).toEqual([
+            Date.UTC(2026, 8, 28, 12, 1),
+            Date.UTC(2026, 8, 28, 12, 1),
+          ]);
 
           vi.setSystemTime(Date.UTC(2026, 8, 28, 12, 10, 5));
           await user.click(screen.getByRole("button", { name: "Period" }));
@@ -843,10 +846,13 @@ describe("a member's board", () => {
 
           await waitFor(() => {
             frames.loadAll(screen.getAllByTitle("Custom chart"));
-            expect(frames.lastContext()!.timeWindow.end).toBe(Date.UTC(2026, 8, 28, 12, 11));
+            expect(frames.latestContexts().map(({ timeWindow }) => timeWindow.end)).toEqual([
+              Date.UTC(2026, 8, 28, 12, 11),
+              Date.UTC(2026, 8, 28, 12, 11),
+            ]);
           });
-          const after = frames.lastContext()!.timeWindow;
-          expect(after.end - after.start).toBe(86_400_000);
+          const after = frames.latestContexts().map(({ timeWindow }) => timeWindow);
+          expect(after.map(({ start, end }) => end - start)).toEqual([86_400_000, 86_400_000]);
         } finally {
           frames.restore();
         }

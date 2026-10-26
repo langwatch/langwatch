@@ -15,8 +15,10 @@ async function describeBoardOrThrow({ id, notFound }: { id: string; notFound: un
       `**Updated**: ${board.updatedAt}`,
       `**URL**: ${board.platformUrl}`,
     ].join("\n");
-  } catch {
-    throw notFound;
+  } catch (error) {
+    // Only the board route's own 404 means neither area holds the id.
+    if (error instanceof LangWatchApiError && error.status === 404) throw notFound;
+    throw error;
   }
 }
 

@@ -52,6 +52,16 @@ describe("handleGetDashboard()", () => {
     });
   });
 
+  describe("when the board route itself fails", () => {
+    it("propagates that error rather than the Reports not found", async () => {
+      vi.mocked(getDashboard).mockRejectedValue(notFound());
+      const failure = new LangWatchApiError("boom", 500, "{}");
+      vi.mocked(getBoard).mockRejectedValue(failure);
+
+      await expect(handleGetDashboard({ id: "x" })).rejects.toBe(failure);
+    });
+  });
+
   describe("when the Reports API fails for another reason", () => {
     it("does not look for a board", async () => {
       vi.mocked(getDashboard).mockRejectedValue(new LangWatchApiError("boom", 500, "{}"));

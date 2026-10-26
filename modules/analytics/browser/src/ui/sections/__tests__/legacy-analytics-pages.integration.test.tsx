@@ -9,7 +9,7 @@
 import { createUiQueryClient } from "@langwatch/browser/query-client";
 import { answeringUiTransport, type UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
@@ -64,7 +64,8 @@ describe("given a member opens the legacy analytics overview", () => {
 
   /** @scenario "AC20 Legacy analytics pages behave exactly as before" */
   it("sends no LWQL query", async () => {
-    await vi.waitUntil(() => calls.length > 0);
+    await waitFor(() => expect(calls.map(({ path }) => path)).toContain("analytics.getTimeseries"));
+    await waitFor(() => expect(document.querySelector("canvas, svg")).not.toBeNull());
     expect(
       calls.map(({ path }) => path).filter((path) => path.startsWith("analytics.lwql.")),
     ).toEqual([]);

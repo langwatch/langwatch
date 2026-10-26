@@ -1,19 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
-import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
+import {
+  DashboardsApiError,
+  DashboardsApiService,
+} from "@/client-sdk/services/dashboards/dashboards-api.service";
 
-vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", () => ({
+vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   DashboardsApiService: vi.fn(),
 }));
-vi.mock("@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service", () => ({
-  DashboardWidgetsApiService: vi.fn(),
-}));
+vi.mock(
+  "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service",
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    DashboardWidgetsApiService: vi.fn(),
+  }),
+);
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({ apiKey: "k", source: "env", endpoint: "e" })),
 }));
+const { spinnerFail } = vi.hoisted(() => ({ spinnerFail: vi.fn() }));
 vi.mock("ora", () => ({
-  default: () => ({ start: vi.fn().mockReturnThis(), succeed: vi.fn(), fail: vi.fn() }),
+  default: () => ({ start: vi.fn().mockReturnThis(), succeed: vi.fn(), fail: spinnerFail }),
 }));
 
 import { getDashboardCommand } from "../get";
@@ -27,6 +36,8 @@ const board = {
   updatedAt: "2026-10-02T00:00:00.000Z",
   platformUrl: "https://app.langwatch.ai/p/analytics/boards/dashboard_v2",
 };
+
+const notFound = () => new DashboardsApiError("Dashboard not found", "get", undefined, 404);
 
 describe("getDashboardCommand()", () => {
   const reportsGet = vi.fn();
@@ -49,7 +60,7 @@ describe("getDashboardCommand()", () => {
   describe("when the id is a Dashboards board the Reports API does not hold", () => {
     /** @scenario "AC8c An agent reads a Dashboards board by its id" */
     it("answers with the Dashboards board", async () => {
-      reportsGet.mockRejectedValue(new Error("Dashboard not found"));
+      reportsGet.mockRejectedValue(notFound());
       getBoard.mockResolvedValue(board);
 
       const result = await getDashboardCommand("dashboard_v2");
@@ -61,10 +72,31 @@ describe("getDashboardCommand()", () => {
 
   describe("when neither area holds the id", () => {
     it("fails with the Reports error", async () => {
-      reportsGet.mockRejectedValue(new Error("Dashboard not found"));
-      getBoard.mockRejectedValue(new Error("not found"));
+      reportsGet.mockRejectedValue(notFound());
+      getBoard.mockRejectedValue(notFound());
 
       await expect(getDashboardCommand("missing")).rejects.toThrow("process.exit(1)");
+    });
+  });
+
+  describe("when the board route fails for another reason", () => {
+    it("surfaces that error, not the Reports not found", async () => {
+      reportsGet.mockRejectedValue(notFound());
+      getBoard.mockRejectedValue(
+        new DashboardsApiError("board route exploded", "get", undefined, 500),
+      );
+
+      await expect(getDashboardCommand("x")).rejects.toThrow("process.exit(1)");
+      expect(spinnerFail).toHaveBeenCalledWith(expect.stringContaining("board route exploded"));
+    });
+  });
+
+  describe("when the Reports API fails for another reason", () => {
+    it("does not ask the Dashboards area", async () => {
+      reportsGet.mockRejectedValue(new DashboardsApiError("boom", "get", undefined, 500));
+
+      await expect(getDashboardCommand("x")).rejects.toThrow("process.exit(1)");
+      expect(getBoard).not.toHaveBeenCalled();
     });
   });
 
