@@ -499,7 +499,7 @@ interface Response {
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/board.rest.ts:112`    |
+| Declared at | `src/transport/board.rest.ts:96`     |
 | Base URL    | `/api/boards`, twin `/api/v1/boards` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -509,7 +509,7 @@ interface Response {
 
 List boards
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:116`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:100`.
 
 Answers at `/api/boards`, `/api/v1/boards`; also, undocumented, `/api/boards/2026-08-07`, `/api/v1/boards/2026-08-07`, `/api/boards/latest`, `/api/v1/boards/latest`.
 
@@ -521,7 +521,7 @@ type Response = z.infer<typeof boardListSchema>; // ../contract/src/board-rest.s
 
 Create a board
 
-Permission `analytics:create`. Declared at `src/transport/board.rest.ts:144`.
+Permission `analytics:create`. Declared at `src/transport/board.rest.ts:127`.
 
 Answers at `/api/boards`, `/api/v1/boards`; also, undocumented, `/api/boards/2026-08-07`, `/api/v1/boards/2026-08-07`, `/api/boards/latest`, `/api/v1/boards/latest`.
 
@@ -537,7 +537,7 @@ type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-re
 
 Get a board
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:172`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:154`.
 
 Answers at `/api/boards/:boardId`, `/api/v1/boards/:boardId`; also, undocumented, `/api/boards/2026-08-07/:boardId`, `/api/v1/boards/2026-08-07/:boardId`, `/api/boards/latest/:boardId`, `/api/v1/boards/latest/:boardId`.
 
@@ -553,7 +553,7 @@ type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-re
 
 Update a board
 
-Permission `analytics:update`. Declared at `src/transport/board.rest.ts:200`.
+Permission `analytics:update`. Declared at `src/transport/board.rest.ts:181`.
 
 Answers at `/api/boards/:boardId`, `/api/v1/boards/:boardId`; also, undocumented, `/api/boards/2026-08-07/:boardId`, `/api/v1/boards/2026-08-07/:boardId`, `/api/boards/latest/:boardId`, `/api/v1/boards/latest/:boardId`.
 
@@ -571,7 +571,7 @@ type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-re
 
 Delete a board
 
-Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:234`.
+Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:214`.
 
 Answers at `/api/boards/:boardId`, `/api/v1/boards/:boardId`; also, undocumented, `/api/boards/2026-08-07/:boardId`, `/api/v1/boards/2026-08-07/:boardId`, `/api/boards/latest/:boardId`, `/api/v1/boards/latest/:boardId`.
 
@@ -588,7 +588,7 @@ interface Response {
 
 List a board's widgets
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:273`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:252`.
 
 Answers at `/api/boards/:boardId/widgets`, `/api/v1/boards/:boardId/widgets`; also, undocumented, `/api/boards/2026-08-07/:boardId/widgets`, `/api/v1/boards/2026-08-07/:boardId/widgets`, `/api/boards/latest/:boardId/widgets`, `/api/v1/boards/latest/:boardId/widgets`.
 
@@ -601,7 +601,7 @@ type Response = z.infer<typeof dashboardWidgetListSchema>; // ../contract/src/da
 
 Create a widget on a board
 
-Permission `analytics:create`. Declared at `src/transport/board.rest.ts:299`.
+Permission `analytics:create`. Declared at `src/transport/board.rest.ts:277`.
 
 Answers at `/api/boards/:boardId/widgets`, `/api/v1/boards/:boardId/widgets`; also, undocumented, `/api/boards/2026-08-07/:boardId/widgets`, `/api/v1/boards/2026-08-07/:boardId/widgets`, `/api/boards/latest/:boardId/widgets`, `/api/v1/boards/latest/:boardId/widgets`.
 
@@ -615,7 +615,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Get a widget on a board
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:336`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:313`.
 
 Answers at `/api/boards/:boardId/widgets/:widgetId`, `/api/v1/boards/:boardId/widgets/:widgetId`; also, undocumented, `/api/boards/2026-08-07/:boardId/widgets/:widgetId`, `/api/v1/boards/2026-08-07/:boardId/widgets/:widgetId`, `/api/boards/latest/:boardId/widgets/:widgetId`, `/api/v1/boards/latest/:boardId/widgets/:widgetId`.
 
@@ -632,7 +632,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Update a widget on a board
 
-Permission `analytics:update`. Declared at `src/transport/board.rest.ts:363`.
+Permission `analytics:update`. Declared at `src/transport/board.rest.ts:339`.
 
 Answers at `/api/boards/:boardId/widgets/:widgetId`, `/api/v1/boards/:boardId/widgets/:widgetId`; also, undocumented, `/api/boards/2026-08-07/:boardId/widgets/:widgetId`, `/api/v1/boards/2026-08-07/:boardId/widgets/:widgetId`, `/api/boards/latest/:boardId/widgets/:widgetId`, `/api/v1/boards/latest/:boardId/widgets/:widgetId`.
 
@@ -646,13 +646,13 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Delete a widget on a board
 
-Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:400`.
+Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:375`.
 
 Answers at `/api/boards/:boardId/widgets/:widgetId`, `/api/v1/boards/:boardId/widgets/:widgetId`; also, undocumented, `/api/boards/2026-08-07/:boardId/widgets/:widgetId`, `/api/v1/boards/2026-08-07/:boardId/widgets/:widgetId`, `/api/boards/latest/:boardId/widgets/:widgetId`, `/api/v1/boards/latest/:boardId/widgets/:widgetId`.
 
 ```typescript
 type Params = z.infer<typeof boardWidgetParamsSchema>; // ../contract/src/board-rest.schemas.ts:69
-// Response: inline, src/transport/board.rest.ts:416
+// Response: inline, src/transport/board.rest.ts:396
 type Response = unknown;
 ```
 
