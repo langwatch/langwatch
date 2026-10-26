@@ -232,6 +232,39 @@ func TestExecute_ReasoningModelOverridesTempAndMaxTokens(t *testing.T) {
 	}
 }
 
+// markedCatalog marks the models it lists as taking max_completion_tokens.
+type markedCatalog map[string]bool
+
+func (c markedCatalog) OutputTokensParameter(modelID string) (string, bool) {
+	if c[modelID] {
+		return "max_completion_tokens", true
+	}
+	return "", false
+}
+
+// @scenario "A workflow LLM call on a marked model sends max_completion_tokens"
+func TestExecute_CatalogMarkedModelSendsMaxCompletionTokens(t *testing.T) {
+	// A model the name rule does not recognize: only the catalog can say.
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
+	exec := New(gw, WithModelCatalog(markedCatalog{"openai/acme-reasoner": true}))
+
+	maxTok := 900
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model:         "openai/acme-reasoner",
+		MaxTokens:     &maxTok,
+		LiteLLMParams: map[string]any{"api_key": "k"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasField(t, gw.lastReq.Body, "max_tokens") {
+		t.Errorf("max_tokens must be absent for a catalog-marked model")
+	}
+	if got := bodyFloat(t, gw.lastReq.Body, "max_completion_tokens"); got != 900 {
+		t.Errorf("expected max_completion_tokens 900, got %v", got)
+	}
+}
+
 // TestExecute_AnthropicReasoningEnabledFloorsMaxTokens pins the
 // non-OpenAI half of langwatch_nlp regression ead6141a4. When the
 // customer config sets a reasoning field on a non-reasoning-class
