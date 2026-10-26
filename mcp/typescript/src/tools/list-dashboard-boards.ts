@@ -3,10 +3,26 @@
  * the id `add_dashboard_widget` and `update_dashboard_widget` take.
  */
 
-import { listBoards } from "../langwatch-api-boards.js";
+import { listBoards, listProjectBoards } from "../langwatch-api-boards.js";
+import { getCurrentProject } from "../langwatch-api-projects.js";
+import { LangWatchApiError } from "../langwatch-api.js";
+
+/**
+ * /api/v1/boards first, so no deprecation note; it answers 404 while Dashboards is off (or on a
+ * server without it), and only then the project-path list, which answers either way.
+ */
+async function boardsOfProject() {
+  try {
+    return await listBoards();
+  } catch (error) {
+    if (!(error instanceof LangWatchApiError && error.status === 404)) throw error;
+    const project = await getCurrentProject();
+    return listProjectBoards({ projectId: project.id });
+  }
+}
 
 export async function handleListDashboardBoards(): Promise<string> {
-  const { data: boards } = await listBoards();
+  const { data: boards } = await boardsOfProject();
 
   if (boards.length === 0) {
     return "No dashboards found in this project. Create one in the Dashboards area first.";

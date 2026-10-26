@@ -8,7 +8,12 @@ vi.mock("../langwatch-api-boards.js", () => ({
   getBoard: vi.fn(),
   getBoardWidget: vi.fn(),
   listBoards: vi.fn(),
+  listProjectBoards: vi.fn(),
   updateBoardWidget: vi.fn(),
+}));
+
+vi.mock("../langwatch-api-projects.js", () => ({
+  getCurrentProject: vi.fn(async () => ({ id: "proj_1" })),
 }));
 
 import {
@@ -16,6 +21,7 @@ import {
   getBoard,
   getBoardWidget,
   listBoards,
+  listProjectBoards,
   updateBoardWidget,
 } from "../langwatch-api-boards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
@@ -306,15 +312,46 @@ describe("handleUpdateDashboardWidget()", () => {
 
 describe("handleListDashboardBoards()", () => {
   describe("when the project has Dashboards boards", () => {
-    it("lists them from the project's boards route, each with the id the widget tools take", async () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
+    it("lists them from /api/v1/boards, each with the id the widget tools take", async () => {
       mockListBoards.mockResolvedValue({ data: [{ ...sampleBoard, widgetCount: 3 }] });
 
       const result = await handleListDashboardBoards();
 
       expect(mockListBoards).toHaveBeenCalledWith();
+      expect(listProjectBoards).not.toHaveBeenCalled();
       expect(result).toContain("Agent health");
       expect(result).toContain("**ID**: dash_1");
       expect(result).toContain("**Widgets**: 3");
+      expect(result).not.toContain("deprecated");
+    });
+  });
+
+  describe("when /api/v1/boards answers 404, as while Dashboards is off", () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
+    it("lists them from the project-path list instead", async () => {
+      mockListBoards.mockRejectedValue(
+        new LangWatchApiError("Not found", 404, "{}", { code: "dashboards_not_released" }),
+      );
+      vi.mocked(listProjectBoards).mockResolvedValue({
+        data: [{ ...sampleBoard, widgetCount: 2 }],
+      });
+
+      const result = await handleListDashboardBoards();
+
+      expect(listProjectBoards).toHaveBeenCalledWith({ projectId: "proj_1" });
+      expect(result).toContain("**Widgets**: 2");
+    });
+  });
+
+  describe("when /api/v1/boards fails any other way", () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
+    it("reports that failure and asks nothing else", async () => {
+      const failure = new LangWatchApiError("Server error", 500, "{}");
+      mockListBoards.mockRejectedValue(failure);
+
+      await expect(handleListDashboardBoards()).rejects.toBe(failure);
+      expect(listProjectBoards).not.toHaveBeenCalled();
     });
   });
 
