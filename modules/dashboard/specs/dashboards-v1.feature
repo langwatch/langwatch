@@ -312,7 +312,7 @@ Feature: Dashboards v1
   # AC 17: "Langy insights on a block" (withdrawn: a widget's result lives in its sandboxed frame; no scenario until it can be read)
   # AC 18: "Every Project board is visible to every project member" (changed by langwatch/tasks#911; scope added on 2026-10-09, dashboards-v2.feature AC170-186) -> Scenario: AC18 Every Project board is visible to every member of the project; Scenario: AC18 Blocks on a Project board are reachable to every member; Scenario: AC18 Saved charts on a Project board are reachable to every member
   # AC 19: "LWQL only" → Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
-  # AC 20: "Legacy analytics untouched" → Scenario: AC20 Legacy analytics files are untouched; Scenario: AC20 Legacy analytics pages behave exactly as before
+  # AC 20: "Legacy analytics untouched" → Scenario: AC20 Legacy analytics pages behave exactly as before (the "files are untouched" half is a merge-time diff check, see the note above the scenario)
   # AC 21: "Permissions" (sharpened) → Scenario: AC21 A member without analytics:view is refused; Scenario: AC21 A refused member sees the same not-found page
   # AC 22: "Gateway routing and coding agents ship in the state their data supports" → Scenario: AC22 An unqueryable source ships as a call to action; Scenario: AC22 A queryable source follows the normal widget rules
   # AC 23: "A failing query does not take the board down" → Scenario: AC23 A failing query does not take the board down
