@@ -52,5 +52,28 @@ describe("DashboardWidgetsApiService", () => {
         params: { path: { projectId: "project_1", boardId: "board_1" } },
       });
     });
+
+    describe("when only an API key is set", () => {
+      const service = (GET: ReturnType<typeof vi.fn>) =>
+        new DashboardWidgetsApiService({ langwatchApiClient: { GET } as never });
+
+      it("reads the board under the project the key belongs to", async () => {
+        vi.stubEnv("LANGWATCH_PROJECT_ID", "   ");
+        const GET = vi
+          .fn()
+          .mockResolvedValueOnce({ data: { id: "key_project" } })
+          .mockResolvedValueOnce({ data: { id: "board_1" } });
+
+        await service(GET).getBoard("board_1");
+
+        expect(GET).toHaveBeenNthCalledWith(1, "/api/v1/me/project");
+        expect(GET).toHaveBeenNthCalledWith(
+          2,
+          "/api/v1/projects/{projectId}/analytics/boards/{boardId}",
+          { params: { path: { projectId: "key_project", boardId: "board_1" } } },
+        );
+        vi.unstubAllEnvs();
+      });
+    });
   });
 });

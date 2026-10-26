@@ -33,11 +33,8 @@ export const getDashboardCommand = async (id: string): Promise<CommandResult | v
     const dashboard = await service.get(id).catch(async (error: unknown) => {
       // The Reports API never holds a Dashboards board, so its 404 is not final.
       if (!isNotFound(error)) throw error;
-      const widgets = new DashboardWidgetsApiService();
-      // The board route is project-scoped; with only an API key there is none to ask.
-      if (!widgets.hasProject()) throw error;
       try {
-        return { ...(await widgets.getBoard(id)), graphs: [] };
+        return { ...(await new DashboardWidgetsApiService().getBoard(id)), graphs: [] };
       } catch (boardError) {
         // Only the board route's own 404 means "neither area holds it".
         throw isNotFound(boardError) ? error : boardError;

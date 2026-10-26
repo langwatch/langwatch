@@ -84,13 +84,33 @@ export class DashboardWidgetsApiService {
     throw new DashboardWidgetsApiError(message, operation, error, status);
   }
 
+  /** A blank value is no value, as `cli/utils/apiKey.ts` reads `LANGWATCH_PROJECT_ID`. */
   private resolvedProjectId(): string | undefined {
-    return this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
+    const candidates = [
+      this.configuredProjectId,
+      scopedProjectId(),
+      process.env.LANGWATCH_PROJECT_ID,
+    ];
+    return candidates.map((value) => value?.trim()).find((value) => value);
   }
 
-  /** Whether a project is in scope; the board routes carry it in the path and refuse without. */
-  hasProject(): boolean {
-    return this.resolvedProjectId() !== undefined;
+  /**
+   * The project in scope, else the one the API key itself belongs to (`/api/v1/me/project`):
+   * a plain API key names no project anywhere else.
+   */
+  private async projectIdOrKeyProject(operation: string): Promise<string> {
+    const inScope = this.resolvedProjectId();
+    if (inScope) return inScope;
+    // The identity door is not in the generated paths, so the typed client cannot name it.
+    const client = this.apiClient as unknown as {
+      GET: (
+        path: string,
+      ) => Promise<{ data?: { id?: string }; error?: unknown; response?: Response }>;
+    };
+    const { data, error, response } = await client.GET("/api/v1/me/project");
+    if (error) this.handleApiError({ operation, error, response });
+    if (!data?.id) return this.projectId(operation);
+    return data.id;
   }
 
   private projectId(operation: string): string {
@@ -187,7 +207,7 @@ export class DashboardWidgetsApiService {
 
   /** One Dashboards board by id; an Analytics Reports board answers 404. */
   async getBoard(id: string): Promise<DashboardBoardDetail> {
-    const projectId = this.projectId(`get dashboard "${id}"`);
+    const projectId = await this.projectIdOrKeyProject(`get dashboard "${id}"`);
     const { data, error, response } = await this.apiClient.GET(
       "/api/v1/projects/{projectId}/analytics/boards/{boardId}",
       { params: { path: { projectId, boardId: id } } },

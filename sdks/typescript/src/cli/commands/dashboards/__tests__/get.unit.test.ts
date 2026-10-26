@@ -42,16 +42,14 @@ const notFound = () => new DashboardsApiError("Dashboard not found", "get", unde
 describe("getDashboardCommand()", () => {
   const reportsGet = vi.fn();
   const getBoard = vi.fn();
-  let hasProject = true;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    hasProject = true;
     vi.mocked(DashboardsApiService).mockImplementation(function () {
       return { get: reportsGet } as unknown as DashboardsApiService;
     });
     vi.mocked(DashboardWidgetsApiService).mockImplementation(function () {
-      return { getBoard, hasProject: () => hasProject } as unknown as DashboardWidgetsApiService;
+      return { getBoard } as unknown as DashboardWidgetsApiService;
     });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new Error(`process.exit(${code})`);
@@ -78,17 +76,6 @@ describe("getDashboardCommand()", () => {
       getBoard.mockRejectedValue(notFound());
 
       await expect(getDashboardCommand("missing")).rejects.toThrow("process.exit(1)");
-    });
-  });
-
-  describe("when no project is in scope", () => {
-    it("reports the Reports not found without asking the board route", async () => {
-      hasProject = false;
-      reportsGet.mockRejectedValue(notFound());
-
-      await expect(getDashboardCommand("x")).rejects.toThrow("process.exit(1)");
-      expect(getBoard).not.toHaveBeenCalled();
-      expect(spinnerFail).toHaveBeenCalledWith(expect.stringContaining("Dashboard not found"));
     });
   });
 
