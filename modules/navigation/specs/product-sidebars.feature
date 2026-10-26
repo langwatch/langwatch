@@ -3,14 +3,15 @@ Feature: Product sidebars
   I want the sidebar to hold only the pages of the product I am in
   So that each product reads as its own coherent surface
 
-  Both modes share one sidebar frame: pinned Quick Search first, then the
-  product's own pages, then a pinned bottom block with usage, Settings,
-  Support and the theme control. A product may pin its own entry there,
-  just above Settings: Dashboards pins Insights (insight-inbox.feature). The product bodies reuse the same menu
-  components the app has always rendered: LLM Ops and Me keep their
-  sections minus the Govern group (the product switcher replaces it),
-  and Gateway and Governance promote their section pages from the
-  shared registry.
+  Both modes share one sidebar frame: pinned Quick Search first, then
+  the product's own pages, then a pinned bottom block with usage,
+  Settings, Support and the theme control. A product may pin its own
+  entry there, just above Settings: Dashboards pins Insights (insight-
+  inbox.feature). The product bodies reuse the same menu components
+  the app has always rendered: LLM Ops and Me keep their sections
+  minus the Govern group (the product switcher replaces it), and
+  Gateway and Governance promote their section pages from the shared
+  registry.
 
   The column is wide and its type is one step smaller, which is what
   lets the longer page names hold one line. The size is a property of
