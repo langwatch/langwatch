@@ -324,7 +324,13 @@ export class ApiRestCredentialsService {
     const { apiKeyId, userId, organizationId, isLangySessionKey } = organization.resolved;
 
     return {
-      principal: { kind: "apiKey", apiKeyId, userId, organizationId, isLangySessionKey },
+      principal: {
+        kind: "apiKey",
+        apiKeyId,
+        userId,
+        organizationId,
+        ...(isLangySessionKey ? { isLangySessionKey: true } : {}),
+      },
       organizationId,
       markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),
     };
