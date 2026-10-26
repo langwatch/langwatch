@@ -14676,6 +14676,24 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "AutoPausedAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "AutoPausedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AutoPausedReason",
+              "type": "Nullable(String)",
+              "description": "AutoPausedReason",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
             }
           ],
           "exampleSql": "SELECT MonitorId, ExperimentId, EvaluatorId\nFROM analytics.monitors\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
