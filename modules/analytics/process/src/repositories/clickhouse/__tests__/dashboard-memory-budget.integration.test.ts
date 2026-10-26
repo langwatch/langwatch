@@ -331,20 +331,27 @@ describe("dashboard panels under a memory cap", () => {
 
   afterAll(async () => {
     if (!ch) return;
+    const errors: unknown[] = [];
     try {
       await deleteMigratedTenantRows({ client: ch, tenantId: TENANT_ID, tables: SEEDED_TABLES });
       // The deletes finish, and their rewritten parts unload, before the next suite starts.
       await waitForQuietMigratedServer({ client: ch, tables: SEED_WRITTEN_TABLES });
       await releaseMigratedCaches(ch);
-    } finally {
-      // Reset even when the cleanup fails, so no later suite inherits the seed's table settings.
-      for (const table of SEEDED_TABLES) {
-        await ch.command({ query: `ALTER TABLE ${table} RESET SETTING max_compress_block_size` });
-      }
-      for (const table of SEED_WRITTEN_TABLES) {
-        await ch.command({ query: `ALTER TABLE ${table} RESET SETTING old_parts_lifetime` });
-      }
+    } catch (error) {
+      errors.push(error);
     }
+    // Reset even when the cleanup fails, so no later suite inherits the seed's table settings.
+    // Every reset is tried; one failure does not skip the rest.
+    const resets = [
+      ...SEEDED_TABLES.map((table) => `ALTER TABLE ${table} RESET SETTING max_compress_block_size`),
+      ...SEED_WRITTEN_TABLES.map(
+        (table) => `ALTER TABLE ${table} RESET SETTING old_parts_lifetime`,
+      ),
+    ];
+    for (const query of resets) {
+      await ch.command({ query }).catch((error: unknown) => errors.push(error));
+    }
+    if (errors.length > 0) throw new AggregateError(errors, "memory-budget cleanup failed");
   }, 180_000);
 
   describe("when the trace count summary compares against the previous period", () => {
