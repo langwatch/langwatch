@@ -46,8 +46,8 @@ export function RevokeLegacyKeyDialog({
     >
       <Text>
         The legacy key stops working within seconds. We create a new API key for{" "}
-        {projectName ?? "this project"} and show it to you once. Put it wherever the legacy key
-        was used.
+        {projectName ?? "this project"} and show it to you once. Put it wherever the legacy key was
+        used.
       </Text>
     </Dialog>
   );

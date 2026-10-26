@@ -469,7 +469,9 @@ describe("given the project still has a legacy key", () => {
 
       const banner = screen.getByTestId("legacy-project-key-banner");
       expect(banner).toHaveTextContent("Legacy project keys are going away");
-      expect(within(banner).getByRole("button", { name: "Revoke and replace" })).toBeInTheDocument();
+      expect(
+        within(banner).getByRole("button", { name: "Revoke and replace" }),
+      ).toBeInTheDocument();
     });
 
     /** @scenario The banner's button revokes and replaces the legacy key */
