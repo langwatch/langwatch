@@ -56,15 +56,27 @@ export type FrameInit = { dashboardContext: ChartFrameDashboardContext };
  */
 export function recordWidgetFrames() {
   const inits: FrameInit[] = [];
+  const contexts: ChartFrameDashboardContext[] = [];
   const prototype = HTMLIFrameElement.prototype;
   const real = Object.getOwnPropertyDescriptor(prototype, "contentWindow");
   const windows = new WeakMap<HTMLIFrameElement, Pick<Window, "postMessage">>();
   Object.defineProperty(prototype, "contentWindow", {
     configurable: true,
     get(this: HTMLIFrameElement) {
-      const recorded = windows.get(this) ?? {
-        postMessage: (message: unknown) => void inits.push(message as FrameInit),
-      };
+      const recorded =
+        windows.get(this) ??
+        ({
+          postMessage: (message: unknown, _origin?: unknown, transfer?: readonly unknown[]) => {
+            inits.push(message as FrameInit);
+            contexts.push((message as FrameInit).dashboardContext);
+            const port = transfer?.[0] as MessagePort | undefined;
+            if (port) {
+              port.onmessage = ({ data }: MessageEvent<Partial<FrameInit>>) => {
+                if (data.dashboardContext) contexts.push(data.dashboardContext);
+              };
+            }
+          },
+        } as Pick<Window, "postMessage">);
       windows.set(this, recorded);
       return recorded;
     },
@@ -75,6 +87,8 @@ export function recordWidgetFrames() {
       for (const frame of frames) fireEvent.load(frame);
       return inits;
     },
+    /** The context the frames were last handed, at load or as a change after it. */
+    lastContext: () => contexts.at(-1),
     restore: () => {
       if (real) Object.defineProperty(prototype, "contentWindow", real);
     },
