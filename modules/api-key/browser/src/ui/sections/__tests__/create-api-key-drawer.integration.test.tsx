@@ -9,7 +9,8 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithApiKeyHost } from "../../../testing.tsx";
-import { CreateApiKeyDrawer, type CreateApiKeyInput } from "../create-api-key-drawer.tsx";
+import type { CreateApiKeyInput } from "../../../model/api-key-form.ts";
+import { CreateApiKeyDrawer } from "../create-api-key-drawer.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: { members: [] as { id: string; name: string; email: string }[] },
