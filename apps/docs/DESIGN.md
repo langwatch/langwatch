@@ -36,9 +36,9 @@ not recreated in the browser. The API uses the existing request generator,
 and validation. No automatic request is sent on mount.
 Navigation disposes the API root, aborts pending work and clears credentials.
 
-Stateful islands run on `preact/compat` in the browser build, about a tenth of
-react-dom's size, so a first click on search, a menu or the playground downloads
-little. No island hydrates server markup: each mounts into an empty node, so
+Search runs on no component runtime at all (see below). The menus and the playground
+run on `preact/compat` in the browser build, about a tenth of react-dom's size, so a
+first click on them downloads little. No island hydrates server markup: each mounts into an empty node, so
 prerendering keeps real React and the HTML is unchanged. Whole-page hydration, Chakra in a lazy page bundle, runtime
 highlighting and a second client-side copy of MDX are rejected. Hydrating small
 static buttons with React would charge the renderer cost for no useful state, so
@@ -119,11 +119,14 @@ and never gates; deleting its `pull_request` trigger leaves the daily run.
 
 ## Shared command surface and contextual controls
 
-Search uses the published CommandBarSurface, Input, Group, Item and Footer from
-the design system. The portal-based surface cannot be extracted as a closed
-static frame, so its React/Chakra runtime loads only when search is requested.
-The contextual Menu surfaces share that deferred runtime. Their explicit design-system
-provider uses the five recipes those islands render and the shared semantic foundation;
+Search uses the published CommandBarInput, Group, Item and Footer from the design
+system, rendered at build time into inert `<template>` elements on every page, so
+their styles come from the page stylesheet like any other prerendered markup. The
+search island is plain TypeScript: it moves the bar into a native modal `<dialog>`
+and fills rows by cloning the row templates, selecting one by toggling the
+`data-selected` attribute CommandBarItem styles. It downloads about 5 KB.
+The contextual Menu surfaces still load a deferred React/Chakra runtime. Their explicit design-system
+provider uses the recipes those islands render and the shared semantic foundation;
 it does not pull in a second full theme or next-themes. Prerendering keeps the
 full system. A new interactive Chakra component needs its recipe added to
 `src/app/island-theme.ts` and covered in the island parity checks. No navigation-module
@@ -135,7 +138,7 @@ An inline listener in the page head catches Meta or Ctrl+K before any script has
 first shortcut always opens search once its island arrives. The island and the chunks it imports
 are preloaded when a reader heads for search (pointer or focus on the search button, or Meta or
 Ctrl held), since modulepreload alone fetches only the entry; most readers never open search, so
-no page pays its 85 KB up front.
+no page pays for it up front.
 
 Headings use the brand's Sentient serif; body text is Inter and code JetBrains
 Mono, all self-hosted. Brand orange (#f56b1a) decorates; text accents use its

@@ -97,7 +97,7 @@ await it("groups documentation in the command surface and supports keyboard navi
         await shot({ page, name: "command-results-light" });
         await page.keyboard.press("Escape");
         await dialog.waitFor({ state: "hidden" });
-        assert.equal(await page.locator(".docs-command-bar").count(), 0);
+        assert.equal(await page.locator(".docs-search-dialog[open]").count(), 0);
       } finally {
         await context.close();
       }

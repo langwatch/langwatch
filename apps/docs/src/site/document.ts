@@ -13,7 +13,7 @@ export const ISLANDS = {
   toc: "src/features/shell/browser/toc.ts",
   disclosures: "src/features/content/browser/disclosures.ts",
   "skill-prompts": "src/features/content/browser/skill-prompts.ts",
-  search: "src/features/search/browser/search.tsx",
+  search: "src/features/search/browser/search.ts",
   playground: "src/features/api-reference/browser/playground.tsx",
   reading: "src/browser/reading.ts",
   redirect: "src/features/navigation/browser/redirect.ts",

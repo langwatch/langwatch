@@ -1,19 +1,13 @@
 import { createDesignSystem } from "@langwatch/design-system/system";
 import { describe, expect, it } from "vitest";
 
-import { docsMenuSystem, docsSearchSystem } from "../island-theme.ts";
+import { docsMenuSystem } from "../island-theme.ts";
 import { docsTheme } from "../theme-config.ts";
 
 const docsSystem = createDesignSystem(docsTheme);
 
 const ISLANDS = [
   { name: "context menus", system: docsMenuSystem, recipes: ["button"], slotRecipes: ["menu"] },
-  {
-    name: "search",
-    system: docsSearchSystem,
-    recipes: ["button", "input", "spinner"],
-    slotRecipes: ["dialog"],
-  },
 ];
 
 describe.each(ISLANDS)(

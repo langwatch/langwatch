@@ -29,8 +29,15 @@ function packagesOf({ entry }: { entry: string }) {
 describe("when a reader opens search", () => {
   /** @scenario "Load the search engine without a schema library" */
   it("loads no schema validation library with the search island", () => {
-    const packages = packagesOf({ entry: path.join(searchRoot, "browser/search.tsx") });
-    expect(packages).toContain("react");
+    const packages = packagesOf({ entry: path.join(searchRoot, "browser/search.ts") });
     expect(packages.filter((name) => name === "zod" || name.startsWith("zod/"))).toEqual([]);
+  });
+
+  /** @scenario "Open search on the prerendered command bar" */
+  it("loads no component runtime or design system code with the search island", () => {
+    const packages = packagesOf({ entry: path.join(searchRoot, "browser/search.ts") });
+    expect(
+      packages.filter((name) => /^(react|preact|@chakra-ui|@emotion|@zag-js|@langwatch\/design-system)/.test(name)),
+    ).toEqual([]);
   });
 });

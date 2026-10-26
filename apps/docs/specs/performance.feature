@@ -178,10 +178,10 @@ Feature: Static documentation with progressive interaction
 
   @e2e
   Scenario: Answer a first click on search, a context menu or the playground on a small download
-    Given the islands render on a React compatible runtime a tenth of React's size
-    And each island loads only the theme recipes it renders
+    Given search fills the command bar already drawn into the page
+    And the other islands render on a React compatible runtime a tenth of React's size, with only the theme recipes they render
     When a reader first opens search, a page or theme menu, or the API playground
-    Then search downloads at most 86,000 gzip bytes of script before it answers
+    Then search downloads at most 6,000 gzip bytes of script before it answers
     And a context menu downloads at most 95,000
     And the playground downloads at most 24,500
     And the page itself still loads under 3,000 gzip bytes of script before any interaction
@@ -337,6 +337,13 @@ Feature: Static documentation with progressive interaction
     Then the same pages are found, ranked as before, with the heading anchor for heading matches
     And punctuation around a term is ignored, but punctuation inside it, as in an API path or a dotted name, must match
     But a page missing any query term is not found
+
+  @unit
+  Scenario: Open search on the prerendered command bar
+    Given every page carries the design system's command bar as inert markup, styled by the page stylesheet
+    When a reader opens search
+    Then the search island fills that markup in a native modal dialog
+    And it loads no component runtime and no design system code
 
   @unit
   Scenario: Load the search engine without a schema library

@@ -7,7 +7,7 @@ import { gzipSync } from "node:zlib";
    Search grew by its result icons the same day. */
 export const INTERACTION_BUDGETS = {
   contextMenusInteractionGzip: 95_000,
-  searchInteractionGzip: 86_000,
+  searchInteractionGzip: 6_000,
   playgroundInteractionGzip: 24_500,
 };
 const ISLAND_OF = {

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { TypeRegion } from "../../../lib/type-mode.tsx";
 import type { TypeMode } from "../../../lib/type-mode.tsx";
 import { neighbours, trailOf } from "../../navigation/model/nav.ts";
+import { SearchTemplates } from "../../search/ui/search-template.tsx";
 import { MobileNav } from "../../navigation/ui/mobile-nav.tsx";
 import { SideNav } from "../../navigation/ui/side-nav.tsx";
 import { sectionOf, site } from "../../navigation/ui/site-nav.ts";
@@ -226,6 +227,7 @@ export function DocsShell({
       </Box>
       <SiteFooter />
       <MobileNav site={site} />
+      <SearchTemplates />
     </Box>
   );
 }

@@ -398,7 +398,8 @@ export function CommandBarGroup({ label, children }: { label: string; children: 
   );
 }
 
-/** One command bar row: icon, label, a quieter description, the enter glyph when selected. */
+/** One command bar row: icon, label, a quieter description, the enter glyph when selected.
+    Selection is the `data-selected` attribute, so the row's look follows the attribute alone. */
 export function CommandBarItem({
   icon: Icon,
   iconColor,
@@ -425,40 +426,47 @@ export function CommandBarItem({
   return (
     <HStack
       data-index={index}
+      data-selected={isSelected ? "" : undefined}
       paddingX={3}
       paddingY={2}
       cursor="pointer"
       borderRadius="lg"
       marginX={{ base: 2, md: 2.5 }}
-      background={isSelected ? "bg.selected" : "transparent"}
+      background="transparent"
+      _selected={{ background: "bg.selected" }}
       _hover={{ background: "bg.hover" }}
       onClick={onSelect}
       onMouseEnter={onMouseEnter}
       gap={3.5}
     >
-      <Box color={iconColor} flexShrink={0}>
+      <Box data-part="icon" color={iconColor} flexShrink={0}>
         <Icon size={18} />
       </Box>
       <HStack flex={1} gap={2} overflow="hidden">
-        <Text textStyle="body" fontWeight="medium" color="fg.default" truncate>
+        <Text data-part="label" textStyle="body" fontWeight="medium" color="fg.default" truncate>
           {label}
         </Text>
         {description ? (
-          <Text textStyle="caption" color="fg.subtle" truncate>
+          <Text data-part="description" textStyle="caption" color="fg.subtle" truncate>
             {description}
           </Text>
         ) : null}
       </HStack>
       {meta ? (
-        <Text textStyle="caption" color="fg.muted" flexShrink={0}>
+        <Text data-part="meta" textStyle="caption" color="fg.muted" flexShrink={0}>
           {meta}
         </Text>
       ) : null}
-      {isSelected ? (
-        <Box color="fg.muted" flexShrink={0}>
-          <CornerDownLeft size={14} />
-        </Box>
-      ) : null}
+      {/* Drawn on every row and shown by the selected attribute, so a static copy of the row
+          can be selected by toggling `data-selected` without re-rendering. */}
+      <Box
+        color="fg.muted"
+        flexShrink={0}
+        display="none"
+        css={{ "[data-selected] > &": { display: "block" } }}
+      >
+        <CornerDownLeft size={14} />
+      </Box>
     </HStack>
   );
 }

@@ -1,21 +1,5 @@
 import { sitePath } from "../../../lib/site-path.ts";
 
-export const QUICK_ACTIONS = [
-  {
-    id: "app",
-    title: "Open app",
-    href: "https://app.langwatch.ai",
-    description: "Go to your LangWatch workspace",
-  },
-  {
-    id: "github",
-    title: "GitHub",
-    href: "https://github.com/langwatch/langwatch",
-    description: "Explore the source and contribute",
-  },
-  { id: "theme", title: "Toggle theme", href: "", description: "Switch between light and dark" },
-  { id: "copy", title: "Copy page", href: "", description: "Copy this page as Markdown for LLMs" },
-];
 export async function runQuickAction({ id }: { id: string }) {
   if (id === "theme") {
     const dark = !document.documentElement.classList.contains("dark");
