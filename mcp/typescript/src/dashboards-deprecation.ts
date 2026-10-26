@@ -8,6 +8,7 @@ export const DASHBOARDS_DEPRECATION_NOTE =
   "Note: /api/v1/dashboards is deprecated for this project; use list_dashboard_boards and the other board tools (/api/v1/boards).";
 
 import { createHash } from "node:crypto";
+
 import { tryGetConfig } from "./config.ts";
 
 // The HTTP server serves many API keys in one process, so the flag state is kept per key.
