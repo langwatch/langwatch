@@ -6,7 +6,6 @@ import {
   Flex,
   Input,
   NativeSelect,
-  Spinner,
   Text,
   Textarea,
 } from "@langwatch/design-system/primitives";
@@ -15,16 +14,11 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import type { RequestState } from "../model/codegen.ts";
-import { liveRequest, paramKey } from "../model/codegen.ts";
+import { paramKey } from "../model/codegen.ts";
 import type { Operation, Parameter, Scheme } from "../model/operation.ts";
-import { requestErrorOutcome } from "../model/playground-outcome.ts";
-import type { Outcome } from "../model/playground-outcome.ts";
-import { validateRequest, errorFieldId } from "../model/request-validation.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { Panel } from "./panel.tsx";
-import { ResponseArea } from "./playground-response.tsx";
 
-const REQUEST_TIMEOUT_MS = 30000;
 function ParamInput({
   param,
   value,
@@ -208,19 +202,13 @@ function AuthField({
   );
 }
 function SendActions({
-  outcome,
   mutating,
   jsonOnly,
   host,
-  onSend,
-  onCancel,
 }: {
-  outcome: Outcome;
   mutating: boolean;
   jsonOnly: boolean;
   host: string;
-  onSend: () => void;
-  onCancel: () => void;
 }) {
   return (
     <Box>
@@ -241,29 +229,10 @@ function SendActions({
             bg="fg"
             color="fg.inverted"
             _hover={{ bg: "docs.body" }}
-            disabled={outcome.kind === "sending"}
             id="pg-send"
-            onClick={onSend}
           >
-            {outcome.kind === "sending" ? (
-              <>
-                <Spinner size="sm" /> Sending...
-              </>
-            ) : (
-              "Send request"
-            )}
+            Send request
           </Button>
-          {outcome.kind === "sending" ? (
-            <Button
-              type="button"
-              variant="outline"
-              colorPalette="gray"
-              height="44px"
-              onClick={onCancel}
-            >
-              Cancel
-            </Button>
-          ) : null}
         </Flex>
       ) : (
         <Text margin="0" fontSize="13px" color="fg.muted">
@@ -382,23 +351,19 @@ function ParameterFields({
 export function PlaygroundRequest({
   operation,
   state,
-  curl,
   children,
   onChange,
   onTouched,
 }: {
   operation: Operation;
   state: RequestState;
-  curl: string;
   children: ReactNode;
   onChange: (state: RequestState) => void;
   onTouched: () => void;
 }) {
   const { values, body } = state;
-  const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const [key, setKey] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const controller = useRef<AbortController | null>(null);
+  const errors: Record<string, string> = {};
   const formRef = useRef<HTMLDivElement>(null);
   const { tryOpen, setTryOpen } = useEndpointState();
   const scheme = operation.schemes[0];
@@ -406,7 +371,6 @@ export function PlaygroundRequest({
   const jsonOnly = !operation.body || Boolean(bodyContent);
   const mutating = operation.method !== "GET";
   const host = operation.origin.replace(/^https?:\/\//, "");
-  useEffect(() => () => controller.current?.abort(), []);
 
   useEffect(() => {
     if (!tryOpen) return;
@@ -417,46 +381,6 @@ export function PlaygroundRequest({
   const edit = ({ location, name, value }: { location: string; name: string; value: string }) => {
     onTouched();
     onChange({ ...state, values: { ...values, [paramKey({ location, name })]: value } });
-  };
-
-  const send = async () => {
-    const nextErrors = validateRequest({ operation, state, key });
-    setErrors(nextErrors);
-    const [first] = Object.keys(nextErrors);
-    if (first !== undefined) {
-      document.getElementById(errorFieldId({ first }))?.focus();
-      return;
-    }
-    const request = liveRequest({ operation, state, key });
-    controller.current?.abort();
-    const abort = new AbortController();
-    controller.current = abort;
-    const timeout = window.setTimeout(() => abort.abort("timeout"), REQUEST_TIMEOUT_MS);
-    setOutcome({ kind: "sending" });
-    const started = performance.now();
-    try {
-      const response = await fetch(request.url, {
-        method: operation.method,
-        headers: request.headers,
-        body: request.body,
-        signal: abort.signal,
-      });
-      const text = await response.text();
-      if (abort.signal.aborted) return;
-      setOutcome({
-        kind: "response",
-        status: response.status,
-        statusText: response.statusText,
-        ms: Math.round(performance.now() - started),
-        contentType: response.headers.get("content-type") ?? "unknown",
-        body: text,
-        headers: [...response.headers.entries()],
-      });
-    } catch {
-      setOutcome(requestErrorOutcome({ signal: abort.signal }));
-    } finally {
-      window.clearTimeout(timeout);
-    }
   };
 
   const closeForm = () => {
@@ -508,25 +432,11 @@ export function PlaygroundRequest({
               />
             ) : null}
 
-            <SendActions
-              outcome={outcome}
-              mutating={mutating}
-              jsonOnly={jsonOnly}
-              host={host}
-              onSend={send}
-              onCancel={() => controller.current?.abort("cancel")}
-            />
+            <SendActions mutating={mutating} jsonOnly={jsonOnly} host={host} />
           </Flex>
         </Panel>
       </div>
       {children}
-      {outcome.kind !== "idle" ? (
-        <Panel title="Live response">
-          <Box padding="4" aria-live="polite">
-            <ResponseArea outcome={outcome} onRetry={send} curl={curl} />
-          </Box>
-        </Panel>
-      ) : null}
     </>
   );
 }

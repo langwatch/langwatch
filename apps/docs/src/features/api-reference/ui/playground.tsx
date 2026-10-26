@@ -55,7 +55,6 @@ export function Playground({
         state={state}
         onChange={setState}
         onTouched={() => setTouched(true)}
-        curl={examples.curl?.code ?? ""}
       >
         <ResponsiveExamples>
           <RequestExamples examples={examples} />
