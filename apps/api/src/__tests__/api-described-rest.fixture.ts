@@ -2,7 +2,7 @@ import type { RestIdentity } from "@langwatch/api/hosting";
 import { RestHost } from "@langwatch/api/rest";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 
-import { processModules } from "../process-modules.generated.ts";
+import { describedMiddlewareContexts } from "../openapi-document.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
 /** Describing routes needs no credential: every door refuses, every middleware context throws. */
@@ -17,24 +17,6 @@ export async function bootDescribedRest() {
     authorize: refuse,
     authorizePlatform: refuse,
   };
-  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
-
-  for (const module of processModules) {
-    for (const transport of module.transports ?? []) {
-      if (transport.protocol !== "rest") continue;
-
-      const declaration = transport.router() as {
-        routes: readonly { middleware?: readonly { name: string }[] }[];
-      };
-
-      for (const route of declaration.routes) {
-        for (const declared of route.middleware ?? []) {
-          contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
-        }
-      }
-    }
-  }
-
   let rest: RestHost | undefined;
   const { runtime } = await bootApi({
     surface: () => {
@@ -51,7 +33,7 @@ export async function bootDescribedRest() {
         audit: { record: async () => {} },
         idempotency: refuse,
         rateLimiter: { check: refuse },
-        middlewareContext: [...contexts.values()] as never,
+        middlewareContext: describedMiddlewareContexts() as never,
         entitlements: { holds: refuse },
       });
       const mountNothing = { mount: () => {} };

@@ -15,11 +15,11 @@ import type { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  describedMiddlewareContexts,
   describedRestApplication,
   generateOpenApiDocument,
   writeOpenApiDocument,
 } from "../openapi-document.ts";
-import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
 const METHODS = ["get", "head", "post", "put", "patch", "delete"] as const;
@@ -48,20 +48,6 @@ async function bootedApi() {
     authorize: refuse,
     authorizePlatform: refuse,
   };
-  const contexts = new Map<string, { middlewareContext: string; resolve: () => never }>();
-  for (const module of processModules) {
-    for (const transport of module.transports ?? []) {
-      if (transport.protocol !== "rest") continue;
-      const declaration = transport.router() as {
-        routes: readonly { middleware?: readonly { name: string }[] }[];
-      };
-      for (const route of declaration.routes) {
-        for (const declared of route.middleware ?? []) {
-          contexts.set(declared.name, { middlewareContext: declared.name, resolve: refuse });
-        }
-      }
-    }
-  }
 
   let rest: RestHost | undefined;
   const { runtime } = await bootApi({
@@ -79,7 +65,7 @@ async function bootedApi() {
         audit: { record: async () => {} },
         idempotency: refuse,
         rateLimiter: { check: refuse },
-        middlewareContext: [...contexts.values()] as never,
+        middlewareContext: describedMiddlewareContexts() as never,
         entitlements: { holds: refuse },
       });
       const mountNothing = { mount: () => {} };
