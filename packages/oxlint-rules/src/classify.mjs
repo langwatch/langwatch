@@ -2,6 +2,12 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import {
+  cyclesOf,
+  declaredFeatures,
+  optsIntoAppFeatureLayout,
+  placeOf,
+} from "../grammar/app-feature-layout.mjs";
+import {
   FEATURE_PREFIX,
   SERVICE_MODULE_PATTERN,
   entrySourcePaths,
@@ -66,6 +72,7 @@ const classificationCache = new Map();
 const modulePackageCache = new Map();
 const libraryRootCache = new Map();
 const featureLayoutPackageCache = new Map();
+const appFeatureLayoutCache = new Map();
 // Every rule classifies the same file in turn: the last answer is checked before a key is built.
 let last;
 
@@ -130,6 +137,7 @@ function classifyPath(cwd, filename) {
   const modulePackage = workspacePath.match(MODULE_PACKAGE);
   const library = modulePackage ? undefined : libraryPackageOf(cwd, workspacePath);
   const base = {
+    appFeatures: undefined,
     enterprise: false,
     feature: undefined,
     filename,
@@ -175,6 +183,23 @@ function classifyPath(cwd, filename) {
     };
   }
 
+  if (application) {
+    const appFeatures = appFeatureSourceOf({
+      app: application[1],
+      cwd,
+      sourcePath: application[2],
+    });
+    if (appFeatures) {
+      return {
+        ...base,
+        appFeatures,
+        kind: "app-features",
+        relative: `src/${application[2]}`,
+        sourcePath: application[2],
+      };
+    }
+  }
+
   const composition = workspacePath.match(ENTERPRISE_COMPOSITION_SOURCE);
   if (composition) {
     return {
@@ -191,6 +216,30 @@ function classifyPath(cwd, filename) {
   if (SHARED_PACKAGE.test(workspacePath)) return sharedPackageOf(base, workspacePath);
 
   return base;
+}
+
+/**
+ * A file of an application that opts into the app-features layout: where it
+ * sits, and the app's declared feature graph with the cycles on it.
+ */
+function appFeatureSourceOf({ app, cwd, sourcePath }) {
+  const key = `${cwd}|${app}`;
+  if (!appFeatureLayoutCache.has(key)) {
+    appFeatureLayoutCache.set(key, readAppFeatureLayout({ app, cwd }));
+  }
+  const layout = appFeatureLayoutCache.get(key);
+
+  return layout && { ...layout, place: placeOf(sourcePath) };
+}
+
+function readAppFeatureLayout({ app, cwd }) {
+  const manifestPath = join(cwd, "apps", app, "package.json");
+  if (!existsSync(manifestPath)) return undefined;
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (!optsIntoAppFeatureLayout(manifest)) return undefined;
+  const features = declaredFeatures(manifest);
+
+  return { app, cycles: cyclesOf(features), features };
 }
 
 /** A `packages/*` package whose manifest opts into the feature layout (ADR-181), or undefined. */
@@ -399,5 +448,6 @@ export function resetClassificationCache() {
   modulePackageCache.clear();
   libraryRootCache.clear();
   featureLayoutPackageCache.clear();
+  appFeatureLayoutCache.clear();
   last = undefined;
 }
