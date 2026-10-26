@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -339,6 +340,94 @@ def execute():
 	require.NotNil(t, res.Error, "a forged result was accepted: %#v", res.Outputs)
 	assert.Equal(t, codeblock.RunnerErrorType, res.Error.Type)
 	assert.NotEqual(t, "FORGED", res.Outputs["sum"])
+}
+
+// askThePayloadChannel asks the channel for a payload twice over: from the
+// interpreter, which already collected its own, and from a process the
+// executed code starts, which never had one. The name of the socket is in the
+// environment and the abstract namespace is shared, so both reach it; the pid
+// the kernel reports is what decides the answer.
+const askThePayloadChannel = `
+import os, socket, subprocess, sys
+
+_ASK = """
+import socket, sys
+
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.settimeout(10)
+try:
+    sock.connect("\\0" + sys.argv[1])
+except OSError as exc:
+    sys.stdout.write("refused:" + type(exc).__name__)
+    raise SystemExit(0)
+chunks = []
+while True:
+    chunk = sock.recv(1 << 16)
+    if not chunk:
+        break
+    chunks.append(chunk)
+sys.stdout.write(b"".join(chunks).decode("utf-8", "replace"))
+"""
+
+
+def _ask(name):
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(10)
+    try:
+        sock.connect("\0" + name)
+    except OSError as exc:
+        return "refused:" + type(exc).__name__
+    chunks = []
+    while True:
+        chunk = sock.recv(1 << 16)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    sock.close()
+    return b"".join(chunks).decode("utf-8", "replace")
+
+
+def execute():
+    name = os.environ.get("NLPGO_CODE_BLOCK_CHANNEL", "")
+    child = subprocess.run([sys.executable, "-c", _ASK, name],
+                           capture_output=True, text=True, timeout=30)
+    return {
+        "channel": name,
+        "from_interpreter": _ask(name) if name else "<no channel>",
+        "from_child": child.stdout,
+    }
+`
+
+// @scenario "the payload channel answers only the interpreter it started, once"
+func TestCodeBlock_ThePayloadChannelAnswersNobodyElse(t *testing.T) {
+	requirePython(t)
+	exe := newExec(t)
+
+	// The pid check is the whole authorization: no token and no secret, because
+	// anything the engine could hand the interpreter beforehand would be
+	// readable in the very window the channel exists to close. So it is worth a
+	// test of its own that a second ask and an ask from a different process
+	// both come back with nothing.
+	res, err := exe.Execute(context.Background(), codeblock.Request{
+		Code:            askThePayloadChannel,
+		DeclaredOutputs: []string{"channel", "from_interpreter", "from_child"},
+		Secrets:         map[string]string{"TOKEN": "sk-secret-of-the-project"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "%+v", res.Error)
+
+	channel, ok := res.Outputs["channel"].(string)
+	require.True(t, ok, "expected a string, got %#v", res.Outputs["channel"])
+	require.NotEmpty(t, channel, "the payload did not travel over the channel, so this proves nothing")
+
+	for _, asker := range []string{"from_interpreter", "from_child"} {
+		answer, isText := res.Outputs[asker].(string)
+		require.True(t, isText, "expected a string for %s, got %#v", asker, res.Outputs[asker])
+		assert.NotContains(t, answer, "sk-secret-of-the-project",
+			"%s was handed a payload by the channel", asker)
+		assert.True(t, answer == "" || strings.HasPrefix(answer, "refused:"),
+			"%s was answered with %q instead of nothing", asker, answer)
+	}
 }
 
 // waitForSpooledPid reads the pid out of the spool file once the execution

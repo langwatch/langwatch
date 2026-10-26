@@ -57,7 +57,8 @@ rationale. The stub arrives as source in the payload and is built as a
 module in memory: neither it nor this runner is ever written to the
 filesystem, so the executed code has no copy of either to rewrite.
 
-Wire shape (stdin):
+Wire shape (the payload, asked for over the socket nlpgo names in
+NLPGO_CODE_BLOCK_CHANNEL, or read from stdin where there is none):
     {
       "code":        "<python source>",
       "inputs":      {"name": value, ...},
@@ -66,6 +67,7 @@ Wire shape (stdin):
       "params":      {"NAME": value, ...},
       "dspy_stub":   "<python source of the dspy stand-in>",
       "result_path": "<where to write the result>",
+      "work_dir":    "<the run's directory, which this process moves into>",
       "nonce":       "<stamped on the result so nlpgo knows it is ours>",
       "env":         {"NAME": "value", ...}
     }
@@ -115,18 +117,22 @@ import sys
 # read until this has happened: the payload is asked for below, over a
 # socket the engine answers by the kernel's own idea of who is asking.
 #
-# Best effort by necessity: it needs ctypes, and the result decides
-# nothing but how much is hidden.
+# On Linux this has to work, which is why nothing here is caught: a
+# failure is the one state in which the payload would arrive into a
+# process another execution can read, so the run fails instead. There
+# is nothing to hide anywhere else: no /proc, and no prctl.
 _PR_SET_DUMPABLE = 4
 
 
 def _hide_from_other_executions() -> None:
-    try:
-        import ctypes
+    if not sys.platform.startswith("linux"):
+        return
 
-        ctypes.CDLL(None, use_errno=True).prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0)
-    except Exception:  # noqa: BLE001 — nothing here is worth failing a run over
-        pass
+    import ctypes
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), "prctl(PR_SET_DUMPABLE) failed")
 
 
 _hide_from_other_executions()

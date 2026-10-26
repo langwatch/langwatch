@@ -247,6 +247,10 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     # no path on its command line. Once non-dumpable it asks nlpgo for its
     # payload over a socket nlpgo answers by the pid the kernel reports for
     # the process connecting, and moves into its working directory from it.
+    # The pid is the whole check, so the payload is handed over once and an
+    # ask from anything else is answered with nothing. Where that socket
+    # exists and cannot be bound, the engine refuses to run code blocks at
+    # all rather than put a payload back on a descriptor.
     #
     # The limit: a process USER CODE starts is a fresh exec, which the kernel
     # makes dumpable again, and it inherits the run's credential and directory
@@ -270,6 +274,13 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then its standard input is empty, because the payload did not arrive on one
       And the file its errors go to has no name another execution could open
       And that file is not inside the run's working directory
+
+    @unit
+    Scenario: the payload channel answers only the interpreter it started, once
+      Given a code node whose body asks nlpgo for a payload, from the interpreter and from a process it starts
+      When the engine invokes the node
+      Then the interpreter asking again is told nothing, because its payload was handed over once
+      And the process the code started is told nothing, because it is not an execution the engine started
 
     @unit
     Scenario: the run's credential is never in the interpreter's initial variables

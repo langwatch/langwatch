@@ -17,6 +17,7 @@
 package codeblock
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -36,6 +37,10 @@ type payloadChannel struct {
 // just asked for its payload, so this only bounds a process that asked and
 // then stopped reading.
 const payloadWriteBudget = 10 * time.Second
+
+// acceptRetryPause keeps a failing accept from spinning while whatever it ran
+// out of comes back.
+const acceptRetryPause = 50 * time.Millisecond
 
 // newPayloadChannel binds the socket and starts answering. The name travels to
 // the runner in its environment and is not a secret: the peer check is what
@@ -64,11 +69,19 @@ func (c *payloadChannel) channelEnv() []string {
 	return []string{payloadChannelEnvVar + "=" + c.name}
 }
 
+// serve answers for as long as the socket is open. An accept can fail for a
+// reason that passes, descriptors running out being the likely one, and giving
+// up on it would leave every later execution waiting for a payload that never
+// arrives, so only a closed listener ends this.
 func (c *payloadChannel) serve() {
 	for {
 		conn, err := c.listener.AcceptUnix()
 		if err != nil {
-			return
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			time.Sleep(acceptRetryPause)
+			continue
 		}
 		go c.answer(conn)
 	}

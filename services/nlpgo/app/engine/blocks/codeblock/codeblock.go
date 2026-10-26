@@ -1,23 +1,27 @@
 // Package codeblock executes user-authored Python code in an isolated
-// subprocess. The subprocess is the bundled `runner.py` helper; nlpgo
-// pipes the code+inputs over stdin and reads a structured result from
-// a tmp file. Timeout is enforced from Go via context cancellation.
+// subprocess. The subprocess is the bundled `runner.py` helper, which asks
+// nlpgo for the code+inputs and writes a structured result to a tmp file.
+// Timeout is enforced from Go via context cancellation.
 //
 // On the multi-tenant cloud many customers' code blocks run in one nlpgo
 // container, so an execution has to be isolated from the others and not just
-// from the engine. Three properties carry that, and each is a test in this
+// from the engine. Four properties carry that, and each is a test in this
 // package:
 //
 //   - The runner and the `dspy` stand-in are never written to disk. They
-//     travel from the engine's memory to the interpreter over argv and stdin,
-//     and the runner drops the working directory from sys.path, so no code the
-//     interpreter loads comes from a place user code can write.
+//     travel from the engine's memory to the interpreter over argv and the
+//     payload, and the runner drops the working directory from sys.path, so no
+//     code the interpreter loads comes from a place user code can write.
 //   - Nothing an execution starts outlives it. The interpreter leads its own
 //     process group, every exit path kills the group, and a descendant that
 //     detached from it is found as a child of the engine and killed too (see
 //     processtree_linux.go).
 //   - Each execution works in a directory of its own, with a random name
 //     inside a root that cannot be listed, removed when the execution ends.
+//   - One execution cannot read another's process. The interpreter is handed
+//     nothing of the run, makes itself non-dumpable and then asks for its
+//     payload over a socket answered by the pid the kernel reports for the
+//     process connecting (see payloadchannel_linux.go).
 //
 // What this does not do is give an execution its own UID, PID namespace or
 // cgroup. All three would be stronger: a per-execution UID would make the
@@ -211,20 +215,18 @@ func New(opts Options) (*Executor, error) {
 	// reaper for the descendants that detach from an execution, and takes its
 	// own /proc files away from the user they run as.
 	enableProcessHardening()
-	scratchRoot, err := newScratchRoot()
+	// A channel the runner asks for its payload on, so nothing of the run is
+	// in the interpreter when it starts. Where there is one there is no
+	// acceptable fallback: a payload on stdin is readable out of /proc by
+	// another execution in the moment before the runner hides itself, so an
+	// engine that cannot bind the socket refuses to serve code blocks.
+	channel, err := newPayloadChannel()
 	if err != nil {
 		return nil, err
 	}
-	// A channel the runner asks for its payload on, so nothing of the run is
-	// in the interpreter when it starts. Without one the payload goes on
-	// stdin, which is where it was: worth saying out loud rather than failing
-	// the service over.
-	channel, err := newPayloadChannel()
+	scratchRoot, err := newScratchRoot()
 	if err != nil {
-		opts.logger().Warn("nlpgo_code_block_payload_channel_unavailable",
-			zap.Error(err),
-			zap.String("hint", "payloads travel to the interpreter on stdin instead, where another execution running as the same user can read them out of /proc in the moment before the runner hides itself"),
-		)
+		return nil, err
 	}
 	return &Executor{
 		opts:           opts,
