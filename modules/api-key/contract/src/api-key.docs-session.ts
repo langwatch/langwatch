@@ -34,6 +34,8 @@ const docsSessionKeyMintedSchemaDefinition = z
   .object({
     token: z.string().min(1),
     expiresAt: z.iso.datetime(),
+    /** Seconds the key lives from the mint, so a reader whose clock is wrong still times it. */
+    expiresIn: z.number().int().positive(),
     project: z.object({ id: z.string().min(1), name: z.string() }).strict(),
   })
   .strict();
@@ -100,6 +102,7 @@ const docsSessionMessageSchemaDefinition = z.discriminatedUnion("outcome", [
       outcome: z.literal("granted"),
       token: z.string().min(1),
       expiresAt: z.iso.datetime(),
+      expiresIn: z.number().int().positive(),
       project: z.object({ id: z.string().min(1), name: z.string() }).strict(),
     })
     .strict(),

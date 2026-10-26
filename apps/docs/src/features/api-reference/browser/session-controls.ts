@@ -1,5 +1,3 @@
-import { Temporal } from "@langwatch/time";
-
 import type { DocsSession } from "../model/docs-session.ts";
 import {
   clear,
@@ -23,11 +21,9 @@ function part(name: string) {
   return document.querySelector<HTMLElement>(`[data-docs-session-${name}]`);
 }
 
-function until({ expiresAt }: { expiresAt: number }) {
-  return Temporal.Instant.fromEpochMilliseconds(expiresAt).toLocaleString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function endsWithin({ endsAt }: { endsAt: number }) {
+  const minutes = Math.max(1, Math.ceil((endsAt - performance.now()) / 60_000));
+  return minutes === 1 ? "a minute" : `${minutes} minutes`;
 }
 
 /** Shows the connection, or the note after it, in the playground's prerendered controls. */
@@ -42,7 +38,7 @@ export function showSession({ note }: { note?: string } = {}) {
   if (manual) manual.hidden = Boolean(session);
   if (!status) return;
   status.textContent = session
-    ? `Sending as you in ${session.project.name}, until ${until(session)}.${note ? ` ${note}` : ""}`
+    ? `Sending as you in ${session.project.name}. Access ends within ${endsWithin(session)}.${note ? ` ${note}` : ""}`
     : (note ?? "Or paste an API key below.");
 }
 

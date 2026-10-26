@@ -184,6 +184,7 @@ describe("given a member signed in with access to two projects", () => {
     const lifetime = Date.parse(minted.expiresAt) - before;
     expect(lifetime).toBeLessThanOrEqual(DOCS_SESSION_KEY_LIFETIME_MS + 1_000);
     expect(lifetime).toBeGreaterThan(DOCS_SESSION_KEY_LIFETIME_MS - 5_000);
+    expect(minted.expiresIn).toBe(Math.floor(DOCS_SESSION_KEY_LIFETIME_MS / 1000));
 
     const verified = await app.findVerifiedToken({ token: minted.token });
     expect(verified).not.toBeNull();

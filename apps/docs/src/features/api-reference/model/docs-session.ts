@@ -1,4 +1,3 @@
-import { Temporal } from "@langwatch/time";
 import { z } from "zod/mini";
 
 import { liveRequest, type RequestState } from "./codegen.ts";
@@ -13,19 +12,20 @@ export const REVOKE_PATH = "/api/docs-session";
 
 export type DocsSession = {
   token: string;
-  expiresAt: number;
+  /** When the key ends on this page's monotonic clock (`performance.now()`), not the wall clock. */
+  endsAt: number;
   project: { id: string; name: string };
   appOrigin: string;
 };
 
-const expiry = z.union([z.number(), z.iso.datetime({ offset: true })]);
 const grantSchema = z.object({
   type: z.literal(DOCS_SESSION_MESSAGE),
   version: z.literal(1),
   state: z.string(),
   outcome: z.literal("granted"),
   token: z.string().check(z.minLength(16)),
-  expiresAt: expiry,
+  expiresAt: z.iso.datetime({ offset: true }),
+  expiresIn: z.number().check(z.positive()),
   project: z.object({ id: z.string().check(z.minLength(1)), name: z.string() }),
 });
 const denialSchema = z.object({
@@ -80,21 +80,21 @@ export function readConsentAnswer({
   data,
   state,
   appOrigin,
+  receivedAt,
 }: {
   data: unknown;
   state: string;
   appOrigin: string;
+  /** `performance.now()` when the answer arrived; the key's lifetime counts from here. */
+  receivedAt: number;
 }): { outcome: "granted"; session: DocsSession } | { outcome: "denied" } | null {
   const denial = denialSchema.safeParse(data);
   if (denial.success) return denial.data.state === state ? { outcome: "denied" } : null;
   const grant = grantSchema.safeParse(data);
   if (!grant.success || grant.data.state !== state) return null;
-  const { token, project } = grant.data;
-  const expiresAt =
-    typeof grant.data.expiresAt === "number"
-      ? grant.data.expiresAt
-      : Temporal.Instant.from(grant.data.expiresAt).epochMilliseconds;
-  return { outcome: "granted", session: { token, expiresAt, project, appOrigin } };
+  const { token, project, expiresIn } = grant.data;
+  const endsAt = receivedAt + expiresIn * 1000;
+  return { outcome: "granted", session: { token, endsAt, project, appOrigin } };
 }
 
 /** The live request sent as the connected member: the app's API, the key as X-Auth-Token. */

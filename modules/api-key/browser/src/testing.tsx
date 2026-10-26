@@ -250,6 +250,7 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
     const answer = this.options.docsKey ?? {
       token: "sk-lw-docs",
       expiresAt: "2026-10-26T12:05:00.000Z",
+      expiresIn: 300,
       project: { id: input.projectId, name: "Checkout" },
     };
     return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);

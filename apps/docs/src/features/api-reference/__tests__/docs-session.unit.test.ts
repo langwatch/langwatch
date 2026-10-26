@@ -25,17 +25,20 @@ const grant = {
   outcome: "granted",
   token: "sk-lw-docs-session-0123456789",
   expiresAt: "2026-10-26T12:05:00.000Z",
+  expiresIn: 300,
   project: { id: "project_1", name: "Checkout agent" },
 };
 
 describe("when the consent page answers", () => {
   /** @scenario "Ignore any message that is not the expected answer" */
   it("accepts only a well-formed answer for this state", () => {
-    expect(readConsentAnswer({ data: grant, state: STATE, appOrigin: APP })).toEqual({
+    expect(
+      readConsentAnswer({ data: grant, state: STATE, appOrigin: APP, receivedAt: 1_000 }),
+    ).toEqual({
       outcome: "granted",
       session: {
         token: grant.token,
-        expiresAt: Date.parse(grant.expiresAt),
+        endsAt: 1_000 + 300_000,
         project: grant.project,
         appOrigin: APP,
       },
@@ -46,17 +49,23 @@ describe("when the consent page answers", () => {
       { ...grant, type: "other" },
       { ...grant, token: "" },
       { ...grant, expiresAt: "soon" },
+      { ...grant, expiresIn: 0 },
+      { ...grant, expiresIn: "300" },
       { ...grant, project: { id: "" } },
       null,
       "granted",
     ])
-      expect(readConsentAnswer({ data, state: STATE, appOrigin: APP })).toBeNull();
+      expect(
+        readConsentAnswer({ data, state: STATE, appOrigin: APP, receivedAt: 1_000 }),
+      ).toBeNull();
   });
 
   /** @scenario "Fall back to a pasted key when connecting does not work" */
   it("reads a denial for this state", () => {
     const denial = { type: grant.type, version: 1, state: STATE, outcome: "denied" };
-    expect(readConsentAnswer({ data: denial, state: STATE, appOrigin: APP })).toEqual({
+    expect(
+      readConsentAnswer({ data: denial, state: STATE, appOrigin: APP, receivedAt: 1_000 }),
+    ).toEqual({
       outcome: "denied",
     });
   });
@@ -70,7 +79,7 @@ describe("when the playground sends as the connected member", () => {
       state: { values: {}, body: '{"query":"refund"}' },
       session: {
         token: grant.token,
-        expiresAt: 0,
+        endsAt: 0,
         project: grant.project,
         appOrigin: APP,
       },

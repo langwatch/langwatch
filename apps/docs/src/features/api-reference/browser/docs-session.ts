@@ -1,5 +1,3 @@
-import { nowInstant } from "@langwatch/time";
-
 import { docsAppOrigin } from "../../../config.ts";
 import {
   CONNECT_TIMEOUT_MS,
@@ -26,7 +24,7 @@ export function appOrigin(): string {
 
 /** The connected member's key while it lasts; null once it has expired. */
 export function currentSession(): DocsSession | null {
-  if (session && session.expiresAt <= nowInstant().epochMilliseconds) clear();
+  if (session && session.endsAt <= performance.now()) clear();
   return session;
 }
 
@@ -38,11 +36,7 @@ export function onSessionChange(listener: Listener): () => void {
 function set(next: DocsSession | null) {
   window.clearTimeout(expiryTimer);
   session = next;
-  if (next)
-    expiryTimer = window.setTimeout(
-      clear,
-      Math.max(0, next.expiresAt - nowInstant().epochMilliseconds),
-    );
+  if (next) expiryTimer = window.setTimeout(clear, Math.max(0, next.endsAt - performance.now()));
   for (const listener of listeners) listener(session);
 }
 
@@ -76,7 +70,12 @@ export function connect(): Promise<ConnectResult> {
     };
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== app || event.source !== popup) return;
-      const answer = readConsentAnswer({ data: event.data, state, appOrigin: app });
+      const answer = readConsentAnswer({
+        data: event.data,
+        state,
+        appOrigin: app,
+        receivedAt: performance.now(),
+      });
       if (!answer) return;
       if (answer.outcome === "granted") set(answer.session);
       finish(answer.outcome);

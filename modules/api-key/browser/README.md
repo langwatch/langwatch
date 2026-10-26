@@ -4,7 +4,7 @@ The browser half of [api-key](../README.md). What a browser installs when it ins
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/api-key.web.ts:9` (`defineBrowserModule("api-key")`), exported as `apiKeyWeb` at `./declaration`.
+Declared in `src/api-key.web.ts:10` (`defineBrowserModule("api-key")`), exported as `apiKeyWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -28,5 +28,6 @@ None.
 
 - Client packages (package.json): `@langwatch/organization-client`, `@langwatch/project-client`, `@langwatch/trace-client`.
 - Host APIs it requires: `ApiKeyHostApi`, `AuthorizeHostApi`.
+- Config slices: `api-key`.
 
 <!-- readme:generated:end -->

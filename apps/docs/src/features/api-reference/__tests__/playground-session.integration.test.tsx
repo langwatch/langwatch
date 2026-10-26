@@ -67,7 +67,8 @@ const grant = (overrides: Record<string, unknown> = {}) => ({
   state: state(),
   outcome: "granted",
   token: "sk-lw-docs-session-0123456789",
-  expiresAt: Date.now() + 5 * 60_000,
+  expiresAt: "2026-10-26T12:05:00.000Z",
+  expiresIn: 300,
   project: { id: "project_1", name: "Checkout agent" },
   ...overrides,
 });
@@ -156,7 +157,7 @@ describe("when I connect with my account", () => {
   /** @scenario "Connect with my account" */
   it("shows the project and sends requests to the app's API as me, without cookies", async () => {
     await connected();
-    expect(status()).toMatch(/^Sending as you in Checkout agent, until/);
+    expect(status()).toMatch(/^Sending as you in Checkout agent\. Access ends within 5 minutes\./);
     await send();
     const sent = fetches.at(-1);
     expect(sent?.url).toBe(`${APP}/api/traces`);
@@ -251,7 +252,7 @@ describe("when access ends", () => {
     vi.useFakeTimers();
     try {
       connectButton()?.click();
-      post({ data: grant({ expiresAt: Date.now() + 1_000 }) });
+      post({ data: grant({ expiresIn: 1 }) });
       await vi.advanceTimersByTimeAsync(1_500);
       expect(status()).toMatch(/Your access ended/);
     } finally {

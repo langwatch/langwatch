@@ -455,6 +455,7 @@ describe("the apiKey tRPC transport", () => {
       const mintDocsSessionKey = vi.fn(async () => ({
         token: "sk-lw-docs",
         expiresAt: "2026-10-26T12:05:00.000Z",
+        expiresIn: 300,
         project: { id: "project_1", name: "Checkout" },
       }));
       const { caller } = harness({ mintDocsSessionKey });

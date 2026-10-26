@@ -84,8 +84,9 @@ export class DocsSessionKeyService {
       this.options.projects.getWithTeam(input.projectId),
       this.options.organizations.getSessionPolicy({ organizationId: scope.organizationId }),
     ]);
+    const nowMs = (this.options.now ?? nowInstant)().epochMilliseconds;
     const expiresAt = docsSessionKeyExpiresAt({
-      nowMs: (this.options.now ?? nowInstant)().epochMilliseconds,
+      nowMs,
       sessionExpiresAt: browserSession.expiresAt,
       sessionStartedAt: browserSession.startedAt,
       maxSessionDurationDays: policy.maxSessionDurationDays,
@@ -110,6 +111,7 @@ export class DocsSessionKeyService {
     return {
       token,
       expiresAt: toDate(expiresAt).toISOString(),
+      expiresIn: Math.max(1, Math.floor((expiresAt.epochMilliseconds - nowMs) / 1000)),
       project: { id: project.id, name: project.name },
     };
   }

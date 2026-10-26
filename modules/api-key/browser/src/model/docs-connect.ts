@@ -66,6 +66,7 @@ export function grantedMessage({
     outcome: "granted",
     token: minted.token,
     expiresAt: minted.expiresAt,
+    expiresIn: minted.expiresIn,
     project: { id: minted.project.id, name: minted.project.name },
   };
 }

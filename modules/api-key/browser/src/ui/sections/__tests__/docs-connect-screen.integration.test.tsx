@@ -111,6 +111,7 @@ describe("given the consent page is open", () => {
           outcome: "granted",
           token: "sk-lw-docs",
           expiresAt: "2026-10-26T12:05:00.000Z",
+          expiresIn: 300,
           project: { id: "proj-1", name: "Checkout" },
         },
         targetOrigin: DOCS,
