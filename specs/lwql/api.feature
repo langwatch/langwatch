@@ -510,6 +510,22 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query executes and returns tabular results
 
   @integration
+  Scenario: A Langy session key runs a LangWatchQL query and reads its schema and reference
+    Given an API key that Langy minted for a chat session, scoped to one project
+    When it runs a LangWatchQL query
+    And it calls the schema discovery endpoint
+    And it calls the query reference endpoint
+    Then each call answers 200
+    And the query reaches the database with the key's own reach
+
+  @integration
+  Scenario: An organization key whose credential carries no Langy flag still runs a query
+    Given an organization API key whose resolved credential names no Langy session flag
+    When it runs a LangWatchQL query
+    Then the query answers 200
+    And the query reaches the database with the key's own reach
+
+  @integration
   Scenario: Results carry typed columns, rows, execution statistics, and diagnostics
     Given an authenticated API client
     When it executes a LangWatchQL query
