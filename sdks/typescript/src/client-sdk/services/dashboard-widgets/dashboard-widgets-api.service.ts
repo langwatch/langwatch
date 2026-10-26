@@ -101,13 +101,7 @@ export class DashboardWidgetsApiService {
   private async projectIdOrKeyProject(operation: string): Promise<string> {
     const inScope = this.resolvedProjectId();
     if (inScope) return inScope;
-    // The identity door is not in the generated paths, so the typed client cannot name it.
-    const client = this.apiClient as unknown as {
-      GET: (
-        path: string,
-      ) => Promise<{ data?: { id?: string }; error?: unknown; response?: Response }>;
-    };
-    const { data, error, response } = await client.GET("/api/v1/me/project");
+    const { data, error, response } = await this.apiClient.GET("/api/v1/me/project");
     if (error) this.handleApiError({ operation, error, response });
     if (!data?.id) return this.projectId(operation);
     return data.id;

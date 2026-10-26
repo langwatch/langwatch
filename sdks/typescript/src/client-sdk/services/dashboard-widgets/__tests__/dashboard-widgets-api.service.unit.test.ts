@@ -3,7 +3,7 @@
  *
  * Spec: modules/dashboard/specs/dashboards-v2.feature (AC199l)
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LangwatchApiClient } from "@/internal/api/client";
 
@@ -54,6 +54,8 @@ describe("DashboardWidgetsApiService", () => {
     });
 
     describe("when only an API key is set", () => {
+      afterEach(() => vi.unstubAllEnvs());
+
       const service = (GET: ReturnType<typeof vi.fn>) =>
         new DashboardWidgetsApiService({ langwatchApiClient: { GET } as never });
 
@@ -72,7 +74,6 @@ describe("DashboardWidgetsApiService", () => {
           "/api/v1/projects/{projectId}/analytics/boards/{boardId}",
           { params: { path: { projectId: "key_project", boardId: "board_1" } } },
         );
-        vi.unstubAllEnvs();
       });
     });
   });
