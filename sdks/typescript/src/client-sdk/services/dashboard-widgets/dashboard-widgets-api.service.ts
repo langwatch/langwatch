@@ -84,9 +84,17 @@ export class DashboardWidgetsApiService {
     throw new DashboardWidgetsApiError(message, operation, error, status);
   }
 
+  private resolvedProjectId(): string | undefined {
+    return this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
+  }
+
+  /** Whether a project is in scope; the board routes carry it in the path and refuse without. */
+  hasProject(): boolean {
+    return this.resolvedProjectId() !== undefined;
+  }
+
   private projectId(operation: string): string {
-    const projectId =
-      this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
+    const projectId = this.resolvedProjectId();
     if (!projectId) {
       throw new DashboardWidgetsApiError(
         "No project is in scope. Pass --project <slug-or-id>, or set LANGWATCH_PROJECT_ID.",

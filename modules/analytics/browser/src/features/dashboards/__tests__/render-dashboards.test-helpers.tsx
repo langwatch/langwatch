@@ -56,7 +56,6 @@ export type FrameInit = { dashboardContext: ChartFrameDashboardContext };
  */
 export function recordWidgetFrames() {
   const inits: FrameInit[] = [];
-  const contexts: ChartFrameDashboardContext[] = [];
   const perFrame = new Map<HTMLIFrameElement, ChartFrameDashboardContext>();
   const prototype = HTMLIFrameElement.prototype;
   const real = Object.getOwnPropertyDescriptor(prototype, "contentWindow");
@@ -71,13 +70,11 @@ export function recordWidgetFrames() {
     const recorded = {
       postMessage: (message: unknown, _origin?: unknown, transfer?: readonly unknown[]) => {
         inits.push(message as FrameInit);
-        contexts.push((message as FrameInit).dashboardContext);
         perFrame.set(frame, (message as FrameInit).dashboardContext);
         const port = transfer?.[0] as MessagePort | undefined;
         if (port) {
           port.onmessage = ({ data }: MessageEvent<Partial<FrameInit>>) => {
             if (!data.dashboardContext) return;
-            contexts.push(data.dashboardContext);
             perFrame.set(frame, data.dashboardContext);
           };
         }
@@ -92,8 +89,6 @@ export function recordWidgetFrames() {
       for (const frame of frames) fireEvent.load(frame);
       return inits;
     },
-    /** The context the frames were last handed, at load or as a change after it. */
-    lastContext: () => contexts.at(-1),
     /** The context each widget frame was last handed, one per frame. */
     latestContexts: () => [...perFrame.values()],
     restore: () => {

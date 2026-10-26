@@ -37,4 +37,20 @@ describe("DashboardWidgetsApiService", () => {
       });
     });
   });
+
+  describe("getBoard()", () => {
+    it("reads one board by its id on the project route", async () => {
+      const GET = vi.fn().mockResolvedValue({ data: { id: "board_1" }, error: undefined });
+      const service = new DashboardWidgetsApiService({
+        langwatchApiClient: { GET } as never,
+        projectId: "project_1",
+      });
+
+      await service.getBoard("board_1");
+
+      expect(GET).toHaveBeenCalledWith("/api/v1/projects/{projectId}/analytics/boards/{boardId}", {
+        params: { path: { projectId: "project_1", boardId: "board_1" } },
+      });
+    });
+  });
 });
