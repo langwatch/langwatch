@@ -995,7 +995,17 @@
             "dashboard-widget update",
             "dashboard-widget delete",
             "dashboard-widget boards",
-            "dashboard-widget pin"
+            "dashboard-widget pin",
+            "boards list",
+            "boards get",
+            "boards create",
+            "boards update",
+            "boards delete",
+            "boards widgets list",
+            "boards widgets get",
+            "boards widgets create",
+            "boards widgets update",
+            "boards widgets delete"
           ],
           "hints": {
             "dashboard-widget schema": "langwatch dashboard-widget schema",
@@ -1005,7 +1015,17 @@
             "dashboard-widget update": "langwatch dashboard-widget update <id> --code-file widget.tsx",
             "dashboard-widget delete": "langwatch dashboard-widget delete <id>",
             "dashboard-widget boards": "langwatch dashboard-widget boards -f json",
-            "dashboard-widget pin": "langwatch dashboard-widget pin <widget-id> --dashboard <dashboard-id-or-name>"
+            "dashboard-widget pin": "langwatch dashboard-widget pin <widget-id> --dashboard <dashboard-id-or-name>",
+            "boards list": "langwatch boards list -f json",
+            "boards get": "langwatch boards get <board-id> -f json",
+            "boards create": "langwatch boards create \"Usage\"",
+            "boards update": "langwatch boards update <board-id> --name \"Usage by model\"",
+            "boards delete": "langwatch boards delete <board-id>",
+            "boards widgets list": "langwatch boards widgets list <board-id> -f json",
+            "boards widgets get": "langwatch boards widgets get <board-id> <widget-id> -f json",
+            "boards widgets create": "langwatch boards widgets create <board-id> --name \"Errors by model\" --code-file widget.tsx --queries-file queries.json",
+            "boards widgets update": "langwatch boards widgets update <board-id> <widget-id> --code-file widget.tsx --queries-file queries.json",
+            "boards widgets delete": "langwatch boards widgets delete <board-id> <widget-id>"
           },
           "skill": null,
           "docs": null
