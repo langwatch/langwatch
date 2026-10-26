@@ -172,9 +172,9 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
       });
 
       /** @scenario Event-attribute keys are listed once each with how often they occur */
-      it("counts every (span, event) occurrence of a key, as before the fix", async () => {
-        // The subcolumn must not change multiplicity: one row per key per event
-        // per span, which is what orders the sidebar by frequency.
+      it("counts every (span, event) occurrence of a key", async () => {
+        // One row per key per event per span, which is what orders the
+        // sidebar by frequency.
 
         const keys = rows.map((row) => row.facet_value);
         expect(keys).toHaveLength(EXPECTED_DISTINCT_KEYS);
@@ -194,20 +194,19 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
 
     describe("when reading the whole Map instead of the keys subcolumn", () => {
       /** @scenario Discovering event-attribute keys does not read their values */
-      it("blows the same memory budget (the bug this fixes)", async () => {
-        // Identical query except both the projection and the empty
-        // short-circuit go through the Map, dragging the values column in.
-        // This is the pre-fix shape; it must exceed the budget the
-        // subcolumn query clears.
+      it("fits the budget that the whole-Map read exceeds", async () => {
+        // The same query with the projection and the empty short-circuit
+        // reading the Map instead of its keys, which drags the values column
+        // in; it must exceed the budget the keys read clears.
         const query = forTenant(EVENT_ATTRIBUTE_KEYS_FACET.queryBuilder(ctx));
-        const preFixSql = query.sql
+        const wholeMapSql = query.sql
           .replace(
             "arrayJoin(arrayJoin(`Events.Attributes`.keys))",
             "arrayJoin(mapKeys(arrayJoin(`Events.Attributes`)))",
           )
           .replace("length(`Events.Attributes`.keys) > 0", "length(`Events.Attributes`) > 0");
-        expect(preFixSql).not.toBe(query.sql); // guard: the replaces actually hit
-        expect(preFixSql).not.toContain(".keys");
+        expect(wholeMapSql).not.toBe(query.sql); // guard: the replaces actually hit
+        expect(wholeMapSql).not.toContain(".keys");
 
         const fits = await ch.query({
           query: query.sql,
@@ -219,7 +218,7 @@ describe.skipIf(!clickHouseConfigured)("event-attribute-keys facet integration",
         await expect(
           ch
             .query({
-              query: preFixSql,
+              query: wholeMapSql,
               query_params: query.params,
               format: "JSONEachRow",
               clickhouse_settings: BUDGET,
