@@ -1,8 +1,7 @@
 /**
- * The `add_dashboard_widget` MCP tool: one create under the board's own path,
- * `POST /api/v1/boards/{boardId}/widgets`, which places the widget as it saves it. When the
- * board routes answer 404 (Dashboards off) it creates, then places, on the project path; a failed
- * placement deletes the widget it just created.
+ * `add_dashboard_widget`: one create under the board's path, which places the widget as it saves
+ * it. On a 404 (Dashboards off) it creates, then places, on the project path; a failed placement
+ * deletes the widget it just created.
  */
 
 import { createBoardWidget } from "../langwatch-api-boards.js";

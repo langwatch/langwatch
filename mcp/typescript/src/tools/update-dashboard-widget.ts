@@ -1,8 +1,7 @@
 /**
- * The `update_dashboard_widget` MCP tool over the widget PATCH: a field left out keeps its
- * stored value. The widget must sit on the named dashboard, so an agent never edits one it
- * found somewhere else by mistake. When the board routes answer 404
- * (Dashboards off) it works on the project-path widget routes instead. Spec: modules/dashboard/specs/dashboard-widget-mcp.feature
+ * `update_dashboard_widget`: the widget must sit on the named dashboard, so an agent never edits
+ * one it found elsewhere by mistake. On a 404 (Dashboards off) it uses the project-path routes.
+ * Spec: modules/dashboard/specs/dashboard-widget-mcp.feature
  */
 
 import { getBoardWidget, updateBoardWidget } from "../langwatch-api-boards.js";
@@ -98,7 +97,7 @@ async function getWidgetOnDashboard({
   }
 }
 
-/** The project-path widget, refused by id when it is not in this project or not on this dashboard. */
+/** The project-path widget, refused by id unless it is in this project and on this dashboard. */
 async function getWidgetOnProjectPath({
   projectId,
   widgetId,
