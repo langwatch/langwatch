@@ -5,7 +5,7 @@
  */
 
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
-import type { ApiKeyRole, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
+import type { ApiKeyRole } from "@langwatch/api-key-contract";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
@@ -21,7 +21,6 @@ import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { SettingsField } from "@langwatch/design-system/settings-field";
-import type { Instant } from "@langwatch/time";
 import { TriangleAlert } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
@@ -30,6 +29,7 @@ import {
   earliestCustomExpiration,
   EXPIRATION_OPTIONS,
   EXPIRATION_UNCHOSEN,
+  type CreateApiKeyInput,
   isExpirationChosen,
   resolveExpiresAt,
 } from "../../model/api-key-form.ts";
@@ -54,19 +54,6 @@ type MyBindings = {
 
 type OrgProject = { id: string; name: string; teamId: string };
 type OrgTeam = { id: string; name: string };
-
-export type CreateApiKeyInput = {
-  name: string;
-  description: string;
-  expiresAt: Instant | undefined;
-  permissionMode: PermissionMode;
-  keyType: "personal" | "service";
-  assignedToUserId?: string;
-  scopeType: string;
-  scopeId: string;
-  permissions?: string[];
-  bindings: ApiKeyTrpcGrant[];
-};
 
 type CreateKeyForm = {
   name: string;
