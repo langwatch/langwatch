@@ -267,7 +267,7 @@ describe("given the query door over the real service", () => {
 
       expect([fromAbsent.status, fromUndefined.status]).toEqual([200, 200]);
       expect(absent.reaches).toEqual([organizationReach]);
-      expect(undefinedValued.reaches.map((reach) => reach.kind)).toEqual(["apiKey"]);
+      expect(undefinedValued.reaches).toEqual([organizationReach]);
       expect(undefinedValued.executor.requests).toHaveLength(1);
     });
   });
