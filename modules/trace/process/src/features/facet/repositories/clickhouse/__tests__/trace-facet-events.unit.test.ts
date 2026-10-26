@@ -71,11 +71,11 @@ describe("traceFacetEventsRepository.buildEventsFacetQuery", () => {
         const metrics = sql.slice(sql.indexOf("AS names"), sql.indexOf("AS metrics"));
         // Gated on the keys subcolumn, which reaches PREWHERE and never opens
         // the values column, so granules with no metric-bearing span skip the
-        // values entirely.
-        // Explicit rather than left to optimize_move_to_prewhere, so the
-        // saving holds whatever the optimizer settings are.
+        // values entirely. Explicit, so the saving holds whatever the optimizer
+        // settings are; an explicit PREWHERE moves nothing else, so the tenant
+        // and window sit there too.
         expect(metrics).toMatch(
-          /PREWHERE arrayExists\(\s*keys -> arrayExists\(k -> startsWith\(k, 'event\.metrics\.'\), keys\),\s*`Events\.Attributes`\.keys\s*\)/,
+          /PREWHERE \{\{tenantScope[^}]*\}\} AND StartTime >= [^\n]*\{timeFrom:Int64\}\) AND StartTime <= [^\n]*\{timeTo:Int64\}\)\s*AND arrayExists\(\s*keys -> arrayExists\(k -> startsWith\(k, 'event\.metrics\.'\), keys\),\s*`Events\.Attributes`\.keys\s*\)/,
         );
       });
 
@@ -103,15 +103,14 @@ describe("traceFacetEventsRepository.buildEventsFacetQuery", () => {
           ctx({ filterWhere: { sql: scope, params: { scopeParam: "x" } } }),
         );
         const metrics = sql.slice(sql.indexOf("AS names"), sql.indexOf("AS metrics"));
-        const prewhere = metrics.slice(
-          metrics.indexOf("PREWHERE"),
-          metrics.indexOf("WHERE {{tenantScope"),
-        );
-        // Only the metric-key gate belongs there; the tenant, time and scope
-        // predicates stay in WHERE as in every other facet builder.
+        const prewhereStart = metrics.indexOf("PREWHERE");
+        const whereStart = metrics.indexOf("WHERE ", prewhereStart + "PREWHERE".length);
+        const prewhere = metrics.slice(prewhereStart, whereStart);
+        // The scope's membership subquery stays in WHERE, after PREWHERE has
+        // cut the granules, as in the other facet builders.
         expect(prewhere).toMatch(/`Events\.Attributes`\.keys/);
-        expect(prewhere).not.toContain("tenantScope");
         expect(prewhere).not.toContain(scope);
+        expect(metrics.slice(whereStart)).toContain(scope);
       });
 
       it("keeps an event name with no metrics as an empty bucket list", () => {

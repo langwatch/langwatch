@@ -22,11 +22,13 @@ class ClickHouseTraceFacetEventsRepository {
 
   /** Event names with counts, joined to the metric buckets of events carrying `event.metrics.*`
    * keys. Names read `Events.Name` alone; the map is read only where its keys subcolumn holds
-   * a metric key, gated in PREWHERE, so a granule without one never opens the values. A search
-   * filter's trace-scope subquery runs once per half: it reads light trace_summaries columns,
-   * cheap beside the heavy map a single pass would drag through the join. */
+   * a metric key, gated in PREWHERE beside the tenant and window, so a granule without one never
+   * opens the values. A search filter's trace-scope subquery runs once per half: it reads light
+   * trace_summaries columns, cheap beside the heavy map a single pass would drag through the join. */
   buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = this.facetQueries.buildTimeWhere("StartTime", ctx);
+    const bounds = this.facetQueries.buildTimeWhere("StartTime");
+    const traceScope = this.facetQueries.buildTraceScope("StartTime", ctx);
     const prefixFilter = ctx.prefix ? "AND lower(name) ILIKE concat({prefix:String}, '%')" : "";
     return {
       sql: `
@@ -67,11 +69,12 @@ class ClickHouseTraceFacetEventsRepository {
             FROM (
               SELECT arrayJoin(arrayZip(\`Events.Name\`, \`Events.Attributes\`)) AS ev
               FROM stored_spans
-              PREWHERE arrayExists(
-                keys -> arrayExists(k -> startsWith(k, '${EVENT_METRICS_PREFIX}'), keys),
-                \`Events.Attributes\`.keys
-              )
-              WHERE ${where}
+              PREWHERE ${bounds}
+                AND arrayExists(
+                  keys -> arrayExists(k -> startsWith(k, '${EVENT_METRICS_PREFIX}'), keys),
+                  \`Events.Attributes\`.keys
+                )
+              ${traceScope ? `WHERE ${traceScope}` : ""}
             )
             WHERE ev.1 != ''
           )

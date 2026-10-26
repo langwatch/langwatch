@@ -39,19 +39,26 @@ export class ClickHouseTraceFacetQueryRepository {
     timeColumn: keyof typeof FACET_TABLE_BY_TIME_COLUMN,
     ctx?: Pick<FacetQueryContext, "filterWhere" | "isLiveWindow">,
   ): string {
-    const traceScope = ctx?.filterWhere
-      ? scopeTraceFilterToTable({
-          table: FACET_TABLE_BY_TIME_COLUMN[timeColumn],
-          filterWhere: ctx.filterWhere,
-          isLiveWindow: ctx.isLiveWindow === true,
-        })
-      : undefined;
+    const traceScope = this.buildTraceScope(timeColumn, ctx);
     return [
       tenantScope(timeColumn),
       `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
       `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
-      ...(traceScope ? [traceScope.sql] : []),
+      ...(traceScope ? [traceScope] : []),
     ].join(" AND ");
+  }
+
+  /** The search filter's trace-scope predicate alone, for a builder that places it apart. */
+  buildTraceScope(
+    timeColumn: keyof typeof FACET_TABLE_BY_TIME_COLUMN,
+    ctx?: Pick<FacetQueryContext, "filterWhere" | "isLiveWindow">,
+  ): string | undefined {
+    if (!ctx?.filterWhere) return undefined;
+    return scopeTraceFilterToTable({
+      table: FACET_TABLE_BY_TIME_COLUMN[timeColumn],
+      filterWhere: ctx.filterWhere,
+      isLiveWindow: ctx.isLiveWindow === true,
+    }).sql;
   }
 
   /**
