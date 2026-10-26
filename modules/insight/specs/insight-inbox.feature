@@ -384,7 +384,8 @@ Feature: The insights inbox
 
   Rule: The Insights entry in the side menu
     Insights lives in the Dashboards product: one entry, at the bottom of the Dashboards side
-    menu just above Settings, with the grey unread pill. No other product's menu carries a second one.
+    menu just above Settings (above Support for a member who cannot see Settings), with the
+    grey unread pill. No other product's menu carries a second one.
 
     @integration
     Scenario: The Dashboards side menu holds the one Insights entry with its unread count

@@ -6,7 +6,7 @@ import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 
 import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
@@ -111,18 +111,18 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
 
 /**
  * The pinned utility block at the bottom of every sidebar: usage, Settings,
- * Support and the theme control. In Dashboards, Insights sits just above
- * Settings. The Settings sidebar drops its own entry since the top bar
+ * Support and the theme control, with a product's own pinned entry just
+ * above Settings. The Settings sidebar drops its own entry since the top bar
  * already names it.
  */
 function SidebarBottomBlock({
-  surface,
   showExpanded,
   shouldIncludeSettingsLink,
+  productPinned,
 }: {
-  surface: SidebarSurface;
   showExpanded: boolean;
   shouldIncludeSettingsLink: boolean;
+  productPinned?: ReactNode;
 }) {
   const host = useNavigationHost();
   const pathname = host.pathname();
@@ -143,7 +143,7 @@ function SidebarBottomBlock({
       paddingX={1}
     >
       <UsageIndicator showLabel={showExpanded} />
-      {surface === "dashboards" && <InsightsMenuLink showExpanded={showExpanded} />}
+      {productPinned}
       {shouldIncludeSettingsLink && host.hasPermission("organization:view") && (
         <SideMenuLink
           icon={featureIcons.settings.icon}
@@ -325,11 +325,11 @@ function SectionItemsNav({
  */
 function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
+  if (!showExpanded) return null;
   const pattern = toProjectRoutePattern({
     pathname: host.pathname(),
     projectSlug: host.project()?.slug,
   });
-  if (!showExpanded) return null;
   return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
 }
 
@@ -519,9 +519,11 @@ export function SidebarContent({
 
       <Box width="full" paddingX={2}>
         <SidebarBottomBlock
-          surface={surface}
           showExpanded={showExpanded}
           shouldIncludeSettingsLink={surface !== "settings"}
+          productPinned={
+            surface === "dashboards" ? <InsightsMenuLink showExpanded={showExpanded} /> : null
+          }
         />
       </Box>
     </VStack>

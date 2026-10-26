@@ -152,6 +152,7 @@ describe("the Dashboards product sidebar", () => {
 describe("the Insights entry", () => {
   describe("given release_insights is on and the member holds analytics:view", () => {
     /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */
+    /** @scenario The sidebar bottom block keeps usage, settings, support and theme */
     it("sits in the Dashboards sidebar's bottom block just above Settings, with the lent count", async () => {
       renderSidebar({
         surface: "dashboards",
@@ -168,6 +169,20 @@ describe("the Insights entry", () => {
       const links = bottom.getAllByRole("link");
       expect(links.indexOf(entry)).toBeGreaterThanOrEqual(0);
       expect(links[links.indexOf(entry) + 1]).toBe(bottom.getByRole("link", { name: "Settings" }));
+    });
+
+    /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */
+    it("sits just above Support for a member who cannot see Settings", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards", insightsOn: true });
+
+      const entry = await screen.findByRole("link", { name: "Insights" });
+      const block = screen.getByTestId("sidebar-bottom-block");
+      expect(block).toContainElement(entry);
+      expect(within(block).queryByRole("link", { name: "Settings" })).toBeNull();
+      const support = within(block).getByRole("button", { name: "Support" });
+      expect(
+        entry.compareDocumentPosition(support) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
 
     /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */

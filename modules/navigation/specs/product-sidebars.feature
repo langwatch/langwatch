@@ -5,7 +5,8 @@ Feature: Product sidebars
 
   Both modes share one sidebar frame: pinned Quick Search first, then the
   product's own pages, then a pinned bottom block with usage, Settings,
-  Support and the theme control. The product bodies reuse the same menu
+  Support and the theme control. A product may pin its own entry there,
+  just above Settings: Dashboards pins Insights (insight-inbox.feature). The product bodies reuse the same menu
   components the app has always rendered: LLM Ops and Me keep their
   sections minus the Govern group (the product switcher replaces it),
   and Gateway and Governance promote their section pages from the
@@ -101,6 +102,7 @@ Feature: Product sidebars
   Scenario: The sidebar bottom block keeps usage, settings, support and theme
     Given a product sidebar
     Then the bottom block holds the usage indicator, Settings, Support and the theme control
+    And a product's own pinned entry, if it has one, sits just above Settings
 
   @integration
   Scenario: Chat moves inside the Support menu

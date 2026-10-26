@@ -31,7 +31,7 @@ Feature: Dashboards v1
     When the member looks at the Dashboards product sidebar
     Then they see "Your dashboards" with My dashboard first, then Starred when they have stars,
       then From LangWatch, each board with a menu
-    And the sidebar shows nothing else besides Quick Search and, while release_insights is on, the Insights entry at the bottom just above Settings
+    And the sidebar's page list shows nothing else besides Quick Search, while the bottom block holds the Insights entry just above Settings when release_insights is on
 
   # ---------------------------------------------------------------------------
   # Agent Flight Deck
