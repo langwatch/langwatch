@@ -98,9 +98,9 @@ type Options struct {
 	//   - non-nil empty  → pass nothing (maximally locked down)
 	//   - populated      → pass exactly those names, when present
 	//
-	// A project's own secrets reach user code via Request.Secrets (piped
-	// over stdin into the `secrets` namespace), never via the environment,
-	// so withholding the environment does not break the secrets contract.
+	// A project's own secrets reach user code via Request.Secrets (they ride
+	// in the payload, into the `secrets` namespace), never via the
+	// environment, so withholding it does not break the secrets contract.
 	//
 	// The one credential that does travel in the environment is the run's
 	// sandbox key; see Request.SandboxAPIKey.
@@ -155,12 +155,12 @@ var defaultEnvAllowlist = []string{
 // Executor runs code blocks via a Python subprocess.
 //
 // The runner sources are held as bytes in the engine's own memory and reach
-// the interpreter over argv and stdin, never as a file. User code and the
-// interpreter run as the same user, so a file the subprocess can read is a
-// file it can also rewrite; the only copy it cannot reach is the one that was
-// never on the filesystem. The execution's own directory therefore holds no
-// code at all, and what one execution runs cannot depend on what another
-// wrote.
+// the interpreter over argv and in the payload it asks for, never as a file.
+// User code and the interpreter run as the same user, so a file the subprocess
+// can read is a file it can also rewrite; the only copy it cannot reach is the
+// one that was never on the filesystem. The execution's own directory
+// therefore holds no code at all, and what one execution runs cannot depend on
+// what another wrote.
 type Executor struct {
 	opts           Options
 	runnerSource   []byte
@@ -176,7 +176,7 @@ type Executor struct {
 // New builds an Executor, reading the runner sources it holds in memory for
 // every execution: the embedded copies, or the files named by
 // Options.RunnerPath when a dev run overrides them. Neither is ever written to
-// disk; both travel to the interpreter over argv and stdin.
+// disk; both travel to the interpreter over argv and in the payload.
 func New(opts Options) (*Executor, error) {
 	if opts.Python == "" {
 		opts.Python = "python3"

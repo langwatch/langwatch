@@ -178,7 +178,8 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     # container, so an execution is isolated from the other executions and not
     # only from the engine. The runner script and its bundled `dspy` stand-in
     # are never written to the filesystem: they travel from the engine's own
-    # embedded copy to the interpreter over argv and stdin, and the runner
+    # embedded copy to the interpreter over argv and in the payload it asks
+    # for, and the runner
     # drops the working directory from sys.path before any user code runs.
     # Everything the interpreter loads therefore comes either from the engine's
     # memory or from the image's read-only library path.
