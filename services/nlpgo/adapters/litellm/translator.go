@@ -156,42 +156,97 @@ func EnsureReasoningMaxTokens(body map[string]any) bool {
 	return true
 }
 
-// ApplyReasoningOverrides mutates the provider request body in place to
-// pin temperature to 1.0 and floor max_tokens at reasoningMaxTokensFloor
-// for reasoning-class models. Returns true if any override was applied
-// (so the caller can log it for diagnostics).
+// OutputTokensLookup reports which request parameter a model takes its
+// output token limit as, and whether it knows the model at all. The model
+// catalog (adapters/modelcatalog) implements it.
+type OutputTokensLookup interface {
+	OutputTokensParameter(modelID string) (param string, known bool)
+}
+
+// takesMaxCompletionTokens is whether the output token limit goes out as
+// max_completion_tokens. The catalog decides for every model it carries; a
+// model it does not carry keeps the name rule the engine has always applied.
+func takesMaxCompletionTokens(modelID string, catalog OutputTokensLookup) bool {
+	if catalog != nil {
+		if param, known := catalog.OutputTokensParameter(modelID); known {
+			return param == "max_completion_tokens"
+		}
+	}
+	return IsReasoningModel(modelID)
+}
+
+// NeedsReasoningOverrides is whether ApplyReasoningOverrides would change a
+// request for modelID, so a caller holding raw bytes can skip the decode.
+func NeedsReasoningOverrides(modelID string, catalog OutputTokensLookup) bool {
+	return IsReasoningModel(modelID) || takesMaxCompletionTokens(modelID, catalog)
+}
+
+// ApplyReasoningOverrides mutates the provider request body in place. It
+// sends the output token limit as max_completion_tokens when the model takes
+// it under that name: OpenAI's reasoning models refuse max_tokens with HTTP
+// 400 ("Unsupported parameter: 'max_tokens' is not supported with this model.
+// Use 'max_completion_tokens' instead."). For reasoning-class models it also
+// pins temperature to 1.0 and floors the limit at reasoningMaxTokensFloor.
+// Returns true if any override was applied (so the caller can log it for
+// diagnostics).
 //
 // modelID is the ALREADY-translated id (post TranslateModelID) so the
-// regex matches consistently across `openai/o3` and bare `o3`.
-func ApplyReasoningOverrides(modelID string, body map[string]any) bool {
-	if !IsReasoningModel(modelID) {
+// regex matches consistently across `openai/o3` and bare `o3`, and the
+// catalog is asked by the provider-prefixed id.
+func ApplyReasoningOverrides(modelID string, body map[string]any, catalog OutputTokensLookup) bool {
+	reasoning := IsReasoningModel(modelID)
+	rename := takesMaxCompletionTokens(modelID, catalog)
+	if !reasoning && !rename {
 		return false
 	}
-	body["temperature"] = float64(1.0)
-	// OpenAI's reasoning-class models (o1/o3/o4/o5/gpt-5) reject
-	// max_tokens with HTTP 400 ("Unsupported parameter: 'max_tokens'
-	// is not supported with this model. Use 'max_completion_tokens'
-	// instead."). Migrate the field if the caller set it, and apply
-	// the floor either way.
-	existing := body["max_tokens"]
-	delete(body, "max_tokens")
-	floor := reasoningMaxTokensFloor
-	switch n := existing.(type) {
-	case int:
-		if n > floor {
-			floor = n
-		}
-	case int64:
-		if int(n) > floor {
-			floor = int(n)
-		}
-	case float64:
-		if int(n) > floor {
-			floor = int(n)
-		}
+	if reasoning {
+		body["temperature"] = float64(1.0)
 	}
-	body["max_completion_tokens"] = floor
+
+	key := "max_tokens"
+	if rename {
+		key = "max_completion_tokens"
+		moveMaxTokensToMaxCompletionTokens(body)
+	}
+	if reasoning {
+		floorOutputTokens(body, key)
+	}
 	return true
+}
+
+// moveMaxTokensToMaxCompletionTokens sends the limit under the name OpenAI's
+// reasoning models take. A max_completion_tokens the caller set wins.
+func moveMaxTokensToMaxCompletionTokens(body map[string]any) {
+	limit, present := body["max_tokens"]
+	if !present {
+		return
+	}
+	delete(body, "max_tokens")
+	if _, set := body["max_completion_tokens"]; !set {
+		body["max_completion_tokens"] = limit
+	}
+}
+
+// floorOutputTokens raises the limit under key to reasoningMaxTokensFloor,
+// keeping a higher one.
+func floorOutputTokens(body map[string]any, key string) {
+	floor := reasoningMaxTokensFloor
+	if n, ok := intValue(body[key]); ok && n > floor {
+		floor = n
+	}
+	body[key] = floor
+}
+
+func intValue(v any) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	}
+	return 0, false
 }
 
 // ClampAnthropicTemperature pins temperature to [0, 1] for anthropic

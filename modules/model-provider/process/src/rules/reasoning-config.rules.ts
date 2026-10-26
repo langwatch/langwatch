@@ -114,7 +114,7 @@ const REASONING_RULES: readonly { matches: (id: string) => boolean; config: Reas
     config: OPENAI_O_SERIES,
   },
   {
-    matches: (id) => id.includes("openai/") && includesAny(id, ["/o1", "/o3"]),
+    matches: (id) => id.includes("openai/") && includesAny(id, ["/o1", "/o3", "/o4"]),
     config: OPENAI_O_SERIES,
   },
   {

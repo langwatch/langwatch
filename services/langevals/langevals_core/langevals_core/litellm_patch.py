@@ -10,6 +10,7 @@ import litellm.cost_calculator
 from openai import OpenAI, AzureOpenAI
 import json
 
+from langevals_core.model_capabilities import output_tokens_parameter
 from langevals_core.model_pricing import register_langwatch_model_pricing
 from langevals_core.request_env import current_request_env
 
@@ -400,6 +401,29 @@ def apply_anthropic_sampling_compatibility(kwargs: dict) -> dict:
     return kwargs
 
 
+def apply_output_tokens_parameter(
+    kwargs: dict, requested_model: Optional[str] = None
+) -> dict:
+    """
+    Send the output token limit under the name the catalog records for the
+    model. OpenAI's reasoning models refuse `max_tokens`, and litellm renames it
+    only for the models it recognises by name.
+
+    Looked up by the model the caller named, before any Azure deployment
+    rewrite, since a deployment name says nothing about the model behind it. A
+    limit the caller already sent as `max_completion_tokens` is kept.
+    """
+    if kwargs.get("max_tokens") is None:
+        return kwargs
+    model = requested_model or kwargs.get("model")
+    if output_tokens_parameter(model) != "max_completion_tokens":
+        return kwargs
+
+    limit = kwargs.pop("max_tokens")
+    kwargs.setdefault("max_completion_tokens", limit)
+    return kwargs
+
+
 def convert_param_type(key: str, value: str):
     """Convert string env var value to proper type for litellm params."""
     if key in INT_PARAMS:
@@ -609,6 +633,9 @@ def patch_litellm_params(kwargs):
     # each came from — an evaluator argument or a request's X_LITELLM_*
     # setting — so this is the first point the conflict is even visible.
     kwargs = apply_anthropic_sampling_compatibility(kwargs)
+    # The limit can arrive from an evaluator argument or a request's
+    # X_LITELLM_max_tokens, so this too waits until both have landed.
+    kwargs = apply_output_tokens_parameter(kwargs, requested_model=requested_model)
 
     return kwargs
 

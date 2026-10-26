@@ -82,6 +82,10 @@ COPY --from=go-build /out/service /usr/local/bin/service
 ENV SANDBOX_PYTHON=/usr/bin/python3.11
 ENV PYTHONPATH=/opt/sandbox-libs
 ENV SERVER_ADDR=:8080
+# The model catalog (services/nlpgo/adapters/modelcatalog): it decides the name
+# each model takes its output token limit as, the same files langevals reads.
+ENV LANGWATCH_MODEL_CATALOG_DIR=/opt/model-catalog
+COPY modules/model-provider/contract/src/catalog/model-catalog.json modules/model-provider/contract/src/catalog/model-catalog.overlay.json /opt/model-catalog/
 
 # The adapter probes nlpgo's liveness and streams each SSE flush as its own
 # response chunk.

@@ -547,7 +547,7 @@ func TestExecute_StreamHeaderTrueWhenStreaming(t *testing.T) {
 		Model:         "openai/gpt-5-mini",
 		LiteLLMParams: map[string]any{"api_key": "k"},
 	}
-	gwReq, err := buildGatewayRequest(context.Background(), req, true)
+	gwReq, err := (&Executor{}).buildGatewayRequest(context.Background(), req, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -561,7 +561,7 @@ func TestExecute_NoStreamFieldWhenNotStreaming(t *testing.T) {
 		Model:         "openai/gpt-5-mini",
 		LiteLLMParams: map[string]any{"api_key": "k"},
 	}
-	gwReq, err := buildGatewayRequest(context.Background(), req, false)
+	gwReq, err := (&Executor{}).buildGatewayRequest(context.Background(), req, false)
 	if err != nil {
 		t.Fatal(err)
 	}

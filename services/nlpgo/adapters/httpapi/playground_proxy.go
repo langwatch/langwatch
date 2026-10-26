@@ -69,6 +69,10 @@ type playgroundProxyStream interface {
 // playgroundProxyDispatch builds the http.HandlerFunc that runs an
 // inbound /go/proxy/v1/* request through the dispatcher.
 func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
+	var catalog litellm.OutputTokensLookup
+	if source, ok := proxy.(modelCatalogSource); ok {
+		catalog = source.ModelCatalog()
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -130,9 +134,11 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		// raw-forwarding bodies authored by Vercel AI SDK / playground
 		// callers that emit `max_tokens`. Mirror the executor here so
 		// /go/proxy/v1/chat/completions doesn't 400 on Studio Monaco
-		// code-completion / playground / model.factory.ts traffic.
-		if litellm.IsReasoningModel(bareModel) {
-			body, err = applyReasoningOverridesToBody(body, bareModel)
+		// code-completion / playground / model.factory.ts traffic. The
+		// model catalog decides the limit's name for every model it
+		// carries, so it is asked by the provider-prefixed id.
+		if litellm.NeedsReasoningOverrides(model, catalog) {
+			body, err = applyReasoningOverridesToBody(body, model, catalog)
 			if err != nil {
 				writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 					"reason": "apply_reasoning_overrides",
@@ -233,7 +239,7 @@ func rewriteBodyModel(body []byte, newModel string) ([]byte, error) {
 // the in-process llmexecutor path. The actual rewrite logic lives in
 // litellm.ApplyReasoningOverrides (translator.go) — this is the
 // raw-bytes-in / raw-bytes-out wrapper for the playground proxy.
-func applyReasoningOverridesToBody(body []byte, modelID string) ([]byte, error) {
+func applyReasoningOverridesToBody(body []byte, modelID string, catalog litellm.OutputTokensLookup) ([]byte, error) {
 	if len(body) == 0 {
 		return body, nil
 	}
@@ -241,7 +247,7 @@ func applyReasoningOverridesToBody(body []byte, modelID string) ([]byte, error) 
 	if err := json.Unmarshal(body, &generic); err != nil {
 		return nil, err
 	}
-	litellm.ApplyReasoningOverrides(modelID, generic)
+	litellm.ApplyReasoningOverrides(modelID, generic, catalog)
 	return json.Marshal(generic)
 }
 
@@ -462,14 +468,37 @@ type DispatchStream interface {
 // RequestTypePassthrough so /v1beta/* (Gemini-native) calls reach the
 // dispatcher's raw-forward path.
 type shimAdapter struct {
-	shim DispatcherShim
+	shim    DispatcherShim
+	catalog litellm.OutputTokensLookup
+}
+
+// modelCatalogSource is a PlaygroundProxy that knows the model catalog, which
+// decides the name each model takes its output token limit as.
+type modelCatalogSource interface {
+	ModelCatalog() litellm.OutputTokensLookup
+}
+
+// ModelCatalog implements modelCatalogSource.
+func (a *shimAdapter) ModelCatalog() litellm.OutputTokensLookup { return a.catalog }
+
+// PlaygroundOption configures the proxy NewPlaygroundProxyFromShim builds.
+type PlaygroundOption func(*shimAdapter)
+
+// WithPlaygroundModelCatalog gives the proxy the model catalog. Without it
+// every model keeps the engine's name rule.
+func WithPlaygroundModelCatalog(catalog litellm.OutputTokensLookup) PlaygroundOption {
+	return func(a *shimAdapter) { a.catalog = catalog }
 }
 
 // NewPlaygroundProxyFromShim returns a PlaygroundProxy that forwards
 // to the given DispatcherShim. cmd/ wires this with a tiny adapter
 // over *dispatcher.Dispatcher.
-func NewPlaygroundProxyFromShim(shim DispatcherShim) PlaygroundProxy {
-	return &shimAdapter{shim: shim}
+func NewPlaygroundProxyFromShim(shim DispatcherShim, opts ...PlaygroundOption) PlaygroundProxy {
+	adapter := &shimAdapter{shim: shim}
+	for _, opt := range opts {
+		opt(adapter)
+	}
+	return adapter
 }
 
 func (a *shimAdapter) Dispatch(ctx context.Context, req playgroundProxyRequest) (*playgroundProxyResponse, error) {

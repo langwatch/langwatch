@@ -56,6 +56,7 @@ const modelCatalogEntrySchemaDefinition = z
         canDisable: z.boolean(),
       })
       .optional(),
+    outputTokensParameter: z.enum(["max_tokens", "max_completion_tokens"]).optional(),
   })
   .strict();
 export interface ModelCatalogEntrySchema extends Named<typeof modelCatalogEntrySchemaDefinition> {}

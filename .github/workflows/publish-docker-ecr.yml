@@ -238,6 +238,7 @@ jobs:
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-nlp-service:
               - 'infra/docker/Dockerfile.langwatch_nlp'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
               - 'cmd/**'
               - 'pkg/**'
               - 'services/**'
@@ -250,6 +251,7 @@ jobs:
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-nlp-lambda:
               - 'infra/docker/Dockerfile.langwatch_nlp.lambda'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
               - 'go.work'
               - 'go.work.sum'
               - 'cmd/**'

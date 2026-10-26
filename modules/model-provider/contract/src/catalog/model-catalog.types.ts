@@ -67,6 +67,9 @@ export type ReasoningConfig = {
   canDisable: boolean;
 };
 
+/** The request parameters a model can take its output token limit as. */
+export type OutputTokensParameter = "max_tokens" | "max_completion_tokens";
+
 // ============================================================================
 // Model Entry Type
 // ============================================================================
@@ -104,6 +107,11 @@ export type LLMModelEntry = {
   supportsAudioOutput: boolean;
   /** Reasoning/thinking configuration (undefined if not supported) */
   reasoningConfig?: ReasoningConfig;
+  /**
+   * The request parameter the model takes its output token limit as. Undefined means
+   * `max_tokens`; OpenAI's reasoning models refuse it and take only `max_completion_tokens`.
+   */
+  outputTokensParameter?: OutputTokensParameter;
 };
 
 // ============================================================================
