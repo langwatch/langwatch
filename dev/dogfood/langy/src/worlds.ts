@@ -15,8 +15,8 @@ const DAYS = 2;
 export const EXPECTED_TOTAL = PER_HOUR * 24 * DAYS;
 
 const widgetsPath = (project: string) => `/api/v1/projects/${project}/analytics/dashboard-widgets`;
-/** Dashboards V2 boards; the legacy /api/dashboards table cannot hold widgets. */
-const boardsPath = (project: string) => `/api/v1/projects/${project}/analytics/boards`;
+/** Dashboards boards, project from the key; answers 404 unless release_dashboards is on. */
+const BOARDS_PATH = "/api/v1/boards";
 const chartsPath = (project: string) => `/api/v1/projects/${project}/analytics/charts`;
 
 type WidgetKind = "count" | "slowest" | "errors";
@@ -582,7 +582,7 @@ export async function setupWorld({
     const boardName = `${name} ${tag}`;
     const created = await http.request<{ id: string }>({
       method: "POST",
-      path: boardsPath(http.projectId),
+      path: BOARDS_PATH,
       body: { name: boardName },
     });
     const boardId = expectOk({ answer: created, what: "create board" }).id;
@@ -678,7 +678,7 @@ export async function teardownWorld({ http, state }: { http: LangWatchHttp; stat
   for (const boardId of Object.values(runBoards({ state }))) {
     const answer = await http.request({
       method: "DELETE",
-      path: `${boardsPath(http.projectId)}/${boardId}`,
+      path: `${BOARDS_PATH}/${boardId}`,
     });
     (answer.status < 300 ? deleted.dashboards : left).push(boardId);
   }
