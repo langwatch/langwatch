@@ -29,7 +29,8 @@
     "shots": "node scripts/shots.mjs",
     "contrast": "node scripts/contrast.mjs",
     "audit:site": "node src/site/audit/run.ts",
-    "test:audit": "node scripts/audit.smoke.test.mjs"
+    "test:audit": "node scripts/audit.smoke.test.mjs",
+    "test:session": "node scripts/session.smoke.test.mjs"
   },
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
