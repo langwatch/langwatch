@@ -16,6 +16,16 @@ const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
 const TTL_SECONDS = 30;
 const START = 1_800_000_000_000;
 
+const sessionKey = (projectId: string, sessionId: string) =>
+  `presence:v1:{${projectId}}:${sessionId}`;
+const indexKey = (projectId: string) => `presence:v1:index:{${projectId}}`;
+/** Redis's rule: the text between the first `{` and the next `}`, when that text is not empty. */
+function hashTagOf(key: string): string | undefined {
+  const open = key.indexOf("{");
+  const close = open === -1 ? -1 : key.indexOf("}", open + 1);
+  return close > open + 1 ? key.slice(open + 1, close) : undefined;
+}
+
 function sessionFor({
   projectId,
   sessionId,
@@ -82,21 +92,52 @@ describe.skipIf(!redisUrl)("given the Redis presence repository", () => {
   describe("when one session left and another stopped heartbeating", () => {
     /** @scenario "A session that left or stopped heartbeating is not listed" */
     it("lists neither, and the index expires with its last session", async () => {
+      // The clock stays put: only Redis's own expiry can drop the stale session.
       clock = START;
       const projectId = `project-${randomUUID()}`;
+      const soloProjectId = `project-${randomUUID()}`;
       await repository.upsert(sessionFor({ projectId, sessionId: "left" }), TTL_SECONDS);
       await repository.upsert(sessionFor({ projectId, sessionId: "stale" }), 1);
       await repository.upsert(sessionFor({ projectId, sessionId: "live" }), TTL_SECONDS);
+      await repository.upsert(sessionFor({ projectId: soloProjectId, sessionId: "solo" }), 1);
 
       const removed = await repository.remove({ projectId, sessionId: "left" });
-      clock = START + 2_000;
+      await vi.waitFor(
+        async () => {
+          expect(await redis.exists(sessionKey(projectId, "stale"))).toBe(0);
+          expect(await redis.exists(sessionKey(soloProjectId, "solo"))).toBe(0);
+          expect(await redis.exists(indexKey(soloProjectId))).toBe(0);
+        },
+        { timeout: 3_000, interval: 100 },
+      );
       const sessions = await repository.findByProject(projectId);
-      const indexTtl = await redis.ttl(`presence:v1:index:${projectId}`);
+      clock = START + 2_000;
+      await repository.findByProject(projectId);
 
       expect(removed).toBe(true);
+      expect(await redis.zscore(indexKey(projectId), "left")).toBeNull();
       expect(sessions.map((s) => s.sessionId)).toEqual(["live"]);
-      expect(indexTtl).toBeGreaterThan(0);
-      expect(indexTtl).toBeLessThanOrEqual(TTL_SECONDS);
+      expect(await redis.zrange(indexKey(projectId), 0, -1)).toEqual(["live"]);
+    });
+  });
+
+  describe("when a session heartbeats", () => {
+    /** @scenario "A project's sessions and its index share one cluster slot" */
+    it("writes only keys carrying the project's hash tag", async () => {
+      clock = START;
+      const projectId = `project-${randomUUID()}`;
+
+      await repository.upsert(sessionFor({ projectId, sessionId: "a" }), TTL_SECONDS);
+      const written: string[] = [];
+      let cursor = "0";
+      do {
+        const [next, keys] = await redis.scan(cursor, "MATCH", `*${projectId}*`);
+        written.push(...keys);
+        cursor = next;
+      } while (cursor !== "0");
+
+      expect(written).toHaveLength(2);
+      expect(written.map(hashTagOf)).toEqual([projectId, projectId]);
     });
   });
 });

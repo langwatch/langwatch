@@ -118,6 +118,14 @@ Feature: Collaborative presence
     Then neither is listed
     And the project's index expires with its last session
 
+  # A heartbeat writes the session and the index in one transaction, and a Redis cluster refuses
+  # a transaction across slots, so both keys hash on the project id.
+  @integration
+  Scenario: A project's sessions and its index share one cluster slot
+    Given a session heartbeating in a project
+    When presence stores it
+    Then every key it wrote carries the project's hash tag
+
   # The presenter is the existing session-person context the door binds, with image (rulings
   # 2026-10-05, "Presence presenter"); presence keeps no user peer.
   @unit

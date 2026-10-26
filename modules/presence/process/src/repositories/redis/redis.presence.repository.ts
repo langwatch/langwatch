@@ -7,9 +7,9 @@ import { PresenceRepository } from "../presence.repository.ts";
 const KEY_PREFIX = "presence:v1";
 
 /**
- * Sessions live at `presence:v1:<projectId>:<sessionId>`; each project also keeps
- * a sorted set of its session ids scored by expiry, so listing a project reads
- * that set instead of scanning the whole keyspace.
+ * Sessions live at `presence:v1:{<projectId>}:<sessionId>`; each project also keeps a sorted set
+ * of its session ids scored by expiry, so listing reads that set instead of scanning the keyspace.
+ * Both keys hash on `{<projectId>}`, so a cluster accepts the transactions that write them.
  */
 export class RedisPresenceRepository extends PresenceRepository {
   private constructor(
@@ -54,11 +54,18 @@ export class RedisPresenceRepository extends PresenceRepository {
     projectId: string;
     sessionId: string;
   }): Promise<boolean> {
-    const [deleted] = await Promise.all([
-      this.redis.del(this.sessionKey(projectId, sessionId)),
-      this.redis.zrem(this.indexKey(projectId), sessionId),
-    ]);
-    return deleted > 0;
+    // One transaction, so a heartbeat cannot land between the two and leave a live session
+    // unindexed.
+    const results = await this.redis
+      .multi()
+      .del(this.sessionKey(projectId, sessionId))
+      .zrem(this.indexKey(projectId), sessionId)
+      .exec();
+    if (!results) throw new Error(`Failed to remove presence session ${sessionId}`);
+    const failed = results.find(([error]) => error);
+    if (failed?.[0]) throw failed[0];
+    const [, deleted] = results[0] ?? [];
+    return typeof deleted === "number" && deleted > 0;
   }
 
   async findSession({
@@ -99,11 +106,11 @@ export class RedisPresenceRepository extends PresenceRepository {
   }
 
   private sessionKey(projectId: string, sessionId: string): string {
-    return `${KEY_PREFIX}:${projectId}:${sessionId}`;
+    return `${KEY_PREFIX}:{${projectId}}:${sessionId}`;
   }
 
-  /** Outside the `<projectId>:*` namespace so it never collides with a session key. */
+  /** Outside the `{<projectId>}:*` namespace so it never collides with a session key. */
   private indexKey(projectId: string): string {
-    return `${KEY_PREFIX}:index:${projectId}`;
+    return `${KEY_PREFIX}:index:{${projectId}}`;
   }
 }
