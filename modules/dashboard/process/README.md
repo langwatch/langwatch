@@ -890,7 +890,7 @@ List all dashboards for the project
 
 Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:263`.
 
-Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
+Answers only, undocumented, at `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`.
 
 ```typescript
 type Response = z.infer<typeof dashboardListResponseSchema>; // ../contract/src/dashboard.responses.ts:90
@@ -902,7 +902,7 @@ Create a new dashboard
 
 Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:271`.
 
-Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
+Answers only, undocumented, at `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`.
 
 ```typescript
 type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:215
@@ -915,7 +915,7 @@ Reorder dashboards by an ordered list of IDs
 
 Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:283`.
 
-Answers at `/api/dashboards/reorder`, `/api/v1/dashboards/reorder`; also, undocumented, `/api/dashboards/2026-08-07/reorder`, `/api/v1/dashboards/2026-08-07/reorder`, `/api/dashboards/latest/reorder`, `/api/v1/dashboards/latest/reorder`.
+Answers only, undocumented, at `/api/dashboards/2026-08-07/reorder`, `/api/v1/dashboards/2026-08-07/reorder`.
 
 ```typescript
 type Body = z.infer<typeof dashboardRestReorderSchema>; // ../contract/src/dashboard.ts:224
@@ -928,7 +928,7 @@ Get a dashboard by its id, with its graphs
 
 Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:299`.
 
-Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
+Answers only, undocumented, at `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`.
 
 ```typescript
 // Params: dashboardRestParamsSchema, ../contract/src/dashboard.ts:231
@@ -944,7 +944,7 @@ Rename a dashboard
 
 Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:313`.
 
-Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
+Answers only, undocumented, at `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`.
 
 ```typescript
 type Params = z.infer<typeof dashboardRestParamsSchema>; // ../contract/src/dashboard.ts:231
@@ -958,7 +958,7 @@ Delete a dashboard and its graphs
 
 Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:331`.
 
-Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
+Answers only, undocumented, at `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`.
 
 ```typescript
 type Params = z.infer<typeof dashboardRestParamsSchema>; // ../contract/src/dashboard.ts:231
