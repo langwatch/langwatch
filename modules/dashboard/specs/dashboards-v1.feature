@@ -175,20 +175,15 @@ Feature: Dashboards v1
   # Guard rails
   # ---------------------------------------------------------------------------
 
-  @e2e @unimplemented
+  @integration
   Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
     Given any dashboard page is open
     When its data loads
     Then every data request goes to the LWQL endpoint
     And no request goes to a legacy analytics endpoint
 
-  @unit @unimplemented
-  Scenario: AC20 Legacy analytics files are untouched
-    Given the change is merged
-    When the diff is limited to the legacy analytics paths
-    Then it is empty
-
-  @integration @unimplemented
+  # AC20 "legacy analytics files are untouched" is a merge-time diff check, not a test.
+  @integration
   Scenario: AC20 Legacy analytics pages behave exactly as before
     Given the change is merged
     When a member opens the legacy analytics pages
@@ -222,7 +217,7 @@ Feature: Dashboards v1
     When the member views the widget
     Then it follows the connected, unconnected and empty-period rules like any other widget
 
-  @integration @unimplemented
+  @integration
   Scenario: AC23 A failing query does not take the board down
     Given one widget on a board whose LWQL query fails
     When the member views the board
