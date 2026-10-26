@@ -1,3 +1,6 @@
+/**
+ * Spec: modules/dashboard/specs/dashboards-v2.feature (AC199l: the CLI reads a board under the key's own project)
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));

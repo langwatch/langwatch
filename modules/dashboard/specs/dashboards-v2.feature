@@ -1099,6 +1099,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And /api/v1/dashboards still lists only the Reports board
     When the key adds a widget to either board
     Then the Dashboards board takes it, and the Reports board is not found
+    When the CLI reads a board by id with only an API key, so no project is in scope
+    Then it reads the board under the project the key belongs to
 
   @unit @integration
   Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden
