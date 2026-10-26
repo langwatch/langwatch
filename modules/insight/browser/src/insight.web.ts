@@ -1,6 +1,6 @@
 /**
  * What a browser installs when it installs insight: the inbox screen behind
- * `release_insights`, and what it lends the shell and a board's header (the bell, the sidebar
+ * `release_insights` and `release_dashboards`, and what it lends the shell and a board's header (the bell, the sidebar
  * count and "Daily insights"). All lazy; none is on first paint.
  */
 
