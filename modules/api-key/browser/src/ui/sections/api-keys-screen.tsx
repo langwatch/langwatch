@@ -41,7 +41,10 @@ import {
   scopeHierarchyOf,
   type ScopeFilterValue,
 } from "../../model/api-key-scope-filter.ts";
-import { legacyKeyReplacementInput } from "../../model/legacy-key-replacement.ts";
+import {
+  LEGACY_KEY_REVOKED_NOTICE,
+  legacyKeyReplacementInput,
+} from "../../model/legacy-key-replacement.ts";
 import { IngestionKeysSection } from "../blocks/ingestion-keys-section.tsx";
 import { LegacyProjectKeyBanner } from "../blocks/legacy-project-key-banner.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";
@@ -687,6 +690,7 @@ export default function ApiKeysScreen() {
           currentTeamId={scope.teamId}
           currentProjectId={scope.projectId}
           prefill={legacyReplacement ?? undefined}
+          notice={legacyReplacement ? LEGACY_KEY_REVOKED_NOTICE : undefined}
           onClose={() => {
             setLegacyReplacement(null);
             onCreateClose();

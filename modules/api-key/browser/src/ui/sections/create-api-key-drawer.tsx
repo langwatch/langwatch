@@ -376,6 +376,7 @@ export function CreateApiKeyDrawer({
   currentTeamId,
   currentProjectId,
   prefill,
+  notice,
   onClose,
   onCreate,
 }: {
@@ -390,6 +391,8 @@ export function CreateApiKeyDrawer({
   currentProjectId?: string;
   /** The key the form opens filled with, such as a legacy key's replacement; no expiry. */
   prefill?: Pick<CreateApiKeyInput, "name" | "description" | "scopeId" | "keyType">;
+  /** A warning over the form, such as that the key being replaced already stopped working. */
+  notice?: { title: string; body: string };
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
 }) {
@@ -549,6 +552,15 @@ export function CreateApiKeyDrawer({
     >
       <VStack gap={5} align="start">
         {accessBlocked && <AccessNote myBindings={myBindings} />}
+        {notice && (
+          <Banner
+            status="warning"
+            title={notice.title}
+            icon={<TriangleAlert size={16} aria-hidden="true" />}
+          >
+            {notice.body}
+          </Banner>
+        )}
         {/* Key type — only admins can create service keys */}
         {isAdmin && (
           <KeyTypeField

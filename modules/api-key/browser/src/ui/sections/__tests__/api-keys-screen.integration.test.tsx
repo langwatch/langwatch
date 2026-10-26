@@ -540,6 +540,7 @@ describe("given the project still has a legacy key", () => {
       expect(screen.queryByTestId("legacy-key-row")).toBeNull();
       expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
       expect(screen.getByTestId("api-key-name")).toHaveValue("Project API Key");
+      expect(screen.getByText("The legacy project key no longer works")).toBeInTheDocument();
       // An expiry is already chosen (none), so the drawer asks for no other.
       expect(screen.queryByTestId("api-key-expiration-hint")).toBeNull();
       expect(mutations.create).not.toHaveBeenCalled();

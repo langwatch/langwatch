@@ -164,6 +164,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And a toast says "Legacy project key revoked"
       And the legacy key row and the banner are gone
       And the create drawer opens with the name "Project API Key", full access to project "alpha" and no expiry
+      And the drawer warns that the legacy key no longer works and the project has no key until one is created
       And no API key is created yet
 
     @integration
