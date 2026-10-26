@@ -12,7 +12,7 @@ import {
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { InsightsNavCountToken } from "@langwatch/insight-contract";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
@@ -152,15 +152,22 @@ describe("the Dashboards product sidebar", () => {
 describe("the Insights entry", () => {
   describe("given release_insights is on and the member holds analytics:view", () => {
     /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */
-    it("sits in the Dashboards sidebar above the saved-dashboards list, with the lent count", async () => {
-      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards", insightsOn: true });
+    it("sits in the Dashboards sidebar's bottom block just above Settings, with the lent count", async () => {
+      renderSidebar({
+        surface: "dashboards",
+        pathname: "/demo/dashboards",
+        insightsOn: true,
+        permissions: ["analytics:view", "organization:view"],
+      });
 
       const entry = await screen.findByRole("link", { name: "Insights" });
       expect(screen.getAllByRole("link", { name: /Insights/ })).toHaveLength(1);
       expect(entry).toHaveAttribute("href", "/demo/insights");
       expect(await screen.findByTestId("insights-nav-count")).toHaveTextContent("3");
-      const list = await screen.findByTestId("saved-dashboards");
-      expect(entry.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const bottom = within(screen.getByTestId("sidebar-bottom-block"));
+      const links = bottom.getAllByRole("link");
+      expect(links.indexOf(entry)).toBeGreaterThanOrEqual(0);
+      expect(links[links.indexOf(entry) + 1]).toBe(bottom.getByRole("link", { name: "Settings" }));
     });
 
     /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */

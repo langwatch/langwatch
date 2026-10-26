@@ -383,14 +383,14 @@ Feature: The insights inbox
       And it is back in their Inbox folder
 
   Rule: The Insights entry in the side menu
-    Insights lives in the Dashboards product: one entry, at the top of the Dashboards side
-    menu, with the grey unread pill. No other product's menu carries a second one.
+    Insights lives in the Dashboards product: one entry, at the bottom of the Dashboards side
+    menu just above Settings, with the grey unread pill. No other product's menu carries a second one.
 
     @integration
     Scenario: The Dashboards side menu holds the one Insights entry with its unread count
       Given the release_insights and release_dashboards flags are on and a member with analytics:view
       When they look at the Dashboards side menu
-      Then it holds one Insights entry above the saved dashboards, with the unread pill
+      Then it holds one Insights entry at the bottom, just above Settings, with the unread pill
       And the entry is marked current on the Insights page
 
     @integration

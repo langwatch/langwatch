@@ -111,13 +111,15 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
 
 /**
  * The pinned utility block at the bottom of every sidebar: usage, Settings,
- * Support and the theme control. The Settings sidebar drops its own entry
+ * Support and the theme control; in Dashboards, Insights sits just above Settings. The Settings sidebar drops its own entry
  * since the top bar already names it.
  */
 function SidebarBottomBlock({
+  surface,
   showExpanded,
   shouldIncludeSettingsLink,
 }: {
+  surface: SidebarSurface;
   showExpanded: boolean;
   shouldIncludeSettingsLink: boolean;
 }) {
@@ -140,6 +142,7 @@ function SidebarBottomBlock({
       paddingX={1}
     >
       <UsageIndicator showLabel={showExpanded} />
+      {surface === "dashboards" && <InsightsMenuLink showExpanded={showExpanded} />}
       {shouldIncludeSettingsLink && host.hasPermission("organization:view") && (
         <SideMenuLink
           icon={featureIcons.settings.icon}
@@ -316,8 +319,8 @@ function SectionItemsNav({
 }
 
 /**
- * The Dashboards sidebar body: the Insights entry, then the saved-dashboards list analytics
- * lends, with the board the address opens marked (dashboards-v1.feature).
+ * The Dashboards sidebar body: only the saved-dashboards list analytics lends,
+ * with the board the address opens marked (dashboards-v1.feature).
  */
 function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
@@ -325,21 +328,17 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
     pathname: host.pathname(),
     projectSlug: host.project()?.slug,
   });
-  return (
-    <>
-      <InsightsMenuLink pattern={pattern} showExpanded={showExpanded} />
-      {showExpanded && <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />}
-    </>
-  );
+  if (!showExpanded) return null;
+  return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
 }
 
 /**
- * The one Insights entry, at the top of the Dashboards menu: the inbox is where a day starts.
+ * The one Insights entry, in the Dashboards menu's bottom block just above Settings.
  * Hidden until `release_insights` answers on, and on an aggregate project, which files no
  * insight; the unread pill is the one insight lends.
  * @see modules/insight/specs/insight-inbox.feature
  */
-function InsightsMenuLink({ pattern, showExpanded }: { pattern: string; showExpanded: boolean }) {
+function InsightsMenuLink({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
   const { enabled, isLoading } = host.featureFlag(FrontendFlags.release_insights);
   if (isLoading || !enabled || !host.hasPermission("analytics:view")) return null;
@@ -355,7 +354,13 @@ function InsightsMenuLink({ pattern, showExpanded }: { pattern: string; showExpa
       label={projectNavItems.insights.title}
       href={destination.href}
       unavailableReason={destination.unavailableReason}
-      isActive={isPathUnder({ pathname: pattern, base: projectNavItems.insights.path })}
+      isActive={isPathUnder({
+        pathname: toProjectRoutePattern({
+          pathname: host.pathname(),
+          projectSlug: host.project()?.slug,
+        }),
+        base: projectNavItems.insights.path,
+      })}
       showLabel={showExpanded}
       rightElement={<InsightsNavCount />}
     />
@@ -513,6 +518,7 @@ export function SidebarContent({
 
       <Box width="full" paddingX={2}>
         <SidebarBottomBlock
+          surface={surface}
           showExpanded={showExpanded}
           shouldIncludeSettingsLink={surface !== "settings"}
         />
