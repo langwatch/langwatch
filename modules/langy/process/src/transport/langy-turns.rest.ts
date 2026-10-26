@@ -17,7 +17,7 @@ import {
 } from "@langwatch/langy-contract";
 import type { z } from "zod";
 
-import { langyEmptyTurnLineFromParts } from "../rules/langy-empty-turn.rules.ts";
+import { langySilentTurnReplyFromParts } from "../rules/langy-empty-turn.rules.ts";
 
 /**
  * A turn is text plus small structured parts, never an upload.
@@ -42,12 +42,12 @@ const HONO_NOT_FOUND = {
 const TURN_PRODUCES = ["application/json", "text/plain; charset=UTF-8"] as const;
 
 /**
- * A completed turn that ended on a card has no prose; say what it waits for. Stays here, not in
- * the settlement, so the canary still reads a silent model as `empty_reply`.
+ * A completed turn with no reply text answers with its said lines or the card it waits on. Stays
+ * here, not in the settlement, so the canary still reads a silent model as `empty_reply`.
  */
 function replyText(settlement: Extract<LangyTurnSettlement, { succeeded: true }>): string {
   return settlement.outcome === "completed" && settlement.text.trim() === ""
-    ? langyEmptyTurnLineFromParts(settlement.parts)
+    ? langySilentTurnReplyFromParts(settlement.parts)
     : settlement.text;
 }
 

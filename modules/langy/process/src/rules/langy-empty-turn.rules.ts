@@ -1,7 +1,14 @@
-import type { LangyMessagePart, LangyStreamEntry } from "@langwatch/langy-contract";
+import {
+  saidTextOf,
+  type LangyMessagePart,
+  type LangyStreamEntry,
+} from "@langwatch/langy-contract";
 
 /** The tool call that puts the code access card up (ADR-129). */
 const CODE_ACCESS_TOOL = "code_access";
+
+/** The tool call that puts a question card up and settles the turn. */
+const QUESTION_TOOL = "question";
 
 /**
  * What the panel says when a turn finishes without the agent writing anything. Names the state
@@ -14,15 +21,29 @@ export const LANGY_EMPTY_TURN_FALLBACK =
 const CODE_ACCESS_LINE =
   "I'm waiting for you to say how I should reach your code, on the card above.";
 
+const QUESTION_LINE = "I'm waiting for your answer on the card above before I go on.";
+
+const PERMISSION_LINE =
+  "I'm waiting for your answer on the permission card above before I run that command.";
+
+/** Is this part a call of the named tool, under either part shape? */
+function isToolPart(part: LangyMessagePart, name: string): boolean {
+  return part.type === `tool-${name}` || (part.type === "dynamic-tool" && part.toolName === name);
+}
+
 /**
- * The same line as `langyEmptyTurnLine` for a settled turn read back as message parts (REST result
- * path), where the code access card is a `tool-code_access` part rather than a stream entry.
- * Pending question and permission cards never reach it: a turn waiting on one has not completed.
+ * The reply for a completed turn with no reply text, read back as message parts (REST result
+ * path): the lines it said with `say`, else the line `langyEmptyTurnLine` gives for the card it
+ * ended on. A question card settles the turn as completed, so it is named here too.
  */
-export function langyEmptyTurnLineFromParts(parts: readonly LangyMessagePart[]): string {
-  return parts.some((part) => part.type === `tool-${CODE_ACCESS_TOOL}`)
-    ? CODE_ACCESS_LINE
-    : LANGY_EMPTY_TURN_FALLBACK;
+export function langySilentTurnReplyFromParts(parts: readonly LangyMessagePart[]): string {
+  const said = parts.map(saidTextOf).filter((text) => text.trim() !== "");
+  if (said.length > 0) return said.join("\n\n");
+  for (const part of [...parts].reverse()) {
+    if (isToolPart(part, QUESTION_TOOL)) return QUESTION_LINE;
+    if (isToolPart(part, CODE_ACCESS_TOOL)) return CODE_ACCESS_LINE;
+  }
+  return LANGY_EMPTY_TURN_FALLBACK;
 }
 
 /**
@@ -32,10 +53,10 @@ export function langyEmptyTurnLineFromParts(parts: readonly LangyMessagePart[]):
 export function langyEmptyTurnLine(entries: readonly LangyStreamEntry[]): string {
   for (const entry of [...entries].reverse()) {
     if (entry.type === "local_permission" && entry.status === "pending") {
-      return "I'm waiting for your answer on the permission card above before I run that command.";
+      return PERMISSION_LINE;
     }
     if (entry.type === "question" && entry.status === "pending") {
-      return "I'm waiting for your answer on the card above before I go on.";
+      return QUESTION_LINE;
     }
     if (entry.type === "tool" && entry.name === CODE_ACCESS_TOOL) {
       return CODE_ACCESS_LINE;

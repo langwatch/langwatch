@@ -138,6 +138,32 @@ describe("given a project key starting a Langy turn", () => {
     });
   });
 
+  describe("when the waited turn completes having spoken only through the say tool", () => {
+    /** @scenario "A turn whose lines were all said with the say tool is not an empty turn" */
+    it("answers the reply with the said line, not a fallback", async () => {
+      const api = buildApi({
+        settle: async () => ({
+          kind: "settled",
+          settlement: {
+            succeeded: true,
+            outcome: "completed",
+            text: "",
+            messageId: "message-1",
+            parts: [{ type: "tool-say", input: { text: "Two spans failed." } }],
+            error: null,
+          },
+        }),
+      });
+
+      const response = await api.post(TURN, { prefer: "wait=30" });
+
+      expect(await response.json()).toMatchObject({
+        status: "completed",
+        reply: { role: "assistant", text: "Two spans failed." },
+      });
+    });
+  });
+
   describe("when the waited turn ends without finishing on a card", () => {
     /** @scenario "A stream that ends without the turn finishing says nothing" */
     it("says nothing when the stream stopped before the turn completed", async () => {
