@@ -140,8 +140,17 @@ jobs:
           restore-keys: |
             docs-media-${{ runner.os }}-
       # The build transcodes the docs videos to AV1 and H.264 (src/site/video-variants.ts).
+      # A stalled Ubuntu mirror once held this for 30 minutes: retry stalled
+      # connections, and fail fast enough to rerun.
       - name: Install ffmpeg
-        run: command -v ffmpeg || { sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg; }
+        timeout-minutes: 10
+        env:
+          APT_OPTS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+        run: |
+          command -v ffmpeg || {
+            sudo apt-get $APT_OPTS update
+            sudo apt-get $APT_OPTS install -y --no-install-recommends ffmpeg
+          }
       - name: Read the Playwright version
         id: playwright
         run: |
@@ -154,6 +163,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
       - name: Install build browser
+        timeout-minutes: 10
         run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
       - name: Build the documentation
         run: pnpm --filter @langwatch/docs-site build ${{ matrix.build-args }}
