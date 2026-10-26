@@ -583,6 +583,8 @@ describe("given the project still has a legacy key", () => {
       );
       expect(screen.queryByRole("heading", { name: "Create new secret key" })).toBeNull();
       expect(screen.getByTestId("legacy-key-row")).toBeInTheDocument();
+      // The confirm stays open and usable, so the reader can retry.
+      expect(screen.getByTestId("legacy-key-revoke-confirm")).toBeEnabled();
       expect(mutations.create).not.toHaveBeenCalled();
     });
 

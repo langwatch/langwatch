@@ -180,6 +180,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       When they confirm and the revoke fails
       Then an error says the legacy key could not be revoked
       And the legacy key row stays and no drawer opens
+      And the confirm stays open so they can try again
 
     @integration
     Scenario: A failed create after the revoke keeps the drawer open
