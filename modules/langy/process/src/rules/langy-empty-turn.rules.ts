@@ -1,4 +1,5 @@
 import {
+  isToolPart,
   saidTextOf,
   type LangyMessagePart,
   type LangyStreamEntry,
@@ -25,11 +26,6 @@ const QUESTION_LINE = "I'm waiting for your answer on the card above before I go
 
 const PERMISSION_LINE =
   "I'm waiting for your answer on the permission card above before I run that command.";
-
-/** Is this part a call of the named tool, under either part shape? */
-function isToolPart(part: LangyMessagePart, name: string): boolean {
-  return part.type === `tool-${name}` || (part.type === "dynamic-tool" && part.toolName === name);
-}
 
 /**
  * The reply for a completed turn with no reply text, read back as message parts (REST result
