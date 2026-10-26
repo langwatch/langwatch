@@ -249,6 +249,46 @@ describe("the key door", () => {
     });
   });
 
+  describe("given an organization key, with and without the Langy session flag", () => {
+    const orgDoor = doorOver(
+      new KeyStore(
+        new Map(),
+        new Map<string, OrganizationApiKeyResolution>([
+          ["sk-lw-org-plain", ORG_KEY],
+          [
+            "sk-lw-org-langy",
+            {
+              ok: true,
+              resolved: {
+                type: "apiKey-org",
+                apiKeyId: "key-langy",
+                userId: null,
+                organizationId: "org-2",
+                isLangySessionKey: true,
+              },
+            },
+          ],
+        ]),
+      ),
+    );
+
+    it("adds no Langy flag to a key without it", async () => {
+      const credential = await orgDoor.identifyKey({
+        request: request({ authorization: "Bearer sk-lw-org-plain" }),
+      });
+
+      expect(credential.principal).not.toHaveProperty("isLangySessionKey");
+    });
+
+    it("carries the Langy flag on a Langy session key", async () => {
+      const credential = await orgDoor.identifyKey({
+        request: request({ authorization: "Bearer sk-lw-org-langy" }),
+      });
+
+      expect(credential.principal).toMatchObject({ isLangySessionKey: true });
+    });
+  });
+
   describe("given a request with no credential", () => {
     /** @scenario "A request with neither credential is refused" */
     it("is refused as missing credentials", async () => {
