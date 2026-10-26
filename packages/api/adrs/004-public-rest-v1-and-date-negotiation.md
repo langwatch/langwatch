@@ -81,6 +81,12 @@ before `date`, and leaves `latest` and the bare path to the newer family of its 
 registered at `date`. `/api/v1/dashboards` uses it: the Reports boards before 2026-10-26,
 the Dashboards API from then on.
 
+`.withSupersededAt(date, { unpinnedFallbackOn: code })` also hands an unpinned request back
+(no `X-API-Version`, no version in the path) when the newer family refuses it with `code` or
+has no route for its method: the superseded family answers it at its own date, so clients
+published before the newer family keep working where it is not on. `/api/v1/dashboards` uses
+it with `dashboards_not_released`. A pinned request is never handed back.
+
 ## Consequences
 
 - REST and RPC share one handler, schema, capability and error discipline.

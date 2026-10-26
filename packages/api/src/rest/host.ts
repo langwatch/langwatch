@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { Hono } from "hono";
+import { Hono, type Context, type Next } from "hono";
 
 import type { Authorize, Entitlements } from "../access/access.ts";
 /**
@@ -24,6 +24,8 @@ import {
   datedRoutePattern,
   pinnedVersionPath,
   type DatedFamilyRoutes,
+  unpinnedFallbackOf,
+  type UnpinnedFallback,
   routeScopesOf,
   type MountableRestApp,
 } from "./addressing.ts";
@@ -40,7 +42,7 @@ import {
   type RestDoor,
   type MiddlewareContextBinding,
 } from "./request.ts";
-import { canonicalErrorResponse } from "./response.ts";
+import { canonicalErrorResponse, ROUTE_TEMPLATE } from "./response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "./runtime.ts";
 
 const restErrorLogger = createLogger("langwatch:api:rest");
@@ -134,6 +136,9 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   /** Each dated family's base, its `/api/v1` twin and its routes: where `X-API-Version` pins. */
   private readonly datedFamilies: DatedFamilyRoutes[] = [];
 
+  /** Superseded families that answer an unpinned request their successor refuses. */
+  private readonly unpinnedFallbacks: UnpinnedFallback[] = [];
+
   private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {
     // Ahead of every family: a pinned request is answered again at its dated address, so the
     // header and a dated URL select through the one path (public-rest.feature).
@@ -150,13 +155,43 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
         return canonicalErrorResponse(error, context);
       }
 
-      if (pinned === null) return next();
+      if (pinned === null) return this.answerUnpinned(context, next);
 
       const url = new URL(context.req.raw.url);
       url.pathname = pinned;
 
       return this.app.fetch(new Request(url, context.req.raw), context.env);
     });
+  }
+
+  /**
+   * A request naming no version, answered by the newer family; when that family refuses it
+   * with a superseded family's fallback code or has no route for it, the superseded family
+   * answers it at its own date instead, as before the newer family took the path over.
+   */
+  private async answerUnpinned(context: Context, next: Next): Promise<void> {
+    const fallback = unpinnedFallbackOf({
+      method: context.req.method,
+      path: context.req.path,
+      header: context.req.header(API_VERSION_HEADER),
+      fallbacks: this.unpinnedFallbacks,
+    });
+    if (fallback === null) return next();
+
+    const replay = context.req.raw.clone();
+    await next();
+
+    const refusal = context.error instanceof HandledError ? context.error.code : undefined;
+    if (context.res.status !== 405 && refusal !== fallback.refusal) return;
+
+    const url = new URL(context.req.raw.url);
+    url.pathname = fallback.path;
+    const answer = await this.app.fetch(new Request(url, replay), context.env);
+
+    context.set(ROUTE_TEMPLATE, fallback.template);
+    // Unset first: Hono's setter would otherwise copy the refusal's headers onto the answer.
+    context.res = undefined;
+    context.res = answer;
   }
 
   /**
@@ -270,6 +305,23 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
 
     for (const each of twin ? [base, twin] : [base]) {
       this.datedFamilies.push({ base: each, routes });
+    }
+
+    const refusal = declaration.unpinnedFallbackOn;
+    if (refusal === void 0) return;
+
+    const templates = declaration.routes.map((route) => ({
+      method: route.method,
+      pattern: datedRoutePattern(route.path),
+      template: `${base}/${declaration.version}${route.path === "/" ? "" : route.path}`,
+    }));
+    for (const each of twin ? [base, twin] : [base]) {
+      this.unpinnedFallbacks.push({
+        base: each,
+        version: declaration.version,
+        refusal,
+        routes: templates,
+      });
     }
   }
 

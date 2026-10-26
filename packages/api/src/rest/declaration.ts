@@ -667,6 +667,8 @@ export type RestTransportDeclaration<
    * dates from `version` up to the day before, and leaves `latest` and the bare path to it.
    */
   readonly supersededAt?: DateVersion;
+  /** The refusal code of the newer family that hands an unpinned request back to this one. */
+  readonly unpinnedFallbackOn?: string;
   readonly addressing: RestAddressing;
   /** Whether the family's `dated` addresses also answer under `/api/v1`. */
   readonly v1Twin: boolean;
@@ -1982,6 +1984,7 @@ class RestTransportRouter<
   private generation = DEFAULT_GENERATION;
   private deprecated: RestDeprecation | undefined;
   private supersededAt: DateVersion | undefined;
+  private unpinnedFallbackOn: string | undefined;
 
   private readonly api: FeatureApiWitness<Api>;
   readonly namespace: string;
@@ -2036,6 +2039,7 @@ class RestTransportRouter<
     router.generation = this.generation;
     router.deprecated = this.deprecated;
     router.supersededAt = this.supersededAt;
+    router.unpinnedFallbackOn = this.unpinnedFallbackOn;
 
     return router;
   }
@@ -2065,10 +2069,12 @@ class RestTransportRouter<
 
   /**
    * Hands `latest` and the bare path to a newer family of this namespace registered at
-   * `version`: this one keeps answering a caller who pins an earlier date.
+   * `version`: this one keeps answering a caller who pins an earlier date, and with
+   * `unpinnedFallbackOn` an unpinned one the newer family refuses (ADR-004 amendment).
    */
   withSupersededAt(
     version: DateVersion,
+    options?: Readonly<{ unpinnedFallbackOn?: string }>,
   ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session, Named, Needs> {
     assertVersionLabel(version);
 
@@ -2080,6 +2086,7 @@ class RestTransportRouter<
     }
 
     this.supersededAt = version;
+    this.unpinnedFallbackOn = options?.unpinnedFallbackOn;
 
     return this;
   }
@@ -2105,6 +2112,7 @@ class RestTransportRouter<
       namespace: this.namespace,
       version: this.version,
       ...(this.supersededAt ? { supersededAt: this.supersededAt } : {}),
+      ...(this.unpinnedFallbackOn ? { unpinnedFallbackOn: this.unpinnedFallbackOn } : {}),
       addressing: this.addressing,
       v1Twin: this.v1Twin,
       generation: this.generation,

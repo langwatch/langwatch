@@ -277,6 +277,52 @@ export function pinnedVersionPath({
   return header === VERSION_LATEST ? null : `${served.base}/${header}${rest}`;
 }
 
+/** A superseded family answering, at its own date, the unpinned requests its successor refuses. */
+export type UnpinnedFallback = Readonly<{
+  base: string;
+  version: string;
+  /** The successor's refusal code that hands the request over. */
+  refusal: string;
+  /** Each route as `datedRoutePattern`, with the template its dated address is counted by. */
+  routes: readonly Readonly<{ method: string; pattern: RegExp; template: string }>[];
+}>;
+
+/**
+ * Where a request naming no version is answered again when its successor refuses it, with the
+ * route template that answers there; null for a pinned request or a path no fallback serves.
+ */
+export function unpinnedFallbackOf({
+  method,
+  path,
+  header,
+  fallbacks,
+}: Readonly<{
+  method: string;
+  path: string;
+  header: string | undefined;
+  fallbacks: readonly UnpinnedFallback[];
+}>): Readonly<{ path: string; template: string; refusal: string }> | null {
+  if (header !== void 0) return null;
+
+  for (const fallback of fallbacks) {
+    if (path !== fallback.base && !path.startsWith(`${fallback.base}/`)) continue;
+
+    const rest = path.slice(fallback.base.length) || "/";
+    if (isVersionSegment(rest.split("/")[1] ?? "")) continue;
+
+    const asked = method.toLowerCase();
+    const route = fallback.routes.find(
+      (each) => each.method.toLowerCase() === asked && each.pattern.test(rest),
+    );
+    if (route === void 0) continue;
+
+    const dated = `${fallback.base}/${fallback.version}${rest === "/" ? "" : rest}`;
+    return { path: dated, template: route.template, refusal: fallback.refusal };
+  }
+
+  return null;
+}
+
 /** Whether one of the family's routes answers the request, at its base or a version beneath it. */
 function servesPath({
   family,

@@ -252,12 +252,13 @@ export const dashboardRest = defineRestRouter(DashboardApi)
 
 /**
  * `/api/v1/dashboards` as it answered before 2026-10-26: the Reports boards, for a caller that
- * pins an earlier version. Undocumented; the Dashboards API answers latest and the bare path.
+ * pins an earlier version, or names none while Dashboards is off for its project (AC199v).
+ * Undocumented; the Dashboards API answers latest and the bare path.
  */
 export const dashboardRestBeforeDashboardsApi = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withSupersededAt(DASHBOARDS_API_VERSION)
+  .withSupersededAt(DASHBOARDS_API_VERSION, { unpinnedFallbackOn: "dashboards_not_released" })
 
   .get("/", "getApiDashboardsReports")
   .withPermission("analytics:view")
