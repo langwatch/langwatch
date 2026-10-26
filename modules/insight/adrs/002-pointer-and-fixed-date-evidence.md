@@ -51,17 +51,13 @@ a new field with a default is the default, not an upcast.
 - The board's Source (which origins a board leaves out) is not kept yet,
   because no board has one on this branch. It joins `replayContext`, the JSON
   column beside the window, with no migration.
-- (Removed 2026-10-23, https://github.com/langwatch/langwatch/issues/8998: "Save as
-  insight" is gone; a daily run is the one way an insight is filed from the product.)
-  An answer that carries an insights card hands "Save as insight" that card
-  (`LangyAnswerActionProps.insights`). Saving one of its findings files the
-  finding's title, body, tone, topic and valid days, the card's board with the
-  finding's widget, the finding's query and the card's window, all as typed
-  data. The query is Langy's own text and is not checked when it is filed: the
-  LangWatchQL door checks it when a reader replays it.
-- (Removed 2026-10-23, https://github.com/langwatch/langwatch/issues/8998, with
-  "Save as insight".) No asking module hands Langy a structured subject for an
-  ordinary answer yet (`LangyAnswerActionProps.subject`), so an answer with no
-  card is saved from its text and carries no pointer and no window.
+- Removed 2026-10-23 (https://github.com/langwatch/langwatch/issues/8998): "Save as
+  insight" is gone, and a daily run is the one way the product files an insight.
+  While it lived, an answer that carried an insights card handed that card to
+  "Save as insight" (`LangyAnswerActionProps.insights`), and saving a finding
+  filed its title, body, tone, topic, valid days, board, widget, query and window
+  as typed data; an answer with no card was saved from its text, with no pointer
+  and no window. The query was Langy's own text, checked only when a reader
+  replayed it.
 - An old image that folds a new filed event drops the three fields, because it
   does not know them. Replaying the insight projection restores them.
