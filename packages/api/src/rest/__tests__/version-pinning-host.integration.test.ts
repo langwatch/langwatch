@@ -197,6 +197,18 @@ describe("given a namespace registered at one date and superseded by a new famil
     ]);
   });
 
+  /** @scenario "A URL naming latest or preview is answered there whatever the header pins" */
+  it("answers a latest URL at latest when the header pins a date, as the SDK sends it", async () => {
+    const server = host();
+
+    const answered = await ask(server, "/api/v1/things/latest/thing-1", { version: FIRST });
+
+    expect({ status: answered.status, answer: answered.answer }).toEqual({
+      status: 200,
+      answer: "second:thing-1",
+    });
+  });
+
   /** @scenario "Invalid and unavailable header versions differ" */
   it("refuses a header that is no version, and finds nothing before the service existed", async () => {
     const server = host();

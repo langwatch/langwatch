@@ -61,6 +61,12 @@ Feature: Public REST is a first-class API surface
     And neither source silently takes precedence
 
   @versioning @integration
+  Scenario: A URL naming latest or preview is answered there whatever the header pins
+    When the URL names latest or preview and X-API-Version names a real date
+    Then the registration the URL names answers
+    And it is not refused as a conflict
+
+  @versioning @integration
   Scenario: Invalid and unavailable header versions differ
     When X-API-Version is neither latest nor a real calendar date
     Then the response is 400 invalid_api_version

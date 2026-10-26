@@ -236,7 +236,7 @@ export function restVersionSelectorMiddleware({
 /**
  * The dated address a request pinning its version in `X-API-Version` is answered at, or null
  * when it is answered where it was sent: no header, `latest`, a path no dated family owns, or a
- * path naming the same version. Throws when the header is no version or contradicts the path.
+ * path naming a version itself. Throws when the header is no version or contradicts a dated path.
  */
 export function pinnedVersionPath({
   path,
@@ -259,7 +259,9 @@ export function pinnedVersionPath({
   const named = rest.split("/")[1] ?? "";
 
   if (isVersionSegment(named)) {
-    if (named !== header) throw new ApiVersionConflictError();
+    // Only a dated URL contradicts the header; a URL naming `latest` or `preview` is answered
+    // there, as the SDK's management calls send it alongside their pinned date.
+    if (isDateVersion(named) && named !== header) throw new ApiVersionConflictError();
     return null;
   }
 

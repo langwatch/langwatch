@@ -17,7 +17,6 @@ import {
   dashboardReorderResponseSchema,
   dashboardResponseSchema,
   dashboardRestNameSchema,
-  dashboardRestParamsSchema,
   dashboardRestReorderSchema,
   DashboardApi,
   DashboardNotFoundError,
@@ -296,8 +295,8 @@ export const dashboardRestBeforeDashboardsApi = defineRestRouter(DashboardApi)
     }),
   )
 
-  .get("/:id", "getApiDashboardsReportsById")
-  .withParams(dashboardRestParamsSchema)
+  .get("/:reportId", "getApiDashboardsReportsByReportId")
+  .withParams(reportRestParamsSchema)
   .withPermission("analytics:view")
   .withOutput(dashboardDetailResponseSchema)
   .withDocs({ tags: REPORT_TAGS, description: "Get a dashboard by its id, with its graphs" })
@@ -305,15 +304,15 @@ export const dashboardRestBeforeDashboardsApi = defineRestRouter(DashboardApi)
     reportOperations.read({
       app,
       projectId: scope.id,
-      dashboardId: input.id,
+      dashboardId: input.reportId,
       ...viewerOfActor({ actor }),
     }),
   )
 
-  .patch("/:id", "patchApiDashboardsReportsById")
+  .patch("/:reportId", "patchApiDashboardsReportsByReportId")
   .keepsRecords()
   .withAudit("dashboards.rename")
-  .withParams(dashboardRestParamsSchema)
+  .withParams(reportRestParamsSchema)
   .withInput(dashboardRestNameSchema)
   .withPermission("analytics:update")
   .withOutput(dashboardResponseSchema)
@@ -322,20 +321,20 @@ export const dashboardRestBeforeDashboardsApi = defineRestRouter(DashboardApi)
     reportOperations.rename({
       app,
       projectId: scope.id,
-      dashboardId: input.id,
+      dashboardId: input.reportId,
       name: input.name,
       ...viewerOfActor({ actor }),
     }),
   )
 
-  .delete("/:id", "deleteApiDashboardsReportsById")
+  .delete("/:reportId", "deleteApiDashboardsReportsByReportId")
   .withAudit("dashboards.delete")
-  .withParams(dashboardRestParamsSchema)
+  .withParams(reportRestParamsSchema)
   .withPermission("analytics:manage")
   .withConfirmation({
     resource: "dashboard",
     action: "delete",
-    idParam: "id",
+    idParam: "reportId",
     name: (target) => reportOperations.nameForDelete(target),
   })
   .withOutput(dashboardDeletedResponseSchema)
@@ -344,7 +343,7 @@ export const dashboardRestBeforeDashboardsApi = defineRestRouter(DashboardApi)
     reportOperations.delete({
       app,
       projectId: scope.id,
-      dashboardId: input.id,
+      dashboardId: input.reportId,
       ...viewerOfActor({ actor }),
     }),
   )
