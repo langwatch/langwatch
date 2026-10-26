@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Logger } from "../../../logger";
 import { createLangWatchApiClient } from "../../api/client";
+import { LANGWATCH_API_VERSION } from "../../constants";
 import {
   createLangWatchFetch,
   LangWatchRedirectError,
@@ -132,6 +133,7 @@ describe("langwatchFetch", () => {
         expect(replay.headers).toEqual({
           Authorization: "Bearer sk-lw-secret",
           "Content-Type": "application/json",
+          "X-API-Version": LANGWATCH_API_VERSION,
         });
         expect(replay.body).toBe(body);
       });
@@ -636,6 +638,38 @@ describe("langwatchFetch", () => {
 
         expect(response.status).toBe(status);
         expect(calls).toHaveLength(1);
+      }
+    });
+  });
+
+  describe("given any request to the LangWatch API", () => {
+    /** @scenario The TypeScript SDK and CLI name the API version on every request */
+    it("names the client's API version, for a URL and for a Request alike", async () => {
+      const { fetchImpl, calls } = scripted(ok(), ok(), ok());
+      const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
+
+      await fetchLangWatch(HTTPS_URL);
+      await fetchLangWatch(HTTPS_URL, { method: "POST", headers: CREDENTIALS, body: "{}" });
+      await fetchLangWatch(new Request(HTTPS_URL, { headers: CREDENTIALS }));
+
+      for (const call of calls) {
+        expect(headersOf(call).get("x-api-version")).toBe(LANGWATCH_API_VERSION);
+      }
+      expect(headersOf(calls[1]!).get("x-auth-token")).toBe("sk-lw-secret");
+      expect(headersOf(calls[2]!).get("x-auth-token")).toBe("sk-lw-secret");
+      expect(LANGWATCH_API_VERSION).toBe("2026-08-07");
+    });
+
+    /** @scenario A caller that names its own API version keeps it */
+    it("keeps a version the caller names, once", async () => {
+      const { fetchImpl, calls } = scripted(ok(), ok());
+      const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
+
+      await fetchLangWatch(HTTPS_URL, { headers: { "x-api-version": "2027-01-01" } });
+      await fetchLangWatch(new Request(HTTPS_URL, { headers: { "X-API-Version": "2027-01-01" } }));
+
+      for (const call of calls) {
+        expect(headersOf(call).get("x-api-version")).toBe("2027-01-01");
       }
     });
   });

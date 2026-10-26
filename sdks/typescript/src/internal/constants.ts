@@ -8,6 +8,13 @@ export const LANGWATCH_SDK_NAME_CLIENT = "langwatch-client-sdk";
 export const LANGWATCH_SDK_LANGUAGE = "typescript";
 export const LANGWATCH_SDK_VERSION = version;
 
+/**
+ * Every API request names the dated version this client is written against
+ * (specs/api-reference/client-api-version.feature).
+ */
+export const API_VERSION_HEADER = "X-API-Version";
+export const LANGWATCH_API_VERSION = "2026-08-07";
+
 export const DEFAULT_ENDPOINT = "https://app.langwatch.ai";
 export const DEFAULT_SERVICE_NAME = "unknown-service.langwatch";
 
