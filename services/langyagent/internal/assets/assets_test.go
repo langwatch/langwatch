@@ -87,8 +87,9 @@ func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
 }
 
 // Langy's CLI runs in its own sandbox, so a credential failure is Langy's to
-// report, never the user's to fix by signing in; a permission refusal is the
-// user's missing access and must not be dressed up as an internal error.
+// report, never the user's to fix by signing in; `unauthorized` (HTTP 401) is
+// that credential being refused. A permission refusal (`forbidden`,
+// `permission_denied`, HTTP 403) is the user's missing access.
 //
 // @scenario "The prompt reports a sandbox credential failure as an internal error"
 func TestAgentsTemplate_ReportsSandboxCredentialFailureAsInternalError(t *testing.T) {
@@ -97,18 +98,18 @@ func TestAgentsTemplate_ReportsSandboxCredentialFailureAsInternalError(t *testin
 		t.Fatalf("AgentsTemplate: %v", err)
 	}
 	for _, phrase := range []string{
-		"`missing_api_key` or \"Not logged in\" is your sandbox credential",
+		"`missing_api_key`, `unauthorized` or \"Not logged in\" is your sandbox credential",
 		"never tell them to sign in",
 		"never claim you lack the CLI or tools",
 		"say you hit an internal error, name the read or write that failed",
-		"`unauthorized` is a permission refusal: name the access they lack",
+		"`forbidden` or `permission_denied` is a permission refusal: name the access they lack",
 	} {
 		if !strings.Contains(tmpl, phrase) {
 			t.Errorf("AGENTS.md failure rule never says %q", phrase)
 		}
 	}
-	if strings.Contains(tmpl, "`unauthorized` or \"Not logged in\"") {
-		t.Errorf("AGENTS.md groups unauthorized with the sandbox credential failures, so a permission refusal reads as an internal error")
+	if strings.Contains(tmpl, "`unauthorized` is a permission refusal") {
+		t.Errorf("AGENTS.md calls unauthorized (HTTP 401, an expired or revoked sandbox key) a permission refusal, so Langy blames its own credential on the user")
 	}
 }
 

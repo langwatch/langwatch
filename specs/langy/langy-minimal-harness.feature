@@ -83,8 +83,8 @@ Feature: Langy minimal worker
   @unit
   Scenario: The prompt reports a sandbox credential failure as an internal error
     When the prompt asset is checked
-    Then on missing_api_key or "Not logged in" it tells Langy to report an
-      internal error naming the read or write that failed
+    Then on missing_api_key, unauthorized or "Not logged in" it tells Langy to
+      report an internal error naming the read or write that failed
     And it forbids telling the user to sign in or claiming Langy has no CLI
-    And it names an unauthorized refusal as a permission refusal, not an
-      internal error
+    And it names a forbidden or permission_denied refusal as a permission
+      refusal, not an internal error
