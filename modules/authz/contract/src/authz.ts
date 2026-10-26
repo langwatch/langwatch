@@ -198,6 +198,8 @@ const collectedGrantsSchemaDefinition = z
     organizationRole: organizationRoleSchema.nullable(),
     isOrgMember: z.boolean(),
     membershipDisabled: z.boolean().default(false),
+    /** ADR-185 §2: absent is off; while on, only organisation-wide bindings confer it. */
+    braidsOrganizationAdminsOnly: z.boolean().optional(),
     bindings: z.array(collectedBindingSchema),
     customRolePermissions: customRolePermissionsSchema,
   })

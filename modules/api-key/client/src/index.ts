@@ -6,3 +6,4 @@ export {
   tokenScopeNote,
 } from "./personal-token-scope.ts";
 export { type PersonalTokenMint, useMintPersonalToken } from "./use-mint-personal-token.ts";
+export { type SigningKeysPanelProps, SigningKeysPanelToken } from "./signing-keys-panel.ts";

@@ -438,3 +438,26 @@ describe("given the translate action collapsed into the overflow menu", () => {
     });
   });
 });
+
+describe("given the input panel of a span braided in from another project", () => {
+  /** @scenario "Actions that would act on the owner's data are off on a braided span, with a reason" */
+  it("keeps commenting, suggesting an edit and the playground off, each saying why", () => {
+    renderViewer({ isBraided: true });
+
+    const reason = "Not available on spans braided from another project";
+    for (const label of ["Comment", "Suggest edit", "Open in Playground"]) {
+      const button = screen.getByRole("button", { name: `${label}: ${reason}` });
+      expect(button).toBeDisabled();
+    }
+    expect(screen.queryByRole("link", { name: /Open in Playground/ })).not.toBeInTheDocument();
+  });
+
+  it("offers a viewer who may not annotate no comment or suggestion to be refused", () => {
+    mocks.canManage = false;
+    renderViewer({ isBraided: true });
+
+    expect(screen.queryByRole("button", { name: /^Comment/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Suggest edit/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Open in Playground/ })).toBeDisabled();
+  });
+});

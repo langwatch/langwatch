@@ -57,6 +57,21 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
       .toSorted();
   };
 
+  findActiveMemberIds = async ({
+    organizationId,
+    limit,
+  }: {
+    organizationId: string;
+    limit: number;
+  }): Promise<string[]> => {
+    const prefix = this.memory.membershipKey(organizationId, "");
+    return [...this.memory.memberships]
+      .filter(([key, row]) => key.startsWith(prefix) && !row.disabled)
+      .map(([key]) => key.slice(prefix.length))
+      .toSorted()
+      .slice(0, limit);
+  };
+
   findUserBindings = async ({
     userId,
     organizationId,
@@ -186,15 +201,20 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
     projectId,
   }: {
     projectId: string;
-  }): Promise<{ teamId: string; organizationId: string; kind: string } | null> => {
-    const project = this.memory.projects.find((row) => row.id === projectId && !row.archivedAt);
-    const team = this.memory.teams.find((row) => row.id === project?.teamId);
-    if (!project || !team) return null;
-    return {
-      teamId: team.id,
-      organizationId: team.organizationId,
-      kind: project.kind ?? "application",
-    };
+  }): Promise<{ teamId: string; organizationId: string; kind: string } | null> =>
+    this.lineageOf({ projectId });
+
+  findProjectLineages = async ({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<Map<string, { teamId: string; organizationId: string; kind: string }>> => {
+    const lineages = new Map<string, { teamId: string; organizationId: string; kind: string }>();
+    for (const projectId of new Set(projectIds)) {
+      const lineage = this.lineageOf({ projectId });
+      if (lineage) lineages.set(projectId, lineage);
+    }
+    return lineages;
   };
 
   findLiveSharedReads = async ({
@@ -272,5 +292,20 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
         ids.includes(row.principalId) &&
         (BINDING_SCOPE_TYPES as readonly string[]).includes(row.scopeType),
     );
+  }
+
+  private lineageOf({
+    projectId,
+  }: {
+    projectId: string;
+  }): { teamId: string; organizationId: string; kind: string } | null {
+    const project = this.memory.projects.find((row) => row.id === projectId && !row.archivedAt);
+    const team = this.memory.teams.find((row) => row.id === project?.teamId);
+    if (!project || !team) return null;
+    return {
+      teamId: team.id,
+      organizationId: team.organizationId,
+      kind: project.kind ?? "application",
+    };
   }
 }

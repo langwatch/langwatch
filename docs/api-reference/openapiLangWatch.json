@@ -15954,7 +15954,8 @@
                                           "featureFlags:manageExperiments",
                                           "governanceCost:view",
                                           "sso:view",
-                                          "sso:manage"
+                                          "sso:manage",
+                                          "braids:manage"
                                         ]
                                       }
                                     ]
@@ -16175,7 +16176,8 @@
                                     "featureFlags:manageExperiments",
                                     "governanceCost:view",
                                     "sso:view",
-                                    "sso:manage"
+                                    "sso:manage",
+                                    "braids:manage"
                                   ]
                                 }
                               ]
@@ -16796,7 +16798,8 @@
                                                   "featureFlags:manageExperiments",
                                                   "governanceCost:view",
                                                   "sso:view",
-                                                  "sso:manage"
+                                                  "sso:manage",
+                                                  "braids:manage"
                                                 ]
                                               }
                                             ]
@@ -17017,7 +17020,8 @@
                                             "featureFlags:manageExperiments",
                                             "governanceCost:view",
                                             "sso:view",
-                                            "sso:manage"
+                                            "sso:manage",
+                                            "braids:manage"
                                           ]
                                         }
                                       ]
@@ -17459,7 +17463,8 @@
                                         "featureFlags:manageExperiments",
                                         "governanceCost:view",
                                         "sso:view",
-                                        "sso:manage"
+                                        "sso:manage",
+                                        "braids:manage"
                                       ]
                                     }
                                   ]

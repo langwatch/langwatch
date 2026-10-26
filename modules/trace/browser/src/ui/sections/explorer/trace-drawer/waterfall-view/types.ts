@@ -1,4 +1,4 @@
-import type { SpanTreeNode } from "@langwatch/trace-contract";
+import type { BraidedOwner, SpanTreeNode } from "@langwatch/trace-contract";
 import type { IconType } from "react-icons";
 import {
   LuBot,
@@ -24,6 +24,8 @@ export interface WaterfallViewProps {
   promptSpanIds?: ReadonlySet<string>;
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
+  /** Projects that braided spans into the trace, in strand order; absent on a trace with none. */
+  braidedOwners?: readonly BraidedOwner[] | null;
 }
 
 export interface WaterfallTreeNode {
@@ -49,6 +51,8 @@ export interface SiblingGroup {
   maxEnd: number;
   depth: number;
   parentSpanId: string | null;
+  /** Set when the group's spans were braided in from another project. */
+  ownerProjectId?: string | null;
 }
 
 export type FlatRow = { kind: "span"; node: WaterfallTreeNode } | SiblingGroup;

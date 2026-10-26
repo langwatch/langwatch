@@ -62,7 +62,7 @@ export type AuthzDatabase = Readonly<{
   customRole: FindManyDelegate;
   apiKey: FindUniqueDelegate & FindManyDelegate;
   shareLink: FindManyDelegate;
-  project: FindUniqueDelegate;
+  project: FindUniqueDelegate & FindManyDelegate;
   team: FindUniqueDelegate;
   groupMembership: FindManyDelegate;
   grant: FindManyDelegate & FindFirstDelegate;
@@ -105,6 +105,11 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
   // Function-typed properties below, not method shorthand: test mocks are
   // asserted on directly, which trips `unbound-method` on shorthand members.
 
+  /** Many projects' lineage in one read, by project id; unknown and archived ones are absent. */
+  abstract findProjectLineages: (args: {
+    projectIds: readonly string[];
+  }) => Promise<Map<string, { teamId: string; organizationId: string; kind: string }>>;
+
   /** The live `project-reader` grants a reader project holds (ADR-177); a window that does
    *  not parse is left out. */
   abstract findLiveSharedReads: (args: {
@@ -123,6 +128,11 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
   }) => Promise<OrganizationMembership | null>;
   /** User ids of the ADMIN memberships whose seat is not disabled; none for an unknown org. */
   abstract findActiveAdministratorIds: (args: { organizationId: string }) => Promise<string[]>;
+  /** User ids of every membership whose seat is not disabled, by id, at most `limit`. */
+  abstract findActiveMemberIds: (args: {
+    organizationId: string;
+    limit: number;
+  }) => Promise<string[]>;
   /** Direct user bindings - viaGroupId null. Fenced on an ACTIVE membership. */
   abstract findUserBindings: (args: {
     userId: string;

@@ -121,6 +121,8 @@ const ADMIN_ADDITIONS: readonly AuthzPermission[] = [
   "featureFlags:manageExperiments",
   // The playground's completion route asks playground:view (Alex, 2026-10-06, Q97).
   "playground:view",
+  // Project admins may braid out of their own project (Alex, 2026-10-21, ADR-185 §2).
+  "braids:manage",
 ];
 
 /**

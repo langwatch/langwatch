@@ -16,6 +16,7 @@ import { generate } from "@langwatch/ksuid";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
+import type * as Braids from "./authz-braids.commands.ts";
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
 import type * as Grants from "./authz-grants-rest.schemas.ts";
 import type * as Platform from "./authz-platform-operators.commands.ts";
@@ -189,6 +190,35 @@ export interface AuthzApi {
   awaitSharedProjectGrants(args: Commands.AuthzAwaitSharedProjectGrantsInput): Promise<void>;
   /** Revokes a reader's live shared reads (all, or those on `memberProjectIds`); answers ids. */
   revokeSharedProjectGrants(args: Commands.AuthzRevokeSharedProjectGrantsInput): Promise<string[]>;
+  /** ADR-185: the live braids out of a project and into it; a downgraded organisation lists too. */
+  listBraids(args: Braids.AuthzListBraidsInput): Promise<Braids.AuthzProjectBraids>;
+  /** A braid from the owner (`projectId`) into the reader, its condition compiled on save. */
+  createBraid(args: Braids.AuthzCreateBraidInput): Promise<Braids.AuthzBraid>;
+  /** Attaches the changed braid naming the one it replaces, then revokes that one. */
+  changeBraid(args: Braids.AuthzChangeBraidInput): Promise<Braids.AuthzBraid>;
+  /** Revokes a braid touching `projectId` with reason `braid_removed`. */
+  removeBraid(args: Braids.AuthzRemoveBraidInput): Promise<Braids.AuthzBraidRemoved>;
+  /**
+   * ADR-185 §8: one `braided_spans.viewed` audit row per actor, reader and owner per five
+   * minutes, naming the braids and never a span. Never fails the read that calls it.
+   */
+  recordBraidedSpansView(args: Braids.AuthzRecordBraidedSpansViewInput): Promise<void>;
+  /** The organisation's authz settings; one with no stored row has every setting off. */
+  getOrganizationPolicy(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Keeps braids to organisation admins or opens them again; audited, and bumps the epoch. */
+  setBraidsPolicy(args: Braids.AuthzSetBraidsPolicyInput): Promise<Braids.AuthzOrganizationPolicy>;
+  /** Every live braid in the organisation. */
+  listOrganizationBraids(
+    args: Braids.AuthzOrganizationInput,
+  ): Promise<Braids.AuthzOrganizationBraids>;
+  /** ADR-185 §7: the organisation's active members holding `permission` at the project. */
+  countProjectMembersHolding(
+    args: Braids.AuthzCountProjectMembersHoldingInput,
+  ): Promise<Braids.AuthzProjectMembersHolding>;
+  /** The braid dialog's picker: which projects the caller may braid into, one batched decision. */
+  listBraidTargets(args: Braids.AuthzListBraidTargetsInput): Promise<Braids.AuthzBraidTargets>;
   changeBindingRole(
     args: Commands.AuthzChangeBindingRoleInput,
   ): Promise<Commands.AuthzChangeBindingRoleOutput>;

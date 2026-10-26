@@ -57,6 +57,8 @@ export interface SpanSummaryRow {
   startTimeMs: number;
   /** Row version, bumped on re-projection. The live delta poll keys off this, not `startTimeMs`. */
   updatedAtMs: number;
+  /** Set only on a span braided in from another project (ADR-185 §5); absent: the reader's own. */
+  ownerProjectId?: string;
 }
 
 /**
@@ -71,6 +73,8 @@ export interface SpanResourceInfo {
   resourceAttributes: Record<string, string>;
   scopeName: string | null;
   scopeVersion: string | null;
+  /** Set only on a span braided in from another project (ADR-185 §5); absent: the reader's own. */
+  ownerProjectId?: string;
 }
 
 /**

@@ -52,6 +52,16 @@ describe("the Enterprise plan gate", () => {
         meta: { feature: "MANAGEMENT_API" },
       });
     });
+
+    /** ADR-185 §9: every route that writes a braid refuses below Enterprise. */
+    it("names Braids as an Enterprise feature", () => {
+      expect(Object.keys(ENTERPRISE_FEATURE_ERRORS)).toContain("BRAIDS");
+      expect(new EnterprisePlanRequiredError("BRAIDS")).toMatchObject({
+        code: "enterprise_plan_required",
+        httpStatus: 402,
+        meta: { feature: "BRAIDS" },
+      });
+    });
   });
 
   describe("assertEnterprisePlanType()", () => {

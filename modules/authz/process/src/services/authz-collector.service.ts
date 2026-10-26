@@ -13,6 +13,7 @@ import type {
 } from "@langwatch/authz-contract";
 import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 
+import type { AuthzOrganizationPolicyRepository } from "../repositories/authz-organization-policy.repository.ts";
 import type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
@@ -27,6 +28,8 @@ type AuthzCollectorOptions = {
   lineage?: Pick<ScopeLineageRepository, "findProjectLineage" | "findTeamOrganization">;
   /** Injected so binding and share-link liveness are testable at their exact boundary. */
   now?: () => Instant;
+  /** The organisation's settings (ADR-185 §2); omitted = every setting off. */
+  policies?: Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
 };
 
 export class AuthzCollectorService {
@@ -36,6 +39,7 @@ export class AuthzCollectorService {
 
   private readonly now: () => Instant;
   private readonly reader: AuthzReadRepository;
+  private readonly policies: AuthzCollectorOptions["policies"];
   private readonly lineage: Pick<
     ScopeLineageRepository,
     "findProjectLineage" | "findTeamOrganization"
@@ -45,6 +49,7 @@ export class AuthzCollectorService {
     this.reader = options.reader;
     this.lineage = options.lineage ?? options.reader;
     this.now = options.now ?? nowInstant;
+    this.policies = options.policies;
   }
 
   /**
@@ -306,7 +311,7 @@ export class AuthzCollectorService {
     organizationId: string;
     reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const [membership, directBindings, groupBindings] = await Promise.all([
+    const [membership, directBindings, groupBindings, policy] = await Promise.all([
       reader.findOrganizationMembership({
         userId: principal.id,
         organizationId,
@@ -316,6 +321,7 @@ export class AuthzCollectorService {
         userId: principal.id,
         organizationId,
       }),
+      this.policies?.getPolicy({ organizationId }),
     ]);
 
     // Ended bindings drop here, once, for every principal: nothing is written when the moment
@@ -337,6 +343,7 @@ export class AuthzCollectorService {
       organizationRole: isOrgMember ? membership.role : null,
       isOrgMember,
       membershipDisabled: membership?.disabled ?? false,
+      ...(policy?.braidsOrganizationAdminsOnly ? { braidsOrganizationAdminsOnly: true } : {}),
       bindings,
       customRolePermissions: await this.prefetchCustomRolePermissions({
         principal,

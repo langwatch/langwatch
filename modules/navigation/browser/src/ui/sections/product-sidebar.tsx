@@ -1,7 +1,8 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
+import { EnterprisePill } from "@langwatch/design-system/enterprise-pill";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
-import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
@@ -528,19 +529,7 @@ function OutboundArrow() {
   return <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />;
 }
 
-/** The quiet "ENT" chip on an Enterprise entry the plan includes; a locked entry shows a lock. */
+/** The "ENT" chip on an Enterprise entry the plan includes; a locked entry shows a lock. */
 function EnterpriseChip() {
-  return (
-    <Badge
-      title="Enterprise plan feature"
-      variant="outline"
-      textStyle="micro"
-      fontWeight="semibold"
-      letterSpacing="0.06em"
-      textTransform="uppercase"
-      {...QUIET_SIDEBAR_CHIP}
-    >
-      ENT
-    </Badge>
-  );
+  return <EnterprisePill />;
 }

@@ -18,6 +18,7 @@ import type { TraceAnnotationScoresReadRepository } from "./trace-annotation-sco
 import type { TraceAnnotationsReadRepository } from "./trace-annotations.repository.ts";
 import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "./trace-attributed-rollup.repository.ts";
+import type { TraceBraidReadsRepository } from "./trace-braid-reads.repository.ts";
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "./trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
@@ -52,6 +53,8 @@ export interface TraceRepositories {
   /** The span tree's summary rows, read under the route's proof (ADR-177). */
   readonly spanTree: TraceProjectedReadRepository;
   readonly existence: TraceExistenceRepository;
+  /** The braid dialog's and Braids page's reads (ADR-185 §7); absent, they answer empty. */
+  readonly braidReads?: TraceBraidReadsRepository;
   readonly derivationSpans: TraceDerivationSpanReaderRepository;
   readonly summary: TraceSummaryRepository;
   readonly logRecords: LogRecordStorageRepository;

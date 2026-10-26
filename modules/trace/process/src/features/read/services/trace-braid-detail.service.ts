@@ -1,0 +1,216 @@
+import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { BraidedOwner, SpanBraid } from "@langwatch/trace-contract";
+
+import {
+  braidConditionsShownFor,
+  type VerifiedMark,
+} from "../../../rules/braided-span-owner.rules.ts";
+
+/** The peers a braided read asks about owners and audits through (ADR-185 §5, §8). */
+export interface TraceBraidDirectory {
+  authz: Pick<AuthzApi, "hasPermission" | "listBraids" | "recordBraidedSpansView">;
+  projects: Pick<ProjectApi, "findSummaryById">;
+}
+
+/** What a braided span says about its owner, and the audit of reads that showed owner spans. */
+export class TraceBraidDetailService {
+  static create({ directory }: { directory: TraceBraidDirectory | null }): TraceBraidDetailService {
+    return new TraceBraidDetailService(directory);
+  }
+
+  readonly #directory: TraceBraidDirectory | null;
+  readonly #logger = createLogger("langwatch:trace:braid-detail");
+
+  private constructor(directory: TraceBraidDirectory | null) {
+    this.#directory = directory;
+  }
+
+  /** The span panel's `braid`: the owner's slug only for a viewer who may open the owner. */
+  async describe({
+    readerProjectId,
+    ownerProjectId,
+    viewerUserId,
+    spanStartedAtMs,
+    verifiedMarks = [],
+  }: {
+    readerProjectId: string;
+    ownerProjectId: string;
+    viewerUserId: string;
+    spanStartedAtMs: number;
+    /** The span's verified marks (ADR-185 §4). */
+    verifiedMarks?: readonly VerifiedMark[];
+  }): Promise<SpanBraid> {
+    const directory = this.#directory;
+    const signedKeys = signedKeysOf({ verifiedMarks, readerProjectId });
+    const signedBy = await this.#signedByReader({ readerProjectId, signed: signedKeys.size > 0 });
+    if (directory === null) {
+      return {
+        ownerProjectId,
+        ownerName: ownerProjectId,
+        ownerProjectSlug: null,
+        canOpenOwner: false,
+        matchedConditions: [],
+        signedBy,
+      };
+    }
+    const [owner, canReadOwner, braids] = await Promise.all([
+      directory.projects.findSummaryById(ownerProjectId),
+      directory.authz.hasPermission({
+        userId: viewerUserId,
+        permission: "traces:view",
+        projectId: ownerProjectId,
+      }),
+      directory.authz.listBraids({ projectId: readerProjectId }),
+    ]);
+    const canOpenOwner = canReadOwner && owner !== null;
+    return {
+      ownerProjectId,
+      ownerName: owner?.name ?? ownerProjectId,
+      ownerProjectSlug: canOpenOwner ? owner.slug : null,
+      canOpenOwner,
+      matchedConditions: braidConditionsShownFor({
+        braids: braids.fromOtherProjects,
+        ownerProjectId,
+        spanStartedAtMs,
+        signedKeys,
+      }),
+      signedBy,
+    };
+  }
+
+  /** The reader, named, when one of the span's verified marks names it; otherwise null. */
+  async #signedByReader({
+    readerProjectId,
+    signed,
+  }: {
+    readerProjectId: string;
+    signed: boolean;
+  }): Promise<SpanBraid["signedBy"]> {
+    if (!signed) return null;
+    const reader = await this.#directory?.projects.findSummaryById(readerProjectId);
+    return { projectId: readerProjectId, name: reader?.name ?? readerProjectId };
+  }
+
+  /** The header's owners, in the order given: the slug only for a viewer who may open one. */
+  async describeOwners({
+    ownerProjectIds,
+    viewerUserId,
+  }: {
+    ownerProjectIds: readonly string[];
+    viewerUserId: string;
+  }): Promise<BraidedOwner[]> {
+    const directory = this.#directory;
+    return Promise.all(
+      ownerProjectIds.map(async (projectId): Promise<BraidedOwner> => {
+        if (directory === null) return { projectId, name: projectId, canOpen: false, slug: null };
+        const [owner, canRead] = await Promise.all([
+          directory.projects.findSummaryById(projectId),
+          directory.authz.hasPermission({
+            userId: viewerUserId,
+            permission: "traces:view",
+            projectId,
+          }),
+        ]);
+        const canOpen = canRead && owner !== null;
+        return {
+          projectId,
+          name: owner?.name ?? projectId,
+          canOpen,
+          slug: canOpen ? owner.slug : null,
+        };
+      }),
+    );
+  }
+
+  /** Each span's `braid`, null on the reader's own; each owner and the braids are asked once. */
+  async describeSpans({
+    readerProjectId,
+    viewerUserId,
+    spans,
+  }: {
+    readerProjectId: string;
+    viewerUserId: string;
+    spans: readonly {
+      ownerProjectId?: string | undefined;
+      startedAtMs: number;
+      verifiedMarks?: readonly VerifiedMark[];
+    }[];
+  }): Promise<(SpanBraid | null)[]> {
+    const ownerProjectIds = [
+      ...new Set(spans.flatMap((span) => (span.ownerProjectId ? [span.ownerProjectId] : []))),
+    ];
+    if (ownerProjectIds.length === 0) return spans.map(() => null);
+    const signedKeysBySpan = spans.map(({ verifiedMarks = [] }) =>
+      signedKeysOf({ verifiedMarks, readerProjectId }),
+    );
+    const signed = spans.some(
+      (span, index) => !!span.ownerProjectId && signedKeysBySpan[index]!.size > 0,
+    );
+    const [owners, braids, signedBy] = await Promise.all([
+      this.describeOwners({ ownerProjectIds, viewerUserId }),
+      this.#directory === null
+        ? Promise.resolve([])
+        : this.#directory.authz
+            .listBraids({ projectId: readerProjectId })
+            .then((listed) => listed.fromOtherProjects),
+      this.#signedByReader({ readerProjectId, signed }),
+    ]);
+    const ownerById = new Map(owners.map((owner) => [owner.projectId, owner]));
+    return spans.map(({ ownerProjectId, startedAtMs }, index) => {
+      if (!ownerProjectId) return null;
+      const signedKeys = signedKeysBySpan[index]!;
+      const owner = ownerById.get(ownerProjectId);
+      return {
+        ownerProjectId,
+        ownerName: owner?.name ?? ownerProjectId,
+        ownerProjectSlug: owner?.slug ?? null,
+        canOpenOwner: owner?.canOpen ?? false,
+        matchedConditions: braidConditionsShownFor({
+          braids,
+          ownerProjectId,
+          spanStartedAtMs: startedAtMs,
+          signedKeys,
+        }),
+        signedBy: signedKeys.size > 0 ? signedBy : null,
+      };
+    });
+  }
+
+  /** One audit call for a read that returned owner spans; an audit failure never fails the read. */
+  async recordView({
+    authorization,
+    ownerProjectIds,
+  }: {
+    authorization: Authorization;
+    ownerProjectIds: readonly (string | null | undefined)[];
+  }): Promise<void> {
+    const owners = [...new Set(ownerProjectIds.filter((id): id is string => !!id))];
+    if (owners.length === 0 || this.#directory === null) return;
+    const readerProjectId = ownProjectIdReadBy(authorization);
+    try {
+      await this.#directory.authz.recordBraidedSpansView({
+        actor: authorization.actor,
+        readerProjectId,
+        ownerProjectIds: owners,
+      });
+    } catch (error) {
+      this.#logger.warn({ error, readerProjectId }, "braided spans view was not audited");
+    }
+  }
+}
+
+/** The keys of the marks that name the reader: what its `Verified("k")` terms ask for. */
+function signedKeysOf({
+  verifiedMarks,
+  readerProjectId,
+}: {
+  verifiedMarks: readonly VerifiedMark[];
+  readerProjectId: string;
+}): ReadonlySet<string> {
+  return new Set(
+    verifiedMarks.filter((mark) => mark.projectId === readerProjectId).map((mark) => mark.key),
+  );
+}

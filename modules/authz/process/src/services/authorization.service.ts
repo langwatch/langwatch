@@ -30,6 +30,9 @@ import type { AuthzService } from "./authz.service.ts";
  *  how stale a route's view of access may be. */
 export const AUTHORIZATION_MAX_AGE_MS = 5 * 60 * 1000;
 
+/** ADR-185 §8: a proof carrying a braid lives at most this, so a removal shows within it. */
+export const BRAID_REVOCATION_BOUND_MS = 30_000;
+
 /** How long a project's organisation is remembered for internal mints: it
  *  bounds how stale a remembered scope may be, for a project that has since
  *  been deleted. */
@@ -286,23 +289,32 @@ function sharedGrantsFrom({
       condition,
     });
     if (expiry !== undefined) expiresAt = Math.min(expiresAt, expiry);
+    if (condition.type === "span") expiresAt = Math.min(expiresAt, now + BRAID_REVOCATION_BOUND_MS);
   }
   return { shared, expiresAt };
 }
 
 /**
- * The ledger's ISO window as the proof's epoch milliseconds. A non-empty `where` has no compiler
- * in v1, and a window with no start would open the widest window there is, so either keeps the
- * row out of the proof rather than in it unfiltered.
+ * The ledger's ISO window as the proof's epoch milliseconds. Only a span braid carries a `where`,
+ * with its compiled form, which the proof keeps; any other `where`, or a window with no start
+ * (the widest there is), keeps the row out of the proof rather than in it unfiltered.
  */
 function proofCondition(condition: GrantCondition): AuthorizationCondition | "not_applicable" {
-  if (condition.where !== undefined && condition.where !== "") return "not_applicable";
+  const hasWhere = condition.where !== undefined && condition.where !== "";
+  const isBraid = condition.type === "span" && condition.compiledWhere !== undefined;
+  if (hasWhere !== isBraid) return "not_applicable";
+  if (condition.compiledWhere !== undefined && condition.type !== "span") return "not_applicable";
   if (condition.from === undefined) return "not_applicable";
   const from = epochMillisecondsOf(condition.from);
   const until = condition.until === undefined ? null : epochMillisecondsOf(condition.until);
   if (from === "not_applicable" || until === "not_applicable") return "not_applicable";
 
-  return { type: condition.type, from, until };
+  return {
+    type: condition.type,
+    ...(isBraid ? { where: condition.where, compiledWhere: condition.compiledWhere } : {}),
+    from,
+    until,
+  };
 }
 
 function epochMillisecondsOf(iso: string): number | "not_applicable" {

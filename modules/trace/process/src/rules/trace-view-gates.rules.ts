@@ -3,10 +3,12 @@ import type {
   Protections,
   Evaluation,
   SpanTreeNode,
+  SpanResourceInfo,
   TraceHeader,
   TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
 
+import { protectByOwner } from "./braided-span-owner.rules.ts";
 import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
 
 /**
@@ -38,6 +40,24 @@ export function gateTreeCost({
   return nodes.map((node) => (node.cost == null ? node : { ...node, cost: null }));
 }
 
+/** Each span's spend gated by its owner's cost:view, the reader's by theirs (ADR-185 §5). */
+export function gateTreeCostByOwner({
+  nodes,
+  reader,
+  owners,
+}: {
+  nodes: SpanTreeNode[];
+  reader: Protections;
+  owners: ReadonlyMap<string, Protections>;
+}): SpanTreeNode[] {
+  return protectByOwner({
+    items: nodes,
+    reader,
+    owners,
+    protect: (group, protections) => gateTreeCost({ nodes: group, protections }),
+  });
+}
+
 /**
  * Strip session spend for viewers without cost:view. Zeroed rather than nulled
  * to match existing chip rendering.
@@ -53,22 +73,76 @@ export function gateSessionCost<T extends { totalCost: number }>({
   return sessions.map((session) => ({ ...session, totalCost: 0 }));
 }
 
-/** Redact resource attributes with the viewer's restricted-attribute rules. */
+/**
+ * The resource pane: the trace's resources from the reader's root span (a braided span is never
+ * the root), and every span's, each gated by its owner's protections (ADR-185 §5).
+ */
+export function resourceInfoOf({
+  rows,
+  protections,
+  ownerProtections,
+}: {
+  rows: SpanResourceInfo[];
+  protections: Protections;
+  ownerProtections: ReadonlyMap<string, Protections>;
+}): TraceResourceInfoDto {
+  const ownRows = rows.filter((row) => row.ownerProjectId === undefined);
+  const root = ownRows.find((row) => row.parentSpanId == null) ?? ownRows[0] ?? null;
+  return gateResources({
+    resources: {
+      rootSpanId: root?.spanId ?? null,
+      resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
+      scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
+      spans: rows.map((row) => ({
+        spanId: row.spanId,
+        parentSpanId: row.parentSpanId,
+        resourceAttributes:
+          row.ownerProjectId === undefined
+            ? withoutHiddenResourceAttrs(row.resourceAttributes)
+            : withoutIngestKey(row.resourceAttributes),
+        scope: { name: row.scopeName ?? "", version: row.scopeVersion },
+        ...(row.ownerProjectId === undefined ? {} : { ownerProjectId: row.ownerProjectId }),
+      })),
+    },
+    protections,
+    ownerProtections,
+  });
+}
+
+/**
+ * Redact resource attributes with the viewer's restricted-attribute rules; a braided span's with
+ * its owner's (ADR-185 §5), and every attribute of an owner whose protections were not resolved.
+ */
 export function gateResources({
   resources,
   protections,
+  ownerProtections = new Map(),
 }: {
   resources: TraceResourceInfoDto;
   protections: Protections;
+  ownerProtections?: ReadonlyMap<string, Protections>;
 }): TraceResourceInfoDto {
-  const redact = (attrs: Record<string, string>): Record<string, string> =>
-    createAttributeRedactor({ hidden: protections.hiddenAttributes })(attrs) ?? attrs;
+  const redactWith =
+    (hidden: Protections["hiddenAttributes"]) =>
+    (attrs: Record<string, string>): Record<string, string> =>
+      createAttributeRedactor({ hidden })(attrs) ?? attrs;
+  const redact = redactWith(protections.hiddenAttributes);
+  const redactOwned = (
+    ownerProjectId: string,
+  ): ((attrs: Record<string, string>) => Record<string, string>) =>
+    redactWith(
+      ownerProtections.get(ownerProjectId)?.hiddenAttributes ?? [
+        { pattern: "*", visibleTo: "members of the owning project" },
+      ],
+    );
   return {
     ...resources,
     resourceAttributes: redact(resources.resourceAttributes),
     spans: resources.spans.map((span) => ({
       ...span,
-      resourceAttributes: redact(span.resourceAttributes),
+      resourceAttributes: (span.ownerProjectId ? redactOwned(span.ownerProjectId) : redact)(
+        span.resourceAttributes,
+      ),
     })),
   };
 }
@@ -106,6 +180,15 @@ export function gateEvaluations({
  * Fixed set, independent of viewer. Applied before gateResources.
  */
 const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([NON_BILLABLE_ATTR]);
+
+/** Stamped by the ingestion receiver: the key a span was sent with, the sending project's own. */
+export const API_KEY_ID_ATTRIBUTE = "langwatch.api_key.id";
+
+/** Resources shown outside the project that sent them: a share page, or a braided span. */
+export function withoutIngestKey(attrs: Record<string, string>): Record<string, string> {
+  const { [API_KEY_ID_ATTRIBUTE]: _apiKeyId, ...rest } = withoutHiddenResourceAttrs(attrs);
+  return rest;
+}
 
 export function withoutHiddenResourceAttrs(attrs: Record<string, string>): Record<string, string> {
   let hasHidden = false;

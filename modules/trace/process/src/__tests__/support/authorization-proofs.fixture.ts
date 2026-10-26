@@ -1,5 +1,9 @@
 // Sealed proofs for tests that read ClickHouse through the authorized client (ADR-177 block C).
-import { type Authorization, sealAuthorization } from "@langwatch/authorization";
+import {
+  type Authorization,
+  type CompiledWhere,
+  sealAuthorization,
+} from "@langwatch/authorization";
 import {
   expandFragment,
   expandStatement,
@@ -57,6 +61,42 @@ export function aggregateProof({
         via: [`grant_${index}`],
         kind: "shared" as const,
         condition: { type: "trace" as const, from: member.from, until: member.until ?? null },
+      })),
+    ],
+    expiresAt: now + TEST_PROOF_LIFETIME_MS,
+    purpose: { kind: "route", route: "test" },
+  });
+}
+
+/** A reader's proof carrying braids (ADR-185): own on the reader, one `span` grant per braid. */
+export function braidedProof({
+  projectId,
+  braids,
+  now = Date.now(),
+}: {
+  projectId: string;
+  braids: { owner: string; compiledWhere?: CompiledWhere; from?: number; until?: number | null }[];
+  now?: number;
+}): Authorization {
+  return sealAuthorization({
+    actor: TEST_ACTOR,
+    principal: TEST_ACTOR,
+    scope: { organizationId: TEST_ORGANIZATION_ID },
+    grants: [
+      { projectId, permissions: [...TEST_PERMISSIONS], via: [], kind: "own" },
+      ...braids.map((braid, index) => ({
+        projectId: braid.owner,
+        permissions: ["traces:view"],
+        via: [`braid_${index}`],
+        kind: "shared" as const,
+        condition: {
+          type: "span" as const,
+          ...(braid.compiledWhere === undefined
+            ? {}
+            : { where: "compiled", compiledWhere: braid.compiledWhere }),
+          from: braid.from ?? 0,
+          until: braid.until ?? null,
+        },
       })),
     ],
     expiresAt: now + TEST_PROOF_LIFETIME_MS,

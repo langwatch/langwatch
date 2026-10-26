@@ -1,5 +1,10 @@
 import { grantConditionSchema } from "@langwatch/authorization";
-import { type AuthzSharedProjectGrant, OffboardIncompleteError } from "@langwatch/authz-contract";
+import {
+  type AuthzSharedProjectGrant,
+  GRANT_SOURCE_BRAID,
+  OffboardIncompleteError,
+  PROJECT_READER_ROLE_KEY,
+} from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { type Instant, fromDate, toDate } from "@langwatch/time";
 import { z } from "zod";
@@ -8,6 +13,7 @@ import {
   AuthzLedgerReadRepository,
   type LedgerDirectoryGrantRow,
   type LedgerGrantIdentity,
+  type LedgerBraidRow,
   type LedgerRoleDefinition,
 } from "../authz-ledger-read.repository.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
@@ -20,6 +26,21 @@ import {
   grantRowFromStored,
 } from "./prisma.authz-grant.mapper.ts";
 import type { AuthzGrantFilter } from "./prisma.authz-ledger.mapper.ts";
+
+const braidRowsSchema = z.array(
+  z.object({
+    id: z.string(),
+    principalId: z.string().nullable(),
+    scopeId: z.string(),
+    condition: z.unknown().optional(),
+    expiresAt: z.date().nullable(),
+    createdByUserId: z.string().nullable(),
+    occurredAt: z.date(),
+    revokedAt: z.date().nullable(),
+    revokedReason: z.string().nullable(),
+    replacesGrantId: z.string().nullable(),
+  }),
+);
 
 const sharedProjectGrantRowsSchema = z.array(
   z.object({ id: z.string(), scopeId: z.string(), condition: z.unknown().optional() }),
@@ -166,6 +187,58 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
       grantId: row.id,
       memberProjectId: row.scopeId,
       condition: grantConditionSchema.safeParse(row.condition).data ?? null,
+    }));
+  }
+
+  async findBraids({
+    organizationId,
+    projectId,
+    grantId,
+    includeRevoked = false,
+  }: {
+    organizationId: string;
+    projectId?: string;
+    grantId?: string;
+    includeRevoked?: boolean;
+  }): Promise<LedgerBraidRow[]> {
+    const where = {
+      organizationId,
+      source: GRANT_SOURCE_BRAID,
+      roleKey: PROJECT_READER_ROLE_KEY,
+      scopeType: "PROJECT" as const,
+      ...(grantId === undefined ? {} : { id: grantId }),
+      ...(projectId === undefined
+        ? {}
+        : { OR: [{ principalId: projectId }, { scopeId: projectId }] }),
+    };
+    const select = {
+      id: true,
+      principalId: true,
+      scopeId: true,
+      condition: true,
+      expiresAt: true,
+      createdByUserId: true,
+      occurredAt: true,
+      revokedAt: true,
+      revokedReason: true,
+      replacesGrantId: true,
+    };
+    const rows = braidRowsSchema.parse(
+      includeRevoked
+        ? await this.prisma.grant.findMany({ where, select, orderBy: { occurredAt: "asc" } })
+        : await liveGrants(this.prisma).findMany({ where, select, orderBy: { occurredAt: "asc" } }),
+    );
+    return rows.map((row) => ({
+      grantId: row.id,
+      ownerProjectId: row.scopeId,
+      readerProjectId: row.principalId ?? "",
+      condition: grantConditionSchema.safeParse(row.condition).data ?? null,
+      expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+      createdByUserId: row.createdByUserId,
+      occurredAt: fromDate(row.occurredAt),
+      revokedReason: row.revokedReason,
+      isLive: row.revokedAt === null,
+      replacesGrantId: row.replacesGrantId,
     }));
   }
 

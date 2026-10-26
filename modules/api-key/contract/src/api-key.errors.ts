@@ -209,3 +209,17 @@ export class AggregateProjectHasNoCredentialError extends HandledError {
     this.name = "AggregateProjectHasNoCredentialError";
   }
 }
+
+/** A signing key that is not in the named project, or does not exist: one answer for both. */
+export class SigningKeyNotFoundError extends NotFoundError {
+  declare readonly code: "not_found";
+
+  constructor(keyId: string) {
+    super(
+      "not_found",
+      { resource: "Signing key", id: keyId },
+      { meta: { signingKeyId: keyId }, fault: "customer" },
+    );
+    this.name = "SigningKeyNotFoundError";
+  }
+}

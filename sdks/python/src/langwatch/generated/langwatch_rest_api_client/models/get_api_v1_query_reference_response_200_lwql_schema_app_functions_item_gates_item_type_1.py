@@ -23,6 +23,7 @@ class GetApiV1QueryReferenceResponse200LwqlSchemaAppFunctionsItemGatesItemType1(
     ANOMALYRULESUPDATE = "anomalyRules:update"
     ANOMALYRULESVIEW = "anomalyRules:view"
     AUDITLOGVIEW = "auditLog:view"
+    BRAIDSMANAGE = "braids:manage"
     COMPLIANCEEXPORTVIEW = "complianceExport:view"
     COSTVIEW = "cost:view"
     DATASETSCREATE = "datasets:create"

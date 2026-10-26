@@ -19,6 +19,8 @@ const spanTreeNodeSchemaDefinition = z.object({
   cacheReadTokens: z.number().nullish(),
   cacheCreationTokens: z.number().nullish(),
   updatedAtMs: z.number().nullish(),
+  /** Set only on a span braided in from another project (ADR-185 §5); absent: the reader's own. */
+  ownerProjectId: z.string().nullish(),
 });
 export interface SpanTreeNodeSchema extends Named<typeof spanTreeNodeSchemaDefinition> {}
 export const spanTreeNodeSchema: SpanTreeNodeSchema = spanTreeNodeSchemaDefinition;
@@ -28,6 +30,8 @@ export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;
 const spanTreeCursorSchemaDefinition = z.object({
   startTimeMs: z.number().int().min(0),
   spanId: z.string().min(1).max(128),
+  /** The last span's owner, null for the reader's own; absent on a cursor made before braids. */
+  ownerProjectId: z.string().min(1).max(128).nullish(),
 });
 export interface SpanTreeCursorSchema extends Named<typeof spanTreeCursorSchemaDefinition> {}
 export const spanTreeCursorSchema: SpanTreeCursorSchema = spanTreeCursorSchemaDefinition;

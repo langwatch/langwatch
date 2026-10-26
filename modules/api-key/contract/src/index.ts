@@ -15,3 +15,5 @@ export * from "./api-key.trpc.ts";
 export * from "./api-key-trpc.schemas.ts";
 export * from "./api-key.device-label.ts";
 export * from "./api-key.session-ceiling.ts";
+export * from "./signing-key.ts";
+export * from "./signing-key.trpc.ts";

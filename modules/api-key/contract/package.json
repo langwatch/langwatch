@@ -12,6 +12,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./signing-key-wire-format": {
+      "types": "./dist/signing-key.wire-format.d.ts",
+      "default": "./src/signing-key.wire-format.ts"
     }
   },
   "scripts": {

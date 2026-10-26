@@ -13,6 +13,7 @@ import { apiKeyOrganizationsRest } from "./transport/api-key-organizations.rest.
 import { apiKeyProjectsRest } from "./transport/api-key-projects.rest.ts";
 import { apiKeyRest } from "./transport/api-key.rest.ts";
 import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
+import { signingKeyTrpcTransport } from "./transport/signing-key.trpc.ts";
 
 /**
  * The whole module, declared. Every call answers something already
@@ -23,7 +24,13 @@ export const apiKeyProcessModule: PublishedProcessModule<"api-key", ApiKeyApi> =
   defineProcessModule("api-key")
     .withRepositories(apiKeyRepositories)
     .withApi(ApiKeyModule)
-    .withTransports(apiKeyRest, apiKeyProjectsRest, apiKeyOrganizationsRest, apiKeyTrpcTransport)
+    .withTransports(
+      apiKeyRest,
+      apiKeyProjectsRest,
+      apiKeyOrganizationsRest,
+      apiKeyTrpcTransport,
+      signingKeyTrpcTransport,
+    )
     // The credential itself, not just its holder: two of these routes ask whether
     // the KEY may act organization-wide as well as whether the member may, so a
     // narrowed key cannot borrow the reach of whoever created it.

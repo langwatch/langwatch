@@ -726,6 +726,13 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
         organizationId: fixture.organizationId,
         kind: "application",
       });
+      await expect(
+        fixture.repositories.read.findProjectLineages({
+          projectIds: [archived, live, id("project")],
+        }),
+      ).resolves.toEqual(
+        new Map([[live, { teamId, organizationId: fixture.organizationId, kind: "application" }]]),
+      );
     });
   });
 });
