@@ -19,6 +19,10 @@
 //	TEST_VK_BEDROCK      vk-lw-...
 //	TEST_VK_AZURE        vk-lw-...
 //	TEST_VK_VERTEX       vk-lw-...
+//	TEST_VK_VOYAGE       vk-lw-...  (embeddings)
+//	TEST_VK_ELEVENLABS   vk-lw-...  (audio)
+//
+// CI mints every one of these per run with cmd/matrixseed.
 //
 // Each cell asserts four invariants:
 //  1. Gateway returns HTTP 200.
