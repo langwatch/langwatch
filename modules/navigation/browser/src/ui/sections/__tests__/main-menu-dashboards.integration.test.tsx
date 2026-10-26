@@ -66,10 +66,12 @@ function renderSidebar({
   surface,
   pathname,
   permissions = ["analytics:view"],
+  dashboardsFlag = true,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "settings";
   pathname: string;
   permissions?: string[];
+  dashboardsFlag?: boolean;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
@@ -78,7 +80,7 @@ function renderSidebar({
         project: PROJECT,
         pathname,
         permissions,
-        flags: { release_dashboards: { enabled: true, isLoading: false } },
+        flags: { release_dashboards: { enabled: dashboardsFlag, isLoading: false } },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
       }}
     >
@@ -95,7 +97,7 @@ afterEach(() => {
 describe("the Dashboards product sidebar", () => {
   describe("given a board is open", () => {
     /** @scenario "AC3 Sidebar matches the reference" */
-    it("holds only Quick Search and the saved-dashboards list, marking the open board", async () => {
+    it("holds only Quick Search, the saved-dashboards list and Legacy analytics, marking the open board", async () => {
       renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards/agent-flight-deck" });
 
       expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
@@ -106,6 +108,19 @@ describe("the Dashboards product sidebar", () => {
       expect(screen.queryByText("Observe")).toBeNull();
       expect(screen.queryByText("Test")).toBeNull();
       expect(screen.queryByText("Build")).toBeNull();
+    });
+  });
+
+  describe("given a member who wants the old analytics pages", () => {
+    /** @scenario "AC3c The Dashboards sidebar offers Legacy analytics" */
+    it("offers Legacy analytics, opening the legacy analytics address", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
+
+      await screen.findByTestId("saved-dashboards");
+      expect(screen.getByRole("link", { name: "Legacy analytics" })).toHaveAttribute(
+        "href",
+        "/demo/analytics",
+      );
     });
   });
 
@@ -136,6 +151,40 @@ describe("the LLM Ops sidebar", () => {
       expect(screen.getByRole("link", { name: "Analytics" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Dashboards" })).toBeNull();
       expect(screen.queryByTestId("saved-dashboards")).toBeNull();
+    });
+
+    /** @scenario "AC3b The Analytics entry opens Dashboards when the flag is on" */
+    it("opens Dashboards from the Analytics entry", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo" });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+        "href",
+        "/demo/dashboards",
+      );
+    });
+  });
+
+  describe("given the dashboards flag is on but the member lacks analytics:view", () => {
+    it("keeps the Analytics entry on legacy analytics", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", permissions: [] });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+        "href",
+        "/demo/analytics",
+      );
+    });
+  });
+
+  describe("given the dashboards flag is off", () => {
+    /** @scenario "AC3d The Analytics entry opens legacy analytics when the flag is off" */
+    it("opens legacy analytics from the Analytics entry, as before", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", dashboardsFlag: false });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+        "href",
+        "/demo/analytics",
+      );
+      expect(screen.queryByRole("link", { name: "Legacy analytics" })).toBeNull();
     });
   });
 });

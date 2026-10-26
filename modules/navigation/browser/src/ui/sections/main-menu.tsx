@@ -15,6 +15,7 @@ import {
   type CodingAgentLinks,
   useCodingAgentLinks,
 } from "../../behavior/use-coding-agent-links.ts";
+import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
 import {
   isExperimentsActivePath,
@@ -28,9 +29,9 @@ import { SideMenuLink } from "../blocks/side-menu-link.tsx";
 import { SidebarSection } from "./sidebar-section.tsx";
 
 /**
- * The project navigation sections the LLM Ops sidebar renders. The Govern group
- * is gone because the product switcher replaces it, and the Ops group because
- * the settings menu holds the operations pages. Dashboards is its own product.
+ * The LLM Ops sidebar's project sections. No Govern group (the product switcher has it),
+ * no Ops group (the settings menu has it). Dashboards is its own product; once a member
+ * can reach it, the Analytics entry opens it (dashboards-v1.feature AC3b).
  */
 export const MainMenuSections = function MainMenuSections({
   showExpanded,
@@ -49,6 +50,10 @@ export const MainMenuSections = function MainMenuSections({
     { enabled: !!project?.id && navigation.test },
   );
   const codingAgentLinks = useCodingAgentLinks();
+  const { reachableProducts } = useReachableProducts();
+  const analyticsPath = reachableProducts.includes("dashboards")
+    ? projectNavItems.dashboards.path
+    : projectNavItems.analytics.path;
 
   const sectionProps = { showExpanded, project, pathname };
 
@@ -70,6 +75,7 @@ export const MainMenuSections = function MainMenuSections({
         {...sectionProps}
         codingAgentLinks={codingAgentLinks}
         showAnalytics={navigation.analytics}
+        analyticsPath={analyticsPath}
         showOnlineEvaluations={navigation.onlineEvaluations}
       />
       {navigation.test && (
@@ -115,17 +121,19 @@ function ObserveSection({
   pathname,
   codingAgentLinks,
   showAnalytics,
+  analyticsPath,
   showOnlineEvaluations,
 }: ProjectSectionProps & {
   codingAgentLinks: CodingAgentLinks;
   showAnalytics: boolean;
+  analyticsPath: string;
   showOnlineEvaluations: boolean;
 }) {
   return (
     <SidebarSection id="observe" label="Observe" showExpanded={showExpanded}>
       {showAnalytics && (
         <PageMenuLink
-          path={projectNavItems.analytics.path}
+          path={analyticsPath}
           icon={featureIcons.analytics.icon}
           label={projectNavItems.analytics.title}
           project={project}

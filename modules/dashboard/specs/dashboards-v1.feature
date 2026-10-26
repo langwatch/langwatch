@@ -31,7 +31,34 @@ Feature: Dashboards v1
     When the member looks at the Dashboards product sidebar
     Then they see "Your dashboards" with My dashboard first, then Starred when they have stars,
       then From LangWatch, each board with a menu
-    And the sidebar shows nothing else besides Quick Search
+    And the sidebar shows nothing else besides Quick Search and the Legacy analytics entry
+
+  # Switch-over: with the flag on, Dashboards is where analytics opens, and legacy
+  # analytics stays one click away. Its pages and addresses do not change (AC20).
+  @integration
+  Scenario: AC3b The Analytics entry opens Dashboards when the flag is on
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry opens /[project]/dashboards
+
+  @integration
+  Scenario: AC3c The Dashboards sidebar offers Legacy analytics
+    Given the release_dashboards flag is on for the project
+    When the member looks at the Dashboards product sidebar
+    Then a "Legacy analytics" entry opens /[project]/analytics
+
+  @integration
+  Scenario: AC3d The Analytics entry opens legacy analytics when the flag is off
+    Given the release_dashboards flag is off for the project
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry opens /[project]/analytics, as before
+
+  @integration
+  Scenario: AC3e An old analytics address opens its own page
+    Given the release_dashboards flag is on for the project
+    When a member opens an address under /[project]/analytics
+    Then that legacy analytics page opens with no redirect to Dashboards
 
   # ---------------------------------------------------------------------------
   # Agent Flight Deck
@@ -296,7 +323,11 @@ Feature: Dashboards v1
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing" (changed again by langwatch/tasks#911: /dashboards lands on My dashboard) -> dashboards-v2.feature Scenario: AC160 The dashboards area lands on My dashboard
-  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Starred, From LangWatch; no Browse templates item) -> Scenario: AC3 Sidebar matches the reference
+  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Starred, From LangWatch; no Browse templates item; changed by the analytics switch-over: a Legacy analytics entry) -> Scenario: AC3 Sidebar matches the reference
+  # AC 3b: "The Analytics entry opens Dashboards when the flag is on" -> Scenario: AC3b The Analytics entry opens Dashboards when the flag is on
+  # AC 3c: "Legacy analytics is one click from Dashboards" -> Scenario: AC3c The Dashboards sidebar offers Legacy analytics
+  # AC 3d: "Flag off changes nothing" -> Scenario: AC3d The Analytics entry opens legacy analytics when the flag is off
+  # AC 3e: "Old analytics addresses never redirect" -> Scenario: AC3e An old analytics address opens its own page
   # AC 5: "Status tiles compare with the previous period" → Scenario: AC5 Status tiles compare with the previous period
   # AC 6: "Unconnected source shows a call to action" → Scenario: AC6 Unconnected source shows a call to action
   # AC 7: "Connected state comes from real data" → Scenario: AC7 Connected state comes from real data

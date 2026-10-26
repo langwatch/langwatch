@@ -24,7 +24,12 @@ import {
   OPERATIONS_CONSOLE,
   type ProductId,
 } from "../../model/products.ts";
-import { dashboardsAreaAt, toProjectRoutePattern } from "../../model/project-nav-items.ts";
+import {
+  dashboardsAreaAt,
+  projectNavItems,
+  toProjectRoutePattern,
+} from "../../model/project-nav-items.ts";
+import { projectScopedDestination } from "../../model/project-scoped-nav.ts";
 import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
 import {
@@ -308,18 +313,35 @@ function SectionItemsNav({
 }
 
 /**
- * The Dashboards sidebar body: only the saved-dashboards list analytics lends,
- * with the board the address opens marked (dashboards-v1.feature).
+ * The Dashboards sidebar body: the saved-dashboards list analytics lends, with the board
+ * the address opens marked, and Legacy analytics at the foot (dashboards-v1.feature AC3c).
  */
 function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
+  const project = host.project();
   const pattern = toProjectRoutePattern({
     pathname: host.pathname(),
-    projectSlug: host.project()?.slug,
+    projectSlug: project?.slug,
   });
-  if (!showExpanded) return null;
-  return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
+  return (
+    <>
+      {showExpanded && <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />}
+      <Box flex={1} width="full" />
+      <SideMenuLink
+        icon={featureIcons.analytics.icon}
+        label={LEGACY_ANALYTICS_LABEL}
+        showLabel={showExpanded}
+        {...projectScopedDestination({
+          path: projectNavItems.analytics.path,
+          label: LEGACY_ANALYTICS_LABEL,
+          project,
+        })}
+      />
+    </>
+  );
 }
+
+const LEGACY_ANALYTICS_LABEL = "Legacy analytics";
 
 /**
  * The member's starred dashboards in every other product's sidebar, for a member who can reach
