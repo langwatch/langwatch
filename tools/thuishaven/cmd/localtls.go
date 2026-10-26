@@ -3,6 +3,7 @@ package cmd
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -29,13 +30,15 @@ func localHTTPClient(timeout time.Duration) *http.Client {
 }
 
 // localRoots is the system pool plus the PEM at ca, or nil (the default roots)
-// when there is no CA or it does not load.
+// when there is no CA or it does not load. A CA that is there but does not load
+// says so on stderr: the x509 error that follows would otherwise not name it.
 func localRoots(ca string) *x509.CertPool {
 	if ca == "" {
 		return nil
 	}
 	pem, err := os.ReadFile(ca)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "haven: could not read the portless CA %s (%v); using the system roots only\n", ca, err)
 		return nil
 	}
 	pool, err := x509.SystemCertPool()
@@ -43,6 +46,7 @@ func localRoots(ca string) *x509.CertPool {
 		pool = x509.NewCertPool()
 	}
 	if !pool.AppendCertsFromPEM(pem) {
+		fmt.Fprintf(os.Stderr, "haven: the portless CA %s holds no PEM certificate; using the system roots only\n", ca)
 		return nil
 	}
 	return pool
