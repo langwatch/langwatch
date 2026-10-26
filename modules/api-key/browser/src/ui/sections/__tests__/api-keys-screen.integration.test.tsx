@@ -540,6 +540,7 @@ describe("given the project still has a legacy key", () => {
       expect(screen.queryByTestId("legacy-key-row")).toBeNull();
       expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
       expect(screen.getByTestId("api-key-name")).toHaveValue("Project API Key");
+      expect(screen.getByText("The legacy project key no longer works")).toBeInTheDocument();
       // An expiry is already chosen (none), so the drawer asks for no other.
       expect(screen.queryByTestId("api-key-expiration-hint")).toBeNull();
       expect(mutations.create).not.toHaveBeenCalled();
@@ -563,6 +564,10 @@ describe("given the project still has a legacy key", () => {
         }),
       );
       expect(mutations.revokeLegacy).toHaveBeenCalledTimes(1);
+      // The legacy key is revoked on confirm, before the new key is created.
+      expect(mutations.revokeLegacy.mock.invocationCallOrder[0]).toBeLessThan(
+        mutations.create.mock.invocationCallOrder[0]!,
+      );
       expect(
         within(await screen.findByTestId("token-created-key")).getByText("Project API Key"),
       ).toBeInTheDocument();
@@ -582,6 +587,8 @@ describe("given the project still has a legacy key", () => {
       );
       expect(screen.queryByRole("heading", { name: "Create new secret key" })).toBeNull();
       expect(screen.getByTestId("legacy-key-row")).toBeInTheDocument();
+      // The confirm stays open and usable, so the reader can retry.
+      expect(screen.getByTestId("legacy-key-revoke-confirm")).toBeEnabled();
       expect(mutations.create).not.toHaveBeenCalled();
     });
 
@@ -671,6 +678,7 @@ describe("given the project still has a legacy key", () => {
       await user.click(await screen.findByRole("menuitem", { name: "Revoke" }));
 
       expect(await screen.findByTestId("legacy-key-revoke-confirm")).toBeDisabled();
+      expect(mutations.revokeLegacy).not.toHaveBeenCalled();
       expect(mutations.create).not.toHaveBeenCalled();
     });
 
