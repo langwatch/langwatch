@@ -36,6 +36,7 @@ function world() {
       revokeDocsSessionKeys: async (input) => {
         revoked.push(input);
         sessionsAtRevoke.push(memory.db.Session.map((session) => session.id));
+        return { revoked: true as const };
       },
     },
     sessions: MemoryAuthSessionRepository.create({ memory }),

@@ -40,7 +40,7 @@ function harness() {
     }),
   });
   const service = BrowserSessionService.create({
-    docsKeys: { revokeDocsSessionKeys: async () => {} },
+    docsKeys: { revokeDocsSessionKeys: async () => ({ revoked: true as const }) },
     sessions: MemoryAuthSessionRepository.create({ memory }),
     cache: null,
     identityEmails: void 0,
