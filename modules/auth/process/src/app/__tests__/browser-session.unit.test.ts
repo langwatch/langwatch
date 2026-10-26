@@ -157,6 +157,7 @@ function service(
   return {
     sessions,
     service: BrowserSessionService.create({
+      docsKeys: { revokeDocsSessionKeys: async () => {} },
       sessions,
       cache: options.cache === undefined ? new Cache() : options.cache,
       identityEmails: options.identityEmails ?? new IdentityEmails(),

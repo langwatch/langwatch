@@ -1,3 +1,4 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   browserSessionInventoryEntrySchema,
   browserSessionSchema,
@@ -52,6 +53,8 @@ interface BrowserSessionDeps {
   /** Re-asks the operator's platform grant on every impersonated read, so a revoked one lapses.
    *  shortcut: optional until auth.app.ts passes `dependencies.authz`; then make it required. */
   operators?: Pick<AuthzApi, "can">;
+  /** Ends the docs session keys a session minted before the session itself ends (ADR-185). */
+  docsKeys: Pick<ApiKeyApi, "revokeDocsSessionKeys">;
   now(): Instant;
 }
 
@@ -114,6 +117,7 @@ export class BrowserSessionService {
         pendingSsoSetup: verified.user.pendingSsoSetup ?? false,
       },
       expires: verified.session.expiresAt.toISOString(),
+      startedAt: toDate(stored.createdAt).toISOString(),
       sessionId: verified.session.id,
     });
 
@@ -343,6 +347,7 @@ export class BrowserSessionService {
     const records = await this.deps.sessions.findForUser({ userId });
     if (!records.some((record) => record.id === sessionId)) return { ended: 0 };
 
+    await this.#endDocsKeys({ userId, sessionIds: [sessionId] });
     const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const ended = await this.deps.sessions.deleteById({ id: sessionId });
     await this.#cachedSessions.clearCachedSessions({ userId, tokens });
@@ -366,6 +371,7 @@ export class BrowserSessionService {
     const minted = records.filter((record) => record.identifierId === identifierId);
     if (minted.length === 0) return { ended: 0 };
 
+    await this.#endDocsKeys({ userId, sessionIds: minted.map((record) => record.id) });
     const tokens = await this.#cachedSessions.tokensToClear({ userId });
     let ended = 0;
     for (const record of minted) {
@@ -379,6 +385,8 @@ export class BrowserSessionService {
 
   /** Rows first, then the cache (Better Auth's own order), so no refresh re-caches a dead row. */
   async revokeAllBrowserSessions({ userId }: { userId: string }): Promise<void> {
+    const records = await this.deps.sessions.findForUser({ userId });
+    await this.#endDocsKeys({ userId, sessionIds: records.map((record) => record.id) });
     const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const deleted = await this.deps.sessions.deleteAllForUser({ userId });
     await this.#cachedSessions.clearCachedSessions({ userId, tokens });
@@ -393,12 +401,15 @@ export class BrowserSessionService {
     }
 
     const userId = session.userId;
+    const [docsKeys] = await Promise.allSettled([
+      this.#endDocsKeys({ userId, sessionIds: [sessionId] }),
+    ]);
     const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const [deletion] = await Promise.allSettled([this.deps.sessions.deleteById({ id: sessionId })]);
     const [cache] = await Promise.allSettled([
       this.#cachedSessions.dropCachedSessions({ userId, tokens }),
     ]);
-    for (const outcome of [deletion, cache]) {
+    for (const outcome of [docsKeys, deletion, cache]) {
       if (outcome.status === "rejected") throw outcome.reason;
     }
     logger.info({ sessionId, userId }, "Revoked browser session");
@@ -412,6 +423,11 @@ export class BrowserSessionService {
     keepSessionId: string;
   }): Promise<void> {
     const keep = await this.deps.sessions.findById({ id: keepSessionId });
+    const others = await this.deps.sessions.findForUser({ userId });
+    await this.#endDocsKeys({
+      userId,
+      sessionIds: others.map((record) => record.id).filter((id) => id !== keepSessionId),
+    });
     const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const deleted = await this.deps.sessions.deleteOthersForUser({ userId, keepSessionId });
     await this.#cachedSessions.clearCachedSessions({
@@ -420,6 +436,18 @@ export class BrowserSessionService {
       keepToken: keep?.sessionToken,
     });
     logger.info({ deleted, keepSessionId, userId }, "Revoked other browser sessions for user");
+  }
+
+  /** Before the rows go: a docs key outliving the session that minted it is the leak (ADR-185). */
+  async #endDocsKeys({
+    userId,
+    sessionIds,
+  }: {
+    userId: string;
+    sessionIds: readonly string[];
+  }): Promise<void> {
+    if (sessionIds.length === 0) return;
+    await this.deps.docsKeys.revokeDocsSessionKeys({ userId, browserSessionIds: [...sessionIds] });
   }
 }
 

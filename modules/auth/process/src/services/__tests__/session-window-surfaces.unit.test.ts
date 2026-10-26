@@ -50,6 +50,7 @@ async function worldWithAnIdleSessionPastItsWindow({
     }),
   });
   const service = BrowserSessionService.create({
+    docsKeys: { revokeDocsSessionKeys: async () => {} },
     sessions: MemoryAuthSessionRepository.create({ memory }),
     cache: null,
     identityEmails: void 0,
