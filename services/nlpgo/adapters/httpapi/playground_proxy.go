@@ -136,9 +136,10 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		// /go/proxy/v1/chat/completions doesn't 400 on Studio Monaco
 		// code-completion / playground / model.factory.ts traffic. The
 		// model catalog decides the limit's name for every model it
-		// carries, so it is asked by the provider-prefixed id.
-		if litellm.NeedsReasoningOverrides(model, catalog) {
-			body, err = applyReasoningOverridesToBody(body, model, catalog)
+		// marks, so it is asked by the provider-prefixed id.
+		overrideID := reasoningOverridesModelID(model, bareModel, catalog)
+		if litellm.NeedsReasoningOverrides(overrideID, catalog) {
+			body, err = applyReasoningOverridesToBody(body, overrideID, catalog)
 			if err != nil {
 				writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 					"reason": "apply_reasoning_overrides",
@@ -239,6 +240,18 @@ func rewriteBodyModel(body []byte, newModel string) ([]byte, error) {
 // the in-process llmexecutor path. The actual rewrite logic lives in
 // litellm.ApplyReasoningOverrides (translator.go) — this is the
 // raw-bytes-in / raw-bytes-out wrapper for the playground proxy.
+// reasoningOverridesModelID is the id the reasoning overrides are decided on:
+// the provider-prefixed id when the catalog carries it, else the bare id, whose
+// basename the name rule reads (`custom/openai/gpt-5` is `openai/gpt-5` bare).
+func reasoningOverridesModelID(model, bareModel string, catalog litellm.OutputTokensLookup) string {
+	if catalog != nil {
+		if _, known := catalog.OutputTokensParameter(model); known {
+			return model
+		}
+	}
+	return bareModel
+}
+
 func applyReasoningOverridesToBody(body []byte, modelID string, catalog litellm.OutputTokensLookup) ([]byte, error) {
 	if len(body) == 0 {
 		return body, nil

@@ -164,21 +164,24 @@ type OutputTokensLookup interface {
 }
 
 // takesMaxCompletionTokens is whether the output token limit goes out as
-// max_completion_tokens. The catalog decides for every model it carries; a
-// model it does not carry keeps the name rule the engine has always applied.
+// max_completion_tokens: the catalog marks the model, or the name rule the
+// engine has always applied recognizes it. The catalog only adds models; an
+// entry left at the default never takes a rename the name rule gave.
 func takesMaxCompletionTokens(modelID string, catalog OutputTokensLookup) bool {
-	if catalog != nil {
-		if param, known := catalog.OutputTokensParameter(modelID); known {
-			return param == "max_completion_tokens"
-		}
+	if IsReasoningModel(modelID) {
+		return true
 	}
-	return IsReasoningModel(modelID)
+	if catalog == nil {
+		return false
+	}
+	param, known := catalog.OutputTokensParameter(modelID)
+	return known && param == "max_completion_tokens"
 }
 
 // NeedsReasoningOverrides is whether ApplyReasoningOverrides would change a
 // request for modelID, so a caller holding raw bytes can skip the decode.
 func NeedsReasoningOverrides(modelID string, catalog OutputTokensLookup) bool {
-	return IsReasoningModel(modelID) || takesMaxCompletionTokens(modelID, catalog)
+	return takesMaxCompletionTokens(modelID, catalog)
 }
 
 // ApplyReasoningOverrides mutates the provider request body in place. It

@@ -286,8 +286,6 @@ func resolveSandboxPython(explicit string, getenv func(string) string) string {
 	return nlpgo.DefaultSandboxPython
 }
 
-// splitCSV splits "a,b,c" into ["a","b","c"], trimming whitespace and
-// dropping empty entries.
 // loadModelCatalog reads the model catalog the image ships with, or the
 // checkout's in a development run. Without one the engine still serves, and
 // every model keeps the name rule the engine applied before the catalog; the
@@ -314,6 +312,8 @@ func loadModelCatalog(logger *zap.Logger, getenv func(string) string) litellm.Ou
 	return catalog
 }
 
+// splitCSV splits "a,b,c" into ["a","b","c"], trimming whitespace and
+// dropping empty entries.
 func splitCSV(s string) []string {
 	if s == "" {
 		return nil

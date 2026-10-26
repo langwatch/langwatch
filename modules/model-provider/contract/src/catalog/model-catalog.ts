@@ -51,8 +51,8 @@ const modelCatalogEntrySchemaDefinition = z
       .object({
         supported: z.boolean(),
         parameterName: z.string(),
-        allowedValues: z.array(z.enum(["none", "low", "medium", "high", "xhigh"])),
-        defaultValue: z.enum(["none", "low", "medium", "high", "xhigh"]),
+        allowedValues: z.array(z.enum(["none", "low", "medium", "high", "xhigh", "max"])),
+        defaultValue: z.enum(["none", "low", "medium", "high", "xhigh", "max"]),
         canDisable: z.boolean(),
       })
       .optional(),

@@ -51,6 +51,13 @@ Feature: The model catalog says how each model takes its output token limit
       When the catalog is built
       Then it offers low, medium and high reasoning effort with medium by default
 
+    @unit
+    Scenario: GPT 5.4 and later models offer the reasoning efforts OpenAI documents
+      Given a GPT 5.4, 5.5, 5.6, 6 or 6.1 model in the catalog
+      When the catalog is built
+      Then it offers the reasoning efforts and the default listed on that model's OpenAI page
+      And a model with no OpenAI page of its own offers no reasoning effort
+
   Rule: An evaluator sends its output limit under the name the catalog records
 
     @unit

@@ -211,17 +211,16 @@ func TestApplyReasoningOverrides_CatalogDefaultKeepsMaxTokens(t *testing.T) {
 	assert.Equal(t, 100, body["max_tokens"])
 }
 
-// @scenario "A workflow LLM call on a model that takes max_tokens keeps max_tokens"
-func TestApplyReasoningOverrides_CatalogOverridesTheNameRule(t *testing.T) {
-	// The name rule reads gpt-5 as a reasoning model; the catalog decides the
-	// limit's name, while the reasoning-class temperature and floor still apply.
-	catalog := fakeCatalog{"openai/gpt-5-mini": "max_tokens"}
+func TestApplyReasoningOverrides_CatalogDefaultLeavesTheNameRuleRename(t *testing.T) {
+	// An entry left at the default (the openai_codex/ ids) is not a claim
+	// that the model takes max_tokens, so the name rule's rename stands.
+	catalog := fakeCatalog{"openai_codex/gpt-5.6-sol": "max_tokens"}
 	body := map[string]any{"temperature": 0.2, "max_tokens": 1000}
 
-	ApplyReasoningOverrides("openai/gpt-5-mini", body, catalog)
+	ApplyReasoningOverrides("openai_codex/gpt-5.6-sol", body, catalog)
 
-	assert.NotContains(t, body, "max_completion_tokens")
-	assert.Equal(t, reasoningMaxTokensFloor, body["max_tokens"])
+	assert.NotContains(t, body, "max_tokens")
+	assert.Equal(t, reasoningMaxTokensFloor, body["max_completion_tokens"])
 	assert.InDelta(t, 1.0, body["temperature"], 0)
 }
 
