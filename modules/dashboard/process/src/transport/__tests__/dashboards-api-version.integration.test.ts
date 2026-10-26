@@ -150,6 +150,44 @@ describe("given a Reports board and a Dashboards board, with Dashboards switched
       code: "invalid_api_version",
     });
   });
+
+  /** @scenario "AC199v Split: a caller naming no version keeps the Reports boards while Dashboards is off" */
+  it("keeps answering a caller naming no version with the Dashboards API", async () => {
+    const { reports, board, send } = await hostWithBothBoards();
+
+    const read = await send(`/api/v1/dashboards/${board.id}`);
+    const reportsId = await send(`/api/v1/dashboards/${reports.id}`);
+
+    expect({
+      read: [read.status, read.json.id, "scope" in read.json],
+      reportsId: [reportsId.status, reportsId.json.code],
+    }).toEqual({
+      read: [200, board.id, true],
+      reportsId: [404, "dashboard_not_found"],
+    });
+  });
+
+  /** @scenario "AC199v Split: a caller naming no version keeps the Reports boards while Dashboards is off" */
+  it("reorders the Reports boards for a caller naming no version, as before 2026-10-26", async () => {
+    const { app, reports, send } = await hostWithBothBoards();
+    const second = await app.create({ projectId: PROJECT, name: "Second" });
+
+    const reordered = await send("/api/v1/dashboards/reorder", {
+      method: "PUT",
+      body: { dashboardIds: [second.id, reports.id] },
+    });
+    const order = await app.getAll({ projectId: PROJECT, graphCountScope: "builder" });
+
+    expect({
+      status: reordered.status,
+      json: reordered.json,
+      order: order.map(({ id }) => id),
+    }).toEqual({
+      status: 200,
+      json: { success: true },
+      order: [second.id, reports.id],
+    });
+  });
 });
 
 describe("given a Reports board and a Dashboards board, with Dashboards switched off", () => {
@@ -215,23 +253,5 @@ describe("given a Reports board and a Dashboards board, with Dashboards switched
     expect(answers.map(({ status, json }) => ({ status, code: json.code }))).toEqual(
       answers.map(() => ({ status: 404, code: "dashboards_not_released" })),
     );
-  });
-});
-
-describe("given a Reports board and a Dashboards board, with Dashboards switched on", () => {
-  /** @scenario "AC199v Split: a caller naming no version keeps the Reports boards while Dashboards is off" */
-  it("keeps answering a caller naming no version with the Dashboards API", async () => {
-    const { reports, board, send } = await hostWithBothBoards();
-
-    const read = await send(`/api/v1/dashboards/${board.id}`);
-    const reportsId = await send(`/api/v1/dashboards/${reports.id}`);
-
-    expect({
-      read: [read.status, read.json.id, "scope" in read.json],
-      reportsId: [reportsId.status, reportsId.json.code],
-    }).toEqual({
-      read: [200, board.id, true],
-      reportsId: [404, "dashboard_not_found"],
-    });
   });
 });

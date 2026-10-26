@@ -1,8 +1,9 @@
 /**
  * A caller pins a dated family's version by URL or by `X-API-Version`, through one path; a
- * family superseded at a later date keeps only its own dates.
+ * superseded family keeps only its own dates, and answers an unpinned request handed back.
  * Spec: packages/api/specs/public-rest.feature.
  */
+import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -95,6 +96,79 @@ const sharedRatings = defineRestRouter(NotesApi)
   .build()
   .router();
 
+const HANDED_BACK = "gadgets_not_here";
+
+class GadgetRefusedError extends HandledError {
+  constructor(code: string) {
+    super(code, "Not found", { httpStatus: 404, fault: "customer" });
+    this.name = "GadgetRefusedError";
+  }
+}
+
+/** `/api/gadgets` before SECOND: a list, a read by id and a reorder echoing its body. */
+const gadgetsBefore = defineRestRouter(ThingApi)
+  .withNamespace("gadgets")
+  .withVersion(FIRST)
+  .withSupersededAt(SECOND, { unpinnedFallbackOn: HANDED_BACK })
+  .get("/", "listGadgets")
+  .withAccess(PUBLIC)
+  .withOutput(served)
+  .handle(({ app }) => app.serve({}))
+
+  .get("/:gadgetId", "getGadget")
+  .withAccess(PUBLIC)
+  .withParams(z.object({ gadgetId: z.string() }))
+  .withOutput(served)
+  .handle(({ app, input }) => app.serve({ id: input.gadgetId }))
+
+  .put("/reorder", "reorderGadgets")
+  .withAccess(PUBLIC)
+  .withoutAudit("test route")
+  .keepsRecords()
+  .withInput(z.object({ ids: z.array(z.string()) }))
+  .withOutput(served)
+  .handle(({ app, input }) => app.serve({ body: input.ids.join(",") }))
+  .build()
+  .router();
+
+/** `/api/gadgets` from SECOND: refuses every read, handing back only the list. */
+const gadgetsAfter = defineRestRouter(ThingApi)
+  .withNamespace("gadgets")
+  .withVersion(SECOND)
+  .get("/", "listGadgets")
+  .withAccess(PUBLIC)
+  .withOutput(served)
+  .handle(() => {
+    throw new GadgetRefusedError(HANDED_BACK);
+  })
+
+  .get("/:gadgetId", "getGadget")
+  .withAccess(PUBLIC)
+  .withParams(z.object({ gadgetId: z.string() }))
+  .withOutput(served)
+  .handle(() => {
+    throw new GadgetRefusedError("gadget_not_found");
+  })
+
+  .get("/:gadgetId/parts", "listGadgetParts")
+  .withAccess(PUBLIC)
+  .withParams(z.object({ gadgetId: z.string() }))
+  .withOutput(served)
+  .handle(() => {
+    throw new GadgetRefusedError(HANDED_BACK);
+  })
+
+  .patch("/:gadgetId", "renameGadget")
+  .withAccess(PUBLIC)
+  .withoutAudit("test route")
+  .keepsRecords()
+  .withParams(z.object({ gadgetId: z.string() }))
+  .withInput(z.object({ name: z.string() }))
+  .withOutput(served)
+  .handle(({ app, input }) => app.serve({ id: input.gadgetId, body: input.name }))
+  .build()
+  .router();
+
 /** Which registration answered, and with what. */
 const answering =
   (registration: string): (() => ThingApi) =>
@@ -123,6 +197,8 @@ function host() {
   server.mount(plain, answering("plain"));
   server.mount(literalNotes, answering("notes"));
   server.mount(sharedRatings, answering("rating"));
+  server.mount(gadgetsBefore, answering("first"));
+  server.mount(gadgetsAfter, answering("second"));
 
   return server;
 }
@@ -130,10 +206,10 @@ function host() {
 async function ask(
   server: RestHost,
   path: string,
-  { version, body }: { version?: string; body?: unknown } = {},
+  { version, body, method }: { version?: string; body?: unknown; method?: string } = {},
 ) {
   const response = await server.app.request(path, {
-    method: body === void 0 ? "GET" : "POST",
+    method: method ?? (body === void 0 ? "GET" : "POST"),
     headers: {
       ...(version ? { "X-API-Version": version } : {}),
       ...(body === void 0 ? {} : { "content-type": "application/json" }),
@@ -309,5 +385,56 @@ describe("given a family that is not dated", () => {
 
     expect(pinned).toEqual(bare);
     expect(pinned.answer).toBe("plain:plain");
+  });
+});
+
+describe("given a superseded registration that names its successor's hand-back refusal", () => {
+  /** @scenario "A superseded registration answers an unpinned request its successor hands back" */
+  it("answers a request naming no version that the new family refuses with that code", async () => {
+    const server = host();
+
+    const answers = await Promise.all([
+      ask(server, "/api/v1/gadgets"),
+      ask(server, "/api/gadgets"),
+    ]);
+
+    expect(answers.map(({ status, answer }) => ({ status, answer }))).toEqual([
+      { status: 200, answer: "first" },
+      { status: 200, answer: "first" },
+    ]);
+  });
+
+  /** @scenario "A superseded registration answers an unpinned request its successor hands back" */
+  it("answers a 405 of the new family only where the first registration serves that method", async () => {
+    const server = host();
+
+    const [reordered, deleted] = await Promise.all([
+      ask(server, "/api/v1/gadgets/reorder", { method: "PUT", body: { ids: ["b", "a"] } }),
+      ask(server, "/api/v1/gadgets/gadget-1", { method: "DELETE" }),
+    ]);
+
+    expect([reordered, deleted].map(({ status, answer }) => ({ status, answer }))).toEqual([
+      { status: 200, answer: "first:b,a" },
+      { status: 405, answer: undefined },
+    ]);
+  });
+
+  /** @scenario "A superseded registration answers an unpinned request its successor hands back" */
+  it("leaves any other refusal, a pinned request and a path it does not serve to the new family", async () => {
+    const server = host();
+
+    const answers = await Promise.all([
+      ask(server, "/api/v1/gadgets/gadget-1"),
+      ask(server, "/api/v1/gadgets", { version: SECOND }),
+      ask(server, `/api/v1/gadgets/${SECOND}`),
+      ask(server, "/api/v1/gadgets/gadget-1/parts"),
+    ]);
+
+    expect(answers.map(({ status, answer }) => ({ status, answer }))).toEqual([
+      { status: 404, answer: "gadget_not_found" },
+      { status: 404, answer: HANDED_BACK },
+      { status: 404, answer: HANDED_BACK },
+      { status: 404, answer: HANDED_BACK },
+    ]);
   });
 });

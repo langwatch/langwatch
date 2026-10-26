@@ -1159,6 +1159,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then it still answers 404 dashboards_not_released
     When Dashboards is switched on
     Then a key naming no version gets the Dashboards API, as in AC199u
+    But its PUT /api/v1/dashboards/reorder still reorders the Reports boards, as before 2026-10-26,
+      because the Dashboards API has no reorder route
 
   @unit
   Scenario: AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards

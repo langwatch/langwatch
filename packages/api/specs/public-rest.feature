@@ -86,7 +86,24 @@ Feature: Public REST is a first-class API surface
     When a caller pins a date from the first registration up to the day before the later one
     Then the first registration answers
     When a caller pins the later date or after, or names no date
-    Then the new family answers
+    Then the new family answers, unless it hands a request naming no date back as below
+
+  @versioning @integration
+  Scenario: A superseded registration answers an unpinned request its successor hands back
+    Given a registration superseded at a later date that names the new family's refusal code
+      that hands a request back
+    When a caller naming no version is refused by the new family with that code
+    Then the first registration answers the request at its own date, body included
+    When the new family answers 405 and the first registration serves that method on that path
+    Then the first registration answers it
+    When the first registration does not serve that method on that path
+    Then the new family's 405 stands
+    When the new family refuses with any other code
+    Then that refusal stands
+    When the caller pins a version by header or by URL
+    Then the new family's refusal stands, and nothing falls back
+    When the first registration does not serve the path at all
+    Then the new family's refusal stands
 
   @versioning @integration
   Scenario: A header on a family that is not dated changes nothing
