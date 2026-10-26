@@ -54,7 +54,7 @@
     "@slack/webhook": "catalog:",
     "better-auth": "catalog:",
     "nanoid": "catalog:",
-    "samlify": "2.13.1",
+    "samlify": "2.14.0",
     "zod": "catalog:"
   },
   "devDependencies": {
