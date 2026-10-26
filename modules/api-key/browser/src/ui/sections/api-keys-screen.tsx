@@ -32,8 +32,8 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { type LegacyKeyStatus, useLegacyKey } from "../../behavior/use-legacy-key-status.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
-import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
 import type { CreateApiKeyInput } from "../../model/api-key-form.ts";
+import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
 import {
   filterRowsByScope,
   scopeFilterAddressWrite,
