@@ -290,32 +290,32 @@ export class EntitlementModule implements EntitlementApiContract {
   }
 
   /**
-   * The deployment's bound, except that an organization with its own per-file
-   * limit answers the larger of that and what its limit derives, for the
-   * dataset size bounds only. See specs/dataset-bounds-override.feature.
+   * The organization's configured or plan bound, except that one with its own
+   * per-file limit answers the larger of that and what its limit derives, for
+   * the dataset size bounds only. See specs/dataset-bounds-override.feature.
    */
   async requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number> {
-    const deploymentBound = await this.#deploymentRequestBound(input);
-    if (!isDatasetDerivedBoundKey(input.key)) return deploymentBound;
+    const organizationBound = await this.#organizationRequestBound(input);
+    if (!isDatasetDerivedBoundKey(input.key)) return organizationBound;
 
     const { attachmentMaxMb } = await this.#tenancy.getDatasetLimits({
       organizationId: input.organizationId,
     });
-    if (attachmentMaxMb === null) return deploymentBound;
+    if (attachmentMaxMb === null) return organizationBound;
 
     const raised = deriveDatasetBounds(
       effectiveDatasetAttachmentMaxBytes(attachmentMaxMb * BYTES_PER_MEBIBYTE),
     );
 
-    return Math.max(deploymentBound, raised[input.key]);
+    return Math.max(organizationBound, raised[input.key]);
   }
 
   /**
-   * A plain-number override answers on every tier without a plan lookup;
-   * otherwise the active plan resolves through the same path `getActivePlan`
-   * uses, and its tier's bound answers — per-tier overrides included.
+   * First `LANGWATCH_REQUEST_BOUNDS_BY_ORGANIZATION` for this organization, then a
+   * plain-number `LANGWATCH_REQUEST_BOUNDS` override on every tier, then the active
+   * plan (as `getActivePlan` resolves it) answers its tier's bound, per-tier overrides included.
    */
-  async #deploymentRequestBound(input: {
+  async #organizationRequestBound(input: {
     key: RequestBoundKey;
     organizationId: string;
   }): Promise<number> {

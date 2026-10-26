@@ -100,7 +100,7 @@ export class ReadBudget {
       for (const window of admissionWindows(call, limits)) {
         const cost = window.dimension.startsWith("rows_") ? 0 : 1;
         const decision = await this.#deps.counter.check(
-          keyOf(call.credential, window),
+          keyOf({ credential: call.credential, window, organizationId }),
           window,
           cost,
         );
@@ -137,7 +137,7 @@ export class ReadBudget {
       const { limits, organizationId } = await this.#deps.limitsFor({ scope: call.scope });
       for (const window of rowWindows(call.credential, limits)) {
         const decision = await this.#deps.counter.check(
-          keyOf(call.credential, window),
+          keyOf({ credential: call.credential, window, organizationId }),
           window,
           call.rows,
         );
@@ -285,8 +285,30 @@ function rowWindows(credential: ReadCredential, limits: ReadBudgetLimits): reado
   ];
 }
 
-function keyOf(credential: ReadCredential, window: Window): string {
-  return `read-budget:${credential.type}:${credential.id}:${window.suffix}`;
+/** Credentials keyed by a person, who can belong to several organizations. */
+const PERSON_CREDENTIALS: ReadonlySet<ReadCredentialType> = new Set([
+  "session",
+  "access_token",
+  "impersonation",
+]);
+
+/**
+ * A person's window is per organization, as its allowance is: one person in two
+ * organizations never spends one window judged against whichever the latest call names.
+ */
+function keyOf({
+  credential,
+  window,
+  organizationId,
+}: {
+  credential: ReadCredential;
+  window: Window;
+  organizationId: string | null;
+}): string {
+  const owner = PERSON_CREDENTIALS.has(credential.type)
+    ? `${credential.id}:${organizationId ?? "none"}`
+    : credential.id;
+  return `read-budget:${credential.type}:${owner}:${window.suffix}`;
 }
 
 /** Rows an answer carries: a list's length, the longest top-level list of an object, else one. */

@@ -26,9 +26,9 @@ export interface EntitlementApi {
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning>;
   listOrganizationSpend(input: ListOrganizationSpendInput): Promise<ProjectSpendRollup[]>;
   /**
-   * The numeric ceiling one request dimension answers under the organization's
-   * active plan (enterprise for ENTERPRISE/OPEN_SOURCE, free for FREE/LAUNCH,
-   * paid otherwise). `LANGWATCH_REQUEST_BOUNDS` overrides win over tier values.
+   * The ceiling one request dimension answers under the organization's active plan (enterprise
+   * for ENTERPRISE/OPEN_SOURCE, free for FREE/LAUNCH, paid otherwise). Precedence: this
+   * organization's `LANGWATCH_REQUEST_BOUNDS_BY_ORGANIZATION`, `LANGWATCH_REQUEST_BOUNDS`, tier.
    */
   requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number>;
   /** Where this plan upgrades next, priced from the organization's own model and currency. */

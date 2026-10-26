@@ -172,10 +172,10 @@ describe("the tRPC read budget", () => {
 
       expect(await call({ procedure: "listRows", query: true })).toBe(200);
 
-      expect(used.get("read-budget:session:sam:reads-minute")).toBe(1);
+      expect(used.get("read-budget:session:sam:organization-1:reads-minute")).toBe(1);
       expect(scopes).toContainEqual({ tier: "project", id: "project-1" });
       await vi.waitFor(() => {
-        expect(used.get("read-budget:session:sam:rows-hour")).toBe(ROWS.length);
+        expect(used.get("read-budget:session:sam:organization-1:rows-hour")).toBe(ROWS.length);
       });
     });
   });
@@ -186,8 +186,8 @@ describe("the tRPC read budget", () => {
 
       expect(await call({ procedure: "exportRows", query: false })).toBe(200);
 
-      expect(used.get("read-budget:session:sam:exports-minute")).toBe(1);
-      expect(used.has("read-budget:session:sam:reads-minute")).toBe(false);
+      expect(used.get("read-budget:session:sam:organization-1:exports-minute")).toBe(1);
+      expect(used.has("read-budget:session:sam:organization-1:reads-minute")).toBe(false);
     });
   });
 

@@ -6,16 +6,24 @@ import { describe, expect, it } from "vitest";
 
 import { redisRateLimiter } from "../src/redis-members.ts";
 
-/** The script and the read the limiter issues, over a memory counter that keeps each expiry. */
+/** The script and the read the limiter issues, over a memory counter that keeps expiry and cost. */
 function memoryRedis() {
   const counters = new Map<string, number>();
   const expiries = new Map<string, number>();
   const commands: string[] = [];
 
   const redis = {
-    eval: async (_script: string, _keys: number, key: string, seconds: number) => {
+    eval: async (
+      script: string,
+      _keys: number,
+      key: string,
+      seconds: number,
+      cost: number | string,
+    ) => {
       commands.push("eval");
-      const used = (counters.get(key) ?? 0) + 1;
+      // Spends the cost only when the script increments by its second argument.
+      const step = script.includes("'INCRBY', KEYS[1], ARGV[2]") ? Number(cost) : 1;
+      const used = (counters.get(key) ?? 0) + step;
       counters.set(key, used);
       if (!expiries.has(key)) expiries.set(key, seconds);
 
@@ -80,6 +88,40 @@ describe("given a limiter constructed with a window", () => {
       const refused = await limiter.check("other");
 
       expect(refused.allowed).toBe(false);
+    });
+  });
+});
+
+describe("given a caller that names a cost", () => {
+  describe("when the cost is 0", () => {
+    it("reads the window without spending it, and still refuses a spent one", async () => {
+      const { redis, counters } = memoryRedis();
+      const limiter = redisRateLimiter(redis, { requests: 2, seconds: 60 });
+
+      await limiter.check("caller-1", undefined, 2);
+
+      expect(await limiter.check("caller-1", undefined, 0)).toEqual({ allowed: true });
+      expect(counters.get("member:rate-limit:caller-1")).toBe(2);
+
+      await limiter.check("caller-1", undefined, 1);
+      const refused = await limiter.check("caller-1", undefined, 0);
+
+      expect(refused).toMatchObject({ allowed: false, used: 3 });
+      expect(counters.get("member:rate-limit:caller-1")).toBe(3);
+    });
+  });
+
+  describe("when the cost is n", () => {
+    it("advances the counter by n", async () => {
+      const { redis, counters } = memoryRedis();
+      const limiter = redisRateLimiter(redis, { requests: 10, seconds: 60 });
+
+      expect(await limiter.check("caller-1", undefined, 5)).toEqual({ allowed: true });
+      expect(counters.get("member:rate-limit:caller-1")).toBe(5);
+
+      const refused = await limiter.check("caller-1", undefined, 6);
+
+      expect(refused).toMatchObject({ allowed: false, used: 11 });
     });
   });
 });

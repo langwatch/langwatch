@@ -16,8 +16,8 @@ function scopeOfInput(input: unknown): AuthzDeclaredScopeId | null {
   return typeof projectId === "string" ? { tier: "project", id: projectId } : null;
 }
 
-/** Absent a budget, every call passes through uncounted. */
-export function trpcReadBudget<TContext>(readBudget: TrpcReadBudget<TContext> | undefined) {
+/** Counts the reads and exports the caller makes; a write passes through uncounted. */
+export function trpcReadBudget<TContext>(readBudget: TrpcReadBudget<TContext>) {
   return async ({
     ctx,
     path,
@@ -31,7 +31,6 @@ export function trpcReadBudget<TContext>(readBudget: TrpcReadBudget<TContext> | 
     input?: unknown;
     next: () => Promise<MiddlewareResult<object>>;
   }): Promise<MiddlewareResult<object>> => {
-    if (!readBudget) return next();
     const kind = readKindOf({
       operation: path.split(".").at(-1) ?? path,
       method: type === "query" ? "GET" : "POST",

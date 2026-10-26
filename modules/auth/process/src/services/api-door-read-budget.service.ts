@@ -87,15 +87,20 @@ export class ApiDoorReadBudgetService {
       organizationId
         ? this.#peers.entitlements.requestBound({ key, organizationId })
         : Promise.resolve(resolveRequestBound(key, "PRO"));
-    const [readsPerMinute, rowsPerHour, rowsPerDay, exportsPerMinute, exportsPerDay] =
-      await Promise.all([
-        bound("readRequestsPerMinute"),
-        bound("readRowsPerHour"),
-        bound("readRowsPerDay"),
-        bound("readExportsPerMinute"),
-        bound("readExportsPerDay"),
-      ]);
-    const [impersonationReadsPerMinute, impersonationRowsPerDay] = await Promise.all([
+    const [
+      readsPerMinute,
+      rowsPerHour,
+      rowsPerDay,
+      exportsPerMinute,
+      exportsPerDay,
+      impersonationReadsPerMinute,
+      impersonationRowsPerDay,
+    ] = await Promise.all([
+      bound("readRequestsPerMinute"),
+      bound("readRowsPerHour"),
+      bound("readRowsPerDay"),
+      bound("readExportsPerMinute"),
+      bound("readExportsPerDay"),
       bound("impersonationReadsPerMinute"),
       bound("impersonationRowsPerDay"),
     ]);

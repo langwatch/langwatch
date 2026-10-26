@@ -1154,7 +1154,7 @@ export type TrpcRuntimeMembers<TContext> = Readonly<{
    * throttles at all. Absent, every procedure passes through uncounted.
    */
   throttle?: TrpcThrottle<TContext>;
-  /** Counts every query and export against the credential that made it. */
+  /** Counts every query and export against the credential that made it; absent, none is. */
   readBudget?: TrpcReadBudget<TContext>;
   audit: Readonly<{
     record(entry: TrpcRuntimeAuditEntry): Promise<void>;
@@ -1226,7 +1226,7 @@ export function createTrpcRuntime<
   const trace = tracer(members);
   const handledError = handledErrors(members);
   const throttle = members.throttle ? trpcThrottle(members.throttle) : undefined;
-  const readBudget = trpcReadBudget(members.readBudget);
+  const readBudget = members.readBudget ? trpcReadBudget(members.readBudget) : undefined;
 
   const build = (
     request: TrpcProcedureRequest<TContext>,
@@ -1243,25 +1243,14 @@ export function createTrpcRuntime<
       .use(trace)
       .use(requestLog(members, { anonymous }))
       .use(handledError)
-      .use(
-        access({
-          members,
-          declaration: request.access,
-          procedure: request.procedure,
-          kind: request.member.kind,
-          app: request.app,
-          contexts,
-          ...(request.entitlement ? { entitlement: request.entitlement } : {}),
-          ...(request.mintsCredential ? { mintsCredential: request.mintsCredential } : {}),
-          refusedOnAggregate: request.refusedOnAggregate === true,
-          ...(request.onRefused ? { onRefused: request.onRefused } : {}),
-        }),
-      );
+      .use(accessOf({ members, request, contexts }));
 
     // The throttle runs AFTER the check, so the caller it counts is the one
     // the door resolved, and BEFORE the trail, so a refused call writes no
     // audit row.
-    const built = (throttle ? checked.use(throttle) : checked).use(readBudget).use(
+    const throttled = throttle ? checked.use(throttle) : checked;
+    const budgeted = readBudget ? throttled.use(readBudget) : throttled;
+    const built = budgeted.use(
       auditTrail(members, {
         anonymous,
         ...(request.audit ? { target: auditTargetPort({ members, request }) } : {}),
@@ -1316,6 +1305,30 @@ function contextBindings<TContext>(
   });
 
   return new Map(contexts.map((binding) => [binding.trpcMiddlewareContext.name, binding] as const));
+}
+
+/** The access step for one procedure request, its optional gates carried only when set. */
+function accessOf<TContext extends object>({
+  members,
+  request,
+  contexts,
+}: {
+  members: TrpcRuntimeMembers<TContext>;
+  request: TrpcProcedureRequest<TContext>;
+  contexts: readonly BoundContext<TContext>[];
+}) {
+  return access({
+    members,
+    declaration: request.access,
+    procedure: request.procedure,
+    kind: request.member.kind,
+    app: request.app,
+    contexts,
+    ...(request.entitlement ? { entitlement: request.entitlement } : {}),
+    ...(request.mintsCredential ? { mintsCredential: request.mintsCredential } : {}),
+    refusedOnAggregate: request.refusedOnAggregate === true,
+    ...(request.onRefused ? { onRefused: request.onRefused } : {}),
+  });
 }
 
 /**

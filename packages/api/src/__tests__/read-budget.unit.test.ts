@@ -12,6 +12,7 @@ import {
   READ_RATE_LIMIT_EXCEEDED_EVENT,
   ReadBudget,
   type ReadBudgetLimits,
+  type ReadCall,
   type ReadCredential,
   readKindOf,
   rowsOf,
@@ -75,14 +76,17 @@ function recordingLogger() {
 function budgetWith({
   enforced,
   counter = memoryCounter(),
+  organizationOf = () => "org-1",
 }: {
   enforced: boolean;
   counter?: RateLimiter;
+  organizationOf?: (scope: ReadCall["scope"]) => string | null;
 }) {
   const { logger, lines } = recordingLogger();
   const budget = ReadBudget.create({
     counter,
-    limitsFor: () => Promise.resolve({ limits: LIMITS, organizationId: "org-1" }),
+    limitsFor: ({ scope }) =>
+      Promise.resolve({ limits: LIMITS, organizationId: organizationOf(scope) }),
     enforced: () => Promise.resolve(enforced),
     logger,
   });
@@ -100,8 +104,12 @@ async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
   }
 }
 
-function readBy(credential: ReadCredential, kind: "read" | "export" = "read") {
-  return { credential, kind, route: "traces.searchTraces", scope: SCOPE } as const;
+function readBy(
+  credential: ReadCredential,
+  kind: "read" | "export" = "read",
+  scope: ReadCall["scope"] = SCOPE,
+) {
+  return { credential, kind, route: "traces.searchTraces", scope } as const;
 }
 
 describe("ReadBudget", () => {
@@ -126,6 +134,37 @@ describe("ReadBudget", () => {
 
       expect(await codeOf(budget.admit(readBy(KEY_B)))).toBeUndefined();
       expect(await codeOf(budget.admit(readBy(KEY_A)))).toBe("read_rate_limited");
+    });
+  });
+
+  describe("given a person who belongs to two organizations", () => {
+    const ORG_ONE_PROJECT = { tier: "project", id: "project-1" } as const;
+    const ORG_TWO_PROJECT = { tier: "project", id: "project-2" } as const;
+    const organizationOf = (scope: ReadCall["scope"]) =>
+      scope?.id === ORG_TWO_PROJECT.id ? "org-2" : "org-1";
+
+    /** @scenario "A person in two organizations has a separate budget in each" */
+    it("admits a read in the second organization once the first's minute is spent", async () => {
+      const { budget } = budgetWith({ enforced: true, organizationOf });
+      for (let call = 0; call < LIMITS.readsPerMinute; call += 1) {
+        await budget.admit(readBy(SESSION, "read", ORG_ONE_PROJECT));
+      }
+
+      expect(await codeOf(budget.admit(readBy(SESSION, "read", ORG_TWO_PROJECT)))).toBeUndefined();
+      expect(await codeOf(budget.admit(readBy(SESSION, "read", ORG_ONE_PROJECT)))).toBe(
+        "read_rate_limited",
+      );
+    });
+
+    /** @scenario "A key's budget does not split by the organization a call names" */
+    it("keeps one window for a key bound to its own organization", async () => {
+      const counter = memoryCounter();
+      const { budget } = budgetWith({ enforced: true, counter, organizationOf });
+
+      await budget.admit(readBy(KEY_A, "read", ORG_ONE_PROJECT));
+      await budget.admit(readBy(KEY_A, "read", ORG_TWO_PROJECT));
+
+      expect(counter.used.get("read-budget:api_key:key-a:reads-minute")).toBe(2);
     });
   });
 
@@ -182,8 +221,8 @@ describe("ReadBudget", () => {
 
       await budget.record({ ...readBy(SESSION), rows: 500 });
 
-      expect(counter.used.get("read-budget:session:user-1:rows-hour")).toBe(500);
-      expect(counter.used.get("read-budget:session:user-1:rows-day")).toBe(500);
+      expect(counter.used.get("read-budget:session:user-1:org-1:rows-hour")).toBe(500);
+      expect(counter.used.get("read-budget:session:user-1:org-1:rows-day")).toBe(500);
     });
 
     /** @scenario "A credential past its hourly row allowance is refused before the next read runs" */
@@ -227,8 +266,8 @@ describe("ReadBudget", () => {
 
       await budget.admit(readBy(OPERATOR));
 
-      expect(counter.used.get("read-budget:impersonation:operator-1:reads-minute")).toBe(1);
-      expect(counter.used.has("read-budget:session:user-1:reads-minute")).toBe(false);
+      expect(counter.used.get("read-budget:impersonation:operator-1:org-1:reads-minute")).toBe(1);
+      expect(counter.used.has("read-budget:session:user-1:org-1:reads-minute")).toBe(false);
       expect(lines.find((line) => line.fields.event === "impersonated_read")?.fields).toMatchObject(
         { impersonatorId: "operator-1", subjectUserId: "user-1", route: "traces.searchTraces" },
       );
@@ -240,7 +279,7 @@ describe("ReadBudget", () => {
 
       await budget.record({ ...readBy(OPERATOR), rows: LIMITS.impersonationRowsPerDay + 1 });
 
-      expect(counter.used.has("read-budget:impersonation:operator-1:rows-hour")).toBe(false);
+      expect(counter.used.has("read-budget:impersonation:operator-1:org-1:rows-hour")).toBe(false);
       expect(exceeded().map((line) => line.fields)).toEqual([
         expect.objectContaining({
           dimension: "rows_per_day",

@@ -10,12 +10,15 @@ Feature: Per-credential read and export rate limits
   # behind a busy project. A credential is one of:
   #
   #   api_key            a project or organization API key, by key id
-  #   access_token       a CLI personal access token, by its person
+  #   access_token       a CLI personal access token, by its person and organization
   #   legacy_project_key the project's legacy key, by project
   #   ingestion_key      an ingestion template key, by key id
   #   langy_session_key  a Langy session key, by key id
-  #   session            a signed-in browser session, by person
-  #   impersonation      a platform operator acting as somebody, by the operator
+  #   session            a signed-in browser session, by person and organization
+  #   impersonation      a platform operator acting as somebody, by the operator and organization
+  #
+  # A person can belong to several organizations, and each organization's allowance
+  # is its own, so a person's budget is counted per organization the call names.
   #
   # Two dimensions are counted: requests per minute, and rows returned per hour
   # and per day. An export counts against a tighter allowance of its own,
@@ -54,6 +57,19 @@ Feature: Per-credential read and export rate limits
       Given one API key on a project has used its whole minute's allowance
       When a second API key on the same project makes a read
       Then the second key's read is admitted
+
+    @unit
+    Scenario: A person in two organizations has a separate budget in each
+      Given a person in two organizations has used their whole minute's allowance in the first
+      When they make a read in the second organization
+      Then the read is admitted
+      And another read in the first organization is refused when enforcement is on
+
+    @unit
+    Scenario: A key's budget does not split by the organization a call names
+      Given an API key that has made no reads yet
+      When it makes reads naming two organizations
+      Then every read counts against the key's one budget
 
     @unit
     Scenario: A read past the minute's allowance is refused when enforcement is on
@@ -124,6 +140,8 @@ Feature: Per-credential read and export rate limits
       When its allowance is resolved
       Then the raised allowance answers for that organization
       And every other organization keeps its plan's allowance
+
+  Rule: The budget fails open
 
     @unit
     Scenario: A store failure never refuses a read
