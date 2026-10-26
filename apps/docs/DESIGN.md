@@ -24,6 +24,23 @@ redirects have static fallback pages; pattern rules and HTTP behavior belong to
 a future host. CI validates and uploads the artifact, without cloud deployment
 or host-specific code generation.
 
+## Feature layout
+
+`src/` is features, not modules: each folder under `src/features/` owns one subject in up to four
+layers, and the lint rule `langwatch/app-feature-layout` holds the shape (opt-in and graph in
+`package.json`, tables in `packages/oxlint-rules/grammar/app-feature-layout.mjs`, decision in ADR-137).
+
+- `model/` is pure and takes only `model/`. `ui/` (build-time React) takes `model/` and `ui/`.
+  `compile/` (Node, Vite plugins, MDX) and `browser/` (islands) take `model/` and their own layer,
+  never `ui/`: rendering a component is the composition's job, and an island must not bundle React.
+- Another feature is imported only through its entry, `features/<name>/<layer>.ts`, which holds
+  named re-exports of that layer and nothing else. The browser entry is separate from the build-time
+  ones, so an island pulls in no build code; it never re-exports an island that runs on load.
+- `package.json` `langwatch.features` names each feature and the features it imports. The graph is
+  acyclic: code, releases, content, api-reference, navigation, discovery, search, shell.
+- `lib/` and the top-level files (`config.ts`, `paths.ts`) are leaves every place imports. `app/`,
+  `site/`, `browser/` and `testing/` compose features through their entries and nothing imports them.
+
 ## Browser boundaries
 
 A small bootstrap installs same-origin HTML navigation and a module-script

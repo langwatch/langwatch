@@ -3,7 +3,7 @@
 # runs on every event, and passes when the docs jobs passed or were skipped
 # because nothing they cover changed.
 #
-# Shape: `changes` gates; `verify` (typecheck, unit tests) and `build` (the
+# Shape: `changes` gates; `verify` (typecheck, lint, unit tests) and `build` (the
 # site at the root and under /docs, uploaded once) run in parallel; the
 # browser and link checks, and the audit, download the build instead of
 # rebuilding it.
@@ -47,6 +47,10 @@ jobs:
               - 'apps/docs/**'
               - 'packages/design-system/**'
               - 'packages/time/**'
+              - 'packages/oxlint-rules/**'
+              - 'packages/architecture-enforcer/oxlint.architecture.jsonc'
+              - 'packages/architecture-enforcer/oxlint-plugin.mjs'
+              - '.oxlintrc*.jsonc'
               - 'CHANGELOG.md'
               - '.gitattributes'
               - 'pnpm-lock.yaml'
@@ -73,7 +77,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/docs-site... @langwatch/workspace"
+          install: "@langwatch/docs-site... @langwatch/architecture-enforcer... @langwatch/workspace"
       # The typecheck's references reach observability, which imports the built
       # SDK, so build it first (the workspace root install brings Nx).
       - uses: ./.github/actions/nx-cache
@@ -83,6 +87,12 @@ jobs:
         run: pnpm exec nx run langwatch:build --outputStyle=static
       - name: Typecheck the docs app
         run: pnpm --filter @langwatch/docs-site typecheck
+      # Every rule, the langwatch plugin's app-feature-layout included, over the docs app alone.
+      # 0 turns off oxlint's local slot queue on a runner only this job uses.
+      - name: Lint the docs app
+        env:
+          LANGWATCH_LINT_SLOTS: "0"
+        run: pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc apps/docs
       - name: Test docs generation and local routing
         run: VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/docs-site test
 
