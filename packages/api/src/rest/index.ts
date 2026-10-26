@@ -31,6 +31,7 @@ export {
 // a route states its sources, its answers and its door with.
 export {
   browserSessionContext,
+  callerAddressContext,
   defineRestRouter,
   permissionOf,
   projectRequestContext,
@@ -108,6 +109,7 @@ export type {
   IdempotencyReceiptRecord,
 } from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
+export { recordRequestPrincipal } from "./request-principal.ts";
 export {
   bindMiddlewareContext,
   bodyLimit,
@@ -154,6 +156,7 @@ export {
   type AppRestProjectVariables,
   browserCallerOfRequest,
   browserSessionOfRequest,
+  callerAddressOfRequest,
   credentialPrincipalOf,
   credentialPrincipalOfToken,
   keyCredentialOfRequest,
@@ -176,8 +179,10 @@ export {
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
+  recordRouteTemplate,
   recordScimCredential,
   resolvePersonalCaller,
+  routeTemplateOf,
   type RestBrowserCaller,
   type RestResolvedScimCredential,
   scimCredentialOfRequest,

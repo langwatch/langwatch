@@ -8,6 +8,7 @@ import {
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, REQUEST_CAUSE_FIELD, validationMeta } from "@langwatch/observability";
+import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
@@ -74,9 +75,11 @@ import {
   type RestConfirmationGate,
   type RestConfirmationReceipt,
 } from "./confirmation.ts";
+import { doorCredentialOf } from "./credential-census.ts";
 import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
+  recordRouteTemplate,
 } from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
@@ -111,6 +114,7 @@ import {
   documentRoute,
   requiresBody,
 } from "./openapi.ts";
+import { recordRequestPrincipal, requestPrincipalOf } from "./request-principal.ts";
 import {
   bodyLimit,
   cachedRestAnswer,
@@ -146,6 +150,7 @@ import {
   ENDPOINT_ROUTE,
   isDeclined,
   REQUEST_FAMILY,
+  ROUTE_TEMPLATE,
   withRetryAfter,
 } from "./response.ts";
 
@@ -330,6 +335,7 @@ function mountFamilyRoutes<Api>({
           ports,
           options,
           contexts,
+          template: basePath === "" ? mount.path : mergePath(basePath, mount.path),
           ...mount.context,
         }),
         policy: registryPolicy({ route, options, credential }),
@@ -538,6 +544,8 @@ function assertPortsBound<Api>({
 
     assertDoorQuestions({ address, route, door, credential });
 
+    assertLegacyKeyScopes({ address, route, door, credential });
+
     if (anonymousOnRefusal(route) && !door.identify) {
       throw new Error(
         `REST ${address} answers a refused credential as none, and this runtime ` +
@@ -593,6 +601,38 @@ function assertDoorQuestions({
 /** Whether the route asks its plan before its permission (Q31), at the credential's scope. */
 function planFirst(route: RestTransportRoute<unknown>): boolean {
   return route.entitlement?.before === "permission";
+}
+
+/**
+ * A legacy key scope is told to the project door when it asks the route's permission, so the
+ * route must ask one before the body; a door that lists its scopes refuses a name it lacks.
+ */
+function assertLegacyKeyScopes({
+  address,
+  route,
+  door,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  door: RestIdentity;
+  credential: RestDoorCredential;
+}): void {
+  const scopes = route.legacyKeyScopes;
+  if (!scopes) return;
+
+  if (credential !== "project" || !route.permission || identifiedFirst({ route, credential })) {
+    throw new Error(
+      `REST ${address} names a legacy key scope, which only a project door route that asks ` +
+        "its permission before the body can carry",
+    );
+  }
+  const unknown = door.legacyKeyScopes
+    ? scopes.filter((scope) => !door.legacyKeyScopes?.includes(scope))
+    : [];
+  if (unknown.length > 0) {
+    throw new Error(`REST ${address} names unknown legacy key scopes: ${unknown.join(", ")}`);
+  }
 }
 
 /** Whether the door only identifies the caller, leaving the permission to be asked later. */
@@ -772,6 +812,7 @@ function routeStack<Api>({
   ports,
   options,
   contexts,
+  template,
   version,
   status,
   paramSource = "route",
@@ -782,6 +823,8 @@ function routeStack<Api>({
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
   contexts: ReadonlyMap<string, MiddlewareContextBinding>;
+  /** The full path template this mount answers, which the credential census counts by. */
+  template: string;
   version: string;
   status: VersionStatus;
   paramSource?: "route" | "context";
@@ -797,7 +840,12 @@ function routeStack<Api>({
   const publishable = route.anyMethod !== true && declaration.credential !== "browser";
   const documents = documented && publishable;
   const credential = route.credential ?? declaration.credential;
-  const door = authenticateMiddleware({ route, credential, ports });
+  const door = authenticateMiddleware({
+    route,
+    credential,
+    ports,
+    template: `${route.method.toUpperCase()} ${basePathOf(declaration)}${route.path}`,
+  });
   const refusal = routeRefusal({ route, door: doorOf({ credential, ports }) });
 
   // Ahead of the validators: they read the body to parse it, and a stream
@@ -827,7 +875,7 @@ function routeStack<Api>({
   return [
     ...legacyErrorScopes(route),
     ...(refusal ? [protocolRefusalScope({ route, refusal })] : []),
-    versionContext({ route, family, version, status }),
+    versionContext({ route, family, template, version, status }),
     ...(documents
       ? [
           documentRoute({
@@ -890,13 +938,17 @@ function authenticateMiddleware({
   route,
   credential,
   ports,
+  template,
 }: {
   route: RestTransportRoute<unknown>;
   credential: RestDoorCredential;
   ports: RestRuntimeMembers;
+  /** The route as `METHOD /path/:param`, which the door may log; never the concrete URL. */
+  template: string;
 }): MiddlewareHandler {
   return async (context, next) => {
     if (route.access?.kind !== "public") {
+      recordRouteTemplate(context.req.raw, template);
       const caller = await callerOf({
         route,
         door: doorOf({ credential, ports }),
@@ -913,7 +965,21 @@ function authenticateMiddleware({
         });
       }
 
+      if (caller) {
+        noteRequestCredential(doorCredentialOf({ credential, caller, request: context.req.raw }));
+      }
       callers.set(context, caller);
+      recordRequestPrincipal({
+        context,
+        read: () =>
+          requestPrincipalOf({
+            actor: caller?.actor,
+            key:
+              caller && isKeyDoor(credential)
+                ? recordedKeyOfDoor({ door: credential, request: context.req.raw })
+                : (caller?.key ?? null),
+          }),
+      });
     }
 
     await next();
@@ -1072,11 +1138,13 @@ function deprecationLog<Api>({
 function versionContext({
   route,
   family,
+  template,
   version,
   status,
 }: {
   route: RestTransportRoute<unknown>;
   family: string;
+  template: string;
   version: string;
   status: VersionStatus;
 }): MiddlewareHandler {
@@ -1085,6 +1153,7 @@ function versionContext({
 
   return async (context, next) => {
     context.set(ENDPOINT_ROUTE, identity);
+    context.set(ROUTE_TEMPLATE, template);
     context.set(REQUEST_FAMILY, family);
 
     try {
@@ -1430,6 +1499,11 @@ function handlerMiddleware<Api>({
           actor: null,
           scope: null,
           target: null,
+          recordKey: (key) =>
+            recordRequestPrincipal({
+              context,
+              read: () => requestPrincipalOf({ actor: null, key }),
+            }),
         }),
         ...(await resolveContexts({ route, contexts, context, input })),
       );
@@ -1964,6 +2038,7 @@ function handlerArguments<Api>({
   authorization = null,
   session,
   key,
+  recordKey,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -1975,6 +2050,7 @@ function handlerArguments<Api>({
   authorization?: Authorization | null;
   session?: unknown;
   key?: RestKeyCredential | undefined;
+  recordKey?: ((key: RestKeyCredential) => void) | undefined;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -1996,6 +2072,7 @@ function handlerArguments<Api>({
     response: route.response
       ? producerFor({ kind: route.response.kind, accept: context.req.header("Accept") ?? "" })
       : undefined,
+    ...(recordKey ? { recordKey } : {}),
   };
 }
 
@@ -2239,6 +2316,7 @@ async function callerOf({
     permissions: routePermissions(route),
     ...(route.permissionReach ? { reach: route.permissionReach } : {}),
     ...(route.keyKinds ? { keyKinds: route.keyKinds } : {}),
+    ...(route.legacyKeyScopes ? { legacyKeyScopes: route.legacyKeyScopes } : {}),
   });
 }
 
@@ -2843,6 +2921,7 @@ function dateFallback<Api>({
       ports,
       options,
       contexts,
+      template: mergePath(basePath, route.path || "/"),
       version: declaration.version,
       status: "stable",
       paramSource: "context",

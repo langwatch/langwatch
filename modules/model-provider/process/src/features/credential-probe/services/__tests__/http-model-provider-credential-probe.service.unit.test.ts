@@ -1255,6 +1255,22 @@ describe("given a deployment that points a provider's probe at its own API root"
 
     expect(mockFetch).toHaveBeenCalledWith("https://api.deepseek.com/v1/models", expect.anything());
   });
+
+  it("asks Doubleword's own models endpoint for a Doubleword key", async () => {
+    const result = await probeAt({
+      provider: "doubleword",
+      customKeys: { DOUBLEWORD_API_KEY: "any-key" },
+      deployed: {},
+    });
+
+    expect(result.outcome).toBe("verified");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.doubleword.ai/v1/models",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer any-key" }),
+      }),
+    );
+  });
 });
 
 describe("validateKeyWithCustomUrl", () => {

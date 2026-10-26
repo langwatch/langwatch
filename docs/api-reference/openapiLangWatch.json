@@ -28680,6 +28680,12 @@
                           },
                           "tokensKnown": {
                             "type": "boolean"
+                          },
+                          "aiUnits": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -28690,7 +28696,8 @@
                           "cacheCreationTokens",
                           "totalTokens",
                           "costUsd",
-                          "tokensKnown"
+                          "tokensKnown",
+                          "aiUnits"
                         ],
                         "additionalProperties": false
                       }
@@ -29081,6 +29088,12 @@
                           },
                           "tokensKnown": {
                             "type": "boolean"
+                          },
+                          "aiUnits": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -29091,7 +29104,8 @@
                           "cacheCreationTokens",
                           "totalTokens",
                           "costUsd",
-                          "tokensKnown"
+                          "tokensKnown",
+                          "aiUnits"
                         ],
                         "additionalProperties": false
                       }
@@ -77254,6 +77268,20 @@
                       "updatedAt": {
                         "type": "string"
                       },
+                      "autoPausedAt": {
+                        "description": "When the monitor paused itself because its evaluations mostly failed.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "autoPausedReason": {
+                        "description": "Why the monitor paused itself.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -77275,6 +77303,8 @@
                       "threadIdleTimeout",
                       "createdAt",
                       "updatedAt",
+                      "autoPausedAt",
+                      "autoPausedReason",
                       "platformUrl"
                     ],
                     "additionalProperties": false
@@ -77370,6 +77400,20 @@
                     "updatedAt": {
                       "type": "string"
                     },
+                    "autoPausedAt": {
+                      "description": "When the monitor paused itself because its evaluations mostly failed.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "autoPausedReason": {
+                      "description": "Why the monitor paused itself.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -77391,6 +77435,8 @@
                     "threadIdleTimeout",
                     "createdAt",
                     "updatedAt",
+                    "autoPausedAt",
+                    "autoPausedReason",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -77594,6 +77640,20 @@
                     "updatedAt": {
                       "type": "string"
                     },
+                    "autoPausedAt": {
+                      "description": "When the monitor paused itself because its evaluations mostly failed.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "autoPausedReason": {
+                      "description": "Why the monitor paused itself.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -77615,6 +77675,8 @@
                     "threadIdleTimeout",
                     "createdAt",
                     "updatedAt",
+                    "autoPausedAt",
+                    "autoPausedReason",
                     "platformUrl"
                   ],
                   "additionalProperties": false
@@ -77743,6 +77805,20 @@
                     "updatedAt": {
                       "type": "string"
                     },
+                    "autoPausedAt": {
+                      "description": "When the monitor paused itself because its evaluations mostly failed.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "autoPausedReason": {
+                      "description": "Why the monitor paused itself.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -77764,6 +77840,8 @@
                     "threadIdleTimeout",
                     "createdAt",
                     "updatedAt",
+                    "autoPausedAt",
+                    "autoPausedReason",
                     "platformUrl"
                   ],
                   "additionalProperties": false

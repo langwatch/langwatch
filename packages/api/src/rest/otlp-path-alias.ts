@@ -6,6 +6,8 @@
 import { canonicalOtlpPath, stampCorrectedPath } from "@langwatch/observability";
 import type { Hono } from "hono";
 
+import { ClientAddress } from "../policy/client-address.ts";
+
 /** The request onto its canonical OTLP path, the original stamped in a header; else itself. */
 export function canonicalOtlpRequest(request: Request): Request {
   const url = new URL(request.url);
@@ -14,7 +16,7 @@ export function canonicalOtlpRequest(request: Request): Request {
   if (!canonical || canonical === originalPath) return request;
 
   url.pathname = canonical;
-  const rewritten = new Request(url, request);
+  const rewritten = ClientAddress.carried({ from: request, to: new Request(url, request) });
   stampCorrectedPath({ headers: rewritten.headers, originalPath });
 
   return rewritten;

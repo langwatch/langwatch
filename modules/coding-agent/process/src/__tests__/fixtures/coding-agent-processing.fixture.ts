@@ -104,10 +104,15 @@ export class TestModelProviderService implements ModelProviderApi {
 
   constructor(
     private readonly estimate: (input: ModelCostEstimateInput) => number = () => 0,
+    private readonly priced: (model: string) => boolean = () => true,
   ) {}
 
   estimateCost(input: ModelCostEstimateInput): number {
     return this.estimate(input);
+  }
+
+  isModelPriced(model: string): boolean {
+    return this.priced(model);
   }
 
   listForProject(): Promise<[]> {
