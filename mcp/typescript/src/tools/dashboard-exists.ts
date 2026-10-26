@@ -4,7 +4,7 @@ import { LangWatchApiError } from "../langwatch-api.js";
 const isNotFound = (error: unknown) => error instanceof LangWatchApiError && error.status === 404;
 
 /**
- * Whether /api/v1/boards/{id} answers for this id. A 404 means the board routes are off for the
+ * Whether /api/v1/dashboards/{id} answers for this id. A 404 means the board routes are off for the
  * project (Dashboards switched off) or the id is unknown; the caller then takes the project-path
  * routes, whose own check refuses an unknown id.
  */

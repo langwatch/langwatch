@@ -2,7 +2,6 @@ import type { HandledErrorFault, SerializedReason } from "@langwatch/handled-err
 
 import packageJson from "../package.json" with { type: "json" };
 import { getConfig, requireApiKey } from "./config.ts";
-import { noteDashboardsDeprecation } from "./dashboards-deprecation.ts";
 import type { EvaluationSummary } from "./utils/format-evaluations.ts";
 
 /** Every request names itself so the platform attributes it. */
@@ -15,7 +14,7 @@ export const MCP_IDENTITY_HEADERS: Record<string, string> = {
 };
 
 /** The dated API version every request names (specs/api-reference/client-api-version.feature). */
-export const LANGWATCH_API_VERSION = "2026-08-07";
+export const LANGWATCH_API_VERSION = "2026-10-26";
 
 /** Names the hosted MCP server's calls apart from a local server's. */
 export const HOSTED_MCP_HEADER = "X-LangWatch-MCP-Host";
@@ -301,7 +300,6 @@ export async function makeRequest(
     headers,
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
-  noteDashboardsDeprecation({ path, headers: response.headers });
 
   if (!response.ok) {
     const responseBody = await response.text();

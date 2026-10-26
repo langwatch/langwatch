@@ -8,7 +8,7 @@ import { getCurrentProject } from "../langwatch-api-projects.js";
 import { LangWatchApiError } from "../langwatch-api.js";
 
 /**
- * /api/v1/boards first, so no deprecation note; it answers 404 while Dashboards is off (or on a
+ * /api/v1/dashboards first; it answers 404 while Dashboards is off (or on a
  * server without it), and only then the project-path list, which answers either way.
  */
 async function boardsOfProject() {

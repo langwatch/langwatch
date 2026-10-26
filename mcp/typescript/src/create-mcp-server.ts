@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.ts";
-import { withDashboardsDeprecationNote } from "./dashboards-deprecation.ts";
 import { fetchDocumentation } from "./documentation-fetch.ts";
 import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.ts";
 import {
@@ -1326,22 +1325,20 @@ function registerAgentTools(server: McpServer): void {
 function registerDashboardTools(server: McpServer): void {
   server.tool(
     "platform_list_dashboards",
-    "List all analytics dashboards in the LangWatch project.",
+    "List the Analytics Reports dashboards in the LangWatch project (/api/v1/analytics/reports).",
     {},
     withToolLogging("platform_list_dashboards", async () => {
       requireApiKey();
       const { handleListDashboards } = await import("./tools/list-dashboards.ts");
       return {
-        content: [
-          { type: "text", text: withDashboardsDeprecationNote(await handleListDashboards()) },
-        ],
+        content: [{ type: "text", text: await handleListDashboards() }],
       };
     }),
   );
 
   server.tool(
     "platform_get_dashboard",
-    "Get a dashboard by its ID, including its graphs.",
+    "Get an Analytics Reports dashboard by its ID, including its graphs.",
     {
       id: z.string().describe("The dashboard ID"),
     },
@@ -1349,16 +1346,14 @@ function registerDashboardTools(server: McpServer): void {
       requireApiKey();
       const { handleGetDashboard } = await import("./tools/get-dashboard.ts");
       return {
-        content: [
-          { type: "text", text: withDashboardsDeprecationNote(await handleGetDashboard(params)) },
-        ],
+        content: [{ type: "text", text: await handleGetDashboard(params) }],
       };
     }),
   );
 
   server.tool(
     "platform_create_dashboard",
-    "Create a new analytics dashboard.",
+    "Create a new Analytics Reports dashboard.",
     {
       name: z.string().describe("Dashboard name"),
     },
@@ -1369,7 +1364,7 @@ function registerDashboardTools(server: McpServer): void {
         content: [
           {
             type: "text",
-            text: withDashboardsDeprecationNote(await handleCreateDashboard(params)),
+            text: await handleCreateDashboard(params),
           },
         ],
       };
@@ -1378,7 +1373,7 @@ function registerDashboardTools(server: McpServer): void {
 
   server.tool(
     "platform_delete_dashboard",
-    "Delete a dashboard and all its graphs.",
+    "Delete an Analytics Reports dashboard and all its graphs.",
     {
       id: z.string().describe("The dashboard ID to delete"),
     },
@@ -1389,7 +1384,7 @@ function registerDashboardTools(server: McpServer): void {
         content: [
           {
             type: "text",
-            text: withDashboardsDeprecationNote(await handleDeleteDashboard(params)),
+            text: await handleDeleteDashboard(params),
           },
         ],
       };
@@ -1398,7 +1393,7 @@ function registerDashboardTools(server: McpServer): void {
 
   server.tool(
     "platform_rename_dashboard",
-    "Rename a dashboard.",
+    "Rename an Analytics Reports dashboard.",
     {
       id: z.string().describe("The dashboard ID to rename"),
       name: z.string().describe("The new name for the dashboard"),
@@ -1411,9 +1406,7 @@ function registerDashboardTools(server: McpServer): void {
         content: [
           {
             type: "text",
-            text: withDashboardsDeprecationNote(
-              `Dashboard "${result.name}" renamed successfully (ID: ${result.id}).`,
-            ),
+            text: `Dashboard "${result.name}" renamed successfully (ID: ${result.id}).`,
           },
         ],
       };
@@ -1422,7 +1415,7 @@ function registerDashboardTools(server: McpServer): void {
 
   server.tool(
     "list_dashboard_boards",
-    "Lists the project's boards in the Dashboards area, with each one's ID and widget count. Use an ID from here as the dashboardId of add_dashboard_widget and update_dashboard_widget; the analytics dashboards platform_list_dashboards lists hold no widgets.",
+    "Lists the project's boards in the Dashboards area, with each one's ID and widget count. Use an ID from here as the dashboardId of add_dashboard_widget and update_dashboard_widget; the Analytics Reports dashboards platform_list_dashboards lists hold no widgets.",
     {},
     withToolLogging("list_dashboard_boards", async () => {
       requireApiKey();
@@ -1517,7 +1510,7 @@ function registerDashboardTools(server: McpServer): void {
   registerDashboardBoardTools(server);
 }
 
-/** Board CRUD and a board's widgets, over `/api/v1/boards` (the project comes from the key). */
+/** Board CRUD and a board's widgets, over `/api/v1/dashboards` (the project comes from the key). */
 function registerDashboardBoardTools(server: McpServer): void {
   const boardId = z.string().describe("The board's ID, as list_dashboard_boards lists it");
   const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });

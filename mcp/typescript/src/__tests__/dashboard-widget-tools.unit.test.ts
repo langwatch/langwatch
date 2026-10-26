@@ -453,8 +453,8 @@ describe("handleUpdateDashboardWidget()", () => {
 
 describe("handleListDashboardBoards()", () => {
   describe("when the project has Dashboards boards", () => {
-    /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
-    it("lists them from /api/v1/boards, each with the id the widget tools take", async () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
+    it("lists them from /api/v1/dashboards, each with the id the widget tools take", async () => {
       mockListBoards.mockResolvedValue({ data: [{ ...sampleBoard, widgetCount: 3 }] });
 
       const result = await handleListDashboardBoards();
@@ -464,12 +464,11 @@ describe("handleListDashboardBoards()", () => {
       expect(result).toContain("Agent health");
       expect(result).toContain("**ID**: dash_1");
       expect(result).toContain("**Widgets**: 3");
-      expect(result).not.toContain("deprecated");
     });
   });
 
-  describe("when /api/v1/boards answers 404, as while Dashboards is off", () => {
-    /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
+  describe("when /api/v1/dashboards answers 404, as while Dashboards is off", () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
     it("lists them from the project-path list instead", async () => {
       mockListBoards.mockRejectedValue(
         new LangWatchApiError("Not found", 404, "{}", { code: "dashboards_not_released" }),
@@ -485,8 +484,8 @@ describe("handleListDashboardBoards()", () => {
     });
   });
 
-  describe("when /api/v1/boards fails any other way", () => {
-    /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
+  describe("when /api/v1/dashboards fails any other way", () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
     it("reports that failure and asks nothing else", async () => {
       const failure = new LangWatchApiError("Server error", 500, "{}");
       mockListBoards.mockRejectedValue(failure);

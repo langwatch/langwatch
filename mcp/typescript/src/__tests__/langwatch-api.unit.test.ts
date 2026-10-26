@@ -56,7 +56,7 @@ describe("langwatch-api", () => {
 
       const [, calledOptions] = mockFetch.mock.calls[0]!;
       expect(calledOptions.headers["X-API-Version"]).toBe(LANGWATCH_API_VERSION);
-      expect(LANGWATCH_API_VERSION).toBe("2026-08-07");
+      expect(LANGWATCH_API_VERSION).toBe("2026-10-26");
     });
   });
 

@@ -5,9 +5,9 @@ import type {
 import { makeRequest } from "./langwatch-api.js";
 
 /**
- * A board in the Dashboards area, at `/api/v1/boards`; the project comes from the API key
+ * A board in the Dashboards area, at `/api/v1/dashboards`; the project comes from the API key
  * (`modules/dashboard/contract/src/board-rest.schemas.ts`). Every route answers 404 while
- * Dashboards is off for the key's project. Analytics Reports boards are `/api/v1/dashboards`.
+ * Dashboards is off for the key's project. Analytics Reports live at `/api/v1/analytics/reports`.
  */
 export interface Board {
   id: string;
@@ -24,13 +24,13 @@ export interface BoardListItem extends Board {
   widgetCount: number;
 }
 
-const boardPath = (boardId: string) => `/api/v1/boards/${encodeURIComponent(boardId)}`;
+const boardPath = (boardId: string) => `/api/v1/dashboards/${encodeURIComponent(boardId)}`;
 const widgetPath = (boardId: string, widgetId: string) =>
   `${boardPath(boardId)}/widgets/${encodeURIComponent(widgetId)}`;
 
 /** The key's project's Dashboards boards, each with how many widgets it holds. */
 export async function listBoards(): Promise<{ data: BoardListItem[] }> {
-  return makeRequest("GET", "/api/v1/boards") as Promise<{ data: BoardListItem[] }>;
+  return makeRequest("GET", "/api/v1/dashboards") as Promise<{ data: BoardListItem[] }>;
 }
 
 /** The same list at the deprecated project path, which answers while Dashboards is off too. */
@@ -65,7 +65,7 @@ export async function getBoard({ boardId }: { boardId: string }): Promise<Board>
 }
 
 export async function createBoard({ name }: { name: string }): Promise<Board> {
-  return makeRequest("POST", "/api/v1/boards", { name }) as Promise<Board>;
+  return makeRequest("POST", "/api/v1/dashboards", { name }) as Promise<Board>;
 }
 
 /** A field left out keeps its value; a `null` description clears it. */

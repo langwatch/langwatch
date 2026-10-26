@@ -1,5 +1,5 @@
 /**
- * The board tools over `/api/v1/boards`: read, create, rename and delete a Dashboards board,
+ * The board tools over `/api/v1/dashboards`: read, create, rename and delete a Dashboards board,
  * list a board's widgets and delete one. Spec: modules/dashboard/specs/dashboards-v2.feature
  * AC199s.
  */
