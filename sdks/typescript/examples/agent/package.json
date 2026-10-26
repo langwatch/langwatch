@@ -14,12 +14,12 @@
     "@ai-sdk/openai": "^3.0.79",
     "ai": "^6.0.0",
     "langwatch": "file:../../",
-    "zod": "^4.0.14"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "typescript": "^5.9.2"
   },
   "overrides": {
-    "undici@>=6.0.0 <6.28.1": ">=6.28.1 <7"
+    "undici@>=6.0.0 <6.29.1": ">=6.29.1 <7"
   }
 }
