@@ -1,4 +1,8 @@
 import {
+  DASHBOARDS_DEPRECATION_WARNING,
+  warnOnceIfDeprecated,
+} from "@/client-sdk/services/_shared/deprecation-warning";
+import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
@@ -59,6 +63,7 @@ export class DashboardsApiService {
 
   async list(): Promise<{ data: DashboardSummary[] }> {
     const { data, error, response } = await this.apiClient.GET("/api/v1/dashboards");
+    warnOnceIfDeprecated({ response, message: DASHBOARDS_DEPRECATION_WARNING });
     return unwrapApiResult({
       operation: "list dashboards",
       data,
@@ -72,6 +77,7 @@ export class DashboardsApiService {
     const { data, error, response } = await this.apiClient.GET("/api/v1/dashboards/{id}", {
       params: { path: { id } },
     });
+    warnOnceIfDeprecated({ response, message: DASHBOARDS_DEPRECATION_WARNING });
     return unwrapApiResult({
       operation: `get dashboard "${id}"`,
       data,
@@ -85,6 +91,7 @@ export class DashboardsApiService {
     const { data, error, response } = await this.apiClient.POST("/api/v1/dashboards", {
       body: params,
     });
+    warnOnceIfDeprecated({ response, message: DASHBOARDS_DEPRECATION_WARNING });
     return unwrapApiResult({
       operation: "create dashboard",
       data,
@@ -99,6 +106,7 @@ export class DashboardsApiService {
       params: { path: { id } },
       body: params,
     });
+    warnOnceIfDeprecated({ response, message: DASHBOARDS_DEPRECATION_WARNING });
     return unwrapApiResult({
       operation: `rename dashboard "${id}"`,
       data,
@@ -112,6 +120,7 @@ export class DashboardsApiService {
     const { data, error, response } = await this.apiClient.DELETE("/api/v1/dashboards/{id}", {
       params: { path: { id } },
     });
+    warnOnceIfDeprecated({ response, message: DASHBOARDS_DEPRECATION_WARNING });
     return unwrapApiResult({
       operation: `delete dashboard "${id}"`,
       data,
