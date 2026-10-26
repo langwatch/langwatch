@@ -1,6 +1,6 @@
 import chalk from "chalk";
 
-import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+import { BoardsApiService } from "@/client-sdk/services/boards/boards-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable, sanitizeTerminalText } from "../../utils/formatting";
@@ -17,11 +17,11 @@ export const listDashboardWidgetBoardsCommand = async (options?: {
 }): Promise<CommandResult | void> => {
   await resolveCredentials({ project: options?.project });
 
-  const service = new DashboardWidgetsApiService();
+  const service = new BoardsApiService();
   const spinner = createSpinner("Fetching dashboards...").start();
 
   try {
-    const result = await service.listBoards();
+    const result = await service.list();
     const boards = result.data;
 
     spinner.succeed(`Found ${boards.length} dashboard${boards.length !== 1 ? "s" : ""}`);

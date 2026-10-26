@@ -7,8 +7,13 @@
 export const DASHBOARDS_DEPRECATION_NOTE =
   "Note: /api/v1/dashboards is deprecated for this project; use list_dashboard_boards and the other board tools (/api/v1/boards).";
 
-let seen = false;
-let surfaced = false;
+import { tryGetConfig } from "./config.ts";
+
+// The HTTP server serves many API keys in one process, so the flag state is kept per key.
+const seen = new Set<string>();
+const surfaced = new Set<string>();
+
+const currentKey = (): string => tryGetConfig()?.apiKey ?? "";
 
 /** Records a response's deprecation; only `/api/v1/dashboards` answers count. */
 export function noteDashboardsDeprecation({
@@ -18,21 +23,23 @@ export function noteDashboardsDeprecation({
   path: string;
   headers: Headers | undefined;
 }): void {
-  if (seen || !path.startsWith("/api/v1/dashboards")) return;
+  const key = currentKey();
+  if (seen.has(key) || !path.startsWith("/api/v1/dashboards")) return;
   if (!headers?.get("Deprecation")) return;
-  seen = true;
+  seen.add(key);
   process.stderr.write(`${DASHBOARDS_DEPRECATION_NOTE}\n`);
 }
 
 /** The tool's text, with the note appended the first time one was seen and not yet shown. */
 export function withDashboardsDeprecationNote(text: string): string {
-  if (!seen || surfaced) return text;
-  surfaced = true;
+  const key = currentKey();
+  if (!seen.has(key) || surfaced.has(key)) return text;
+  surfaced.add(key);
   return `${text}\n\n${DASHBOARDS_DEPRECATION_NOTE}`;
 }
 
 /** Test seam: forget what this process has seen and shown. */
 export function resetDashboardsDeprecation(): void {
-  seen = false;
-  surfaced = false;
+  seen.clear();
+  surfaced.clear();
 }

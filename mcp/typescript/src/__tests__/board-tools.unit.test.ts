@@ -4,7 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { initConfig } from "../config.ts";
+import { initConfig, runWithConfig } from "../config.ts";
 import {
   DASHBOARDS_DEPRECATION_NOTE,
   resetDashboardsDeprecation,
@@ -176,6 +176,30 @@ describe("given the dashboards tools call /api/v1/dashboards", () => {
     expect(second).toBe("listed");
     expect(stderr).toHaveBeenCalledTimes(1);
     expect(DASHBOARDS_DEPRECATION_NOTE).toContain("/api/v1/boards");
+  });
+
+  it("keeps the state per API key, so a flag-off session never gets another key's note", async () => {
+    vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    globalThis.fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      const flagged = JSON.stringify(init.headers).includes("key-on");
+      return new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: flagged ? { Deprecation: "true" } : {},
+      });
+    }) as unknown as typeof fetch;
+    const session = (apiKey: string) =>
+      runWithConfig({ apiKey, endpoint: ENDPOINT }, async () => {
+        await listDashboards();
+        return withDashboardsDeprecationNote("listed");
+      });
+
+    const on = await session("key-on");
+    const off = await session("key-off");
+    const onAgain = await session("key-on");
+
+    expect(on).toBe(`listed\n\n${DASHBOARDS_DEPRECATION_NOTE}`);
+    expect(off).toBe("listed");
+    expect(onAgain).toBe("listed");
   });
 
   /** @scenario "AC199s Split: the CLI and MCP manage boards and warn on the deprecated route" */
