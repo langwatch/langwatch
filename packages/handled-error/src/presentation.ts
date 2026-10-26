@@ -665,6 +665,11 @@ const presentations = {
     title: "Dashboards aren't switched on here",
     describe: () => "This project doesn't have Dashboards enabled yet.",
   },
+  dashboards_not_released: {
+    title: "The boards API isn't available here",
+    describe: () =>
+      "Dashboards isn't available for this project yet. The /api/v1/dashboards routes still work.",
+  },
   insight_not_found: {
     title: "Insight not found",
     describe: () => "It may have been removed. Reload to see the current inbox.",
