@@ -1147,6 +1147,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And the MCP server offers the same board tools
     When `langwatch dashboards` or a dashboards MCP tool gets an answer with a Deprecation header
     Then it prints one warning naming /api/v1/boards and `langwatch boards`, once per run
+    When `langwatch dashboard-widget boards` or the MCP `list_dashboard_boards` tool lists boards
+    Then it reads /api/v1/boards, and prints no deprecation warning
+    And when /api/v1/boards answers 404, as while Dashboards is off, it lists the boards from
+      /api/v1/projects/{projectId}/analytics/boards instead
+    And any other failure is reported as it is, with no second request
 
   # ---------------------------------------------------------------------------
   # Sidebar, My dashboard, From LangWatch and the ask bar (langwatch/tasks#911)
