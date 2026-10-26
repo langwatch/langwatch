@@ -564,6 +564,10 @@ describe("given the project still has a legacy key", () => {
         }),
       );
       expect(mutations.revokeLegacy).toHaveBeenCalledTimes(1);
+      // The legacy key is revoked on confirm, before the new key is created.
+      expect(mutations.revokeLegacy.mock.invocationCallOrder[0]).toBeLessThan(
+        mutations.create.mock.invocationCallOrder[0]!,
+      );
       expect(
         within(await screen.findByTestId("token-created-key")).getByText("Project API Key"),
       ).toBeInTheDocument();
@@ -674,6 +678,7 @@ describe("given the project still has a legacy key", () => {
       await user.click(await screen.findByRole("menuitem", { name: "Revoke" }));
 
       expect(await screen.findByTestId("legacy-key-revoke-confirm")).toBeDisabled();
+      expect(mutations.revokeLegacy).not.toHaveBeenCalled();
       expect(mutations.create).not.toHaveBeenCalled();
     });
 
