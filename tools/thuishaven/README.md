@@ -328,7 +328,9 @@ use `make service-watch svc=mailsim` or `make service-watch svc=idpsim`.
 running stack: portless install (pinned to one version, `domain.PortlessVersion`
 — haven installs it when it is missing, upgrades a machine that has another
 version, and does nothing when the pin is already there) + CA trust (once per
-machine, guarded by a marker so it never re-prompts), `pnpm install` when the lockfile
+machine, guarded by a marker so it never re-prompts; haven's own sign-in and `haven api`
+calls trust `~/.portless/ca.pem` directly, so they work even when the system store
+lost it), `pnpm install` when the lockfile
 changed, database create + migrate + seed, recovery of a wedged ClickHouse
 container (data kept), and content-addressed langy images — rebuilt only when
 the Dockerfile or a COPY source actually changed, pulled from CI when
