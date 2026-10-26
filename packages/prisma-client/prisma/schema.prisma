@@ -1843,6 +1843,9 @@ model Project {
   name                String
   slug                String                    @unique
   apiKey              String                    @unique
+  /// When the legacy apiKey last authenticated a request, written at most once a
+  /// minute per project and process. Spec: modules/api-key/specs/request-credential-type.feature
+  legacyApiKeyLastUsedAt DateTime?
   /// Random per-project secret whose SHA-256 digest is this project's LangWatchQL
   /// SQL tenant capability in ClickHouse. Deliberately NOT the API key: the
   /// credential a caller authenticates with and the capability the database
@@ -2109,6 +2112,8 @@ model Monitor {
   threadIdleTimeout Int? // Seconds to wait after last message before evaluating thread. null = disabled (evaluate on every message)
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @default(now()) @updatedAt
+  autoPausedAt      DateTime? // Set when the monitor paused itself because its evaluations mostly errored
+  autoPausedReason  String? // Why it paused itself; cleared with autoPausedAt when enabled again
 
   @@unique([projectId, slug])
   @@index([projectId])

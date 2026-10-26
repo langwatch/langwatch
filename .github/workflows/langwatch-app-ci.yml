@@ -30,16 +30,11 @@
 name: langwatch-app-ci
 
 on:
+  # Pull requests and the merge queue reach this through pr.yml.
+  workflow_call:
   push:
     branches:
       - main
-  # ready_for_review is NOT a default pull_request activity type. Without it,
-  # taking a PR out of draft fires no event, so the heavy jobs gated on
-  # `draft == false` below would never get their first run.
-  pull_request:
-    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
-    types: [opened, synchronize, reopened, ready_for_review]
-  merge_group:
   workflow_dispatch:
 
 env:
@@ -47,7 +42,7 @@ env:
 
 concurrency:
   # A manual run (coverage, duration weights) has its own group, so a push cannot cancel it.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  group: langwatch-app-ci-${{ github.event_name }}-${{ github.ref }}
   # A newer commit supersedes an older run, on main too: the newest verdict
   # covers the commits before it. Image and release builds keep their own rule.
   cancel-in-progress: true
@@ -144,6 +139,18 @@ jobs:
               - '.github/workflows/migration-compat.yml'
               - '.github/workflows/npx-server-smoke.yml'
               - '.github/workflows/gateway-matrix.yaml'
+              # Read by .github/scripts/release-please-timer.test.ts.
+              - '.github/workflows/release-please-sdks.yml'
+              # Read by .github/scripts/pr-workflow-filters.test.ts.
+              - '.github/workflows/e2e-ci.yml'
+              - '.github/workflows/langwatch-nlp-ci.yml'
+              - '.github/workflows/langevals-ci.yml'
+              - '.github/workflows/mcp-javascript-ci.yml'
+              - '.github/workflows/sdk-go-ci.yml'
+              - '.github/workflows/sdk-javascript-ci.yml'
+              - '.github/workflows/docs-ci.yml'
+              - '.github/workflows/codeql.yml'
+              - '.github/workflows/clickhouse-serverless.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
               # ci-scripts-test reads this workflow's path filters and its
@@ -1373,6 +1380,9 @@ jobs:
           .github/scripts/nightly-flaky.test.ts
           .github/scripts/nightly-dashboard.test.ts
           .github/scripts/nightly-workflows.test.ts
+
+      - name: Test when release pull requests refresh
+        run: node --test --experimental-strip-types .github/scripts/release-please-timer.test.ts
 
   ci-self-test:
     needs: changes
