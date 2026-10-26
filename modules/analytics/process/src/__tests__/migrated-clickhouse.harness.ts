@@ -284,9 +284,8 @@ const QUIET_POLL_MS = 1_000;
 
 /**
  * Waits until no user database on the endpoint runs a merge or mutation, and `tables` hold no
- * outdated part. Suites share the endpoint and the cap counts the whole server; `system` log
- * tables merge all the time, so they are left out. The server limit counts whole-process RSS, so a seed or a capped
- * query must not share it with background work or unloaded-but-still-held parts.
+ * outdated part. The cap counts the whole server's RSS, which suites share, so a seed or a capped
+ * query must not overlap background work or held old parts. `system` log tables always merge.
  */
 export async function waitForQuietMigratedServer({
   client,
