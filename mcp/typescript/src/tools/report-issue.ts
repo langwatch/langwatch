@@ -7,6 +7,7 @@ import {
 } from "@langwatch/redaction";
 
 import { getConfig } from "../config.ts";
+import { LANGWATCH_API_VERSION } from "../langwatch-api.ts";
 
 /** Transcripts are capped after redaction; oldest lines are dropped first. */
 const MAX_SESSION_BYTES = 8 * 1024 * 1024;
@@ -77,6 +78,7 @@ async function deliverReport(report: RedactedReport, params: ReportIssueParams):
     method: "POST",
     headers: {
       "content-type": "application/json",
+      "x-api-version": LANGWATCH_API_VERSION,
       ...(config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {}),
     },
     body: JSON.stringify({

@@ -60240,6 +60240,26 @@ langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to 
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
+## Boards
+
+A board is the page widgets live on. **Use an existing board** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new board, or none fits and they agree.
+
+```bash
+langwatch dashboards list -f json                          # ids, names, widget counts
+langwatch dashboards get <dashboardId> -f json
+langwatch dashboards create "<name>" -f json               # empty board; prints platformUrl
+langwatch dashboards update <dashboardId> --name "<name>"  # rename; or --description / --clear-description
+langwatch dashboards delete <dashboardId>                  # removes the board and its widgets
+langwatch dashboards widgets list <dashboardId> -f json
+langwatch dashboards widgets create <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
+langwatch dashboards widgets update <dashboardId> <widgetId> --code-file widget.tsx --queries-file queries.json
+langwatch dashboards widgets delete <dashboardId> <widgetId>
+```
+
+- **Never pick a board for the user.** When more than one board fits, ask with the `question` tool (a choices card): one option per board from `langwatch dashboards list`, its id in `ref`.
+- **Confirm before any delete** of a board or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a board takes its widgets with it.
+- Boards need Dashboards switched on for the project. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
+
 ## Worked example: bar chart of daily trace counts
 
 `widget.tsx`:
@@ -72141,73 +72161,6 @@ The same data renders in the product on the [sessions](/coding-agents/sessions) 
 
 ---
 
-# FILE: ./api-reference/dashboards/create-dashboards.mdx
-
----
-title: "Create a new dashboard"
-openapi: "POST /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/delete-dashboards.mdx
-
----
-title: "Delete a dashboard and its graphs"
-openapi: "DELETE /api/v1/dashboards/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/get-dashboards.mdx
-
----
-title: "Get a dashboard by its id, including its graphs"
-openapi: "GET /api/v1/dashboards/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/list-dashboards.mdx
-
----
-title: "List Dashboards"
-openapi: "GET /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/overview.mdx
-
----
-title: "Overview"
-description: "Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs."
----
-
-## Intro
-
-Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.
-
----
-
-# FILE: ./api-reference/dashboards/put-update-reorder-reorder.mdx
-
----
-title: "Update Reorder"
-openapi: "PUT /api/v1/dashboards/reorder"
----
-
----
-
-# FILE: ./api-reference/dashboards/update-dashboards.mdx
-
----
-title: "Rename a dashboard"
-openapi: "PATCH /api/v1/dashboards/{id}"
----
-
----
-
 # FILE: ./api-reference/datasets/action-records.mdx
 
 ---
@@ -74710,6 +74663,17 @@ Project API keys (`X-Auth-Token`) cannot be used here, because they lack organiz
 | `GET`    | `/api/v1/projects/{id}/api-key`            | Get the project's API key                                    |
 | `POST`   | `/api/v1/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
 
+## Dashboards boards
+
+These routes read the boards of the Dashboards area in one project. Unlike the routes above, they take the project API key in the `X-Auth-Token` header, not an organization key.
+
+| Method | Path                                                      | Description                                            |
+| ------ | --------------------------------------------------------- | ------------------------------------------------------ |
+| `GET`  | `/api/v1/projects/{projectId}/analytics/boards`           | List the project's boards, each with its `widgetCount` |
+| `GET`  | `/api/v1/projects/{projectId}/analytics/boards/{boardId}` | Get one board                                          |
+
+A board in another project answers `404`.
+
 ## Moving a Project to Another Team
 
 You can move a project to a different team by including `teamId` in the `PATCH` request:
@@ -75434,6 +75398,73 @@ A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LI
 ---
 title: "Run a LangWatchQL query"
 openapi: "POST /api/v1/query"
+---
+
+---
+
+# FILE: ./api-reference/reports/create-reports.mdx
+
+---
+title: "Create a new dashboard"
+openapi: "POST /api/v1/analytics/reports"
+---
+
+---
+
+# FILE: ./api-reference/reports/delete-reports.mdx
+
+---
+title: "Delete a dashboard and its graphs"
+openapi: "DELETE /api/v1/analytics/reports/{reportId}"
+---
+
+---
+
+# FILE: ./api-reference/reports/get-reports.mdx
+
+---
+title: "Get a dashboard by its id, including its graphs"
+openapi: "GET /api/v1/analytics/reports/{reportId}"
+---
+
+---
+
+# FILE: ./api-reference/reports/list-reports.mdx
+
+---
+title: "List Reports"
+openapi: "GET /api/v1/analytics/reports"
+---
+
+---
+
+# FILE: ./api-reference/reports/overview.mdx
+
+---
+title: "Overview"
+description: "Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs."
+---
+
+## Intro
+
+Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs.
+
+---
+
+# FILE: ./api-reference/reports/update-reorder.mdx
+
+---
+title: "Update Reorder"
+openapi: "PUT /api/v1/analytics/reports/reorder"
+---
+
+---
+
+# FILE: ./api-reference/reports/update-reports.mdx
+
+---
+title: "Rename a dashboard"
+openapi: "PATCH /api/v1/analytics/reports/{reportId}"
 ---
 
 ---

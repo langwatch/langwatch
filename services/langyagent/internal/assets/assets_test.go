@@ -303,3 +303,34 @@ func TestChartSkills_PlaceOnTheDashboardInContextOrAsk(t *testing.T) {
 		}
 	}
 }
+
+// Langy drives boards through the CLI: the skill must carry the create and
+// delete commands, a confirm-before-delete rule and the not-released answer.
+//
+// @scenario "The dashboard-widgets skill never picks a board for the user"
+// @scenario "The dashboard-widgets skill confirms before deleting a board or a widget"
+// @scenario "The dashboard-widgets skill reads dashboards_not_released as Dashboards being off"
+func TestDashboardWidgetsSkill_TeachesBoardCommands(t *testing.T) {
+	dest := t.TempDir()
+	if err := MaterializeSkills(dest); err != nil {
+		t.Fatalf("MaterializeSkills: %v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(dest, "dashboard-widgets", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read dashboard-widgets skill: %v", err)
+	}
+	for _, want := range []string{
+		"langwatch dashboards create",
+		"langwatch dashboards delete <dashboardId>",
+		"langwatch dashboards widgets create <dashboardId>",
+		"Never pick a board for the user",
+		"one option per board from `langwatch dashboards list`",
+		"Confirm before any delete",
+		"run the command only on Delete",
+		"dashboards_not_released` means it is off: tell the user, do not retry",
+	} {
+		if !strings.Contains(string(body), want) {
+			t.Errorf("the dashboard-widgets skill lacks %q", want)
+		}
+	}
+}
