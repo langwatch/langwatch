@@ -40,6 +40,7 @@ import type { SessionMetricSeriesRepository } from "../repositories/session-metr
 import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
 import type { CodingAgentBillingPolicy } from "./coding-agent-cost-attribution.service.ts";
 import { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
+import type { CodingAgentCostEstimator } from "./model-catalog-cost-estimator.service.ts";
 
 export const MAX_SESSION_EVENTS_PAGE_SIZE = MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
 
@@ -92,6 +93,7 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
     projects: ProjectApi;
     billing: CodingAgentBillingPolicy;
     clock: CodingAgentClock;
+    modelProviders: CodingAgentCostEstimator;
   }): CodingAgentFeatureService {
     const sessionReads = CodingAgentSessionReadService.create({
       sessions: options.sessions,
@@ -102,7 +104,9 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
     });
     const assignments = CodingAgentPullRequestAssignmentService.create();
     const shares = CodingAgentPullRequestShareService.create({ assignments });
-    const usage = CodingAgentPullRequestUsageService.create();
+    const usage = CodingAgentPullRequestUsageService.create({
+      modelProviders: options.modelProviders,
+    });
     const personalValues = CodingAgentPersonalPullRequestValuesService.create({
       assignments,
       usage,

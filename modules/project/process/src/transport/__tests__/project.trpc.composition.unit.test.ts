@@ -259,6 +259,7 @@ describe("the project tRPC namespace over the application the composition builds
 
       await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
         present: true,
+        lastUsedAt: null,
       });
       const answer = await caller.revokeProjectApiKey({ projectId: "project_1" });
 
@@ -266,6 +267,7 @@ describe("the project tRPC namespace over the application the composition builds
       expect(JSON.stringify(answer)).not.toContain(LEGACY_KEY);
       await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
         present: false,
+        lastUsedAt: null,
       });
       expect(database.findProject("project_1")?.apiKey).not.toBe(LEGACY_KEY);
       expect(await app.findIdByLegacyApiKey({ token: LEGACY_KEY })).toBeNull();
@@ -285,6 +287,22 @@ describe("the project tRPC namespace over the application the composition builds
       });
     });
 
+    /** @scenario The legacy key status answers when the key was last used */
+    it("answers when the legacy key last authenticated, and forgets it once revoked", async () => {
+      const { app, caller } = mount();
+
+      await app.markLegacyApiKeyUsed({ projectId: "project_1" });
+      const status = await caller.getLegacyKeyStatus({ projectId: "project_1" });
+
+      expect(status.present).toBe(true);
+      expect(status.lastUsedAt).toBeInstanceOf(Date);
+      await caller.revokeProjectApiKey({ projectId: "project_1" });
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
+        present: false,
+        lastUsedAt: null,
+      });
+    });
+
     /** @scenario Revoking the legacy project key again succeeds and changes nothing a caller can use */
     it("answers a second revocation as revoked, and the status stays absent", async () => {
       const { caller } = mount();
@@ -296,6 +314,7 @@ describe("the project tRPC namespace over the application the composition builds
       });
       await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
         present: false,
+        lastUsedAt: null,
       });
     });
 

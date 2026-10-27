@@ -22,7 +22,7 @@ function ingestion({ collector = MemoryRumCollectorChannel.create() } = {}) {
     logger,
   });
   const report = (session: string, body = exportWith(1)) =>
-    service.ingest({ body, session, forwardedFor: undefined });
+    service.ingest({ body, session, callerAddress: null });
   return { service, collector, rateLimits, lines, report };
 }
 
@@ -47,9 +47,7 @@ describe("ingesting a browser trace export", () => {
       });
 
       expect(
-        await codeOf(
-          service.ingest({ body: exportWith(1), session: "s", forwardedFor: undefined }),
-        ),
+        await codeOf(service.ingest({ body: exportWith(1), session: "s", callerAddress: null })),
       ).toBe("rum_ingest_disabled");
       expect(rateLimits.countKeys()).toBe(0);
     });

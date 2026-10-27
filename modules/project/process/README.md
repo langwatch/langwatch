@@ -184,6 +184,14 @@ The live project a legacy `apiKey` column names, or nothing.
 findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null>;
 ```
 
+#### `markLegacyApiKeyUsed`
+
+Stamps when the project's legacy `apiKey` last authenticated a request.
+
+```typescript
+markLegacyApiKeyUsed(input: Readonly<{ projectId: string }>): Promise<void>;
+```
+
 #### `findTraceSharingConfig`
 
 Whether the organisation and the project both still allow trace sharing. Nothing when the project is not there to read the two switches from.
@@ -421,7 +429,7 @@ Answers at `/api/projects/:id`, `/api/v1/projects/:id`; also, undocumented, `/ap
 interface Params {
   id: string;
 }
-// Response: projectRestDetailSchema, ../contract/src/project.responses.ts:110
+// Response: projectRestDetailSchema, ../contract/src/project.responses.ts:112
 interface Response {
   id: string;
   name: string;
@@ -453,7 +461,7 @@ interface Body {
   teamId?: string;
   piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
 }
-type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:110
+type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:112
 ```
 
 #### `DELETE /:id` · `archiveProject`
@@ -466,7 +474,7 @@ Answers at `/api/projects/:id`, `/api/v1/projects/:id`; also, undocumented, `/ap
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395
-// Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:125
+// Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:127
 interface Response {
   id: string;
   name: string;
@@ -509,7 +517,7 @@ type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/
 
 ### `project`
 
-Contract `../contract/src/project.trpc.ts:28`, router `src/transport/project.trpc.ts:80`.
+Contract `../contract/src/project.trpc.ts:28`, router `src/transport/project.trpc.ts:81`.
 
 | Procedure                           | Kind     | Gate                                                                                                                                                                                                                                                                | Input                                         | Output                                   |
 | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------- |
@@ -543,14 +551,15 @@ interface Output {
 
 // project.getLegacyKeyStatus
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:15
-// Output: projectLegacyKeyStatusSchema, ../contract/src/project.responses.ts:65
+// Output: projectLegacyKeyStatusSchema, ../contract/src/project.responses.ts:67
 interface Output {
   present: boolean;
+  lastUsedAt: unknown | null;
 }
 
 // project.revokeProjectApiKey
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/project-trpc.schemas.ts:15
-// Output: projectApiKeyRevokedSchema, ../contract/src/project.responses.ts:74
+// Output: projectApiKeyRevokedSchema, ../contract/src/project.responses.ts:76
 interface Output {
   revoked: true;
 }
@@ -569,7 +578,7 @@ interface Input {
   projectId: string;
   projectToArchiveId: string;
 }
-// Output: projectArchivedSchema, ../contract/src/project.responses.ts:82
+// Output: projectArchivedSchema, ../contract/src/project.responses.ts:84
 interface Output {
   success: true;
   alreadyArchived: boolean;
@@ -577,7 +586,7 @@ interface Output {
 
 // project.updateAggregateRule
 type Input = z.infer<typeof projectUpdateAggregateRuleInputSchema>; // ../contract/src/project-trpc.schemas.ts:97
-// Output: projectAggregateRuleUpdatedSchema, ../contract/src/project.responses.ts:136
+// Output: projectAggregateRuleUpdatedSchema, ../contract/src/project.responses.ts:138
 interface Output {
   success: true;
   members: {
@@ -594,7 +603,7 @@ interface Output {
 interface Input {
   organizationId: string;
 }
-// Output: projectAggregateMemberCandidatesSchema, ../contract/src/project.responses.ts:145
+// Output: projectAggregateMemberCandidatesSchema, ../contract/src/project.responses.ts:147
 type Output = {
   id: string;
   name: string;

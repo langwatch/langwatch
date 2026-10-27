@@ -34,7 +34,8 @@ export interface CurrencyRequestHeadersSchema extends Named<
 export const currencyRequestHeadersSchema: CurrencyRequestHeadersSchema =
   currencyRequestHeadersSchemaDefinition;
 
-/** The request a currency is detected from: only its headers are read. */
+/** The request a currency is detected from: its country headers and the resolved address. */
 export type CurrencyRequest = {
   headers?: Record<string, string | string[] | undefined>;
+  callerAddress?: string | null;
 };
