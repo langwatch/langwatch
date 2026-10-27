@@ -1163,8 +1163,11 @@
               "api-reference/evaluators-config/overview",
               "api-reference/evaluators-config/list-evaluators",
               "api-reference/evaluators-config/create-evaluators",
+              "api-reference/evaluators-config/get-versions",
               "api-reference/evaluators-config/get-evaluators",
+              "api-reference/evaluators-config/update-labels",
               "api-reference/evaluators-config/update-evaluators",
+              "api-reference/evaluators-config/delete-labels",
               "api-reference/evaluators-config/delete-evaluators"
             ]
           },
@@ -1396,11 +1399,14 @@
               "api-reference/agents/create-agents",
               "api-reference/agents/create-frames",
               "api-reference/agents/create-register",
+              "api-reference/agents/list-an-agent-s-versions-newest-first-wi",
               "api-reference/agents/get-agents",
+              "api-reference/agents/point-a-deploy-label-such-as-production",
               "api-reference/agents/update-agents",
               "api-reference/agents/put-update-agents",
               "api-reference/agents/action-call",
               "api-reference/agents/action-test",
+              "api-reference/agents/remove-a-deploy-label-from-an-agent",
               "api-reference/agents/delete-agents"
             ]
           },
