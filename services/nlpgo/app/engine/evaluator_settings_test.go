@@ -148,14 +148,15 @@ func TestDispatchEvaluator_LegacySettingsDictStillWorks(t *testing.T) {
 // so they win, and the dict's other keys survive.
 func TestDispatchEvaluator_FlattenedOverlaysLegacyDict(t *testing.T) {
 	body := dispatchEvaluatorBody(t, []dsl.Field{
-		{Identifier: "settings", Type: "dict", Value: json.RawMessage(`{"model":"openai/gpt-5-mini","max_tokens":128}`)},
+		{Identifier: "settings", Type: "dict", Value: json.RawMessage(`{"model":"openai/gpt-5-nano","max_tokens":128}`)},
 		param(t, "model", "openai/gpt-5-mini"),
 	})
 
 	settings, ok := body["settings"].(map[string]any)
 	require.True(t, ok, "settings missing from the outbound body: %v", body)
-	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
-	assert.EqualValues(t, 128, settings["max_tokens"])
+	assert.Equal(t, "openai/gpt-5-mini", settings["model"],
+		"the flattened parameter is the fresher edit and must win over the dict")
+	assert.EqualValues(t, 128, settings["max_tokens"], "a dict key with no flattened twin survives")
 }
 
 // TestDispatchEvaluator_NoSettingsOmitsTheField keeps the saved-evaluator path
@@ -199,8 +200,10 @@ func TestEvaluatorSettings_SkipsNullParameters(t *testing.T) {
 
 // TestDispatchEvaluator_NameIsNotASetting is the hazard the assembly adds:
 // settings now come from parameters[], so a reserved identifier left in that
-// slice would travel as a setting and fail the endpoint's schema parse. The
-// name keeps going out as the body's own field, as it always did.
+// slice would travel as a setting. The per-evaluator schemas are not strict,
+// so the endpoint's parse would quietly drop it rather than refuse the call,
+// which is why the exclusion is pinned here instead. The name keeps going out
+// as the body's own field, as it always did.
 func TestDispatchEvaluator_NameIsNotASetting(t *testing.T) {
 	body := dispatchEvaluatorBody(t, []dsl.Field{
 		{Identifier: "name", Type: "str", Value: json.RawMessage(`"is-answer-correct"`)},
