@@ -137,9 +137,50 @@ export async function healRevokedIngestKey({
     sourceType,
     allowOfflineFallback: false,
   });
-  if (!resolved.minted) return { status: "failed" };
+  if (!resolved.minted) {
+    // A live cached key under a dead wired one is the drift itself: point the wiring at it.
+    const liveCachedKey =
+      rejectedTokenSource === "wiring" &&
+      resolved.token !== rejectedToken &&
+      extractLookupIdFromToken(resolved.token) !== undefined;
+    return liveCachedKey ? rewireToKey({ cfg, tool, resolved, deps }) : { status: "failed" };
+  }
 
   return adoptMintedKey({ sourceType, tool, cfg, resolved, deps });
+}
+
+/** Rewrites the tool's wiring onto a key the cache already holds; the cache is untouched. */
+function rewireToKey({
+  cfg,
+  tool,
+  resolved,
+  deps,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  resolved: Awaited<ReturnType<HealDeps["resolveLiveIngestionKey"]>>;
+  deps: HealDeps;
+}): HealOutcome {
+  const wiring = deps.installTelemetryWiring({
+    cfg,
+    tool,
+    endpoint: resolved.endpoint,
+    token: resolved.token,
+  });
+  if (wiring.requiredFailures.length > 0 || wiring.labels.length === 0) {
+    return { status: "failed" };
+  }
+  return healedTarget(resolved);
+}
+
+function healedTarget(resolved: { endpoint: string; token: string }): HealOutcome {
+  return {
+    status: "healed",
+    target: {
+      endpoint: `${resolved.endpoint}/v1/logs`,
+      headers: { Authorization: `Bearer ${resolved.token}` },
+    },
+  };
 }
 
 /**
@@ -231,11 +272,5 @@ function adoptMintedKey({
     return { status: "failed" };
   }
 
-  return {
-    status: "healed",
-    target: {
-      endpoint: `${resolved.endpoint}/v1/logs`,
-      headers: { Authorization: `Bearer ${resolved.token}` },
-    },
-  };
+  return healedTarget(resolved);
 }

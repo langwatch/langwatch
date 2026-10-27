@@ -1,9 +1,9 @@
-import { codexOtelBlockAuthToken, codexOtelBlockLogsEndpoint } from "../codex-config-toml";
 /**
  * The telemetry target an agent's OWN exporter is wired to, read from the file the agent loads
  * rather than this CLI's cache, which can drift from it (#7958). Reads only; never throws, and
  * a machine with no wiring answers null.
  */
+import { codexOtelBlockAuthToken, codexOtelBlockLogsEndpoint } from "../codex-config-toml";
 import { appEnvValues, appSettingsTargetFor } from "./app-settings";
 import { parseOtlpHeaders } from "./session-context";
 import { otelWiringLooksLangwatchAuthored } from "./telemetry-refresh";

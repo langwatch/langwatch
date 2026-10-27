@@ -34,19 +34,29 @@ const CLI_KEY_ENV = {
   OTEL_EXPORTER_OTLP_HEADERS: `Authorization=Bearer ${CLI_KEY}`,
 };
 
+/** The plain header record the hook posts with, whatever shape `init.headers` arrived in. */
+function headersOf(headers: HeadersInit | undefined): Record<string, string> {
+  if (headers instanceof Headers || Array.isArray(headers)) {
+    return Object.fromEntries(new Headers(headers));
+  }
+  return headers ?? {};
+}
+
+function record(input: Parameters<typeof fetch>[0], init: RequestInit | undefined): PostedRequest {
+  return {
+    url: String(input),
+    headers: headersOf(init?.headers),
+    body: JSON.parse(String(init?.body)) as PostedRequest["body"],
+  };
+}
+
 /** A collector that refuses exactly the stale wired bearer. */
-const wiredRejectingCollector: typeof fetch = ((
-  url: string,
-  init: { headers: Record<string, string>; body: string },
-) => {
-  posted.push({
-    url,
-    headers: init.headers,
-    body: JSON.parse(init.body) as PostedRequest["body"],
-  });
-  const status = init.headers.Authorization === `Bearer ${WIRED_KEY}` ? 401 : 200;
-  return Promise.resolve(new Response("{}", { status }));
-}) as unknown as typeof fetch;
+const wiredRejectingCollector = vi.fn<typeof fetch>(async (input, init) => {
+  const request = record(input, init);
+  posted.push(request);
+  const status = request.headers.Authorization === `Bearer ${WIRED_KEY}` ? 401 : 200;
+  return new Response("{}", { status });
+});
 
 describe("the wired-exporter probe", () => {
   describe("given an agent whose settings file holds a key the collector refuses", () => {
@@ -134,14 +144,35 @@ describe("the wired-exporter probe", () => {
 
   describe("given a machine with no wiring at all", () => {
     it("stays silent and costs one lookup", async () => {
+      const readWiredTarget = vi.fn(() => null);
       await hook.runHook({
         env: CLI_KEY_ENV,
         fetchImpl: hook.collector(200),
-        readWiredTarget: () => null,
+        readWiredTarget,
       });
 
+      expect(readWiredTarget).toHaveBeenCalledOnce();
       expect(posted).toHaveLength(1);
       expect(hook.stdout).toEqual([]);
+    });
+  });
+
+  describe("given a codex session with drifted wiring", () => {
+    /** @scenario "Only Claude Code's wiring is probed" */
+    it("probes nothing, since codex has no channel to report the outcome on", async () => {
+      const readWiredTarget = vi.fn(() => WIRED);
+      const healRevokedKey = vi.fn().mockResolvedValue(HEALED);
+      await hook.runHook({
+        tool: "codex",
+        env: CLI_KEY_ENV,
+        fetchImpl: wiredRejectingCollector,
+        readWiredTarget,
+        healRevokedKey,
+      });
+
+      expect(readWiredTarget).not.toHaveBeenCalled();
+      expect(posted.filter((r) => r.url === WIRED_ENDPOINT)).toEqual([]);
+      expect(healRevokedKey).not.toHaveBeenCalled();
     });
   });
 
@@ -149,21 +180,15 @@ describe("the wired-exporter probe", () => {
     /** @scenario "An offline probe does not spend the session's one ask" */
     it("releases the session's one ask so the next hook retries", async () => {
       let calls = 0;
-      const flaky: typeof fetch = ((
-        url: string,
-        init: { headers: Record<string, string>; body: string },
-      ) => {
-        if (url === WIRED_ENDPOINT) {
+      const flaky = vi.fn<typeof fetch>(async (input, init) => {
+        const request = record(input, init);
+        if (request.url === WIRED_ENDPOINT) {
           calls += 1;
-          if (calls === 1) return Promise.reject(new Error("ECONNREFUSED"));
+          if (calls === 1) throw new Error("ECONNREFUSED");
         }
-        posted.push({
-          url,
-          headers: init.headers,
-          body: JSON.parse(init.body) as PostedRequest["body"],
-        });
-        return Promise.resolve(new Response("{}", { status: 200 }));
-      }) as unknown as typeof fetch;
+        posted.push(request);
+        return new Response("{}", { status: 200 });
+      });
 
       await hook.runHook({
         env: CLI_KEY_ENV,

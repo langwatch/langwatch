@@ -307,9 +307,9 @@ async function runHook({
 }
 
 /**
- * Posts one empty batch per session to the agent's own wired target; a 401 there runs the
- * same heal as the hook's own 401. Skipped when the wiring matches the target just posted
- * with or names none; an offline probe releases its marker so the next hook asks again.
+ * Posts one empty batch per session to Claude Code's wired target; a 401 runs the same heal
+ * as the hook's own 401. Claude only: no other agent has a channel to report the outcome on.
+ * Skipped when the wiring matches the target just posted with; offline asks again next hook.
  */
 async function probeWiredExporter({
   agent,
@@ -334,6 +334,7 @@ async function probeWiredExporter({
   readWiredTarget: NonNullable<HookCommandOptions["readWiredTarget"]>;
   healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
 }): Promise<void> {
+  if (agent !== "claude_code") return;
   const wired = readWiredTarget({ agent });
   if (!wired) return;
   if (wired.endpoint === cliTarget.endpoint && wired.token === bearerOf(cliTarget.headers)) {
@@ -358,13 +359,12 @@ async function probeWiredExporter({
     return;
   }
   if (probe.status === 401) {
-    await healWiredRejection({ agent, sourceType, env, now, stateDir, wired, healRevokedKey });
+    await healWiredRejection({ sourceType, env, now, stateDir, wired, healRevokedKey });
   }
 }
 
 /** The wired key was refused: heal it as the hook's own 401 would be, or report it. */
 async function healWiredRejection({
-  agent,
   sourceType,
   env,
   now,
@@ -372,7 +372,6 @@ async function healWiredRejection({
   wired,
   healRevokedKey,
 }: {
-  agent: string;
   sourceType: string;
   env: NodeJS.ProcessEnv;
   now: () => number;
@@ -396,7 +395,6 @@ async function healWiredRejection({
   if (outcome.status === "declined") {
     releaseHealWindow({ stateDir, sourceType });
   }
-  if (agent !== "claude_code") return;
   if (outcome.status === "healed") {
     debug({ message: "the agent's wiring was re-minted and rewritten", env });
     notifyClaude(HEAL_NOTICE);

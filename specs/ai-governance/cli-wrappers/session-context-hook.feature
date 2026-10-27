@@ -595,11 +595,15 @@ Rule: A revoked ingest key heals itself
 Rule: The hook probes the target the agent itself exports with
 
   # The hook posts with the CLI's cached key; the agent's exporter posts with
-  # whatever its settings file holds. The two can drift — a live cache over a
-  # revoked wiring — and then the hook succeeds on every session while every
-  # span the agent emits is refused in silence (#7958). One empty batch per
-  # session, posted to the wired target read out of the agent's own settings
-  # file, is the question nobody was asking.
+  # whatever its settings file holds, and the two can drift (#7958). One empty
+  # batch per session goes to the wired target. Claude Code only: it is the one
+  # agent the hook can report the outcome to.
+
+  @unit
+  Scenario: Only Claude Code's wiring is probed
+    Given a codex session whose wiring holds a key the collector refuses
+    When the hook runs
+    Then no probe is sent and nothing is healed
 
   @unit
   Scenario: A drifted wired key is probed and healed
@@ -646,6 +650,13 @@ Rule: The hook probes the target the agent itself exports with
     And a platform that says the key was retired by its own doing
     When the healer is asked about the wired credential
     Then it re-mints and rewires the tool
+
+  @unit
+  Scenario: A drifted wired key is rewired onto the live cached key
+    Given a wired personal key that differs from the cached one
+    And a platform that still lists the cached key as live
+    When the healer is asked about the wired credential
+    Then it rewires the tool onto the cached key, minting nothing
 
   @unit
   Scenario: A wired key the platform does not know is not re-minted

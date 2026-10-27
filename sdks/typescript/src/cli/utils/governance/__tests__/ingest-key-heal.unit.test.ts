@@ -412,6 +412,40 @@ describe("healRevokedIngestKey", () => {
       expect(d.installTelemetryWiring).toHaveBeenCalledOnce();
     });
 
+    /** @scenario "A drifted wired key is rewired onto the live cached key" */
+    it("rewires onto the cached key the platform still lists as live, minting nothing", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockResolvedValue({ status: "revoked", revocationCause: "cap" }),
+        resolveLiveIngestionKey: vi.fn().mockResolvedValue({
+          token: CACHED,
+          prefix: CACHED.slice(0, 12),
+          endpoint: "https://app.example.com/api/otel",
+          minted: false,
+        }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        sourceType: "claude_code",
+        rejectedToken: WIRED,
+        rejectedTokenSource: "wiring",
+        deps: d,
+      });
+
+      expect(healed).toEqual({
+        status: "healed",
+        target: {
+          endpoint: "https://app.example.com/api/otel/v1/logs",
+          headers: { Authorization: `Bearer ${CACHED}` },
+        },
+      });
+      expect(d.installTelemetryWiring).toHaveBeenCalledWith(
+        expect.objectContaining({ tool: "claude", token: CACHED }),
+      );
+      expect(d.saveConfig).not.toHaveBeenCalled();
+    });
+
     /** @scenario "A wired key the platform does not know is not re-minted" */
     it("declines when the platform has no such key of this account's, where a cached key would mint", async () => {
       const d = deps();
