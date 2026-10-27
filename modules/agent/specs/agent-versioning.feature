@@ -203,3 +203,10 @@ Feature: Agent versions and deploy labels
     Given an agent created by "Ada"
     When the agents screen lists it
     Then its card shows "Created by Ada" and its latest version badge
+
+  @integration
+  Scenario: The experiment agent target drawer picks the deploy label
+    Given an agent target in the workbench whose agent has "production" on version 2 and latest version 3
+    When the user opens the target's agent drawer
+    Then the deploy label picker shows "latest" by default
+    And picking "production" pins the target to "production"

@@ -15,6 +15,10 @@ const listed = vi.hoisted(() => ({ rows: [] as unknown[] }));
 const opener = vi.hoisted(() => ({
   props: {} as Record<string, unknown>,
   onInputMappingsChange: undefined as ((...args: unknown[]) => void) | undefined,
+  onAgentLabelChange: undefined as ((label: string | undefined) => void) | undefined,
+}));
+const versions = vi.hoisted(() => ({
+  data: { versions: [] as { version: number }[], labels: [] as unknown[], availableLabels: [] },
 }));
 const fetched = vi.hoisted(() => ({ agent: undefined as unknown, workflow: undefined as unknown }));
 const calls = vi.hoisted(() => ({
@@ -30,8 +34,13 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getDrawerStack: () => stack.entries,
   getComplexProps: () => opener.props,
   getFlowCallbacks: () =>
-    opener.onInputMappingsChange
-      ? { onInputMappingsChange: opener.onInputMappingsChange }
+    opener.onInputMappingsChange || opener.onAgentLabelChange
+      ? {
+          ...(opener.onInputMappingsChange
+            ? { onInputMappingsChange: opener.onInputMappingsChange }
+            : {}),
+          ...(opener.onAgentLabelChange ? { onAgentLabelChange: opener.onAgentLabelChange } : {}),
+        }
       : undefined,
 }));
 
@@ -82,6 +91,7 @@ vi.mock("../../../behavior/agent-api.ts", () => {
       agents: {
         getAll: { useQuery: () => ({ data: listed.rows, isLoading: false }) },
         getById: { useQuery: () => ({ data: fetched.agent, isLoading: false, isError: false }) },
+        listVersions: { useQuery: () => ({ data: versions.data, isLoading: false }) },
         create: mutation((input) => {
           calls.agentCreated.push(input);
           return Promise.resolve({ id: "agent_new" });
@@ -245,6 +255,8 @@ afterEach(() => {
   fetched.workflow = undefined;
   opener.props = {};
   opener.onInputMappingsChange = undefined;
+  opener.onAgentLabelChange = undefined;
+  versions.data = { versions: [], labels: [], availableLabels: [] };
   drawer.closeDrawer.mockReset();
   drawer.goBack.mockReset();
   drawer.canGoBack = false;
@@ -871,5 +883,57 @@ describe("the HTTP agent editor opened from an evaluation workbench", () => {
     render(<RoutedAgentHttpEditorDrawer agentId="agent_http" />, { wrapper });
 
     expect(screen.queryByText("Input Variables")).toBeNull();
+  });
+});
+
+describe("the agent target's deploy label in an evaluation workbench", () => {
+  /** @scenario "The experiment agent target drawer picks the deploy label" */
+  it("starts on latest and hands the picked label to the workbench", async () => {
+    const picked: (string | undefined)[] = [];
+    fetched.agent = storedHttpAgent;
+    versions.data = {
+      versions: [{ version: 3 }, { version: 2 }, { version: 1 }],
+      labels: [{ label: "production", version: 2 }],
+      availableLabels: [],
+    };
+    opener.props = { availableSources: datasetSources, inputMappings: {} };
+    opener.onAgentLabelChange = (label) => picked.push(label);
+    render(<RoutedAgentHttpEditorDrawer agentId="agent_http" />, { wrapper });
+
+    const trigger = screen.getByTestId("target-agent-label-select");
+    expect(trigger).toHaveTextContent("latest");
+    expect(trigger).toHaveTextContent("v3");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Deploy label" }));
+    await user.click(await screen.findByRole("option", { name: /production/ }));
+
+    expect(picked).toEqual(["production"]);
+    expect(trigger).toHaveTextContent("production");
+  });
+
+  /** @scenario "The experiment agent target drawer picks the deploy label" */
+  it("shows the label the target is pinned to", () => {
+    fetched.agent = storedCodeAgent;
+    versions.data = {
+      versions: [{ version: 2 }, { version: 1 }],
+      labels: [{ label: "production", version: 1 }],
+      availableLabels: [],
+    };
+    opener.props = {
+      availableSources: datasetSources,
+      inputMappings: {},
+      agentLabel: "production",
+    };
+    opener.onAgentLabelChange = () => undefined;
+    render(<RoutedAgentCodeEditorDrawer agentId="agent_code" />, { wrapper });
+
+    expect(screen.getByTestId("target-agent-label-select")).toHaveTextContent("production");
+  });
+
+  it("shows no deploy label outside a workbench", () => {
+    fetched.agent = storedHttpAgent;
+    render(<RoutedAgentHttpEditorDrawer agentId="agent_http" />, { wrapper });
+
+    expect(screen.queryByTestId("target-agent-label-select")).toBeNull();
   });
 });
