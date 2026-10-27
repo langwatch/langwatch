@@ -30,6 +30,11 @@ var blockedCloudDomains = []string{
 	".amazonaws.com", ".aws.amazon.com", ".compute.internal", ".internal", ".local", ".localhost",
 }
 
+// onPremiseLabels are the blockedCloudDomains suffixes the allowlist may lift
+// for one exact host, as packages/egress ON_PREMISE_SUFFIXES: they name
+// private infrastructure, which hands out no ambient credentials.
+var onPremiseLabels = map[string]struct{}{"local": {}, "localhost": {}}
+
 // blockedMetadataHosts are refused by name whatever the local policy says.
 var blockedMetadataHosts = map[string]struct{}{
 	"169.254.169.254": {}, "fd00:ec2::254": {}, "169.254.170.2": {},
@@ -108,10 +113,11 @@ func (v *Validator) Validate(ctx context.Context, raw string) (Destination, erro
 	if isCloudMetadataHost(dest.Hostname) {
 		return Destination{}, refusal(msgMetadataHost)
 	}
-	if isBlockedCloudDomain(dest.Hostname) {
+	allowlisted := v.isAllowlisted(dest.Hostname)
+	if !(allowlisted && isOnPremiseDomain(dest.Hostname)) && isBlockedCloudDomain(dest.Hostname) {
 		return Destination{}, refusal(msgCloudDomain)
 	}
-	if v.isAllowlisted(dest.Hostname) {
+	if allowlisted {
 		return v.allowlisted(ctx, dest)
 	}
 	if literal, err := netip.ParseAddr(dest.Hostname); err == nil {
@@ -349,6 +355,24 @@ func isBlockedCloudDomain(hostname string) bool {
 		}
 	}
 	return false
+}
+
+// isOnPremiseDomain reports whether hostname is a cloud domain only for its
+// on-premise suffix. Every trailing local/localhost label comes off before the
+// cloud suffixes are tested, so metadata.google.internal.local.localhost is
+// still read as metadata.google.internal.
+func isOnPremiseDomain(hostname string) bool {
+	labels := strings.Split(hostname, ".")
+	if _, ok := onPremiseLabels[labels[len(labels)-1]]; len(labels) < 2 || !ok {
+		return false
+	}
+	for len(labels) > 1 {
+		if _, ok := onPremiseLabels[labels[len(labels)-1]]; !ok {
+			break
+		}
+		labels = labels[:len(labels)-1]
+	}
+	return !isBlockedCloudDomain(strings.Join(labels, "."))
 }
 
 func anyMetadata(addrs []netip.Addr) bool {

@@ -98,6 +98,53 @@ func TestValidatorAdmissions(t *testing.T) {
 	assert.False(t, unresolved.Pinned.IsValid())
 }
 
+// @scenario "An allowlisted on-premise .local host is reachable"
+func TestValidatorAdmitsAnAllowlistedOnPremiseHost(t *testing.T) {
+	dns := fakeDNS(map[string]string{"llm.corp.local": "10.0.5.9"})
+	strict := NewValidator(Policy{BlockLocal: true, AllowedHosts: []string{"llm.corp.local"}}, dns)
+
+	dest, err := strict.Validate(context.Background(), "http://llm.corp.local./v1/chat")
+	require.NoError(t, err)
+	assert.Equal(t, KindAllowlisted, dest.Kind)
+	assert.Equal(t, netip.MustParseAddr("10.0.5.9"), dest.Pinned)
+}
+
+// @scenario "A .local host the allowlist does not name stays refused"
+func TestValidatorRefusesAnOnPremiseHostTheAllowlistDoesNotName(t *testing.T) {
+	v := NewValidator(Policy{BlockLocal: true, AllowedHosts: []string{"llm.corp.local"}}, fakeDNS(nil))
+	_, err := v.Validate(context.Background(), "http://other.corp.local/api")
+	require.ErrorContains(t, err, msgCloudDomain)
+}
+
+// @scenario "A cloud internal domain cannot be allowlisted"
+func TestValidatorRefusesAnAllowlistedCloudDomain(t *testing.T) {
+	assertAllowlistRefusesCloudDomains(t, "s3.amazonaws.com", "ip-10-0-0-1.ec2.compute.internal", "grafana.internal")
+}
+
+// @scenario "A cloud internal domain with an on-premise suffix added cannot be allowlisted"
+func TestValidatorRefusesACloudDomainDressedAsOnPremise(t *testing.T) {
+	assertAllowlistRefusesCloudDomains(t,
+		"metadata.google.internal.local",
+		"metadata.google.internal.local.local",
+		"s3.amazonaws.com.localhost.local",
+		"s3.amazonaws.com.local.localhost",
+		"grafana.internal.local",
+	)
+}
+
+// assertAllowlistRefusesCloudDomains checks each host is refused as a cloud
+// domain even when the allowlist names it exactly.
+func assertAllowlistRefusesCloudDomains(t *testing.T, hosts ...string) {
+	t.Helper()
+	for _, host := range hosts {
+		t.Run(host, func(t *testing.T) {
+			v := NewValidator(Policy{BlockLocal: true, AllowedHosts: []string{host}}, fakeDNS(nil))
+			_, err := v.Validate(context.Background(), "http://"+host+"/")
+			require.ErrorContains(t, err, msgCloudDomain)
+		})
+	}
+}
+
 // serverPort is the port an httptest server listens on.
 func serverPort(t *testing.T, srv *httptest.Server) string {
 	t.Helper()

@@ -92,6 +92,66 @@ describe("SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS half)", () => {
     });
   });
 
+  describe("given ALLOWED_PROXY_HOSTS names an on-premise .local host", () => {
+    const validate = createSsrfUrlValidator({
+      blockLocal: true,
+      allowedHosts: ["llm.corp.local"],
+    });
+
+    /** @scenario An allowlisted on-premise .local host is reachable */
+    it("admits that exact host and pins the address it resolved to", async () => {
+      resolvesTo({ a: ["10.0.5.9"] });
+
+      await expect(validate("http://llm.corp.local/v1/chat")).resolves.toMatchObject({
+        type: "allowlisted",
+        resolvedIp: "10.0.5.9",
+      });
+    });
+
+    /** @scenario An allowlisted on-premise .local host is reachable */
+    it("admits it spelled with a trailing dot", async () => {
+      resolvesTo({ a: ["10.0.5.9"] });
+
+      await expect(validate("http://llm.corp.local./v1/chat")).resolves.toMatchObject({
+        type: "allowlisted",
+      });
+    });
+
+    /** @scenario A .local host the allowlist does not name stays refused */
+    it("still refuses a .local host the allowlist does not name", async () => {
+      await expect(validate("http://other.corp.local/api")).rejects.toThrow(
+        /cloud provider internal domains/i,
+      );
+    });
+  });
+
+  describe("given ALLOWED_PROXY_HOSTS names a cloud internal domain", () => {
+    /** @scenario A cloud internal domain cannot be allowlisted */
+    it.each(["s3.amazonaws.com", "ip-10-0-0-1.ec2.compute.internal", "grafana.internal"])(
+      "refuses %s",
+      async (hostname) => {
+        const validate = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [hostname] });
+        await expect(validate(`http://${hostname}/`)).rejects.toThrow(
+          /cloud provider internal domains/i,
+        );
+      },
+    );
+
+    /** @scenario A cloud internal domain with an on-premise suffix added cannot be allowlisted */
+    it.each([
+      "metadata.google.internal.local",
+      "metadata.google.internal.local.local",
+      "s3.amazonaws.com.localhost.local",
+      "s3.amazonaws.com.local.localhost",
+      "grafana.internal.local",
+    ])("refuses %s", async (hostname) => {
+      const validate = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [hostname] });
+      await expect(validate(`http://${hostname}/`)).rejects.toThrow(
+        /cloud provider internal domains/i,
+      );
+    });
+  });
+
   describe("given a cloud metadata host", () => {
     /** @scenario <impl> blocks cloud metadata even when BLOCK_LOCAL_HTTP_CALLS is "false" */
     it.each(["169.254.169.254", "metadata.google.internal"])(
