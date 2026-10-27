@@ -55,20 +55,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.EMBEDS_AWS_SECRET_ACCESS_KEY }}
 `
 
-// writeRepo writes files over a repository that already holds every listed
-// fallback workflow with its sanctioned fallback, so the stale-entry check
-// stays quiet unless a test overrides or removes one.
+// writeRepo writes files into an empty repository.
 func writeRepo(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
-	seeded := map[string]string{}
-	for gateVar, rel := range ciguard.StaticKeyFallbackVars {
-		seeded[rel] = strings.ReplaceAll(gatedFallbackWorkflow, "EMBEDS_AWS_ROLE_ARN", gateVar)
-	}
 	for rel, content := range files {
-		seeded[rel] = content
-	}
-	for rel, content := range seeded {
 		path := filepath.Join(root, rel)
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
 		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
@@ -153,142 +144,34 @@ func TestStaticCloudKeysScansCompositeActions(t *testing.T) {
 	assert.Contains(t, problems[0], ".github/actions/aws/action.yml:6")
 }
 
-// @scenario "A gated stored-key fallback with an OIDC twin passes during the move"
-func TestStaticCloudKeysAcceptsTheGatedFallback(t *testing.T) {
+// @scenario "A stored key fails CI whatever condition gates its step"
+func TestStaticCloudKeysRejectsTheGatedFallback(t *testing.T) {
 	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: gatedFallbackWorkflow}))
 
 	require.NoError(t, err)
-	assert.Empty(t, problems)
+	assert.Equal(t, []string{
+		embedsPath + ":19: stored AWS key: a long-lived key in GitHub can be read by any workflow edit; assume a role with GitHub OIDC (role-to-assume) instead",
+		embedsPath + ":20: stored AWS key: a long-lived key in GitHub can be read by any workflow edit; assume a role with GitHub OIDC (role-to-assume) instead",
+	}, problems)
 }
 
-// @scenario "A fallback gated on an unlisted variable fails CI"
-func TestStaticCloudKeysRejectsAnUnlistedGate(t *testing.T) {
-	invented := strings.ReplaceAll(gatedFallbackWorkflow, "EMBEDS_AWS_ROLE_ARN", "MY_NEW_ROLE_ARN")
-
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: invented}))
-
-	require.NoError(t, err)
-	assert.Contains(t, strings.Join(problems, "\n"), "not a sanctioned OIDC fallback")
-}
-
-// @scenario "A fallback gated on an unlisted variable fails CI"
-func TestStaticCloudKeysRejectsAGateBorrowedByAnotherWorkflow(t *testing.T) {
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{".github/workflows/other.yml": gatedFallbackWorkflow}))
-
-	require.NoError(t, err)
-	assert.Contains(t, strings.Join(problems, "\n"), "not a sanctioned OIDC fallback")
-}
-
-// @scenario "A stored-key fallback without an OIDC twin fails CI"
-func TestStaticCloudKeysRejectsAFallbackWithoutTwin(t *testing.T) {
-	noTwin := strings.Replace(gatedFallbackWorkflow, "role-to-assume: ${{ vars.EMBEDS_AWS_ROLE_ARN }}", "aws-region: eu-central-1", 1)
-
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: noTwin}))
-
-	require.NoError(t, err)
-	assert.Contains(t, strings.Join(problems, "\n"), "no separate step in the same job")
-}
-
-// @scenario "A stored-key fallback without an OIDC twin fails CI"
-func TestStaticCloudKeysRequiresIDTokenWrite(t *testing.T) {
-	noToken := strings.Replace(gatedFallbackWorkflow, "      id-token: write\n", "", 1)
-
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: noToken}))
-
-	require.NoError(t, err)
-	assert.Contains(t, strings.Join(problems, "\n"), "id-token: write")
-}
-
-// @scenario "A fallback gate that can run while the role variable is set fails CI"
-func TestStaticCloudKeysRejectsAGateWithAnEscape(t *testing.T) {
+// @scenario "A stored key fails CI whatever condition gates its step"
+func TestStaticCloudKeysRejectsAStoredKeyUnderAnyCondition(t *testing.T) {
 	for name, condition := range map[string]string{
-		"or true":         "${{ vars.EMBEDS_AWS_ROLE_ARN == '' || true }}",
-		"or always":       "${{ always() || vars.EMBEDS_AWS_ROLE_ARN == '' }}",
-		"parenthesised":   "${{ !(vars.EMBEDS_AWS_ROLE_ARN == '' && false) }}",
-		"negated group":   "${{ !(true && vars.EMBEDS_AWS_ROLE_ARN == '' && false) }}",
-		"and in a string": "${{ 'x&&vars.EMBEDS_AWS_ROLE_ARN == ''&&' != '' }}",
-		"open string":     "${{ vars.EMBEDS_AWS_ROLE_ARN == '' && 'x }}",
+		"a role-variable gate":  "${{ vars.EMBEDS_AWS_ROLE_ARN == '' }}",
+		"a never-true gate":     "false",
+		"a dispatch-only gate":  "github.event_name == 'workflow_dispatch'",
+		"a gate in conjunction": "${{ !inputs.dry_run && vars.MATRIX_AWS_ROLE_ARN == '' }}",
 	} {
 		t.Run(name, func(t *testing.T) {
-			escaped := strings.Replace(gatedFallbackWorkflow, "${{ vars.EMBEDS_AWS_ROLE_ARN == '' }}", condition, 1)
+			workflow := strings.Replace(gatedFallbackWorkflow, "if: ${{ vars.EMBEDS_AWS_ROLE_ARN == '' }}", "if: "+condition, 1)
 
-			problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: escaped}))
+			problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{".github/workflows/other.yml": workflow}))
 
 			require.NoError(t, err)
-			assert.Contains(t, strings.Join(problems, "\n"), "stored AWS key")
+			assert.Len(t, problems, 2)
 		})
 	}
-}
-
-// @scenario "A gated stored-key fallback with an OIDC twin passes during the move"
-func TestStaticCloudKeysAcceptsAGateInAConjunction(t *testing.T) {
-	conjunction := strings.Replace(gatedFallbackWorkflow, "${{ vars.EMBEDS_AWS_ROLE_ARN == '' }}",
-		"${{ !inputs.dry_run && vars.EMBEDS_AWS_ROLE_ARN == '' }}", 1)
-
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: conjunction}))
-
-	require.NoError(t, err)
-	assert.Empty(t, problems)
-}
-
-// @scenario "A stored key outside the sanctioned fallback step fails CI"
-func TestStaticCloudKeysAttributesKeysToTheirStep(t *testing.T) {
-	inline := strings.Replace(gatedFallbackWorkflow,
-		"        with:\n          aws-access-key-id: ${{ secrets.EMBEDS_AWS_ACCESS_KEY_ID }}\n          aws-secret-access-key: ${{ secrets.EMBEDS_AWS_SECRET_ACCESS_KEY }}\n",
-		"        with: { aws-access-key-id: \"${{ secrets.EMBEDS_AWS_ACCESS_KEY_ID }}\", aws-secret-access-key: \"${{ secrets.EMBEDS_AWS_SECRET_ACCESS_KEY }}\" }\n"+
-			"      - run: echo hi\n        env:\n          LEAK: ${{ secrets.OTHER_AWS_SECRET_ACCESS_KEY }}\n", 1)
-
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: inline}))
-
-	require.NoError(t, err)
-	require.Len(t, problems, 1)
-	assert.Contains(t, problems[0], embedsPath+":21:")
-}
-
-// @scenario "A fallback whose job's effective permissions lack id-token write fails CI"
-func TestStaticCloudKeysReadsTheEffectivePermissions(t *testing.T) {
-	jobOverrides := strings.Replace(
-		strings.Replace(gatedFallbackWorkflow, "      id-token: write\n", "", 1),
-		"on: workflow_dispatch\n", "on: workflow_dispatch\npermissions:\n  id-token: write\n", 1)
-
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: jobOverrides}))
-
-	require.NoError(t, err)
-	assert.Contains(t, strings.Join(problems, "\n"), "effective permissions")
-}
-
-// @scenario "A fallback whose job's effective permissions lack id-token write fails CI"
-func TestStaticCloudKeysAcceptsWriteAll(t *testing.T) {
-	writeAll := strings.Replace(gatedFallbackWorkflow, "    permissions:\n      contents: read\n      id-token: write\n",
-		"    permissions: write-all\n", 1)
-
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: writeAll}))
-
-	require.NoError(t, err)
-	assert.Empty(t, problems)
-}
-
-// @scenario "A fallback that assumes the role with its own stored key fails CI"
-func TestStaticCloudKeysRejectsRoleAssumedWithTheStoredKey(t *testing.T) {
-	sameStep := strings.Replace(
-		strings.Replace(gatedFallbackWorkflow, "role-to-assume: ${{ vars.EMBEDS_AWS_ROLE_ARN }}", "aws-region: eu-central-1", 1),
-		"          aws-secret-access-key: ${{ secrets.EMBEDS_AWS_SECRET_ACCESS_KEY }}\n",
-		"          aws-secret-access-key: ${{ secrets.EMBEDS_AWS_SECRET_ACCESS_KEY }}\n          role-to-assume: ${{ vars.EMBEDS_AWS_ROLE_ARN }}\n", 1)
-
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: sameStep}))
-
-	require.NoError(t, err)
-	assert.Contains(t, strings.Join(problems, "\n"), "no separate step in the same job")
-}
-
-// @scenario "A fallback that assumes the role with its own stored key fails CI"
-func TestStaticCloudKeysRejectsATwinThatIsNotComplementary(t *testing.T) {
-	alwaysOn := strings.Replace(gatedFallbackWorkflow, "${{ vars.EMBEDS_AWS_ROLE_ARN != '' }}", "${{ always() }}", 1)
-
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: alwaysOn}))
-
-	require.NoError(t, err)
-	assert.Contains(t, strings.Join(problems, "\n"), "no separate step in the same job")
 }
 
 // @scenario "A change to a composite action runs the guard"
@@ -306,27 +189,6 @@ func TestStaticCloudKeysRunsOnCompositeActionChanges(t *testing.T) {
 	}
 
 	assert.Contains(t, filters["ciguards"], ".github/actions/**")
-}
-
-// @scenario "A listed fallback variable with no fallback step left fails CI"
-func TestStaticCloudKeysRefusesAStaleFallbackEntry(t *testing.T) {
-	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: oidcOnlyWorkflow}))
-
-	require.NoError(t, err)
-	require.Len(t, problems, 1)
-	assert.Contains(t, problems[0], "StaticKeyFallbackVars lists EMBEDS_AWS_ROLE_ARN")
-}
-
-// @scenario "A listed fallback variable with no fallback step left fails CI"
-func TestStaticCloudKeysRefusesAnEntryWhoseWorkflowIsGone(t *testing.T) {
-	root := writeRepo(t, nil)
-	require.NoError(t, os.Remove(filepath.Join(root, embedsPath)))
-
-	problems, err := ciguard.StaticCloudKeys(root)
-
-	require.NoError(t, err)
-	require.Len(t, problems, 1)
-	assert.Contains(t, problems[0], "StaticKeyFallbackVars lists EMBEDS_AWS_ROLE_ARN for "+embedsPath+", which no longer exists")
 }
 
 func TestStaticCloudKeysPassesOnThisRepository(t *testing.T) {
