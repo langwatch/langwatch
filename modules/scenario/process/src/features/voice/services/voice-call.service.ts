@@ -187,22 +187,9 @@ async function fetchProviderRecord(
 }
 
 /**
- * One in-flight agent create per conversation on this pod (#8027).
- *
- * The finish path's existence check and its create are not atomic: two
- * concurrent retries of the same hang-up — a browser retry racing a slow
- * first request, a double click — both see no run and no agent, and both
- * reach `createVoiceAgent`, leaving an orphan Agent row. The claim is keyed
- * on the conversation, so whichever finish enters first performs the create
- * and every overlapping finish awaits and reuses that same row, whatever the
- * request ordering. Self-cleaning: the entry is removed when the create
- * settles, so a failed create is retried by the caller's next finish rather
- * than cached forever.
- *
- * Per-pod by design. Across pods the Agent table's (projectId, identityKey)
- * unique constraint and the winner re-read in `AgentService.createVoiceAgent`
- * already collapse duplicates; this closes the in-process window at the
- * service seam, where the ports contract makes no dedupe promise.
+ * Single-flight agent create per conversation on this pod: an optimisation that saves the
+ * second finish a DB round trip. Correctness across pods is `AgentService.createVoiceAgent`'s
+ * identity-key dedupe (#8020); entries clear when the create settles, so failures retry.
  */
 const inFlightAgentCreates = new Map<string, Promise<{ id: string }>>();
 
@@ -210,7 +197,6 @@ const inFlightAgentCreates = new Map<string, Promise<{ id: string }>>();
  * Resolve the agent row the run is written under: reuse the one the token
  * carries, else create it from the form values. A create needs a name; without
  * one the panel collects it and retries (throws {@link VoiceNameRequiredError}).
- * Creates are single-flight per conversation (see {@link inFlightAgentCreates}).
  */
 async function resolveAgentRow(
   ports: VoiceSessionInfrastructure,
