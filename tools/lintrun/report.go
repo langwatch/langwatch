@@ -52,18 +52,24 @@ func directiveRules(comment string) []string {
 
 // ParseReport reads one oxlint `-f json` run. ok is false when oxlint failed to run:
 // an exit other than 0 or 1, or output that is not a report. "No files found to lint."
-// is a clean run with no diagnostics.
+// is a clean run only when the report after it shows no files linted and no findings.
 func ParseReport(stdout string, status int) (diagnostics []Diagnostic, ok bool) {
 	if status != 0 && status != 1 {
 		return nil, false
 	}
-	if strings.HasPrefix(strings.TrimLeft(stdout, " \t\r\n"), noFiles) {
-		return []Diagnostic{}, true
+	body := strings.TrimLeft(stdout, " \t\r\n")
+	noneFound := strings.HasPrefix(body, noFiles)
+	if noneFound { // the sentence runs on to the end of its line, then the report follows
+		_, body, _ = strings.Cut(body, "\n")
 	}
 	var report struct {
-		Diagnostics *[]Diagnostic `json:"diagnostics"`
+		Diagnostics   *[]Diagnostic `json:"diagnostics"`
+		NumberOfFiles *int          `json:"number_of_files"`
 	}
-	if err := json.Unmarshal([]byte(stdout), &report); err != nil || report.Diagnostics == nil {
+	if err := json.Unmarshal([]byte(body), &report); err != nil || report.Diagnostics == nil {
+		return nil, false
+	}
+	if noneFound && (report.NumberOfFiles == nil || *report.NumberOfFiles != 0 || len(*report.Diagnostics) > 0) {
 		return nil, false
 	}
 	return *report.Diagnostics, true

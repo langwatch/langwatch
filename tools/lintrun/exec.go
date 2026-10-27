@@ -63,7 +63,7 @@ func (r runner) affectedProjects(q request) ([]string, error) {
 		return nil, exitError{status: max(exit.ExitCode(), 1)}
 	}
 	if err != nil {
-		return nil, exitError{status: 1}
+		return nil, fmt.Errorf("nx show projects: cannot run pnpm: %w", err)
 	}
 	var names []string
 	if err := json.Unmarshal(out, &names); err != nil {

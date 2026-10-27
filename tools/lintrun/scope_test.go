@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/langwatch/langwatch/tools/lintrun"
@@ -29,6 +30,22 @@ func TestPlainScopeLintsTheTreeWhenALintGlobalChanged(t *testing.T) {
 	got := lintrun.PlainScope(files, []string{".oxlintrc.*.jsonc"}, existing(files...))
 	if want := []string{"."}; !reflect.DeepEqual(got, want) {
 		t.Errorf("PlainScope = %q, want %q", got, want)
+	}
+}
+
+func TestLintGlobalsUseOnlySyntaxMatchGlobSupports(t *testing.T) {
+	nx, err := os.ReadFile(filepath.Join("..", "..", "nx.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	globals, err := lintrun.LintGlobals(nx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, g := range globals {
+		if strings.ContainsAny(g, "{}()!+@") || strings.Contains(g, "?(") {
+			t.Errorf("lint global %q uses braces or extglob, which MatchGlob does not support", g)
+		}
 	}
 }
 

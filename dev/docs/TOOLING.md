@@ -64,7 +64,7 @@ first.
 ```
 
 oxlint runs its native rules and the JavaScript plugin one after the other in a
-single process, so the runner (`tools/lintrun`, run as `go run ./cmd/lintrun`) splits the rules into three configs and runs
+single process, so the runner (`tools/lintrun`, built to `.bin/lintrun/lintrun` and run by the `pnpm lint` scripts) splits the rules into three configs and runs
 them side by side: `.oxlintrc.native.jsonc`, `.oxlintrc.plugin.jsonc` and
 `.oxlintrc.types.jsonc` (with `--type-aware`). `.oxlintrc.jsonc` extends all three
 and stays the one config the editor, `pnpm lint:fix` and the Nx targets read; it

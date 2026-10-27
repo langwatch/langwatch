@@ -462,9 +462,11 @@ shard whose split changed restores a partial match and runs the rest.
 ## Amendment, 2026-10-27: the lint runner is a Go CLI
 
 The runner behind `pnpm lint`, `lint:changed` and `lint:types` moved from
-`dev/nx/lint.mjs` to `tools/lintrun` (`go run ./cmd/lintrun`), with the
-unused-directive merge it imported; repository tooling is Go. Its scope, configs,
-output and exit codes are unchanged, with one fix: oxlint's "No files found to
+`dev/nx/lint.mjs` to `tools/lintrun` (the scripts build it to
+`.bin/lintrun/lintrun` and exec it, so its exit status reaches the shell: 0 clean,
+1 findings or a failed process, 2 for a bad flag), with the unused-directive merge
+it imported; repository tooling is Go. Its scope, configs and output are unchanged,
+with one fix: oxlint's "No files found to
 lint." (every path in scope matched an ignore pattern) is a clean run, not a
 failed process. Two smaller differences: an unknown flag is refused, not ignored, and
 findings sort by file byte-wise rather than by locale. The Nx plugins in `dev/nx/`

@@ -70,8 +70,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	changed := flags.Bool("changed", false, "lint what changed since the merge base")
 	types := flags.Bool("types", false, "add the type-aware rules, over the typed projects")
 	base := flags.String("base", "", "lint what changed since this commit")
-	if err := flags.Parse(args); err != nil {
-		return 2
+	for rest := args; ; {
+		if err := flags.Parse(rest); err != nil {
+			return 2
+		}
+		if flags.NArg() == 0 {
+			break
+		}
+		rest = flags.Args()[1:] // a positional is ignored, as the JS runner did; flags may follow it
 	}
 	q := request{changed: *changed, types: *types}
 	flags.Visit(func(f *flag.Flag) {

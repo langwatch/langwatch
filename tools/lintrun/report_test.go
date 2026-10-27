@@ -26,6 +26,20 @@ func TestParseReportReadsNoFilesFoundAsACleanRun(t *testing.T) {
 	}
 }
 
+func TestParseReportRefusesNoFilesFoundWhenFilesWereLinted(t *testing.T) {
+	const prefix = "No files found to lint. Please check your paths and ignore patterns.\n"
+	for _, out := range []string{
+		prefix + `{"diagnostics":[],"number_of_files":4}`,
+		prefix + `{"diagnostics":[{"message":"m","filename":"a.ts"}],"number_of_files":0}`,
+		prefix + `{"diagnostics":[]}`,
+		prefix,
+	} {
+		if _, ok := lintrun.ParseReport(out, 1); ok {
+			t.Errorf("ParseReport(%q, 1) ok, want a failed run", out)
+		}
+	}
+}
+
 func TestParseReportReadsDiagnostics(t *testing.T) {
 	ds, ok := lintrun.ParseReport(`{"diagnostics":[{"message":"m","code":"eslint(x)","filename":"a.ts"}]}`, 1)
 	if !ok || len(ds) != 1 || ds[0].Message != "m" || *ds[0].Code != "eslint(x)" {

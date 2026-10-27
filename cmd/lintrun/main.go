@@ -3,7 +3,7 @@
 //
 // Usage:
 //
-//	go run ./cmd/lintrun [--changed] [--types] [--base <sha>]
+//	.bin/lintrun/lintrun [--changed] [--types] [--base <sha>]
 //
 // Spec: specs/tooling/nx-reruns.feature, specs/tooling/lint-split-unused-directives.feature
 package main

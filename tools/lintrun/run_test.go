@@ -101,7 +101,6 @@ func TestRunPassesWhenOxlintFindsNoFilesToLint(t *testing.T) {
 	}
 }
 
-// @scenario "A plain lint:changed lints the changed files, not their dependants"
 func TestRunFailsOnAFindingAndPrintsIt(t *testing.T) {
 	w := newWorkspace(t)
 	report := `{"diagnostics":[{"message":"Too long.","code":"langwatch(comment-block-size)","filename":"generated/client.ts","labels":[{"span":{"offset":0,"length":1,"line":1,"column":1}}]}]}`
@@ -163,5 +162,66 @@ func TestRunLeavesATypeAwareDirectiveToTheTypesRun(t *testing.T) {
 	}
 	if code, stdout, _ := w.run(t, report, "1", "--types"); code != 1 || !strings.HasSuffix(stdout, "\n1 problem(s)\n") {
 		t.Errorf("types run: exit %d, stdout %q; want the directive reported", code, stdout)
+	}
+}
+
+// fakePnpm puts a pnpm on PATH that prints $PNPM_STDOUT, writes $PNPM_STDERR and exits $PNPM_STATUS.
+func fakePnpm(t *testing.T, stdout, stderr, status string) {
+	t.Helper()
+	dir := t.TempDir()
+	script := "#!/bin/sh\nprintf '%s' \"$PNPM_STDOUT\"\nprintf '%s' \"$PNPM_STDERR\" >&2\nexit \"$PNPM_STATUS\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "pnpm"), []byte(script), 0o755); err != nil { //nolint:gosec // a test stand-in must be executable
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PNPM_STDOUT", stdout)
+	t.Setenv("PNPM_STDERR", stderr)
+	t.Setenv("PNPM_STATUS", status)
+}
+
+func TestRunWithTypesFailsWhenNxFailsAndPrintsItsStderr(t *testing.T) {
+	w := newWorkspace(t)
+	fakePnpm(t, "", "nx: cannot reach the daemon", "3")
+	code, _, stderr := w.run(t, `{"diagnostics":[]}`, "0", "--types", "--base", "HEAD")
+
+	if code != 3 || !strings.Contains(stderr, "nx: cannot reach the daemon") || len(w.lintCalls(t)) != 0 {
+		t.Errorf("exit %d, stderr %q, calls %q; want nx's status, its stderr and no oxlint run", code, stderr, w.lintCalls(t))
+	}
+}
+
+func TestRunWithTypesLintsTheProjectsNxListed(t *testing.T) {
+	w := newWorkspace(t)
+	fakePnpm(t, `["@langwatch/api"]`, "", "0")
+	code, _, stderr := w.run(t, `{"diagnostics":[]}`, "0", "--types", "--base", "HEAD")
+
+	want := "--quiet -f json -c .oxlintrc.types.jsonc --type-aware --ignore-pattern generated/** apps/api"
+	if code != 0 || !slices.Contains(w.lintCalls(t), want) {
+		t.Errorf("exit %d, stderr %q, calls %q; want the listed project linted", code, stderr, w.lintCalls(t))
+	}
+}
+
+func TestRunWithTypesFailsClearlyWhenPnpmIsMissing(t *testing.T) {
+	w := newWorkspace(t)
+	t.Setenv("PATH", t.TempDir())
+	code, _, stderr := w.run(t, `{"diagnostics":[]}`, "0", "--types", "--base", "HEAD")
+
+	if code != 1 || !strings.Contains(stderr, "nx show projects: cannot run pnpm") || len(w.lintCalls(t)) != 0 {
+		t.Errorf("exit %d, stderr %q; want exit 1 naming the missing pnpm", code, stderr)
+	}
+}
+
+func TestRunAcceptsFlagsAfterAPositionalArgument(t *testing.T) {
+	w := newWorkspace(t)
+	code, stdout, stderr := w.run(t, `{"diagnostics":[]}`, "0", "apps/api", "--types")
+
+	if code != 0 || len(w.lintCalls(t)) != 3 {
+		t.Errorf("exit %d, stdout %q, stderr %q, calls %q; want --types applied after a positional", code, stdout, stderr, w.lintCalls(t))
+	}
+}
+
+func TestRunRefusesAnUnknownFlagWithStatusTwo(t *testing.T) {
+	w := newWorkspace(t)
+	if code, _, _ := w.run(t, "", "0", "--bogus"); code != 2 {
+		t.Errorf("exit %d, want 2", code)
 	}
 }
