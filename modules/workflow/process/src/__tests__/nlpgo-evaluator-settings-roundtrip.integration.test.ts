@@ -133,10 +133,9 @@ const COMPETITOR_SETTINGS = {
 };
 
 /**
- * A competitor evaluator, in the shape a bare slug takes: the inline panel
- * writes its settings straight onto parameters[], with no localConfig. Its
- * settings schema declares `name` as the company being defended, so that one
- * parameter is both read in its own right and a setting.
+ * A competitor evaluator in the bare-slug shape: the inline panel writes its
+ * settings onto parameters[] with no localConfig, and its schema declares
+ * `name` as the company defended, so that parameter is also a setting.
  */
 const competitorEvaluatorNode = (): Component => ({
   cls: "LangWatchEvaluator",
