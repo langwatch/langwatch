@@ -203,16 +203,60 @@ describe("ensureCloudflaredBinary", () => {
     });
   });
 
+  describe("when the real download path is taken", () => {
+    it("fetches the pinned release asset from GitHub", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async () => new Response(PINNED_BINARY));
+
+      await ensureCloudflaredBinary({ binPath, platformKey: "linux-x64", pins });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_RELEASE}/cloudflared-linux-amd64`,
+      );
+      expect(fs.readFileSync(binPath)).toEqual(PINNED_BINARY);
+    });
+
+    it("names the HTTP status when GitHub refuses the download", async () => {
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () => new Response("not found", { status: 404 }),
+      );
+
+      await expect(
+        ensureCloudflaredBinary({ binPath, platformKey: "linux-x64", pins }),
+      ).rejects.toThrow(/failed with HTTP 404.*--tunnel-url/);
+      expect(fs.existsSync(binPath)).toBe(false);
+    });
+
+    it("says the download timed out rather than hanging", async () => {
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+        throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      });
+
+      await expect(
+        ensureCloudflaredBinary({ binPath, platformKey: "linux-x64", pins }),
+      ).rejects.toThrow(/did not finish within 5 minutes.*--tunnel-url/);
+      expect(fs.existsSync(binPath)).toBe(false);
+    });
+  });
+
   describe("given the shipped pins", () => {
-    it("pin an archive digest for every platform that ships an archive", () => {
-      for (const pin of Object.values(CLOUDFLARED_PINS)) {
-        expect(pin.sha256).toMatch(/^[0-9a-f]{64}$/);
-        if (pin.asset.endsWith(".tgz")) {
-          expect(pin.archiveSha256).toMatch(/^[0-9a-f]{64}$/);
-        } else {
-          expect(pin.archiveSha256).toBeUndefined();
-        }
-      }
+    const pinsList = Object.values(CLOUDFLARED_PINS);
+
+    it("pin a binary digest for every platform", () => {
+      expect(pinsList.map((pin) => pin.sha256)).toEqual(
+        pinsList.map(() => expect.stringMatching(/^[0-9a-f]{64}$/)),
+      );
+    });
+
+    it("pin an archive digest exactly for the platforms that ship an archive", () => {
+      expect(
+        pinsList.map((pin) => [pin.asset.endsWith(".tgz"), Boolean(pin.archiveSha256)]),
+      ).toEqual(pinsList.map((pin) => [pin.asset.endsWith(".tgz"), pin.asset.endsWith(".tgz")]));
+      const archived = pinsList.filter((pin) => pin.archiveSha256);
+      expect(archived.map((pin) => pin.archiveSha256)).toEqual(
+        archived.map(() => expect.stringMatching(/^[0-9a-f]{64}$/)),
+      );
     });
   });
 });

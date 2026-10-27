@@ -9,10 +9,9 @@ import { launchQuickTunnel, type TunnelHandle } from "../tunnel/cloudflared-proc
 const TUNNEL_URL = "https://lively-otter.trycloudflare.com";
 
 /**
- * A stand-in for the cloudflared binary: records its arguments, logs a failed
- * request to the quick-tunnel service (whose api.trycloudflare.com URL is not
- * the tunnel), then the quick-tunnel URL split across two writes the way a
- * chunked pipe can deliver it, then waits to be stopped.
+ * A stand-in cloudflared: records its arguments, logs a failed request to the
+ * quick-tunnel service (api.trycloudflare.com, never the tunnel), then the URL
+ * split across two writes the way a chunked pipe can deliver it.
  */
 function writeFakeCloudflared(dir: string): string {
   const binPath = path.join(dir, "cloudflared");
@@ -69,6 +68,27 @@ describe.skipIf(process.platform === "win32")("launchQuickTunnel", () => {
         "",
       ]);
       await expect(exited).resolves.toBe("SIGINT");
+    });
+  });
+
+  describe("when cloudflared exits before reporting a URL", () => {
+    it("keeps its last log lines for the error", async () => {
+      const binPath = path.join(dir, "cloudflared");
+      fs.writeFileSync(
+        binPath,
+        `#!/bin/sh
+printf 'ERR failed to request quick Tunnel: 429 Too Many Requests\\n' >&2
+exit 1
+`,
+        { mode: 0o755 },
+      );
+      const tunnel = launchQuickTunnel({ binPath, localUrl: "http://127.0.0.1:4321" });
+      started.push(tunnel);
+
+      const code = await new Promise<unknown>((resolve) => tunnel.once("exit", resolve));
+
+      expect(code).toBe(1);
+      expect(tunnel.recentLog()).toContain("failed to request quick Tunnel: 429");
     });
   });
 

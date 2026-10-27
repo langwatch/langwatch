@@ -24,10 +24,8 @@ function cloudflaredBinPath(): string {
 }
 
 /**
- * Provision the Cloudflare quick tunnel, after {@link ensureCloudflaredBinary}
- * has put the pinned release on disk (with the Cloudflare terms notice printed
- * before any download) and verified it. Resolves with the public URL and a
- * handle to stop the tunnel; rejects when no URL arrives within the timeout.
+ * Starts the quick tunnel on the verified binary and resolves with its public
+ * URL; rejects, carrying cloudflared's last log lines, when no URL arrives.
  */
 export async function startQuickTunnel({
   localUrl,
@@ -42,11 +40,15 @@ export async function startQuickTunnel({
   await ensureCloudflaredBinary({ binPath });
 
   const tunnel = launchQuickTunnel({ binPath, localUrl });
+  const failure = (message: string) => {
+    const log = tunnel.recentLog();
+    return new Error(log ? `${message}\n\ncloudflared said:\n${log}` : message);
+  };
   const url = await new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {
       tunnel.stop();
       reject(
-        new Error(
+        failure(
           `The tunnel did not report a public URL within ${TUNNEL_URL_TIMEOUT_MS / 1000} seconds. Check your network connection and try again, or bring your own tunnel with --tunnel-url.`,
         ),
       );
@@ -63,7 +65,7 @@ export async function startQuickTunnel({
     tunnel.once("exit", (code: number | null) => {
       clearTimeout(timeout);
       reject(
-        new Error(
+        failure(
           `The tunnel process exited (code ${code ?? "unknown"}) before reporting a URL. Try again, or bring your own tunnel with --tunnel-url.`,
         ),
       );

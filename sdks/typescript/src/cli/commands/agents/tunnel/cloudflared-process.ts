@@ -15,23 +15,22 @@ import * as readline from "node:readline";
  */
 const QUICK_TUNNEL_URL = /https:\/\/(?!api\.)[a-z0-9-]+\.trycloudflare\.com/;
 
+/** How many of cloudflared's last log lines a failure carries. */
+const RECENT_LOG_LINES = 10;
+
 /** The tunnel process surface the session needs. */
 export interface TunnelHandle {
   stop: () => void;
+  /** cloudflared's last few log lines, for an error that has no URL to show. */
+  recentLog: () => string;
   once(event: "url", listener: (url: string) => void): unknown;
   once(event: "error", listener: (error: Error) => void): unknown;
   once(event: "exit", listener: (code: number | null, signal: unknown) => void): unknown;
 }
 
 /**
- * Starts `cloudflared tunnel --url <localUrl>` from `binPath` and emits `url`
- * once with the public URL it logs. cloudflared writes its log to stderr; both
- * streams are read line by line for the whole session, so a URL split across
- * chunks is still found and a full pipe never stalls the tunnel.
- *
- * `--no-autoupdate` because cloudflared otherwise downloads a newer release
- * and restarts itself onto it, which would swap the verified binary for one
- * nobody checked in the middle of a session.
+ * Starts `cloudflared tunnel --url <localUrl>` and emits `url` once with the
+ * public URL it logs. Both streams are read line by line for the whole session.
  */
 export function launchQuickTunnel({
   binPath,
@@ -41,12 +40,16 @@ export function launchQuickTunnel({
   localUrl: string;
 }): TunnelHandle {
   const events = new EventEmitter();
+  // Without --no-autoupdate cloudflared swaps itself for an unchecked release.
   const child = spawn(binPath, ["tunnel", "--no-autoupdate", "--url", localUrl], {
     stdio: ["ignore", "pipe", "pipe"],
   });
 
   let hasReportedUrl = false;
+  const recent: string[] = [];
   const onLine = (line: string) => {
+    recent.push(line);
+    if (recent.length > RECENT_LOG_LINES) recent.shift();
     if (hasReportedUrl) return;
     const match = QUICK_TUNNEL_URL.exec(line);
     if (match) {
@@ -54,6 +57,7 @@ export function launchQuickTunnel({
       events.emit("url", match[0]);
     }
   };
+  // Line by line, so a URL split across chunks is found and the pipe never fills.
   for (const stream of [child.stdout, child.stderr]) {
     readline.createInterface({ input: stream }).on("line", onLine);
   }
@@ -65,6 +69,7 @@ export function launchQuickTunnel({
     stop: () => {
       child.kill("SIGINT");
     },
+    recentLog: () => recent.join("\n"),
     once: (event: string, listener: (...args: never[]) => void) =>
       events.once(event, listener as (...args: unknown[]) => void),
   } as TunnelHandle;

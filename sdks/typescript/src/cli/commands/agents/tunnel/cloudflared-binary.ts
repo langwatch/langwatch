@@ -1,11 +1,7 @@
 /**
- * The `cloudflared` binary a dev tunnel runs: one reviewed release, pinned by
- * the SHA-256 digests Cloudflare publishes, downloaded by this CLI and matched
- * against those digests before every run.
- *
- * The CLI owns the download, the file and the process (no `cloudflared` npm
- * package): that package unpacks the macOS archive before anything checks
- * it, and its postinstall fetches whatever `latest` is.
+ * The `cloudflared` binary a dev tunnel runs: one reviewed release, downloaded
+ * by this CLI and matched against Cloudflare's published SHA-256 before every
+ * run. No npm wrapper: it unpacked the macOS archive unchecked (ADR-098).
  */
 
 import { execFileSync } from "node:child_process";
@@ -35,9 +31,8 @@ export interface PinnedAsset {
 
 /**
  * The pinned assets of {@link CLOUDFLARED_RELEASE}, keyed `platform-arch`.
- * Binary digests are the release notes' "SHA256 Checksums" (for the macOS
- * `.tgz` entries those are the binary inside the archive); archive digests are
- * GitHub's own asset digests.
+ * `sha256` comes from the release notes, whose `.tgz` entries hash the binary
+ * inside; `archiveSha256` is GitHub's own asset digest.
  */
 export const CLOUDFLARED_PINS: Record<string, PinnedAsset> = {
   "linux-x64": {
@@ -116,12 +111,9 @@ function fileMatches(filePath: string, expected: string): boolean {
 }
 
 /**
- * Makes sure `binPath` holds the pinned release's binary for this platform,
- * downloading it when it is missing or from another release, and returns
- * once the file on disk has matched the pinned digest. Throws, without
- * running or leaving behind anything unverified, when the platform has no
- * pin or the download does not match. `binPath` must be a file the CLI owns,
- * since one that does not match is replaced.
+ * Leaves the pinned release's binary at `binPath` (the CLI's own file: one that
+ * does not match is replaced), and throws, leaving nothing unverified, when the
+ * platform has no pin or the download does not match.
  */
 export async function ensureCloudflaredBinary({
   binPath,

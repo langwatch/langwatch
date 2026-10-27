@@ -84,8 +84,10 @@ describe("agent tunnel session", () => {
     quickMock.mockImplementation(() => {
       const tunnel = new EventEmitter() as EventEmitter & {
         stop: () => boolean;
+        recentLog: () => string;
       };
       tunnel.stop = vi.fn(() => true);
+      tunnel.recentLog = () => "";
       fakeTunnels.push(tunnel);
       setImmediate(() => tunnel.emit("url", TUNNEL_URL));
       return tunnel;
