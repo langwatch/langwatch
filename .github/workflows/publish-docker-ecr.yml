@@ -46,8 +46,8 @@ name: publish-docker-ecr
 #                         that supplies one
 #
 # The OIDC role (`langwatch-oss-ecr-push`, langwatch/langwatch-saas#486) trusts
-# exactly two subjects: `refs/heads/main` and `refs/tags/langwatch@v*`; this
-# workflow only ever runs as the first. There is
+# exactly two subjects: `refs/heads/main` and `refs/tags/langwatch@v*`. The
+# `meta` job runs only on main, so a dispatch on a tag ref does nothing. There is
 # deliberately no `pull_request` trigger — a PR-ref assume-role is denied by that
 # trust policy, so a PR-triggered run could only ever fail. End-to-end
 # verification happens on the first merge to main.
@@ -81,6 +81,8 @@ env:
 
 jobs:
   meta:
+    # Every other job needs meta, so a dispatch on any other ref stops here.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}

@@ -162,10 +162,11 @@ jobs:
       - name: Push every chart to ECR
         env:
           ROLE_ARN: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
-          # Every chart under charts/, by Chart.yaml name. Each needs an ECR
-          # repository named langwatch-charts/<chart name> in the artifacts
-          # account that the OIDC role may push to.
-          ECR_CHARTS: clickhouse-serverless langwatch-gateway langwatch-langyagent langwatch
+          # Every chart under charts/ with a Chart.yaml, by name (a test
+          # enforces it). Each needs an ECR repository langwatch-charts/<name>
+          # the OIDC role may push to. langyagent first: the push stops at the
+          # first failure, and its repository already exists.
+          ECR_CHARTS: langwatch-langyagent clickhouse-serverless langwatch-gateway langwatch
         run: |
           set -euo pipefail
           ACCOUNT_ID="$(printf '%s' "${ROLE_ARN}" | cut -d: -f5)"

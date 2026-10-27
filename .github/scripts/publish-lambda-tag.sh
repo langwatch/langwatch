@@ -70,7 +70,7 @@ if [ "${IMAGE_WAS_BUILT}" = "true" ]; then
     fi
     exit 1
   fi
-  # Checked here too, so the release tag below never copies an index.
+  # Checked here too, so the re-tag below never copies an index.
   if ! is_single_manifest "${media_type}"; then
     echo "::error::${image}:${IMAGE_TAG} is ${media_type}, not a single manifest; see build-and-push-lambda"
     exit 1

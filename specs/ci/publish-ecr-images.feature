@@ -7,7 +7,8 @@ Feature: Publish every deployable image to the artifacts registry
   # Lambda image gets its tag is .github/scripts/publish-lambda-tag.sh, bound
   # by .github/scripts/__tests__/publish-lambda-tag.test.sh. The path filters
   # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, and where a Lambda
-  # image starts by tools/ciguard/lambdaworkdir_test.go. The rest is the
+  # image starts by tools/ciguard/lambdaworkdir_test.go. That a release
+  # publishes nothing is bound by publish-workflow-shape.test.sh. The rest is the
   # workflow's own build steps, which no test suite can run: those scenarios
   # are @unimplemented and are proved by the first run on main.
 
@@ -76,7 +77,7 @@ Feature: Publish every deployable image to the artifacts registry
     When publish-docker-ecr re-tags that image for a commit that did not change it
     Then it fails instead of writing the commit tag
 
-  @unimplemented
+  @unit
   Scenario: A release publishes nothing to the artifacts registry
     Given a langwatch@v<version> release is published
     Then publish-docker-ecr does not run

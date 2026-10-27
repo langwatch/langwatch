@@ -8,8 +8,8 @@ Feature: Publish every prerelease chart to the artifacts registry only
   # `go run ./cmd/chartpush` (logic in tools/chartpush), bound by
   # tools/chartpush/chartpush_test.go against a stub helm.
   # Which registries the workflow reaches, and that nothing signs the ECR copy,
-  # are the workflow's own shape, which no test suite can run: those scenarios
-  # are @unimplemented and proved by the first run on main. Self-hosters are
+  # are the workflow's own shape, bound by
+  # .github/scripts/__tests__/publish-workflow-shape.test.sh. Self-hosters are
   # unaffected: they install the tagged releases from the public Helm repo.
 
   @unit
@@ -19,14 +19,14 @@ Feature: Publish every prerelease chart to the artifacts registry only
     Then each of langwatch, langwatch-gateway, clickhouse-serverless and langwatch-langyagent is pushed under langwatch-charts in the artifacts registry, at its prerelease version
     And the run summary lists each version and its digest
 
-  @unimplemented
+  @unit
   Scenario: No prerelease chart goes to a public registry
     Given a merge to main changes a chart
     When prerelease-charts-oci finishes
     Then no chart was pushed to GHCR or any other public registry
     And the run holds no permission to write GitHub packages
 
-  @unimplemented
+  @unit
   Scenario: The ECR copy is not signed
     Given the charts were pushed to the artifacts registry
     When prerelease-charts-oci finishes

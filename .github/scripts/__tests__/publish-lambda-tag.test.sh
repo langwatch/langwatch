@@ -236,7 +236,7 @@ test_a_rebuilt_index_fails() {
   reg="$(new_registry)"
   push "$reg" "git-$HEAD_SHA" "$INDEX" '{"index":true}'
   run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=true
-  if [ "$LAST_STATUS" -ne 0 ]; then
+  if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q "not a single manifest"; then
     record yes "a rebuilt tag that is an index fails"
   else
     record no "a rebuilt tag that is an index fails"
