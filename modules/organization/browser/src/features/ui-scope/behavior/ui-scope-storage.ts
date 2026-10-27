@@ -23,6 +23,12 @@ const WRITE_KEYS: Record<UiScopeSelectionWrite["key"], string> = {
   projectSlug: UI_SELECTED_PROJECT_SLUG_KEY,
 };
 
+const SELECTION_FIELDS: Readonly<Record<string, UiScopeSelectionWrite["key"]>> = {
+  [UI_SELECTED_ORGANIZATION_ID_KEY]: "organizationId",
+  [UI_SELECTED_TEAM_ID_KEY]: "teamId",
+  [UI_SELECTED_PROJECT_SLUG_KEY]: "projectSlug",
+};
+
 /** Everything one page remembers about where it was working. */
 export type UiScopeMemory = {
   readonly selection: UiScopeSelection;
@@ -104,8 +110,8 @@ export function broadcastUiScopeWrite(key: string): void {
 
 /**
  * The remembered scope as this document last read it: read when its first reader mounts, then
- * again only on a write in this document. Another tab's write is ignored, even on a later
- * render, so two tabs in two scopes never take each other's (tasks#987).
+ * only the key this document writes. Another tab's write is ignored, even on a later render or
+ * a write of another key, so two tabs in two scopes never take each other's (tasks#987).
  */
 class UiScopeMemoryStore {
   private cached: UiScopeMemory = NOTHING_REMEMBERED;
@@ -121,9 +127,17 @@ class UiScopeMemoryStore {
     return this.cached;
   };
 
+  /** Re-reads the one key this document wrote; the rest stays as this document saw it. */
+  private refresh(key: string | null): void {
+    const field = SELECTION_FIELDS[key ?? ""];
+    if (this.stale || !field) return;
+    const value = readUiScopeMemory(this.storage).selection[field];
+    this.cached = { selection: { ...this.cached.selection, [field]: value } };
+  }
+
   subscribe = (listener: () => void): (() => void) => {
-    const onWrite = () => {
-      this.stale = true;
+    const onWrite = (event: Event) => {
+      this.refresh(event instanceof StorageEvent ? event.key : null);
       listener();
     };
     if (this.readers === 0) this.stale = true;

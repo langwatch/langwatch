@@ -62,6 +62,25 @@ describe("given a tab that read project X as the remembered scope", () => {
     });
   });
 
+  describe("when another tab remembers project Y, then this tab remembers a team", () => {
+    /** @scenario "A write in another tab leaves this tab's remembered scope alone" */
+    it("takes the team and still reads project X", () => {
+      const storage = sharedStorage("project-x");
+      const { hook } = mountReader(storage);
+
+      act(() => anotherTabRemembers({ storage, slug: "project-y" }));
+      act(() =>
+        writeUiScopeSelection({
+          writes: [{ key: "teamId", value: "team-b" }],
+          storage,
+          broadcast: broadcastUiScopeWrite,
+        }),
+      );
+
+      expect(hook.result.current).toBe("project-x");
+    });
+  });
+
   describe("when this tab remembers project Y", () => {
     /** @scenario "A write in this tab is still seen by its own readers" */
     it("reads project Y without a reload", () => {
