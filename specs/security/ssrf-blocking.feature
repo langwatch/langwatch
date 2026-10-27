@@ -238,14 +238,6 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       Then the connection is refused with an SSRF block error
 
     @unit
-    Scenario: The HTTP block falls back across the addresses it checked
-      Given a hostname that resolves to several addresses, all of which pass the policy
-      And the first address does not answer
-      When the NLP service's HTTP block connects to that hostname
-      Then it connects to the next checked address, never to one it did not check
-      And each address gets an equal share of the time left, so one silent address cannot spend it all
-
-    @unit
     Scenario: A bracketed IPv6 metadata literal is refused with local calls allowed
       Given BLOCK_LOCAL_HTTP_CALLS is "false"
       When the TS validator processes a URL whose host is a bracketed IPv6 spelling
@@ -268,6 +260,23 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       Then the validation passes
       And the destination is pinned to that address with the brackets kept for the
         request line and Host header
+
+  # ============================================================================
+  # Connecting — only to checked addresses
+  # ============================================================================
+
+  Rule: The HTTP block connects only to addresses it checked, falling back across them
+    A name can resolve to several addresses. Every one is checked before any
+    connection, and the connection goes to a checked address, never to one a
+    second lookup returns. Allowlisted or not, the same fallback applies.
+
+    @unit
+    Scenario: The HTTP block falls back across the addresses it checked
+      Given a hostname that resolves to several addresses, all of which pass the policy
+      And the first address does not answer
+      When the NLP service's HTTP block connects to that hostname
+      Then it connects to the next checked address, never to one it did not check
+      And each address gets an equal share of the time left, so one silent address cannot spend it all
 
   # ============================================================================
   # Migration — IS_SAAS no longer drives SSRF blocking

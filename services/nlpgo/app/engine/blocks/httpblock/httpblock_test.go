@@ -552,6 +552,26 @@ func TestSafeDialer_ASilentAddressDoesNotSpendTheWholeDeadline(t *testing.T) {
 	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
 }
 
+// @scenario "The HTTP block falls back across the addresses it checked"
+func TestSafeDialer_FallsBackAcrossCheckedAddressesWithoutAnAllowlist(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		AllowLocal: true,
+		Resolver: func(string) ([]net.IP, error) {
+			// Nothing listens on the IPv6 loopback, so the dial must fall back.
+			return []net.IP{net.ParseIP("::1"), net.ParseIP("127.0.0.1")}, nil
+		},
+	})
+	conn, err := dial(context.Background(), "tcp", net.JoinHostPort("agent.example", port))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
+}
+
 // TestSafeDialer_BlocksLiteralPrivateIP catches direct dials by IP.
 func TestSafeDialer_BlocksLiteralPrivateIP(t *testing.T) {
 	dial := httpblock.SafeDialer(httpblock.SSRFOptions{})
