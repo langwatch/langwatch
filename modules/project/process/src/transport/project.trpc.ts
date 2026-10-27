@@ -17,6 +17,7 @@ import {
   type AggregateRule,
   type AggregateRuleMembers,
   type ProjectApi,
+  type ProjectLegacyKeyStatus,
 } from "@langwatch/project-contract";
 
 /** A scope a probe is asked at, when the declaration resolved a different one. */
@@ -50,7 +51,7 @@ export interface ProjectBrowserApi {
     by: Readonly<{ id: string }>;
   }): Promise<{ alreadyArchived: boolean }>;
   /** Whether the legacy project key still authenticates; never the key. */
-  getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }>;
+  getLegacyKeyStatus(input: { projectId: string }): Promise<ProjectLegacyKeyStatus>;
   /** Revokes the legacy project key for good, audited; no key is returned. */
   revokeProjectApiKey(input: { projectId: string; by: Readonly<{ id: string }> }): Promise<void>;
   /** ADR-177: an organisation admin replaces an aggregate's rule; its members answer pending. */

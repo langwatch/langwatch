@@ -8,8 +8,13 @@ import {
 } from "@/cli/utils/governance/claude-plugin";
 import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
-import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
-import { installSessionContextHooks } from "@/cli/utils/governance/session-context-hooks";
+import { buildOtelEnvBlock, TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
+import { sessionContextAgentByKeySourceType } from "@/cli/utils/governance/session-context-agents";
+import {
+  hookFileNotOursNotice,
+  installSessionContextHooks,
+  type SessionContextHooksAction,
+} from "@/cli/utils/governance/session-context-hooks";
 import {
   CODEX_TURN_HARVEST_BLOCKED_MESSAGE,
   type CodexTurnHarvestOutcome,
@@ -22,8 +27,12 @@ import { resolveIngestionCredential } from "@/cli/utils/governance/telemetry-ref
  * Forward-compatible: new tools need one-line edits.
  */
 
-const SUPPORTED_TOOLS = ["codex", "claude_code", "gemini", "opencode"] as const;
+const SUPPORTED_TOOLS = ["codex", "claude_code", "gemini", "opencode", "copilot_cli"] as const;
 type SupportedTool = (typeof SUPPORTED_TOOLS)[number];
+
+function isSupportedTool(slug: string): slug is SupportedTool {
+  return (SUPPORTED_TOOLS as readonly string[]).includes(slug);
+}
 
 export interface InstallOptions {
   json?: boolean;
@@ -37,7 +46,8 @@ export interface InstallOptions {
   codexConfigPath?: string;
   /**
    * Override the hook file the session context hooks are merged into
-   * (claude's settings.json, codex's hooks.json). Test-only, same reason.
+   * (claude's settings.json, codex's hooks.json) or written as (Copilot's
+   * own file). Test-only, same reason.
    */
   hooksPath?: string;
   /** Override the opencode plugins directory. Test-only, same reason. */
@@ -50,6 +60,8 @@ interface InstallReport {
   endpoint: string;
   ingestion_token: string;
   token_prefix: string;
+  /** Whether this run minted a fresh key or reused the one already cached or pinned. */
+  key_action: "minted" | "reused";
   /** Where the telemetry lands: a pinned team project, or the personal one. */
   scope: "project" | "personal";
   /** The pinned project's slug or id, when the scope is a project. */
@@ -63,11 +75,10 @@ interface InstallReport {
    */
   codex_turn_harvest_action?: CodexTurnHarvestOutcome["status"];
   /**
-   * How the tool's session context seam was left: hook entries for
-   * claude_code/codex, the plugin file for opencode. Absent when the Claude
-   * Code plugin took the install, leaving nothing in settings to report.
+   * How the session context seam was left (entries, opencode plugin, or our
+   * own Copilot hook file). Absent when the Claude Code plugin took it.
    */
-  session_hooks_action?: "created" | "updated" | "unchanged";
+  session_hooks_action?: SessionContextHooksAction;
   session_hooks_path?: string;
   /**
    * What became of the Claude Code plugin, claude_code only, when the run
@@ -108,7 +119,7 @@ export async function installCommand(toolArg: string, options: InstallOptions = 
 
 function normaliseTool(raw: string): SupportedTool | null {
   const slug = raw.trim().toLowerCase().replace(/-/g, "_");
-  return (SUPPORTED_TOOLS as readonly string[]).includes(slug) ? (slug as SupportedTool) : null;
+  return isSupportedTool(slug) ? slug : null;
 }
 
 async function runInstall(
@@ -154,6 +165,7 @@ async function runInstall(
     endpoint,
     ingestion_token: token,
     token_prefix: prefix ?? token.slice(0, 12),
+    key_action: minted ? "minted" : "reused",
     scope,
     destination_project: projectLabel,
     env_block: envBlock,
@@ -183,38 +195,41 @@ async function runInstall(
   // Every agent knows which repository, branch and worktree a session runs in
   // and exports none of it over telemetry. The session context seam is what
   // reports it, so activating capture installs it alongside the export block.
-  if (!options.envOnly) {
-    // Claude Code takes the seam as a plugin, which carries its own copy of the
-    // hook command and so never breaks when the CLI on PATH is older than the
-    // subcommand a raw entry names. The entries stay as the fallback for a
-    // `claude` that cannot take a plugin, and the report says which one ran.
-    let isClaudePluginHandlingHooks = false;
-    if (tool === "claude_code") {
-      const plugin = ensureLangwatchClaudePlugin({ interactive: true });
-      report.claude_plugin_action = plugin.action;
-      isClaudePluginHandlingHooks =
-        plugin.action === "installed" || plugin.action === "already_installed";
-    }
-
-    if ((tool === "claude_code" && !isClaudePluginHandlingHooks) || tool === "codex") {
-      const result = installSessionContextHooks({
-        tool,
-        filePath: options.hooksPath,
-      });
-      report.session_hooks_action = result.action;
-      report.session_hooks_path = result.displayPath;
-    }
-
-    if (tool === "opencode") {
-      const result = installOpencodeSessionContextPlugin({
-        dirPath: options.opencodePluginDir,
-      });
-      report.session_hooks_action = result.action;
-      report.session_hooks_path = result.displayPath;
-    }
-  }
+  if (!options.envOnly) installSessionContextSeam({ tool, options, report });
 
   return report;
+}
+
+function installSessionContextSeam({
+  tool,
+  options,
+  report,
+}: {
+  tool: SupportedTool;
+  options: InstallOptions;
+  report: InstallReport;
+}): void {
+  // Claude Code takes the seam as a plugin, which carries its own copy of the
+  // hook command and so never breaks when the CLI on PATH is older than the
+  // subcommand a raw entry names. The entries stay as the fallback for a
+  // `claude` that cannot take a plugin, and the report says which one ran.
+  let isClaudePluginHandlingHooks = false;
+  if (tool === "claude_code") {
+    const plugin = ensureLangwatchClaudePlugin({ interactive: true });
+    report.claude_plugin_action = plugin.action;
+    isClaudePluginHandlingHooks =
+      plugin.action === "installed" || plugin.action === "already_installed";
+  }
+
+  // Which seam, if any, comes from the hooked agent whose key this is.
+  const hooked = sessionContextAgentByKeySourceType(tool);
+  if (!hooked || (hooked.id === "claude_code" && isClaudePluginHandlingHooks)) return;
+  const result =
+    hooked.id === "opencode"
+      ? installOpencodeSessionContextPlugin({ dirPath: options.opencodePluginDir })
+      : installSessionContextHooks({ tool: hooked.id, filePath: options.hooksPath });
+  report.session_hooks_action = result.action;
+  report.session_hooks_path = result.displayPath;
 }
 
 function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): string[] {
@@ -294,11 +309,20 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
         ...base,
         `export OTEL_RESOURCE_ATTRIBUTES="service.name=opencode"`,
       ];
+    case "copilot_cli":
+      // The one builder the wrapper and `langwatch instrument copilot` read,
+      // so this block never drifts from theirs.
+      return Object.entries(buildOtelEnvBlock("copilot", endpoint, token)).map(
+        ([name, value]) => `export ${name}="${value}"`,
+      );
   }
 }
 
 function renderHumanReport(report: InstallReport): void {
-  process.stdout.write(`${chalk.green("✓")} Minted ingestion key for ${chalk.bold(report.tool)}\n`);
+  const keyVerb = report.key_action === "minted" ? "Minted a new" : "Reused the existing";
+  process.stdout.write(
+    `${chalk.green("✓")} ${keyVerb} ingestion key for ${chalk.bold(report.tool)}\n`,
+  );
   process.stdout.write(`  endpoint: ${report.endpoint}\n`);
   process.stdout.write(`  token:    ${report.ingestion_token}\n`);
 
@@ -320,15 +344,7 @@ function renderHumanReport(report: InstallReport): void {
   }
 
   renderCodexTurnHarvest(report);
-
-  if (report.session_hooks_action) {
-    const hooksVerb =
-      report.session_hooks_action === "unchanged"
-        ? "already up to date"
-        : report.session_hooks_action;
-    const what = report.tool === "opencode" ? "session plugin" : "session hooks";
-    process.stdout.write(`${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`);
-  }
+  renderSessionHooks(report);
 
   process.stdout.write("\nAdd to your shell rc (or run in this shell):\n");
   for (const line of report.env_block) {
@@ -336,6 +352,26 @@ function renderHumanReport(report: InstallReport): void {
   }
 
   renderToolInstallationNotes(report);
+}
+
+function renderSessionHooks(report: InstallReport): void {
+  if (report.session_hooks_action === "not_ours") {
+    const displayPath = report.session_hooks_path ?? "";
+    const notice = hookFileNotOursNotice({ displayPath, command: "copilot" });
+    process.stdout.write(`${chalk.yellow("!")} ${notice}\n`);
+  } else if (report.session_hooks_action === "user_file_runs_hook") {
+    process.stdout.write(
+      `${chalk.green("✓")} ${report.session_hooks_path} is your own file and runs the LangWatch ` +
+        `hook, so it was left alone\n`,
+    );
+  } else if (report.session_hooks_action) {
+    const hooksVerb =
+      report.session_hooks_action === "unchanged"
+        ? "already up to date"
+        : report.session_hooks_action;
+    const what = report.tool === "opencode" ? "session plugin" : "session hooks";
+    process.stdout.write(`${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`);
+  }
 }
 
 function renderCodexTurnHarvest(report: InstallReport): void {
@@ -371,6 +407,18 @@ function renderToolInstallationNotes(report: InstallReport): void {
       process.stdout.write(
         `\nSession hooks were added to your Claude Code settings, so every session reports\n` +
           `the repository, branch and worktree it ran in. Your own hooks are untouched.\n`,
+      );
+    }
+  } else if (report.tool === "copilot_cli") {
+    const isHookFileInstalled =
+      report.session_hooks_action === "created" ||
+      report.session_hooks_action === "updated" ||
+      report.session_hooks_action === "unchanged";
+    if (isHookFileInstalled) {
+      process.stdout.write(
+        `\nA LangWatch hook file was added to your Copilot hooks folder, so every Copilot CLI\n` +
+          `and VS Code session reports the repository, branch and worktree it ran in. Your\n` +
+          `own hook files are untouched. Run \`langwatch logout\` to remove it.\n`,
       );
     }
   } else if (report.tool === "opencode") {

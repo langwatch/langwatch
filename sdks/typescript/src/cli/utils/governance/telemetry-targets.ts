@@ -238,6 +238,15 @@ export function scanTelemetryTargets({
     remove: () => removeOpencodeSessionContextPlugin(),
   });
 
+  // copilot, LangWatch's own file in the hook folder the Copilot CLI and VS
+  // Code both load. The file is ours alone, so removal deletes it whole and
+  // the user's own hook files beside it are never opened.
+  targets.push({
+    label: `copilot session hooks (${sessionContextHooksTarget("copilot").displayPath})`,
+    present: hasSessionContextHooks({ tool: "copilot" }),
+    remove: () => removeSessionContextHooks({ tool: "copilot" }),
+  });
+
   // shell rc files — the global gateway block + per-tool scoped functions.
   for (const shell of SHELLS) {
     targets.push({

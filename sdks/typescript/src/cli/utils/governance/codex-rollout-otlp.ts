@@ -187,9 +187,8 @@ async function drainCodexSpool(args: {
           body: JSON.stringify(payload),
           signal: controller.signal,
         });
+        // A fetch that throws got no answer, which ends the drain.
         return response.ok;
-      } catch {
-        return false;
       } finally {
         clearTimeout(timer);
       }
