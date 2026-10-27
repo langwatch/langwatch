@@ -68,5 +68,5 @@ exists) — you'd need to rename or delete first.
 ## Verify
 
 Open the dashboard's `platformUrl` (printed at the end of the run, or from
-`GET /api/dashboards`) and confirm it shows 8 populated widgets in the
+`GET /api/v1/dashboards`) and confirm it shows 8 populated widgets in the
 manifest order above.

@@ -1,9 +1,13 @@
 import {
+  AI_UNITS_SESSION_FACT,
   CODING_AGENT_MAP_COALESCE_MAX_BATCH,
   contributionFactsSchema,
   type ContributionFacts,
+  isSpanFedModelCall,
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
+  type SpanFactsContributedEvent,
+  spanFactsContributedEventSchema,
 } from "@langwatch/coding-agent-contract";
 import {
   type AppendStore,
@@ -12,11 +16,22 @@ import {
 } from "@langwatch/eventing";
 import { z } from "zod";
 
+import {
+  genAiModelCallFacts,
+  modelCallCostInput,
+  spanModelCallRecordId,
+} from "../rules/coding-agent-model-call-facts.rules.ts";
+import type { CodingAgentCostEstimator } from "../services/model-catalog-cost-estimator.service.ts";
+
 const contributionEventDataSchema = z.object({
   facts: contributionFactsSchema,
 });
+const spanIdentitySchema = z.object({ agent: z.string(), name: z.string() });
 
-/** Per-call facts table; log-driven only to prevent double-counting against spans. */
+/**
+ * Per-call facts table. Each call is written from one signal only: log events, except for an
+ * agent whose calls ride spans alone (`isSpanFedModelCall`), whose model-call spans write it.
+ */
 export interface CodingAgentSessionEventRecord {
   tenantId: string;
   sessionId: string;
@@ -59,6 +74,8 @@ export interface CodingAgentSessionEventRecord {
   toolResultBytes: number;
   promptChars: number;
   totalTokens: number;
+  /** The call's AI units (Copilot), a count beside the dollar figure; 0 for every log row. */
+  aiUnits: number;
   /**
    * The working context active when the event happened, stamped from the
    * session's last `session_context` declaration. '' on pre-declaration rows;
@@ -88,7 +105,7 @@ export const EVENT_KIND_BY_RAW_NAME: Record<string, string> = {
 };
 
 /** Enqueue-time gate (ADR-069 invariant 4); gates on resolveEventKind, mirrors map(). */
-const events = [logFactsContributedEventSchema] as const;
+const events = [logFactsContributedEventSchema, spanFactsContributedEventSchema] as const;
 
 export class CodingAgentSessionEventsMapProjection
   extends AbstractMapProjection<CodingAgentSessionEventRecord, typeof events>
@@ -98,10 +115,15 @@ export class CodingAgentSessionEventsMapProjection
   readonly targetTable = "coding_agent_session_events";
   readonly store: AppendStore<CodingAgentSessionEventRecord>;
   protected readonly events = events;
+  private readonly modelProviders: CodingAgentCostEstimator;
 
-  private constructor(deps: { store: AppendStore<CodingAgentSessionEventRecord> }) {
+  private constructor(deps: {
+    store: AppendStore<CodingAgentSessionEventRecord>;
+    modelProviders: CodingAgentCostEstimator;
+  }) {
     super();
     this.store = deps.store;
+    this.modelProviders = deps.modelProviders;
     this.options = {
       coalesceMaxBatch: CODING_AGENT_MAP_COALESCE_MAX_BATCH,
       enqueue: {
@@ -112,6 +134,7 @@ export class CodingAgentSessionEventsMapProjection
 
   static create(deps: {
     store: AppendStore<CodingAgentSessionEventRecord>;
+    modelProviders: CodingAgentCostEstimator;
   }): CodingAgentSessionEventsMapProjection {
     return new CodingAgentSessionEventsMapProjection(deps);
   }
@@ -119,7 +142,43 @@ export class CodingAgentSessionEventsMapProjection
   static readonly accepts = (event: { data?: unknown }): boolean =>
     CodingAgentSessionEventsMapProjection.resolveEventKind(
       CodingAgentSessionEventsMapProjection.rawEventName(event),
-    ) !== null;
+    ) !== null || CodingAgentSessionEventsMapProjection.isSpanFedCall(event);
+
+  /**
+   * A model-call span of an agent whose calls ride spans alone, as a `model_call` row priced the
+   * way the session fold prices it. Every other span maps to nothing: its agent logs its calls.
+   */
+  mapCodingAgentSessionSpanFactsContributed(
+    event: SpanFactsContributedEvent,
+  ): CodingAgentSessionEventRecord | null {
+    if (!CodingAgentSessionEventsMapProjection.isSpanFedCall(event)) return null;
+    const span = event.data;
+    const facts = genAiModelCallFacts(span.facts);
+    return {
+      ...CodingAgentSessionEventsMapProjection.blankRow(),
+      tenantId: span.tenantId,
+      sessionId: span.sessionId,
+      timeUnixMs: span.startTimeUnixMs,
+      recordId: spanModelCallRecordId({ traceId: span.traceId, spanId: span.spanId }),
+      eventKind: "model_call",
+      agent: span.agent,
+      sessionKeySource: span.sessionKeySource,
+      traceId: span.traceId,
+      spanId: span.spanId,
+      model: facts.model ?? "",
+      inputTokens: Math.round(facts.input_tokens),
+      outputTokens: Math.round(facts.output_tokens),
+      cacheReadTokens: Math.round(facts.cache_read_tokens),
+      cacheCreationTokens: Math.round(facts.cache_creation_tokens),
+      costUsd: this.modelProviders.estimateCost(modelCallCostInput(facts)),
+      durationMs: Math.max(0, Math.round(span.endTimeUnixMs - span.startTimeUnixMs)),
+      aiUnits: CodingAgentSessionEventsMapProjection.num(span.facts[AI_UNITS_SESSION_FACT]),
+      repositoryHost: span.repositoryHost ?? "",
+      repositoryOwner: span.repositoryOwner ?? "",
+      repositoryName: span.repositoryName ?? "",
+      branch: span.branch ?? "",
+    };
+  }
 
   mapCodingAgentSessionLogFactsContributed(
     event: LogFactsContributedEvent,
@@ -184,10 +243,66 @@ export class CodingAgentSessionEventsMapProjection
       toolResultBytes: CodingAgentSessionEventsMapProjection.nat(facts.tool_result_size_bytes),
       promptChars: CodingAgentSessionEventsMapProjection.nat(facts.prompt_length),
       totalTokens: CodingAgentSessionEventsMapProjection.nat(facts.total_tokens),
+      aiUnits: 0,
       repositoryHost: event.data.repositoryHost ?? "",
       repositoryOwner: event.data.repositoryOwner ?? "",
       repositoryName: event.data.repositoryName ?? "",
       branch: event.data.branch ?? "",
+    };
+  }
+
+  /** Read totally off any event shape, since the enqueue gate runs on the hot path. */
+  private static isSpanFedCall(event: { data?: unknown }): boolean {
+    const parsed = spanIdentitySchema.safeParse(event.data);
+    return parsed.success && isSpanFedModelCall(parsed.data);
+  }
+
+  /** The columns only a log event fills, empty on a span-fed row. */
+  private static blankRow(): Omit<
+    CodingAgentSessionEventRecord,
+    "tenantId" | "sessionId" | "timeUnixMs" | "recordId" | "eventKind" | "agent"
+  > {
+    return {
+      sessionKeySource: "",
+      traceId: "",
+      spanId: "",
+      promptId: "",
+      querySource: "",
+      agentType: "",
+      eventSequence: -1,
+      requestId: "",
+      model: "",
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      costUsd: 0,
+      durationMs: 0,
+      ttftMs: 0,
+      attempt: 0,
+      speed: "",
+      stopReason: "",
+      preTokens: 0,
+      postTokens: 0,
+      compactionTrigger: "",
+      precomputeReuse: "",
+      statusCode: "",
+      errorType: "",
+      rateLimitCarrier: "",
+      retryDurationMs: 0,
+      toolName: "",
+      success: "",
+      decision: "",
+      decisionSource: "",
+      toolInputBytes: 0,
+      toolResultBytes: 0,
+      promptChars: 0,
+      totalTokens: 0,
+      aiUnits: 0,
+      repositoryHost: "",
+      repositoryOwner: "",
+      repositoryName: "",
+      branch: "",
     };
   }
 

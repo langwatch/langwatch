@@ -1325,7 +1325,7 @@ function registerAgentTools(server: McpServer): void {
 function registerDashboardTools(server: McpServer): void {
   server.tool(
     "platform_list_dashboards",
-    "List all analytics dashboards in the LangWatch project.",
+    "List the Analytics Reports dashboards in the LangWatch project (/api/v1/analytics/reports).",
     {},
     withToolLogging("platform_list_dashboards", async () => {
       requireApiKey();
@@ -1338,7 +1338,7 @@ function registerDashboardTools(server: McpServer): void {
 
   server.tool(
     "platform_get_dashboard",
-    "Get a dashboard by its ID, including its graphs.",
+    "Get an Analytics Reports dashboard by its ID, including its graphs.",
     {
       id: z.string().describe("The dashboard ID"),
     },
@@ -1353,7 +1353,7 @@ function registerDashboardTools(server: McpServer): void {
 
   server.tool(
     "platform_create_dashboard",
-    "Create a new analytics dashboard.",
+    "Create a new Analytics Reports dashboard.",
     {
       name: z.string().describe("Dashboard name"),
     },
@@ -1361,14 +1361,19 @@ function registerDashboardTools(server: McpServer): void {
       requireApiKey();
       const { handleCreateDashboard } = await import("./tools/create-dashboard.ts");
       return {
-        content: [{ type: "text", text: await handleCreateDashboard(params) }],
+        content: [
+          {
+            type: "text",
+            text: await handleCreateDashboard(params),
+          },
+        ],
       };
     }),
   );
 
   server.tool(
     "platform_delete_dashboard",
-    "Delete a dashboard and all its graphs.",
+    "Delete an Analytics Reports dashboard and all its graphs.",
     {
       id: z.string().describe("The dashboard ID to delete"),
     },
@@ -1376,14 +1381,19 @@ function registerDashboardTools(server: McpServer): void {
       requireApiKey();
       const { handleDeleteDashboard } = await import("./tools/delete-dashboard.ts");
       return {
-        content: [{ type: "text", text: await handleDeleteDashboard(params) }],
+        content: [
+          {
+            type: "text",
+            text: await handleDeleteDashboard(params),
+          },
+        ],
       };
     }),
   );
 
   server.tool(
     "platform_rename_dashboard",
-    "Rename a dashboard.",
+    "Rename an Analytics Reports dashboard.",
     {
       id: z.string().describe("The dashboard ID to rename"),
       name: z.string().describe("The new name for the dashboard"),
@@ -1405,7 +1415,7 @@ function registerDashboardTools(server: McpServer): void {
 
   server.tool(
     "list_dashboard_boards",
-    "Lists the project's boards in the Dashboards area, with each one's ID and widget count. Use an ID from here as the dashboardId of add_dashboard_widget and update_dashboard_widget; the analytics dashboards platform_list_dashboards lists hold no widgets.",
+    "Lists the project's boards in the Dashboards area, with each one's ID and widget count. Use an ID from here as the dashboardId of add_dashboard_widget and update_dashboard_widget; the Analytics Reports dashboards platform_list_dashboards lists hold no widgets.",
     {},
     withToolLogging("list_dashboard_boards", async () => {
       requireApiKey();
@@ -1494,6 +1504,87 @@ function registerDashboardTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleUpdateDashboardWidget(params) }],
       };
+    }),
+  );
+
+  registerDashboardBoardTools(server);
+}
+
+/** Board CRUD and a board's widgets, over `/api/v1/dashboards` (the project comes from the key). */
+function registerDashboardBoardTools(server: McpServer): void {
+  const boardId = z.string().describe("The board's ID, as list_dashboard_boards lists it");
+  const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
+
+  server.tool(
+    "get_dashboard_board",
+    "Reads one board in the Dashboards area: its name, scope, description and address.",
+    { boardId },
+    withToolLogging("get_dashboard_board", async (params) => {
+      requireApiKey();
+      const { handleGetDashboardBoard } = await import("./tools/dashboard-boards.js");
+      return text(await handleGetDashboardBoard(params));
+    }),
+  );
+
+  server.tool(
+    "create_dashboard_board",
+    "Creates an empty board in the Dashboards area. Add widgets to it with add_dashboard_widget.",
+    { name: z.string().describe("The board's name") },
+    withToolLogging("create_dashboard_board", async (params) => {
+      requireApiKey();
+      const { handleCreateDashboardBoard } = await import("./tools/dashboard-boards.js");
+      return text(await handleCreateDashboardBoard(params));
+    }),
+  );
+
+  server.tool(
+    "rename_dashboard_board",
+    "Changes a Dashboards board's name and/or description; a field left out keeps its value.",
+    {
+      boardId,
+      name: z.string().optional().describe("The board's new name"),
+      description: z.string().optional().describe("The board's new description"),
+    },
+    withToolLogging("rename_dashboard_board", async (params) => {
+      requireApiKey();
+      const { handleRenameDashboardBoard } = await import("./tools/dashboard-boards.js");
+      return text(await handleRenameDashboardBoard(params));
+    }),
+  );
+
+  server.tool(
+    "delete_dashboard_board",
+    "Deletes a Dashboards board together with the widgets on it. This cannot be undone.",
+    { boardId },
+    withToolLogging("delete_dashboard_board", async (params) => {
+      requireApiKey();
+      const { handleDeleteDashboardBoard } = await import("./tools/dashboard-boards.js");
+      return text(await handleDeleteDashboardBoard(params));
+    }),
+  );
+
+  server.tool(
+    "list_board_widgets",
+    "Lists the custom widgets on one Dashboards board, with each widget's ID and query names.",
+    { boardId },
+    withToolLogging("list_board_widgets", async (params) => {
+      requireApiKey();
+      const { handleListBoardWidgets } = await import("./tools/dashboard-boards.js");
+      return text(await handleListBoardWidgets(params));
+    }),
+  );
+
+  server.tool(
+    "delete_dashboard_widget",
+    "Deletes one custom widget from a Dashboards board. A widget on another board is not found.",
+    {
+      boardId,
+      widgetId: z.string().describe("The widget's ID, as list_board_widgets lists it"),
+    },
+    withToolLogging("delete_dashboard_widget", async (params) => {
+      requireApiKey();
+      const { handleDeleteDashboardWidget } = await import("./tools/dashboard-boards.js");
+      return text(await handleDeleteDashboardWidget(params));
     }),
   );
 }

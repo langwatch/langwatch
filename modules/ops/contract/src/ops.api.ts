@@ -598,7 +598,8 @@ export interface OpsApi {
   /** One report as the intake door received it, answered in the bodies released builds read. */
   receiveBugReport(input: {
     report: SubmitBugReport;
-    forwardedFor: string | null;
+    /** The address the door resolved for the caller; null shares the one unknown bucket. */
+    callerAddress: string | null;
     linkedProjectId: string | null;
   }): Promise<OpsDoorAnswer>;
   findDashboardData(): DashboardData | null;
