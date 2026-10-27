@@ -2,6 +2,14 @@ import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type {
+  AgentCaller,
+  AgentLabel,
+  AgentVersions,
+  AgentVersionSelector,
+  AssignAgentLabelInput,
+  RemoveAgentLabelInput,
+} from "./agent-version.ts";
+import type {
   RegisterConnectedAgentInput,
   ArchiveAgentCommand,
   CopyAgentCommand,
@@ -106,18 +114,32 @@ export interface AgentApi {
     actorId: string;
   }): Promise<{ ok: true }>;
   getAll(input: { projectId: string; viewerUserId?: string | null }): Promise<AgentOverview[]>;
-  getById(input: {
-    id: string;
-    projectId: string;
-    viewerUserId?: string | null;
-  }): Promise<AgentOverview>;
+  /**
+   * The latest agent, or the one a `label` or `version` names; `id` also takes the
+   * `id:label` and `id:3` shorthand. A label pointing nowhere is `agent_version_not_found`.
+   */
+  getById(
+    input: {
+      id: string;
+      projectId: string;
+      viewerUserId?: string | null;
+    } & AgentVersionSelector,
+  ): Promise<AgentOverview>;
   list(input: { projectId: string; page: number; limit: number }): Promise<AgentPage>;
-  create(input: CreateAgentCommand): Promise<AgentWithFields>;
-  update(input: UpdateAgentCommand): Promise<AgentWithFields>;
-  archive(input: ArchiveAgentCommand): Promise<Agent>;
+  /** `caller` authors version 1 and is recorded as the creator. */
+  create(input: CreateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields>;
+  /** Appends a version authored by `caller`; the row stays the latest. */
+  update(input: UpdateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields>;
+  /** A labelled agent needs `agents:deploy` of `caller`; a peer's cascade names no caller. */
+  archive(input: ArchiveAgentCommand & { caller?: AgentCaller }): Promise<Agent>;
   cascadeArchive(
-    input: ArchiveAgentCommand,
+    input: ArchiveAgentCommand & { caller?: AgentCaller },
   ): Promise<{ agent: Agent; archivedWorkflow: { id: string } | null }>;
+  /** Newest first, with their authors and labels; empty for a connected agent. */
+  listVersions(input: { projectId: string; agentId: string }): Promise<AgentVersions>;
+  /** Points a deploy label at a version, creating the label when it is new. */
+  assignLabel(input: AssignAgentLabelInput & { caller?: AgentCaller }): Promise<AgentLabel>;
+  removeLabel(input: RemoveAgentLabelInput): Promise<void>;
   getCopies(input: { sourceAgentId: string; allowedProjectIds?: string[] }): Promise<AgentCopy[]>;
   getSourceOfCopy(input: { agentId: string; projectId: string }): Promise<Agent>;
   /** Writes the copy's row; workflow's `copyAgent` door copied a workflow agent's graph first. */

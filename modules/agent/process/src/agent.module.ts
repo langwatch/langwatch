@@ -11,6 +11,7 @@ import { agentRepositories } from "#repositories/agent-repositories.registry";
 import { connectCallerOf } from "#rules/agent-connect-caller.rules";
 import { AgentHttpCredentialsBackfillService } from "#services/agent-http-credentials-backfill.service";
 import { AgentHttpSecretsService } from "#services/agent-http-secrets.service";
+import { AgentVersionService } from "#services/agent-version.service";
 import { AgentService } from "#services/agent.service";
 import { createAgentConnectRest } from "#transport/agent-connect.rest";
 import { createAgentWebSocketProtocol } from "#transport/agent-connect.ws";
@@ -52,6 +53,28 @@ export const agentProcessModule: PublishedProcessModule<"agent", AgentApi, Agent
             signal,
             afterProjectId: typeof resumed === "string" ? resumed : null,
             onProjectDone: (report) => checkpoint.save({ report }),
+          });
+        },
+      }),
+      defineMigrationStep({
+        id: "agent:backfill-versions",
+        kind: "data",
+        mode: "background",
+        description:
+          "Records version 1 of every agent written before versions existed, with its creator from the audit log.",
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = checkpoint.resumeFrom?.afterId;
+          return AgentVersionService.create({
+            repository: repositories.agents,
+            users: dependencies.users,
+            permissions: dependencies.permissions,
+            auditLog: dependencies.auditLog,
+          }).backfill({
+            dryRun,
+            signal,
+            afterId: typeof resumed === "string" ? resumed : null,
+            onPage: (report) => checkpoint.save({ report }),
           });
         },
       }),

@@ -54,6 +54,12 @@ import {
   type AgentOverviewPage,
   type AgentPage,
   type AgentOverview,
+  type AgentCaller,
+  type AgentLabel,
+  type AgentVersions,
+  type AgentVersionSelector,
+  type AssignAgentLabelInput,
+  type RemoveAgentLabelInput,
 } from "@langwatch/agent-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { type AuthzPermission } from "@langwatch/authorization";
@@ -81,6 +87,7 @@ import { agentPlatformUrl } from "../rules/agent-platform-url.rules.ts";
 import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
 import { AgentCopyService } from "../services/agent-copy.service.ts";
 import { AgentHttpSecretsService } from "../services/agent-http-secrets.service.ts";
+import { AgentVersionService } from "../services/agent-version.service.ts";
 import { AgentVoiceReleaseService } from "../services/agent-voice-release.service.ts";
 import { AgentWorkflowFieldsService } from "../services/agent-workflow-fields.service.ts";
 import { AgentService } from "../services/agent.service.ts";
@@ -124,6 +131,7 @@ export class AgentModule implements AgentApi {
   };
 
   readonly #agents: AgentService;
+  readonly #versions: AgentVersionService;
   readonly #presence = ConnectedAgentPresenceService.create();
   readonly #copies: AgentCopyService;
   readonly #voiceRelease: AgentVoiceReleaseService;
@@ -139,6 +147,12 @@ export class AgentModule implements AgentApi {
 
   private constructor({ repositories, channels, dependencies, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
+    this.#versions = AgentVersionService.create({
+      repository: repositories.agents,
+      users: dependencies.users,
+      permissions: dependencies.permissions,
+      auditLog: dependencies.auditLog,
+    });
     this.#httpSecrets = AgentHttpSecretsService.create({
       secrets: dependencies.secrets,
       agents: this.#agents,
@@ -186,10 +200,29 @@ export class AgentModule implements AgentApi {
     return this.#enrich(await this.#agents.getAll(input), input);
   }
 
-  async getById(input: GetAgentInput & { viewerUserId?: string | null }): Promise<AgentOverview> {
-    const agent = await this.#agents.getById(input);
+  async getById(
+    input: GetAgentInput & { viewerUserId?: string | null } & AgentVersionSelector,
+  ): Promise<AgentOverview> {
+    const { agent, version } = await this.#versions.resolve({
+      projectId: input.projectId,
+      address: input.id,
+      label: input.label,
+      version: input.version,
+    });
     const [enriched] = await this.#enrich([agent], input);
-    return enriched!;
+    return { ...enriched!, version };
+  }
+
+  listVersions(input: { projectId: string; agentId: string }): Promise<AgentVersions> {
+    return this.#versions.listVersions(input);
+  }
+
+  assignLabel(input: AssignAgentLabelInput & { caller?: AgentCaller }): Promise<AgentLabel> {
+    return this.#versions.assignLabel(input);
+  }
+
+  removeLabel(input: RemoveAgentLabelInput): Promise<void> {
+    return this.#versions.removeLabel(input);
   }
 
   list(input: ListAgentsInput): Promise<AgentPage> {
@@ -203,14 +236,17 @@ export class AgentModule implements AgentApi {
     return { ...page, data: await this.#enrich(page.data, input) };
   }
 
-  async create(input: CreateAgentCommand): Promise<AgentWithFields> {
+  async create(input: CreateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields> {
     await this.#voiceRelease.assertWritable({ type: input.type, projectIds: [input.projectId] });
     return agentWithResolvedFields(
-      await this.#agents.create(await this.#httpSecrets.forCreate(input)),
+      await this.#agents.create({
+        ...(await this.#httpSecrets.forCreate(input)),
+        caller: input.caller,
+      }),
     );
   }
 
-  async update(input: UpdateAgentCommand): Promise<AgentWithFields> {
+  async update(input: UpdateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields> {
     // A config-only save of a stored voice agent names no type, so the stored row is asked too.
     const type =
       input.type === "voice"
@@ -218,12 +254,20 @@ export class AgentModule implements AgentApi {
         : (await this.#agents.getById({ id: input.id, projectId: input.projectId })).type;
     await this.#voiceRelease.assertWritable({ type, projectIds: [input.projectId] });
     return agentWithResolvedFields(
-      await this.#agents.update(await this.#httpSecrets.forUpdate(input)),
+      await this.#agents.update({
+        ...(await this.#httpSecrets.forUpdate(input)),
+        caller: input.caller,
+      }),
     );
   }
 
-  async archive(input: GetAgentInput): Promise<Agent> {
-    const agent = await this.#agents.archive(input);
+  async archive(input: GetAgentInput & { caller?: AgentCaller }): Promise<Agent> {
+    await this.#versions.assertArchivable({
+      projectId: input.projectId,
+      agentId: input.id,
+      caller: input.caller,
+    });
+    const agent = await this.#agents.archive({ id: input.id, projectId: input.projectId });
     await this.#recordArchived({ agent, cascadedWorkflowId: null });
     return agent;
   }
@@ -281,14 +325,20 @@ export class AgentModule implements AgentApi {
     return this.#agents.getConnectedByNameAndEnvironment(input);
   }
 
-  async cascadeArchive(input: GetAgentInput): Promise<{
+  async cascadeArchive(input: GetAgentInput & { caller?: AgentCaller }): Promise<{
     agent: Agent;
     archivedWorkflow: {
       id: string;
     } | null;
   }> {
-    const [workflowId] = findLinkedWorkflowIds(await this.#agents.getById(input));
-    const agent = await this.#agents.archive(input);
+    const target = { id: input.id, projectId: input.projectId };
+    const [workflowId] = findLinkedWorkflowIds(await this.#agents.getById(target));
+    await this.#versions.assertArchivable({
+      projectId: input.projectId,
+      agentId: input.id,
+      caller: input.caller,
+    });
+    const agent = await this.#agents.archive(target);
     // Workflow archives the graph from its own side on the fact, seconds later (plan §7, R7).
     await this.#recordArchived({ agent, cascadedWorkflowId: workflowId ?? null });
     return { agent, archivedWorkflow: workflowId ? { id: workflowId } : null };
@@ -543,14 +593,24 @@ export class AgentModule implements AgentApi {
 
   async #enrich(agents: Agent[], input: AgentProjectInput & { viewerUserId?: string | null }) {
     const owned = agents.map((agent) => ({ ...agent, ownerUserId: agent.ownerUserId ?? null }));
-    const [owners, presence] = await Promise.all([
+    const [owners, presence, summaries, people] = await Promise.all([
       this.ownersOf(owned),
       this.#connected?.listPresence({ projectId: input.projectId, agents }) ??
         Promise.resolve(new Map<string, AgentPresence>()),
+      this.#versions.summaries({
+        projectId: input.projectId,
+        ids: agents.map((agent) => agent.id),
+      }),
+      this.#peopleNamed(agents.flatMap((agent) => [agent.createdById, agent.updatedById])),
     ]);
+    const person = (id: string | null | undefined) => (id ? (people.get(id) ?? null) : null);
 
     return owned.map((agent) => ({
       ...agentWithResolvedFields(agent),
+      version: summaries.get(agent.id)?.version ?? null,
+      labels: summaries.get(agent.id)?.labels ?? [],
+      createdBy: person(agent.createdById),
+      updatedBy: person(agent.updatedById),
       environment: agent.environment ?? null,
       ownerUserId: agent.ownerUserId ?? null,
       hostLabel: agent.hostLabel ?? null,
@@ -563,6 +623,14 @@ export class AgentModule implements AgentApi {
         viewerUserId: input.viewerUserId,
       }),
     }));
+  }
+
+  async #peopleNamed(
+    ids: readonly (string | null | undefined)[],
+  ): Promise<Map<string, { id: string; name: string | null }>> {
+    const userIds = [...new Set(ids.flatMap((id) => (id ? [id] : [])))];
+    const users = userIds.length ? await this.#users.getProfiles({ userIds }) : [];
+    return new Map(users.map((user) => [user.id, { id: user.id, name: user.name ?? user.email }]));
   }
 
   async #permittedCopies(
