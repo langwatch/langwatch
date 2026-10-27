@@ -17,11 +17,16 @@ import {
   Edit,
   type LucideIcon,
   RefreshCw,
+  Rocket,
   Trash2,
   X,
 } from "lucide-react";
+import { useState } from "react";
 
+import { useEvaluatorVersions } from "../../behavior/use-evaluator-versions.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
+import { EvaluatorDeployDialog } from "../blocks/evaluator-deploy-dialog.tsx";
+import { EvaluatorVersionList } from "../blocks/evaluator-version-list.tsx";
 
 const ACTION_META = {
   "evaluators.create": { label: "Created", icon: CheckSquare },
@@ -31,6 +36,8 @@ const ACTION_META = {
   "evaluators.copy": { label: "Replicated", icon: Copy },
   "evaluators.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
   "evaluators.syncFromSource": { label: "Synced from source", icon: RefreshCw },
+  "evaluators.assignLabel": { label: "Deployed a label", icon: Rocket },
+  "evaluators.removeLabel": { label: "Removed a label", icon: Rocket },
 } as const satisfies Record<string, { label: string; icon: LucideIcon }>;
 
 /**
@@ -62,9 +69,30 @@ export function EvaluatorHistoryPanel({
     { evaluatorId, projectId: projectId ?? "" },
     { enabled: !!projectId && !!evaluatorId },
   );
+  const versions = useEvaluatorVersions({ projectId: projectId ?? "", evaluatorId });
+  const [deployOpen, setDeployOpen] = useState(false);
+  const hasVersions = versions.versions.length > 0;
 
   return (
-    <Drawer onClose={closeDrawer} title={`${evaluatorName} history`}>
+    <Drawer
+      onClose={closeDrawer}
+      title={`${evaluatorName} history`}
+      {...(hasVersions
+        ? { headerAction: { label: "Deploy", onClick: () => setDeployOpen(true) } }
+        : {})}
+    >
+      {hasVersions && <EvaluatorVersionList versions={versions.versions} />}
+      <EvaluatorDeployDialog
+        open={deployOpen}
+        onClose={() => setDeployOpen(false)}
+        evaluatorName={evaluatorName}
+        state={versions}
+      />
+      {hasVersions && (
+        <Text fontWeight="semibold" fontSize="sm" paddingTop={4} paddingBottom={2}>
+          Activity
+        </Text>
+      )}
       {isLoading && (
         <HStack justify="center" paddingY={8}>
           <Spinner />
