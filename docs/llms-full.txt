@@ -43278,7 +43278,7 @@ Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). 
 | The whole trace as JSON | `trace_json(trace_id)` | 1,000 traces |
 {/* lwql-key-caps-end */}
 
-The cap counts distinct conversations, traces or spans, not rows. Rows that repeat a key cost nothing more, so a query grouping ten thousand rows onto 50 conversations reads 50. A query that needs more keys than the cap is refused with `lwql_app_function_key_cap`.
+The cap counts distinct conversations, traces or spans, not rows. A row that repeats a key does not count again, so a query grouping ten thousand rows onto 50 conversations reads 50. A query that needs more keys than the cap is refused with `lwql_app_function_key_cap`.
 
 These functions return message content, so your key needs both the `input` and the `output` permission. Two exceptions: `llm_input_messages` needs only `input`, and `thread_traces` returns only ids and needs neither.
 
