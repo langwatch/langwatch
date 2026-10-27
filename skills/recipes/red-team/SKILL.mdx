@@ -10,6 +10,7 @@ metadata:
 
 import CliInstall from "../../_shared/cli-install.mdx";
 import ImprovingTheAgent from "../../_shared/improving-the-agent.mdx";
+import RedTeamSetup from "../../_shared/red-team-setup.mdx";
 
 # Red Team Your Agent
 
@@ -44,23 +45,7 @@ If the prompt holds nothing distinctive, the check has nothing to match. Rely on
 
 ## Step 3: Set Up Scenario
 
-Read the red-teaming docs before writing code. Do NOT guess the `RedTeamAgent` API:
-
-```bash
-langwatch scenario-docs advanced/red-teaming
-```
-
-Install the test dependencies with the project's package manager:
-
-- Python: `langwatch-scenario`, `pytest`, `pytest-asyncio`.
-- TypeScript: `@langwatch/scenario`, `vitest`, and the AI SDK provider for the attacker model (for example `@ai-sdk/openai`).
-
-The attacker and the judge call a model, so the environment needs that provider's key (for example `OPENAI_API_KEY`). Ask the user for it when it is missing; never hardcode it.
-
-With `langwatch-scenario` 1.6.0 or older (Python), two known issues need a line each:
-
-- Pin `litellm<1.106` in the test dependencies. litellm 1.106 imports the optional `mcp` package when a call passes tools, and the judge fails with `No module named 'mcp'` after every attack turn was already paid for.
-- When the attacker model is a reasoning model (gpt-5 family, o-series), add `litellm.drop_params = True` at the top of the test file. The attacker sends a fixed temperature, which those models refuse.
+<RedTeamSetup />
 
 ## Step 4: Write the Test
 

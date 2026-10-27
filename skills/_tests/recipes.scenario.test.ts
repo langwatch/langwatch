@@ -315,6 +315,7 @@ describe("Recipes", () => {
     900_000,
   );
 
+  /** @scenario "The red-team recipe writes and runs one leakage test against the real agent" */
   it.skipIf(isCI)(
     "writes and runs a system prompt leakage red-team test",
     async () => {
@@ -371,6 +372,7 @@ describe("Recipes", () => {
     1_200_000,
   );
 
+  /** @scenario "The OWASP recipe tests the conversational categories and reviews the rest" */
   it.skipIf(isCI)(
     "covers the OWASP Top 10 for the support agent",
     async () => {
