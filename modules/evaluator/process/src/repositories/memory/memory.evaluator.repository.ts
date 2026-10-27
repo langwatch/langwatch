@@ -196,7 +196,7 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
     return this.#versions
       .filter((row) => row.projectId === input.projectId && row.evaluatorId === input.evaluatorId)
       .toSorted((left, right) => right.version - left.version)
-      .map((row) => structuredClone(row));
+      .map((row) => ({ ...row, config: structuredClone(row.config) }));
   }
 
   async findVersion(input: EvaluatorVersionLookup): Promise<EvaluatorVersionRecord | undefined> {
@@ -207,7 +207,8 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
         (input.version === void 0 || candidate.version === input.version) &&
         (input.versionId === void 0 || candidate.id === input.versionId),
     );
-    return row ? structuredClone(row) : void 0;
+    // Instants are immutable and lose their prototype in structuredClone, so only config is copied.
+    return row ? { ...row, config: structuredClone(row.config) } : void 0;
   }
 
   async latestVersionNumbers(input: EvaluatorIdsInput): Promise<Map<string, number>> {

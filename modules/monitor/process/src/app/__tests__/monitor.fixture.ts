@@ -170,7 +170,7 @@ export function createMonitorTestApp(
         deleteUncommitted: (reference) => replication.deleteUncommitted(reference),
       }),
       projects: input.projects ?? createApiFixture<ProjectApi>(),
-      users: input.users ?? createApiFixture<UserApi>(),
+      users: input.users ?? createApiFixture<UserApi>({ getProfiles: async () => [] }),
       notifications: input.notifications ?? createApiFixture<NotificationService>(),
     },
     resources: new ResourceScope(),

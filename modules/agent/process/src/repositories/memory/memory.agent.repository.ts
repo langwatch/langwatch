@@ -225,11 +225,11 @@ export class MemoryAgentRepository implements AgentRepository {
   }
 
   async findVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]> {
-    return structuredClone(
-      this.#versions
-        .filter((row) => row.projectId === input.projectId && row.agentId === input.agentId)
-        .toSorted((left, right) => right.version - left.version),
-    );
+    // Instants are immutable and lose their prototype in structuredClone, so only config is copied.
+    return this.#versions
+      .filter((row) => row.projectId === input.projectId && row.agentId === input.agentId)
+      .toSorted((left, right) => right.version - left.version)
+      .map((row) => ({ ...row, config: structuredClone(row.config) }));
   }
 
   async findVersion(input: AgentVersionLookup): Promise<AgentVersionRecord | undefined> {
@@ -255,7 +255,7 @@ export class MemoryAgentRepository implements AgentRepository {
       .filter((row) => row.projectId === input.projectId && input.ids.includes(row.agentId))
       .flatMap(({ projectId: _projectId, ...row }) => {
         const version = this.#versions.find((candidate) => candidate.id === row.versionId);
-        return version ? [{ ...structuredClone(row), version: version.version }] : [];
+        return version ? [{ ...row, version: version.version }] : [];
       })
       .toSorted((left, right) => left.label.localeCompare(right.label));
   }

@@ -9,12 +9,15 @@ import {
   createRestRuntime,
   projectRequestContext,
   canonicalErrorResponse,
+  recordProjectCredential,
 } from "@langwatch/api/rest";
+import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import {
   AVAILABLE_EVALUATORS,
   type Evaluator,
   type EvaluatorApi,
 } from "@langwatch/evaluator-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it, vi } from "vitest";
@@ -22,6 +25,35 @@ import { describe, expect, it, vi } from "vitest";
 import { createEvaluatorRest } from "../evaluator.rest.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
+
+class PermissionDeniedTestError extends HandledError {
+  constructor() {
+    super("permission_denied", "Missing permission", { httpStatus: 403 });
+  }
+}
+
+/** The caller every write names: the project key, since it has no owning user. */
+const KEY_CALLER = { type: "api_key", id: "project-key-1" } as const;
+
+/** A project key with no owning user: the door answers no actor for it. */
+const PROJECT_KEY: RestResolvedProjectCredential = {
+  type: "apiKey",
+  apiKeyId: "project-key-1",
+  userId: null,
+  organizationId: "organization-1",
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  project: {
+    id: "project-1",
+    name: "Project one",
+    slug: "project-one",
+    teamId: "team-1",
+    organizationId: "organization-1",
+    isPersonal: false,
+    ownerUserId: null,
+    kind: "application",
+  },
+};
 
 const evaluator: Evaluator = {
   id: "evaluator_1",
@@ -40,7 +72,7 @@ const evaluator: Evaluator = {
 /** What the read routes answer with: the row plus its computed fields. */
 const enriched = { ...evaluator, fields: [], outputFields: [] };
 
-function buildApi(overrides: Partial<EvaluatorApi> = {}) {
+function buildApi(overrides: Partial<EvaluatorApi> = {}, denied?: string) {
   const mocks = {
     getAllWithFields: vi.fn(async () => [enriched]),
     findByIdOrSlugWithFields: vi.fn(async () => enriched),
@@ -61,7 +93,11 @@ function buildApi(overrides: Partial<EvaluatorApi> = {}) {
     authorization: restTestAuthorization(),
     audit: { record: () => {} },
     identity: {
-      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+      authenticate: ({ permission, request }) => {
+        if (permission === denied) throw new PermissionDeniedTestError();
+        recordProjectCredential(request, PROJECT_KEY);
+        return { actor: null, scope: { tier: "project", id: "project-1" } as const };
+      },
     },
   });
   const hono = runtime.mount(createEvaluatorRest().router(), {
@@ -177,6 +213,7 @@ describe("the evaluators REST family", () => {
         id: "evaluator_1",
         projectId: "project-1",
         data: { name: "Updated Name" },
+        caller: KEY_CALLER,
       });
     });
 
@@ -203,6 +240,7 @@ describe("the evaluators REST family", () => {
             settings: { model: "openai/gpt-5-mini", prompt: "Judge it" },
           },
         },
+        caller: KEY_CALLER,
       });
     });
 
@@ -261,7 +299,11 @@ describe("the evaluators REST family", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ success: true });
-      expect(mocks.archive).toHaveBeenCalledWith({ id: "evaluator_1", projectId: "project-1" });
+      expect(mocks.archive).toHaveBeenCalledWith({
+        id: "evaluator_1",
+        projectId: "project-1",
+        caller: KEY_CALLER,
+      });
     });
 
     it("answers 404 without archiving when the project has no such evaluator", async () => {
@@ -364,6 +406,7 @@ describe("the evaluators REST family", () => {
         projectId: "project-1",
         name: "quick-relevancy",
         config: { evaluatorType: "ragas/response_relevancy" },
+        caller: KEY_CALLER,
       });
     });
 
@@ -376,6 +419,41 @@ describe("the evaluators REST family", () => {
       });
 
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe("when a deploy label is read or moved", () => {
+    /** @scenario "REST reads an evaluator by label or version" */
+    it("hands the label and the address suffix to the application", async () => {
+      const { hono, mocks } = buildApi();
+
+      await request(hono, "/api/evaluators/original-name?label=production");
+      await request(hono, "/api/evaluators/original-name:2");
+
+      expect(mocks.findByIdOrSlugWithFields).toHaveBeenNthCalledWith(1, {
+        idOrSlug: "original-name",
+        projectId: "project-1",
+        label: "production",
+      });
+      expect(mocks.findByIdOrSlugWithFields).toHaveBeenNthCalledWith(2, {
+        idOrSlug: "original-name:2",
+        projectId: "project-1",
+      });
+    });
+
+    /** @scenario "Moving a label needs the deploy permission" */
+    it("refuses a caller without evaluators:deploy before the handler runs", async () => {
+      const assignLabel = vi.fn();
+      const { hono } = buildApi({ assignLabel }, "evaluators:deploy");
+
+      const response = await request(hono, "/api/evaluators/evaluator_1/labels/production", {
+        method: "PUT",
+        headers: jsonHeaders,
+        body: JSON.stringify({ version: 1 }),
+      });
+
+      expect(response.status).toBe(403);
+      expect(assignLabel).not.toHaveBeenCalled();
     });
   });
 });

@@ -221,6 +221,22 @@ describe("deleting a labelled evaluator", () => {
     expect(await app.findById({ id: "evaluator_1", projectId })).toBeDefined();
   });
 
+  /** @scenario "Deleting a labelled evaluator needs the deploy permission" */
+  it("refuses a credential the door could not attribute to a user or key", async () => {
+    const { app } = setup({ canDeploy: true });
+    await evaluatorWithVersions(app, 1);
+    await app.assignLabel({
+      projectId,
+      evaluatorId: "evaluator_1",
+      label: "production",
+      version: 1,
+    });
+
+    await expect(
+      app.archive({ id: "evaluator_1", projectId, caller: { type: "unattributed" } }),
+    ).rejects.toMatchObject({ code: "evaluator_deployed_label_protected" });
+  });
+
   /** @scenario "A caller with the deploy permission deletes a labelled evaluator" */
   it("archives the evaluator for a caller with evaluators:deploy", async () => {
     const { app } = setup({ canDeploy: true });

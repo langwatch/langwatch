@@ -34,23 +34,25 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
 
     .procedure("create")
     .withPermission("evaluations:manage")
-    .handle(({ app, input, actor }) => app.create({ ...input, caller: agentCallerOf(actor) }))
+    .handle(({ app, input, actor }) => app.create({ ...input, caller: agentCallerOf({ actor }) }))
 
     .procedure("update")
     .withPermission("evaluations:manage")
     .handle(async ({ app, input, actor }) =>
-      agentWithFieldsWithoutSecrets(await app.update({ ...input, caller: agentCallerOf(actor) })),
+      agentWithFieldsWithoutSecrets(
+        await app.update({ ...input, caller: agentCallerOf({ actor }) }),
+      ),
     )
 
     .procedure("cascadeArchive")
     .withPermission("evaluations:manage")
     .handle(({ app, input, actor }) =>
-      app.cascadeArchive({ ...input, caller: agentCallerOf(actor) }),
+      app.cascadeArchive({ ...input, caller: agentCallerOf({ actor }) }),
     )
 
     .procedure("delete")
     .withPermission("evaluations:manage")
-    .handle(({ app, input, actor }) => app.archive({ ...input, caller: agentCallerOf(actor) }))
+    .handle(({ app, input, actor }) => app.archive({ ...input, caller: agentCallerOf({ actor }) }))
 
     .procedure("getCopies")
     .withPermission("evaluations:view")
@@ -74,7 +76,9 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
 
     .procedure("assignLabel")
     .withPermission("agents:deploy")
-    .handle(({ app, input, actor }) => app.assignLabel({ ...input, caller: agentCallerOf(actor) }))
+    .handle(({ app, input, actor }) =>
+      app.assignLabel({ ...input, caller: agentCallerOf({ actor }) }),
+    )
 
     .procedure("removeLabel")
     .withPermission("agents:deploy")

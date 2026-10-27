@@ -73,11 +73,15 @@ export type EvaluatorWriteAuthor = {
 export type EvaluatorCaller =
   | { type: "user"; id: string }
   | { type: "api_key"; id: string }
+  /** A credential the door could not attribute to a user or key; it holds no deploy permission. */
+  | { type: "unattributed" }
   | { type: "system" };
 
 export function evaluatorWriteAuthorOf(caller: EvaluatorCaller | undefined): EvaluatorWriteAuthor {
   if (caller?.type === "user") return { authorId: caller.id, authorKind: "user" };
-  if (caller?.type === "api_key") return { authorId: null, authorKind: "api_key" };
+  if (caller?.type === "api_key" || caller?.type === "unattributed") {
+    return { authorId: null, authorKind: "api_key" };
+  }
   return { authorId: null, authorKind: "system" };
 }
 
