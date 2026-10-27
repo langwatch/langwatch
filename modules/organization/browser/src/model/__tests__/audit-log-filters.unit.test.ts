@@ -203,8 +203,8 @@ describe("given a project filter picked in one organization", () => {
   const filter = { organizationId: "org-acme", projectId: "proj-1" };
 
   describe("when the reader is still in that organization", () => {
-    it("keeps filtering by that project, and keeps the very same filter", () => {
-      expect(auditProjectFilterIn({ filter, organizationId: "org-acme" })).toBe(filter);
+    it("keeps filtering by that project", () => {
+      expect(auditProjectFilterIn({ filter, organizationId: "org-acme" })).toEqual(filter);
     });
   });
 
@@ -232,7 +232,7 @@ describe("given a project filter picked in one organization", () => {
   describe("when no project was ever picked", () => {
     it("applies no project filter", () => {
       const empty = { organizationId: "org-acme", projectId: null };
-      expect(auditProjectFilterIn({ filter: empty, organizationId: "org-acme" })).toBe(empty);
+      expect(auditProjectFilterIn({ filter: empty, organizationId: "org-acme" })).toEqual(empty);
     });
   });
 });

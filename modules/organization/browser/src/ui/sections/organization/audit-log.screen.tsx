@@ -247,7 +247,7 @@ export default function AuditLogScreen() {
   const rebasedFilter = auditProjectFilterIn({ filter: projectFilter, organizationId });
   // Rebasing during render rather than masking: the organization the reader
   // left must not come back carrying its old project if they return to it.
-  if (rebasedFilter !== projectFilter) setProjectFilter(rebasedFilter);
+  if (projectFilter.organizationId !== organizationId) setProjectFilter(rebasedFilter);
   const selectedProjectId = rebasedFilter.projectId;
   const [isExporting, setIsExporting] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
