@@ -1084,23 +1084,11 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 		return nil, &NodeError{Type: "evaluator_missing_slug", Message: "evaluator parameter is required (e.g. langevals/exact_match)"}
 	}
 
-	// Same split as the slug, and the same answer: the Studio writes the
-	// node's name onto the typed `data.name` field and nothing emits a
-	// `name` parameter, so reading only parameters[] sent no name at all
-	// and the evaluation was attributed under the saved evaluator's name.
-	name := ""
-	if node.Data.Name != nil {
-		name = *node.Data.Name
-	}
-	if name == "" {
-		name = paramString(node.Data.Parameters, "name")
-	}
-
 	res, err := e.evaluator.Execute(ctx, evaluatorblock.Request{
 		BaseURL:            e.langwatchBaseURL,
 		APIKey:             req.Workflow.APIKey,
 		EvaluatorSlug:      slug,
-		Name:               name,
+		Name:               paramString(node.Data.Parameters, "name"),
 		Settings:           evaluatorSettings(node.Data.Parameters),
 		Data:               inputs,
 		TraceID:            req.TraceID,
@@ -1649,21 +1637,10 @@ var evaluatorReservedParams = map[string]struct{}{
 }
 
 // evaluatorSettings assembles the settings dict for an evaluator node.
-//
-// Two wire shapes reach here and both must work. The Studio sender
-// flattens a node's draft settings into one parameter per key —
-// modules/workflow/contract/src/merge-local-configs.ts
-// mergeEvaluatorLocalConfig replaces parameters[] wholesale with
-// `{identifier: "model", value: "openai/gpt-4o"}` entries — so every
-// non-reserved parameter is a setting. A workflow persisted before the
-// Go port instead carries them all under a single `settings` dict
-// parameter. That dict is the base and the flattened entries overlay
-// it, so an older workflow keeps evaluating and an inline edit on the
-// canvas still wins.
-//
-// Reading only `settings` was the whole of the inline-evaluator bug:
-// nothing has ever emitted that parameter, so every setting the canvas
-// showed was dropped and the evaluator ran on its saved defaults.
+// The Studio flattens its panel settings into one parameter per key, so
+// every non-reserved parameter is a setting; a pre-Go-port workflow
+// instead carries them under one `settings` dict, which is the base the
+// flattened entries overlay. specs/studio/workflow-evaluator-inline-settings.feature
 func evaluatorSettings(params []dsl.Field) map[string]any {
 	settings := map[string]any{}
 	for identifier, value := range paramAnyMap(params, "settings") {

@@ -1,10 +1,7 @@
 /**
- * The dispatch hop for an evaluator configured inline on the Studio canvas:
- * the real TS sender flattens the node's draft settings, the real engine
- * reassembles them, and the evaluate call the engine makes back into the app
- * is captured here. Each end was separately tested before this; neither test
- * could see that they disagreed on the wire shape, so every inline setting was
- * dropped and the evaluator ran on its saved defaults.
+ * The dispatch hop for an evaluator configured on the Studio canvas.
+ * Each end was separately tested, so neither test could see that they
+ * disagreed on the wire shape and dropped every inline setting.
  */
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -13,9 +10,10 @@ import { hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "@langwatch/te
 import {
   mergeLocalConfigsIntoDsl,
   type Component,
+  type Field,
   type StudioNode,
 } from "@langwatch/workflow-contract";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // Unique port alongside the other nlpgo subprocess integration tests
 // (55610 / 55611 / 55612 / 55613 / 55614 / 55615 / 55620). 55616 is this one's.
@@ -23,11 +21,14 @@ const NLPGO_PORT = 55616;
 
 const PROJECT_ID = "project_evaluator_settings";
 const TRACE_ID = "evalset0123456789evalset01234567";
-const EVALUATOR_SLUG = "langevals/llm_boolean";
+
+/** A saved evaluator the panel edits without saving, and a bare slug. */
+const SAVED_EVALUATOR_REF = "evaluators/eval_inline_settings";
+const INLINE_EVALUATOR_SLUG = "langevals/llm_boolean";
 
 /** What the properties panel wrote onto the node, none of it saved. */
 const CANVAS_SETTINGS = {
-  model: "openai/gpt-4o",
+  model: "openai/gpt-5-mini",
   max_tokens: 256,
   prompt: "Is the output a yes?",
 };
@@ -39,13 +40,12 @@ interface CapturedEvaluation {
 }
 
 /**
- * The LangWatch app's evaluator endpoint, faked. The real handler merges
- * defaults, then the saved evaluator, then the request body — so the settings
- * it receives are the top precedence layer and decide what the evaluator runs
- * on. Capturing the body is capturing the outcome.
+ * The LangWatch app's evaluator endpoint, faked. Its real handler merges
+ * defaults, then the saved evaluator, then the request body, so the settings
+ * it receives are the top precedence layer: the body is the outcome.
  */
 class FakeEvaluatorApi {
-  readonly calls: CapturedEvaluation[] = [];
+  calls: CapturedEvaluation[] = [];
   private server: Server | undefined;
   private origin = "";
 
@@ -78,38 +78,51 @@ class FakeEvaluatorApi {
   }
 }
 
+const settingsAsParameters = (settings: Record<string, unknown>): Field[] =>
+  Object.entries(settings).map(([identifier, value]) => ({ identifier, type: "str", value }));
+
+/** Entry -> evaluator -> end, with the evaluator node under test in the middle. */
+const canvasNodes = (judgeData: Component): StudioNode<Component>[] => [
+  {
+    id: "entry",
+    type: "entry",
+    position: { x: 0, y: 0 },
+    data: { outputs: [{ identifier: "output", type: "str" }] },
+  },
+  { id: "judge", type: "evaluator", position: { x: 300, y: 0 }, data: judgeData },
+  {
+    id: "end",
+    type: "end",
+    position: { x: 600, y: 0 },
+    data: { inputs: [{ identifier: "passed", type: "bool" }] },
+  },
+];
+
 /**
- * Entry -> evaluator -> end, with the evaluator node carrying unsaved canvas
- * edits in `localConfig` exactly as the properties panel leaves them.
+ * A node pointing at a saved evaluator. Only this shape gets `localConfig`:
+ * the panel writes unsaved edits there and the sender flattens them.
  */
-const canvasNodes = (): StudioNode<Component>[] =>
-  [
-    {
-      id: "entry",
-      type: "entry",
-      position: { x: 0, y: 0 },
-      data: { outputs: [{ identifier: "output", type: "str" }] },
-    },
-    {
-      id: "judge",
-      type: "evaluator",
-      position: { x: 300, y: 0 },
-      data: {
-        cls: "LangWatchEvaluator",
-        name: "Saved judge",
-        evaluator: EVALUATOR_SLUG,
-        inputs: [{ identifier: "output", type: "str" }],
-        outputs: [{ identifier: "passed", type: "bool" }],
-        localConfig: { name: "Edited judge", settings: CANVAS_SETTINGS },
-      },
-    },
-    {
-      id: "end",
-      type: "end",
-      position: { x: 600, y: 0 },
-      data: { inputs: [{ identifier: "passed", type: "bool" }] },
-    },
-  ] as StudioNode<Component>[];
+const savedEvaluatorWithPanelEdits = (): Component => ({
+  cls: "LangWatchEvaluator",
+  name: "Saved judge",
+  evaluator: SAVED_EVALUATOR_REF,
+  inputs: [{ identifier: "output", type: "str" }],
+  outputs: [{ identifier: "passed", type: "bool" }],
+  localConfig: { name: "Saved judge", settings: CANVAS_SETTINGS },
+});
+
+/**
+ * A node pointing straight at an evaluator slug. The old inline panel writes
+ * its settings onto parameters[] directly, with no localConfig to merge.
+ */
+const inlineEvaluatorNode = (): Component => ({
+  cls: "LangWatchEvaluator",
+  name: "Inline judge",
+  evaluator: INLINE_EVALUATOR_SLUG,
+  inputs: [{ identifier: "output", type: "str" }],
+  outputs: [{ identifier: "passed", type: "bool" }],
+  parameters: settingsAsParameters(CANVAS_SETTINGS),
+});
 
 const EDGES = [
   {
@@ -174,35 +187,59 @@ describe.skipIf(!hasGo())("the inline evaluator settings round trip", () => {
     await api.stop();
   });
 
-  describe("given an evaluator node configured inline on the canvas", () => {
+  beforeEach(() => {
+    api.calls = [];
+  });
+
+  const runAndCaptureEvaluateCall = async (
+    nodes: StudioNode<Component>[],
+  ): Promise<CapturedEvaluation> => {
+    const response = await fetch(`${nlpgo.baseUrl}/go/studio/execute_sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: executeFlowBody(nodes),
+    });
+    expect(response.ok, `engine answered ${response.status} ${response.statusText}`).toBe(true);
+    expect(api.calls).toHaveLength(1);
+    const [call] = api.calls;
+    expect(call).toBeDefined();
+
+    return call!;
+  };
+
+  describe("given a node pointing at a saved evaluator with unsaved panel edits", () => {
     describe("when the studio dispatches the run to the engine", () => {
-      it("calls the evaluator with the settings the canvas showed", async () => {
+      /** @scenario "A saved evaluator with unsaved panel edits dispatches those edits" */
+      it("calls the saved evaluator with the settings the panel showed", async () => {
         // The real sender: it strips localConfig and flattens the settings
         // into one parameter per key. Nothing emits a `settings` parameter.
-        const dispatched = mergeLocalConfigsIntoDsl(canvasNodes());
+        const dispatched = mergeLocalConfigsIntoDsl(canvasNodes(savedEvaluatorWithPanelEdits()));
         const judge = dispatched.find((node) => node.id === "judge");
         expect(judge?.data.parameters).toEqual(
           expect.arrayContaining([
-            expect.objectContaining({ identifier: "model", value: "openai/gpt-4o" }),
+            expect.objectContaining({ identifier: "model", value: "openai/gpt-5-mini" }),
           ]),
         );
         expect(JSON.stringify(judge?.data.parameters)).not.toContain('"identifier":"settings"');
 
-        const response = await fetch(`${nlpgo.baseUrl}/go/studio/execute_sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: executeFlowBody(dispatched),
-        });
-        expect(response.ok, `engine answered ${response.status} ${response.statusText}`).toBe(true);
+        // The far side of the hop. Pre-fix the body had no settings at all
+        // and the endpoint's merge fell through to the saved defaults.
+        const call = await runAndCaptureEvaluateCall(dispatched);
+        expect(call.path).toBe(`/api/evaluations/${SAVED_EVALUATOR_REF}/evaluate`);
+        expect(call.body.settings).toEqual(CANVAS_SETTINGS);
+      }, 120_000);
+    });
+  });
 
-        // The far side of the hop: one evaluate call, carrying every
-        // setting the canvas showed. Pre-fix the body had no settings at
-        // all and the endpoint's merge fell through to the saved defaults.
-        expect(api.calls).toHaveLength(1);
-        const [call] = api.calls;
-        expect(call?.path).toBe(`/api/evaluations/${EVALUATOR_SLUG}/evaluate`);
-        expect(call?.body.settings).toEqual(CANVAS_SETTINGS);
-        expect(call?.body.name).toBe("Edited judge");
+  describe("given a node pointing at an evaluator slug with its settings inline", () => {
+    describe("when the studio dispatches the run to the engine", () => {
+      /** @scenario "An inline evaluator node dispatches the settings on the node" */
+      it("calls the slug with the settings the panel showed", async () => {
+        const dispatched = mergeLocalConfigsIntoDsl(canvasNodes(inlineEvaluatorNode()));
+
+        const call = await runAndCaptureEvaluateCall(dispatched);
+        expect(call.path).toBe(`/api/evaluations/${INLINE_EVALUATOR_SLUG}/evaluate`);
+        expect(call.body.settings).toEqual(CANVAS_SETTINGS);
       }, 120_000);
     });
   });

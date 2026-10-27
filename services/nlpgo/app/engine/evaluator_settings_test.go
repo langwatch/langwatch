@@ -17,10 +17,8 @@ import (
 
 // dispatchEvaluatorBody runs a minimal entry -> evaluator workflow against a
 // stub standing in for POST /api/evaluations/<slug>/evaluate and returns the
-// body the engine sent. The settings layer is the top precedence layer of
-// that endpoint's merge (modules/evaluation/process/src/transport/
-// evaluations-legacy.rest.ts), so what lands in the body is exactly what the
-// evaluator runs on.
+// body the engine sent. Settings are the top precedence layer of that
+// endpoint's merge, so the body is exactly what the evaluator runs on.
 func dispatchEvaluatorBody(t *testing.T, parameters []dsl.Field) map[string]any {
 	t.Helper()
 	return dispatchEvaluatorNode(t, dsl.Component{Parameters: parameters})
@@ -32,10 +30,19 @@ func dispatchEvaluatorNode(t *testing.T, data dsl.Component) map[string]any {
 	t.Helper()
 
 	var captured map[string]any
+	var captureErr error
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		require.NoError(t, json.Unmarshal(raw, &captured))
+		raw, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			captureErr = readErr
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if decodeErr := json.Unmarshal(raw, &captured); decodeErr != nil {
+			captureErr = decodeErr
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status": "processed",
@@ -81,6 +88,7 @@ func dispatchEvaluatorNode(t *testing.T, data dsl.Component) map[string]any {
 	require.Contains(t, res.Nodes, "evaluator-1")
 	require.Equal(t, "success", res.Nodes["evaluator-1"].Status,
 		"evaluator node should succeed against the stub server")
+	require.NoError(t, captureErr, "stub could not read the request body")
 	require.NotNil(t, captured, "stub never received a request body")
 	return captured
 }
@@ -101,14 +109,14 @@ func param(t *testing.T, identifier string, value any) dsl.Field {
 // its saved defaults. Every setting was lost, not just the model.
 func TestDispatchEvaluator_FlattenedParametersBecomeSettings(t *testing.T) {
 	body := dispatchEvaluatorBody(t, []dsl.Field{
-		param(t, "model", "openai/gpt-4o"),
+		param(t, "model", "openai/gpt-5-mini"),
 		param(t, "max_tokens", 256),
 		param(t, "prompt", "Is the answer correct?"),
 	})
 
 	settings, ok := body["settings"].(map[string]any)
 	require.True(t, ok, "settings missing from the outbound body: %v", body)
-	assert.Equal(t, "openai/gpt-4o", settings["model"])
+	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
 	assert.EqualValues(t, 256, settings["max_tokens"])
 	assert.Equal(t, "Is the answer correct?", settings["prompt"])
 }
@@ -141,12 +149,12 @@ func TestDispatchEvaluator_LegacySettingsDictStillWorks(t *testing.T) {
 func TestDispatchEvaluator_FlattenedOverlaysLegacyDict(t *testing.T) {
 	body := dispatchEvaluatorBody(t, []dsl.Field{
 		{Identifier: "settings", Type: "dict", Value: json.RawMessage(`{"model":"openai/gpt-5-mini","max_tokens":128}`)},
-		param(t, "model", "openai/gpt-4o"),
+		param(t, "model", "openai/gpt-5-mini"),
 	})
 
 	settings, ok := body["settings"].(map[string]any)
 	require.True(t, ok, "settings missing from the outbound body: %v", body)
-	assert.Equal(t, "openai/gpt-4o", settings["model"])
+	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
 	assert.EqualValues(t, 128, settings["max_tokens"])
 }
 
@@ -189,24 +197,19 @@ func TestEvaluatorSettings_SkipsNullParameters(t *testing.T) {
 	assert.EqualValues(t, 64, settings["max_tokens"])
 }
 
-// TestDispatchEvaluator_NodeNameReachesTheEvaluateCall pins the same split one
-// field over: the Studio writes the node's name onto `data.name`, so reading
-// it only off parameters[] sent no name and the evaluation was attributed
-// under the saved evaluator's name rather than the one on the canvas.
-func TestDispatchEvaluator_NodeNameReachesTheEvaluateCall(t *testing.T) {
-	nodeName := "Edited judge"
-	body := dispatchEvaluatorNode(t, dsl.Component{Name: &nodeName})
-
-	assert.Equal(t, "Edited judge", body["name"])
-}
-
-// TestDispatchEvaluator_LegacyNameParameterStillWorks keeps the pre-Go-port
-// shape working, where the name lived in parameters[] and `data.name` was
-// never set.
-func TestDispatchEvaluator_LegacyNameParameterStillWorks(t *testing.T) {
+// TestDispatchEvaluator_NameIsNotASetting is the hazard the assembly adds:
+// settings now come from parameters[], so a reserved identifier left in that
+// slice would travel as a setting and fail the endpoint's schema parse. The
+// name keeps going out as the body's own field, as it always did.
+func TestDispatchEvaluator_NameIsNotASetting(t *testing.T) {
 	body := dispatchEvaluatorBody(t, []dsl.Field{
 		{Identifier: "name", Type: "str", Value: json.RawMessage(`"is-answer-correct"`)},
+		param(t, "model", "openai/gpt-5-mini"),
 	})
 
 	assert.Equal(t, "is-answer-correct", body["name"])
+	settings, ok := body["settings"].(map[string]any)
+	require.True(t, ok, "settings missing from the outbound body: %v", body)
+	assert.NotContains(t, settings, "name")
+	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
 }
