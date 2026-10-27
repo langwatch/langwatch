@@ -200,11 +200,11 @@ describe("withoutUndeclaredKeys", () => {
     });
 
     it("cuts by the input side when the output side allows anything", () => {
-      const schema = z.object({ id: z.string() }).pipe(z.unknown());
+      const schema = z.object({ id: z.string() }).pipe(z.any());
 
       expect(withoutUndeclaredKeys(schema, { id: 1, secret: "s" })).toEqual({});
       expect(
-        withoutUndeclaredKeys(z.object({ id: z.number() }).strict().pipe(z.unknown()), {
+        withoutUndeclaredKeys(z.object({ id: z.number() }).strict().pipe(z.any()), {
           id: 1,
           secret: "s",
         }),
