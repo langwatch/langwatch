@@ -184,6 +184,17 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "manage"],
     scopes: ["organization"],
   },
+  // Moving a deploy label ("production") of an agent or an evaluator, and
+  // archiving one that carries a label. Editing stays `evaluations:*`, so a
+  // custom role can edit without deciding what production runs.
+  agents: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
+  evaluators: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
 } as const satisfies Record<
   string,
   {
