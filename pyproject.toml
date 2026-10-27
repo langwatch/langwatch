@@ -53,4 +53,5 @@ constraint-dependencies = [
   # Python 3.11; on 3.10, 3.20.3 sits below all of them and above the older symlink fixes.
   "filelock>=4.2.1; python_full_version >= '3.11'",
   "filelock>=3.20.3,<3.20.4; python_full_version < '3.11'",
+  "setuptools>=84.1.0", # security: setuptools advisory covering <84.1.0
 ]

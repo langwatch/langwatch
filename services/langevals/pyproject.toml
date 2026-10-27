@@ -129,8 +129,8 @@ override-dependencies = [
   "cryptography>=50.0.0",
   # h2 HTTP/2 control-frame flood DoS.
   "h2>=4.4.1",
-  # setuptools path traversal in PackageIndex.
-  "setuptools>=83.0.0",
+  # setuptools path traversal in PackageIndex, and the advisory covering <84.1.0.
+  "setuptools>=84.1.0",
   # torch: deserialization advisory in torch.load.
   "torch>=2.13.0",
   # tornado: HTTP header and multipart parsing advisories.
