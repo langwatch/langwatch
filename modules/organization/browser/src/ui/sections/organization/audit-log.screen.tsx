@@ -116,20 +116,6 @@ function auditProjectTree({
   };
 }
 
-/** Names the member behind a user id, by display name or else by address. */
-function auditOwnerNameIn(members: Parameters<typeof matchMemberId>[0]) {
-  return (userId: string | null) => {
-    const member = members.find((candidate) => candidate.userId === userId);
-    return member?.user.name ?? member?.user.email ?? null;
-  };
-}
-
-/** Names a project from the filter tree, falling back to the id it was filtered by. */
-function auditProjectLabelIn(projects: readonly { id: string; name: string }[]) {
-  return (projectId: string) =>
-    projects.find((project) => project.id === projectId)?.name ?? projectId;
-}
-
 /**
  * The page in place of the table: an upsell below Enterprise, or, when a project grant showed the
  * entry but the organization-wide read refuses, who can see it. Null when the table renders.
@@ -183,6 +169,26 @@ async function collectAuditLogs<T>({
     collected.push(...batch.auditLogs);
   }
   return collected;
+}
+
+/**
+ * The project filter, rebased during render rather than masked: the organization
+ * the reader left must not come back carrying its old project if they return.
+ */
+function useAuditProjectFilter({
+  organizationId,
+  scopedProjectId,
+}: {
+  organizationId: string;
+  scopedProjectId: string | undefined;
+}) {
+  const [filter, setFilter] = useState<AuditProjectFilter>(() => ({
+    organizationId,
+    projectId: scopedProjectId ?? null,
+  }));
+  const rebased = auditProjectFilterIn({ filter, organizationId });
+  if (filter.organizationId !== organizationId) setFilter(rebased);
+  return [rebased, setFilter] as const;
 }
 
 /** Filter controls share one 32px line, 13px text and a 4px radius. */
@@ -254,15 +260,11 @@ export default function AuditLogScreen() {
 
   const [userSearch, setUserSearch] = useState(query.userSearch ?? "");
   const [actionFilter, setActionFilter] = useState(query.actionFilter ?? "");
-  const [projectFilter, setProjectFilter] = useState<AuditProjectFilter>(() => ({
+  const [projectFilter, setProjectFilter] = useAuditProjectFilter({
     organizationId,
-    projectId: scope.projectId ?? null,
-  }));
-  const rebasedFilter = auditProjectFilterIn({ filter: projectFilter, organizationId });
-  // Rebasing during render rather than masking: the organization the reader
-  // left must not come back carrying its old project if they return to it.
-  if (projectFilter.organizationId !== organizationId) setProjectFilter(rebasedFilter);
-  const selectedProjectId = rebasedFilter.projectId;
+    scopedProjectId: scope.projectId,
+  });
+  const selectedProjectId = projectFilter.projectId;
   const [isExporting, setIsExporting] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
@@ -304,9 +306,14 @@ export default function AuditLogScreen() {
   const rows: EnrichedAuditLog[] = feed?.auditLogs ?? [];
   const totalHits = feed?.totalCount ?? 0;
   const backLink = auditBackLink({ target, projectSlug: scope.projectSlug });
-  const ownerName = auditOwnerNameIn(members.data?.members ?? []);
+  const ownerName = (userId: string | null) => {
+    const member = members.data?.members.find((candidate) => candidate.userId === userId);
+    return member?.user.name ?? member?.user.email ?? null;
+  };
   const scopeTree = auditProjectTree({ teams: organization?.teams ?? [], ownerName });
-  const projectLabel = auditProjectLabelIn(scopeTree.projects);
+
+  const projectLabel = (projectId: string) =>
+    scopeTree.projects.find((project) => project.id === projectId)?.name ?? projectId;
 
   const logsView = auditLogsView({ isLoading: auditLogs.isLoading, rowCount: rows.length });
 
