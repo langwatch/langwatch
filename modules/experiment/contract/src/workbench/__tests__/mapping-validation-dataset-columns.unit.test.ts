@@ -5,9 +5,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { TargetConfig } from "../../experiment-workbench.ts";
+import type { EvaluatorConfig, TargetConfig } from "../../experiment-workbench.ts";
 import {
   type DatasetColumnsReference,
+  evaluatorMappingGaps,
   getTargetMissingMappings,
   validateWorkbench,
 } from "../mapping-validation.ts";
@@ -132,5 +133,67 @@ describe("given a connected agent whose optional parameter reads a missing colum
         columnName: "environment",
       },
     ]);
+  });
+});
+
+describe("given an evaluator whose field reads a column the dataset does not have", () => {
+  const evaluator = (): EvaluatorConfig => ({
+    id: "evaluator-1",
+    evaluatorType: "langevals/exact_match",
+    inputs: [
+      { identifier: "output", type: "str" },
+      { identifier: "expected_output", type: "str" },
+    ],
+    mappings: {
+      [DATASET_ID]: {
+        "target-code": {
+          output: {
+            type: "source",
+            source: "target",
+            sourceId: "target-code",
+            sourceField: "output",
+          },
+          expected_output: {
+            type: "source",
+            source: "dataset",
+            sourceId: DATASET_ID,
+            sourceField: "golden",
+          },
+        },
+      },
+    },
+  });
+
+  /** @scenario "An evaluator mapping to a column the dataset does not have is reported as a missing column" */
+  it("reports the field as mapped to a column that is not in the dataset", () => {
+    const result = evaluatorMappingGaps({
+      evaluator: evaluator(),
+      datasetId: DATASET_ID,
+      targetId: "target-code",
+      datasets: datasetsWith("input", "environment"),
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.missingMappings).toEqual([
+      {
+        fieldId: "expected_output",
+        fieldName: "expected_output",
+        isRequired: true,
+        reason: "column_not_in_dataset",
+        columnName: "golden",
+      },
+    ]);
+  });
+
+  /** @scenario "An evaluator mapping to a column the dataset does not have is reported as a missing column" */
+  it("stops the workbench run at that evaluator", () => {
+    const result = validateWorkbench({
+      targets: [codeTarget()],
+      evaluators: [evaluator()],
+      activeDatasetId: DATASET_ID,
+      datasets: datasetsWith("input", "environment"),
+    });
+
+    expect(result.firstInvalidEvaluator?.evaluator.id).toBe("evaluator-1");
   });
 });

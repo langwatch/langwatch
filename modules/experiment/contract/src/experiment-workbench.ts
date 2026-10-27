@@ -583,6 +583,11 @@ export type EvaluationsV3Actions = {
   addColumn: (datasetId: string, column: DatasetColumn) => void;
   removeColumn: (datasetId: string, columnId: string) => void;
   renameColumn: (datasetId: string, columnId: string, newName: string) => void;
+  /**
+   * Drop dataset mappings that read a column the dataset no longer has; with
+   * `targetId`, only that target's own and the evaluators' mappings for it.
+   */
+  removeMappingsToMissingColumns: (args: { datasetId: string; targetId?: string }) => void;
   updateColumnType: (datasetId: string, columnId: string, type: DatasetColumnType) => void;
 
   // Target actions

@@ -73,6 +73,19 @@ describe("VariableMappingInput", () => {
       expect(screen.getByTestId("clear-mapping-button")).toBeInTheDocument();
     });
 
+    /** @scenario "The prompt editor's mapping names a column the dataset does not have" */
+    it("says a mapped column is not in the dataset, and clears it in one click", () => {
+      const onMappingChange = vi.fn();
+      renderComponent({
+        mapping: { type: "source", sourceId: "dataset-1", path: ["question"] },
+        onMappingChange,
+      });
+
+      expect(screen.getByText("Test Data.question (not in dataset)")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("clear-mapping-button"));
+      expect(onMappingChange).toHaveBeenCalledWith(undefined);
+    });
+
     /** @scenario Mapping a value from another target shows the target name not its ID */
     it("labels a target source mapping with the target name, not its raw id", () => {
       const mapping: FieldMapping = {
