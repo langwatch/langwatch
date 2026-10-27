@@ -52,8 +52,8 @@ func TestRunProvisionsOneOrganizationAndProject(t *testing.T) {
 	if got := exported(result)["LW_PROJECT_API_KEY"]; got != serviceKey {
 		t.Fatalf("LW_PROJECT_API_KEY = %q, want the project's service key", got)
 	}
-	if orgs[0].IdempotencyKey == "" || projects[0].IdempotencyKey == "" {
-		t.Fatal("every create must carry an Idempotency-Key")
+	if orgs[0].IdempotencyKey != "" || projects[0].IdempotencyKey != "" {
+		t.Fatal("a create must not carry an Idempotency-Key: the seed never retries")
 	}
 }
 
@@ -183,8 +183,8 @@ func TestRefusalForOneProviderStillSeedsTheOthers(t *testing.T) {
 	if err == nil || !errors.As(err, &refused) || refused.Status != http.StatusUnprocessableEntity {
 		t.Fatalf("want the refusal surfaced, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "anthropic") || !strings.Contains(err.Error(), "refused by the stub") {
-		t.Fatalf("want the error to name the provider and the answer, got %q", err)
+	if !strings.Contains(err.Error(), "anthropic") || !strings.Contains(err.Error(), "answered 422") {
+		t.Fatalf("want the error to name the provider and the status, got %q", err)
 	}
 }
 

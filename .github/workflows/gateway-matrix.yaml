@@ -153,7 +153,7 @@ jobs:
       AWS_DEFAULT_REGION: eu-central-1
       VERTEX_PROJECT: langwatch
       VERTEX_LOCATION: us-central1
-      VERTEX_ACCESS_TOKEN: ${{ secrets.MATRIX_VERTEX_ACCESS_TOKEN }}
+      # VERTEX_ACCESS_TOKEN is minted from the service-account secret below.
       VOYAGE_API_KEY: ${{ secrets.MATRIX_VOYAGE_API_KEY }}
       # The ElevenLabs cells also need a voice id for text to speech; they
       # skip without one.
@@ -285,10 +285,13 @@ jobs:
           pnpm start > /tmp/langwatch-dev.log 2>&1 &
           echo $! > /tmp/langwatch.pid
           # Wait up to 90s for /api/health
-          for i in {1..45}; do
-            curl -fsS http://localhost:5560/api/health && break
+          for _ in {1..45}; do
+            curl -fsS http://localhost:5560/api/health && exit 0
             sleep 2
           done
+          echo "::error title=gateway-matrix::the api never answered /api/health"
+          tail -50 /tmp/langwatch-dev.log
+          exit 1
 
       # The gateway's traces reach ClickHouse through the event-sourcing
       # pipeline the worker drains: without it every cell's cost readback
@@ -325,6 +328,36 @@ jobs:
           tail -n 200 /tmp/langwatch-worker.log
           exit 1
 
+      # The Vertex cache cell calls Vertex directly and needs a bearer token.
+      # The secret cannot gate a step, so a step output records it is set. An
+      # empty secret skips these steps and the cell skips.
+      - name: Check for Vertex credentials
+        id: vertex
+        env:
+          VERTEX_SERVICE_ACCOUNT_JSON: ${{ secrets.MATRIX_VERTEX_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$VERTEX_SERVICE_ACCOUNT_JSON" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to Google Cloud
+        if: ${{ steps.vertex.outputs.present == 'true' }}
+        # A refusal fails only the Vertex cache cell, which then skips.
+        continue-on-error: true
+        id: gcp-auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          credentials_json: ${{ secrets.MATRIX_VERTEX_SERVICE_ACCOUNT_JSON }}
+
+      - name: Mint the Vertex access token
+        if: ${{ steps.gcp-auth.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          token=$(gcloud auth print-access-token)
+          echo "::add-mask::$token"
+          echo "VERTEX_ACCESS_TOKEN=$token" >> "$GITHUB_ENV"
+
       # Mints LW_PROJECT_API_KEY and one TEST_VK_<PROVIDER> per provider with
       # credentials into $GITHUB_ENV. Bedrock's model provider carries only
       # the region, so the gateway signs with the session the AWS step above
@@ -334,24 +367,31 @@ jobs:
         id: seed
         env:
           VERTEX_SERVICE_ACCOUNT_JSON: ${{ secrets.MATRIX_VERTEX_SERVICE_ACCOUNT_JSON }}
+          # Empty is allowed: the gateway then uses its default api version.
+          AZURE_OPENAI_API_VERSION: ${{ vars.MATRIX_AZURE_OPENAI_API_VERSION }}
           ELEVENLABS_API_KEY: ${{ secrets.MATRIX_ELEVENLABS_API_KEY }}
         run: go run ./cmd/matrixseed -base-url "$LW_BASE_URL"
 
       # The matrix also runs after a seed refusal, on the providers that were
-      # seeded, so the gateway must start then too.
+      # seeded, so the gateway must start then too; a failed bootstrap has no
+      # project key, so nothing runs.
       - name: Start gateway (background)
-        if: ${{ success() || steps.seed.outcome == 'failure' }}
+        id: gateway
+        if: ${{ !cancelled() && steps.seed.outputs.bootstrapped == 'true' }}
         run: |
           go build -o /tmp/aigateway ./cmd/service
           /tmp/aigateway aigateway > /tmp/aigateway.log 2>&1 &
           echo $! > /tmp/aigateway.pid
-          for i in {1..30}; do
-            curl -fsS http://localhost:5563/healthz && break
+          for _ in {1..30}; do
+            curl -fsS http://localhost:5563/healthz && exit 0
             sleep 2
           done
+          echo "::error title=gateway-matrix::the gateway never answered /healthz"
+          tail -50 /tmp/aigateway.log
+          exit 1
 
       - name: Run provider matrix
-        if: ${{ success() || steps.seed.outcome == 'failure' }}
+        if: ${{ !cancelled() && steps.seed.outputs.bootstrapped == 'true' && steps.gateway.outcome == 'success' }}
         working-directory: services/aigateway
         env:
           # Force-include all configured tags so a partial-creds run

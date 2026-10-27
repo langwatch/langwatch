@@ -51,7 +51,7 @@ Feature: The live gateway matrix seeds its own control plane
     And the control plane refuses to store the Anthropic model provider
     When the seed runs
     Then the OpenAI virtual key is exported
-    And the seed exits with a failure that names Anthropic and the control plane's answer
+    And the seed exits with a failure that names Anthropic and the control plane's status
 
   @unit
   Scenario: A failed bootstrap exports nothing
@@ -65,6 +65,20 @@ Feature: The live gateway matrix seeds its own control plane
     When the seed exports a virtual key or the project key
     Then the run log carries an add-mask command for the value before the value reaches the job environment
     And the value itself is never printed
+
+  @unit
+  Scenario: A refused request never prints a submitted secret
+    Given the control plane refuses a request and echoes what it received
+    When the seed reports the refusal
+    Then the model-provider request's response body is never printed
+    And any other request's snippet has the submitted secrets removed, raw and JSON-escaped
+
+  @unit
+  Scenario: The Azure api version is stored when the job sets it
+    Given the job holds Azure credentials and an api version
+    When the seed runs
+    Then the Azure model provider carries AZURE_OPENAI_API_VERSION
+    And an empty api version is not stored
 
   @unimplemented
   Scenario: A run on main drives every cell with credentials against the seeded stack
