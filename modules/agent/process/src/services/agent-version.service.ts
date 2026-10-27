@@ -24,7 +24,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { AgentRepository, AgentVersionRecord } from "../repositories/agent.repository.ts";
 
 /** An agent as one of its versions holds it; `version` is null for a connected agent. */
-export type ResolvedAgentVersion = { agent: Agent; version: number | null };
+type ResolvedAgentVersion = { agent: Agent; version: number | null };
 
 const BACKFILL_PAGE = 200;
 

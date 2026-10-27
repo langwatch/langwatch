@@ -1,3 +1,4 @@
+import type { Agent } from "@langwatch/agent-contract";
 import type { AuditLogApi, AuditLogHistoryEntry } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -30,7 +31,9 @@ function profile(id: string, name: string) {
   };
 }
 
-function setup(options: { canDeploy?: boolean; history?: AuditLogHistoryEntry[] } = {}) {
+function setup(
+  options: { canDeploy?: boolean; history?: AuditLogHistoryEntry[]; unversioned?: Agent[] } = {},
+) {
   const people = [profile("user_ada", "Ada"), profile("user_grace", "Grace")];
   const dependencies = {
     users: createApiFixture<UserApi>({
@@ -45,7 +48,7 @@ function setup(options: { canDeploy?: boolean; history?: AuditLogHistoryEntry[] 
         (options.history ?? []).filter((entry) => entry.action.startsWith(actionPrefix)),
     }),
   };
-  const agents = MemoryAgentRepository.create();
+  const agents = MemoryAgentRepository.create({ unversioned: options.unversioned });
   const fixture = createAgentAppFixture({
     ...dependencies,
     repositories: { ...MemoryAgentRepositories.create(), agents },
@@ -310,11 +313,10 @@ describe("the agent:backfill-versions step", () => {
 
   /** @scenario "Existing agents get version 1 from their current config" */
   it("writes version 1 with the audit-log creator, once", async () => {
-    const fixture = setup({ history });
-    fixture.agents.seedUnversioned(
-      agentFixture({ id: "agent_old", projectId, config: { prompt: "current" } }),
-    );
-    const { app, backfill } = fixture;
+    const { app, backfill } = setup({
+      history,
+      unversioned: [agentFixture({ id: "agent_old", projectId, config: { prompt: "current" } })],
+    });
 
     expect((await backfill({ dryRun: false })).written).toBe(1);
     const { versions } = await app.listVersions({ projectId, agentId: "agent_old" });
@@ -333,8 +335,10 @@ describe("the agent:backfill-versions step", () => {
 
   /** @scenario "The backfill dry run writes nothing" */
   it("writes no version and saves no checkpoint on a dry run", async () => {
-    const { app, agents, backfill, checkpoints } = setup({ history });
-    agents.seedUnversioned(agentFixture({ id: "agent_old", projectId }));
+    const { app, backfill, checkpoints } = setup({
+      history,
+      unversioned: [agentFixture({ id: "agent_old", projectId })],
+    });
 
     const report = await backfill({ dryRun: true });
     expect(report).toMatchObject({ written: 0, wouldWrite: 1 });

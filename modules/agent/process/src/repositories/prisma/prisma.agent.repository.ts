@@ -104,7 +104,7 @@ function mapVersionRow(row: VersionRow): AgentVersionRecord {
 const VERSION_WRITE_ATTEMPTS = 3;
 
 export class PrismaAgentRepository
-  extends PrismaRepository.transactionalFor(...VERSION_MODELS)
+  extends PrismaRepository.transactionalFor("Agent", "AgentVersion", "AgentVersionLabel")
   implements AgentRepository
 {
   static readonly create = this.factory((prisma) => new PrismaAgentRepository(prisma));
