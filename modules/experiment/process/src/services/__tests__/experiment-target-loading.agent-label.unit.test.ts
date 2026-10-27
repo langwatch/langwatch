@@ -1,4 +1,4 @@
-import { agentSchema, type Agent, type AgentApi } from "@langwatch/agent-contract";
+import { agentSchema, type AgentApi, type AgentOverview } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -13,8 +13,8 @@ import { ExperimentTargetLoadingService } from "../experiment-target-loading.ser
 
 const PROJECT_ID = "project-1";
 
-function agentAt(prompt: string): Agent {
-  return agentSchema.parse({
+function agentAt(prompt: string): AgentOverview {
+  const agent = agentSchema.parse({
     id: "agent-1",
     projectId: PROJECT_ID,
     name: "Support bot",
@@ -26,6 +26,7 @@ function agentAt(prompt: string): Agent {
     type: "signature",
     config: { prompt },
   });
+  return createApiFixture<AgentOverview>(agent);
 }
 
 function services(): ExecutionDataServices {
