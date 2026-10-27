@@ -144,7 +144,7 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 // replaces the workflow-level one when present, so the effective set is the
 // job's block if it declares one, else the workflow's.
 func prReviewBotPermissions(workflow *ciscan.Workflow) []string {
-	perms := effectivePRReviewBotPermissions(workflow)
+	perms := workflow.EffectivePermissions(prReviewBotReviewJob)
 
 	if perms.Shorthand != "" {
 		return []string{fmt.Sprintf(
@@ -198,18 +198,6 @@ func comparePRReviewBotPermissionScopes(scopes map[string]string) []string {
 	}
 
 	return problems
-}
-
-// effectivePRReviewBotPermissions returns the review job's own permissions
-// block when it declares one, else the workflow-level block — mirroring
-// GitHub's replace-not-merge semantics for job-level permissions.
-func effectivePRReviewBotPermissions(workflow *ciscan.Workflow) ciscan.Permissions {
-	job, ok := workflow.Jobs[prReviewBotReviewJob]
-	if ok && (job.Permissions.Scopes != nil || job.Permissions.Shorthand != "") {
-		return job.Permissions
-	}
-
-	return workflow.Permissions
 }
 
 // prReviewBotPinning enforces the pinning invariant every `uses:` step in this

@@ -613,7 +613,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     { key: "datasets", fn: () => apiClient.GET("/api/v1/dataset") },
     { key: "agents", fn: () => apiClient.GET("/api/v1/agents") },
     { key: "workflows", fn: () => apiClient.GET("/api/v1/workflows") },
-    { key: "dashboards", fn: () => apiClient.GET("/api/v1/dashboards") },
+    { key: "dashboards", fn: () => apiClient.GET("/api/v1/analytics/reports") },
     { key: "triggers", fn: () => fetchCount({ context, url: "/api/v1/triggers" }) },
     { key: "monitors", fn: () => fetchCount({ context, url: "/api/v1/monitors" }) },
     {

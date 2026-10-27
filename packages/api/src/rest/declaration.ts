@@ -186,6 +186,12 @@ export const browserSessionContext = defineMiddlewareContext(
   z.object({ id: z.string().min(1) }).nullable(),
 );
 
+/**
+ * The caller's address as the door resolved it (ClientAddress), or null where none was. Each module
+ * whose routes name it provides it with `callerAddressOfRequest`; no route reads a proxy header.
+ */
+export const callerAddressContext = defineMiddlewareContext("callerAddress", z.string().nullable());
+
 /** What a superseded family or route answers with, and what replaces it. */
 export type RestDeprecation = Readonly<{
   /** The path of the family or route that replaces this one. */
@@ -307,6 +313,11 @@ type PublicHandlerArguments<Input, App> = Omit<
   readonly actor: null;
   readonly scope: null;
   readonly target: null;
+  /**
+   * Names the key the handler resolved on the request's access record, by id and kind only: a
+   * public route that authenticates in its handler has no door to record it.
+   */
+  readonly recordKey: (key: RestKeyCredential) => void;
 };
 /**
  * A route the door answers with or without a credential: both halves of the
@@ -367,6 +378,8 @@ export type StoredHandlerArguments<Api> = Readonly<{
   /** The producer for the kind a route declared; undefined everywhere else. */
   response: RestProducerFor<RestResponseKind> | undefined;
   request: Request;
+  /** A public route's handler names the key it resolved; undefined on every other route. */
+  recordKey?: ((key: RestKeyCredential) => void) | undefined;
 }>;
 type StoredHandler<Api> = {
   invoke(args: StoredHandlerArguments<Api>, ...context: unknown[]): unknown;
@@ -534,6 +547,24 @@ export type RestPermissionPlatform = PlatformPermissionTarget;
  */
 export type RestPermissionReach = Readonly<{ at: "grants" | "organization" }>;
 
+/**
+ * The operator flags that open the permission to a legacy project key whose project they list,
+ * on top of ingestion and full access: one flag, or several where any of them opens it.
+ */
+export type RestLegacyKeyScopes = string | readonly [string, ...string[]];
+
+/**
+ * Where the permission is asked, and the legacy key scopes that open it. The scopes ride on the
+ * permission they open, so a route that asks none has nowhere to name them.
+ */
+export type RestPermissionOptions<
+  Where extends RestPermissionTarget | RestPermissionReach =
+    | RestPermissionTarget
+    | RestPermissionReach,
+> =
+  | (Where & Readonly<{ legacyKey?: RestLegacyKeyScopes }>)
+  | Readonly<{ at?: never; legacyKey: RestLegacyKeyScopes }>;
+
 export type RestTransportRoute<Api> = Readonly<{
   readonly method: HttpMethod;
   readonly path: string;
@@ -583,6 +614,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly mintsCredential?: AuthzPermission;
   /** Present exactly when the route is refused on an aggregate though its permission is exempt. */
   readonly refusedOnAggregate?: true;
+  /** Present exactly when operator flags open the route to a legacy project key. */
+  readonly legacyKeyScopes?: readonly [string, ...string[]];
   /** Present exactly when the route's create is replayable under a caller key. */
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
@@ -629,6 +662,11 @@ export type RestTransportDeclaration<
   /** The family's own path segment: `/api/<namespace>`. */
   readonly namespace: string;
   readonly version: DateVersion;
+  /**
+   * The date a newer family of the same namespace took over from: this one answers only the
+   * dates from `version` up to the day before, and leaves `latest` and the bare path to it.
+   */
+  readonly supersededAt?: DateVersion;
   readonly addressing: RestAddressing;
   /** Whether the family's `dated` addresses also answer under `/api/v1`. */
   readonly v1Twin: boolean;
@@ -667,6 +705,7 @@ type RouteState = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   refusedOnAggregate?: true;
+  legacyKeyScopes?: readonly [string, ...string[]];
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
@@ -1133,21 +1172,21 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   /** A proof-bearing permission: the door mints the proof and the handler is handed it. */
   withPermission(
     permission: ProofBearingPermission,
-    target?: RestPermissionTarget,
+    target?: RestPermissionOptions<RestPermissionTarget>,
   ): RouteBuilder<Api, With<S, { permission: true; proof: true }>>;
   /**
    * The permission this route demands, and where it is asked. `{ at: "route", param }` asks at
    * the scope the route's own path names, for a credential one tier wider than the resource.
-   * `{ at: "grants" }` and `{ at: "organization" }` are the key door's (RestPermissionReach).
+   * `{ at: "grants" | "organization" }` are the key door's; `legacyKey` opens it to a legacy key.
    */
   withPermission(
     permission: AuthzPermission,
-    target?: RestPermissionTarget | RestPermissionReach,
+    target?: RestPermissionOptions,
   ): RouteBuilder<Api, With<S, { permission: true }>>;
   /** Every one of them, asked in this order before the handler; naming an array says AND (E2). */
   withPermission(
     permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]],
-    target?: RestPermissionTarget | RestPermissionReach,
+    target?: RestPermissionOptions,
   ): RouteBuilder<Api, With<S, { permission: true }>>;
   /**
    * The permission the parsed input chooses (`permissionBy`, E3): the door only identifies, and
@@ -1167,12 +1206,13 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   ): RouteBuilder<Api, With<S, { permission: true }>>;
   withPermission(
     declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
-    target?: RestPermissionTarget | RestPermissionReach | RestPermissionPlatform,
+    target?: RestPermissionOptions | RestPermissionPlatform,
   ): unknown {
     if (target?.at === "platform") return this.#platformPermission(declared, target);
 
     const reach = target?.at === "grants" || target?.at === "organization" ? target.at : void 0;
-    const scoped = target && "param" in target ? target : void 0;
+    const scoped = target && "param" in target ? withoutLegacyKey(target) : void 0;
+    const legacyKey = target?.legacyKey;
 
     if (typeof declared === "string") {
       assertNotPlatformPermission({ address: `REST ${this.operation}`, permissions: [declared] });
@@ -1188,6 +1228,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
         ...permissionParts({ operation: this.operation, declared, reach }),
         ...(scoped ? { permissionTarget: scoped } : {}),
         ...(reach ? { permissionReach: reach } : {}),
+        ...(legacyKey ? { legacyKeyScopes: legacyKeyScopesOf(legacyKey) } : {}),
       },
     });
   }
@@ -1859,12 +1900,26 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
   };
 }
 
+/** Where the permission is asked, without the legacy key scopes that ride beside it. */
+function withoutLegacyKey(
+  target: RestPermissionTarget & Readonly<{ legacyKey?: RestLegacyKeyScopes }>,
+): RestPermissionTarget {
+  const { legacyKey: _, ...where } = target;
+  return where;
+}
+
+/** The legacy key scopes as the route stores them: always a non-empty list. */
+function legacyKeyScopesOf(scopes: RestLegacyKeyScopes): readonly [string, ...string[]] {
+  return typeof scopes === "string" ? [scopes] : scopes;
+}
+
 /** What the door reads of a route beyond its permission: gates, credential, audit. */
 function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.refusedOnAggregate ? { refusedOnAggregate: state.refusedOnAggregate } : {}),
+    ...(state.legacyKeyScopes ? { legacyKeyScopes: state.legacyKeyScopes } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
@@ -1926,6 +1981,7 @@ class RestTransportRouter<
   private root = false;
   private generation = DEFAULT_GENERATION;
   private deprecated: RestDeprecation | undefined;
+  private supersededAt: DateVersion | undefined;
 
   private readonly api: FeatureApiWitness<Api>;
   readonly namespace: string;
@@ -1979,6 +2035,7 @@ class RestTransportRouter<
     router.root = this.root;
     router.generation = this.generation;
     router.deprecated = this.deprecated;
+    router.supersededAt = this.supersededAt;
 
     return router;
   }
@@ -2006,6 +2063,27 @@ class RestTransportRouter<
     return this;
   }
 
+  /**
+   * Hands `latest` and the bare path to a newer family of this namespace registered at
+   * `version`: this one keeps answering a caller who pins an earlier date.
+   */
+  withSupersededAt(
+    version: DateVersion,
+  ): RestTransportRouter<Api, Door, StrictJsonSchemas, Session, Named, Needs> {
+    assertVersionLabel(version);
+
+    if (this.addressing !== "dated" || version <= this.version) {
+      throw new Error(
+        `REST "${this.namespace}" can only be superseded as a dated family, at a date after ` +
+          `its own ${this.version}`,
+      );
+    }
+
+    this.supersededAt = version;
+
+    return this;
+  }
+
   /** Marks every route of the family superseded by `successor`. */
   withDeprecated(
     deprecated: RestDeprecation,
@@ -2026,6 +2104,7 @@ class RestTransportRouter<
       api: this.api,
       namespace: this.namespace,
       version: this.version,
+      ...(this.supersededAt ? { supersededAt: this.supersededAt } : {}),
       addressing: this.addressing,
       v1Twin: this.v1Twin,
       generation: this.generation,

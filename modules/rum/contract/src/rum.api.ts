@@ -2,10 +2,9 @@ import { moduleApi, type Named } from "@langwatch/module";
 import { RUM_SESSION_HEADER } from "@langwatch/react-rum/constants";
 import { z } from "zod";
 
-/** The two headers the door names a caller by, both self-asserted. */
+/** The header the door names a caller by, self-asserted. */
 const rumReportHeadersSchemaDefinition = z.object({
   [RUM_SESSION_HEADER]: z.string().optional(),
-  "x-forwarded-for": z.string().optional(),
 });
 export interface RumReportHeadersSchema extends Named<typeof rumReportHeadersSchemaDefinition> {}
 export const rumReportHeadersSchema: RumReportHeadersSchema = rumReportHeadersSchemaDefinition;
@@ -16,8 +15,8 @@ export type BrowserTraceReport = Readonly<{
   body: string;
   /** The visit the browser says it belongs to, self-asserted. */
   session: string | undefined;
-  /** `x-forwarded-for` as the proxies in front of this process wrote it. */
-  forwardedFor: string | undefined;
+  /** The caller's address as the door resolved it, or null where none was. */
+  callerAddress: string | null;
 }>;
 
 /** The platform's own browser telemetry, proxied to its collector (ADR-058). */

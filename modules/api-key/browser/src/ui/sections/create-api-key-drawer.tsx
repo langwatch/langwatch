@@ -5,7 +5,7 @@
  */
 
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
-import type { ApiKeyRole, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
+import type { ApiKeyRole } from "@langwatch/api-key-contract";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
@@ -21,15 +21,16 @@ import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { SettingsField } from "@langwatch/design-system/settings-field";
-import type { Instant } from "@langwatch/time";
 import { TriangleAlert } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import {
   earliestCustomExpiration,
+  EXPIRATION_NEVER,
   EXPIRATION_OPTIONS,
   EXPIRATION_UNCHOSEN,
+  type CreateApiKeyInput,
   isExpirationChosen,
   resolveExpiresAt,
 } from "../../model/api-key-form.ts";
@@ -54,19 +55,6 @@ type MyBindings = {
 
 type OrgProject = { id: string; name: string; teamId: string };
 type OrgTeam = { id: string; name: string };
-
-export type CreateApiKeyInput = {
-  name: string;
-  description: string;
-  expiresAt: Instant | undefined;
-  permissionMode: PermissionMode;
-  keyType: "personal" | "service";
-  assignedToUserId?: string;
-  scopeType: string;
-  scopeId: string;
-  permissions?: string[];
-  bindings: ApiKeyTrpcGrant[];
-};
 
 type CreateKeyForm = {
   name: string;
@@ -387,6 +375,8 @@ export function CreateApiKeyDrawer({
   organizationName,
   currentTeamId,
   currentProjectId,
+  prefill,
+  notice,
   onClose,
   onCreate,
 }: {
@@ -399,6 +389,10 @@ export function CreateApiKeyDrawer({
   organizationName: string | undefined;
   currentTeamId?: string;
   currentProjectId?: string;
+  /** The key the form opens filled with, such as a legacy key's replacement; no expiry. */
+  prefill?: Pick<CreateApiKeyInput, "name" | "description" | "scopeId" | "keyType">;
+  /** A warning over the form, such as that the key being replaced already stopped working. */
+  notice?: { title: string; body: string };
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
 }) {
@@ -471,16 +465,15 @@ export function CreateApiKeyDrawer({
 
   const resetForm = () => {
     setAttempted(false);
-    setName("");
-    setDescription("");
-    setExpirationPreset(EXPIRATION_UNCHOSEN);
+    setName(prefill?.name ?? "");
+    setDescription(prefill?.description ?? "");
+    setExpirationPreset(prefill ? EXPIRATION_NEVER : EXPIRATION_UNCHOSEN);
     setCustomDate("");
-    setSelectedScopes(
-      currentProjectId ? [{ scopeType: "PROJECT", scopeId: currentProjectId }] : [],
-    );
+    const scopeId = prefill?.scopeId ?? currentProjectId;
+    setSelectedScopes(scopeId ? [{ scopeType: "PROJECT", scopeId }] : []);
     setPermissionMode("all");
     setCategorySelections({});
-    setKeyType("personal");
+    setKeyType(prefill?.keyType ?? "personal");
     setSelectedUserId(currentUserId);
   };
 
@@ -559,6 +552,15 @@ export function CreateApiKeyDrawer({
     >
       <VStack gap={5} align="start">
         {accessBlocked && <AccessNote myBindings={myBindings} />}
+        {notice && (
+          <Banner
+            status="warning"
+            title={notice.title}
+            icon={<TriangleAlert size={16} aria-hidden="true" />}
+          >
+            {notice.body}
+          </Banner>
+        )}
         {/* Key type — only admins can create service keys */}
         {isAdmin && (
           <KeyTypeField

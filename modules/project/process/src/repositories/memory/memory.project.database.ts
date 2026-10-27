@@ -27,6 +27,7 @@ export class MemoryProjectDatabase {
   readonly #projects = new Map<string, Project>();
   readonly #teams = new Map<string, Team>();
   readonly #organizations = new Map<string, MemoryOrganizationRow>();
+  readonly #legacyKeyUses = new Map<string, Instant>();
 
   private constructor() {}
 
@@ -82,5 +83,14 @@ export class MemoryProjectDatabase {
   /** Whether a project's team sits in the named organization. */
   isInOrganization(project: Project, organizationId: string): boolean {
     return this.#teams.get(project.teamId)?.organizationId === organizationId;
+  }
+
+  /** When the project's legacy key last authenticated (`Project.legacyApiKeyLastUsedAt`). */
+  findLegacyKeyUse(projectId: string): Instant | undefined {
+    return this.#legacyKeyUses.get(projectId);
+  }
+
+  putLegacyKeyUse(projectId: string, at: Instant): void {
+    this.#legacyKeyUses.set(projectId, at);
   }
 }
