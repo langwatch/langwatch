@@ -1,19 +1,9 @@
 /**
- * `add_dashboard_widget`: one create under the board's path, which places the widget as it saves
- * it. On a 404 (Dashboards off) it creates, then places, on the project path; a failed placement
- * deletes the widget it just created.
+ * `add_dashboard_widget`: one create under the dashboard's path, which also places the widget.
  */
 
-import { createBoardWidget } from "../langwatch-api-boards.js";
-import {
-  assignDashboardWidgetToDashboard,
-  createDashboardWidget,
-  deleteDashboardWidget,
-  type DashboardWidget,
-  type DashboardWidgetQueryInput,
-} from "../langwatch-api-dashboard-widgets.js";
-import { getCurrentProject } from "../langwatch-api-projects.js";
-import { assertProjectDashboardExists, isOnBoardRoutes } from "./dashboard-exists.js";
+import { createWidgetOnDashboard } from "../langwatch-api-dashboards.js";
+import { LangWatchApiError } from "../langwatch-api.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,
@@ -29,46 +19,26 @@ export interface AddDashboardWidgetParams {
 export async function handleAddDashboardWidget(params: AddDashboardWidgetParams): Promise<string> {
   const queries = normalizeDashboardWidgetQueries({ queries: params.queries });
 
-  const widget = (await isOnBoardRoutes({ dashboardId: params.dashboardId }))
-    ? await createBoardWidget({
-        boardId: params.dashboardId,
-        name: params.name,
-        code: params.code,
-        queries,
-      })
-    : await createOnProjectPath({ ...params, queries });
+  let widget;
+  try {
+    widget = await createWidgetOnDashboard({
+      dashboardId: params.dashboardId,
+      name: params.name,
+      code: params.code,
+      queries,
+    });
+  } catch (error) {
+    if (error instanceof LangWatchApiError && error.status === 404) {
+      throw new Error(
+        `No dashboard with ID "${params.dashboardId}" was found in this project. Use list_dashboards to find a valid dashboard ID.`,
+      );
+    }
+    throw error;
+  }
 
   return [
     `Widget "${params.name}" created and added to dashboard "${params.dashboardId}".`,
     `**Widget ID**: ${widget.id}`,
     `**Queries**: ${queries.map((q) => q.name).join(", ")}`,
   ].join("\n");
-}
-
-async function createOnProjectPath({
-  dashboardId,
-  name,
-  code,
-  queries,
-}: {
-  dashboardId: string;
-  name: string;
-  code: string;
-  queries: DashboardWidgetQueryInput[];
-}): Promise<DashboardWidget> {
-  const project = await getCurrentProject();
-  await assertProjectDashboardExists({ projectId: project.id, dashboardId });
-
-  const widget = await createDashboardWidget({ projectId: project.id, name, code, queries });
-  try {
-    return await assignDashboardWidgetToDashboard({
-      projectId: project.id,
-      widgetId: widget.id,
-      dashboardId,
-    });
-  } catch (error) {
-    // Never leave an unplaced widget behind if the dashboard vanished since the check above.
-    await deleteDashboardWidget({ projectId: project.id, widgetId: widget.id }).catch(() => {});
-    throw error;
-  }
 }

@@ -104,9 +104,9 @@ def sync_detailed(
     | PostApiDashboardsResponse403
     | PostApiDashboardsResponse500
 ]:
-    """Create a board
+    """Create a dashboard
 
-     Creates an empty Dashboards board in the key's project. Add widgets to it with POST
+     Creates an empty dashboard in the key's project. Add widgets to it with POST
     /api/v1/dashboards/{dashboardId}/widgets.
 
     Args:
@@ -143,9 +143,9 @@ def sync(
     | PostApiDashboardsResponse500
     | None
 ):
-    """Create a board
+    """Create a dashboard
 
-     Creates an empty Dashboards board in the key's project. Add widgets to it with POST
+     Creates an empty dashboard in the key's project. Add widgets to it with POST
     /api/v1/dashboards/{dashboardId}/widgets.
 
     Args:
@@ -176,9 +176,9 @@ async def asyncio_detailed(
     | PostApiDashboardsResponse403
     | PostApiDashboardsResponse500
 ]:
-    """Create a board
+    """Create a dashboard
 
-     Creates an empty Dashboards board in the key's project. Add widgets to it with POST
+     Creates an empty dashboard in the key's project. Add widgets to it with POST
     /api/v1/dashboards/{dashboardId}/widgets.
 
     Args:
@@ -213,9 +213,9 @@ async def asyncio(
     | PostApiDashboardsResponse500
     | None
 ):
-    """Create a board
+    """Create a dashboard
 
-     Creates an empty Dashboards board in the key's project. Add widgets to it with POST
+     Creates an empty dashboard in the key's project. Add widgets to it with POST
     /api/v1/dashboards/{dashboardId}/widgets.
 
     Args:

@@ -130,11 +130,11 @@ def sync_detailed(
     | PostApiDashboardsByDashboardIdWidgetsResponse404
     | PostApiDashboardsByDashboardIdWidgetsResponse500
 ]:
-    """Create a widget on a board
+    """Create a widget on a dashboard
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
-    board at the next free row. `source` records where the widget came from; without it, the widget is
-    recorded as made through the API.
+    dashboard at the next free row. `source` records where the widget came from; without it, the widget
+    is recorded as made through the API.
 
     Args:
         dashboard_id (str):
@@ -174,11 +174,11 @@ def sync(
     | PostApiDashboardsByDashboardIdWidgetsResponse500
     | None
 ):
-    """Create a widget on a board
+    """Create a widget on a dashboard
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
-    board at the next free row. `source` records where the widget came from; without it, the widget is
-    recorded as made through the API.
+    dashboard at the next free row. `source` records where the widget came from; without it, the widget
+    is recorded as made through the API.
 
     Args:
         dashboard_id (str):
@@ -212,11 +212,11 @@ async def asyncio_detailed(
     | PostApiDashboardsByDashboardIdWidgetsResponse404
     | PostApiDashboardsByDashboardIdWidgetsResponse500
 ]:
-    """Create a widget on a board
+    """Create a widget on a dashboard
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
-    board at the next free row. `source` records where the widget came from; without it, the widget is
-    recorded as made through the API.
+    dashboard at the next free row. `source` records where the widget came from; without it, the widget
+    is recorded as made through the API.
 
     Args:
         dashboard_id (str):
@@ -254,11 +254,11 @@ async def asyncio(
     | PostApiDashboardsByDashboardIdWidgetsResponse500
     | None
 ):
-    """Create a widget on a board
+    """Create a widget on a dashboard
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
-    board at the next free row. `source` records where the widget came from; without it, the widget is
-    recorded as made through the API.
+    dashboard at the next free row. `source` records where the widget came from; without it, the widget
+    is recorded as made through the API.
 
     Args:
         dashboard_id (str):

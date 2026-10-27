@@ -4,6 +4,7 @@
  * and the `local-storage` event lets readers see a write with no reload.
  */
 
+import { isOutOfSpace } from "@langwatch/browser-host/query-persistence";
 import type { UiScopeSelection } from "@langwatch/organization-contract";
 import { useCallback, useSyncExternalStore } from "react";
 
@@ -54,8 +55,9 @@ export function readUiScopeMemory(storage: Storage): UiScopeMemory {
 }
 
 /**
- * Performs the writes a resolution asked for, and tells the document —
- * already guarded, so this loop never broadcasts a no-op.
+ * Performs the writes a resolution asked for, and tells the document (already guarded, so never
+ * a no-op). A write the browser refuses for space is skipped: the memory is a convenience, and
+ * this runs in an effect, so a throw would take the page.
  */
 export function writeUiScopeSelection({
   writes,
@@ -68,7 +70,12 @@ export function writeUiScopeSelection({
 }): void {
   for (const write of writes) {
     const key = WRITE_KEYS[write.key];
-    storage.setItem(key, JSON.stringify(write.value));
+    try {
+      storage.setItem(key, JSON.stringify(write.value));
+    } catch (error) {
+      if (isOutOfSpace(error)) continue;
+      throw error;
+    }
     broadcast?.(key);
   }
 }

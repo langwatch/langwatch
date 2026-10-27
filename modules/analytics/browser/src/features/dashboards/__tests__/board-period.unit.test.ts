@@ -10,6 +10,7 @@ import {
   boardGrainFits,
   boardPeriodBounds,
   boardPeriodGranularity,
+  boardWindowEnd,
   defaultBoardExcludedOrigins,
 } from "../model/board-period.ts";
 
@@ -63,6 +64,49 @@ describe("given the Live range", () => {
     const bounds = boardPeriodBounds({ range: "live", now: NOW });
     expect(bounds).toEqual({ periodStart: NOW - 3_600_000, periodEnd: NOW });
     expect(boardPeriodGranularity({ grain: "auto", ...bounds })).toBe(60);
+  });
+});
+
+describe("boardWindowEnd", () => {
+  const MINUTE = 60_000;
+
+  describe("given a fixed range", () => {
+    /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+    it("ends at the minute the range was picked until the first refresh", () => {
+      const end = boardWindowEnd({ range: "24h", now: NOW + 5 * MINUTE, pickedAt: NOW + 10 });
+      expect(end).toBe(NOW + MINUTE);
+    });
+
+    /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+    it("moves its end to the minute after each refresh", () => {
+      const end = boardWindowEnd({
+        range: "24h",
+        now: NOW + 9 * MINUTE,
+        pickedAt: NOW,
+        refreshedAt: NOW + 3 * MINUTE + 1,
+      });
+      expect(end).toBe(NOW + 4 * MINUTE);
+    });
+
+    /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+    it("keeps the range's length when the end moves", () => {
+      const end = boardWindowEnd({
+        range: "7d",
+        now: NOW,
+        pickedAt: NOW,
+        refreshedAt: NOW + MINUTE,
+      });
+      const bounds = boardPeriodBounds({ range: "7d", now: end });
+      expect(bounds.periodEnd - bounds.periodStart).toBe(7 * 86_400_000);
+    });
+  });
+
+  describe("given the Live range", () => {
+    /** @scenario "AC19c Live is the last hour, rolling, refreshed every minute" */
+    it("rolls with the clock to the next minute", () => {
+      const end = boardWindowEnd({ range: "live", now: NOW + 5 * MINUTE + 1, pickedAt: NOW });
+      expect(end).toBe(NOW + 6 * MINUTE);
+    });
   });
 });
 

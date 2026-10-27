@@ -2926,25 +2926,25 @@ projectId, datasetId, page })`; evaluator `getById({ projectId, id })`; project:
 members `members({ organizationId })` for active members, with deactivated ones in a second key
 that needs `organization:manage`; user `user.me()`.
 
-**Reads are mirrored to disk by default** (Alex, 2026-09-30, amended 2026-10-01; supersedes opt-in
-persistence and the build-id discard). Each tab keeps its own React Query cache, and every declared
-query is mirrored, one sealed row per query keyed by user and query hash (sealing in §10; memory
-where IndexedDB is unavailable). A read stays in memory only when it is over the per-row cap or on
-the named exclusion list for very high-traffic reads (`UI_QUERY_MIRROR_EXCLUDED` in
-`@langwatch/browser-host/cache-tiers`); there is no opt-in. Each user's mirror is LRU-bounded
-(25 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out.
-A row carries its read's schema hash: a digest of the contract's input and output schemas and an
-optional `revision: n`, bumped when a read's meaning changes and its shape does not
-(`schemaHashOf`, `@langwatch/module`). The browser takes the hash from the contract it was
-built with and drops a row whose hash differs before painting it; the server's `x-lw-schema`
-header on every query answer is the backstop for a tab whose bundle is older. No build id or age
-decides it. A mirrored read is restored when first asked for, never all at start-up; the first
-page of a paged read is mirrored too, restored as stale and refetched at once. A tab shown again
-reads IndexedDB first, then refetches the stale reads it holds, so hints it missed while hidden
-are caught up (Alex, 2026-10-01). An answer whose `x-lw-schema` differs from the bundle's hash
-drops that row. ADR-170 (in part),
-specs/ui/browser-query-caching.feature.
-`CachedView` ships.
+**Reads are mirrored to disk by default** (Alex, 2026-09-30, amended 2026-10-01 and 2026-10-26;
+supersedes opt-in persistence and the build-id discard). Each tab keeps its own React Query cache,
+and every declared query is mirrored, one sealed row per query keyed by user and query hash (sealing
+in §10; memory where IndexedDB is unavailable). A read stays in memory only when it is over the
+per-row cap or on the named exclusion list for very high-traffic reads (`UI_QUERY_MIRROR_EXCLUDED`
+in `@langwatch/browser-host/cache-tiers`); there is no opt-in. Each user's mirror is LRU-bounded
+(100 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out,
+room made before a write. A write the browser refuses for space sheds the coldest half and retries
+once, then drops the row. An impersonated session wipes the mirror and writes nothing to it. A row
+carries its read's schema hash: a digest of the contract's input and output schemas and an optional
+`revision: n`, bumped when a read's meaning changes and its shape does not (`schemaHashOf`,
+`@langwatch/module`). The browser takes the hash from the contract it was built with and drops a row
+whose hash differs before painting it; the server's `x-lw-schema` header on every query answer is
+the backstop for a tab whose bundle is older. No build id or age decides it. A mirrored read is
+restored when first asked for, never all at start-up; the first page of a paged read is mirrored
+too, restored as stale and refetched at once. A tab shown again reads IndexedDB first, then
+refetches the stale reads it holds, so hints it missed while hidden are caught up (Alex,
+2026-10-01). An answer whose `x-lw-schema` differs from the bundle's hash drops that row. ADR-170
+(in part), specs/ui/browser-query-caching.feature. `CachedView` ships.
 
 **Browser telemetry** (Alex, 2026-10-01). RUM is on by default wherever a collector is configured.
 Console errors, uncaught errors and rejected promises go out as `browser.error` spans through our

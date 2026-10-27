@@ -389,9 +389,12 @@
 /api-reference/projects
 /api-reference/projects/archive-project
 /api-reference/projects/create-project
+/api-reference/projects/get-a-dashboard
+/api-reference/projects/get-a-dashboard-boards
 /api-reference/projects/get-a-dashboards-board
 /api-reference/projects/get-api-key
 /api-reference/projects/get-project
+/api-reference/projects/list-dashboards
 /api-reference/projects/list-dashboards-boards
 /api-reference/projects/list-projects
 /api-reference/projects/overview

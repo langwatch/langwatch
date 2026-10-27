@@ -1,7 +1,7 @@
 /**
- * The Dashboards area's boards under `/api/v1/dashboards`, the project taken from the key, with a
- * board's widgets as its sub-resource. Not there while `release_dashboards` is off for the key's
- * project (dashboards-v2.feature AC199l, AC199n to AC199q). Reports: /api/v1/analytics/reports.
+ * The dashboards under `/api/v1/dashboards`, the project from the key, their widgets beneath.
+ * 404 while `release_dashboards` is off (dashboards-v2.feature AC199l, AC199n to AC199q); bare
+ * `/api/dashboards` answers too, deprecated (AC199v). Reports: /api/v1/analytics/reports.
  */
 import { DashboardWidgetNotFoundError } from "@langwatch/analytics-contract";
 import {
@@ -58,14 +58,14 @@ export function releasedOrRefused(released: boolean): true {
 const boardNotFoundResponse: Record<404, RouteResponse> = {
   404: {
     description:
-      "No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here.",
+      "No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
     content: { "application/json": { schema: resolver(apiErrorSchema) } },
   },
 };
 
 const widgetNotFoundResponse: Record<404, RouteResponse> = {
   404: {
-    description: "No Dashboards board with this id, or no widget with this id on that board",
+    description: "No dashboard with this id, or no widget with this id on that dashboard",
     content: { "application/json": { schema: resolver(apiErrorSchema) } },
   },
 };
@@ -90,17 +90,17 @@ export function boardResource(
 export const boardRest = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
   .withVersion(DASHBOARDS_API_VERSION)
+  .withAddressing("dated", { bareDeprecated: true })
 
   .get("/", "getApiDashboards")
   .withPermission("analytics:view")
   .withMiddlewareContext(boardsReleased)
   .withOutput(boardListSchema)
   .withDocs({
-    summary: "List boards",
-    description:
-      "Lists the Dashboards boards of the key's project, each with how many widgets it holds.",
+    summary: "List dashboards",
+    description: "Lists the dashboards of the key's project, each with how many widgets it holds.",
     tags: BOARD_TAGS,
-    responses: { ...canonicalBaseResponses, 200: { description: "The project's boards" } },
+    responses: { ...canonicalBaseResponses, 200: { description: "The project's dashboards" } },
   })
   .handle(async ({ app, scope, actor }) => {
     const projectId = scope.id;
@@ -127,11 +127,11 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withOutput(boardResourceSchema)
   .withStatus(201)
   .withDocs({
-    summary: "Create a board",
+    summary: "Create a dashboard",
     description:
-      "Creates an empty Dashboards board in the key's project. Add widgets to it with POST /api/v1/dashboards/{dashboardId}/widgets.",
+      "Creates an empty dashboard in the key's project. Add widgets to it with POST /api/v1/dashboards/{dashboardId}/widgets.",
     tags: BOARD_TAGS,
-    responses: { ...canonicalBaseResponses, 201: { description: "The board was created" } },
+    responses: { ...canonicalBaseResponses, 201: { description: "The dashboard was created" } },
   })
   .handle(async ({ app, input, scope, actor }) => {
     const projectId = scope.id;
@@ -151,13 +151,13 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withMiddlewareContext(boardsReleased)
   .withOutput(boardResourceSchema)
   .withDocs({
-    summary: "Get a board",
-    description: "Returns one Dashboards board.",
+    summary: "Get a dashboard",
+    description: "Returns one dashboard.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
       ...boardNotFoundResponse,
-      200: { description: "The board" },
+      200: { description: "The dashboard" },
     },
   })
   .handle(async ({ app, input, scope, actor }) => {
@@ -181,14 +181,14 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withMiddlewareContext(boardsReleased)
   .withOutput(boardResourceSchema)
   .withDocs({
-    summary: "Update a board",
+    summary: "Update a dashboard",
     description:
-      "Changes a board's name or description; a field the body leaves out keeps its value, and a null description clears it.",
+      "Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null description clears it.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
       ...boardNotFoundResponse,
-      200: { description: "The updated board" },
+      200: { description: "The updated dashboard" },
     },
   })
   .handle(async ({ app, input, scope, actor }) => {
@@ -223,14 +223,14 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withMiddlewareContext(boardsReleased)
   .withOutput(dashboardDeletedResponseSchema)
   .withDocs({
-    summary: "Delete a board",
+    summary: "Delete a dashboard",
     description:
-      "Deletes a board together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted board's id and name.",
+      "Deletes a dashboard together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted dashboard's id and name.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
       ...boardNotFoundResponse,
-      200: { description: "The board was deleted" },
+      200: { description: "The dashboard was deleted" },
     },
   })
   .handle(async ({ app, input, scope, actor }) => {
@@ -249,13 +249,14 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withMiddlewareContext(dashboardWidgetUrl, boardsReleased)
   .withOutput(dashboardWidgetListSchema)
   .withDocs({
-    summary: "List a board's widgets",
-    description: "Lists the widgets on one board, each with its React source and named queries.",
+    summary: "List a dashboard's widgets",
+    description:
+      "Lists the widgets on one dashboard, each with its React source and named queries.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
       ...boardNotFoundResponse,
-      200: { description: "The board's widgets" },
+      200: { description: "The dashboard's widgets" },
     },
   })
   .handle(async ({ app, input, scope, actor }, platformUrl) => {
@@ -278,14 +279,14 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withOutput(dashboardWidgetResourceSchema)
   .withStatus(201)
   .withDocs({
-    summary: "Create a widget on a board",
+    summary: "Create a widget on a dashboard",
     description:
-      "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this board at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.",
+      "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
       ...boardNotFoundResponse,
-      201: { description: "The widget was saved on the board" },
+      201: { description: "The widget was saved on the dashboard" },
     },
   })
   .handle(async ({ app, input, scope, actor }, platformUrl, source) => {
@@ -310,8 +311,8 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withMiddlewareContext(dashboardWidgetUrl, boardsReleased)
   .withOutput(dashboardWidgetResourceSchema)
   .withDocs({
-    summary: "Get a widget on a board",
-    description: "Returns one widget on this board with its React source and named queries.",
+    summary: "Get a widget on a dashboard",
+    description: "Returns one widget on this dashboard with its React source and named queries.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -339,7 +340,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withMiddlewareContext(dashboardWidgetUrl, boardsReleased)
   .withOutput(dashboardWidgetResourceSchema)
   .withDocs({
-    summary: "Update a widget on a board",
+    summary: "Update a widget on a dashboard",
     description:
       "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
     tags: BOARD_TAGS,
@@ -389,8 +390,8 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withMiddlewareContext(boardsReleased)
   .withOutput(z.void())
   .withDocs({
-    summary: "Delete a widget on a board",
-    description: "Deletes one widget on this board. Answers 204 with no body.",
+    summary: "Delete a widget on a dashboard",
+    description: "Deletes one widget on this dashboard. Answers 204 with no body.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,

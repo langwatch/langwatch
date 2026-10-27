@@ -184,6 +184,18 @@ export function AppTopBar({
   );
 }
 
+/**
+ * A sidebar group's title: 12px medium sentence case, at 4.5:1 in both modes. Every sidebar
+ * group title uses it, so a group one module lends reads the same as navigation's own.
+ */
+export function SidebarSectionLabel({ label }: { label: string }) {
+  return (
+    <Text textStyle="groupLabel" color="nav.fgMuted" whiteSpace="nowrap">
+      {label}
+    </Text>
+  );
+}
+
 /** A collapsible group of sidebar links; the owner keeps whether it is open. */
 export function SidebarSection({
   label,

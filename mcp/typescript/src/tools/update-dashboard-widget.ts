@@ -1,18 +1,12 @@
 /**
  * `update_dashboard_widget`: the widget must sit on the named dashboard, so an agent never edits
- * one it found elsewhere by mistake. On a 404 (Dashboards off) it uses the project-path routes.
+ * one it found elsewhere by mistake.
  * Spec: modules/dashboard/specs/dashboard-widget-mcp.feature
  */
 
-import { getBoardWidget, updateBoardWidget } from "../langwatch-api-boards.js";
-import {
-  type DashboardWidget,
-  getDashboardWidget,
-  updateDashboardWidget,
-} from "../langwatch-api-dashboard-widgets.js";
-import { getCurrentProject } from "../langwatch-api-projects.js";
+import type { DashboardWidget } from "../langwatch-api-dashboard-widgets.js";
+import { getWidgetOnDashboard, updateWidgetOnDashboard } from "../langwatch-api-dashboards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
-import { assertProjectDashboardExists, isOnBoardRoutes } from "./dashboard-exists.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,
@@ -51,20 +45,8 @@ export async function handleUpdateDashboardWidget(
     ...(description === undefined ? {} : { description }),
   };
 
-  let widget: DashboardWidget;
-  if (await isOnBoardRoutes({ dashboardId })) {
-    const current = await getWidgetOnDashboard({ widgetId, dashboardId });
-    widget = await updateBoardWidget({ boardId: dashboardId, widgetId: current.id, ...changes });
-  } else {
-    const project = await getCurrentProject();
-    await assertProjectDashboardExists({ projectId: project.id, dashboardId });
-    const current = await getWidgetOnProjectPath({ projectId: project.id, widgetId, dashboardId });
-    widget = await updateDashboardWidget({
-      projectId: project.id,
-      widgetId: current.id,
-      ...changes,
-    });
-  }
+  const current = await widgetOnDashboardOrRefused({ widgetId, dashboardId });
+  const widget = await updateWidgetOnDashboard({ dashboardId, widgetId: current.id, ...changes });
 
   return [
     `Widget "${widget.name}" updated on dashboard "${dashboardId}".`,
@@ -77,8 +59,8 @@ export async function handleUpdateDashboardWidget(
   ].join("\n");
 }
 
-/** The widget, refused by id when it is not on this dashboard (the board route answers 404). */
-async function getWidgetOnDashboard({
+/** The widget, refused by id when it is not on this dashboard (the dashboard route answers 404). */
+async function widgetOnDashboardOrRefused({
   widgetId,
   dashboardId,
 }: {
@@ -86,7 +68,7 @@ async function getWidgetOnDashboard({
   dashboardId: string;
 }): Promise<DashboardWidget> {
   try {
-    return await getBoardWidget({ boardId: dashboardId, widgetId });
+    return await getWidgetOnDashboard({ dashboardId, widgetId });
   } catch (error) {
     if (error instanceof LangWatchApiError && error.status === 404) {
       throw new Error(
@@ -95,33 +77,4 @@ async function getWidgetOnDashboard({
     }
     throw error;
   }
-}
-
-/** The project-path widget, refused by id unless it is in this project and on this dashboard. */
-async function getWidgetOnProjectPath({
-  projectId,
-  widgetId,
-  dashboardId,
-}: {
-  projectId: string;
-  widgetId: string;
-  dashboardId: string;
-}): Promise<DashboardWidget> {
-  let widget: DashboardWidget;
-  try {
-    widget = await getDashboardWidget({ projectId, widgetId });
-  } catch (error) {
-    if (error instanceof LangWatchApiError && error.status === 404) {
-      throw new Error(
-        `No widget with ID "${widgetId}" was found in this project. Use the widget ID add_dashboard_widget returned.`,
-      );
-    }
-    throw error;
-  }
-  if (widget.dashboardId !== dashboardId) {
-    throw new Error(
-      `Widget "${widgetId}" is not on dashboard "${dashboardId}". Pass the dashboard the widget was added to.`,
-    );
-  }
-  return widget;
 }
