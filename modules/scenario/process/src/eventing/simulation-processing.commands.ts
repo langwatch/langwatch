@@ -117,19 +117,14 @@ export const RefreshMetadataCommand = defineCommand({
   aggregateType: "simulation_run",
   schema: simulationRunMetadataRefreshedEventDataSchema,
   aggregateId: (d) => d.scenarioRunId,
-  // Keyed on the attempt that wrote it, NOT on the run and NOT on occurredAt.
-  // A per-run key like recordCutAtLimit's would dedupe a second refresh
-  // carrying different values, which is exactly the retry this event exists to
-  // land (#8032). occurredAt is the call's end time, identical across every
-  // re-drive of one call, so it would collapse them the same way. A retry of
-  // the same attempt re-sends the same attemptId and still dedupes.
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.scenarioRunId}:refreshMetadata:${d.attemptId}`,
+  // Keyed on the attempt, not the run or occurredAt: both are identical across re-drives of one
+  // call and would dedupe the very retry this event lands (#8032). A retry of the same attempt
+  // re-sends its attemptId and still dedupes.
+  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:refreshMetadata:${d.attemptId}`,
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.scenarioRunId}:refresh-metadata:${d.attemptId}`,
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:refresh-metadata:${d.attemptId}`,
 });
 
 const RecordHooksCommand = defineCommand({

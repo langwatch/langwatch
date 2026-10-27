@@ -4,8 +4,7 @@
  * only per-exchange traces.
  */
 
-import { randomUUID } from "node:crypto";
-
+import { generate } from "@langwatch/ksuid";
 import {
   VoiceAgentNotFoundError,
   type CallRecord,
@@ -174,7 +173,7 @@ function createVoiceCallRunWriter(
         // re-drive of this call, so it cannot tell two attempts apart; this id
         // does, so a later re-drive with different recording metadata is not
         // deduped away as a copy of the first.
-        attemptId: randomUUID(),
+        attemptId: generate("scenario").toString(),
         metadata: {
           source: record.source,
           langwatch: { isCutAtLimit: record.isCutAtLimit },

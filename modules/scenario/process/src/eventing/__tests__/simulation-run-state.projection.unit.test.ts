@@ -1,7 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FoldProjectionStore } from "@langwatch/eventing";
-import { createTenantId } from "@langwatch/eventing";
-import { RefreshMetadataCommand } from "../simulation-processing.commands.ts";
+import { createTenantId, deduplicateEvents } from "@langwatch/eventing";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
@@ -19,7 +17,9 @@ import type {
   SimulationTextMessageEndEvent,
   SimulationTextMessageStartEvent,
 } from "@langwatch/scenario-contract";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { RefreshMetadataCommand } from "../simulation-processing.commands.ts";
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
@@ -433,9 +433,7 @@ describe("simulationRunStateFoldProjection", () => {
       // correctly on any later retry.
       const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
       expect(metadata.source).toBe("provider");
-      expect(metadata.audioUrl).toBe(
-        "/api/voice/session/conv_1/audio?projectId=p1",
-      );
+      expect(metadata.audioUrl).toBe("/api/voice/session/conv_1/audio?projectId=p1");
       // The run's other top-level metadata is left as it was — only the keys
       // the refresh carried are touched.
       expect(metadata.agentId).toBe("agent_row_1");
@@ -595,17 +593,13 @@ describe("simulationRunStateFoldProjection", () => {
 
       // Both refreshes survive the dedupe: they are different attempts.
       expect(
-        replayed.filter(
-          (e) => e.type === SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED,
-        ),
+        replayed.filter((e) => e.type === SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED),
       ).toHaveLength(2);
 
       const state = foldEvents(replayed);
       const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
       // The latest attempt's recording is what the run shows (#8032).
-      expect(metadata.audioUrl).toBe(
-        "/api/voice/session/conv_1/audio?projectId=p1",
-      );
+      expect(metadata.audioUrl).toBe("/api/voice/session/conv_1/audio?projectId=p1");
     });
 
     it("still dedupes a retry of the same attempt", () => {

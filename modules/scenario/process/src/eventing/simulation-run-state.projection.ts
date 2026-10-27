@@ -370,16 +370,8 @@ export class SimulationRunStateFoldProjection
   }
 
   /**
-   * The stored metadata with a later attempt's fields merged over it, written
-   * back as one JSON string (#8032). A re-driven run's first attempt could not
-   * know what its second one does — a voice finish that failed before the
-   * provider's record was ready wrote `source: "browser"` and no `audioUrl`;
-   * the retry has the recording. The started event is first-wins on metadata,
-   * so this merges the refresh over the top-level object and deep-merges the
-   * reserved `langwatch` namespace rather than replacing it, so a refresh that
-   * carries `source` / `audioUrl` does not drop the run's `targetType` /
-   * `callerKind`. Only the keys the refresh carries are touched;
-   * `secretParameters` is stripped so it is never written into the stored JSON.
+   * Merges a later attempt's metadata over the stored JSON (#8032): top-level keys are replaced,
+   * the reserved `langwatch` namespace is deep-merged, and `secretParameters` is stripped.
    */
   static withRefreshedMetadata({
     metadata,

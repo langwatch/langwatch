@@ -436,20 +436,9 @@ export type SimulationRunCutAtLimitRecordedEvent = z.infer<
 >;
 
 /**
- * MetadataRefreshed event — a later attempt at the same run carries metadata
- * the first attempt could not. A "Call it myself" voice finish that failed
- * part-way writes `source: "browser"` with no `audioUrl`; the retry, once the
- * provider's record is ready, has the recording and `source: "provider"`
- * (#8032). The started event is first-wins on metadata, so the refresh is its
- * own event. The fold merges these fields over the run's top-level metadata, so
- * a reader that keys on `source` / `audioUrl` / `agentId` sees the latest
- * attempt. Only the keys present are touched; the run's other metadata is left
- * as it was.
- *
- * `attemptId` names the attempt that wrote the refresh and is its idempotency
- * identity. The event's `occurredAt` cannot be: every re-drive of one finished
- * call carries the same end time, so two re-drives with different recording
- * metadata would share a key and the log would keep only the first.
+ * MetadataRefreshed: a later attempt's metadata merged over the run's (#8032), since the started
+ * event is first-wins. `attemptId` is the idempotency identity; `occurredAt` cannot be, as every
+ * re-drive of one call shares the same end time.
  */
 const simulationRunMetadataRefreshedEventDataSchemaDefinition = z.object({
   scenarioRunId: z.string(),
