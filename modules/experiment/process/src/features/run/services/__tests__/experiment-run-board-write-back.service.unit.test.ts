@@ -230,4 +230,49 @@ describe("ExperimentRunBoardWriteBackService.writeBack", () => {
       expect(writers).toEqual([]);
     });
   });
+
+  describe("given a run over a dataset version whose rows sit elsewhere on the board", () => {
+    const pinnedProgress: ExperimentRunProgressState = {
+      ...progress,
+      progress: 3,
+      total: 3,
+      resultFrames: {
+        "target:0:target_a": {
+          type: "target_result",
+          rowIndex: 0,
+          targetId: "target_a",
+          output: "a",
+        },
+        "target:1:target_a": {
+          type: "target_result",
+          rowIndex: 1,
+          targetId: "target_a",
+          output: "b",
+        },
+        "target:2:target_a": {
+          type: "target_result",
+          rowIndex: 2,
+          targetId: "target_a",
+          output: "c",
+        },
+      },
+    };
+
+    /** @scenario "A run pinned to a dataset version writes its results back onto the board" */
+    /** @scenario "A pinned run skips rows the board no longer has" */
+    it("writes each cell onto the board row with its id, skipping a row the board lacks", async () => {
+      const { experiments, results } = board();
+      const service = ExperimentRunBoardWriteBackService.create({
+        folds: await foldsWith({
+          planned: { ...plan, boardRowIndices: [1, null, 0] },
+          folded: pinnedProgress,
+        }),
+        experiments,
+      });
+
+      await service.writeBack({ ...run, finishedCells: 3, lastAttempt: false });
+
+      expect(results()?.targetOutputs).toEqual({ target_a: ["c", "a"] });
+    });
+  });
 });

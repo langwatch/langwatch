@@ -10,7 +10,11 @@ import {
   type DatasetVersionAuthor,
   DatasetVersionNotFoundError,
 } from "@langwatch/dataset-contract";
-import type { Experiment, WorkbenchCredential } from "@langwatch/experiment-contract";
+import type {
+  Experiment,
+  ExperimentRunPlan,
+  WorkbenchCredential,
+} from "@langwatch/experiment-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -56,17 +60,28 @@ const DATASET: Dataset = {
 /** A saved dataset with a version history, answering the reads and links a run makes. */
 class VersionedDataset {
   current: Row[];
-  readonly versions: { version: DatasetVersion; rows: Row[] }[] = [];
+  /** The current rows' ids, in board order; `row-<index>` when not given. */
+  currentIds: string[] | undefined;
+  readonly versions: { version: DatasetVersion; rows: Row[]; ids?: string[] }[] = [];
   readonly resolved: { version?: number; by: DatasetVersionAuthor }[] = [];
   readonly read: number[] = [];
   readonly links: { runId: string; experimentId?: string | null; versionId: string }[] = [];
   failLinks = false;
 
-  constructor(current: Row[]) {
+  constructor(current: Row[], currentIds?: string[]) {
     this.current = current;
+    this.currentIds = currentIds;
   }
 
-  save({ rows, trigger }: { rows: Row[]; trigger: DatasetVersion["trigger"] }): DatasetVersion {
+  save({
+    rows,
+    trigger,
+    ids,
+  }: {
+    rows: Row[];
+    trigger: DatasetVersion["trigger"];
+    ids?: string[];
+  }): DatasetVersion {
     const number = this.versions.length + 1;
     const version: DatasetVersion = {
       id: `version-${number}`,
@@ -87,7 +102,7 @@ class VersionedDataset {
       runCount: 0,
       createdAt: AT,
     };
-    this.versions.push({ version, rows: [...rows] });
+    this.versions.push({ version, rows: [...rows], ...(ids ? { ids } : {}) });
     return version;
   }
 
@@ -117,7 +132,30 @@ class VersionedDataset {
         this.read.push(version);
         return {
           version: found.version,
-          rows: found.rows.map((entry, index) => ({ id: `row-${index}`, entry })),
+          rows: found.rows.map((entry, index) => ({
+            id: found.ids?.[index] ?? `row-${index}`,
+            entry,
+          })),
+        };
+      },
+      listRecords: async ({ page = 1, limit = 50 }) => {
+        const ids = this.current.map((_, index) => this.currentIds?.[index] ?? `row-${index}`);
+        const slice = ids.slice((page - 1) * limit, page * limit);
+        return {
+          data: slice.map((id) => ({
+            id,
+            datasetId: DATASET_ID,
+            projectId: PROJECT_ID,
+            entry: {},
+            createdAt: AT,
+            updatedAt: AT,
+          })),
+          pagination: {
+            page,
+            limit,
+            total: ids.length,
+            totalPages: Math.ceil(ids.length / limit),
+          },
         };
       },
       linkRunVersions: async ({ runId, experimentId, versions }) => {
@@ -165,10 +203,12 @@ function harness({
   datasetVersion?: number;
 }) {
   const started: { runId: string; total: number }[] = [];
+  const plans: ExperimentRunPlan[] = [];
   const runs: WorkbenchRunPipeline = {
     commands: createApiFixture<WorkbenchRunPipeline["commands"]>({
       startExperimentRun: async (start) => {
         started.push({ runId: start.runId, total: start.total });
+        if ("plan" in start && start.plan) plans.push(start.plan);
       },
     }),
     stream: createApiFixture<WorkbenchRunPipeline["stream"]>(),
@@ -211,7 +251,28 @@ function harness({
       credential,
     });
 
-  return { run, started };
+  const executeOnPage = ({ datasetVersion: pinned }: { datasetVersion?: number }) =>
+    service.executeWorkbenchRun(
+      {
+        projectId: PROJECT_ID,
+        experimentId: EXPERIMENT_ID,
+        name: "Support eval",
+        dataset: {
+          id: "ds-ref",
+          name: "Questions",
+          type: "saved",
+          datasetId: DATASET_ID,
+          ...(pinned !== undefined ? { datasetVersion: pinned } : {}),
+          columns: [{ id: "question", name: "question", type: "string" }],
+        },
+        targets: [],
+        evaluators: [],
+        scope: { type: "full" },
+      },
+      { id: "user-1" },
+    );
+
+  return { run, started, plans, executeOnPage };
 }
 
 const questions = (...names: string[]): Row[] => names.map((question) => ({ question }));
@@ -322,6 +383,57 @@ describe("given a saved experiment over a saved dataset", () => {
       await run({ credential: { kind: "legacyProjectKey" } });
 
       expect(dataset.resolved).toEqual([{ by: { kind: "api_key", id: null } }]);
+    });
+  });
+
+  describe("when the run API is called with dataset_version 1 and the rows have moved since", () => {
+    /** @scenario "A run pinned to a dataset version writes its results back onto the board" */
+    it("writes its cells back, each run row aimed at the board row with its id", async () => {
+      const dataset = new VersionedDataset(questions("c", "b", "a"), ["row-c", "row-b", "row-a"]);
+      dataset.save({ rows: questions("a", "b"), trigger: "manual", ids: ["row-a", "row-b"] });
+      const { run, plans } = harness({ dataset });
+
+      await run({ body: JSON.stringify({ dataset_version: 1 }) });
+
+      expect(plans[0]?.persistResults).toBe(true);
+      expect(plans[0]?.boardRowIndices).toEqual([2, 1]);
+    });
+
+    /** @scenario "A pinned run skips rows the board no longer has" */
+    it("aims a row the board no longer has at no board row", async () => {
+      const dataset = new VersionedDataset(questions("b"), ["row-b"]);
+      dataset.save({ rows: questions("a", "b"), trigger: "manual", ids: ["row-a", "row-b"] });
+      const { run, plans } = harness({ dataset });
+
+      await run({ body: JSON.stringify({ dataset_version: 1 }) });
+
+      expect(plans[0]?.boardRowIndices).toEqual([null, 0]);
+    });
+  });
+
+  describe("when no version is pinned", () => {
+    it("writes back row for row, with no board mapping and no extra read", async () => {
+      const dataset = new VersionedDataset(questions("a", "b"));
+      const { run, plans } = harness({ dataset });
+
+      await run();
+
+      expect(plans[0]?.persistResults).toBe(true);
+      expect(plans[0]?.boardRowIndices).toBeUndefined();
+    });
+  });
+
+  describe("when the experiment pins version 1 and the page runs it", () => {
+    /** @scenario "A run started on the workbench page reads the rows the board shows" */
+    it("reads the current content, not version 1", async () => {
+      const dataset = new VersionedDataset(questions("a", "b", "c"));
+      dataset.save({ rows: questions("a"), trigger: "manual" });
+      const { executeOnPage } = harness({ dataset });
+
+      await executeOnPage({ datasetVersion: 1 });
+
+      expect(dataset.resolved).toEqual([{ by: { kind: "user", id: "user-1" } }]);
+      expect(dataset.read).toEqual([2]);
     });
   });
 });

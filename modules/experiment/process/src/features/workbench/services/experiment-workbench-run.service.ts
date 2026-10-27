@@ -40,6 +40,7 @@ import {
   workbenchActorFrom,
 } from "../../../rules/experiment-workbench-actor.rules.ts";
 import { workbenchRunState } from "../../../rules/experiment-workbench-run-state.rules.ts";
+import { ExperimentBoardRowsService } from "../../../services/experiment-board-rows.service.ts";
 import {
   ExperimentExecutionDataService,
   type LoadedExecutionData,
@@ -101,6 +102,7 @@ export class ExperimentWorkbenchRunService {
         origin: "saved",
         actor: workbenchActorFrom({ credential: input.credential }),
         experimentSlug: slug,
+        ...(saved.boardRowIndices ? { boardRowIndices: saved.boardRowIndices } : {}),
         ...options,
       });
       return {
@@ -177,6 +179,17 @@ export class ExperimentWorkbenchRunService {
     const scope: ExecutionScope = runInputs.row_indices
       ? { type: "rows", rowIndices: runInputs.row_indices }
       : { type: "full" };
+    // A run over another version than the board shows writes back onto the rows with its ids.
+    const boardRowIndices =
+      prepared.pinnedVersionRowIds && prepared.datasetVersion && runsSavedDataset(runInputs)
+        ? await ExperimentBoardRowsService.create({
+            datasets: runs.services.datasets,
+          }).boardRowIndices({
+            projectId,
+            datasetId: prepared.datasetVersion.datasetId,
+            runRowIds: prepared.pinnedVersionRowIds,
+          })
+        : undefined;
     const data: LoadedExecutionData = {
       datasetRows: prepared.datasetRows,
       datasetColumns: prepared.datasetColumns,
@@ -192,7 +205,12 @@ export class ExperimentWorkbenchRunService {
       data,
       scope,
       runInputs,
-      carriedOverCells: savedState.planSavedRunCarryOver({ prepared, scope }),
+      ...(boardRowIndices ? { boardRowIndices } : {}),
+      carriedOverCells: savedState.planSavedRunCarryOver({
+        prepared,
+        scope,
+        ...(boardRowIndices ? { boardRowIndices } : {}),
+      }),
     };
   }
 
@@ -208,9 +226,10 @@ export class ExperimentWorkbenchRunService {
     // The refusal a process without Redis or a public address owes, as before the pipeline.
     const runs = this.#startable();
 
+    // The page runs the rows it shows; a pinned version is for runs from the API, CI or an SDK.
     const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
-      dataset: input.dataset,
+      dataset: { ...input.dataset, datasetVersion: null },
       targets: input.targets,
       evaluators: input.evaluators,
       services: runs.services,

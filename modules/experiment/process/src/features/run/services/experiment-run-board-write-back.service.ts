@@ -7,6 +7,7 @@ import {
   applyRunEvent,
   emptyRunResultsDraft,
   type ExperimentRunPlan,
+  remapRunResultsDraft,
   type WorkbenchActor,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
@@ -102,7 +103,10 @@ export class ExperimentRunBoardWriteBackService {
       experimentId,
       runId,
       scope: plan.scope,
-      draft,
+      // A run over another dataset version lands on the board rows with the same ids.
+      draft: plan.boardRowIndices
+        ? remapRunResultsDraft({ draft, boardRowIndices: plan.boardRowIndices })
+        : draft,
     });
   }
 }
