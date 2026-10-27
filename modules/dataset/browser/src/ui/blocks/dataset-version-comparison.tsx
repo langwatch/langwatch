@@ -26,8 +26,11 @@ export type DatasetVersionComparisonView = {
 
 export function DatasetVersionComparison({
   comparison,
+  columnOrder,
 }: {
   comparison: DatasetVersionComparisonView;
+  /** The version's own columns, so row tables read in the dataset's column order. */
+  columnOrder: readonly { name: string }[];
 }) {
   const { version, columns, counts } = comparison;
   const nothingChanged =
@@ -77,6 +80,7 @@ export function DatasetVersionComparison({
 
       {comparison.added.length > 0 && (
         <RowsSection
+          columnOrder={columnOrder}
           title={`Added since version ${version}`}
           tableLabel="Added rows"
           count={counts.added}
@@ -85,6 +89,7 @@ export function DatasetVersionComparison({
       )}
       {comparison.removed.length > 0 && (
         <RowsSection
+          columnOrder={columnOrder}
           title={`Removed since version ${version}`}
           tableLabel="Removed rows"
           count={counts.removed}
@@ -103,7 +108,9 @@ function RowsSection({
   tableLabel,
   count,
   rows,
+  columnOrder,
 }: {
+  columnOrder: readonly { name: string }[];
   title: string;
   tableLabel: string;
   count: number;
@@ -116,7 +123,7 @@ function RowsSection({
       </Heading>
       <DatasetVersionRowsTable
         label={tableLabel}
-        columns={versionColumnNames({ columns: [], rows })}
+        columns={versionColumnNames({ columns: columnOrder, rows })}
         rows={rows}
       />
     </VStack>
