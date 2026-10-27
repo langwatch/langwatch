@@ -9,6 +9,14 @@ import type { Trace } from "@langwatch/trace-contract";
 import type { CodeEvaluatorExecutionInput } from "./code-evaluator.ts";
 import type { EvaluatorIdOrSlugInput, ResolvedEvaluatorExecution } from "./evaluator-execution.ts";
 import type {
+  AssignEvaluatorLabelInput,
+  EvaluatorCaller,
+  EvaluatorLabel,
+  EvaluatorVersions,
+  EvaluatorVersionSelector,
+  RemoveEvaluatorLabelInput,
+} from "./evaluator-version.ts";
+import type {
   EvaluatorCascadeArchive,
   EvaluatorCopy,
   EvaluatorHistoryEntry,
@@ -36,6 +44,8 @@ export type EvaluatorCreateInput = {
   workflowId?: string;
   copiedFromEvaluatorId?: string;
   resolved?: { defaultModel?: string | null; embeddingsModel?: string | null };
+  /** Authors version 1 and is recorded as the creator. */
+  caller?: EvaluatorCaller;
 };
 export type EvaluatorUpdateInput = {
   id: string;
@@ -43,6 +53,10 @@ export type EvaluatorUpdateInput = {
   data: Partial<Pick<Evaluator, "name" | "type" | "workflowId">> & {
     config?: EvaluatorConfig;
   };
+  /** Kept on the version this update appends. */
+  commitMessage?: string;
+  /** Authors the appended version and is recorded as the last updater. */
+  caller?: EvaluatorCaller;
 };
 
 export type NativeEvaluatorExecutionInput = {
@@ -72,8 +86,11 @@ export interface EvaluatorApi {
   getAll(input: { projectId: string }): Promise<Evaluator[]>;
   /** Every evaluator in the project, with its computed input and output fields. */
   getAllWithFields(input: { projectId: string }): Promise<EvaluatorWithFields[]>;
-  /** One evaluator. Throws `EvaluatorNotFoundError` when the project has none. */
-  getById(input: EvaluatorScope): Promise<Evaluator>;
+  /**
+   * One evaluator, at the latest version unless a label or a version is asked for; `id` also
+   * takes the `id:label` address. Throws `EvaluatorNotFoundError` when the project has none.
+   */
+  getById(input: EvaluatorScope & EvaluatorVersionSelector): Promise<Evaluator>;
   /** One evaluator, or `undefined` when the project has none. */
   findById(input: EvaluatorScope): Promise<Evaluator | undefined>;
   /** One evaluator with its computed fields. */
@@ -85,10 +102,12 @@ export interface EvaluatorApi {
   /** Evaluator by project-unique slug; throws `EvaluatorNotFoundError` if none match. */
   getBySlug(input: { slug: string; projectId: string }): Promise<Evaluator>;
   /** One evaluator the way the public API addresses it: by id, failing that by slug. */
-  findByIdOrSlugWithFields(input: {
-    idOrSlug: string;
-    projectId: string;
-  }): Promise<EvaluatorWithFields | undefined>;
+  findByIdOrSlugWithFields(
+    input: {
+      idOrSlug: string;
+      projectId: string;
+    } & EvaluatorVersionSelector,
+  ): Promise<EvaluatorWithFields | undefined>;
   /** The evaluator already assigned to this workflow, if there is one. */
   listByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator[]>;
   /** The entry-node fields a workflow evaluator maps trace data onto. */
@@ -110,15 +129,27 @@ export interface EvaluatorApi {
     name: string;
     config: EvaluatorConfig;
     id?: string;
+    caller?: EvaluatorCaller;
   }): Promise<Evaluator>;
   /** Creates an evaluator against models already resolved by the caller. */
   createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator>;
   /** Updates an evaluator, refusing a code evaluator that carries no program. */
   update(input: EvaluatorUpdateInput): Promise<Evaluator>;
-  /** Soft-deletes an evaluator. */
-  archive(input: EvaluatorScope): Promise<Evaluator>;
+  /** Soft-deletes an evaluator; a labelled one needs `evaluators:deploy` of `caller`. */
+  archive(input: EvaluatorScope & { caller?: EvaluatorCaller }): Promise<Evaluator>;
   /** Archives the evaluator and its workflow, and records `lw.evaluator.deleted`. */
-  cascadeArchive(input: EvaluatorScope): Promise<EvaluatorCascadeArchive>;
+  cascadeArchive(
+    input: EvaluatorScope & { caller?: EvaluatorCaller },
+  ): Promise<EvaluatorCascadeArchive>;
+  /** Every version of the evaluator, newest first, with the labels on each. */
+  listVersions(input: EvaluatorLineageScope): Promise<EvaluatorVersions>;
+  /** Points a deploy label at one of the evaluator's versions. */
+  assignLabel(
+    input: AssignEvaluatorLabelInput & { caller?: EvaluatorCaller },
+  ): Promise<EvaluatorLabel>;
+  removeLabel(input: RemoveEvaluatorLabelInput): Promise<void>;
+  /** The evaluator at a label, or the latest when the label points nowhere (a monitor's pin). */
+  atLabelOrLatest(input: { evaluator: Evaluator; label: string }): Promise<Evaluator>;
   /** Replicates the evaluator, and the workflow backing it, into another project. */
   copy(input: {
     evaluatorId: string;

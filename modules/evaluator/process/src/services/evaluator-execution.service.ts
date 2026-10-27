@@ -5,7 +5,9 @@ import {
   EvaluatorInvalidConfigError,
   EvaluatorNotFoundError,
   EvaluatorWorkflowNotFoundError,
+  parseEvaluatorAddress,
   resolvedEvaluatorExecutionSchema,
+  type Evaluator,
   type EvaluatorIdOrSlugInput,
   type ResolvedEvaluatorExecution,
 } from "@langwatch/evaluator-contract";
@@ -17,11 +19,13 @@ import {
 } from "@langwatch/workflow-contract";
 
 import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
+import type { EvaluatorVersionService } from "./evaluator-version.service.ts";
 
 export class EvaluatorExecutionService {
   static create(options: {
     repository: EvaluatorRepository;
     workflows: WorkflowApi;
+    versions?: EvaluatorVersionService;
   }): EvaluatorExecutionService {
     return new EvaluatorExecutionService(options);
   }
@@ -30,12 +34,16 @@ export class EvaluatorExecutionService {
     private readonly options: {
       repository: EvaluatorRepository;
       workflows: WorkflowApi;
+      versions?: EvaluatorVersionService;
     },
   ) {}
 
-  async resolve(input: EvaluatorIdOrSlugInput): Promise<ResolvedEvaluatorExecution> {
-    const evaluator = await this.options.repository.findByIdOrSlug(input);
-    if (!evaluator) throw new EvaluatorNotFoundError(input.idOrSlug);
+  /** `toxicity`, `toxicity:production` or `toxicity:2`: the suffix picks the version run. */
+  async resolve(addressed: EvaluatorIdOrSlugInput): Promise<ResolvedEvaluatorExecution> {
+    const evaluator = await this.#evaluatorAt(addressed);
+    const input = this.options.versions
+      ? { ...addressed, idOrSlug: parseEvaluatorAddress(addressed.idOrSlug).idOrSlug }
+      : addressed;
 
     const config = evaluatorExecutionConfigSchema.safeParse(evaluator.config);
     const settings = config.success ? config.data.settings : void 0;
@@ -73,6 +81,20 @@ export class EvaluatorExecutionService {
         : `evaluators/${input.idOrSlug}`,
       settings,
     });
+  }
+
+  async #evaluatorAt(input: EvaluatorIdOrSlugInput): Promise<Evaluator> {
+    if (this.options.versions) {
+      const { evaluator } = await this.options.versions.resolve({
+        projectId: input.projectId,
+        address: input.idOrSlug,
+        bySlug: true,
+      });
+      return evaluator;
+    }
+    const evaluator = await this.options.repository.findByIdOrSlug(input);
+    if (!evaluator) throw new EvaluatorNotFoundError(input.idOrSlug);
+    return evaluator;
   }
 
   private async resolveWorkflow({

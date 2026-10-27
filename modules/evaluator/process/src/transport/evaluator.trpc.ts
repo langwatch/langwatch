@@ -6,6 +6,8 @@ import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trp
 import { evaluatorTrpc, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/module";
 
+import { evaluatorCallerOf } from "../rules/evaluator-version-caller.rules.ts";
+
 /** What the evaluator browser door reaches: the evaluator application, and the studio switch. */
 export interface EvaluatorBrowserApi {
   /** This module's own application, as the process composed it. */
@@ -51,8 +53,9 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("create")
   .withPermission("evaluations:manage")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     app.evaluators().create({
+      caller: evaluatorCallerOf(actor),
       id: input.id,
       projectId: input.projectId,
       name: input.name,
@@ -64,10 +67,12 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("update")
   .withPermission("evaluations:manage")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     app.evaluators().update({
       id: input.id,
       projectId: input.projectId,
+      caller: evaluatorCallerOf(actor),
+      ...(input.commitMessage !== void 0 && { commitMessage: input.commitMessage }),
       data: {
         ...(input.name !== void 0 && { name: input.name }),
         ...(input.type !== void 0 && { type: input.type }),
@@ -96,14 +101,22 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("cascadeArchive")
   .withPermission("evaluations:manage")
-  .handle(async ({ app, input }) =>
-    app.evaluators().cascadeArchive({ id: input.id, projectId: input.projectId }),
+  .handle(async ({ app, input, actor }) =>
+    app.evaluators().cascadeArchive({
+      id: input.id,
+      projectId: input.projectId,
+      caller: evaluatorCallerOf(actor),
+    }),
   )
 
   .procedure("delete")
   .withPermission("evaluations:manage")
-  .handle(async ({ app, input }) =>
-    app.evaluators().archive({ id: input.id, projectId: input.projectId }),
+  .handle(async ({ app, input, actor }) =>
+    app.evaluators().archive({
+      id: input.id,
+      projectId: input.projectId,
+      caller: evaluatorCallerOf(actor),
+    }),
   )
 
   .procedure("getWorkflowFields")
@@ -178,4 +191,18 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
 
     return { success: true };
   })
+
+  .procedure("listVersions")
+  .withPermission("evaluations:view")
+  .handle(async ({ app, input }) => app.evaluators().listVersions(input))
+
+  .procedure("assignLabel")
+  .withPermission("evaluators:deploy")
+  .handle(async ({ app, input, actor }) =>
+    app.evaluators().assignLabel({ ...input, caller: evaluatorCallerOf(actor) }),
+  )
+
+  .procedure("removeLabel")
+  .withPermission("evaluators:deploy")
+  .handle(async ({ app, input }) => app.evaluators().removeLabel(input))
   .build();
