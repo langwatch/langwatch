@@ -128,16 +128,16 @@ export function searchMatchesNobody(
 export type AuditProjectFilter = { organizationId: string; projectId: string | null };
 
 /**
- * The project to filter by now. Switching organization keeps the reader on
- * this page, so a filter picked in the one they left would ask the new one
- * for a project it has never heard of, emptying the table and the export.
+ * The filter rebased onto the organization in scope. One picked in an
+ * organization the reader has left is gone for good: it names a project the
+ * new one never heard of, and returning must not revive a forgotten choice.
  */
-export function auditProjectFilterFor({
+export function auditProjectFilterIn({
   filter,
   organizationId,
 }: {
   filter: AuditProjectFilter;
   organizationId: string;
-}): string | null {
-  return filter.organizationId === organizationId ? filter.projectId : null;
+}): AuditProjectFilter {
+  return filter.organizationId === organizationId ? filter : { organizationId, projectId: null };
 }

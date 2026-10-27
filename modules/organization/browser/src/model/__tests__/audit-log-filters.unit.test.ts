@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   auditBackLink,
-  auditProjectFilterFor,
+  auditProjectFilterIn,
   matchMemberId,
   readAuditPaging,
   readAuditTarget,
@@ -203,26 +203,36 @@ describe("given a project filter picked in one organization", () => {
   const filter = { organizationId: "org-acme", projectId: "proj-1" };
 
   describe("when the reader is still in that organization", () => {
-    it("keeps filtering by that project", () => {
-      expect(auditProjectFilterFor({ filter, organizationId: "org-acme" })).toBe("proj-1");
+    it("keeps filtering by that project, and keeps the very same filter", () => {
+      expect(auditProjectFilterIn({ filter, organizationId: "org-acme" })).toBe(filter);
     });
   });
 
   describe("when the reader has switched organization and stayed on the page", () => {
     /** @scenario A project filter is forgotten when the organization changes under it */
-    it("drops the filter rather than asking for a project the new organization lacks", () => {
-      expect(auditProjectFilterFor({ filter, organizationId: "org-beta" })).toBeNull();
+    it("rebases onto the new organization with no project at all", () => {
+      expect(auditProjectFilterIn({ filter, organizationId: "org-beta" })).toEqual({
+        organizationId: "org-beta",
+        projectId: null,
+      });
+    });
+  });
+
+  describe("when the reader switches away and comes back", () => {
+    /** @scenario A project filter is forgotten when the organization changes under it */
+    it("stays forgotten rather than reviving the project they once picked", () => {
+      const away = auditProjectFilterIn({ filter, organizationId: "org-beta" });
+      expect(auditProjectFilterIn({ filter: away, organizationId: "org-acme" })).toEqual({
+        organizationId: "org-acme",
+        projectId: null,
+      });
     });
   });
 
   describe("when no project was ever picked", () => {
     it("applies no project filter", () => {
-      expect(
-        auditProjectFilterFor({
-          filter: { organizationId: "org-acme", projectId: null },
-          organizationId: "org-acme",
-        }),
-      ).toBeNull();
+      const empty = { organizationId: "org-acme", projectId: null };
+      expect(auditProjectFilterIn({ filter: empty, organizationId: "org-acme" })).toBe(empty);
     });
   });
 });

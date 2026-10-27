@@ -615,4 +615,23 @@ describe("given the reader switches organization without leaving the audit page"
       );
     });
   });
+
+  describe("when they switch back to the organization they started in", () => {
+    /** @scenario The audit page re-reads the whole trail after an organization switch */
+    it("leaves the old project forgotten rather than reviving it", () => {
+      state.auditLogs = [auditRow()];
+      state.totalCount = 1;
+      const { rerenderWithHost } = renderWithOrganizationHost(
+        <AuditLogScreen />,
+        planHost({ scope: { organizationId: "org-1", projectId: "proj-1" } }),
+      );
+
+      rerenderWithHost(planHost({ scope: { organizationId: "org-2", projectId: void 0 } }));
+      rerenderWithHost(planHost({ scope: { organizationId: "org-1", projectId: void 0 } }));
+
+      expect(calls.listQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ organizationId: "org-1", projectId: void 0 }),
+      );
+    });
+  });
 });

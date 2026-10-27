@@ -39,7 +39,7 @@ import {
 import {
   auditBackLink,
   type AuditProjectFilter,
-  auditProjectFilterFor,
+  auditProjectFilterIn,
   matchMemberId,
   searchMatchesNobody,
   readAuditPaging,
@@ -244,7 +244,11 @@ export default function AuditLogScreen() {
     organizationId,
     projectId: scope.projectId ?? null,
   }));
-  const selectedProjectId = auditProjectFilterFor({ filter: projectFilter, organizationId });
+  const rebasedFilter = auditProjectFilterIn({ filter: projectFilter, organizationId });
+  // Rebasing during render rather than masking: the organization the reader
+  // left must not come back carrying its old project if they return to it.
+  if (rebasedFilter !== projectFilter) setProjectFilter(rebasedFilter);
+  const selectedProjectId = rebasedFilter.projectId;
   const [isExporting, setIsExporting] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
 

@@ -441,6 +441,7 @@ Feature: Unified Audit Log
     When they switch to organization "bravo" while still reading the audit trail
     Then the project filter no longer applies
     And the trail is read for the whole of "bravo"
+    And switching back to "acme" does not revive the project they had picked
 
   @integration
   Scenario: The audit page re-reads the whole trail after an organization switch
