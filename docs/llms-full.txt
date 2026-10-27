@@ -43265,7 +43265,7 @@ Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). 
 ## Which function do I need
 
 {/* lwql-key-caps-start */}
-| You want | Use | Rows one query reads |
+| You want | Use | Distinct keys one query may read |
 | --- | --- | --- |
 | The conversation as the chat view shows it | `conversation(thread_key)` | 200 conversations |
 | The same, cut to a token budget | `conversation_bounded(thread_key, max_tokens, until_trace_id)` | 200 conversations |
@@ -43277,6 +43277,8 @@ Write each one in the top-level `SELECT` list, with an alias (`AS transcript`). 
 | The model call of one span | `llm_messages_span(trace_id, span_id)` | 1,000 spans |
 | The whole trace as JSON | `trace_json(trace_id)` | 1,000 traces |
 {/* lwql-key-caps-end */}
+
+The cap counts distinct conversations, traces or spans, not rows. Rows that repeat a key cost nothing more, so a query grouping ten thousand rows onto 50 conversations reads 50. A query that needs more keys than the cap is refused with `lwql_app_function_key_cap`.
 
 These functions return message content, so your key needs both the `input` and the `output` permission. Two exceptions: `llm_input_messages` needs only `input`, and `thread_traces` returns only ids and needs neither.
 
@@ -43312,7 +43314,7 @@ eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoye
 | `eval_category(text, instructions, options)` | One of 2 to 255 options, each written `name: meaning` |
 | `eval_category_probs(text, instructions, options)` | A JSON object of each option and its probability |
 
-One query judges at most 1,000 distinct texts. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column can be empty for a row the judge skipped, and the response then carries the `INSTANT_EVAL_SKIPPED` diagnostic.
+One query judges at most 1,000 distinct texts. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then carries the `INSTANT_EVAL_SKIPPED` diagnostic.
 
 **Also check:** [Instant Evals](/features/instant-evals/overview) runs the same kind of question from the CLI, and writes every verdict to the `judgments` view.
 
@@ -43553,6 +43555,7 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 
 ## Error codes
 
+{/* lwql-error-codes-start */}
 | Status | Code | What it means |
 | --- | --- | --- |
 | 400 | `validation_error` | The request body is not valid |
@@ -43562,13 +43565,14 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 | 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
 | 403 | `api_key_permission_denied` | The key does not have `analytics:view` |
 | 404 | `project_not_found` | The `projectId` in the body does not exist, or the key cannot read it with `analytics:view` |
-| 413 | `lwql_result_too_large` | The result is over about 8,000,000 bytes |
+| 413 | `lwql_result_too_large` | The result is over the result size limit in [Limits](#limits) |
 | 422 | `query_scan_limit_exceeded`, `query_memory_exceeded` | The query reads too much data or uses too much memory |
-| 422 | `lwql_app_function_key_cap` | An extraction function was given more keys than one query reads |
+| 422 | `lwql_app_function_key_cap` | An extraction function needs more distinct keys than its cap |
 | 422 | `instant_eval_query_budget_exceeded` | The eval functions in the query are over their token budget |
 | 429 | `lwql_rate_limited` | Too many queries this minute for this project |
 | 503 | `lwql_busy` | Too many queries are running at once |
-| 504 | `query_timeout` | The query ran for more than 10 seconds |
+| 504 | `query_timeout` | The query ran past the run time limit in [Limits](#limits) |
+{/* lwql-error-codes-end */}
 
 [Common questions](/features/langwatchql/common-questions) has the exact messages and how to fix each one.
 
@@ -60600,7 +60604,7 @@ A chart that should follow the dashboard's period selector declares the reserved
 SELECT
   toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
   count() AS traces
-FROM analytics.traces
+FROM langwatch.traces
 WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket
 ORDER BY bucket

@@ -59,6 +59,7 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 
 ## Error codes
 
+{/* lwql-error-codes-start */}
 | Status | Code | What it means |
 | --- | --- | --- |
 | 400 | `validation_error` | The request body is not valid |
@@ -68,12 +69,13 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 | 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
 | 403 | `api_key_permission_denied` | The key does not have `analytics:view` |
 | 404 | `project_not_found` | The `projectId` in the body does not exist, or the key cannot read it with `analytics:view` |
-| 413 | `lwql_result_too_large` | The result is over about 8,000,000 bytes |
+| 413 | `lwql_result_too_large` | The result is over the result size limit in [Limits](#limits) |
 | 422 | `query_scan_limit_exceeded`, `query_memory_exceeded` | The query reads too much data or uses too much memory |
-| 422 | `lwql_app_function_key_cap` | An extraction function was given more keys than one query reads |
+| 422 | `lwql_app_function_key_cap` | An extraction function needs more distinct keys than its cap |
 | 422 | `instant_eval_query_budget_exceeded` | The eval functions in the query are over their token budget |
 | 429 | `lwql_rate_limited` | Too many queries this minute for this project |
 | 503 | `lwql_busy` | Too many queries are running at once |
-| 504 | `query_timeout` | The query ran for more than 10 seconds |
+| 504 | `query_timeout` | The query ran past the run time limit in [Limits](#limits) |
+{/* lwql-error-codes-end */}
 
 [Common questions](/features/langwatchql/common-questions) has the exact messages and how to fix each one.

@@ -10,6 +10,7 @@ import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
   MAX_LWQL_LENGTH,
 } from "@langwatch/analytics-contract/langwatch-ql-limits";
+import { APP_ERROR_CODES } from "@langwatch/handled-error";
 import { resolveRequestBound } from "@langwatch/plans";
 import { describe, expect, it } from "vitest";
 
@@ -17,8 +18,20 @@ import { LWQL_APP_FUNCTION_KEY_CAPS } from "../../features/app-functions/rules/l
 
 const GUIDE_DIR = "../../../../../../docs/features/langwatchql/";
 
+/** The files that write the LangWatchQL error messages the guide quotes. */
+const MESSAGE_SOURCES = [
+  "../langwatch-ql-query-walk.rules.ts",
+  "../../services/langwatch-ql-validation.service.ts",
+  "../../../../contract/src/features/lwql/langwatch-ql.errors.ts",
+  "../../../../contract/src/analytics-query.errors.ts",
+];
+
+function read(path: string): string {
+  return readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8");
+}
+
 function section(file: string, name: string): string {
-  const doc = readFileSync(fileURLToPath(new URL(GUIDE_DIR + file, import.meta.url)), "utf-8");
+  const doc = read(GUIDE_DIR + file);
   const start = `{/* ${name}-start */}`;
   const end = `{/* ${name}-end */}`;
   expect(doc.indexOf(start), `${start} marker present`).toBeGreaterThan(-1);
@@ -74,12 +87,64 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
 
     /** @scenario "The guide's extraction function page carries the key cap of each kind of key" */
     it("states the distinct text cap beside the eval functions", () => {
-      const doc = readFileSync(
-        fileURLToPath(new URL(`${GUIDE_DIR}extraction-functions.mdx`, import.meta.url)),
-        "utf-8",
-      );
+      const doc = read(`${GUIDE_DIR}extraction-functions.mdx`);
 
       expect(doc).toContain(`at most ${format(LWQL_APP_FUNCTION_KEY_CAPS.text)} distinct texts`);
+    });
+  });
+
+  describe("when the row limit is stated outside the limits table", () => {
+    /** @scenario "The guide's row limit figures outside the limits table match the shipped row limit" */
+    it("states the shipped maximum result rows each time", () => {
+      const maxRows = DEFAULT_LWQL_RESOURCE_LIMITS.maxResultRows;
+      const pages = ["limits-and-cost.mdx", "common-questions.mdx"].map((file) =>
+        read(GUIDE_DIR + file),
+      );
+      const counts = pages.flatMap((doc) => [
+        ...[...doc.matchAll(/(?:more than|maximum of|above) ([\d,]+) rows/g)].map((m) => m[1]),
+        ...[...doc.matchAll(/`LIMIT (\d+)`/g)].map((m) => m[1]),
+      ]);
+
+      expect(counts.length).toBeGreaterThan(0);
+      for (const count of counts) {
+        expect(Number(count?.replaceAll(",", ""))).toBe(maxRows);
+      }
+    });
+  });
+
+  describe("when the error messages and error codes are read", () => {
+    /** @scenario "The guide's error messages and error codes are the ones the code returns" */
+    it("quotes only messages the code produces", () => {
+      const code = MESSAGE_SOURCES.map(read)
+        .join("\n")
+        .replace(/[`"]\s*\+\s*[`"]/g, "")
+        .replaceAll("\\`", "`");
+      const doc = read(`${GUIDE_DIR}common-questions.mdx`);
+      const lines = [...doc.matchAll(/```text\n([\s\S]*?)```/g)].flatMap((m) =>
+        (m[1] ?? "").split("\n").filter(Boolean),
+      );
+      const placeholder = new RegExp(
+        `<[a-z]+>|\\bN\\b|X\\.X|: X\\.|\\.\\.\\.$|${format(DEFAULT_LWQL_RESOURCE_LIMITS.maxResultRows)}`,
+      );
+
+      expect(lines.length).toBeGreaterThan(0);
+      for (const line of lines) {
+        for (const fragment of line.split(placeholder).filter((part) => part.length > 3)) {
+          expect(code, `message fragment "${fragment}"`).toContain(fragment);
+        }
+      }
+    });
+
+    /** @scenario "The guide's error messages and error codes are the ones the code returns" */
+    it("lists only registered error codes", () => {
+      const table = section("limits-and-cost.mdx", "lwql-error-codes");
+      const codes = [...table.matchAll(/`([a-z_]+)`/g)].map((m) => m[1]);
+      const registered = new Set<string>(APP_ERROR_CODES);
+
+      expect(codes.length).toBeGreaterThan(10);
+      for (const code of codes) {
+        expect(registered.has(code ?? ""), `${code} is registered`).toBe(true);
+      }
     });
   });
 });
