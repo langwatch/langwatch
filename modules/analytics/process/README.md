@@ -312,7 +312,7 @@ Authenticated: Any API key reaches the projects it holds analytics:view on: the 
 Answers at `/api/v1/query`.
 
 ```typescript
-// Body: lwqlKeyStatementSchema, ../contract/src/features/lwql/analytics-lwql.schemas.ts:140
+// Body: lwqlKeyStatementSchema, ../contract/src/features/lwql/analytics-lwql.schemas.ts:141
 interface Body {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
@@ -477,19 +477,19 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `lwql_reconvergence` (aggregate `global`)
 
-Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:53`.
+Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind            | Name                | Handles                                                                                    | Declared at                                                |
 | --------------- | ------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| process manager | `lwqlReconvergence` | every 5 min (`LWQL_RECONVERGENCE_INTERVAL_MS = 5 * 60_000`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:63` |
-| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                               | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:58` |
+| process manager | `lwqlReconvergence` | every 5 min (`LWQL_RECONVERGENCE_INTERVAL_MS = 5 * 60_000`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:67` |
+| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                               | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:62` |
 
 ## Configuration
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:410`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:411`           |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:411`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:412`           |
 | config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |
@@ -497,8 +497,9 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:53`.
 | config | `langwatchQl.postgresHost`        | `LWQL_POSTGRES_HOST`                      | `../contract/src/analytics.config.ts:15` |
 | config | `langwatchQl.accessModelMode`     | `LWQL_ACCESS_MODEL_MODE`                  | `../contract/src/analytics.config.ts:16` |
 | config | `langwatchQl.sqlSingleNode`       | `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE`       | `../contract/src/analytics.config.ts:17` |
-| config | `langwatchQl.aggregateMaxMembers` | `LWQL_AGGREGATE_MAX_MEMBERS`              | `../contract/src/analytics.config.ts:19` |
-| config | `tenantAnalyticsConcurrency`      | `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` | `../contract/src/analytics.config.ts:25` |
-| config | `publicBaseUrl`                   | `BASE_HOST`                               | `../contract/src/analytics.config.ts:30` |
+| config | `langwatchQl.clickhouseCluster`   | `CLICKHOUSE_CLUSTER`                      | `../contract/src/analytics.config.ts:19` |
+| config | `langwatchQl.aggregateMaxMembers` | `LWQL_AGGREGATE_MAX_MEMBERS`              | `../contract/src/analytics.config.ts:21` |
+| config | `tenantAnalyticsConcurrency`      | `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` | `../contract/src/analytics.config.ts:27` |
+| config | `publicBaseUrl`                   | `BASE_HOST`                               | `../contract/src/analytics.config.ts:32` |
 
 <!-- readme:generated:end -->

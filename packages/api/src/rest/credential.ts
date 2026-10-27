@@ -18,6 +18,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Context } from "hono";
 
 import { ProjectInvalidCredentialsError } from "../errors.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import type { EndpointVariables, ServiceContext } from "./response.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,6 +170,7 @@ const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCre
 const scimCredentials = new WeakMap<Request, RestResolvedScimCredential>();
 const keyCredentials = new WeakMap<Request, RestKeyDoorPrincipal>();
 const browserCallers = new WeakMap<Request, RestBrowserCaller>();
+const routeTemplates = new WeakMap<Request, string>();
 
 /** The project door states what it resolved, once per request. */
 export function recordProjectCredential(
@@ -202,6 +204,16 @@ export function recordKeyCredential(request: Request, credential: RestKeyDoorPri
 /** The byte door states who it verified, once per request. */
 export function recordBrowserCaller(request: Request, caller: RestBrowserCaller): void {
   browserCallers.set(request, caller);
+}
+
+/** The runtime states the route a request matched, as `METHOD /path/:template`, before its door. */
+export function recordRouteTemplate(request: Request, template: string): void {
+  routeTemplates.set(request, template);
+}
+
+/** The route template the runtime recorded, never the concrete URL; outside a route, says so. */
+export function routeTemplateOf(request: Request): string {
+  return routeTemplates.get(request) ?? `${request.method} (no route template)`;
 }
 
 /**
@@ -240,6 +252,11 @@ export function browserSessionOfRequest(request: Request): { id: string } | null
   const sessionId = browserCallers.get(request)?.sessionId;
 
   return sessionId ? { id: sessionId } : null;
+}
+
+/** The value of `callerAddressContext`: the address the door resolved once for this request. */
+export function callerAddressOfRequest(request: Request): string | null {
+  return ClientAddress.resolvedFor(request) ?? null;
 }
 
 function actorIdOf(credential: RestResolvedProjectCredential): string {

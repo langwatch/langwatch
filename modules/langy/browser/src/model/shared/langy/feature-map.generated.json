@@ -921,7 +921,7 @@
     {
       "id": "dashboards",
       "name": "Dashboards",
-      "description": "Custom analytics dashboards with configurable graphs",
+      "description": "Custom analytics dashboards with configurable graphs (Analytics Reports)",
       "surfaces": {
         "code": {
           "sdk": {
@@ -969,7 +969,7 @@
           "skill": null,
           "docs": null
         },
-        "api": "/api/v1/dashboards",
+        "api": "/api/v1/analytics/reports",
         "docs": null
       },
       "sync": null,
@@ -987,6 +987,10 @@
       "description": "Custom React widgets backed by LangWatchQL queries, authored and edited in place on dashboards",
       "surfaces": {
         "code": {
+          "sdk": {
+            "python": "langwatch.boards",
+            "typescript": "langwatch.boards"
+          },
           "cli": [
             "dashboard-widget schema",
             "dashboard-widget list",
@@ -995,7 +999,17 @@
             "dashboard-widget update",
             "dashboard-widget delete",
             "dashboard-widget boards",
-            "dashboard-widget pin"
+            "dashboard-widget pin",
+            "dashboards list",
+            "dashboards get",
+            "dashboards create",
+            "dashboards update",
+            "dashboards delete",
+            "dashboards widgets list",
+            "dashboards widgets get",
+            "dashboards widgets create",
+            "dashboards widgets update",
+            "dashboards widgets delete"
           ],
           "hints": {
             "dashboard-widget schema": "langwatch dashboard-widget schema",
@@ -1005,7 +1019,17 @@
             "dashboard-widget update": "langwatch dashboard-widget update <id> --code-file widget.tsx",
             "dashboard-widget delete": "langwatch dashboard-widget delete <id>",
             "dashboard-widget boards": "langwatch dashboard-widget boards -f json",
-            "dashboard-widget pin": "langwatch dashboard-widget pin <widget-id> --dashboard <dashboard-id-or-name>"
+            "dashboard-widget pin": "langwatch dashboard-widget pin <widget-id> --dashboard <dashboard-id-or-name>",
+            "dashboards list": "langwatch dashboards list -f json",
+            "dashboards get": "langwatch dashboards get <dashboard-id> -f json",
+            "dashboards create": "langwatch dashboards create \"Usage\"",
+            "dashboards update": "langwatch dashboards update <dashboard-id> --name \"Usage by model\"",
+            "dashboards delete": "langwatch dashboards delete <dashboard-id>",
+            "dashboards widgets list": "langwatch dashboards widgets list <dashboard-id> -f json",
+            "dashboards widgets get": "langwatch dashboards widgets get <dashboard-id> <widget-id> -f json",
+            "dashboards widgets create": "langwatch dashboards widgets create <dashboard-id> --name \"Errors by model\" --code-file widget.tsx --queries-file queries.json",
+            "dashboards widgets update": "langwatch dashboards widgets update <dashboard-id> <widget-id> --code-file widget.tsx --queries-file queries.json",
+            "dashboards widgets delete": "langwatch dashboards widgets delete <dashboard-id> <widget-id>"
           },
           "skill": null,
           "docs": null
@@ -1014,8 +1038,14 @@
           "ui": "/dashboards",
           "mcp": [
             "list_dashboard_boards",
+            "get_dashboard_board",
+            "create_dashboard_board",
+            "rename_dashboard_board",
+            "delete_dashboard_board",
+            "list_board_widgets",
             "add_dashboard_widget",
-            "update_dashboard_widget"
+            "update_dashboard_widget",
+            "delete_dashboard_widget"
           ],
           "skill": null,
           "docs": null

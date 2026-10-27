@@ -6,7 +6,9 @@ Feature: Private Dataplane S3 Routing
 
   Credentials come from environment variables as a JSON config. The env var
   format is: DATAPLANE_S3__<label>__<orgId>=<jsonConfig>
-  where JSON contains: endpoint, bucket, accessKeyId, secretAccessKey.
+  where JSON contains: endpoint, bucket, and either roleArn or both
+  accessKeyId and secretAccessKey. A roleArn is assumed through the process's
+  web-identity token and wins when keys are also present.
 
   Background:
     Given shared object storage configured via STORED_OBJECTS_BACKEND, S3_BUCKET_NAME, etc.
@@ -22,6 +24,14 @@ Feature: Private Dataplane S3 Routing
     When the stores parse the DATAPLANE_S3__ family at boot
     Then org "org123" maps to an S3 account with that endpoint, bucket and credentials
     And the label "acme" is ignored by the routing logic
+
+  @unit
+  Scenario: A private S3 config naming a role is read through the web identity
+    Given env var "DATAPLANE_S3__acme__org123" is set to JSON with endpoint, bucket and roleArn
+    When the stores parse the DATAPLANE_S3__ family at boot
+    Then org "org123" maps to an S3 account that assumes that role
+    And the account's S3 client reads the process's web-identity token for it
+    And an accessKeyId and secretAccessKey also present are not used
 
   @unit
   Scenario: Invalid JSON in S3 env var is logged and skipped
