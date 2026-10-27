@@ -82,11 +82,17 @@ export class DashboardWidgetService {
     return rows.map((row) => this.#present(row));
   }
 
-  /** A `template:` id reads a From LangWatch widget from the catalogue: every member sees it. */
+  /**
+   * A `template:` id reads a From LangWatch widget from the catalogue: every member sees it.
+   * It sits on no stored board, so under a board's path it is not found.
+   */
   async getById(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidget> {
     await this.#assertEnabled(input);
     const curated = curatedBoardWidgetById(input.id);
-    if (curated) return this.#presentCurated({ projectId: input.projectId, curated });
+    if (curated) {
+      if (input.onDashboardId !== undefined) throw new DashboardWidgetNotFoundError();
+      return this.#presentCurated({ projectId: input.projectId, curated });
+    }
     return this.#present(await this.#visibleRow(input));
   }
 
