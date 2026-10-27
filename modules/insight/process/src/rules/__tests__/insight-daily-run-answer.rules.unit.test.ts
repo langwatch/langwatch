@@ -39,8 +39,8 @@ const COST_QUERY = [
 const STEP = "{dashboard_context_granularity_seconds:UInt32}";
 const ERRORS_QUERY = `SELECT toStartOfInterval(OccurredAt, INTERVAL ${STEP} SECOND) AS bucket, countIf(HasError) AS errors FROM trace_metrics WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} GROUP BY bucket`;
 const WIDGETS = [
-  { id: "widget-cost", name: "Cost per day", queries: [COST_QUERY] },
-  { id: "widget-errors", name: "Errors per day", queries: [ERRORS_QUERY] },
+  { id: "widget-cost", name: "Cost per day", statements: [{ sql: COST_QUERY }] },
+  { id: "widget-errors", name: "Errors per day", statements: [{ sql: ERRORS_QUERY }] },
 ];
 
 const good = (overrides: Record<string, unknown> = {}) => ({

@@ -269,6 +269,30 @@ describe("given more broken widgets than the cap", () => {
   });
 });
 
+describe("given card text longer than a card holds", () => {
+  /** @scenario "Card text stays bounded: a long widget name, a long refusal message, and more than 20 broken widgets in the summary card" */
+  it("cuts a long name and message, and names 20 widgets in the summary card", () => {
+    const long: BrokenWidget = {
+      widget: { id: "widget-long", name: "N".repeat(300) },
+      reason: "error",
+      failure: { code: "lwql_invalid_query", message: "M".repeat(2_000) },
+    };
+    const others = Array.from({ length: 25 }, (_, at) => broken(`o${at}`));
+
+    const cards = boardHealthCards({ boardId: BOARD_ID, broken: [long, ...others] });
+
+    const [first] = cards;
+    expect(first?.title).toBe(`"${"N".repeat(117)}..." fails to load`);
+    const said = first?.body.split("\n\n").find((part) => part.startsWith("It said: "));
+    expect(said).toBe(`It said: ${"M".repeat(997)}...`);
+    const rest = cards.at(-1);
+    expect(rest?.key).toBe("board-health:more:dashboard-1");
+    expect(rest?.body).toContain("These 22 widgets");
+    expect(rest?.body.split("\n").filter((line) => line.startsWith('- "'))).toHaveLength(20);
+    expect(rest?.body).toContain("- and 2 more");
+  });
+});
+
 describe("given a card the check filed before", () => {
   const [errorCard] = boardHealthCards({
     boardId: BOARD_ID,

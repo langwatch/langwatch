@@ -227,6 +227,18 @@ Feature: The daily run checks the board's widgets
       And one more card names the other 3
       And its title holds no count, since a renewal keeps the title, and its body counts 3
 
+  Rule: A card's text stays bounded
+
+    @unit
+    Scenario: Card text stays bounded: a long widget name, a long refusal message, and more than 20 broken widgets in the summary card
+      Given a widget whose name is longer than 120 characters, refused with a message longer than 1000 characters
+      And 25 more broken widgets on the same board
+      When the run decides its cards
+      Then the widget's card title holds the name cut to 120 characters, ending in "..."
+      And the card body holds the refusal's message cut to 1000 characters, ending in "..."
+      And the summary card names 20 widgets and then says "- and 2 more"
+      And its body counts all 22 widgets
+
   Rule: Langy neither sees the check's cards nor reports the same widgets
 
     @unit

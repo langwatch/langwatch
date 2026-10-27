@@ -50,7 +50,6 @@ type RunBoardReader = {
 export type RunGateWidget = Readonly<{
   id: string;
   name: string;
-  queries: readonly string[];
   statements: readonly HealthStatement[];
 }>;
 
@@ -60,8 +59,8 @@ export type RunGateResult =
       /** The board as it is now, its name as a pointer keeps it. */
       board: { id: string; name: string };
       /**
-       * The widgets on it, in reading order, each with its stored queries, and those queries
-       * with the parameters they declare for the board check. Never empty.
+       * The widgets on it, in reading order, each with its stored statements and the
+       * parameters they declare for the board check. Never empty.
        */
       widgets: readonly RunGateWidget[];
       /** Whether the project is a person's own, where a board reads Langy's traces too. */
@@ -201,7 +200,6 @@ export class InsightRunGateService {
       .map(({ id, name, definition }) => ({
         id,
         name: pointerName({ name, fallback: id }),
-        queries: definition.queries.map((query) => query.sql),
         statements: definition.queries,
       }));
     if (widgets.length === 0) return skipped("board_empty");

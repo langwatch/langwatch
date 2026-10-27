@@ -33,7 +33,11 @@ const OPENING_FENCE = new RegExp(`^ {0,3}\`{3,}[ \\t]*${INSIGHT_RUN_FINDINGS_FEN
 const CLOSING_FENCE = /^ {0,3}`{3,}[ \t]*$/;
 
 /** A widget of the board as the run read it, with the queries the board stores for it. */
-type BoardWidget = Readonly<{ id: string; name: string; queries: readonly string[] }>;
+type BoardWidget = Readonly<{
+  id: string;
+  name: string;
+  statements: readonly Readonly<{ sql: string }>[];
+}>;
 
 /**
  * One finding as the run files it: its words, a widget only when the board has it, a query
@@ -166,7 +170,9 @@ export function checkRunAnswer({
       const stored =
         handedBack === undefined
           ? undefined
-          : widget?.queries.find((query) => isHandedBack({ stored: query, handedBack }));
+          : widget?.statements
+              .map(({ sql }) => sql)
+              .find((query) => isHandedBack({ stored: query, handedBack }));
       return {
         ...words,
         topic: topic ?? null,
