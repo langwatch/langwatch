@@ -14,6 +14,7 @@ import {
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import { MemoryAuthDatabase } from "../../repositories/memory/memory.auth.database.ts";
 import { MemoryBetterAuthHooksRepository } from "../../repositories/memory/memory.better-auth-hooks.repository.ts";
+import { withAccountIssuer } from "./better-auth-transport.test-helpers.ts";
 
 const idTokenAsserting = (claims: Record<string, unknown>): string =>
   [
@@ -46,7 +47,7 @@ function establishedAccount({
   const attach = (idToken: string | undefined) => {
     const now = toDate(nowInstant());
     return hook(
-      {
+      withAccountIssuer({
         id: "account-1",
         userId: "user_1",
         providerId: "google",
@@ -55,7 +56,7 @@ function establishedAccount({
         idToken,
         createdAt: now,
         updatedAt: now,
-      },
+      }),
       null,
     );
   };

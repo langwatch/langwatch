@@ -4,6 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { withAccountIssuer } from "./support/account-issuer.ts";
 import { type IdentityStack, identityStack, signUp } from "./support/storage-adapter-stack.ts";
 
 const EMAIL = "olga@acme.com";
@@ -23,12 +24,14 @@ describe("given the identity storage adapter over the legacy engine", () => {
 
   const linkConnection = async (issuer: string) => {
     const context = await stack.auth.$context;
-    await context.internalAdapter.linkAccount({
-      userId,
-      providerId: CONNECTION,
-      issuer,
-      accountId: SUBJECT,
-    });
+    await context.internalAdapter.linkAccount(
+      withAccountIssuer({
+        userId,
+        providerId: CONNECTION,
+        issuer,
+        accountId: SUBJECT,
+      }),
+    );
     return context;
   };
 
@@ -69,12 +72,14 @@ describe("given the identity storage adapter over the legacy engine", () => {
     /** @scenario "A built-in provider beside a foreign issuer stays unanswered" */
     it("returns no row", async () => {
       const context = await stack.auth.$context;
-      await context.internalAdapter.linkAccount({
-        userId,
-        providerId: "github",
-        issuer: "local:oauth:github",
-        accountId: "sub-github-1",
-      });
+      await context.internalAdapter.linkAccount(
+        withAccountIssuer({
+          userId,
+          providerId: "github",
+          issuer: "local:oauth:github",
+          accountId: "sub-github-1",
+        }),
+      );
 
       const found = await context.adapter.findOne({
         model: "account",
