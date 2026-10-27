@@ -177,18 +177,68 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
     });
   });
 
+  describe("given an embeddings model whose provider cannot serve it", () => {
+    const azure = provider({ id: "mp_azure", provider: "azure", name: "Azure" });
+    const embeddings = {
+      ...base,
+      embeddings: true,
+      model: "openai/text-embedding-ada-002",
+    } as const;
+
+    describe("when the provider has no row and another serves embeddings", () => {
+      it("names the setting and the providers that can serve it", async () => {
+        await expect(service({ azure }).prepare(embeddings)).rejects.toMatchObject({
+          code: "evaluator_config_error",
+          meta: {
+            setting: "settings.embeddings_model",
+            provider: "openai",
+            status: "not configured",
+            availableEmbeddingsProviders: ["azure"],
+          },
+        });
+      });
+    });
+
+    describe("when the provider is disabled and another serves embeddings", () => {
+      it("names the setting and the providers that can serve it", async () => {
+        await expect(
+          service({ azure, openai: provider({ enabled: false }) }).prepare(embeddings),
+        ).rejects.toMatchObject({
+          code: "evaluator_config_error",
+          meta: {
+            setting: "settings.embeddings_model",
+            provider: "openai",
+            status: "not enabled",
+            availableEmbeddingsProviders: ["azure"],
+          },
+        });
+      });
+    });
+
+    describe("when no enabled provider serves embeddings", () => {
+      it("reports that none are available", async () => {
+        await expect(
+          service({
+            azure: provider({ id: "mp_azure", provider: "azure", embeddingsModels: [] }),
+            openai: provider({ enabled: false }),
+          }).prepare(embeddings),
+        ).rejects.toMatchObject({
+          code: "evaluator_config_error",
+          meta: { status: "not enabled", availableEmbeddingsProviders: [] },
+        });
+      });
+    });
+  });
+
   describe("given Azure deployment mappings", () => {
     // A service whose provider row and prepared execution params are supplied
     // per-test, so an Azure `deployment` param can be exercised. The deployment
     // is a routing fact, not a litellm call param: it must leave the X_LITELLM
     // block and land on the env name Langevals reads (#7766).
-    function azureService(
-      azureProvider: ModelProviderExecution,
-      params: Record<string, string>,
-    ) {
+    function azureService(azureProvider: ModelProviderExecution, params: Record<string, string>) {
       return ModelProviderEvaluatorModelEnvService.create({
         modelProviders: createApiFixture<ModelProviderApi>({
-          getExecutionProviders: async () => ({ azure: azureProvider }),
+          getExecutionProviders: async () => ({ [azureProvider.provider]: azureProvider }),
           findRowServingModel: async () => null,
           prepareExecution: async () => params,
         }),
@@ -241,6 +291,8 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
 
         expect(env).not.toHaveProperty("AZURE_DEPLOYMENT_NAME");
         expect(env).not.toHaveProperty("AZURE_EMBEDDINGS_DEPLOYMENT_NAME");
+        // litellm has no `deployment` call param, so it is dropped for every provider.
+        expect(env).not.toHaveProperty("X_LITELLM_deployment");
       });
     });
 

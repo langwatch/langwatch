@@ -61,7 +61,7 @@ export class ModelProviderEvaluatorModelEnvService {
   }: EvaluatorModelEnvInput): Promise<Record<string, string>> {
     const modelProviders = await getProjectModelProviders(this.#modelProviders, projectId);
     const provider = model.split("/")[0]!;
-    const modelProvider = requireEnabledProvider(modelProviders, model, embeddings);
+    const modelProvider = getEnabledProvider(modelProviders, model, embeddings);
 
     const modelName = model.split("/").slice(1).join("/");
     const modelList = embeddings ? modelProvider.embeddingsModels : modelProvider.models;
@@ -152,7 +152,7 @@ type ProjectModelProviders = Awaited<ReturnType<typeof getProjectModelProviders>
  * when the provider is missing or disabled; for an embeddings model the error
  * also lists the enabled providers that do serve embeddings.
  */
-function requireEnabledProvider(
+function getEnabledProvider(
   modelProviders: ProjectModelProviders,
   model: string,
   embeddings: boolean,
@@ -182,7 +182,7 @@ function embeddingsProviderError(
           (candidate.customEmbeddingsModels?.length ?? 0) > 0),
     )
     .map(([name]) => name)
-    .sort();
+    .toSorted();
   const availability =
     availableProviders.length > 0
       ? ` Available embeddings providers: ${availableProviders.join(", ")}.`
@@ -190,6 +190,15 @@ function embeddingsProviderError(
 
   return new EvaluatorConfigError(
     `settings.embeddings_model is "${model}", but provider "${provider}" is ${status}. Set the project's EMBEDDINGS default or select an enabled embeddings model.${availability}`,
+    {
+      meta: {
+        setting: "settings.embeddings_model",
+        model,
+        provider,
+        status,
+        availableEmbeddingsProviders: availableProviders,
+      },
+    },
   );
 }
 

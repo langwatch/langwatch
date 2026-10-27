@@ -1,7 +1,7 @@
 import copy
 import os
 from tempfile import mkdtemp
-from typing import Optional
+from typing import Optional, Tuple
 import warnings
 
 import langevals_core.offline_defaults  # noqa: F401  (before litellm, see module)
@@ -526,6 +526,14 @@ def refuse_request_endpoint_without_key(kwargs: dict, env: dict) -> None:
 
 
 def patch_litellm_params(kwargs):
+    return patch_litellm_params_with_requested_model(kwargs)[0]
+
+
+def patch_litellm_params_with_requested_model(
+    kwargs,
+) -> Tuple[dict, Optional[str]]:
+    """The patched kwargs, and the model the evaluator asked for before any
+    Azure deployment rewrite replaced it with a deployment name."""
     kwargs["drop_params"] = True
     # Caching on disk is timing out for some reason, disable it
     kwargs["cache"] = {"no-cache": True, "no-store": True}
@@ -612,7 +620,7 @@ def patch_litellm_params(kwargs):
     # setting — so this is the first point the conflict is even visible.
     kwargs = apply_anthropic_sampling_compatibility(kwargs)
 
-    return kwargs
+    return kwargs, requested_model
 
 
 def patch_litellm_embedding_params(kwargs):
@@ -639,7 +647,7 @@ def patch_litellm_embedding_params(kwargs):
     # mapped Azure deployment selected by the platform.
     if (
         embeddings_deployment is not None
-        and kwargs.get("model", "").startswith("azure/")
+        and (kwargs.get("model") or "").startswith("azure/")
     ):
         kwargs["model"] = "azure/" + embeddings_deployment
 
@@ -654,16 +662,6 @@ def patch_litellm_embedding_params(kwargs):
 # final call arguments after every patch above has been applied; nothing else
 # should touch them.
 originals: dict = {}
-
-
-def _requested_completion_model(kwargs: dict) -> Optional[str]:
-    """Model selected by the evaluator before Azure deployment rewriting."""
-    request_env = current_request_env()
-    return (
-        request_env.get("X_LITELLM_model")
-        or os.environ.get("X_LITELLM_model")
-        or kwargs.get("model")
-    )
 
 
 def patch_litellm():
@@ -705,8 +703,7 @@ def patch_litellm():
         return with_usage_of(retry, [response])
 
     def patched_completion(*args, **kwargs):
-        requested_model = _requested_completion_model(kwargs)
-        kwargs = patch_litellm_params(kwargs)
+        kwargs, requested_model = patch_litellm_params_with_requested_model(kwargs)
 
         try:
             if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
@@ -731,8 +728,7 @@ def patch_litellm():
     litellm.completion = patched_completion
 
     async def patched_acompletion(*args, **kwargs):
-        requested_model = _requested_completion_model(kwargs)
-        kwargs = patch_litellm_params(kwargs)
+        kwargs, requested_model = patch_litellm_params_with_requested_model(kwargs)
 
         try:
             if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(

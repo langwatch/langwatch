@@ -74,3 +74,9 @@ def test_unmapped_azure_model_keeps_its_model_id():
 
     assert completion["model"] == "azure/gpt-4o"
     assert embeddings["model"] == "azure/text-embedding-3-small"
+
+
+def test_embeddings_deployment_tolerates_a_none_model():
+    with request_env({"AZURE_EMBEDDINGS_DEPLOYMENT_NAME": "prod-embeddings"}):
+        kwargs = patch_litellm_embedding_params({"model": None})
+    assert kwargs["model"] is None
