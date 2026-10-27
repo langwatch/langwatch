@@ -572,8 +572,11 @@ describe("the product-switcher top bar", () => {
   });
 
   describe("when the user belongs to two organizations", () => {
-    /** @scenario A multi-organization user switches organization in place */
-    it("stores the selection, clears the project memory and opens the same product there", async () => {
+    /**
+     * @scenario A multi-organization user switches organization in place
+     * @scenario Switching organization forgets the team as well as the project
+     */
+    it("stores the selection, clears the team and project memory and opens the same product there", async () => {
       renderShell({
         readings: {
           organizations: [orgA, orgB],
@@ -598,41 +601,21 @@ describe("the product-switcher top bar", () => {
       });
     });
 
-    /** @scenario Switching organization forgets the team as well as the project */
-    it("clears the remembered team, which belongs to the organization being left", async () => {
-      renderShell({
-        readings: { organizations: [orgA, orgB], pathname: "/gateway/virtual-keys" },
-      });
-
-      const user = userEvent.setup();
-      await user.click(screen.getByRole("button", { name: "Switch organization" }));
-      await user.click(await screen.findByText("Beta Corp"));
-
-      expect(rememberScopeMock).toHaveBeenCalledWith({
-        organizationId: "org_2",
-        teamId: "",
-        projectSlug: "",
-      });
-    });
-
-    /** @scenario Switching organization before the product gates answer lands on a page of the new organization */
-    it("opens the new organization's project home rather than bouncing off the root", async () => {
+    /** @scenario The switcher offers no organization until the product gates answer */
+    it("does not take a choice while the gates are still out, so one click means one page", () => {
       // The three per-organization flag queries fire on top-bar mount, so
       // this is the window right after a page load: nothing is known about
-      // the target organization's products yet.
+      // the target organization's products yet, and resolving against that
+      // would send the same click somewhere other than where it goes once
+      // the gates answer.
       areOrgFlagsLoading = true;
       renderShell({
         readings: { organizations: [orgA, orgB], pathname: "/gateway/virtual-keys" },
       });
 
-      const user = userEvent.setup();
-      await user.click(screen.getByRole("button", { name: "Switch organization" }));
-      await user.click(await screen.findByText("Beta Corp"));
-
-      await waitFor(() => {
-        expect(navigateMock).toHaveBeenCalledWith("/beta-app");
-      });
-      expect(navigateMock).not.toHaveBeenCalledWith("/");
+      const trigger = screen.getByRole("button", { name: "Switch organization" });
+      expect(trigger).toBeDisabled();
+      expect(trigger).toHaveAttribute("aria-busy", "true");
     });
   });
 
@@ -1005,9 +988,9 @@ describe("the product-switcher top bar", () => {
     /** @scenario A multi-org user switches organization in place from the org-scoped switcher */
     it("switches organization in place and stays in settings", async () => {
       // The settings detour carries no product (`activeProductId` is null),
-      // so the resolver is given the address instead: every settings page
-      // exists in every organization, and being thrown out onto a project
-      // page is what reads as "settings redirected me".
+      // so the resolver is given the address instead: a settings page that
+      // names no entity exists in every organization, and being thrown out
+      // onto a project page is what reads as "settings redirected me".
       const user = userEvent.setup();
       renderShell({ readings: { pathname: "/settings", organizations: [orgA, orgB] } });
 
@@ -1035,6 +1018,26 @@ describe("the product-switcher top bar", () => {
       await waitFor(() => {
         expect(navigateMock).toHaveBeenCalledWith("/settings/members");
       });
+    });
+
+    /** @scenario Switching organization on a settings page that names a team leaves that page */
+    it("leaves a settings page addressed by a team of the organization being left", async () => {
+      // `/settings/teams/:team` names a team the next organization does not
+      // have, so keeping the address would land the reader on "Team not
+      // found". The project home of the organization they chose is the
+      // nearest page that exists.
+      const user = userEvent.setup();
+      renderShell({
+        readings: { pathname: "/settings/teams/acme-core", organizations: [orgA, orgB] },
+      });
+
+      await user.click(screen.getByRole("button", { name: "Switch organization" }));
+      await user.click(await screen.findByText("Beta Corp"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/beta-app");
+      });
+      expect(navigateMock).not.toHaveBeenCalledWith("/settings/teams/acme-core");
     });
   });
 

@@ -1,10 +1,9 @@
 import { type ProductId, productById } from "./products.ts";
 
 /**
- * Where an in-place organization switch lands: the settings detour stays
- * where it is, else the same product's home in the new organization when
- * reachable, else that org's project home, else Me, else the root (which
- * re-resolves).
+ * Where an in-place organization switch lands: the settings detour stays put,
+ * else the same product's home in the new organization when reachable, else
+ * that org's project home, else Me, else the root (which re-resolves).
  */
 export function resolveOrgSwitchDestination({
   currentProduct,
@@ -16,10 +15,10 @@ export function resolveOrgSwitchDestination({
   reachableProducts: readonly ProductId[];
   projectSlug: string | null;
   /**
-   * The settings or ops address the reader is on, null anywhere else. The
-   * detour is not a product, so `currentProduct` is null there and the
-   * resolver would otherwise throw the reader out of settings; every page
-   * on it exists in every organization, so it stays put.
+   * The detour address the reader is on, null anywhere else and null when it
+   * names an entity of the organization being left. The detour is not a
+   * product, so `currentProduct` is null there and the resolver would
+   * otherwise throw the reader out of settings.
    */
   settingsPathname?: string | null;
 }): string {

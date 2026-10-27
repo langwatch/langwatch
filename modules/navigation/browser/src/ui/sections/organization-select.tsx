@@ -8,7 +8,11 @@ import { Building2, Check, ChevronsUpDown } from "lucide-react";
 
 import { useProductFlagsByOrganization } from "../../behavior/use-product-flags-by-organization.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
-import { isSettingsShellRoute, type ProductId } from "../../model/products.ts";
+import {
+  isEntityAddressedDetourRoute,
+  isSettingsShellRoute,
+  type ProductId,
+} from "../../model/products.ts";
 import { resolveOrgSwitchDestination } from "../../model/resolve-org-switch-destination.ts";
 
 const ORG_NAME_MAX_WIDTH = "280px";
@@ -59,6 +63,10 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
   }
 
   const pathname = host.pathname();
+  // A detour page that names an entity of this organization means nothing in
+  // the next one, so only an organization-agnostic detour address is kept.
+  const keptDetourPathname =
+    isSettingsShellRoute(pathname) && !isEntityAddressedDetourRoute(pathname) ? pathname : null;
 
   const switchToOrganization = (target: NavigationOrganization) => {
     if (target.id === organization.id) return;
@@ -66,17 +74,12 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
     // left; a stale value would resolve a cross-organization scope on the
     // next address that names neither. The landing target repopulates them.
     host.rememberScope({ organizationId: target.id, teamId: "", projectSlug: "" });
-    // Until the target organization's product gates answer, every optional
-    // product reads as unreachable. Resolving against that rather than
-    // bailing to the root keeps one click to one navigation: the reader
-    // lands on the new organization's project home, which needs no gate,
-    // instead of watching the root resolver bounce them somewhere else.
     host.navigate(
       resolveOrgSwitchDestination({
-        currentProduct: isReachabilityLoading ? null : activeProductId,
-        reachableProducts: isReachabilityLoading ? [] : reachableProductsIn(target.id),
+        currentProduct: activeProductId,
+        reachableProducts: reachableProductsIn(target.id),
         projectSlug: firstProjectSlug(target),
-        settingsPathname: isSettingsShellRoute(pathname) ? pathname : null,
+        settingsPathname: keptDetourPathname,
       }),
     );
   };
@@ -86,6 +89,10 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
       organizations={organizations}
       currentOrganizationId={organization.id}
       currentOrganizationName={organization.name}
+      // Which products the next organization can reach decides where the
+      // switch lands, so until the gates answer the same click would mean two
+      // different pages. The switcher says it is not ready rather than guess.
+      isPreparing={isReachabilityLoading}
       onSelect={switchToOrganization}
     />
   );
@@ -95,11 +102,13 @@ function OrganizationMenu({
   organizations,
   currentOrganizationId,
   currentOrganizationName,
+  isPreparing,
   onSelect,
 }: {
   organizations: NavigationOrganization[];
   currentOrganizationId: string;
   currentOrganizationName: string;
+  isPreparing: boolean;
   onSelect: (organization: NavigationOrganization) => void;
 }) {
   return (
@@ -108,6 +117,10 @@ function OrganizationMenu({
         <Button
           variant="ghost"
           aria-label="Switch organization"
+          // Not `loading`: a spinner swapped in for the organization name and
+          // straight back out is churn for a wait this short.
+          disabled={isPreparing}
+          aria-busy={isPreparing || undefined}
           textStyle="bodySm"
           fontWeight="normal"
           paddingX={2}

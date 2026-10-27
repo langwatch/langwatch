@@ -135,6 +135,13 @@ Feature: Workspace switcher
     Then the browser opens "/settings/members"
 
   @integration
+  Scenario: Switching organization on a settings page that names a team leaves that page
+    Given I belong to more than one organization
+    And I open the settings page of one of my teams
+    When I pick another organization from the switcher
+    Then the browser opens that organization's project home
+
+  @integration
   Scenario: Switching organization forgets the team as well as the project
     Given I belong to more than one organization
     When I pick another organization from the switcher
@@ -142,12 +149,10 @@ Feature: Workspace switcher
     And the remembered project is cleared
 
   @integration
-  Scenario: Switching organization before the product gates answer lands on a page of the new organization
+  Scenario: The switcher offers no organization until the product gates answer
     Given I belong to more than one organization
     And the product gates for the other organizations have not answered yet
-    When I pick another organization from the switcher
-    Then the browser opens that organization's project home
-    And the browser never opens the root resolver
+    Then the switcher does not take a choice yet
 
   # -------------------------------------------------------------------------
   # Project switching (buildProjectSwitchHref)

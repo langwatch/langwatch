@@ -1,7 +1,13 @@
 import { PRODUCT_NAMES } from "@langwatch/design-system/product-colours";
 import { describe, expect, it } from "vitest";
 
-import { PRODUCTS, productById, productFromPathname, seatReachesProduct } from "../products.ts";
+import {
+  isEntityAddressedDetourRoute,
+  PRODUCTS,
+  productById,
+  productFromPathname,
+  seatReachesProduct,
+} from "../products.ts";
 
 describe("product registry", () => {
   describe("given the five products the registry declares", () => {
@@ -133,6 +139,23 @@ describe("productFromPathname", () => {
           }
         }
       });
+    });
+  });
+});
+
+describe("detour addresses that name an entity", () => {
+  describe("given an address that names one organization's team or run", () => {
+    it("reports it as entity-addressed, since the next organization has no such thing", () => {
+      expect(isEntityAddressedDetourRoute("/settings/teams/acme-core")).toBe(true);
+      expect(isEntityAddressedDetourRoute("/ops/projections/run_17")).toBe(true);
+    });
+  });
+
+  describe("given a detour address that names no entity", () => {
+    it("reports it as portable, including the team list the entity pages hang off", () => {
+      for (const pathname of ["/settings", "/settings/members", "/settings/teams", "/ops"]) {
+        expect(isEntityAddressedDetourRoute(pathname)).toBe(false);
+      }
     });
   });
 });
