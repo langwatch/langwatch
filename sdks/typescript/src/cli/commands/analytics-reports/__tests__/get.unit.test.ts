@@ -1,5 +1,5 @@
 /**
- * `langwatch analytics-reports get` reads only the Reports API: a Dashboards dashboard's id there
+ * `langwatch analytics-report get` reads only the Reports API: a Dashboards dashboard's id there
  * is not found, with no second request. Spec: modules/dashboard/specs/dashboards-v2.feature (AC8c)
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

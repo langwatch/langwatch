@@ -198,13 +198,7 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "dataset", plural: "datasets" },
   },
-  // `langwatch dashboard` is the old name of `langwatch analytics-reports`.
-  dashboard: {
-    surface: "analyticsReports",
-    digestStrategy: "id-ref",
-    noun: { singular: "analytics report", plural: "analytics reports" },
-  },
-  "analytics-reports": {
+  "analytics-report": {
     surface: "analyticsReports",
     digestStrategy: "id-ref",
     noun: { singular: "analytics report", plural: "analytics reports" },
@@ -219,13 +213,8 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "chart", plural: "charts" },
   },
-  "dashboard-widget": {
-    surface: "dashboards",
-    digestStrategy: "id-ref",
-    noun: { singular: "dashboard widget", plural: "dashboard widgets" },
-  },
-  // `langwatch dashboards`: the Dashboards area's dashboards.
-  dashboards: {
+  // `langwatch dashboard`: the Dashboards area's dashboards and, under `widget`, their widgets.
+  dashboard: {
     surface: "dashboards",
     digestStrategy: "id-ref",
     noun: { singular: "dashboard", plural: "dashboards" },

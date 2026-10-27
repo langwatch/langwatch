@@ -53,7 +53,7 @@ export const dashboardWidgetSchemaCommand = async (options?: {
         console.log();
         console.log(
           chalk.gray(
-            `Use ${chalk.cyan("langwatch dashboard-widget schema -o json")} for descriptions and example queries`,
+            `Use ${chalk.cyan("langwatch dashboard widget schema -o json")} for descriptions and example queries`,
           ),
         );
       },

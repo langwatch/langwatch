@@ -76,10 +76,10 @@ langwatch chart run <chart-id> \
 
 A saved chart goes on an Analytics Report, never on a Dashboards dashboard (those take widgets: the `dashboard-widgets` skill).
 
-**Which report:** place on the Analytics Report in the user's context (the one they are on, or one they named). If none is in context, ask which one with the `question` tool, one option per report with its id in `ref`. Never pick one from `langwatch analytics-reports list` on your own.
+**Which report:** place on the Analytics Report in the user's context (the one they are on, or one they named). If none is in context, ask which one with the `question` tool, one option per report with its id in `ref`. Never pick one from `langwatch analytics-report list` on your own.
 
 ```bash
-langwatch analytics-reports list -f json  # the options for that question
+langwatch analytics-report list -f json  # the options for that question
 langwatch chart place <chart-id> --dashboard-id <report-id> -f json
 ```
 

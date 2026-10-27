@@ -76,9 +76,6 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "doctor",
   "docs",
   "scenario-docs",
-  // The deprecated, hidden old name of `analytics-reports` (AC199x); the feature map claims
-  // its verbs under the new name, so listing it would advertise the old one.
-  "dashboard",
   // Gateway tool wrappers: exec another AI tool rather than returning a
   // LangWatch result.
   "claude",

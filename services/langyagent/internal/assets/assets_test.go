@@ -291,7 +291,7 @@ func TestChartSkills_PlaceOnTheDashboardInContextOrAsk(t *testing.T) {
 		"lwql-charts": {
 			"Analytics Report in the user's context",
 			"ask which one with the `question` tool",
-			"Never pick one from `langwatch analytics-reports list` on your own",
+			"Never pick one from `langwatch analytics-report list` on your own",
 		},
 	}
 	for name, skillWants := range wants {
@@ -324,11 +324,11 @@ func TestDashboardWidgetsSkill_TeachesBoardCommands(t *testing.T) {
 		t.Fatalf("read dashboard-widgets skill: %v", err)
 	}
 	for _, want := range []string{
-		"langwatch dashboards create",
-		"langwatch dashboards delete <dashboardId>",
-		"langwatch dashboards widgets create <dashboardId>",
+		"langwatch dashboard create",
+		"langwatch dashboard delete <dashboardId>",
+		"langwatch dashboard widget add <dashboardId>",
 		"Never pick a dashboard for the user",
-		"one option per dashboard from `langwatch dashboards list`",
+		"one option per dashboard from `langwatch dashboard list`",
 		"Confirm before any delete",
 		"run the command only on Delete",
 		"dashboards_not_released` means it is off: tell the user, do not retry",

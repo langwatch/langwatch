@@ -61,8 +61,8 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PutApiV1AnalyticsReportsReorderBody,
 ) -> Response[PutApiV1AnalyticsReportsReorderResponse200]:
-    """Reorder dashboards by providing an ordered list of IDs The Analytics Reports dashboards API is
-    deprecated; use the Dashboards API at /api/v1/dashboards
+    """Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is
+    deprecated; use the Dashboards API at /api/v1/dashboards.
 
     Args:
         body (PutApiV1AnalyticsReportsReorderBody):
@@ -91,8 +91,8 @@ def sync(
     client: AuthenticatedClient,
     body: PutApiV1AnalyticsReportsReorderBody,
 ) -> PutApiV1AnalyticsReportsReorderResponse200 | None:
-    """Reorder dashboards by providing an ordered list of IDs The Analytics Reports dashboards API is
-    deprecated; use the Dashboards API at /api/v1/dashboards
+    """Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is
+    deprecated; use the Dashboards API at /api/v1/dashboards.
 
     Args:
         body (PutApiV1AnalyticsReportsReorderBody):
@@ -116,8 +116,8 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PutApiV1AnalyticsReportsReorderBody,
 ) -> Response[PutApiV1AnalyticsReportsReorderResponse200]:
-    """Reorder dashboards by providing an ordered list of IDs The Analytics Reports dashboards API is
-    deprecated; use the Dashboards API at /api/v1/dashboards
+    """Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is
+    deprecated; use the Dashboards API at /api/v1/dashboards.
 
     Args:
         body (PutApiV1AnalyticsReportsReorderBody):
@@ -144,8 +144,8 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PutApiV1AnalyticsReportsReorderBody,
 ) -> PutApiV1AnalyticsReportsReorderResponse200 | None:
-    """Reorder dashboards by providing an ordered list of IDs The Analytics Reports dashboards API is
-    deprecated; use the Dashboards API at /api/v1/dashboards
+    """Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is
+    deprecated; use the Dashboards API at /api/v1/dashboards.
 
     Args:
         body (PutApiV1AnalyticsReportsReorderBody):

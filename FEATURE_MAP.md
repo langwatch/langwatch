@@ -85,6 +85,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | Evaluators                   |   ✅   |   ✅   |   —    | ✅  |      ✅      | ✅  | ✅  |        ✅        | ✅  |  ✅  |
 | Datasets                     |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
 | **Cross-cutting**            |        |        |        |     |              |     |     |                  |     |      |
+| Dashboards                   |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
 | Analytics Reports            |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
 | Triggers                     |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  —   |
 | **AI Gateway**               |        |        |        |     |              |     |     |                  |     |      |

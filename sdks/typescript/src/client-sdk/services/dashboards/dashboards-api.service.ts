@@ -210,12 +210,3 @@ export class DashboardsApiService {
     if (error) this.handleApiError({ operation, error, response });
   }
 }
-
-/** @deprecated Renamed `DashboardsApiService`; this alias goes in the next major version. */
-export const BoardsApiService = DashboardsApiService;
-/** @deprecated Renamed `DashboardsApiService`; this alias goes in the next major version. */
-export type BoardsApiService = DashboardsApiService;
-/** @deprecated Renamed `DashboardsApiError`; this alias goes in the next major version. */
-export const BoardsApiError = DashboardsApiError;
-/** @deprecated Renamed `DashboardsApiError`; this alias goes in the next major version. */
-export type BoardsApiError = DashboardsApiError;

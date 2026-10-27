@@ -529,6 +529,7 @@ const legacyReports = defineRestRouter(ReportApi)
   .withOutput(z.object({ id: z.string() }))
   .withDocs({
     summary: "Read a report",
+    description: "Reads one report",
     responses: documentedResponses({ 404: notFoundBody }),
   })
   .handle(async ({ app, input }) => app.read({ id: input.id }))
@@ -611,7 +612,7 @@ describe("a family the declaration marked superseded", () => {
       | undefined;
 
     expect(item?.get?.deprecated).toBe(true);
-    expect(item?.get?.description).toContain("Use /api/v1/reports instead");
+    expect(item?.get?.description).toBe("Reads one report. Use /api/v1/reports instead.");
     expect(Object.keys(published.paths ?? {})).not.toContainEqual(
       expect.stringMatching(/\/(latest|\d{4}-\d{2}-\d{2})(\/|$)/),
     );

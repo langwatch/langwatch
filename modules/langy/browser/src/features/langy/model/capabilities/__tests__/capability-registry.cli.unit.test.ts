@@ -279,7 +279,7 @@ describe("buildResourceHref, given a row-level deep link", () => {
 
     /** @scenario "AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports" */
     it("opens a Dashboards dashboard at its own page", () => {
-      expect(linkFor("langwatch.dashboards.get")).toEqual({
+      expect(linkFor("langwatch.dashboard.get")).toEqual({
         label: "Dashboards",
         href: "/acme/dashboards/dashboard_1",
       });
@@ -292,10 +292,10 @@ describe("buildResourceHref, given a row-level deep link", () => {
         href: "/acme/analytics/reports?dashboard=dashboard_1",
       };
       expect(
-        ["analytics-reports", "dashboard", "graph", "chart"].map((resource) =>
+        ["analytics-report", "graph", "chart"].map((resource) =>
           linkFor(`langwatch.${resource}.get`),
         ),
-      ).toEqual([reports, reports, reports, reports]);
+      ).toEqual([reports, reports, reports]);
     });
   });
 

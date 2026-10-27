@@ -11,10 +11,8 @@ import {
   deleteDashboard,
   deleteWidgetOnDashboard,
   getDashboard,
-  getProjectDashboard,
   getWidgetOnDashboard,
   listDashboards,
-  listProjectDashboards,
   listWidgetsOnDashboard,
   updateDashboard,
   updateWidgetOnDashboard,
@@ -107,21 +105,6 @@ describe("given the dashboard client", () => {
       { method: "GET", url: "/api/v1/dashboards/b_1/widgets/w_1", body: undefined },
       { method: "PATCH", url: "/api/v1/dashboards/b_1/widgets/w_1", body: { name: "P95" } },
       { method: "DELETE", url: "/api/v1/dashboards/b_1/widgets/w_1", body: undefined },
-    ]);
-  });
-});
-
-describe("given the project-path dashboard reads", () => {
-  /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
-  it("reads /analytics/boards under the project, which old and new servers both answer", async () => {
-    const calls = stubFetch();
-
-    await listProjectDashboards({ projectId: "proj_1" });
-    await getProjectDashboard({ projectId: "proj_1", dashboardId: "b_1" });
-
-    expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
-      "GET /api/v1/projects/proj_1/analytics/boards",
-      "GET /api/v1/projects/proj_1/analytics/boards/b_1",
     ]);
   });
 });

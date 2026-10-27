@@ -32,7 +32,7 @@ export const listAnalyticsReportsCommand = async (): Promise<CommandResult | voi
           console.log();
           console.log(chalk.gray("No analytics reports found."));
           console.log(chalk.gray("Create one with:"));
-          console.log(chalk.cyan('  langwatch analytics-reports create "My Report"'));
+          console.log(chalk.cyan('  langwatch analytics-report create "My Report"'));
           return;
         }
 
@@ -57,7 +57,7 @@ export const listAnalyticsReportsCommand = async (): Promise<CommandResult | voi
         console.log();
         console.log(
           chalk.gray(
-            `Use ${chalk.cyan("langwatch analytics-reports get <id>")} to view a report's details`,
+            `Use ${chalk.cyan("langwatch analytics-report get <id>")} to view a report's details`,
           ),
         );
       },

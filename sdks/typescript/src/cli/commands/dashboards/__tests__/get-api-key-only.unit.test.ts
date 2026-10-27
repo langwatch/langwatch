@@ -1,5 +1,5 @@
 /**
- * `langwatch dashboards get` with only an API key reads /api/v1/dashboards, where the project
+ * `langwatch dashboard get` with only an API key reads /api/v1/dashboards, where the project
  * comes from the key, and nothing else. Spec: modules/dashboard/specs/dashboards-v2.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

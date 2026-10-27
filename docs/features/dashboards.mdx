@@ -221,8 +221,10 @@ Once connected, your agent has these dashboard tools:
 
 The old Analytics Reports have their own tools: `platform_list_analytics_reports`,
 `platform_get_analytics_report`, `platform_create_analytics_report`,
-`platform_rename_analytics_report` and `platform_delete_analytics_report`. They
-take a `reportId`. Analytics Reports hold charts, not widgets.
+`platform_rename_analytics_report` and `platform_delete_analytics_report`. The
+tools that act on an existing report (`platform_get_analytics_report`,
+`platform_rename_analytics_report` and `platform_delete_analytics_report`) take
+a `reportId`. Analytics Reports hold charts, not widgets.
 
 ### The widget definition format
 
@@ -364,22 +366,22 @@ widgets = langwatch.dashboards.list_widgets(dashboard_id=dashboard.id)
 ```
 
 ```bash CLI
-langwatch dashboards list
-langwatch dashboards create "Agent health"
-langwatch dashboards update <dashboardId> --name "Agent health (prod)"
-langwatch dashboards widgets list <dashboardId>
-langwatch dashboards delete <dashboardId>
+langwatch dashboard list
+langwatch dashboard create "Agent health"
+langwatch dashboard update <dashboardId> --name "Agent health (prod)"
+langwatch dashboard widget list <dashboardId>
+langwatch dashboard delete <dashboardId>
 ```
 
 ```bash REST
-curl "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/dashboards" \
+curl "https://app.langwatch.ai/api/v1/dashboards" \
   -H "X-Auth-Token: $LANGWATCH_API_KEY"
 ```
 
 </CodeGroup>
 
-A widget has the same verbs under `widgets`: `langwatch dashboards widgets
-list|get|create|update|delete <dashboardId> [<widgetId>]`, and
+A widget has its verbs under `widget`: `langwatch dashboard widget
+list|get|add|update|delete <dashboardId> [<widgetId>]`, and
 `createWidget`, `getWidget`, `updateWidget` and `deleteWidget` in the
 TypeScript SDK (`create_widget`, `get_widget`, `update_widget` and
 `delete_widget` in Python).
@@ -387,14 +389,13 @@ TypeScript SDK (`create_widget`, `get_widget`, `update_widget` and
 ### Analytics Reports
 
 The old Analytics Reports are a separate API: `client.analyticsReports` and
-`langwatch.analytics_reports` in the SDKs, `langwatch analytics-reports
-list|get|create|update|delete` in the CLI, and
-`/api/v1/projects/{projectId}/analytics/reports` over REST.
+`langwatch.analytics_reports` in the SDKs, `langwatch analytics-report
+list|get|create|update|delete` in the CLI, and `/api/v1/analytics/reports` over
+REST.
 
 ### Names that changed
 
-`client.boards`, `langwatch.boards`, `langwatch dashboard …` (singular),
-`langwatch dashboard-widget boards` and the REST path
-`/analytics/boards` still work but are deprecated. Use `client.dashboards`,
-`langwatch.dashboards`, `langwatch dashboards …`,
-`langwatch dashboard-widget dashboards` and `/analytics/dashboards`.
+`client.boards` and `langwatch.boards` are now `client.dashboards` and
+`langwatch.dashboards`; the CLI's `dashboards`, `dashboard-widget` and
+`analytics-reports` groups are now `langwatch dashboard` (widgets under
+`langwatch dashboard widget`) and `langwatch analytics-report`.

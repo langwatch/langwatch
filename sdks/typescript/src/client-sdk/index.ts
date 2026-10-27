@@ -71,8 +71,6 @@ export {
 export {
   DashboardsApiService,
   DashboardsApiError,
-  BoardsApiService,
-  BoardsApiError,
 } from "./services/dashboards/dashboards-api.service";
 export type {
   Dashboard,
@@ -296,11 +294,6 @@ export class LangWatch {
 
   get apiClient(): LangwatchApiClient {
     return this.config.langwatchApiClient;
-  }
-
-  /** @deprecated Renamed `dashboards`; this alias goes in the next major version. */
-  get boards(): DashboardsApiService {
-    return this.dashboards;
   }
 
   /**

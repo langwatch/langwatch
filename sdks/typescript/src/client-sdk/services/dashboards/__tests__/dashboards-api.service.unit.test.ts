@@ -1,6 +1,6 @@
 /**
  * The dashboards service's routes, verbs and bodies over /api/v1/dashboards, the analytics
- * reports service's over /api/v1/analytics/reports, and the client's deprecated `boards` alias.
+ * reports service's over /api/v1/analytics/reports, and the client's names for them.
  * Spec: modules/dashboard/specs/dashboards-v2.feature (AC199s, AC199w)
  */
 import { describe, expect, it, vi } from "vitest";
@@ -9,7 +9,8 @@ import { LangWatch } from "@/client-sdk";
 import { AnalyticsReportsApiService } from "@/client-sdk/services/analytics-reports/analytics-reports-api.service";
 import type { LangwatchApiClient } from "@/internal/api/client";
 
-import { BoardsApiService, DashboardsApiService } from "../dashboards-api.service";
+import * as dashboardsModule from "../dashboards-api.service";
+import { DashboardsApiService } from "../dashboards-api.service";
 
 const ok = (data: unknown) => vi.fn(async () => ({ data, response: new Response(null) }));
 
@@ -117,7 +118,7 @@ describe("LangWatch client", () => {
   });
 
   /** @scenario "AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports" */
-  it("keeps boards as a deprecated alias of the Dashboards API", () => {
-    expect([client.boards, BoardsApiService]).toEqual([client.dashboards, DashboardsApiService]);
+  it("has no boards alias for the Dashboards API", () => {
+    expect(["boards" in client, "BoardsApiService" in dashboardsModule]).toEqual([false, false]);
   });
 });

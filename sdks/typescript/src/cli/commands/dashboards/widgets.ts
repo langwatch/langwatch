@@ -7,11 +7,7 @@ import { formatTable, sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
-import {
-  type DefinitionFlags,
-  resolveDefinitionInput,
-  WidgetInputError,
-} from "../dashboard-widgets/definitionInput";
+import { type DefinitionFlags, resolveDefinitionInput, WidgetInputError } from "./definitionInput";
 
 /** The definition flags, resolved; a refusal ends the command before any request. */
 const definitionOf = (flags: DefinitionFlags) => {
@@ -26,7 +22,7 @@ const definitionOf = (flags: DefinitionFlags) => {
   }
 };
 
-/** `langwatch dashboards widgets list <dashboardId>`: the widgets on one dashboard. */
+/** `langwatch dashboard widget list <dashboardId>`: the widgets on one dashboard. */
 export const listWidgetsOnDashboardCommand = async (
   dashboardId: string,
 ): Promise<CommandResult | void> => {
@@ -91,7 +87,7 @@ export const getWidgetOnDashboardCommand = async (
   }
 };
 
-export const createWidgetOnDashboardCommand = async (
+export const addWidgetToDashboardCommand = async (
   dashboardId: string,
   options: DefinitionFlags & { name?: string; description?: string },
 ): Promise<CommandResult | void> => {

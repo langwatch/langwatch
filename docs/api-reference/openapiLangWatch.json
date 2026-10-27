@@ -21285,7 +21285,7 @@
             }
           }
         },
-        "description": "List the organization's role bindings, each naming its principal (user, group or API key), role, scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts the filtered set. superseded by /api/grants, which answers the same rows as grants",
+        "description": "List the organization's role bindings, each naming its principal (user, group or API key), role, scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts the filtered set. superseded by /api/grants, which answers the same rows as grants.",
         "tags": [
           "Role Bindings"
         ],
@@ -21482,7 +21482,7 @@
             }
           }
         },
-        "description": "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization; an identical binding is written again, because bindings are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. superseded by /api/grants, which answers the same rows as grants",
+        "description": "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization; an identical binding is written again, because bindings are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. superseded by /api/grants, which answers the same rows as grants.",
         "tags": [
           "Role Bindings"
         ],
@@ -21675,7 +21675,7 @@
             }
           }
         },
-        "description": "Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead. superseded by /api/grants, which answers the same rows as grants",
+        "description": "Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead. superseded by /api/grants, which answers the same rows as grants.",
         "tags": [
           "Role Bindings"
         ],
@@ -21758,7 +21758,7 @@
             }
           }
         },
-        "description": "Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found. superseded by /api/grants, which answers the same rows as grants",
+        "description": "Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found. superseded by /api/grants, which answers the same rows as grants.",
         "tags": [
           "Role Bindings"
         ],
@@ -29324,7 +29324,7 @@
             }
           }
         },
-        "description": "List all dashboards for the project with graph counts The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards",
+        "description": "List all dashboards for the project with graph counts. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29394,7 +29394,7 @@
             }
           }
         },
-        "description": "Create a new dashboard The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards",
+        "description": "Create a new dashboard. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29460,7 +29460,7 @@
             }
           }
         },
-        "description": "Reorder dashboards by providing an ordered list of IDs The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards",
+        "description": "Reorder dashboards by providing an ordered list of IDs. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29651,7 +29651,7 @@
             }
           }
         },
-        "description": "Get a dashboard by its id, including its graphs The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards",
+        "description": "Get a dashboard by its id, including its graphs. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29732,7 +29732,7 @@
             }
           }
         },
-        "description": "Rename a dashboard The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards",
+        "description": "Rename a dashboard. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -29813,7 +29813,7 @@
             }
           }
         },
-        "description": "Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards",
+        "description": "Delete a dashboard and its graphs (hard delete, cascade). The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.",
         "tags": [
           "Analytics / Reports"
         ],
@@ -41053,7 +41053,7 @@
             }
           }
         },
-        "description": "Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports are listed by /api/v1/analytics/reports instead. Use /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated",
+        "description": "Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports are listed by /api/v1/analytics/reports instead. Use /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated.",
         "summary": "List dashboards",
         "tags": [
           "Analytics / LangWatchQL"
@@ -41562,7 +41562,7 @@
             }
           }
         },
-        "description": "Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only Analytics Reports holds, is reported as not found. Use /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated",
+        "description": "Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only Analytics Reports holds, is reported as not found. Use /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated.",
         "summary": "Get a dashboard",
         "tags": [
           "Analytics / LangWatchQL"
@@ -46997,7 +46997,7 @@
             }
           }
         },
-        "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL) upload the file as a stored object with the purpose dataset_import, then create the dataset from it",
+        "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL). upload the file as a stored object with the purpose dataset_import, then create the dataset from it.",
         "requestBody": {
           "required": true,
           "content": {
@@ -47069,7 +47069,7 @@
             }
           }
         },
-        "description": "Upload a file (CSV, JSON, JSONL) to an existing dataset upload the file as a stored object with the purpose dataset_import, then create the dataset from it",
+        "description": "Upload a file (CSV, JSON, JSONL) to an existing dataset. upload the file as a stored object with the purpose dataset_import, then create the dataset from it.",
         "requestBody": {
           "required": true,
           "content": {
@@ -47143,7 +47143,7 @@
             "content": {}
           }
         },
-        "description": "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. create the upload, send the file to the address it answers, confirm it as a stored object, then put its reference in the cell",
+        "description": "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. create the upload, send the file to the address it answers, confirm it as a stored object, then put its reference in the cell.",
         "requestBody": {
           "required": true,
           "content": {

@@ -34,32 +34,6 @@ export async function listDashboards(): Promise<{ data: DashboardListItem[] }> {
   return makeRequest("GET", "/api/v1/dashboards") as Promise<{ data: DashboardListItem[] }>;
 }
 
-/** The same list at the deprecated project path, which answers while Dashboards is off too. */
-export async function listProjectDashboards({
-  projectId,
-}: {
-  projectId: string;
-}): Promise<{ data: DashboardListItem[] }> {
-  return makeRequest(
-    "GET",
-    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/boards`,
-  ) as Promise<{ data: DashboardListItem[] }>;
-}
-
-/** One dashboard at the deprecated project path, which answers while Dashboards is off too. */
-export async function getProjectDashboard({
-  projectId,
-  dashboardId,
-}: {
-  projectId: string;
-  dashboardId: string;
-}): Promise<Dashboard> {
-  return makeRequest(
-    "GET",
-    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/boards/${encodeURIComponent(dashboardId)}`,
-  ) as Promise<Dashboard>;
-}
-
 /** Reads one dashboard; a dashboard in another project, or an Analytics Report, answers 404. */
 export async function getDashboard({ dashboardId }: { dashboardId: string }): Promise<Dashboard> {
   return makeRequest("GET", dashboardPath(dashboardId)) as Promise<Dashboard>;

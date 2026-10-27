@@ -1,4 +1,3 @@
-from types import ModuleType
 from warnings import warn
 from .utils.module import module_property
 from .telemetry.tracing import trace
@@ -86,7 +85,6 @@ if TYPE_CHECKING:
     triggers: TriggersFacade
     workflows: WorkflowsFacade
     dashboards: DashboardsFacade
-    boards: DashboardsFacade  # deprecated alias of dashboards
     analytics_reports: AnalyticsReportsFacade
     annotations: AnnotationsFacade
     graphs: GraphsFacade
@@ -156,16 +154,6 @@ _LAZY_FACADES = {
 
 
 def __getattr__(name: str):
-    if name == "boards":
-        warn(
-            "langwatch.boards is deprecated; use langwatch.dashboards",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        cached = globals().get("dashboards")
-        if cached is not None and not isinstance(cached, ModuleType):
-            return cached
-        return __getattr__("dashboards")
     if name in _LAZY_MODULES:
         if name == "dspy":
             return _get_dspy()

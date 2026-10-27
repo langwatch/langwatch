@@ -362,22 +362,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerWorkflowCommands(program);
   registerLangyCommands(program);
   registerAgentCommands(program);
-  registerAnalyticsReportsCommands(
-    program
-      .command("analytics-reports")
-      .description("Manage Analytics Reports (the older analytics dashboards)"),
-  );
-  registerAnalyticsReportsCommands(
-    program
-      .command("dashboard", { hidden: true })
-      .description("Deprecated: use `langwatch analytics-reports`")
-      .hook("preAction", () => {
-        console.error(
-          "`langwatch dashboard` is deprecated; use `langwatch analytics-reports` instead.",
-        );
-      }),
-  );
-  registerDashboardsCommands(program);
+  registerAnalyticsReportCommands(program);
+  registerDashboardCommands(program);
   registerModelProviderCommands(program);
   registerModelDefaultCommands(program);
   registerVirtualKeysCommands(program);
@@ -395,7 +381,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerTestSuiteCommands(program);
   registerGraphCommands(program);
   registerChartCommands(program);
-  registerDashboardWidgetCommands(program);
   registerTriggerCommands(program);
   registerSlackConnectionCommands(program);
   registerSecretCommands(program);
@@ -2045,11 +2030,12 @@ function registerAgentCommands(program: Command): void {
   );
 }
 
-/**
- * The Analytics Reports over /api/v1/analytics/reports, as the verbs of `reportsCmd`. Called for
- * `analytics-reports` and for `dashboard`, the old name kept as a deprecated alias (AC199x).
- */
-function registerAnalyticsReportsCommands(reportsCmd: Command): void {
+/** `langwatch analytics-report`: the Analytics Reports, over /api/v1/analytics/reports. */
+function registerAnalyticsReportCommands(program: Command): void {
+  const reportsCmd = program
+    .command("analytics-report")
+    .description("Manage Analytics Reports (the older analytics dashboards)");
+
   emitsResult(
     reportsCmd
       .command("list")
@@ -2112,10 +2098,10 @@ function registerAnalyticsReportsCommands(reportsCmd: Command): void {
   );
 }
 
-function registerDashboardsCommands(program: Command): void {
+function registerDashboardCommands(program: Command): void {
   // The project comes from the API key, over /api/v1/dashboards.
   const dashboardsCmd = program
-    .command("dashboards")
+    .command("dashboard")
     .description("Manage dashboards and the widgets on them");
   const format = (command: Command) =>
     command.option("-f, --format <format>", "Output format: table (default) or json", "table");
@@ -2151,7 +2137,11 @@ function registerDashboardsCommands(program: Command): void {
         .description("Rename a dashboard or change its description")
         .option("--name <name>", "New dashboard name")
         .option("--description <description>", "New dashboard description")
-        .option("--clear-description", "Remove the dashboard's description"),
+        .addOption(
+          new Option("--clear-description", "Remove the dashboard's description").conflicts(
+            "description",
+          ),
+        ),
     ),
     async (
       dashboardId: string,
@@ -2175,8 +2165,24 @@ function registerDashboardsCommands(program: Command): void {
   );
 
   const widgetCmd = dashboardsCmd
-    .command("widgets")
+    .command("widget")
     .description("Manage the widgets on a dashboard");
+
+  emitsResult(
+    format(
+      widgetCmd
+        .command("schema")
+        .description(
+          "Discover the LangWatchQL analytics datasets and columns to write a widget's queries against",
+        )
+        .option("--project <slug-or-id>", "Project to run against"),
+    ),
+    async (options: { project?: string }) => {
+      const { dashboardWidgetSchemaCommand: impl } =
+        await import("./commands/dashboards/schema.js");
+      return impl(options);
+    },
+  );
 
   emitsResult(
     format(widgetCmd.command("list <dashboardId>").description("List the widgets on a dashboard")),
@@ -2211,13 +2217,13 @@ function registerDashboardsCommands(program: Command): void {
     format(
       definitionOptions(
         widgetCmd
-          .command("create <dashboardId>")
-          .description("Create a widget on a dashboard from a React source file and its queries")
+          .command("add <dashboardId>")
+          .description("Add a widget to a dashboard from a React source file and its queries")
           .requiredOption("--name <name>", "Widget name"),
       ),
     ),
     async (dashboardId: string, options: Record<string, string | undefined>) => {
-      const { createWidgetOnDashboardCommand: impl } =
+      const { addWidgetToDashboardCommand: impl } =
         await import("./commands/dashboards/widgets.js");
       return impl(dashboardId, options);
     },
@@ -4233,153 +4239,6 @@ function registerChartCommands(program: Command): void {
     async (id: string, options: { project?: string }) => {
       const { unplaceChartCommand: impl } = await import("./commands/charts/unplace.js");
       return impl(id, options);
-    },
-  );
-}
-
-function registerDashboardWidgetCommands(program: Command): void {
-  // Add dashboard-widget command group — custom-chart-playground widgets
-  const dashboardWidgetCmd = program
-    .command("dashboard-widget")
-    .description("Manage dashboard widgets");
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("schema")
-      .description(
-        "Discover the LangWatchQL analytics datasets and columns to write a widget's queries against",
-      )
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: { project?: string }) => {
-      const { dashboardWidgetSchemaCommand: impl } =
-        await import("./commands/dashboard-widgets/schema.js");
-      return impl(options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("list")
-      .description("List the project's dashboard widgets")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: { project?: string }) => {
-      const { listDashboardWidgetsCommand: impl } =
-        await import("./commands/dashboard-widgets/list.js");
-      return impl(options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("get <id>")
-      .description("Get a dashboard widget by ID — its React source and named queries")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { project?: string }) => {
-      const { getDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/get.js");
-      return impl(id, options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("create")
-      .description(
-        "Save a dashboard widget from a React source file and its named LangWatchQL queries",
-      )
-      .requiredOption("--name <name>", "Widget name")
-      .option("--code <code>", "The widget's React source")
-      .option("--code-file <path>", "Read the widget's React source from a file")
-      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: {
-      name?: string;
-      code?: string;
-      codeFile?: string;
-      queriesFile?: string;
-      project?: string;
-    }) => {
-      const { createDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/create.js");
-      return impl(options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("update <id>")
-      .description("Update a dashboard widget's name or definition")
-      .option("--name <name>", "New widget name")
-      .option("--code <code>", "New React source")
-      .option("--code-file <path>", "Read the new React source from a file")
-      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (
-      id: string,
-      options: {
-        name?: string;
-        code?: string;
-        codeFile?: string;
-        queriesFile?: string;
-        project?: string;
-      },
-    ) => {
-      const { updateDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/update.js");
-      return impl(id, options);
-    },
-  );
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("delete <id>")
-      .description("Delete a dashboard widget")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { project?: string }) => {
-      const { deleteDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/delete.js");
-      return impl(id, options);
-    },
-  );
-
-  // `boards` is the old name, kept working but out of the help (AC199x).
-  for (const [name, hidden] of [
-    ["dashboards", false],
-    ["boards", true],
-  ] as const) {
-    emitsResult(
-      dashboardWidgetCmd
-        .command(name, { hidden })
-        .description("List the dashboards a widget can be pinned to")
-        .option("--project <slug-or-id>", "Project to run against")
-        .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-      async (options: { project?: string }) => {
-        const { listDashboardWidgetDashboardsCommand: impl } =
-          await import("./commands/dashboard-widgets/dashboards.js");
-        return impl(options);
-      },
-    );
-  }
-
-  emitsResult(
-    dashboardWidgetCmd
-      .command("pin <widget>")
-      .description(
-        "Add a dashboard widget to a dashboard (widget and dashboard by id or name, from `dashboard-widget dashboards`)",
-      )
-      .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
-      .option("--project <slug-or-id>", "Project to run against")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (widget: string, options: { dashboard?: string; project?: string }) => {
-      const { pinDashboardWidgetCommand: impl } =
-        await import("./commands/dashboard-widgets/pin.js");
-      return impl(widget, options);
     },
   );
 }

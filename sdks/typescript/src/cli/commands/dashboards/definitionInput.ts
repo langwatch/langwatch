@@ -1,11 +1,11 @@
 import { readFileSync } from "fs";
 
-import type {
-  DashboardWidgetDefinitionInput,
-  DashboardWidgetQueryInput,
-} from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+import type { CreateDashboardWidgetInput } from "@/client-sdk/services/dashboards/dashboards-api.service";
 
-/** The flags `dashboard-widget create` and `update` share for the definition. */
+type DashboardWidgetDefinitionInput = Pick<CreateDashboardWidgetInput, "code" | "queries">;
+type DashboardWidgetQueryInput = CreateDashboardWidgetInput["queries"][number];
+
+/** The flags `dashboard widget add` and `update` share for the definition. */
 export interface DefinitionFlags {
   code?: string;
   codeFile?: string;

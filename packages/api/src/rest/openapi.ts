@@ -136,9 +136,7 @@ export function restRouteDocumentation({
   if (deprecated) {
     options.deprecated = true;
 
-    options.description = [options.description, deprecationNotice(deprecated)]
-      .filter((part) => part !== undefined && part !== "")
-      .join(" ");
+    options.description = withDeprecationNotice({ description: options.description, deprecated });
   }
 
   return options;
@@ -832,6 +830,21 @@ export function handWrittenDocs(spec: DescribeRouteOptions): EndpointDocs {
 // ─────────────────────────────────────────────────────────────────────────────
 // Marking a route, or a whole family, superseded.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** The operation's description and the deprecation notice, each ended as a sentence. */
+function withDeprecationNotice({
+  description,
+  deprecated,
+}: {
+  description: string | undefined;
+  deprecated: RestDeprecation;
+}): string {
+  return [description, deprecationNotice(deprecated)]
+    .map((part) => part?.trimEnd() ?? "")
+    .filter((part) => part !== "")
+    .map((part) => (/[.!?]$/.test(part) ? part : `${part}.`))
+    .join(" ");
+}
 
 /** The sentence a deprecated answer carries, written or derived. */
 export function deprecationNotice({ successor, notice }: RestDeprecation): string {

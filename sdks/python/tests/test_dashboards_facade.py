@@ -7,8 +7,8 @@ Spec: modules/dashboard/specs/dashboards-v2.feature
   AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports
 """
 
+import importlib
 import json
-import warnings
 from typing import Any
 
 import httpx
@@ -149,25 +149,6 @@ def test_analytics_reports_use_the_reports_routes():
 
 
 # @scenario "AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports"
-def test_boards_is_a_deprecated_alias_of_dashboards():
-    """langwatch.boards warns and hands back the dashboards facade."""
-    for stale in ("boards", "dashboards"):
-        vars(langwatch).pop(stale, None)
-    langwatch.setup(api_key="test-key", endpoint_url="http://langwatch.test")
-
-    with pytest.warns(
-        DeprecationWarning,
-        match="langwatch.boards is deprecated; use langwatch.dashboards",
-    ):
-        boards = langwatch.boards
-
-    assert isinstance(boards, DashboardsFacade)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        assert langwatch.dashboards is boards
-
-
-# @scenario "AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports"
 def test_names_dashboards_and_analytics_reports_resolve_to_their_facades():
     """langwatch.dashboards is the Dashboards facade, langwatch.analytics_reports the Reports one."""
     for stale in ("analytics_reports", "dashboards"):
@@ -178,12 +159,12 @@ def test_names_dashboards_and_analytics_reports_resolve_to_their_facades():
     assert isinstance(langwatch.analytics_reports, AnalyticsReportsFacade)
 
 
-def test_the_old_boards_module_keeps_its_old_class_name():
-    with pytest.warns(DeprecationWarning):
-        import importlib
+# @scenario "AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports"
+def test_there_is_no_boards_alias():
+    """The old name is gone: neither the attribute nor the module answers."""
+    vars(langwatch).pop("boards", None)
 
-        import langwatch.boards as old
-
-        importlib.reload(old)
-
-    assert old.BoardsFacade is DashboardsFacade
+    with pytest.raises(AttributeError):
+        langwatch.boards  # noqa: B018
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("langwatch.boards")
