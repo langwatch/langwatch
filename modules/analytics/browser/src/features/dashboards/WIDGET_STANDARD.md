@@ -32,10 +32,11 @@ and draws one of these states:
 
 | State        | What the reader sees                                                                                                                                                      |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| loading      | A skeleton until a query first answers; "Still loading…" after 5 seconds. See "Loading" below.                                                                            |
 | `no_access`  | What is withheld and who to ask, with a lock. See "No access" below.                                                                                                      |
 | failed       | "Couldn't load <widget>", the reason, and Retry. Retry runs all the widget's queries again.                                                                               |
-| `no_traffic` | "No traces in this period", naming what the query counts ("No evaluations ...").                                                                                          |
-| `missing`    | The setup view: "Needs <field>", and "Ask Langy to help" when the board offers Langy.                                                                                     |
+| `no_traffic` | "No traces in this period", naming what the query counts, and what sends it. See "Empty widgets" below.                                                                   |
+| `missing`    | The setup view: "Needs <field>", what sends it, and "Ask Langy to help" when the board offers Langy.                                                                      |
 | `partial`    | The widget's own card, with a clean face. The (i) says what is missing: "Total cost on 400 of 1,000 traces. No price for my-finetune-v2 (600 traces)." and "Add a price". |
 | `complete`   | The widget's own card.                                                                                                                                                    |
 
@@ -50,8 +51,35 @@ A widget with several queries shows one state for all of them:
   for a comparison) may be empty while the main one is not, so it never empties the card.
 - Otherwise the worst state wins: `missing`, then `partial`, then `complete`.
 
-So widget code does not draw its own error, no-traffic or setup face. It draws its loading state
-and its chart.
+So widget code does not draw its own error, no-traffic or setup face. It draws its chart, and its
+own loading state for a query that runs after the first answer.
+
+## Loading: never a blank card
+
+A board opens with every widget's queries in flight, and a blank card reads as broken.
+
+- **A skeleton until the first answer.** The frame covers the card with a chart-shaped skeleton
+  until any of its queries answers, then the widget draws its own card. A widget with no query,
+  or whose code reported an error, has nothing to wait for and shows none.
+- **Slow says so.** After 5 seconds (`SLOW_WIDGET_LOADING_MS`) the skeleton says "Still
+  loading…".
+- **A refresh keeps the chart.** Once a query answered, a new run never brings the skeleton back.
+  Retry starts the widget over, so it does.
+
+## Empty widgets: say how to get the data
+
+An empty card says what is not there and what sends it. The words are in
+`model/dashboard-widget/widget-guidance.ts`.
+
+- **No traffic.** In a project that never received a trace, "Send traces with the LangWatch SDK
+  to fill this widget." and "Set up tracing", which opens the traces page. In a project that
+  did, the period is quiet: the card offers no setup. Evaluations say they come from evaluators.
+- **Setup view.** The field's own step, such as "Send user_id in the trace metadata with the
+  LangWatch SDK." A trace field with no words of its own reads "Send <field> on your traces with
+  the LangWatch SDK."
+- **Several empty.** When two or more widgets on a board show no data (no traffic, the setup
+  view, or no rows from any query), a board that offers Langy says how many and offers "Ask
+  Langy to set this up", a draft naming them (`boardSetupDraft`).
 
 A widget's hand-kept needs (`requirements` in the catalogue) keep only what no query can see,
 such as a judge, a setting or a source to connect. A trace field the query reads is the query's

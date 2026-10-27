@@ -5,10 +5,14 @@
  */
 
 import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
-import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
+import type {
+  ChartFrameDashboardContext,
+  NavigableTarget,
+} from "@langwatch/analytics-contract/chart-frame-protocol";
 import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
@@ -19,15 +23,22 @@ import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
 import { withheldWords } from "../../../../model/dashboard-widget/widget-access.ts";
 import {
+  awaitsFirstAnswer,
   type WidgetFace,
   widgetFace,
 } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import {
   type WidgetExport,
   widgetExportStatus,
+  widgetShowsNoData,
 } from "../../../../model/dashboard-widget/widget-export.ts";
 import {
+  missingFieldGuidance,
+  noTrafficGuidance,
+} from "../../../../model/dashboard-widget/widget-guidance.ts";
+import {
   WidgetFailedFace,
+  WidgetLoadingFace,
   WidgetNoAccessFace,
   WidgetNoTrafficFace,
   WidgetSetupFace,
@@ -35,6 +46,7 @@ import {
 import { useDashboardRefreshedAt } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
+import { useSlowLoading } from "../../behavior/use-slow-loading.ts";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 
@@ -90,6 +102,7 @@ export function DashboardWidgetFrameOverWindow({
   onAskLangyToSetUp,
   onFaceChange,
   onExportChange,
+  onEmptyChange,
 }: DashboardWidgetFrameProps & {
   readonly timeWindow: { start: number; end: number };
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
@@ -101,6 +114,8 @@ export function DashboardWidgetFrameOverWindow({
   readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
   /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
   readonly onExportChange?: (widgetExport: WidgetExport) => void;
+  /** Told whether the card shows none of the widget's data, so a board can offer to set it up. */
+  readonly onEmptyChange?: (empty: boolean) => void;
 }) {
   const { colorMode } = useColorMode();
   const refreshedAt = useDashboardRefreshedAt();
@@ -135,6 +150,8 @@ export function DashboardWidgetFrameOverWindow({
     [face.kind, hasQueries, results],
   );
   useEffect(() => onExportChange?.(widgetExport), [onExportChange, widgetExport]);
+  const empty = widgetShowsNoData({ face: face.kind, status: widgetExport.status });
+  useEffect(() => onEmptyChange?.(empty), [onEmptyChange, empty]);
 
   // Retry starts the frame over, so every query of the widget runs again.
   const [attempt, setAttempt] = useState(0);
@@ -175,6 +192,9 @@ export function DashboardWidgetFrameOverWindow({
   const { diagnostic, onLog } = useFrameDiagnostic({
     resetKey: definition.code,
   });
+  // Until a query answers the frame has nothing to draw; code that reported an error never will.
+  const loading = hasQueries && diagnostic === null && awaitsFirstAnswer(records);
+  const slow = useSlowLoading({ loading });
 
   if (!parsed.success) {
     return (
@@ -189,6 +209,7 @@ export function DashboardWidgetFrameOverWindow({
     name: widgetName ?? "this widget",
     onRetry: retry,
     onAskLangyToSetUp,
+    onSetUp: (target) => onNavigate({ target, params: {} }),
   });
 
   // The frame stays mounted under a face, so a new period can bring the chart back.
@@ -204,6 +225,7 @@ export function DashboardWidgetFrameOverWindow({
           onLog={onLog}
           onNavigate={onNavigate}
           maxHeight={maxHeight}
+          cover={loading && !cover ? <WidgetLoadingFace slow={slow} /> : undefined}
         />
       </Box>
       {cover && (
@@ -222,11 +244,13 @@ function faceInPlaceOfChart({
   name,
   onRetry,
   onAskLangyToSetUp,
+  onSetUp,
 }: {
   face: WidgetFace;
   name: string;
   onRetry: () => void;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  onSetUp: (target: NavigableTarget) => void;
 }) {
   switch (face.kind) {
     case "no_access":
@@ -234,18 +258,42 @@ function faceInPlaceOfChart({
     case "failed":
       return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
     case "no_traffic":
-      return <WidgetNoTrafficFace unit={face.unit} />;
+      return <NoTrafficFace unit={face.unit} onSetUp={onSetUp} />;
     case "missing":
       return (
         <WidgetSetupFace
           label={face.missing.label}
           unit={face.unit}
+          guidance={missingFieldGuidance({ ...face.missing, unit: face.unit })}
           onAskLangy={onAskLangyToSetUp && (() => onAskLangyToSetUp(face.missing))}
         />
       );
     case "chart":
       return null;
   }
+}
+
+/** No traffic, with what sends it; a setup step only where the project awaits its first trace. */
+function NoTrafficFace({
+  unit,
+  onSetUp,
+}: {
+  unit: string;
+  onSetUp: (target: NavigableTarget) => void;
+}) {
+  const project = useAnalyticsHost().project();
+  // An aggregate receives no traces of its own (ADR-177), so it is not asked to send any.
+  const awaitsFirstTrace =
+    project !== undefined && !project.hasFirstMessage && !isAggregateProjectKind(project.kind);
+  const guidance = noTrafficGuidance({ unit, awaitsFirstTrace });
+  const action = guidance?.action;
+  return (
+    <WidgetNoTrafficFace
+      unit={unit}
+      guidance={guidance?.line}
+      onSetUp={action && { label: action.label, onClick: () => onSetUp(action.target) }}
+    />
+  );
 }
 
 /** The no-access state in the words for the project the reader is in. */

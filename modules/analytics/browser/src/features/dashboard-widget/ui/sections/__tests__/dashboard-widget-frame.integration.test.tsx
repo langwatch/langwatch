@@ -11,10 +11,11 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { periodMock, executorMock, frameProps } = vi.hoisted(() => ({
+const { periodMock, executorMock, frameProps, navigateMock } = vi.hoisted(() => ({
   periodMock: vi.fn(),
   executorMock: vi.fn(),
   frameProps: vi.fn<(props: SandboxedChartFrameProps) => void>(),
+  navigateMock: vi.fn(),
 }));
 
 vi.mock("../../../../../behavior/use-analytics-period.ts", async (importOriginal) => ({
@@ -27,16 +28,19 @@ vi.mock("../../../behavior/use-dashboard-widget-executor.ts", () => ({
 }));
 
 vi.mock("../../../behavior/use-dashboard-widget-chart-navigate.ts", () => ({
-  useDashboardWidgetChartNavigate: () => vi.fn(),
+  useDashboardWidgetChartNavigate: () => navigateMock,
 }));
 
 vi.mock("../sandboxed-chart-frame.tsx", () => ({
   SandboxedChartFrame: (props: SandboxedChartFrameProps) => {
     frameProps(props);
-    return <div data-testid="sandboxed-frame" />;
+    return <div data-testid="sandboxed-frame">{props.cover}</div>;
   },
 }));
 
+import type { AnalyticsHostProject } from "../../../../../model/analytics-host.ts";
+import { AnalyticsHostProvider } from "../../../../../model/analytics-host.ts";
+import { StubAnalyticsHost } from "../../../../../testing.tsx";
 import { DashboardRefreshedAtContext } from "../../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import {
   DashboardWidgetFrame,
@@ -177,22 +181,38 @@ const resultWith = (completeness?: QueryCompleteness) => ({
   ...(completeness ? { completeness } : {}),
 });
 
+const PROJECT: AnalyticsHostProject = {
+  id: "project_1",
+  slug: "project",
+  name: "Checkout Agent",
+  hasFirstMessage: true,
+};
+
 /** The board's widget, over a window, as a board card draws it. */
-const boardWidget = (props: {
+const boardWidget = ({
+  project = PROJECT,
+  graph = GRAPH,
+  ...props
+}: {
+  project?: AnalyticsHostProject;
+  graph?: unknown;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  onEmptyChange?: (empty: boolean) => void;
 }) => (
-  <DesignSystemProvider forcedTheme="light">
-    <DashboardWidgetFrameOverWindow
-      id="graph_1"
-      graph={GRAPH}
-      projectId="project_1"
-      projectSlug="project"
-      maxHeight={300}
-      widgetName="Cost per trace"
-      timeWindow={{ start: 1_000, end: 2_000 }}
-      {...props}
-    />
-  </DesignSystemProvider>
+  <AnalyticsHostProvider value={new StubAnalyticsHost({ project })}>
+    <DesignSystemProvider forcedTheme="light">
+      <DashboardWidgetFrameOverWindow
+        id="graph_1"
+        graph={graph}
+        projectId="project_1"
+        projectSlug="project"
+        maxHeight={300}
+        widgetName="Cost per trace"
+        timeWindow={{ start: 1_000, end: 2_000 }}
+        {...props}
+      />
+    </DesignSystemProvider>
+  </AnalyticsHostProvider>
 );
 
 /** The frame runs its query once; the executor answers with `answer`. */
@@ -310,5 +330,191 @@ describe("given a widget on a board", () => {
 
       expect(screen.queryByTestId("widget-state-face")).toBeNull();
     });
+  });
+});
+
+/** A query the test answers when it says so. */
+function deferred<T>() {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+const loadingFace = () => document.querySelector('[data-widget-state="loading"]');
+
+describe("given a widget on a board whose queries are running", () => {
+  describe("when none of its queries has answered yet", () => {
+    /** @scenario "A widget shows a loading skeleton while its first query runs" */
+    it("shows a skeleton until a query answers", async () => {
+      const answer = deferred<unknown>();
+      const run = frameRuns(() => answer.promise);
+      render(boardWidget({}));
+      expect(loadingFace()).not.toBeNull();
+      expect(screen.getByText("Loading")).toBeTruthy();
+
+      const running = run();
+      answer.resolve(resultWith(report({})));
+      await running;
+
+      expect(loadingFace()).toBeNull();
+    });
+  });
+
+  describe("when none has answered after 5 seconds", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A widget that loads for long says it is still loading" */
+    it("says it is still loading", () => {
+      vi.useFakeTimers();
+      frameRuns(() => new Promise(() => undefined));
+      render(boardWidget({}));
+      expect(screen.queryByText("Still loading…")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(4_999);
+      });
+      expect(screen.queryByText("Still loading…")).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      expect(screen.getByText("Still loading…")).toBeTruthy();
+    });
+  });
+
+  describe("when a query that answered runs again", () => {
+    /** @scenario "A refresh keeps the chart, with no skeleton" */
+    it("shows no skeleton", async () => {
+      const answers: Promise<unknown>[] = [
+        Promise.resolve(resultWith(report({}))),
+        new Promise(() => undefined),
+      ];
+      const run = frameRuns(() => answers.shift() ?? new Promise(() => undefined));
+      render(boardWidget({}));
+      await run();
+      void lastFrameProps().executeQuery({
+        queryName: "main",
+        params: {},
+        signal: new AbortController().signal,
+      });
+
+      expect(loadingFace()).toBeNull();
+    });
+  });
+
+  describe("when it has nothing to wait for", () => {
+    /** @scenario "A widget with nothing to wait for shows no skeleton" */
+    it("shows no skeleton for a widget with no queries", () => {
+      render(boardWidget({ graph: { ...GRAPH, queries: [] } }));
+
+      expect(loadingFace()).toBeNull();
+    });
+
+    /** @scenario "A widget with nothing to wait for shows no skeleton" */
+    it("drops the skeleton once the widget's code reports an error", () => {
+      frameRuns(() => new Promise(() => undefined));
+      render(boardWidget({}));
+      expect(loadingFace()).not.toBeNull();
+
+      act(() => {
+        lastFrameProps().onLog({ level: "error", source: "lw.error", text: "Render error" });
+      });
+
+      expect(loadingFace()).toBeNull();
+    });
+  });
+});
+
+describe("given an empty widget on a board", () => {
+  describe("when its project never received a trace and its query found no traffic", () => {
+    /** @scenario "A widget in a project that never sent a trace says how to send one" */
+    it("says how to send traces, and Set up tracing opens the traces page", async () => {
+      const run = frameRuns(() =>
+        Promise.resolve(resultWith(report({ state: "no_traffic", total: 0 }))),
+      );
+      render(boardWidget({ project: { ...PROJECT, hasFirstMessage: false } }));
+      await run();
+
+      expect(screen.getByText("No traces in this period")).toBeTruthy();
+      expect(
+        screen.getByText("Send traces with the LangWatch SDK to fill this widget."),
+      ).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Set up tracing" }));
+      expect(navigateMock).toHaveBeenCalledWith({ target: "traces", params: {} });
+    });
+  });
+
+  describe("when its project has received traces and its query found no traffic", () => {
+    /** @scenario "A quiet period offers no setup" */
+    it("says the period is empty and offers no setup", async () => {
+      const run = frameRuns(() =>
+        Promise.resolve(resultWith(report({ state: "no_traffic", total: 0 }))),
+      );
+      render(boardWidget({}));
+      await run();
+
+      expect(screen.getByText("No traces in this period")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Set up tracing" })).toBeNull();
+    });
+  });
+
+  describe("when its query needs the user id no trace carries", () => {
+    /** @scenario "The setup view says how to send the field it needs" */
+    it("names the field and the metadata key that sends it", async () => {
+      const run = frameRuns(() =>
+        Promise.resolve(
+          resultWith(
+            report({
+              state: "missing",
+              fields: [{ field: "UserId", label: "user", present: 0 }],
+            }),
+          ),
+        ),
+      );
+      render(boardWidget({}));
+      await run();
+
+      expect(screen.getByText("Needs user")).toBeTruthy();
+      expect(
+        screen.getByText("Send user_id in the trace metadata with the LangWatch SDK."),
+      ).toBeTruthy();
+    });
+  });
+});
+
+describe("given a widget whose card wants to know when it is empty", () => {
+  const emptyAfter = async (answer: () => Promise<unknown>) => {
+    const onEmptyChange = vi.fn();
+    const run = frameRuns(answer);
+    render(boardWidget({ onEmptyChange }));
+    await run();
+    return onEmptyChange.mock.calls.at(-1)?.[0];
+  };
+
+  /** @scenario "The frame tells its card when the widget shows no data" */
+  it("says empty for no traffic, the setup view, or a query with no rows", async () => {
+    expect(
+      await emptyAfter(() => Promise.resolve(resultWith(report({ state: "no_traffic" })))),
+    ).toBe(true);
+    cleanup();
+    expect(await emptyAfter(() => Promise.resolve(resultWith(MISSING_COST)))).toBe(true);
+    cleanup();
+    expect(await emptyAfter(() => Promise.resolve(resultWith(report({}))))).toBe(true);
+  });
+
+  /** @scenario "The frame tells its card when the widget shows no data" */
+  it("says not empty for a widget with rows, or still loading", async () => {
+    const withRows = { ...resultWith(report({})), rows: [{ n: 1 }] };
+    expect(await emptyAfter(() => Promise.resolve(withRows))).toBe(false);
+    cleanup();
+
+    const onEmptyChange = vi.fn();
+    frameRuns(() => new Promise(() => undefined));
+    render(boardWidget({ onEmptyChange }));
+    expect(onEmptyChange).toHaveBeenLastCalledWith(false);
   });
 });

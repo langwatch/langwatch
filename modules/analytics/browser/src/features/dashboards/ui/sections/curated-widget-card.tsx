@@ -26,6 +26,7 @@ export function CuratedWidgetCard({
   granularitySeconds,
   excludeOrigins,
   onAskLangy,
+  onEmptyChange,
 }: {
   widget: BoardTemplateWidget;
   /** The frame's id on this board: the template's id and the widget's key. */
@@ -41,6 +42,8 @@ export function CuratedWidgetCard({
   excludeOrigins: readonly string[];
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: () => void;
+  /** Told whether the card shows none of the widget's data. */
+  onEmptyChange?: (empty: boolean) => void;
 }) {
   const { name, definition } = widget;
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
@@ -73,6 +76,7 @@ export function CuratedWidgetCard({
         excludeOrigins={excludeOrigins}
         onFaceChange={setFace}
         onExportChange={csvExport.onExportChange}
+        onEmptyChange={onEmptyChange}
       />
     </WidgetCardShell>
   );

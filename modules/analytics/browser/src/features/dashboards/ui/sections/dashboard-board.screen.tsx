@@ -28,10 +28,12 @@ import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.t
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
+import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardLangyChip, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
   boardContextChip,
+  boardSetupDraft,
   boardSubject,
   widgetMissingDataDraft,
   widgetPromptDraft,
@@ -47,6 +49,7 @@ import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
 import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
 import { BoardUnavailable } from "../blocks/board-unavailable.tsx";
+import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
@@ -72,6 +75,14 @@ function AddWidgetButton({ onClick }: { onClick: () => void }) {
       <Plus size={15} strokeWidth={2} /> Add a widget
     </Button>
   );
+}
+
+/** "Ask Langy to set this up" for the board's empty widgets; absent without Langy. */
+function setupAsk({
+  langy,
+  ...draft
+}: Parameters<typeof boardSetupDraft>[0] & { langy: ReturnType<typeof useLangyAsk> }) {
+  return langy.enabled ? () => langy.ask(boardSetupDraft(draft)) : undefined;
 }
 
 function OpenBoard({ board }: { board: SavedBoard }) {
@@ -102,6 +113,9 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const langy = useLangyAsk();
   useBoardLangyChip(boardContextChip({ board: subject, range, period }));
   const editor = useBoardEditor({ board: subject, period, widgets });
+  const empty = useEmptyWidgets();
+  const emptyWidgetNames = empty.emptyNames({ widgets, keyOf: ({ id }) => id });
+  const askLangyToSetUp = setupAsk({ langy, emptyWidgetNames, board: subject, period });
 
   const openPicker = () => {
     if (!picker.isOpen) picker.open();
@@ -195,6 +209,10 @@ function OpenBoard({ board }: { board: SavedBoard }) {
         <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
           <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
             <VStack align="stretch" gap={4}>
+              <EmptyWidgetsBanner
+                emptyWidgetNames={emptyWidgetNames}
+                onAskLangy={askLangyToSetUp}
+              />
               <BoardWidgetsGrid
                 projectId={projectId}
                 projectSlug={saved.projectSlug}
@@ -203,6 +221,9 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 widgets={widgets}
                 period={period}
                 isWriting={boardWidgets.isWriting}
+                onEmptyChange={({ widget, empty: isEmpty }) =>
+                  empty.report({ key: widget.id, empty: isEmpty })
+                }
                 langyFor={
                   langy.enabled
                     ? (widget) => ({

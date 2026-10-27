@@ -1,19 +1,75 @@
 /**
- * What a widget card shows in place of its chart when the chart would mislead: no traffic in
- * the period, a field its query needs that no trace carries, data the reader may not see, or a
- * failure it cannot draw past. The rules: features/dashboards/WIDGET_STANDARD.md.
+ * What a widget card shows in place of its chart when the chart would mislead or is not there
+ * yet: loading, no traffic, a field no trace carries, data the reader may not see, or a failure
+ * it cannot draw past. The rules: features/dashboards/WIDGET_STANDARD.md.
  */
 
-import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Lock, Plug, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
+import {
+  Box,
+  Button,
+  HStack,
+  Skeleton,
+  Text,
+  VisuallyHidden,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { ArrowRight, Lock, Plug, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
 
-/** The query found nothing in the board's period at all: "No traces in this period". */
-export function WidgetNoTrafficFace({ unit }: { unit: string }) {
+/** The widget's queries have not answered yet: a chart-shaped skeleton, and words when slow. */
+export function WidgetLoadingFace({ slow }: { slow: boolean }) {
   return (
-    <VStack height="full" justify="center" paddingX={4}>
+    <VStack
+      height="full"
+      align="stretch"
+      justify="center"
+      gap={3}
+      padding={4}
+      aria-busy="true"
+      data-widget-state="loading"
+    >
+      <VisuallyHidden>Loading</VisuallyHidden>
+      <Skeleton height="20px" width="30%" aria-hidden />
+      <Skeleton flex={1} maxHeight="160px" aria-hidden />
+      {slow && (
+        <Text textStyle="caption" color="fg.muted" textAlign="center">
+          Still loading…
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
+/**
+ * The query found nothing in the board's period at all: "No traces in this period", then what
+ * sends that data and its setup step, when the widget has words for them.
+ */
+export function WidgetNoTrafficFace({
+  unit,
+  guidance,
+  onSetUp,
+}: {
+  unit: string;
+  /** What sends the data, "Send traces with the LangWatch SDK to fill this widget." */
+  guidance?: string;
+  /** The setup step's button, when the project has one to take. */
+  onSetUp?: { label: string; onClick: () => void };
+}) {
+  return (
+    <VStack height="full" justify="center" gap={1.5} paddingX={4} textAlign="center">
       <Text textStyle="bodySm" color="fg.muted">
         No {unit} in this period
       </Text>
+      {guidance && (
+        <Text textStyle="caption" color="fg.muted" maxWidth="320px">
+          {guidance}
+        </Text>
+      )}
+      {onSetUp && (
+        <Button size="xs" variant="outline" marginTop={1.5} onClick={onSetUp.onClick}>
+          {onSetUp.label}
+          <ArrowRight size={13} aria-hidden />
+        </Button>
+      )}
     </VStack>
   );
 }
@@ -25,12 +81,15 @@ export function WidgetNoTrafficFace({ unit }: { unit: string }) {
 export function WidgetSetupFace({
   label,
   unit,
+  guidance,
   onAskLangy,
 }: {
   /** The field's plain words, "total cost". */
   label: string;
   /** What the query counts, "traces". */
   unit: string;
+  /** What sends the field, "Send user_id in the trace metadata with the LangWatch SDK." */
+  guidance?: string;
   onAskLangy?: () => void;
 }) {
   return (
@@ -44,6 +103,11 @@ export function WidgetSetupFace({
       <Text textStyle="caption" color="fg.muted">
         None of the {unit} in this period have it.
       </Text>
+      {guidance && (
+        <Text textStyle="caption" color="fg.muted">
+          {guidance}
+        </Text>
+      )}
       {onAskLangy && (
         <Button size="xs" variant="outline" marginTop={1.5} onClick={onAskLangy}>
           <Sparkles size={13} aria-hidden />
