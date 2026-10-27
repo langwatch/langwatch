@@ -631,12 +631,10 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
     });
 
     function partialBlobStore(): TraceBlobStoreService {
-      return blobStoreReading(
-        async ({ field }) => {
-          if (field === attrA) return fullValue;
-          throw new BlobNotFoundError("evt-b", field, "proj-1");
-        },
-      );
+      return blobStoreReading(async ({ field }) => {
+        if (field === attrA) return fullValue;
+        throw new BlobNotFoundError("evt-b", field, "proj-1");
+      });
     }
 
     describe("when resolved", () => {

@@ -17,6 +17,7 @@ import (
 	"github.com/langwatch/langwatch/tools/chartheap"
 )
 
+// no-test: a thin loop over chartheap.Checks; tools/chartheap tests every check and the chart workflow runs this.
 func main() {
 	chart := flag.String("chart", "charts/langwatch", "path to the langwatch chart")
 	flag.Parse()
