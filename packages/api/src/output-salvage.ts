@@ -39,22 +39,32 @@ function innerOf(schema: z.ZodType): z.ZodType | undefined {
 
   if (schema instanceof z.ZodLazy) return schema.def.getter() as z.ZodType;
 
-  // A pipe or codec answers what its output side names; a transform there is unknowable.
-  if (schema instanceof z.ZodPipe || schema instanceof z.ZodCodec) {
-    return schema.def.out instanceof z.ZodTransform ? NOTHING : (schema.def.out as z.ZodType);
-  }
-
   return undefined;
 }
 
-/** Names a value nothing may be answered for: the salvage keeps none of it. */
-const NOTHING = z.never();
+/**
+ * A pipe or codec is cut by both sides, input first, so neither side's allow-list is skipped. A
+ * transform on the output side computes what nothing names, so it answers nothing.
+ */
+function salvagePipe(schema: z.ZodPipe | z.ZodCodec, value: unknown): unknown {
+  const input = schema.def.in as z.ZodType;
+  const output = schema.def.out as z.ZodType;
+
+  if (output instanceof z.ZodTransform) return undefined;
+
+  const cut = input instanceof z.ZodTransform ? value : withoutUndeclaredKeys(input, value);
+
+  return withoutUndeclaredKeys(output, cut);
+}
 
 function salvage(schema: z.ZodType, value: unknown): unknown {
   const inner = innerOf(schema);
 
   // Here a null or undefined was already refused, so the wrapper's field is dropped.
   if (inner) return value == null ? undefined : withoutUndeclaredKeys(inner, value);
+
+  if (schema instanceof z.ZodPipe || schema instanceof z.ZodCodec)
+    return salvagePipe(schema, value);
 
   if (schema instanceof z.ZodObject) return salvageObject(schema, value);
 

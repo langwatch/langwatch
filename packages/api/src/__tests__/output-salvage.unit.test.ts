@@ -199,6 +199,18 @@ describe("withoutUndeclaredKeys", () => {
       expect(withoutUndeclaredKeys(schema, { id: "a", secret: "s" })).toEqual({ id: "a" });
     });
 
+    it("cuts by the input side when the output side allows anything", () => {
+      const schema = z.object({ id: z.string() }).pipe(z.unknown());
+
+      expect(withoutUndeclaredKeys(schema, { id: 1, secret: "s" })).toEqual({});
+      expect(
+        withoutUndeclaredKeys(z.object({ id: z.number() }).strict().pipe(z.unknown()), {
+          id: 1,
+          secret: "s",
+        }),
+      ).toEqual({ id: 1 });
+    });
+
     it("cuts a codec by its output side", () => {
       const schema = z.codec(z.object({ id: z.string() }), z.object({ id: z.string() }).strict(), {
         decode: (value) => value,

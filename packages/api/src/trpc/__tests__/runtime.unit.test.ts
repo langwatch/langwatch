@@ -348,7 +348,7 @@ describe("a mounted contract procedure", () => {
       expect(JSON.stringify(record)).not.toContain("stored-value");
     });
 
-    /** @scenario "A procedure that declares no output and answers a value is logged and answers nothing" */
+    /** @scenario "A subscription that declares no output is refused" */
     it("still refuses a subscription that declares no output, and logs it", async () => {
       const { runtime } = harness();
       const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };

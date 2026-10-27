@@ -98,6 +98,14 @@ Feature: Transport declaration split
     And the log carries no response contents
     And the caller receives nothing
 
+  @unit
+  Scenario: A subscription that declares no output is refused
+    Given a subscription that declares no output
+    When its handler streams values
+    Then the stream is logged as an error with the procedure name
+    And the log carries no response contents
+    And the caller receives an internal error and never a streamed value
+
   @unit @typecheck
   Scenario: The browser derives its client from the contract
     Given a contract built with defineTrpcContract
