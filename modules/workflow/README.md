@@ -11,7 +11,7 @@ Workflows: definitions, graph versions and the Studio DSL, and executing a workf
 | Classification | core (`modules/catalogue.json`)                                                                            |
 | Subjects       | workflow                                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                |
-| Api token      | `WorkflowApi` = `moduleApi<WorkflowApi>()("workflow")`, `contract/src/workflow.api.ts:407` (53 operations) |
+| Api token      | `WorkflowApi` = `moduleApi<WorkflowApi>()("workflow")`, `contract/src/workflow.api.ts:409` (53 operations) |
 | Other token    | `WorkflowBrowserApi`, `process/src/transport/workflow.trpc.ts:26`                                          |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                 |
 
