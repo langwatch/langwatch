@@ -1,5 +1,6 @@
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import {
+  boardExcludedOriginsSchema,
   boardSchema,
   DashboardNotFoundError,
   type DashboardScope,
@@ -70,12 +71,20 @@ const boardRow = (row: DashboardsV2): BoardRecord =>
     updatedAt: row.updatedAt,
   });
 
-/** A null list is written as SQL NULL, the board's default, not as a JSON null. */
+/**
+ * A null list is written as SQL NULL, the board's default, not as a JSON null. A list is checked
+ * as the contract bounds it, so no caller stores one a widget's query would refuse.
+ */
 const boardData = ({ excludedOrigins, ...data }: BoardUpdate): Prisma.DashboardsV2UpdateInput => ({
   ...data,
   ...(excludedOrigins === undefined
     ? {}
-    : { excludedOrigins: excludedOrigins === null ? Prisma.DbNull : [...excludedOrigins] }),
+    : {
+        excludedOrigins:
+          excludedOrigins === null
+            ? Prisma.DbNull
+            : [...boardExcludedOriginsSchema.parse(excludedOrigins)],
+      }),
 });
 
 export class PrismaBoardRepository

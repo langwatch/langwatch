@@ -1738,7 +1738,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When a member opens it
     Then the header shows "Langy traces: Left out" beside the period
     And every widget leaves out the origin "langy", as before (AC190)
-    # Why: no board changes until a member asks; the stored value is empty until then
+    # Why: no board changes until a member asks; the stored value is null (the default) until
+    # then, which is not the empty list: an empty list includes Langy (AC200e)
 
   @unit @integration
   Scenario: AC200b Langy setting: a board set to include Langy runs every widget with no origin left out

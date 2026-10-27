@@ -338,7 +338,8 @@ describe("given a stored board's Langy traces setting", () => {
 
       await user.click(await screen.findByRole("button", { name: "Langy traces: Left out" }));
       await user.click(await screen.findByRole("menuitemradio", { name: "Included" }));
-      await screen.findByRole("button", { name: "Langy traces: Included" });
+      const pending = await screen.findByRole("button", { name: "Langy traces: Included" });
+      expect(pending.hasAttribute("disabled")).toBe(true);
       await vi.waitFor(() => expect(refreshedAt()).toBeDefined());
       const afterPick = refreshedAt();
       await act(async () => server.refuseUpdate());

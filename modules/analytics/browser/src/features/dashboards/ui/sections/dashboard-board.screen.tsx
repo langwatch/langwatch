@@ -90,6 +90,7 @@ function BoardLangySetting({
   return (
     <BoardLangyControl
       includesLangy={origins.includesLangy}
+      isSaving={origins.isSaving}
       onPick={(includeLangy) => {
         // A frame re-runs on a refresh, not on new origins alone.
         if (origins.setIncludesLangy(includeLangy)) onChanged();

@@ -49,6 +49,8 @@ export function useBoardOrigins({
     /** What `useBoardPeriod` runs the board with. */
     excludedOrigins,
     includesLangy,
+    /** A pick is saving; the control takes no other until it lands. */
+    isSaving: update.isPending,
     /** Saves the pick; answers whether it changed anything, so the board can refresh. */
     setIncludesLangy: (includeLangy: boolean): boolean => {
       if (includeLangy === includesLangy) return false;
