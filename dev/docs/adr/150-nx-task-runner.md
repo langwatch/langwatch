@@ -468,6 +468,8 @@ The runner behind `pnpm lint`, `lint:changed` and `lint:types` moved from
 it imported; repository tooling is Go. Its scope, configs and output are unchanged,
 with one fix: oxlint's "No files found to
 lint." (every path in scope matched an ignore pattern) is a clean run, not a
-failed process. Two smaller differences: an unknown flag is refused, not ignored, and
-findings sort by file byte-wise rather than by locale. The Nx plugins in `dev/nx/`
+failed process. Three smaller differences: an unknown flag is refused, not ignored;
+findings sort by file byte-wise rather than by locale; and a `--base` git cannot read,
+or a `--changed` run with no merge base, ends the run with exit 1 naming the git
+command, where the old runner linted only untracked files and exited 0. The Nx plugins in `dev/nx/`
 stay JavaScript, because Nx loads them.
