@@ -298,9 +298,31 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
           REDIS_URL: redis://localhost:6379
           CLICKHOUSE_HOST: http://localhost:8123
+          # The api's voice listener holds the default port; the worker needs none.
+          VOICE_TUNNEL: "false"
+          VOICE_WS_PORT: "0"
+          WORKER_METRICS_PORT: "2999"
+        # The seed's organization create waits on a grant projection the worker
+        # folds, so the worker must answer /readyz before the seed runs.
         run: |
+          set -euo pipefail
           pnpm start > /tmp/langwatch-worker.log 2>&1 &
           echo $! > /tmp/langwatch-worker.pid
+          for attempt in $(seq 1 60); do
+            if ! kill -0 "$(cat /tmp/langwatch-worker.pid)" 2> /dev/null; then
+              echo "::error title=gateway-matrix::the worker exited before it was ready"
+              tail -n 200 /tmp/langwatch-worker.log
+              exit 1
+            fi
+            if curl -fsS -o /dev/null http://127.0.0.1:2999/readyz; then
+              echo "worker ready after ${attempt} probes"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error title=gateway-matrix::the worker never answered /readyz"
+          tail -n 200 /tmp/langwatch-worker.log
+          exit 1
 
       # Mints LW_PROJECT_API_KEY and one TEST_VK_<PROVIDER> per provider with
       # credentials into $GITHUB_ENV. Bedrock's model provider carries only
