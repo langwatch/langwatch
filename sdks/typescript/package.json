@@ -118,7 +118,7 @@
     "dotenv": "catalog:",
     "dotenv-cli": "^11.0.0",
     "esbuild": "catalog:",
-    "eslint": "^9.32.0",
+    "eslint": "^10.13.0",
     "fets": "^0.8.5",
     "fishery": "^2.3.1",
     "js-yaml": "catalog:",
