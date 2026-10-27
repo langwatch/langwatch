@@ -103,6 +103,7 @@ describe("given the LangWatchQL guide and the code's numbers", () => {
       const counts = pages.flatMap((doc) => [
         ...[...doc.matchAll(/(?:more than|maximum of|above) ([\d,]+) rows/g)].map((m) => m[1]),
         ...[...doc.matchAll(/`LIMIT (\d+)`/g)].map((m) => m[1]),
+        ...[...doc.matchAll(/`LIMIT` above ([\d,]+)/g)].map((m) => m[1]),
       ]);
 
       expect(counts.length).toBeGreaterThan(0);
