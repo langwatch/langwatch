@@ -45,8 +45,10 @@ No migration. Existing rows keep the issuer they carry and stay findable.
 
 - A connection whose identity provider changes issuer refuses its existing subjects until
   their rows are re-linked. 1.7.1 failed those sign-ins too, on the unique constraint.
-- Microsoft is not guarded: its `sub` is pairwise per application, so two tenants do not
-  share one. Its rows still carry the tenant issuer identity reads.
+- Microsoft is not guarded: better-auth keys its rows by the `oid` claim, not `sub`
+  (`(microsoft, oid)` in 1.7.7; 1.7.1 also keyed the tenant issuer). Microsoft assigns
+  `oid`, so no tenant can choose one that collides with another tenant's. Its rows still
+  carry the tenant issuer identity reads.
 - The issuer-keyed account query shape in identity's storage branch is no longer issued by
   better-auth. It is left in place and can go once 1.7.7 has run in production.
 
