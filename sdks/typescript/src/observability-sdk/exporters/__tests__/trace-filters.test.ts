@@ -241,6 +241,12 @@ describe("trace-filters", () => {
       expect(isVercelAiSpan(createMockSpan("op", "Ai"))).toBe(true);
     });
 
+    /** @scenario "AI SDK 7's gen_ai spans pass the vercelAIOnly preset" */
+    it("returns true for gen_ai scope emitted by AI SDK 7", () => {
+      expect(isVercelAiSpan(createMockSpan("chat gpt-5-mini", "gen_ai"))).toBe(true);
+      expect(isVercelAiSpan(createMockSpan("op", "GEN_AI"))).toBe(true);
+    });
+
     it("returns false for non-ai scopes", () => {
       expect(isVercelAiSpan(createMockSpan("op", "http"))).toBe(false);
       expect(isVercelAiSpan(createMockSpan("op", "custom"))).toBe(false);

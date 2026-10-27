@@ -123,12 +123,13 @@ export function valueMatches(value: string, rule: Match): boolean {
 }
 
 /**
- * Checks if a span is from the Vercel AI SDK (scope name === 'ai', case-insensitive).
+ * Checks if a span is from the Vercel AI SDK (scope name 'ai' or 'gen_ai', case-insensitive).
+ * AI SDK 6 and earlier emit 'ai'; `@ai-sdk/otel` (AI SDK 7) emits 'gen_ai'.
  * @param span - Span to check
  */
 export function isVercelAiSpan(span: ReadableSpan): boolean {
   const scope = span.instrumentationScope?.name?.toLowerCase?.() ?? "";
-  return scope === "ai";
+  return scope === "ai" || scope === "gen_ai";
 }
 
 /**

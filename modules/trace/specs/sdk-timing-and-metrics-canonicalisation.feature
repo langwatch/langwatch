@@ -141,3 +141,11 @@ Feature: SDK timing and metrics canonicalisation
       Given a span whose start and end are the same instant
       When it is folded into a trace
       Then the trace duration is zero
+
+  @unit
+  Scenario: AI SDK 7's time to first chunk becomes the time to first token
+    Given a span carries gen_ai.client.operation.time_to_first_chunk in seconds, as AI SDK 7 records it
+    When the span is canonicalised
+    Then gen_ai.server.time_to_first_token holds that time in milliseconds and the client key is consumed
+    But when gen_ai.response.time_to_first_chunk also carries a valid time, that one wins
+    And when gen_ai.response.time_to_first_chunk is negative, the client key is used instead
