@@ -38,6 +38,8 @@ import {
 } from "../../../model/audit-log-export.ts";
 import {
   auditBackLink,
+  type AuditProjectFilter,
+  auditProjectFilterFor,
   matchMemberId,
   searchMatchesNobody,
   readAuditPaging,
@@ -238,9 +240,11 @@ export default function AuditLogScreen() {
 
   const [userSearch, setUserSearch] = useState(query.userSearch ?? "");
   const [actionFilter, setActionFilter] = useState(query.actionFilter ?? "");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    scope.projectId ?? null,
-  );
+  const [projectFilter, setProjectFilter] = useState<AuditProjectFilter>(() => ({
+    organizationId,
+    projectId: scope.projectId ?? null,
+  }));
+  const selectedProjectId = auditProjectFilterFor({ filter: projectFilter, organizationId });
   const [isExporting, setIsExporting] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
@@ -304,7 +308,7 @@ export default function AuditLogScreen() {
   };
 
   const handleProjectChange = (projectId: string | null) => {
-    setSelectedProjectId(projectId);
+    setProjectFilter({ organizationId, projectId });
     host.setQuery(withAuditFilter(query, { projectId: projectId ?? void 0 }));
   };
 

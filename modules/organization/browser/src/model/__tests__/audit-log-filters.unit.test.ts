@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   auditBackLink,
+  auditProjectFilterFor,
   matchMemberId,
   readAuditPaging,
   readAuditTarget,
@@ -194,6 +195,33 @@ describe("given the members the user box matches against", () => {
     /** @scenario The user search resolves a typed name or address to one actor */
     it("applies no user filter rather than filtering to nobody", () => {
       expect(matchMemberId(members, "carol")).toBeUndefined();
+    });
+  });
+});
+
+describe("given a project filter picked in one organization", () => {
+  const filter = { organizationId: "org-acme", projectId: "proj-1" };
+
+  describe("when the reader is still in that organization", () => {
+    it("keeps filtering by that project", () => {
+      expect(auditProjectFilterFor({ filter, organizationId: "org-acme" })).toBe("proj-1");
+    });
+  });
+
+  describe("when the reader has switched organization and stayed on the page", () => {
+    it("drops the filter rather than asking for a project the new organization lacks", () => {
+      expect(auditProjectFilterFor({ filter, organizationId: "org-beta" })).toBeNull();
+    });
+  });
+
+  describe("when no project was ever picked", () => {
+    it("applies no project filter", () => {
+      expect(
+        auditProjectFilterFor({
+          filter: { organizationId: "org-acme", projectId: null },
+          organizationId: "org-acme",
+        }),
+      ).toBeNull();
     });
   });
 });

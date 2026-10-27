@@ -188,8 +188,12 @@ export function isSettingsShellRoute(pathname: string): boolean {
   return isPathUnder({ pathname, base: "/settings" }) || isPathUnder({ pathname, base: "/ops" });
 }
 
-/** Detour pages addressed by one organization's entity; the rest exist in every organization. */
-const ENTITY_ADDRESSED_DETOUR_BASES = ["/settings/teams", "/ops/projections"];
+/**
+ * Detour pages addressed by one organization's entity. Instance pages under
+ * `/ops` are not among them: a replay run or an operator belongs to the
+ * instance, so its address means the same thing in every organization.
+ */
+const ENTITY_ADDRESSED_DETOUR_BASES = ["/settings/teams"];
 
 /**
  * Whether a detour address names an entity of the current organization, such

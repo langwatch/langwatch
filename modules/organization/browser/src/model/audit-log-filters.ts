@@ -123,3 +123,21 @@ export function searchMatchesNobody(
   if (!members || !search.trim()) return false;
   return matchMemberId(members, search) === undefined;
 }
+
+/** The project filter, remembered together with the organization it was picked in. */
+export type AuditProjectFilter = { organizationId: string; projectId: string | null };
+
+/**
+ * The project to filter by now. Switching organization keeps the reader on
+ * this page, so a filter picked in the one they left would ask the new one
+ * for a project it has never heard of, emptying the table and the export.
+ */
+export function auditProjectFilterFor({
+  filter,
+  organizationId,
+}: {
+  filter: AuditProjectFilter;
+  organizationId: string;
+}): string | null {
+  return filter.organizationId === organizationId ? filter.projectId : null;
+}

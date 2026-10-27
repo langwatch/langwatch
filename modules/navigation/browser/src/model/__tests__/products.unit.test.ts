@@ -144,16 +144,21 @@ describe("productFromPathname", () => {
 });
 
 describe("detour addresses that name an entity", () => {
-  describe("given an address that names one organization's team or run", () => {
-    it("reports it as entity-addressed, since the next organization has no such thing", () => {
+  describe("given an address that names one organization's team", () => {
+    it("reports it as entity-addressed, since the next organization has no such team", () => {
       expect(isEntityAddressedDetourRoute("/settings/teams/acme-core")).toBe(true);
-      expect(isEntityAddressedDetourRoute("/ops/projections/run_17")).toBe(true);
     });
   });
 
-  describe("given a detour address that names no entity", () => {
-    it("reports it as portable, including the team list the entity pages hang off", () => {
-      for (const pathname of ["/settings", "/settings/members", "/settings/teams", "/ops"]) {
+  describe("given a detour address that names no organization entity", () => {
+    it("reports it as portable, including the team list and the instance pages", () => {
+      for (const pathname of [
+        "/settings",
+        "/settings/members",
+        "/settings/teams",
+        "/ops",
+        "/ops/projections/run_17",
+      ]) {
         expect(isEntityAddressedDetourRoute(pathname)).toBe(false);
       }
     });

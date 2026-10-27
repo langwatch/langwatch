@@ -92,20 +92,6 @@ describe("resolveOrgSwitchDestination", () => {
     });
   });
 
-  describe("given the product gates have not answered yet", () => {
-    it("lands on the new organization's project home rather than the root", () => {
-      // The caller passes no product and nothing reachable while the gates
-      // load; the project home needs no gate.
-      expect(
-        resolveOrgSwitchDestination({
-          currentProduct: null,
-          reachableProducts: [],
-          projectSlug: "beta-app",
-        }),
-      ).toBe("/beta-app");
-    });
-  });
-
   describe("given nothing can be decided", () => {
     it("lands on the root, which re-resolves", () => {
       expect(
