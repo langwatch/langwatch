@@ -188,12 +188,12 @@ The application runs entirely offline, using only materialized prompts, and need
 
 A fetch policy decides whether `prompts.get` reads the materialized file, calls the LangWatch API, or both. The Python and TypeScript SDKs ship the same four policies. When you don't pass one, both use `MATERIALIZED_FIRST`.
 
-| Policy                         | Behavior                                                                                                    | Use Case                                  |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `MATERIALIZED_FIRST` (default) | Uses the local file if there is one, otherwise fetches from the API                                         | Most applications                         |
-| `ALWAYS_FETCH`                 | Fetches from the API, and uses the local file only if that call fails                                       | Live updates with an offline fallback     |
-| `CACHE_TTL`                    | Fetches from the API and keeps the result in memory for the TTL (default 5 minutes). Uses the local file if a fetch fails | Controlled update frequency               |
-| `MATERIALIZED_ONLY`            | Never calls the API, and fails if there is no local file                                                    | Air-gapped or strict offline environments |
+| Policy                         | Behavior                                                                                             | Use Case                                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `MATERIALIZED_FIRST` (default) | Uses the local file if there is one, otherwise fetches from the API                                  | Most applications                         |
+| `ALWAYS_FETCH`                 | Fetches from the API, and uses the local file only if that call fails                                | Live updates with an offline fallback     |
+| `CACHE_TTL`                    | Fetches from the API and caches it for the TTL (default 5 min); uses the local file if a fetch fails | Controlled update frequency               |
+| `MATERIALIZED_ONLY`            | Never calls the API, and fails if there is no local file                                             | Air-gapped or strict offline environments |
 
 <Tabs>
   <Tab title="Python SDK">
@@ -275,7 +275,7 @@ The Python SDK only uses the second source, the `materialized` path in `prompts-
 
 ### Versions and Tags
 
-The local file holds the version you last pulled. `MATERIALIZED_FIRST` returns it even when you pass a specific version. To get a specific or the latest version from the server, use `ALWAYS_FETCH`.
+The local file holds the version you last pulled. `MATERIALIZED_FIRST` returns it even when you pass a specific version. To get a specific or the latest version from the server, use `ALWAYS_FETCH`. If the API call fails, `ALWAYS_FETCH` returns the local file, which may not be the version or tag you asked for.
 
 Tags differ between the SDKs:
 
