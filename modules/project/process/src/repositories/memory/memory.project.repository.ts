@@ -41,7 +41,7 @@ import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import { isLegacyKeyRevoked } from "../../rules/legacy-project-key.rules.ts";
 import type {
-  LiveLegacyProjectKey,
+  LiveLegacyKey,
   ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
@@ -664,7 +664,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     return this.#database.findLegacyKeyUse(input.projectId) ?? null;
   }
 
-  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyProjectKey[]> {
+  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]> {
     return this.#database
       .projects()
       .filter(

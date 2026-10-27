@@ -42,13 +42,9 @@ import {
 } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type {
-  LiveLegacyProjectKey,
-  ProjectRepository,
-} from "../repositories/project.repository.ts";
+import type { LiveLegacyKey, ProjectRepository } from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
 import { isLegacyKeyRevoked } from "../rules/legacy-project-key.rules.ts";
-import { memberScopes, namesNoScope, reachesNoScope } from "../rules/project-scope.rules.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
 import { ProjectInternalService } from "./project-internal.service.ts";
@@ -362,10 +358,14 @@ export class ProjectService {
       return this.repository.findSharedProjectSlugs({ organizationId, limit });
     }
 
-    const member = memberScopes(
-      await this.authorization.listUserBindings({ organizationId, userId: memberUserId }),
-    );
-    if (reachesNoScope(member)) return [];
+    const bindings = await this.authorization.listUserBindings({
+      organizationId,
+      userId: memberUserId,
+    });
+    const scopeIds = (scopeType: "TEAM" | "PROJECT") =>
+      bindings.filter((binding) => binding.scopeType === scopeType).map(({ scopeId }) => scopeId);
+    const member = { teamIds: scopeIds("TEAM"), projectIds: scopeIds("PROJECT") };
+    if (member.teamIds.length === 0 && member.projectIds.length === 0) return [];
 
     return this.repository.findSharedProjectSlugs({ organizationId, member, limit });
   }
@@ -403,7 +403,9 @@ export class ProjectService {
 
   async listActiveByScopes(input: ActiveProjectsByScopesInput): Promise<ActiveProjectsByScopes> {
     const parsed = activeProjectsByScopesInputSchema.parse(input);
-    if (namesNoScope(parsed)) return { data: [], hasMore: false };
+    if (!parsed.organizationWide && parsed.teamIds.length === 0 && parsed.projectIds.length === 0) {
+      return { data: [], hasMore: false };
+    }
 
     const rows = await this.repository.findActiveByScopes(parsed);
 
@@ -474,7 +476,7 @@ export class ProjectService {
     return this.repository.findLegacyApiKeyLastUsedAt(input);
   }
 
-  findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyProjectKey[]> {
+  findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]> {
     return this.repository.findLiveLegacyKeys(input);
   }
 

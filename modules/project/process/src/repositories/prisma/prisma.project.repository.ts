@@ -46,7 +46,7 @@ import {
   REVOKED_LEGACY_KEY_PREFIX,
 } from "../../rules/legacy-project-key.rules.ts";
 import type {
-  LiveLegacyProjectKey,
+  LiveLegacyKey,
   ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
@@ -835,7 +835,7 @@ export class PrismaProjectRepository
    * stored-prefix filter is a narrowing only: every row is still put to the
    * rule, which is the one place that decides what a revoked key looks like.
    */
-  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyProjectKey[]> {
+  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]> {
     const projects = await this.prisma.project.findMany({
       where: {
         archivedAt: null,

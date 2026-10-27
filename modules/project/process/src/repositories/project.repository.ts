@@ -31,7 +31,7 @@ import type {
 import type { Instant } from "@langwatch/time";
 
 /** A live project whose legacy `apiKey` still authenticates; never the key itself. */
-export type LiveLegacyProjectKey = Readonly<{
+export type LiveLegacyKey = Readonly<{
   projectId: string;
   /** The owning team, so a standing decision needs no lineage read of its own. */
   teamId: string;
@@ -169,7 +169,7 @@ export interface ProjectRepository {
   /** When the legacy key last authenticated, or nothing when no use was stamped. */
   findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null>;
   /** Live legacy keys in the organisation, excluding UNMANAGED_PROJECT_KEY_KINDS. */
-  findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyProjectKey[]>;
+  findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
   /** Creates a team's personal project once and answers its id; a second call creates nothing. */
