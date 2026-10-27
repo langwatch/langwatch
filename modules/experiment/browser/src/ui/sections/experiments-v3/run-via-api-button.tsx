@@ -22,9 +22,10 @@ export function RunViaApiDialogContainer({
 }) {
   const { project } = useOrganizationTeamProject();
 
-  const { experimentSlug, datasets, activeDatasetId } = useEvaluationsV3Store(
+  const { experimentSlug, datasets, activeDatasetId, concurrency } = useEvaluationsV3Store(
     useShallow((state) => ({
       experimentSlug: state.experimentSlug,
+      concurrency: state.ui.concurrency,
       datasets: state.datasets,
       activeDatasetId: state.activeDatasetId,
     })),
@@ -48,6 +49,7 @@ export function RunViaApiDialogContainer({
       datasetColumns={columnNames}
       datasetName={activeDataset?.name}
       projectSlug={project?.slug}
+      concurrency={concurrency}
     />
   );
 }

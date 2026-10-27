@@ -10,7 +10,7 @@ import {
   PLACEHOLDER_PARAMETERS,
 } from "../evaluate-api-snippet.ts";
 
-export type RunSnippetLang = "python" | "typescript" | "go" | "shell";
+export type RunSnippetLang = "python" | "typescript" | "go" | "shell" | "cli" | "github_actions";
 export type RunSnippetDataSource = "attached" | "inline" | "dataset_id";
 export type RunSnippetKind = "workflow" | "experiment";
 
@@ -36,6 +36,19 @@ export interface BuildRunSnippetInput {
   projectSlug?: string;
   /** Language the snippet is generated for. */
   lang: RunSnippetLang;
+  /**
+   * Cells the experiment run executes at once, 1 meaning one at a time in row
+   * order. Read only for kind "experiment": the workflow endpoint has no such field.
+   */
+  concurrency?: number;
+}
+
+/** The origin the CLI reaches without a LANGWATCH_ENDPOINT. */
+const CLOUD_ORIGIN = "https://app.langwatch.ai";
+
+/** The concurrency the snippet starts the run with, or undefined when it names none. */
+function runConcurrency({ kind, concurrency }: BuildRunSnippetInput): number | undefined {
+  return kind === "experiment" ? concurrency : undefined;
 }
 
 /** Placeholder a reader replaces with a real platform dataset id. */
@@ -160,9 +173,11 @@ function buildPythonSnippet(input: BuildRunSnippetInput): string {
     parametersExample,
     inlineRow,
   });
+  const concurrency = runConcurrency(input);
+  const concurrencyArg = concurrency !== undefined ? `, concurrency=${concurrency}` : "";
   const call =
     kind === "experiment"
-      ? `langwatch.experiment.run("${identifier}", ${arg})`
+      ? `langwatch.experiment.run("${identifier}", ${arg}${concurrencyArg})`
       : `langwatch.workflow.run("${identifier}", ${arg})`;
   const comment = dataSourceComment({
     dataSource,
@@ -194,9 +209,11 @@ function buildTypescriptSnippet(input: BuildRunSnippetInput): string {
     parametersExample,
     inlineRow,
   });
+  const concurrency = runConcurrency(input);
+  const concurrencyArg = concurrency !== undefined ? `\n    concurrency: ${concurrency},` : "";
   const call =
     kind === "experiment"
-      ? `await langwatch.experiments.runWithResults("${identifier}", {\n    ${arg},\n  })`
+      ? `await langwatch.experiments.runWithResults("${identifier}", {\n    ${arg},${concurrencyArg}\n  })`
       : `await langwatch.workflows.run("${identifier}", {\n    ${arg},\n  })`;
   const comment = dataSourceComment({
     dataSource,
@@ -251,6 +268,22 @@ function goRequestBody({
   dataSource,
   parametersExample,
   inlineRow,
+  concurrency,
+}: {
+  dataSource: RunSnippetDataSource;
+  parametersExample: Record<string, string | number | boolean>;
+  inlineRow: Record<string, string | number | boolean>;
+  concurrency?: number;
+}): string {
+  const source = goDataSourceEntry({ dataSource, parametersExample, inlineRow });
+  if (concurrency === undefined) return source;
+  return `${source}\n\t\t"concurrency": ${concurrency},`;
+}
+
+function goDataSourceEntry({
+  dataSource,
+  parametersExample,
+  inlineRow,
 }: {
   dataSource: RunSnippetDataSource;
   parametersExample: Record<string, string | number | boolean>;
@@ -282,7 +315,12 @@ function buildGoSnippet(input: BuildRunSnippetInput): string {
     datasetName,
     commentPrefix: "\t//",
   });
-  const body = goRequestBody({ dataSource, parametersExample, inlineRow });
+  const body = goRequestBody({
+    dataSource,
+    parametersExample,
+    inlineRow,
+    concurrency: runConcurrency(input),
+  });
 
   return `package main
 
@@ -464,6 +502,8 @@ function buildShellSnippet(input: BuildRunSnippetInput): string {
   } else {
     body = { parameters: parametersExample };
   }
+  const concurrency = runConcurrency(input);
+  if (concurrency !== undefined) body.concurrency = concurrency;
 
   // Pretty JSON re-indented two spaces so the body sits under `-d '`.
   const bodyJson = JSON.stringify(body, null, 2).replace(/\n/g, "\n  ");
@@ -518,6 +558,67 @@ curl -s "${baseUrl}/api/experiments/runs/$RUN_ID/results" \\
   -H "X-Auth-Token: \${LANGWATCH_API_KEY}" | jq`;
 }
 
+/** Single-quote a shell word when it holds anything beyond safe characters. */
+function shellWord(word: string): string {
+  return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`;
+}
+
+/** The `langwatch experiment run` command line, one flag per continued line. */
+function cliCommand({ input, binary }: { input: BuildRunSnippetInput; binary: string }): string {
+  const parts = [`${binary} experiment run ${shellWord(input.identifier)}`, "--wait"];
+  const concurrency = runConcurrency(input);
+  if (concurrency !== undefined) parts.push(`--concurrency ${concurrency}`);
+  if (input.dataSource === "attached") {
+    const parameters = buildParametersExample(input.entryFields, input.datasetColumns);
+    for (const [key, value] of Object.entries(parameters)) {
+      parts.push(`--param ${shellWord(`${key}=${String(value)}`)}`);
+    }
+  }
+  return parts.join(" \\\n  ");
+}
+
+/** The note a CLI snippet carries when the chosen data source is not the attached dataset. */
+function cliDataSourceComment({ dataSource, datasetName }: BuildRunSnippetInput): string {
+  if (dataSource === "attached") {
+    return dataSourceComment({ dataSource, datasetName, commentPrefix: "#" });
+  }
+  return "# The CLI runs the experiment's attached dataset. To pass inline rows or a\n# dataset id, use the Shell, Python or TypeScript snippet.";
+}
+
+function buildCliSnippet(input: BuildRunSnippetInput): string {
+  const endpoint =
+    input.baseUrl === CLOUD_ORIGIN ? "" : `export LANGWATCH_ENDPOINT="${input.baseUrl}"\n`;
+
+  return `# npm install -g langwatch
+export LANGWATCH_API_KEY="your-api-key"
+${endpoint}
+${cliDataSourceComment(input)}
+# --wait exits non-zero when the run fails, so a CI job fails with it.
+${cliCommand({ input, binary: "langwatch" })}`;
+}
+
+function buildGithubActionsSnippet(input: BuildRunSnippetInput): string {
+  const endpoint =
+    input.baseUrl === CLOUD_ORIGIN ? "" : `\n    LANGWATCH_ENDPOINT: ${input.baseUrl}`;
+  const comment = cliDataSourceComment(input)
+    .split("\n")
+    .map((line) => `    ${line}`)
+    .join("\n");
+  const command = cliCommand({ input, binary: "npx --yes langwatch@latest" })
+    .split("\n")
+    .map((line) => `    ${line}`)
+    .join("\n");
+
+  return `# A step for a job in .github/workflows/*.yml.
+# Store the project API key as the repository secret LANGWATCH_API_KEY.
+- name: Run the ${input.identifier} experiment
+  env:
+    LANGWATCH_API_KEY: \${{ secrets.LANGWATCH_API_KEY }}${endpoint}
+  run: |
+${comment}
+${command}`;
+}
+
 /**
  * Build the Run via API snippet for one (language x data source) combination.
  */
@@ -525,5 +626,7 @@ export function buildRunSnippet(input: BuildRunSnippetInput): string {
   if (input.lang === "python") return buildPythonSnippet(input);
   if (input.lang === "typescript") return buildTypescriptSnippet(input);
   if (input.lang === "go") return buildGoSnippet(input);
+  if (input.lang === "cli") return buildCliSnippet(input);
+  if (input.lang === "github_actions") return buildGithubActionsSnippet(input);
   return buildShellSnippet(input);
 }
