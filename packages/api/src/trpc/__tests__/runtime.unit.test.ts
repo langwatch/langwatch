@@ -324,6 +324,29 @@ describe("a mounted contract procedure", () => {
       expect(JSON.stringify(record)).not.toContain("annotation-1");
       expect(JSON.stringify(record)).not.toContain("stored-value");
     });
+
+    /** @scenario "A procedure whose answer breaks its output schema is logged and still answered" */
+    it("logs a value from a procedure that declares no output, and answers nothing", async () => {
+      const { runtime } = harness();
+      const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
+
+      const declaration = reviewRouter({
+        getById: (async () => ({ id: "annotation-1", comment: "read" })) as never,
+        archive: (async () => ({ secret: "stored-value" })) as never,
+      });
+
+      const caller = runtime
+        .mount(declaration, () => app)
+        .createCaller({ actor: { id: "reviewer-1" } });
+
+      const answer = await caller.archive({ projectId: "project-1", id: "annotation-1" });
+
+      expect(answer).toBeUndefined();
+      const record = logged[0] as { fields: Record<string, unknown>; message: string };
+      expect(record.fields.endpoint).toBe("review.archive");
+      expect(record.fields.validation).toEqual({ expected: "void", received: "object" });
+      expect(JSON.stringify(record)).not.toContain("stored-value");
+    });
   });
 
   describe("given the handler throws", () => {

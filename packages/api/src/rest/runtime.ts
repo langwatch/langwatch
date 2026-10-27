@@ -55,10 +55,10 @@ import {
   UnsupportedMediaTypeError,
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
-import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
+import { withoutUndeclaredKeys } from "../schema.ts";
 import {
   addressesOf,
   basePathOf,
@@ -2631,8 +2631,8 @@ function respond({
     answer = withoutUndeclaredKeys(route.output as z.ZodType, result);
   }
 
-  // Reachable only for a `z.void()` output: a route that declared no answer
-  // always takes this branch, and every other route never does.
+  // A `z.void()` output, a route that declared no answer, or a refused answer
+  // the schema left nothing of.
   if (answer === undefined) return context.body(null, route.status ?? 204);
 
   return context.json(answer as never, route.status ?? 200);

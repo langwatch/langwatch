@@ -47,6 +47,7 @@ function fold(row: RawAtomRow) {
 
 describe("toAtom", () => {
   describe("when the run carries evaluator results", () => {
+    /** @scenario "An atom with its evaluator results is one the Results tab accepts" */
     it("folds an atom the page schema accepts", () => {
       const atom = fold(
         rawRow({
@@ -87,6 +88,7 @@ describe("toAtom", () => {
   });
 
   describe("when the run carries no evaluator results", () => {
+    /** @scenario "An atom with its evaluator results is one the Results tab accepts" */
     it("folds an atom the page schema accepts", () => {
       const parsed = resultAtomsPageSchema.safeParse({
         atoms: [fold(rawRow())],
