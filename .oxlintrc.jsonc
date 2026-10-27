@@ -2,7 +2,7 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
 
   // Every rule, for the editor, `pnpm lint:fix` and the Nx targets. `pnpm lint`
-  // runs the three parts as parallel processes instead (dev/nx/lint.mjs).
+  // runs the three parts as parallel processes instead (tools/lintrun).
   // Categories take the last extended value: the native config stays last.
   // ignorePatterns are not inherited, so they live here; the runner reads them.
   "extends": ["./.oxlintrc.types.jsonc", "./.oxlintrc.plugin.jsonc", "./.oxlintrc.native.jsonc"],

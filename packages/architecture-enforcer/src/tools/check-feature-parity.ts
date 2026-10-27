@@ -270,6 +270,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
+  // The oxlint runner behind `pnpm lint`: its scope and verdict scenarios
+  // (specs/tooling/nx-reruns.feature, lint-split-unused-directives.feature) bind here.
+  "tools/lintrun",
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",

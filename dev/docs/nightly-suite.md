@@ -60,7 +60,7 @@ A nightly that fails every night on known debt is noise, so the hygiene report
 - a rule whose count rose since last night;
 - a rule with findings that had none last night;
 - a pull request lint check that passed last night and fails tonight;
-- a tool that produced no report. `dev/nx/lint.mjs` still prints its
+- a tool that produced no report. The lint runner (`tools/lintrun`) still prints its
   `N problem(s)` count when one of its oxlint processes failed, so that process's
   `oxlint -c <config> exited` line, captured with stdout, is what tells a crash
   from a clean tree. A typecheck that failed with no `error TS` line did not

@@ -34,8 +34,8 @@
     "typecheck:src": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx run workspace:typecheck:src --outputStyle=static",
     "sync:references": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx sync",
     "test:dev-scripts": "TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs dev/scripts/upgrade-rehearsal/__tests__/*.unit.test.mjs",
-    "lint": "node dev/nx/lint.mjs",
-    "lint:changed": "node dev/nx/lint.mjs --changed",
+    "lint": "go run ./cmd/lintrun",
+    "lint:changed": "go run ./cmd/lintrun --changed",
     "lint:architecture": "pnpm --filter @langwatch/architecture-enforcer lint",
     "lint:fix": "oxlint --fix --quiet --config .oxlintrc.jsonc .",
     "format": "oxfmt --write --disable-nested-config .",
@@ -65,7 +65,7 @@
     "test:affected": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx affected -t test --parallel=4",
     "test:changed": "node dev/nx/test-changed.mjs",
     "build:affected": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx affected -t build",
-    "lint:types": "node dev/nx/lint.mjs --types",
+    "lint:types": "go run ./cmd/lintrun --types",
     "lint:types:affected": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx affected -t lint:types"
   },
   "devDependencies": {

@@ -10,6 +10,8 @@ app:
   - "pnpm-workspace.yaml"
   - "package.json"
   - ".npmrc"
+  - "tools/lintrun/**"
+  - "cmd/lintrun/**"
   - ".github/workflows/langwatch-app-ci.yml"
   - ".github/workflows/nightly.yml"
   - ".github/workflows/codebase-health.yml"

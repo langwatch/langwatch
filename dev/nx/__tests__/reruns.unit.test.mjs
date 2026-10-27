@@ -1,12 +1,11 @@
-// dev/nx/lint.mjs, dev/nx/test-reads-plugin.mjs and nx.json,
-// bound to specs/tooling/nx-reruns.feature.
+// dev/nx/test-reads-plugin.mjs and nx.json, bound to specs/tooling/nx-reruns.feature.
+// The lint scenarios bind in tools/lintrun.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { matchesGlob } from "node:path";
 import { describe, it } from "node:test";
 
-import { plainScope } from "../lint.mjs";
 import { reads } from "../test-reads-plugin.mjs";
 
 const SCANNERS = {
@@ -42,19 +41,5 @@ void describe("Nx reruns", () => {
     const { production } = nxJson.namedInputs;
     assert.ok(production.includes("!{projectRoot}/**/__tests__/**/*"));
     assert.ok(production.includes("!{projectRoot}/**/*.md"));
-  });
-
-  /** @scenario "A plain lint:changed lints the changed files, not their dependants" */
-  void it("lints only the changed lintable files", () => {
-    const files = ["dev/nx/lint.mjs", "packages/time/README.md", "packages/time/src/gone.ts"];
-    assert.deepEqual(plainScope({ files, globals: ["modules/catalogue.json"] }), [
-      "dev/nx/lint.mjs",
-    ]);
-  });
-
-  /** @scenario "A changed lint global relints the whole tree" */
-  void it("lints the tree when a lint global changed", () => {
-    const files = ["dev/nx/lint.mjs", ".oxlintrc.native.jsonc"];
-    assert.deepEqual(plainScope({ files, globals: [".oxlintrc.*.jsonc"] }), ["."]);
   });
 });

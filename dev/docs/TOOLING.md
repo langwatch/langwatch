@@ -64,7 +64,7 @@ first.
 ```
 
 oxlint runs its native rules and the JavaScript plugin one after the other in a
-single process, so `dev/nx/lint.mjs` splits the rules into three configs and runs
+single process, so the runner (`tools/lintrun`, run as `go run ./cmd/lintrun`) splits the rules into three configs and runs
 them side by side: `.oxlintrc.native.jsonc`, `.oxlintrc.plugin.jsonc` and
 `.oxlintrc.types.jsonc` (with `--type-aware`). `.oxlintrc.jsonc` extends all three
 and stays the one config the editor, `pnpm lint:fix` and the Nx targets read; it
@@ -72,9 +72,10 @@ also holds the `ignorePatterns`, which the runner passes to every process.
 
 Each process reports every disable directive its own rules did not use, so the
 runner keeps an unused-directive report only when every process made it
-(`packages/oxlint-rules/src/unused-directives.mjs`). Plain `pnpm lint` has no
+(`tools/lintrun/diagnostic.go`). Plain `pnpm lint` has no
 type-aware process, so a directive naming only a type-aware rule reads as unused
-there, as it always has.
+there, as it always has. When every path in scope matches an ignore pattern,
+oxlint answers "No files found to lint." and the runner reads that as a clean run.
 
 `--changed` and `--base <sha>` narrow every process to the projects
 `nx show projects --affected` names, plus the files no project owns. The Nx

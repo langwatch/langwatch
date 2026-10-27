@@ -3382,7 +3382,7 @@ anonymous id it once allowed was never mounted and is deleted (Alex, 2026-10-05)
 
 **The lint split and the CI type-aware gate** (Alex, 2026-10-05). oxlint's native rules and the langwatch
 plugin run as two parallel oxlint processes; the root `package.json` lint scripts own the split, and CI,
-lint-staged and the editor call those scripts. CI runs `node dev/nx/lint.mjs --types` in one process
+lint-staged and the editor call those scripts. CI runs `pnpm lint:types` (`go run ./cmd/lintrun --types`) in one process
 (affected on a PR via `--base`, all otherwise); the `lint:types` Nx target stays for local per-project runs,
 and ADR-150 is amended to say why. The type-aware pass runs only the rules that need types, from its own
 config. One unused-suppression check replaces oxlint's across the native, plugin and type-aware processes,

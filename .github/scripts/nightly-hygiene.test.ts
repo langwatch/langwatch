@@ -200,7 +200,7 @@ void describe("given last night's report", () => {
     /** @scenario "A tool that produced no report goes red rather than reading as clean" */
     void it("reports the tool and compares none of its rules", () => {
       const previous = night({ results: { oxlint: findings("a", 3) } });
-      // dev/nx/lint.mjs still prints a count after one of its processes failed.
+      // The lint runner (tools/lintrun) still prints a count after one of its processes failed.
       const crashed = parseOxlint({
         text: "oxlint -c .oxlintrc.native.jsonc exited 2:\nconfig error\n\n0 problem(s)",
       });

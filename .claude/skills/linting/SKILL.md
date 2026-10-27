@@ -18,7 +18,7 @@ document disagree, the finding is right and the document is the defect.
 | architecture enforcer           | `pnpm lint:architecture`         | The whole tree: package graph, ownership, cycles, dead exports | `packages/architecture-enforcer/README.md`       |
 
 The plugin lives in `packages/oxlint-rules` (rules under `src/rules/`, grammar
-tables under `grammar/`). `pnpm lint` (`dev/nx/lint.mjs`) runs two oxlint
+tables under `grammar/`). `pnpm lint` (`tools/lintrun`, a Go CLI) runs two oxlint
 processes in parallel (§17): `.oxlintrc.native.jsonc`, the stock rules, and
 `.oxlintrc.plugin.jsonc`, which extends
 `packages/architecture-enforcer/oxlint.architecture.jsonc` and turns every

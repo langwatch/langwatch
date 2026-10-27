@@ -77,7 +77,7 @@ member and `lint:types` for every TypeScript one;
 what the cross-file rules read outside a project (`modules/catalogue.json`, module
 `package.json` files, the published OpenAPI document, the plugin config), so editing
 one of them re-lints every project and editing a file re-lints its project and dependents.
-The root `pnpm lint` is `dev/nx/lint.mjs`: `nx run-many -t lint` plus one oxlint run over
+The root `pnpm lint` is the lint runner (`tools/lintrun` since 2026-10-27): `nx run-many -t lint` plus one oxlint run over
 the files outside every project. A project with a `lint` script of its own (the
 architecture enforcer, the SDK's eslint) keeps it, because Nx lets a package.json script
 outrank a plugin; the runner excludes those two from the target and the outside-files run
@@ -332,15 +332,15 @@ single thread catches up. The rules now sit in three disjoint configs:
 correctness tier off). `.oxlintrc.jsonc` extends all three for the editor,
 `pnpm lint:fix` and the Nx targets; the native config is extended last because
 the last `categories` wins, and the root keeps `ignorePatterns` because `extends`
-does not carry them. `pnpm lint` (`dev/nx/lint.mjs`) runs native and plugin as two
+does not carry them. `pnpm lint` (the lint runner) runs native and plugin as two
 parallel processes over the tree; `--changed` and `--base` narrow both to the
 changed files (the tree when a `lintGlobals` file changed; only `--types` keeps dependants). It no
 longer runs the per-project `lint` target: cold, that was 213 to 280 s against
 about 35 s whole-tree; the `lint` and `lint:types` targets stay for cached
 per-project runs.
 
-**CI type-aware gate (Alex).** CI runs `pnpm lint:types` (`dev/nx/lint.mjs
---types`; `--base` on a PR, everything on a push or a global lint input change)
+**CI type-aware gate (Alex).** CI runs `pnpm lint:types` (the runner's
+`--types`; `--base` on a PR, everything on a push or a global lint input change)
 in place of `nx affected -t lint:types`: one type-aware process over the projects
 parses each shared dependency once, where one process per project re-parsed it
 237 times. CI restores no Nx cache, so per-project caching bought it nothing, and
@@ -352,7 +352,7 @@ projects.
 `reportUnusedDisableDirectives`, so each process reports each directive its own
 rules did not use. The runner keeps a report only when every process made it; a
 per-rule report ("from `<rule>`") also stands where another process found the
-whole directive unused (`packages/oxlint-rules/src/unused-directives.mjs`). Plain
+whole directive unused (`tools/lintrun/diagnostic.go`). Plain
 `pnpm lint` has no type-aware process, so a directive naming only type-aware
 rules reads as unused there, as it did before the split.
 
@@ -458,3 +458,14 @@ own cache, `.nx/suites`, apart from the build cache, so it holds only test
 results: one per shard, saved by main and same-repository pull requests (one
 copy kept). A re-push splits the same way and replays its unchanged suites. A
 shard whose split changed restores a partial match and runs the rest.
+
+## Amendment, 2026-10-27: the lint runner is a Go CLI
+
+The runner behind `pnpm lint`, `lint:changed` and `lint:types` moved from
+`dev/nx/lint.mjs` to `tools/lintrun` (`go run ./cmd/lintrun`), with the
+unused-directive merge it imported; repository tooling is Go. Its scope, configs,
+output and exit codes are unchanged, with one fix: oxlint's "No files found to
+lint." (every path in scope matched an ignore pattern) is a clean run, not a
+failed process. Two smaller differences: an unknown flag is refused, not ignored, and
+findings sort by file byte-wise rather than by locale. The Nx plugins in `dev/nx/`
+stay JavaScript, because Nx loads them.

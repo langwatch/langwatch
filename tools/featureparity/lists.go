@@ -62,6 +62,7 @@ var (
 		"tools/linkcheck",
 		"tools/chartpush",
 		"tools/matrixseed",
+		"tools/lintrun",
 		"cmd/linkcheck",
 		"cmd/service",
 		"tools/upgradelab",
