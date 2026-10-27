@@ -142,32 +142,30 @@ describe("the LLM Ops sidebar", () => {
   });
 
   describe("given the Analytics entry", () => {
-    /** @scenario "AC3b The Analytics entry is marked legacy and still opens analytics" */
-    it("opens /analytics and carries the Legacy pill when Dashboards is reachable", () => {
+    /** @scenario "AC3b The Analytics entry opens Dashboards when the project can reach them" */
+    it("opens Dashboards with no pill when Dashboards is reachable", () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo" });
 
-      const link = screen.getByRole("link", { name: /Analytics/ });
-      expect(link).toHaveAttribute("href", "/demo/analytics");
-      expect(within(link).getByText("Legacy")).toBeInTheDocument();
+      const link = screen.getByRole("link", { name: "Analytics" });
+      expect(link).toHaveAttribute("href", "/demo/dashboards");
+      expect(within(link).queryByText("Legacy")).toBeNull();
     });
 
-    /** @scenario "AC3b The Analytics entry is marked legacy and still opens analytics" */
-    it("nests no interactive control in the link and names the legacy status", () => {
-      renderSidebar({ surface: "llm-ops", pathname: "/demo" });
+    /** @scenario "AC3b The Analytics entry opens Dashboards when the project can reach them" */
+    it("is marked active on the Dashboards pages", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo/dashboards/agent-flight-deck" });
 
-      const link = screen.getByRole("link", { name: /Analytics/ });
-      expect(link).toHaveAccessibleName("Analytics (Legacy)");
-      expect(link.querySelector("a, button, input, select, [tabindex], [role=button]")).toBeNull();
-      // The popover trigger stays reachable, beside the link.
-      const trigger = screen.getByRole("button", { name: "Legacy" });
-      expect(link.contains(trigger)).toBe(false);
+      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
     });
 
-    /** @scenario "AC3b The Analytics entry is marked legacy and still opens analytics" */
-    it("carries no pill when Dashboards is not reachable", () => {
+    /** @scenario "AC3h The Analytics entry opens analytics when Dashboards is out of reach" */
+    it("opens analytics with no pill when Dashboards is not reachable", () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo", dashboardsFlag: false });
 
-      const link = screen.getByRole("link", { name: /Analytics/ });
+      const link = screen.getByRole("link", { name: "Analytics" });
       expect(link).toHaveAttribute("href", "/demo/analytics");
       expect(within(link).queryByText("Legacy")).toBeNull();
     });

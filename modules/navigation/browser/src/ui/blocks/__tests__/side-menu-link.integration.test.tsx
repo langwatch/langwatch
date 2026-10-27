@@ -46,3 +46,21 @@ describe("a sidebar entry", () => {
     });
   });
 });
+
+describe("a legacy sidebar entry that cannot open yet", () => {
+  /** @scenario "AC3g A legacy Analytics entry that cannot open is still announced as legacy" */
+  it("is named with its legacy status", () => {
+    renderWithDesignSystem(
+      <WithStubNavigationHost>
+        <SideMenuLink
+          icon={<LuSettings />}
+          label="Analytics"
+          legacy
+          unavailableReason="Pick a project first"
+        />
+      </WithStubNavigationHost>,
+    );
+
+    expect(screen.getByRole("button", { name: "Analytics (Legacy)" })).toBeInTheDocument();
+  });
+});

@@ -33,14 +33,37 @@ Feature: Dashboards v1
       then From LangWatch, each board with a menu
     And the sidebar shows nothing else besides Quick Search
 
-  # Switch-over: Analytics stays at /analytics, marked legacy, and points at Dashboards.
-  # Its pages and addresses do not change and nothing redirects (AC20).
+  # Switch-over: where Dashboards opens, the Analytics entry leads to Dashboards and the
+  # legacy pages stay at /[project]/analytics, unchanged, with a banner pointing back (AC20).
   @integration
-  Scenario: AC3b The Analytics entry is marked legacy and still opens analytics
+  Scenario: AC3b The Analytics entry opens Dashboards when the project can reach them
     Given the member holds analytics:view
+    And the release_dashboards flag is on for the project
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry opens /[project]/dashboards
+    And it carries no Legacy pill
+    And it is marked active on the Dashboards pages
+
+  @integration
+  Scenario: AC3h The Analytics entry opens analytics when Dashboards is out of reach
+    Given the release_dashboards flag is off for the project
     When the member looks at the LLM Ops sidebar
     Then the Analytics entry opens /[project]/analytics
-    And it carries the Legacy pill only when the member can reach Dashboards
+    And it carries no Legacy pill
+
+  @integration
+  Scenario: AC3i The Dashboards pages point back to the old Analytics
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens a Dashboards page
+    Then an info banner asks "Looking for the old Analytics? It is still here."
+    And the banner links to /[project]/analytics
+
+  @integration
+  Scenario: AC3j The Dashboards pages show no old-Analytics banner when they do not open
+    Given the release_dashboards flag is off for the project
+    When the member opens a Dashboards page
+    Then no old-Analytics banner shows
 
   @integration
   Scenario: AC3c The legacy Analytics page offers Dashboards when the flag is on
@@ -55,6 +78,27 @@ Feature: Dashboards v1
     Given the release_dashboards flag is off for the project
     When the member opens a legacy analytics page
     Then no legacy banner shows
+
+  @integration
+  Scenario: AC3e The legacy Analytics page shows no banner to a member without analytics:view
+    Given the release_dashboards flag is on for the project
+    And the member lacks analytics:view
+    When the member opens a legacy analytics page
+    Then no legacy banner shows
+
+  @integration
+  Scenario: AC3f The custom graph pages carry the legacy banner too
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens /[project]/analytics/custom
+    Then a warning banner at the top says it is the legacy view
+
+  @integration
+  Scenario: AC3g A legacy Analytics entry that cannot open is still announced as legacy
+    Given the Analytics entry is marked legacy
+    And the entry cannot open yet
+    When a screen reader reads the sidebar
+    Then the entry is named "Analytics (Legacy)"
 
   # ---------------------------------------------------------------------------
   # Agent Flight Deck
@@ -320,7 +364,7 @@ Feature: Dashboards v1
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing" (changed again by langwatch/tasks#911: /dashboards lands on My dashboard) -> dashboards-v2.feature Scenario: AC160 The dashboards area lands on My dashboard
   # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Starred, From LangWatch; no Browse templates item) -> Scenario: AC3 Sidebar matches the reference
-  # AC 3b: "The Analytics entry is marked legacy" -> Scenario: AC3b The Analytics entry is marked legacy and still opens analytics
+  # AC 3b: "The Analytics entry leads to Dashboards" -> Scenario: AC3b The Analytics entry opens Dashboards when the project can reach them
   # AC 3c: "Legacy analytics offers Dashboards" -> Scenario: AC3c The legacy Analytics page offers Dashboards when the flag is on
   # AC 3d: "Flag off shows no banner" -> Scenario: AC3d The legacy Analytics page shows no banner when the flag is off
   # AC 5: "Status tiles compare with the previous period" → Scenario: AC5 Status tiles compare with the previous period

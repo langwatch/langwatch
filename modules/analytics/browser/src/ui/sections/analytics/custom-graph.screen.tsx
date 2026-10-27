@@ -96,6 +96,7 @@ import {
 import { FilterIconWithBadge } from "../../../ui/sections/filter-icon-with-badge.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-toggle.tsx";
+import { LegacyAnalyticsBanner } from "../../../ui/sections/legacy-analytics-banner.tsx";
 import { SavedViewsScope } from "../../../ui/sections/saved-views-scope.tsx";
 import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
 import { AnalyticsOverflowMenu } from "../analytics-overflow-menu.tsx";
@@ -366,6 +367,7 @@ function AnalyticsCustomGraphContent({
 
   return (
     <SavedViewsScope>
+      <LegacyAnalyticsBanner />
       <PageLayout.Header>
         <PageLayout.Heading>Custom graph</PageLayout.Heading>
         <Spacer />
@@ -1558,6 +1560,7 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   if (stored.error) {
     return (
       <>
+        <LegacyAnalyticsBanner />
         <PageLayout.Header>
           <PageLayout.Heading>Graph not found</PageLayout.Heading>
         </PageLayout.Header>

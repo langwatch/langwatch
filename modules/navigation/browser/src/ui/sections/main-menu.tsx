@@ -72,7 +72,7 @@ export const MainMenuSections = function MainMenuSections({
         {...sectionProps}
         codingAgentLinks={codingAgentLinks}
         showAnalytics={navigation.analytics}
-        analyticsIsLegacy={reachableProducts.includes("dashboards")}
+        analyticsLeadsToDashboards={reachableProducts.includes("dashboards")}
         showOnlineEvaluations={navigation.onlineEvaluations}
       />
       {navigation.test && (
@@ -118,26 +118,31 @@ function ObserveSection({
   pathname,
   codingAgentLinks,
   showAnalytics,
-  analyticsIsLegacy,
+  analyticsLeadsToDashboards,
   showOnlineEvaluations,
 }: ProjectSectionProps & {
   codingAgentLinks: CodingAgentLinks;
   showAnalytics: boolean;
-  analyticsIsLegacy: boolean;
+  analyticsLeadsToDashboards: boolean;
   showOnlineEvaluations: boolean;
 }) {
   return (
     <SidebarSection id="observe" label="Observe" showExpanded={showExpanded}>
       {showAnalytics && (
         <PageMenuLink
-          path={projectNavItems.analytics.path}
+          path={
+            analyticsLeadsToDashboards
+              ? projectNavItems.dashboards.path
+              : projectNavItems.analytics.path
+          }
           icon={featureIcons.analytics.icon}
           label={projectNavItems.analytics.title}
           project={project}
-          isActive={pathname.includes("/analytics")}
+          isActive={
+            pathname.includes("/analytics") ||
+            (analyticsLeadsToDashboards && pathname.includes("/dashboards"))
+          }
           showLabel={showExpanded}
-          legacy={analyticsIsLegacy}
-          legacyLabel="Legacy"
         />
       )}
       <PageMenuLink

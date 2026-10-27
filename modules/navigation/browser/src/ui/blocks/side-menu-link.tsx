@@ -7,7 +7,7 @@ import type React from "react";
 import { useEffect, useRef } from "react";
 
 import { BetaPill } from "../elements/beta-pill.tsx";
-import { LegacyPill } from "../elements/legacy-pill.tsx";
+import { LEGACY_BADGE_STYLE, LegacyPill } from "../elements/legacy-pill.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { SIDE_MENU_DENSITIES, useSideMenuDensity } from "../elements/side-menu-density.tsx";
 
@@ -85,11 +85,7 @@ export const SideMenuItem = ({
   // The status is in the entry's accessible name (see legacyName), so this is aria-hidden.
   const legacyPill = legacy ? (
     <Badge
-      variant="subtle"
-      colorPalette="red"
-      fontSize="2xs"
-      paddingX={1.5}
-      lineHeight={1.2}
+      {...LEGACY_BADGE_STYLE}
       aria-hidden="true"
       visibility={legacyOverlaid ? "hidden" : "visible"}
     >
@@ -173,7 +169,7 @@ export const SideMenuItem = ({
 };
 
 // Link variant for navigation items
-export type SideMenuLinkProps = SideMenuItemProps & {
+export type SideMenuLinkProps = Omit<SideMenuItemProps, "legacyOverlaid"> & {
   href?: string;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   /** Opens the destination in a new tab. */
@@ -219,6 +215,8 @@ export const SideMenuLink = ({
     }
   }, [isActive]);
 
+  const legacyName = legacy ? `${label} (${legacyLabel ?? DEFAULT_LEGACY_LABEL})` : label;
+
   if (unavailableReason) {
     return (
       <Tooltip content={unavailableReason} positioning={{ placement: "right" }} showArrow>
@@ -228,7 +226,7 @@ export const SideMenuLink = ({
           width="full"
           textAlign="start"
           aria-disabled="true"
-          aria-label={label}
+          aria-label={legacyName}
           opacity={0.4}
           cursor="not-allowed"
         >
@@ -247,7 +245,6 @@ export const SideMenuLink = ({
     );
   }
 
-  const legacyName = legacy ? `${label} (${legacyLabel ?? DEFAULT_LEGACY_LABEL})` : label;
   const overlayLegacy = Boolean(legacy) && showLabel;
 
   // The link recipe's plain variant gives the entry its hover underline.
@@ -297,7 +294,7 @@ export const SideMenuLink = ({
   if (!overlayLegacy) return entry;
 
   // The explaining popover is a control, so it sits beside the link, laid over the
-  // link's own static pill, not inside the <a>.
+  // link's own static pill, not inside the anchor.
   return (
     <Box position="relative" width="full">
       {entry}

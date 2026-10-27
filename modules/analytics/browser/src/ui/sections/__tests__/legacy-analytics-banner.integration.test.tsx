@@ -46,7 +46,7 @@ describe("given the legacy analytics page", () => {
   });
 
   describe("when the member lacks analytics:view", () => {
-    /** @scenario "AC3d The legacy Analytics page shows no banner when the flag is off" */
+    /** @scenario "AC3e The legacy Analytics page shows no banner to a member without analytics:view" */
     it("shows no banner, as Dashboards would be refused", () => {
       renderBanner({ flags: { release_dashboards: true }, permissions: [] });
 
