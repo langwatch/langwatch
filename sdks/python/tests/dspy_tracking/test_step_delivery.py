@@ -1,12 +1,7 @@
-"""Step posts that fail are retried, buffered and resent — never raised.
+"""Step posts that fail are retried, buffered or dropped — never raised.
 
-A platform failure while posting a step must not fail the optimizer
-evaluation the step reports: MIPROv2 and friends treat a raised evaluation
-as a failed trial and record 0.0 for a candidate that was fully evaluated
-(issue #7894). Transient failures (network blips, 5xx) are retried; client
-errors are not. Either way the step stays buffered for the next post.
-
-Spec: specs/python-sdk/dspy-gepa-tracking.feature
+Why a raised post must not reach the optimizer (#7894) is in the spec:
+specs/python-sdk/dspy-gepa-tracking.feature
 """
 
 import json
@@ -30,11 +25,8 @@ from .helpers import Program, tracked_optimizer, valset_of
 
 class Posts:
     """The step posts made so far, answered with `statuses` in order, then 200.
-
-    A status may also be an exception instance, which is raised instead of
-    answered — that is how a transport failure (timeout, refused connection)
-    looks to the caller, as opposed to an HTTP status.
-    """
+    An exception instance is raised instead, the way a transport failure
+    (timeout, refused connection) reaches the caller."""
 
     def __init__(self):
         self.statuses: list[int | Exception] = []
@@ -110,8 +102,17 @@ class TestWhenTheStepPostFails:
             httpx.ReadError("connection reset by peer"),
             httpx.WriteError("broken pipe"),
             httpx.ReadTimeout("read operation timed out"),
+            429,
+            408,
         ],
-        ids=["connect-error", "read-error", "write-error", "timeout"],
+        ids=[
+            "connect-error",
+            "read-error",
+            "write-error",
+            "timeout",
+            "too-many-requests",
+            "request-timeout",
+        ],
     )
     def test_retries_a_network_failure(self, posts, caplog, failure):
         posts.statuses.extend([failure, failure, failure])
@@ -130,15 +131,20 @@ class TestWhenTheStepPostFails:
 
     # @scenario "A client error is a real answer, not a blip"
     @pytest.mark.unit
-    def test_does_not_retry_a_client_error(self, posts, caplog):
+    def test_drops_a_batch_refused_with_a_client_error(self, posts, caplog):
         posts.statuses.extend([422])
 
         with caplog.at_level(logging.WARNING, logger="langwatch.dspy"):
             log_a_step("0")
 
-        assert len(posts.bodies) == 1
-        assert [step.index for step in langwatch_dspy.steps_buffer] == ["0"]
-        assert "Could not log optimizer step 0" in caplog.text
+        assert len(posts.bodies) == 1, "a 422 is not retried"
+        assert langwatch_dspy.steps_buffer == []
+        assert "Dropped optimizer step(s) 0" in caplog.text
+
+        log_a_step("1")
+
+        assert [step["index"] for step in posts.bodies[-1]] == ["1"]
+        assert langwatch_dspy.steps_buffer == []
 
     # @scenario "The buffer is bounded while the platform is down"
     @pytest.mark.unit

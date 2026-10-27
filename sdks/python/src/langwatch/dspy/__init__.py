@@ -58,18 +58,15 @@ MAX_STEPS_BODY_BYTES = 20 * 1024 * 1024
 
 
 def _is_transient_error(error: BaseException) -> bool:
-    """Network blips and server 5xx responses are retryable; client 4xx
-    responses are real answers and must surface immediately.
-
-    `httpx.NetworkError` covers every transport failure (connect, read,
-    write, close), so a connection reset mid-request is retried the same
-    way as a refused connection."""
+    """Transport failures, 5xx, 408 and 429 are retryable; any other 4xx is
+    a real answer. `httpx.NetworkError` covers connect, read, write and
+    close, so a reset mid-request is retried like a refused connection."""
     if isinstance(error, (httpx.TimeoutException, httpx.NetworkError)):
         return True
-    return (
-        isinstance(error, httpx.HTTPStatusError)
-        and error.response.status_code >= 500
-    )
+    if not isinstance(error, httpx.HTTPStatusError):
+        return False
+    status = error.response.status_code
+    return status >= 500 or status in (408, 429)
 
 
 _retry_on_transient = tenacity_retry(
@@ -474,12 +471,9 @@ class LangWatchDSPy:
 
     def send_steps(self) -> None:
         """Post the buffered steps, oldest first, in bodies the platform accepts.
-
-        Each batch leaves the buffer only once its post is accepted, so a
-        failure part-way leaves exactly the unsent steps for the next attempt.
-        A step whose body alone is over the limit can never be accepted and is
-        dropped, rather than holding every later step behind its 413.
-        """
+        A batch leaves the buffer once accepted; a transient failure keeps it.
+        A batch no retry can fix (over the size limit, or refused with a
+        non-transient 4xx) is dropped rather than block every later step."""
         while self.steps_buffer:
             count, body = self._first_batch()
             if count == 0:
@@ -492,7 +486,21 @@ class LangWatchDSPy:
                     MAX_STEPS_BODY_BYTES,
                 )
                 continue
-            self._post_steps(body)
+            try:
+                self._post_steps(body)
+            except httpx.HTTPStatusError as err:
+                status = err.response.status_code
+                if _is_transient_error(err) or not 400 <= status < 500:
+                    raise
+                refused = self.steps_buffer[:count]
+                del self.steps_buffer[:count]
+                logger.warning(
+                    "[LangWatch] Dropped optimizer step(s) %s: the platform "
+                    "refused them with %d, which no retry can fix.",
+                    ", ".join(str(step.index) for step in refused),
+                    status,
+                )
+                continue
             del self.steps_buffer[:count]
 
     def _first_batch(self) -> tuple[int, bytes]:

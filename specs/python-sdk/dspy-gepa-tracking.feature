@@ -70,6 +70,9 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
     When log_step is called without examples
     Then the step carries the buffered examples and the buffer is empty afterwards
 
+  # A step post that raises must never reach the optimizer: MIPROv2 and the
+  # other Evaluate-based optimizers treat a raised evaluation as a failed
+  # trial and record 0.0 for a candidate that was fully evaluated (#7894).
   @unit
   Scenario: A step that could not be sent goes out with the next one
     Given the platform answers 502 to the step post
@@ -80,7 +83,7 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
 
   @unit
   Scenario: A network failure is retried and buffered like a server error
-    Given the connection to the platform times out, is refused, or is dropped mid-request
+    Given the connection to the platform times out, is refused, is dropped mid-request, or is answered 408 or 429
     When log_step is called and the post fails after its retries
     Then the evaluation the step reports is not failed by it
     And the step stays in the buffer
@@ -91,7 +94,8 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
     When log_step is called
     Then the post is not retried
     And the evaluation the step reports is not failed by it
-    And the step stays in the buffer
+    And the refused steps are dropped with a warning naming them
+    And the next log_step posts only its own step
 
   @unit
   Scenario: The buffer is bounded while the platform is down
