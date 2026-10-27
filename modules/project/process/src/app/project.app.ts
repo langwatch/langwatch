@@ -24,6 +24,7 @@ import {
   type ArchivedProject,
   type Project,
   type ProjectIdentity,
+  type ProjectLegacyKeyStatus,
   type ProjectWithTeam,
   type PaginatedProjects,
   type TraceDestinationDecision,
@@ -286,7 +287,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#requests.archiveOtherProject(input);
   }
 
-  getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }> {
+  getLegacyKeyStatus(input: { projectId: string }): Promise<ProjectLegacyKeyStatus> {
     return this.#operations.getLegacyKeyStatus(input);
   }
 

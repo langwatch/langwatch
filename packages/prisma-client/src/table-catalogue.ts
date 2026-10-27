@@ -984,7 +984,9 @@ export const prismaModelFieldCatalogue = {
     "level",
     "threadIdleTimeout",
     "createdAt",
-    "updatedAt"
+    "updatedAt",
+    "autoPausedAt",
+    "autoPausedReason"
   ],
   "Cost": [
     "id",

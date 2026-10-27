@@ -61,6 +61,27 @@ function autoGrain({ spanMs }: { spanMs: number }): Exclude<BoardPeriodGrain, "a
   return "1w";
 }
 
+const MINUTE_MS = 60_000;
+
+/**
+ * Where a board's window ends, on the next whole minute so a render does not refetch: Live
+ * rolls with the clock; a fixed range ends at the last refresh, or when it was picked (AC19d).
+ */
+export function boardWindowEnd({
+  range,
+  now,
+  pickedAt,
+  refreshedAt,
+}: {
+  range: BoardPeriodRange;
+  now: number;
+  pickedAt: number;
+  refreshedAt?: number;
+}): number {
+  const end = range === "live" ? now : Math.max(pickedAt, refreshedAt ?? 0);
+  return Math.ceil(end / MINUTE_MS) * MINUTE_MS;
+}
+
 /** `[periodStart, periodEnd]` in epoch milliseconds for a range ending at `now`. */
 export function boardPeriodBounds({ range, now }: { range: BoardPeriodRange; now: number }): {
   periodStart: number;

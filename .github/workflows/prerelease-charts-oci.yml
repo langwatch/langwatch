@@ -51,6 +51,8 @@ jobs:
     # trust signal for these prereleases, so it must not be forgeable by
     # anyone who can click Run workflow.
     if: github.ref == 'refs/heads/main'
+    env:
+      AWS_REGION: eu-central-1
     permissions:
       contents: read
       # Required to push OCI artifacts to ghcr.io.
@@ -213,3 +215,43 @@ jobs:
 
             echo "- \`${registry}/${chart_name}:${version}\`" >> "$GITHUB_STEP_SUMMARY"
           done
+
+      # LangWatch Cloud deploys langy-agent from this chart, and pulls it from
+      # the same private ECR registry as the langy-agent image, so the deploy
+      # needs no GitHub credential. Self-hosters keep installing the tagged
+      # releases from the public Helm repo, and anyone can still pull these
+      # prereleases from GHCR.
+      #
+      # Same exact .tgz the loop above pushed to GHCR. Not signed: a keyless
+      # signature puts the reference in the public transparency log, and this
+      # registry's host is kept out of the public record (see
+      # publish-docker-ecr.yml). The deploy pins the digest instead.
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+          role-session-name: prerelease-charts-oci-${{ github.run_id }}
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Push the langyagent chart to ECR
+        env:
+          ROLE_ARN: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+          # Charts whose prereleases LangWatch Cloud deploys. Each needs an ECR
+          # repository named langwatch-charts/<chart name> in the artifacts
+          # account that the OIDC role may push to.
+          ECR_CHARTS: langwatch-langyagent
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(printf '%s' "${ROLE_ARN}" | cut -d: -f5)"
+          echo "::add-mask::${ACCOUNT_ID}"
+          registry="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          aws ecr get-login-password --region "${AWS_REGION}" \
+            | helm registry login "$registry" --username AWS --password-stdin
+
+          # shellcheck disable=SC2086 # ECR_CHARTS is a space-separated list
+          go run ./cmd/chartpush -registry "$registry" $ECR_CHARTS

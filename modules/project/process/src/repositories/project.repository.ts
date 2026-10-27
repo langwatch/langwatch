@@ -156,6 +156,8 @@ export interface ProjectRepository {
   /** The live project the legacy `apiKey` column names, or nothing. */
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
   markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void>;
+  /** When the legacy key last authenticated, or nothing when no use was stamped. */
+  findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
   /** Creates a team's personal project once and answers its id; a second call creates nothing. */

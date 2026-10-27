@@ -474,7 +474,7 @@ type Response = z.infer<typeof apiResponseModelProvidersSchema>; // ../contract/
 
 Create or update a model provider
 
-Permission `project:update`. Declared at `src/transport/model-provider.rest.ts:50`.
+Permission `project:update`. Declared at `src/transport/model-provider.rest.ts:49`.
 
 Answers at `/api/model-providers/:provider`, `/api/v1/model-providers/:provider`; also, undocumented, `/api/model-providers/2026-08-07/:provider`, `/api/v1/model-providers/2026-08-07/:provider`, `/api/model-providers/latest/:provider`, `/api/v1/model-providers/latest/:provider`.
 

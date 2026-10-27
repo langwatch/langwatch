@@ -1124,6 +1124,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ThreadIdleTimeout: { source: "threadIdleTimeout" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
+      AutoPausedAt: { source: "autoPausedAt" },
+      AutoPausedReason: { source: "autoPausedReason", content: "output" },
     },
   }),
   notifications: defineTableCatalogue({

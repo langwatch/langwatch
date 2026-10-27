@@ -12,7 +12,7 @@ import {
 } from "../../../../behavior/use-dashboard-auto-refresh.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
-import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import { boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
@@ -29,8 +29,11 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
-  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
+  const { range } = useBoardRange();
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
+  const { grain, period, setRange, setGrain } = useBoardPeriod({
+    refreshedAt: autoRefresh.refreshedAt,
+  });
   const subject = boardSubject({
     board: {
       id: `${CURATED_SEGMENT}/${board.templateId}`,

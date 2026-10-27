@@ -24,7 +24,7 @@ import {
 import { useBoardAccess } from "../../behavior/use-board-access.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
-import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
@@ -89,7 +89,11 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     dashboardId: board.id,
     stored: board.description,
   });
-  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
+  const { range } = useBoardRange();
+  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
+  const { grain, period, setRange, setGrain } = useBoardPeriod({
+    refreshedAt: autoRefresh.refreshedAt,
+  });
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
   const { widgets } = boardWidgets;
@@ -97,7 +101,6 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const langy = useLangyAsk();
   useBoardLangyChip(boardContextChip({ board: subject, range, period }));
   const editor = useBoardEditor({ board: subject, period, widgets });
-  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
 
   const openPicker = () => {
     if (!picker.isOpen) picker.open();

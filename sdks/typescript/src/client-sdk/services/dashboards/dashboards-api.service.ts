@@ -32,12 +32,18 @@ export class DashboardsApiError extends Error {
     message: string,
     public readonly operation: string,
     public readonly originalError?: unknown,
+    /** The HTTP status the platform answered with, when the response was kept. */
+    public readonly status?: number,
   ) {
     super(message);
     this.name = "DashboardsApiError";
   }
 }
 
+/**
+ * Typed client for the Analytics Reports dashboards at `/api/v1/analytics/reports`. The
+ * Dashboards area's boards are `BoardsApiService`, at `/api/v1/dashboards`.
+ */
 export class DashboardsApiService {
   private readonly apiClient: LangwatchApiClient;
 
@@ -46,19 +52,18 @@ export class DashboardsApiService {
   }
 
   private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const status = response?.status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({
       operation: operation,
       error: error,
-      options: {
-        status: response?.status ?? extractStatusFromResponse(error),
-      },
+      options: { status },
     });
-    throwIfHandledError({ operation, error, message });
-    throw new DashboardsApiError(message, operation, error);
+    throwIfHandledError({ operation, error, response, message });
+    throw new DashboardsApiError(message, operation, error, status);
   }
 
   async list(): Promise<{ data: DashboardSummary[] }> {
-    const { data, error, response } = await this.apiClient.GET("/api/v1/dashboards");
+    const { data, error, response } = await this.apiClient.GET("/api/v1/analytics/reports");
     return unwrapApiResult({
       operation: "list dashboards",
       data,
@@ -69,9 +74,12 @@ export class DashboardsApiService {
   }
 
   async get(id: string): Promise<DashboardDetail> {
-    const { data, error, response } = await this.apiClient.GET("/api/v1/dashboards/{id}", {
-      params: { path: { id } },
-    });
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/analytics/reports/{reportId}",
+      {
+        params: { path: { reportId: id } },
+      },
+    );
     return unwrapApiResult({
       operation: `get dashboard "${id}"`,
       data,
@@ -82,7 +90,7 @@ export class DashboardsApiService {
   }
 
   async create(params: { name: string }): Promise<DashboardDetail> {
-    const { data, error, response } = await this.apiClient.POST("/api/v1/dashboards", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/analytics/reports", {
       body: params,
     });
     return unwrapApiResult({
@@ -95,10 +103,13 @@ export class DashboardsApiService {
   }
 
   async rename(id: string, params: { name: string }): Promise<DashboardDetail> {
-    const { data, error, response } = await this.apiClient.PATCH("/api/v1/dashboards/{id}", {
-      params: { path: { id } },
-      body: params,
-    });
+    const { data, error, response } = await this.apiClient.PATCH(
+      "/api/v1/analytics/reports/{reportId}",
+      {
+        params: { path: { reportId: id } },
+        body: params,
+      },
+    );
     return unwrapApiResult({
       operation: `rename dashboard "${id}"`,
       data,
@@ -109,9 +120,12 @@ export class DashboardsApiService {
   }
 
   async delete(id: string): Promise<{ id: string; name: string }> {
-    const { data, error, response } = await this.apiClient.DELETE("/api/v1/dashboards/{id}", {
-      params: { path: { id } },
-    });
+    const { data, error, response } = await this.apiClient.DELETE(
+      "/api/v1/analytics/reports/{reportId}",
+      {
+        params: { path: { reportId: id } },
+      },
+    );
     return unwrapApiResult({
       operation: `delete dashboard "${id}"`,
       data,

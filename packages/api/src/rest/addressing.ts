@@ -39,6 +39,12 @@ export type MountableRestApp = Hono;
 /** The dated management API version, bumped centrally for breaking changes. */
 export const MANAGEMENT_API_VERSION = "2026-08-07";
 
+/**
+ * The version `/api/v1/dashboards` became the Dashboards API at; before it, that path answered
+ * the Analytics Reports boards. Clients written since name it in `X-API-Version`.
+ */
+export const DASHBOARDS_API_VERSION = "2026-10-26";
+
 const DATE_VERSION_RE = /^20\d{2}-\d{2}-\d{2}$/;
 
 /** Returns true when `value` is a real calendar date in `YYYY-MM-DD` form. */
@@ -227,6 +233,96 @@ export function restVersionSelectorMiddleware({
   };
 }
 
+/** A dated family's base and the routes it serves beneath it, each path as `datedRoutePattern`. */
+export type DatedFamilyRoutes = Readonly<{
+  base: string;
+  routes: readonly Readonly<{ method: string; pattern: RegExp }>[];
+}>;
+
+/**
+ * The dated address a request pinning its version in `X-API-Version` is answered at, or null
+ * when it is answered where it was sent: no header, `latest`, a path no dated family serves, or a
+ * path naming a version itself. Throws when the header is no version or contradicts a dated path.
+ */
+export function pinnedVersionPath({
+  method,
+  path,
+  header,
+  datedFamilies,
+}: Readonly<{
+  method: string;
+  path: string;
+  header: string | undefined;
+  /** Each dated family's base, `/api/<namespace>` and its `/api/v1` twin, with its routes. */
+  datedFamilies: readonly DatedFamilyRoutes[];
+}>): string | null {
+  if (header === void 0) return null;
+
+  // A literal or shared-path route beneath a dated base has no dated address to be sent to.
+  const served = datedFamilies.find((family) => servesPath({ family, method, path }));
+  if (served === void 0) return null;
+
+  if (!isVersionSegment(header)) throw new InvalidApiVersionError();
+
+  const rest = path.slice(served.base.length);
+  const named = rest.split("/")[1] ?? "";
+
+  if (isVersionSegment(named)) {
+    // Only a dated URL contradicts the header; a URL naming `latest` or `preview` is answered
+    // there, as the SDK's management calls send it alongside their pinned date.
+    if (isDateVersion(named) && named !== header) throw new ApiVersionConflictError();
+    return null;
+  }
+
+  return header === VERSION_LATEST ? null : `${served.base}/${header}${rest}`;
+}
+
+/** Whether one of the family's routes answers the request, at its base or a version beneath it. */
+function servesPath({
+  family,
+  method,
+  path,
+}: {
+  family: DatedFamilyRoutes;
+  method: string;
+  path: string;
+}): boolean {
+  if (path !== family.base && !path.startsWith(`${family.base}/`)) return false;
+
+  const rest = path.slice(family.base.length);
+  const named = rest.split("/")[1] ?? "";
+  const route = (isVersionSegment(named) ? rest.slice(named.length + 1) : rest) || "/";
+
+  // HEAD is answered by the GET route, as Hono does.
+  const asked = method.toLowerCase() === "head" ? "get" : method.toLowerCase();
+
+  return family.routes.some(
+    (each) => each.method.toLowerCase() === asked && each.pattern.test(route),
+  );
+}
+
+/**
+ * A route path relative to its family's base (`/`, `/:id`, `/:id{.+}/tags`, `/*`) as a pattern
+ * matching the request paths it answers.
+ */
+export function datedRoutePattern(routePath: string): RegExp {
+  const source = routePath
+    .split("/")
+    .map((segment) => {
+      const param = /^:\w+(?:\{(.+)\})?\??$/.exec(segment);
+      if (param) return `(?:${param[1] ?? "[^/]+"})`;
+      if (segment === "*") return ".*";
+      return segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    })
+    .join("/");
+
+  return new RegExp(`^${source}/?$`);
+}
+
+function isVersionSegment(value: string): boolean {
+  return value === VERSION_LATEST || value === VERSION_PREVIEW || isDateVersion(value);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // How a family is addressed, and the paths each addressing publishes.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -392,11 +488,16 @@ export function addressesOf<Api>({
     return [{ path: suffix || "/", context: { version, status: "stable" } }];
   }
 
+  const dated = {
+    path: `/${version}${suffix}`,
+    context: { version, status: "stable" as const, documented: false },
+  };
+
+  // Superseded: the newer family in its namespace answers latest and the bare path.
+  if (declaration.supersededAt !== void 0) return [dated];
+
   return [
-    {
-      path: `/${version}${suffix}`,
-      context: { version, status: "stable", documented: false },
-    },
+    dated,
     {
       path: `/${VERSION_LATEST}${suffix}`,
       context: { version: VERSION_LATEST, status: "latest", documented: false },
