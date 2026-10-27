@@ -507,7 +507,10 @@ export class PrismaAgentRepository
       });
       if (!version) throw new AgentVersionNotFoundError({ agentId: input.agentId });
       const row = await transaction.agentVersionLabel.upsert({
-        where: { agentId_label: { agentId: input.agentId, label: input.label } },
+        where: {
+          agentId_label: { agentId: input.agentId, label: input.label },
+          projectId: input.projectId,
+        },
         create: {
           id: generate("agentversionlabel").toString(),
           projectId: input.projectId,

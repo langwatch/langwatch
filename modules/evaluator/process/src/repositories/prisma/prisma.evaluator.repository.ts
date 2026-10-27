@@ -404,7 +404,10 @@ export class PrismaEvaluatorRepository
       });
       if (!version) throw new EvaluatorVersionNotFoundError({ evaluatorId: input.evaluatorId });
       const row = await transaction.evaluatorVersionLabel.upsert({
-        where: { evaluatorId_label: { evaluatorId: input.evaluatorId, label: input.label } },
+        where: {
+          evaluatorId_label: { evaluatorId: input.evaluatorId, label: input.label },
+          projectId: input.projectId,
+        },
         create: {
           id: generate("evaluatorversionlabel").toString(),
           projectId: input.projectId,
