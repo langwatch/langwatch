@@ -73,6 +73,15 @@ describe("DynamicZodForm score range", () => {
         expect(scoreRangeInputs()).toHaveLength(0);
       });
     });
+
+    describe("when a member picks an own decision model as its model", () => {
+      /** @scenario "The score range shows for a judge on its own decision model" */
+      it("shows the score range fields, as it does for Instant Evals", () => {
+        renderScoreJudge({ model: "openai/decisions:gpt-6-luna" });
+
+        expect(scoreRangeInputs()).toHaveLength(2);
+      });
+    });
   });
 
   describe("given an evaluator that is not the score judge", () => {

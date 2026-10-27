@@ -7,10 +7,15 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import {
+  DECISION_MODELS,
   findDecisionModel,
   INSTANT_EVAL_DECISION_FEATURE_KEY,
+  isDecisionModelId,
   isOwnDecisionModelId,
+  LANGWATCH_DECISION_MODEL_ID,
   ModelDefaultValidationError,
+  type BuiltInModel,
+  type DecisionModelEntry,
   type DecisionModelResolution,
   type ModelProvider,
 } from "@langwatch/model-provider-contract";
@@ -48,6 +53,10 @@ const UNSET_CODES: ReadonlySet<string> = new Set([
   "model_restricted_for_feature",
 ]);
 
+function choiceOf(entry: DecisionModelEntry): BuiltInModel {
+  return { value: entry.id, label: entry.label };
+}
+
 export class ModelProviderDecisionModelService {
   readonly #cache = new Map<string, CachedResolution>();
 
@@ -57,23 +66,73 @@ export class ModelProviderDecisionModelService {
     return new ModelProviderDecisionModelService(options);
   }
 
-  /** Concurrent callers share one lookup; a failed lookup is not kept. */
-  resolve({ projectId }: { projectId: string }): Promise<DecisionModelResolution> {
+  /**
+   * Concurrent callers share one lookup; a failed lookup is not kept. An override is part of
+   * the key, so one judge's pick never answers for another's.
+   */
+  resolve({
+    projectId,
+    model,
+  }: {
+    projectId: string;
+    model?: string;
+  }): Promise<DecisionModelResolution> {
     const nowMs = (this.options.now ?? nowInstant)().epochMilliseconds;
-    const cached = this.#cache.get(projectId);
+    const key = model === undefined ? projectId : `${projectId}\u0000${model}`;
+    const cached = this.#cache.get(key);
     if (cached && cached.expiresAt > nowMs) return cached.resolution;
 
-    const resolution = this.lookUp(projectId);
+    const resolution = this.lookUp({ projectId, override: model });
     if (this.#cache.size >= MAX_CACHED_PROJECTS) this.#cache.clear();
-    this.#cache.set(projectId, { resolution, expiresAt: nowMs + CACHE_TTL_MS });
+    this.#cache.set(key, { resolution, expiresAt: nowMs + CACHE_TTL_MS });
     resolution.catch(() => {
-      if (this.#cache.get(projectId)?.resolution === resolution) this.#cache.delete(projectId);
+      if (this.#cache.get(key)?.resolution === resolution) this.#cache.delete(key);
     });
     return resolution;
   }
 
-  private async lookUp(projectId: string): Promise<DecisionModelResolution> {
-    const model = await this.storedModel(projectId);
+  /** Which decision models this project may be offered: the hosted one, then those that would run. */
+  async listPickable({ projectId }: { projectId: string }): Promise<readonly BuiltInModel[]> {
+    const hosted = findDecisionModel(LANGWATCH_DECISION_MODEL_ID);
+    const pickable: BuiltInModel[] = hosted ? [choiceOf(hosted)] : [];
+
+    const { organizationId } = await this.options.scopes.getProjectContext(projectId);
+    if (!(await this.options.isOwnModelAllowed({ organizationId }))) return pickable;
+
+    const rows = new Map<string, ModelProvider | undefined>();
+    for (const entry of DECISION_MODELS) {
+      if (!isOwnDecisionModelId(entry.id)) continue;
+      if (!rows.has(entry.provider)) {
+        const row = await this.options.findProviderForProject({
+          projectId,
+          provider: entry.provider,
+        });
+        rows.set(entry.provider, row ?? undefined);
+      }
+      const resolution = decisionModelResolutionOf({
+        model: entry.id,
+        row: rows.get(entry.provider),
+      });
+      if (resolution.kind === "own") pickable.push(choiceOf(entry));
+    }
+    return pickable;
+  }
+
+  /**
+   * A valid decision-model override wins over the stored column; anything else is ignored, so a
+   * judge holding a chat model still reads the project default. The guards below are unchanged.
+   */
+  private async lookUp({
+    projectId,
+    override,
+  }: {
+    projectId: string;
+    override: string | undefined;
+  }): Promise<DecisionModelResolution> {
+    const model =
+      override !== undefined && isDecisionModelId(override)
+        ? override
+        : await this.storedModel(projectId);
     if (model === undefined || !isOwnDecisionModelId(model)) return { kind: "langwatch" };
 
     const { organizationId } = await this.options.scopes.getProjectContext(projectId);
