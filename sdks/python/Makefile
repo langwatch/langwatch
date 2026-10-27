@@ -106,9 +106,9 @@ API_SPEC = ../../specs/api-reference/openapi-document.json
 # generator has produced one. Deleting it up front left the SDK with no
 # client (about 4,000 files) whenever the generator could not run.
 generate/api-client:
-	@echo "Generating OpenAPI spec..."
 	@cd ../.. && pnpm --filter @langwatch/platform-api run openapi:generate
 	@echo "Building API client..."
+	@rm -rf .tmp/api-client
 	@mkdir -p .tmp/api-client
 	@python3 scripts/spec-for-python-generator.py \
 		$(API_SPEC) \
@@ -120,9 +120,10 @@ generate/api-client:
 		--overwrite
 	@test -d .tmp/api-client/lang_watch_api_client || { echo "The generator produced no client; keeping the committed one."; exit 1; }
 	@echo "Replacing the old API client..."
+	@rm -rf src/langwatch/generated/langwatch_rest_api_client.new
+	@cp -R .tmp/api-client/lang_watch_api_client src/langwatch/generated/langwatch_rest_api_client.new
 	@rm -rf src/langwatch/generated/langwatch_rest_api_client
-	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
-	@cp -R .tmp/api-client/lang_watch_api_client/. src/langwatch/generated/langwatch_rest_api_client/
+	@mv src/langwatch/generated/langwatch_rest_api_client.new src/langwatch/generated/langwatch_rest_api_client
 	@echo "Cleaning up..."
 	@rm -rf .tmp/api-client .tmp/openapiLangWatch.python.json
 	@echo "Done! API client has been integrated into the SDK."

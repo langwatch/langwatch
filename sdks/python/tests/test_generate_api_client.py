@@ -1,16 +1,6 @@
-"""`make generate/api-client` keeps the committed client when generation fails.
+"""Spec: specs/python-sdk/generate-api-client.feature (langwatch/tasks#509).
 
-Spec: specs/python-sdk/generate-api-client.feature (langwatch/tasks#509)
-
-The target used to delete the committed client before the generator ran, so
-a generator that could not run left the SDK without its client. Each test
-copies the real Makefile into a throwaway tree shaped like the repo, puts
-stub `pnpm` and `uv` executables first on PATH, and runs the target with
-make. The stubs stand in for the OpenAPI export and the generator, so no
-network or real generator is involved.
-
-These run in the default (unmarked) lane on purpose: `make test-unit`, which
-CI runs, deselects tests marked `integration`.
+Unmarked on purpose: `make test-unit`, which CI runs, deselects `integration`.
 """
 
 import json
@@ -83,9 +73,13 @@ def _repo_shaped_tree(root: Path) -> Path:
 
 
 def _run_target(
-    tmp_path: Path, generator: str
+    tmp_path: Path, generator: str, stale_tmp_client: bool = False
 ) -> tuple[subprocess.CompletedProcess, Path]:
     sdk = _repo_shaped_tree(tmp_path / "repo")
+    if stale_tmp_client:
+        stale = sdk / ".tmp/api-client/lang_watch_api_client"
+        stale.mkdir(parents=True)
+        (stale / "__init__.py").write_text("STALE = True\n")
     stubs = tmp_path / "stubs"
     stubs.mkdir()
     _write_executable(stubs / "pnpm", "#!/bin/sh\nexit 0\n")
@@ -126,9 +120,18 @@ def test_a_generator_that_writes_no_client_keeps_the_committed_client(tmp_path: 
     assert (client / "__init__.py").read_text() == COMMITTED
 
 
+# @scenario "A stale client left in .tmp by an earlier run is not installed"
+def test_a_stale_tmp_client_is_not_installed(tmp_path: Path):
+    result, client = _run_target(tmp_path, "empty", stale_tmp_client=True)
+
+    assert result.returncode != 0
+    assert (client / "__init__.py").read_text() == COMMITTED
+
+
 # @scenario "A generated client replaces the committed one"
 def test_a_generated_client_replaces_the_committed_one(tmp_path: Path):
     result, client = _run_target(tmp_path, "ok")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert (client / "__init__.py").read_text() == GENERATED
+    assert not client.with_name(client.name + ".new").exists()
