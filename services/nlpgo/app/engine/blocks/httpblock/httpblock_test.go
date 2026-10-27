@@ -497,6 +497,38 @@ func TestSafeDialer_BlocksMetadataIPAtDialTime(t *testing.T) {
 	assert.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
 }
 
+// @scenario "An allowlisted hostname that resolves to the metadata address is refused"
+func TestSafeDialer_RefusesAnAllowlistedNameThatResolvesToMetadata(t *testing.T) {
+	opts := httpblock.SSRFOptions{
+		AllowedHosts: []string{"imds-bait.example"},
+		Resolver: func(string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("10.0.0.5"), net.ParseIP("169.254.169.254")}, nil
+		},
+	}
+	_, err := httpblock.SafeDialer(opts)(context.Background(), "tcp", "imds-bait.example:80")
+	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+	require.ErrorIs(t, httpblock.CheckURL("http://imds-bait.example/latest/meta-data/", opts), httpblock.ErrSSRFBlocked)
+}
+
+// @scenario "An allowlisted hostname that resolves to the metadata address is refused"
+func TestSafeDialer_DialsAnAllowlistedPrivateNameAtTheCheckedAddress(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		AllowedHosts: []string{"agent.corp.local"},
+		Resolver: func(string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		},
+	})
+	conn, err := dial(context.Background(), "tcp", net.JoinHostPort("agent.corp.local", port))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
+}
+
 // TestSafeDialer_BlocksLiteralPrivateIP catches direct dials by IP.
 func TestSafeDialer_BlocksLiteralPrivateIP(t *testing.T) {
 	dial := httpblock.SafeDialer(httpblock.SSRFOptions{})

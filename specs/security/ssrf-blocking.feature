@@ -231,6 +231,14 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       Then the validation fails with a metadata security error
 
     @unit
+    Scenario: An allowlisted hostname that resolves to the metadata address is refused
+      Given ALLOWED_PROXY_HOSTS is "imds-bait.example"
+      And the hostname "imds-bait.example" resolves to the cloud metadata address
+      When the NLP service's HTTP block connects to "http://imds-bait.example/latest/meta-data/"
+      Then the connection is refused with an SSRF block error
+      And an allowlisted hostname resolving to a private address is still connected to that address
+
+    @unit
     Scenario: A bracketed IPv6 metadata literal is refused with local calls allowed
       Given BLOCK_LOCAL_HTTP_CALLS is "false"
       When the TS validator processes a URL whose host is a bracketed IPv6 spelling
