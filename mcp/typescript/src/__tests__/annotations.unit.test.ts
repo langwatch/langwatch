@@ -4,13 +4,15 @@ vi.mock("../langwatch-api.js", () => ({
   makeRequest: vi.fn(),
 }));
 
-import { makeRequest } from "../langwatch-api.js";
 import {
   listAnnotations,
   getAnnotation,
   getAnnotationsByTrace,
   createAnnotation,
+  AnnotationEnvelopeError,
 } from "../langwatch-api-annotations.js";
+import { makeRequest } from "../langwatch-api.js";
+import { handleCreateAnnotation } from "../tools/create-annotation.js";
 import { handleListAnnotations } from "../tools/list-annotations.js";
 
 const mockMakeRequest = vi.mocked(makeRequest);
@@ -44,9 +46,7 @@ describe("annotations API envelope", () => {
     it("getAnnotationsByTrace returns the array", async () => {
       mockMakeRequest.mockResolvedValue({ data: [annotation] });
 
-      await expect(getAnnotationsByTrace("trace_1")).resolves.toEqual([
-        annotation,
-      ]);
+      await expect(getAnnotationsByTrace("trace_1")).resolves.toEqual([annotation]);
     });
   });
 
@@ -70,15 +70,21 @@ describe("annotations API envelope", () => {
     it("refuses a bare array instead of returning a lookalike shape", async () => {
       mockMakeRequest.mockResolvedValue([annotation]);
 
-      await expect(listAnnotations()).rejects.toThrow('no "data" envelope');
+      await expect(listAnnotations()).rejects.toMatchObject({
+        code: "annotation_envelope_missing",
+      });
+    });
+    it("refuses a non-array data payload for a list", async () => {
+      mockMakeRequest.mockResolvedValue({ data: {} });
+      await expect(listAnnotations()).rejects.toBeInstanceOf(AnnotationEnvelopeError);
     });
 
     it("refuses a null data payload", async () => {
       mockMakeRequest.mockResolvedValue({ data: null });
 
-      await expect(getAnnotation("annotation_1")).rejects.toThrow(
-        'no "data" envelope',
-      );
+      await expect(getAnnotation("annotation_1")).rejects.toMatchObject({
+        code: "annotation_envelope_missing",
+      });
     });
   });
 });
@@ -100,5 +106,16 @@ describe("platform_list_annotations through the tool layer", () => {
     const text = await handleListAnnotations({});
 
     expect(text).toContain("No annotations found");
+  });
+});
+describe("platform_create_annotation through the tool layer", () => {
+  it("renders the created annotation's id from an enveloped response", async () => {
+    mockMakeRequest.mockResolvedValue({ data: annotation });
+    const text = await handleCreateAnnotation({
+      traceId: "trace_1",
+      comment: "Great answer",
+      isThumbsUp: true,
+    });
+    expect(text).toContain("**ID**: annotation_1");
   });
 });
