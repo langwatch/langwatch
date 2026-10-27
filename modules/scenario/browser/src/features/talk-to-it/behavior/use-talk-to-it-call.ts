@@ -20,7 +20,8 @@ export function useTalkToItCall(props: TalkToItPanelProps) {
   refs.stateRef.current = state;
 
   const finish = useCallback(
-    ({ nameOverride }: { nameOverride?: string }) => runFinish({ props, refs, dispatch, nameOverride }),
+    ({ nameOverride }: { nameOverride?: string }) =>
+      runFinish({ props, refs, dispatch, nameOverride }),
     [props, refs],
   );
   const endCall = useCallback(

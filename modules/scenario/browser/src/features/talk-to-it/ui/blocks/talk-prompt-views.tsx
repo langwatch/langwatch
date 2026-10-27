@@ -7,12 +7,10 @@ import type { TalkState } from "../../model/talk-to-it-machine.ts";
 const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
 
 export function NeedsNameView({
-  state,
   pendingName,
   setPendingName,
   onSave,
 }: {
-  state: Extract<TalkState, { kind: "needsName" }>;
   pendingName: string;
   setPendingName: (value: string) => void;
   onSave: (args: { name: string }) => void;

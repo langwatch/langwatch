@@ -76,24 +76,14 @@ describe("callReachedLimit", () => {
     it("is off one millisecond under the limit and on from the limit itself", () => {
       const maxCallSeconds = 300;
 
-      expect(
-        callReachedLimit({ durationMs: 300_000 - 1, maxCallSeconds }),
-      ).toBe(false);
-      expect(callReachedLimit({ durationMs: 300_000, maxCallSeconds })).toBe(
-        true,
-      );
-      expect(
-        callReachedLimit({ durationMs: 300_000 + 4_321, maxCallSeconds }),
-      ).toBe(true);
+      expect(callReachedLimit({ durationMs: 300_000 - 1, maxCallSeconds })).toBe(false);
+      expect(callReachedLimit({ durationMs: 300_000, maxCallSeconds })).toBe(true);
+      expect(callReachedLimit({ durationMs: 300_000 + 4_321, maxCallSeconds })).toBe(true);
     });
 
     it("follows the configured limit rather than the default", () => {
-      expect(callReachedLimit({ durationMs: 60_000, maxCallSeconds: 60 })).toBe(
-        true,
-      );
-      expect(
-        callReachedLimit({ durationMs: 60_000, maxCallSeconds: 300 }),
-      ).toBe(false);
+      expect(callReachedLimit({ durationMs: 60_000, maxCallSeconds: 60 })).toBe(true);
+      expect(callReachedLimit({ durationMs: 60_000, maxCallSeconds: 300 })).toBe(false);
     });
   });
 });

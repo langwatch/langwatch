@@ -728,9 +728,7 @@ describe("finishVoiceSession", () => {
       /** @scenario "A Call it myself finish at or over the call limit is marked as cut" */
       it("writes the record with the cutoff marker on, from the span alone", async () => {
         const runner = fakeRunner();
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({ runner, over: { writeCallRun } });
 
         await finishVoiceSession({
@@ -751,26 +749,22 @@ describe("finishVoiceSession", () => {
         // that ends a call at the limit runs on the browser's. A provider record
         // that rounds a cut call down must not clear the marker.
         const runner = fakeRunner({
-          getCallRecord: vi.fn(
-            async (): Promise<CallRecord> => ({
-              conversationId: "conv_1",
-              transport: "elevenlabs_convai",
-              agentExternalId: "agent_xyz",
-              startedAt: 1000,
-              endedAt: 1000 + (MAX_CALL_SECONDS - 1) * 1000,
-              durationMs: (MAX_CALL_SECONDS - 1) * 1000,
-              turns: [
-                { role: "caller", text: "hi", startMs: 0, endMs: 400 },
-                { role: "agent", text: "hello", startMs: 500, endMs: 900 },
-              ],
-              isCutAtLimit: false,
-              source: "provider",
-            }),
-          ),
+          getCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+            conversationId: "conv_1",
+            transport: "elevenlabs_convai",
+            agentExternalId: "agent_xyz",
+            startedAt: 1000,
+            endedAt: 1000 + (MAX_CALL_SECONDS - 1) * 1000,
+            durationMs: (MAX_CALL_SECONDS - 1) * 1000,
+            turns: [
+              { role: "caller", text: "hi", startMs: 0, endMs: 400 },
+              { role: "agent", text: "hello", startMs: 500, endMs: 900 },
+            ],
+            isCutAtLimit: false,
+            source: "provider",
+          })),
         });
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({ runner, over: { writeCallRun } });
 
         await finishVoiceSession({
