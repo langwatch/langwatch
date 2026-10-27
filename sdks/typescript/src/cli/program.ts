@@ -363,6 +363,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerLangyCommands(program);
   registerAgentCommands(program);
   registerDashboardCommands(program);
+  registerBoardCommands(program);
   registerModelProviderCommands(program);
   registerModelDefaultCommands(program);
   registerVirtualKeysCommands(program);
@@ -2087,6 +2088,133 @@ function registerDashboardCommands(program: Command): void {
     async (id: string) => {
       const { deleteDashboardCommand: impl } = await import("./commands/dashboards/delete.js");
       return impl(id);
+    },
+  );
+}
+
+function registerBoardCommands(program: Command): void {
+  // Dashboards boards over /api/v1/dashboards; the project comes from the API key. The
+  // Analytics Reports dashboards stay on `langwatch dashboard`.
+  const boardCmd = program
+    .command("dashboards")
+    .description("Manage Dashboards boards and the widgets on them");
+  const format = (command: Command) =>
+    command.option("-f, --format <format>", "Output format: table (default) or json", "table");
+
+  emitsResult(
+    format(boardCmd.command("list").description("List the project's boards")),
+    async () => {
+      const { listBoardsCommand: impl } = await import("./commands/boards/boards.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    format(boardCmd.command("get <boardId>").description("Get a board by ID")),
+    async (boardId: string) => {
+      const { getBoardCommand: impl } = await import("./commands/boards/boards.js");
+      return impl(boardId);
+    },
+  );
+
+  emitsResult(
+    format(boardCmd.command("create <name>").description("Create an empty board")),
+    async (name: string) => {
+      const { createBoardCommand: impl } = await import("./commands/boards/boards.js");
+      return impl(name);
+    },
+  );
+
+  emitsResult(
+    format(
+      boardCmd
+        .command("update <boardId>")
+        .description("Rename a board or change its description")
+        .option("--name <name>", "New board name")
+        .option("--description <description>", "New board description")
+        .option("--clear-description", "Remove the board's description"),
+    ),
+    async (
+      boardId: string,
+      options: { name?: string; description?: string; clearDescription?: boolean },
+    ) => {
+      const { updateBoardCommand: impl } = await import("./commands/boards/boards.js");
+      return impl(boardId, options);
+    },
+  );
+
+  emitsResult(
+    format(boardCmd.command("delete <boardId>").description("Delete a board and its widgets")),
+    async (boardId: string) => {
+      const { deleteBoardCommand: impl } = await import("./commands/boards/boards.js");
+      return impl(boardId);
+    },
+  );
+
+  const widgetCmd = boardCmd.command("widgets").description("Manage the widgets on a board");
+
+  emitsResult(
+    format(widgetCmd.command("list <boardId>").description("List the widgets on a board")),
+    async (boardId: string) => {
+      const { listBoardWidgetsCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId);
+    },
+  );
+
+  emitsResult(
+    format(
+      widgetCmd
+        .command("get <boardId> <widgetId>")
+        .description("Get a widget on a board — its React source and named queries"),
+    ),
+    async (boardId: string, widgetId: string) => {
+      const { getBoardWidgetCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId, widgetId);
+    },
+  );
+
+  const definitionOptions = (command: Command) =>
+    command
+      .option("--description <description>", "What the widget shows")
+      .option("--code <code>", "The widget's React source")
+      .option("--code-file <path>", "Read the widget's React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }");
+
+  emitsResult(
+    format(
+      definitionOptions(
+        widgetCmd
+          .command("create <boardId>")
+          .description("Create a widget on a board from a React source file and its queries")
+          .requiredOption("--name <name>", "Widget name"),
+      ),
+    ),
+    async (boardId: string, options: Record<string, string | undefined>) => {
+      const { createBoardWidgetCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId, options);
+    },
+  );
+
+  emitsResult(
+    format(
+      definitionOptions(
+        widgetCmd
+          .command("update <boardId> <widgetId>")
+          .description("Update a widget on a board")
+          .option("--name <name>", "New widget name"),
+      ),
+    ),
+    async (boardId: string, widgetId: string, options: Record<string, string | undefined>) => {
+      const { updateBoardWidgetCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId, widgetId, options);
+    },
+  );
+
+  emitsResult(
+    format(widgetCmd.command("delete <boardId> <widgetId>").description("Delete a widget")),
+    async (boardId: string, widgetId: string) => {
+      const { deleteBoardWidgetCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId, widgetId);
     },
   );
 }

@@ -43,6 +43,11 @@ describe("the routes each legacy project key scope flag opens", () => {
   it("is exactly the pinned list", () => {
     expect(routesByScope()).toMatchInlineSnapshot(`
       {
+        "legacy_project_key_annotations_read": [
+          "GET annotations /",
+          "GET annotations /:id",
+          "GET annotations /trace/:id",
+        ],
         "legacy_project_key_connected_agents": [
           "GET agents /connect/poll",
           "GET model-providers /",

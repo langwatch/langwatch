@@ -23,11 +23,13 @@ import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../../../services/langwatch-ql-connection.service.ts";
+import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import { LWQL_APP_FUNCTION_CATALOG } from "../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { LangWatchQLAppFunctionStatementsService } from "./langwatch-ql-app-function-statements.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   LangWatchQLPostgresMappingService,
+  type PostgresNamedCollection,
 } from "./langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "./langwatch-ql-postgres-views.service.ts";
 import { LWQL_POSTGRES_READER_ROLE } from "./langwatch-ql-production-provisioning.service.ts";
@@ -42,6 +44,7 @@ const connections = LangWatchQLConnectionService.create();
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
+const sqlText = LangWatchQLSqlTextService.create();
 
 /** The SaaS-convention names every self-provisioning distribution shares. */
 export const LWQL_SELF_PROVISION_DEFAULTS = {
@@ -73,7 +76,7 @@ export type LwqlAccessModelMode = "rendered" | "sql";
 
 /** What the app-owned ClickHouse objects lack; names only, never DDL. */
 interface LwqlClickHouseDrift {
-  /** Each object absent. */
+  /** Each object absent, and each engine table not stamped with the current credentials. */
   readonly objects: readonly string[];
   /** The key map was among them, so a converge that repairs it is followed by a fill. */
   readonly isKeyMapMissing: boolean;
@@ -86,14 +89,29 @@ export interface LwqlPostgresGap {
 }
 
 /**
- * What the check found absent in each store; both empty means converged. Columns are the
- * deploy's, so an older worker never rewrites a newer object. `unknown`: PostgreSQL could not
- * be read, so it is neither converged nor cleared.
+ * What the check found absent in each store (or, for an engine table, built on stale credentials);
+ * both empty means converged. Columns are the deploy's, so an older worker never rewrites a newer
+ * object. `unknown`: PostgreSQL could not be read, so it is neither converged nor cleared.
  */
 export interface LwqlAppOwnedDrift {
   readonly clickHouse: readonly string[];
   readonly postgres: readonly LwqlPostgresGap[] | "unknown";
   readonly isKeyMapMissing: boolean;
+}
+
+/** The PostgreSQL connection the app expects the named collection to hold. */
+type LwqlPostgresSettings = Readonly<{ endpoint: LwqlPostgresEndpoint; readerPassword: string }>;
+
+/**
+ * Two reads that together prove the collection holds the app's values: one through the collection,
+ * one with the app's own values. The reader role has one password, so both succeeding means the
+ * collection carries the app's (#8858).
+ */
+export interface LwqlCollectionProbe {
+  readonly collection: string;
+  /** An approved view the engine tables read; reading its structure authenticates. */
+  readonly relation: string;
+  readonly connection: Omit<PostgresNamedCollection, "collection">;
 }
 
 /** The endpoint must be reachable from the ClickHouse server; the chart's cluster DNS is. */
@@ -160,6 +178,62 @@ export class LangWatchQLSelfProvisioningService {
     return source.LWQL_ACCESS_MODEL_MODE === "sql" ? "sql" : "rendered";
   }
 
+  /** The values the app renders into the named collection, in either mode. */
+  namedCollectionValues({
+    names,
+    postgres,
+  }: {
+    names: LangWatchQLNames;
+    postgres: LwqlPostgresSettings;
+  }): PostgresNamedCollection {
+    return {
+      collection: this.namedCollection({ names }),
+      host: postgres.endpoint.host,
+      port: postgres.endpoint.port,
+      database: postgres.endpoint.database,
+      user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
+      password: postgres.readerPassword,
+    };
+  }
+
+  /** The fingerprint of {@link namedCollectionValues}, which a current engine table carries. */
+  credentialFingerprint({
+    names,
+    postgres,
+  }: {
+    names: LangWatchQLNames;
+    postgres: LwqlPostgresSettings;
+  }): string {
+    const { host, port, database, user, password } = this.namedCollectionValues({
+      names,
+      postgres,
+    });
+    return postgresMapping.credentialFingerprint({
+      connection: { host, port, database, user, password },
+    });
+  }
+
+  /** What to read before stamping an engine table with the app's collection values. */
+  collectionProbe({
+    names,
+    postgres,
+  }: {
+    names: LangWatchQLNames;
+    postgres: LwqlPostgresSettings;
+  }): LwqlCollectionProbe {
+    const { collection, ...connection } = this.namedCollectionValues({ names, postgres });
+    const [first] = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
+    if (!first) throw new Error("lwql self-provisioning: the catalog maps no PostgreSQL dataset");
+    sqlText.assertIdentifier(collection, "named collection");
+    return { collection, relation: first.postgres.approvedView, connection };
+  }
+
+  /** The engine tables a converge creates: every one, or those among the check's drift. */
+  engineTablesIn({ only }: { only: readonly string[] | undefined }): string[] {
+    const engineTables = postgresViews.engineTableNames();
+    return only === undefined ? engineTables : engineTables.filter((name) => only.includes(name));
+  }
+
   /**
    * Every ClickHouse statement a self-provisioning boot runs: the access model, the PostgreSQL
    * bridge, then the views. Each app-owned object is created or replaced in one statement,
@@ -173,17 +247,20 @@ export class LangWatchQLSelfProvisioningService {
     includeAppFunctions = true,
     mode = "sql",
     only,
+    collectionLoaded = false,
   }: {
     names: LangWatchQLNames;
     restrictedPassword: string;
     sourceDatabase: string;
-    postgres: { endpoint: LwqlPostgresEndpoint; readerPassword: string };
+    postgres: LwqlPostgresSettings;
     /** Off where a `CREATE FUNCTION` would reach one replica of several. */
     includeAppFunctions?: boolean;
     /** `rendered` leaves the config-store-owned entities to the config files. */
     mode?: LwqlAccessModelMode;
     /** The reconvergence check's drift: only these app-owned objects, never the access entities. */
     only?: readonly string[];
+    /** The task found ClickHouse holds the app's collection values: engine tables are stamped. */
+    collectionLoaded?: boolean;
   }): string[] {
     if (names.database !== sourceDatabase) {
       throw new Error(
@@ -191,6 +268,9 @@ export class LangWatchQLSelfProvisioningService {
       );
     }
     const collection = this.namedCollection({ names });
+    const credentialFingerprint = collectionLoaded
+      ? this.credentialFingerprint({ names, postgres })
+      : undefined;
     if (only !== undefined) {
       return this.#driftedStatements({
         names,
@@ -198,23 +278,21 @@ export class LangWatchQLSelfProvisioningService {
         collection,
         includeAppFunctions,
         only,
+        credentialFingerprint,
       });
     }
     const definition = accessModelDefinition.build({
       names,
       passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
-      namedCollection: {
-        collection,
-        host: postgres.endpoint.host,
-        port: postgres.endpoint.port,
-        database: postgres.endpoint.database,
-        user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
-        password: postgres.readerPassword,
-      },
+      namedCollection: this.namedCollectionValues({ names, postgres }),
       sourceDatabase,
     });
     const structural = accessModel.setupStatements({ names, sourceDatabase, includeAppFunctions });
-    const engineTables = postgresViews.engineTableStatements({ names, collection });
+    const engineTables = postgresViews.engineTableStatements({
+      names,
+      collection,
+      ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
+    });
     const views = viewProvisioning.setupStatements({
       names,
       sourceDatabase,
@@ -237,12 +315,14 @@ export class LangWatchQLSelfProvisioningService {
     collection,
     includeAppFunctions,
     only,
+    credentialFingerprint,
   }: {
     names: LangWatchQLNames;
     sourceDatabase: string;
     collection: string;
     includeAppFunctions: boolean;
     only: readonly string[];
+    credentialFingerprint: string | undefined;
   }): string[] {
     const drifted = new Set(only);
     const engineTables = catalogShapes
@@ -262,7 +342,12 @@ export class LangWatchQLSelfProvisioningService {
       ...(drifted.has(names.keyMapTable)
         ? [accessModel.keyMapTableStatement({ names, sourceDatabase })]
         : []),
-      ...postgresViews.engineTableStatements({ names, collection, views: engineTables }),
+      ...postgresViews.engineTableStatements({
+        names,
+        collection,
+        views: engineTables,
+        ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
+      }),
       ...viewProvisioning.setupStatements({
         names,
         sourceDatabase,
@@ -312,21 +397,35 @@ export class LangWatchQLSelfProvisioningService {
     ];
   }
 
-  /** Each expected relation absent, then each expected app function absent. */
+  /**
+   * Each expected relation absent or, for an engine table, not stamped with the current
+   * credential fingerprint (a table from before #8858 has none); then each app function absent.
+   */
   findDrift({
     names,
     relations,
     functions,
     found,
+    credentialFingerprint,
   }: {
     names: LangWatchQLNames;
     relations: readonly string[];
     /** The app functions to expect; empty where a `CREATE FUNCTION` cannot reach every replica. */
     functions: readonly string[];
-    found: { relations: readonly string[]; functions: readonly string[] };
+    found: {
+      relations: readonly string[];
+      functions: readonly string[];
+      /** Each present relation's `system.tables` comment. */
+      comments: Readonly<Record<string, string>>;
+    };
+    credentialFingerprint: string;
   }): LwqlClickHouseDrift {
+    const engineTables = postgresViews.engineTableNames();
+    const current = postgresMapping.credentialComment({ fingerprint: credentialFingerprint });
+    const isStale = (name: string) =>
+      engineTables.includes(name) && found.comments[name] !== current;
     const objects = [
-      ...relations.filter((name) => !found.relations.includes(name)),
+      ...relations.filter((name) => !found.relations.includes(name) || isStale(name)),
       ...functions.filter((name) => !found.functions.includes(name)),
     ];
     return { objects, isKeyMapMissing: objects.includes(names.keyMapTable) };

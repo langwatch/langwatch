@@ -22,7 +22,7 @@ const board = {
 
 describe("DashboardWidgetsApiService", () => {
   describe("when listing the boards a widget can be added to", () => {
-    it("reads the Dashboards boards route of the project in scope, not /api/v1/dashboards", async () => {
+    it("reads the Dashboards boards route of the project in scope, not /api/v1/analytics/reports", async () => {
       const GET = vi.fn(async () => ({ data: { data: [board] } }));
       const service = new DashboardWidgetsApiService({
         langwatchApiClient: { GET } as unknown as LangwatchApiClient,

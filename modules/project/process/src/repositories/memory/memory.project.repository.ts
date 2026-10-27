@@ -653,8 +653,13 @@ export class MemoryProjectRepository implements ProjectRepository {
     return project?.id ?? null;
   }
 
-  /** The memory store keeps no usage stamp: nothing in it reads one back. */
-  async markLegacyApiKeyUsed(_input: { projectId: string; at: Instant }): Promise<void> {}
+  async markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void> {
+    this.#database.putLegacyKeyUse(input.projectId, input.at);
+  }
+
+  async findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null> {
+    return this.#database.findLegacyKeyUse(input.projectId) ?? null;
+  }
 
   /** Answers false for a project this memory holds no live row for, as the fenced UPDATE does. */
   async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
