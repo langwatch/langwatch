@@ -52,7 +52,7 @@ async def handle_user_query_manual(query: str):
         llm_response = ""
         async with langwatch.span(type="llm", name="Manual LLM Generation") as llm_span:
             llm_input = {"role": "user", "content": f"Context: {retrieved_docs}\nQuery: {query}"}
-            llm_metadata = {"model_name": "gpt-5"}
+            llm_metadata = {"model_name": "gpt-6-luna"}
 
             # ... your async LLM call logic ...
             await asyncio.sleep(0.1)

@@ -71,7 +71,7 @@ client = OpenAI()
 
 def extract_booking_details(message: str) -> BookingDetails:
     response = client.responses.parse(
-        model="gpt-5",
+        model="gpt-6-luna",
         instructions="Extract structured booking details from the user message. Only include fields you are confident about.",
         response_format=BookingDetails,
         input=[{"role": "user", "content": message}],

@@ -34,7 +34,7 @@ Then to capture your LLM calls, you can use the `withActiveSpan` method to creat
 import { AzureOpenAI } from "openai";
 
 // Model to be used and messages that will be sent to the LLM
-const model = "gpt-5-mini";
+const model = "gpt-6-luna";
 const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
   { role: "system", content: "You are a helpful assistant." },
   {
@@ -116,7 +116,7 @@ For automatic instrumentation without manual span creation, you can use the [Ope
   
   // This call will be automatically instrumented
   const completion = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-6-luna",
     messages: [{ role: "user", content: "Hello!" }],
   });
   ```

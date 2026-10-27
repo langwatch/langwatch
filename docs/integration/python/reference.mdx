@@ -438,7 +438,7 @@ def complex_op():
         rag_span.update(output=retrieved_data)
 
     # ... more work ...
-    with langwatch.span(name="LLMCall", type="llm", input={"prompt": "Summarize this"}, model="gpt-5") as llm_span:
+    with langwatch.span(name="LLMCall", type="llm", input={"prompt": "Summarize this"}, model="gpt-6-luna") as llm_span:
         summary = "summary from LLM"
         llm_span.update(output=summary, metrics={"input_tokens": 50, "output_tokens": 15})
     return summary
@@ -514,7 +514,7 @@ complex_op()
 </ParamField>
 
 <ParamField path="model" type="Optional[str]" default="None">
-  The name or identifier of the model used in this operation (e.g., `'gpt-5'`,
+  The name or identifier of the model used in this operation (e.g., `'gpt-6-luna'`,
   `'text-embedding-ada-002'`).
 </ParamField>
 

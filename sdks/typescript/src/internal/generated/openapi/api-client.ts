@@ -12594,9 +12594,9 @@ export interface operations {
                         options?: (string | number | boolean)[];
                         required?: boolean;
                     }[];
-                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default. */
                     simulatorModel?: string | null;
-                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;
@@ -12747,9 +12747,9 @@ export interface operations {
                         options?: (string | number | boolean)[];
                         required?: boolean;
                     }[];
-                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default. */
                     simulatorModel?: string | null;
-                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;
@@ -12882,9 +12882,9 @@ export interface operations {
                         options?: (string | number | boolean)[];
                         required?: boolean;
                     }[];
-                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default. */
                     simulatorModel?: string | null;
-                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;

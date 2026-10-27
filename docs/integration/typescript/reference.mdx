@@ -272,7 +272,7 @@ The `LangWatchSpan` extends the standard OpenTelemetry `Span` with additional me
 
 <ParamField path="setRequestModel" type="(model: string) => this">
   Set the request model name for the span. This is typically the model name sent in the API request
-  (e.g., 'gpt-5', 'claude-sonnet-5').
+  (e.g., 'gpt-6-luna', 'claude-sonnet-5').
 </ParamField>
 
 <ParamField path="setResponseModel" type="(model: string) => this">
@@ -1000,11 +1000,11 @@ const tracer = getLangWatchTracer("my-service");
 
 await tracer.withActiveSpan("process-request", async (span) => {
   span.setType("llm");
-  span.setRequestModel("gpt-5");
+  span.setRequestModel("gpt-6-luna");
 
   // Your LLM call here
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-6-luna",
     messages: [{ role: "user", content: "Hello!" }],
   });
 
@@ -1096,7 +1096,7 @@ setupObservability();
 const handler = new LangWatchCallbackHandler();
 const llm = new ChatOpenAI({
   callbacks: [handler],
-  model: "gpt-5-mini",
+  model: "gpt-6-luna",
 });
 
 // All operations are automatically traced

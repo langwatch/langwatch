@@ -97305,7 +97305,7 @@
                     }
                   },
                   "simulatorModel": {
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -97318,7 +97318,7 @@
                     ]
                   },
                   "judgeModel": {
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -97934,7 +97934,7 @@
                     }
                   },
                   "simulatorModel": {
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -97947,7 +97947,7 @@
                     ]
                   },
                   "judgeModel": {
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -98350,7 +98350,7 @@
                     }
                   },
                   "simulatorModel": {
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",
@@ -98363,7 +98363,7 @@
                     ]
                   },
                   "judgeModel": {
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.",
+                    "description": "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.",
                     "anyOf": [
                       {
                         "type": "string",

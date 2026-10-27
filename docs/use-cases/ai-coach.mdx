@@ -73,7 +73,7 @@ def run_stacking_judge_llm(model_output: str) -> JudgeAnswer:
     prompt = "You are an evaluator checking whether the AI coach response includes at least one open-ended question "
 
     response = client.responses.parse(
-        model="gpt-5",
+        model="gpt-6-luna",
         instructions=prompt,
         response_format=JudgeAnswer,
         input={"role": "user", "content": f"AI Response: {model_output}"},
@@ -94,7 +94,7 @@ def run_looping_judge_llm(model_output: str, history_json: str) -> bool:
         })
 
     response = client.responses.parse(
-        model="gpt-5",
+        model="gpt-6-luna",
         instructions=prompt,
         response_format=JudgeAnswer,
         input=messages,

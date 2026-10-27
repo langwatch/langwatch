@@ -262,9 +262,9 @@ When the license names `managed_models` and no administrator switched it off, th
 
 The gateway sends the whole request (messages, tools, attachments) to that slot, and the response comes back through it. LangWatch serves it with model providers it holds keys for and meters it against the organization's budget.
 
-A request reaches the slot only when the caller names a `langwatch/<model>` model, for example `langwatch/gpt-5-mini`.
+A request reaches the slot only when the caller names a `langwatch/<model>` model, for example `langwatch/gpt-6-luna`.
 
-A bare model name, with no provider prefix, never reaches the slot. It is served by the organization's own providers, or refused with `model_not_recognized` when the slot is the only provider. A model with another provider prefix, for example `openai/gpt-5-mini`, stays with that provider, and its retries never fall back to the slot.
+A bare model name, with no provider prefix, never reaches the slot. It is served by the organization's own providers, or refused with `model_not_recognized` when the slot is the only provider. A model with another provider prefix, for example `openai/gpt-6-luna`, stays with that provider, and its retries never fall back to the slot.
 
 To remove the slot, switch managed models off on **Settings, Connect**, or set `LANGWATCH_CONNECT_DISABLED=true` for the whole install.
 

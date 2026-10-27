@@ -1250,15 +1250,15 @@ class Experiment:
 
         Args:
             name: Unique identifier for the target
-            metadata: Optional metadata for comparison (e.g., {"model": "gpt-4"})
+            metadata: Optional metadata for comparison (e.g., {"model": "gpt-6-luna"})
 
         Example:
             ```python
             for index, row in evaluation.loop(df.iterrows()):
                 def task(index, row):
-                    # Compare GPT-4 and Claude
-                    with evaluation.target("gpt-4", {"model": "openai/gpt-4"}):
-                        response = call_gpt4(row["question"])
+                    # Compare gpt-6-luna and Claude
+                    with evaluation.target("gpt-6-luna", {"model": "openai/gpt-6-luna"}):
+                        response = call_gpt(row["question"])
                         # target auto-inferred, use data= to record output
                         evaluation.log("quality", index=index, score=0.95,
                                        data={"output": response})
@@ -1425,8 +1425,8 @@ class Experiment:
         Example:
             ```python
             # With explicit target
-            with evaluation.target("gpt-4", {"model": "openai/gpt-4"}):
-                response = call_gpt4(row["question"])
+            with evaluation.target("gpt-6-luna", {"model": "openai/gpt-6-luna"}):
+                response = call_gpt(row["question"])
                 evaluation.log_response(response)  # Store the output
                 evaluation.log("quality", index=index, score=0.95)  # Log metrics
 
@@ -1877,7 +1877,7 @@ class Experiment:
         Example:
             ```python
             for index, row in experiment.loop(df.iterrows()):
-                with experiment.target("gpt-5-mini"):
+                with experiment.target("gpt-6-luna"):
                     experiment.log_response(call_gpt(row["question"]))
 
                 with experiment.target("claude-sonnet-5"):

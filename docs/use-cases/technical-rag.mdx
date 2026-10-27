@@ -73,7 +73,7 @@ def generate_answer(question: str, contexts: List[str]) -> str:
     system_prompt = "You are a helpful technical assistant. Use the following document chunks to answer the user's question accurately."
 
     response = client.responses.create(
-        model="gpt-5",
+        model="gpt-6-luna",
         instructions=system_prompt,
         input=[{"role": "user", "content": f"Documents:\n{chr(10).join(contexts)}"}, {"role": "user", "content": f"Question: {question}"}
         ]

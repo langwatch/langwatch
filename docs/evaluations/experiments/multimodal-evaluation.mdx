@@ -4,7 +4,7 @@ sidebarTitle: Multimodal Evaluation
 description: Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 ---
 
-The built-in LLM-as-a-Judge evaluators accept images as inputs and outputs. Any vision-capable model (GPT-5.2, Claude Sonnet, Gemini and others) reads the images and scores them against the criteria in your prompt.
+The built-in LLM-as-a-Judge evaluators accept images as inputs and outputs. Any vision-capable model (gpt-6-luna, Claude Sonnet, Gemini and others) reads the images and scores them against the criteria in your prompt.
 
 This covers common multimodal use cases:
 - **Image generation quality**: score outputs of image generation models
@@ -60,7 +60,7 @@ Image detection is strict by design, a field is treated as an image only when th
 
 1. On the prompt or agent column, click **Add evaluator**, then **New Evaluator**
 2. Pick the **LLM as Judge** category and one of the Boolean, Score or Category evaluators
-3. Choose a **vision-capable model** (e.g. `gpt-5.2`, `claude-sonnet-4-5-20250929`)
+3. Choose a **vision-capable model** (e.g. `gpt-6-luna`, `claude-sonnet-4-5-20250929`)
 4. Write a prompt that references the image fields, and map dataset columns to the evaluator's `input`, `output` and `contexts` variables
 
 The evaluator automatically detects image values and sends them as multipart content to the vision model. No special configuration needed.
@@ -166,7 +166,7 @@ experiment = langwatch.experiment.init("custom-image-evaluation")
 for index, row in experiment.loop(df.iterrows()):
     # Call a vision model directly
     response = litellm.completion(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[{
             "role": "user",
             "content": [
@@ -199,7 +199,7 @@ from unstructured.partition.pdf import partition_pdf
 from unstructured.staging.base import elements_to_text
 import dspy
 
-dspy.configure(lm=dspy.LM("openai/gpt-5-mini"))
+dspy.configure(lm=dspy.LM("openai/gpt-6-luna"))
 
 # Dataset of PDFs with ground truth metadata
 df = pd.DataFrame([

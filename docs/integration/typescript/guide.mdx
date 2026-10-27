@@ -99,7 +99,7 @@ async function askAI(question: string) {
   return await tracer.withActiveSpan("ask-ai", async (span) => {
     // Make the LLM call using Vercel AI SDK
     const response = await generateText({
-      model: openai("gpt-5-mini"),
+      model: openai("gpt-6-luna"),
       prompt: question,
       maxTokens: 100,
       // The LangWatch SDK will automatically capture LLM data
@@ -184,7 +184,7 @@ async function chatWithAI(userMessage: string) {
   return await tracer.withActiveSpan("chat-with-ai", async (span) => {
     // Make the LLM call
     const response = await generateText({
-      model: openai("gpt-5-mini"),
+      model: openai("gpt-6-luna"),
       prompt: userMessage,
       experimental_telemetry: { isEnabled: true }, // Auto-captures LLM data
     });

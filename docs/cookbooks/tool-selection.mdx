@@ -169,7 +169,7 @@ async def process_user_query(query: str):
     start_time = asyncio.get_event_loop().time()
 
     response = await client.responses.create(
-        model="gpt-5",
+        model="gpt-6-luna",
         input=messages,
         tools=available_tools,
     )

@@ -55,7 +55,7 @@ async function main(message: string): Promise<string> {
     span.setInput(message);
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-6-luna",
       messages: [{ role: "user", content: message }],
     });
 

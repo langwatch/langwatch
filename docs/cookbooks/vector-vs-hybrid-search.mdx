@@ -189,7 +189,7 @@ tbl.create_fts_index("searchable_text", replace=True)
 
 When you don't have production data to start with, you can generate synthetic data to simulate a real-world scenario. We already have the 'output', which is the clothing item we just embedded. We now want to generate synthetic queries that would be relevant to the clothing item.
 
-In this case, we'll use GPT-5 to generate realistic user queries that would naturally lead to each product in our catalog. This gives us query-product pairs where we know the ground truth relevance.
+In this case, we'll use gpt-6-luna to generate realistic user queries that would naturally lead to each product in our catalog. This gives us query-product pairs where we know the ground truth relevance.
 
 ```python
 import random
@@ -238,7 +238,7 @@ def generate_synthetic_query(item):
 
     # Generate query using OpenAI
     response = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-6-luna",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that generates realistic shopping queries."},
             {"role": "user", "content": prompt}
