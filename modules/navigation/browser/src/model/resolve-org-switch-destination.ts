@@ -16,9 +16,8 @@ export function resolveOrgSwitchDestination({
   projectSlug: string | null;
   /**
    * The detour address the reader is on, null anywhere else and null when it
-   * names an entity of the organization being left. The detour is not a
-   * product, so `currentProduct` is null there and the resolver would
-   * otherwise throw the reader out of settings.
+   * names an entity of the organization being left. A detour carries no
+   * product, so without it the resolver throws the reader out of settings.
    */
   settingsPathname?: string | null;
 }): string {
