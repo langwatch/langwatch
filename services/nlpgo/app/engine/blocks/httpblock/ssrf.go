@@ -165,16 +165,7 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 			if len(ips) == 0 || anyMetadata(ips, opts, host) {
 				return nil, ErrSSRFBlocked
 			}
-			// Every address was checked, so fall back through them as a dial by name would.
-			var lastErr error
-			for _, ip := range ips {
-				conn, err := base.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
-				if err == nil {
-					return conn, nil
-				}
-				lastErr = err
-			}
-			return nil, lastErr
+			return checkedAddrs{ips: ips, port: port}.dial(ctx, base, network)
 		}
 		var ips []net.IP
 		if ip := net.ParseIP(host); ip != nil {
@@ -194,10 +185,30 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 				return nil, ErrSSRFBlocked
 			}
 		}
-		// Dial against the IP we just validated — net/http's internal
+		// Dial against the IPs we just validated — net/http's internal
 		// resolver can't redirect us to an unchecked address.
-		return base.DialContext(ctx, network, net.JoinHostPort(ips[0].String(), port))
+		return checkedAddrs{ips: ips, port: port}.dial(ctx, base, network)
 	}
+}
+
+// checkedAddrs are addresses the policy has already passed, on one port.
+type checkedAddrs struct {
+	ips  []net.IP
+	port string
+}
+
+// dial tries each checked address in turn, falling back as a dial by name
+// would, and never reaches an address that was not checked.
+func (c checkedAddrs) dial(ctx context.Context, base *net.Dialer, network string) (net.Conn, error) {
+	var lastErr error
+	for _, ip := range c.ips {
+		conn, err := base.DialContext(ctx, network, net.JoinHostPort(ip.String(), c.port))
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
 }
 
 // addrsOf is the literal address, or what the name resolves to.
