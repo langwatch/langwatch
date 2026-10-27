@@ -540,50 +540,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
     limit: number;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
-    const { upToTimestamp, upToEventId, ...page } = request;
-    return this.readPage({
-      ...page,
-      upTo: { timestamp: upToTimestamp, eventId: upToEventId },
-      failure: "Failed to get paged event records up to event from ClickHouse",
-    });
-  }
-
-  /**
-   * Cursor-paginated `getEventRecords`: one aggregate's whole history a page at a time, so a
-   * rebuild of a huge aggregate never holds every EventPayload blob at once.
-   */
-  async getEventRecordsPaged(request: {
-    tenantId: string;
-    aggregateType: string;
-    aggregateId: string;
-    after: { timestamp: number; eventId: string } | undefined;
-    limit: number;
-    occurredAtFromMs?: number;
-  }): Promise<EventRecord[]> {
-    return this.readPage({
-      ...request,
-      failure: "Failed to get paged event records from ClickHouse",
-    });
-  }
-
-  private async readPage({
-    failure,
-    ...request
-  }: {
-    tenantId: string;
-    aggregateType: string;
-    aggregateId: string;
-    upTo?: { timestamp: number; eventId: string };
-    after: { timestamp: number; eventId: string } | undefined;
-    limit: number;
-    occurredAtFromMs?: number;
-    failure: string;
-  }): Promise<EventRecord[]> {
-    const { tenantId, aggregateType, aggregateId, limit } = request;
-    // Before the index lookup below, so a refused limit issues no query at all.
-    if (!Number.isSafeInteger(limit) || limit < 1) {
-      throw new RangeError(`A page of event records needs a positive integer limit, got ${limit}`);
-    }
+    const { tenantId, aggregateType, aggregateId } = request;
     try {
       const occurredAtFromMs = await this.occurredAtFloor({
         tenantId,
@@ -600,40 +557,41 @@ export class EventingClickHouseEventRepository implements EventRepository {
         query,
         query_params,
         format: "JSONEachRow",
-        // `event_log` is not sorted in page order, so a page scans the aggregate's rows for its
-        // top `limit`; lifting the lazy-read cap to the page size reads only their payloads.
-        clickhouse_settings: { query_plan_max_limit_for_lazy_materialization: request.limit },
         // Unbounded, as in `getEventRecords`: a long-lived aggregate's history by its key.
         ...(declaresFullScan ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
       });
       const rows = await result.json<EventLogRow>();
       return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
-      this.logger.warn({ ...request, aggregateId: String(aggregateId), error }, failure);
+      this.logger.warn(
+        { ...request, aggregateId: String(aggregateId), error },
+        "Failed to get paged event records up to event from ClickHouse",
+      );
       throw error;
     }
   }
 
-  /** One page's query + params: {@link getEventRecordsUpToPaged}, {@link getEventRecordsPaged}. */
+  /** Query + params for {@link getEventRecordsUpToPaged}. */
   private buildPagedQuery(request: {
     tenantId: string;
     aggregateType: string;
     aggregateId: string;
-    upTo?: { timestamp: number; eventId: string };
+    upToTimestamp: number;
+    upToEventId: string;
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
     occurredAtFromMs?: number;
   }): { query: string; query_params: Record<string, unknown>; declaresFullScan: boolean } {
-    const { tenantId, aggregateType, aggregateId, upTo, after, limit, occurredAtFromMs } = request;
-    const upToClause = upTo
-      ? `AND (
-            EventTimestamp < {upToTimestamp:UInt64}
-            OR (
-              EventTimestamp = {upToTimestamp:UInt64}
-              AND EventId <= {upToEventId:String}
-            )
-          )`
-      : "";
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      after,
+      limit,
+      occurredAtFromMs,
+    } = request;
     const afterClause = after
       ? `AND (
             EventTimestamp > {afterTimestamp:UInt64}
@@ -658,7 +616,13 @@ export class EventingClickHouseEventRepository implements EventRepository {
           AND AggregateType = {aggregateType:String}
           AND AggregateId = {aggregateId:String}
           ${occurredAtFilter}
-          ${upToClause}
+          AND (
+            EventTimestamp < {upToTimestamp:UInt64}
+            OR (
+              EventTimestamp = {upToTimestamp:UInt64}
+              AND EventId <= {upToEventId:String}
+            )
+          )
           ${afterClause}
         ORDER BY EventTimestamp ASC, EventId ASC
         LIMIT {limit:UInt32}
@@ -667,7 +631,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
         tenantId,
         aggregateType,
         aggregateId: String(aggregateId),
-        ...(upTo ? { upToTimestamp: upTo.timestamp, upToEventId: upTo.eventId } : {}),
+        upToTimestamp,
+        upToEventId,
         ...(hasLowerBound ? { occurredAtFromMs } : {}),
         ...(after ? { afterTimestamp: after.timestamp, afterEventId: after.eventId } : {}),
         limit,

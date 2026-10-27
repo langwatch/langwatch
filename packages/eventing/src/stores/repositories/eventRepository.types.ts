@@ -93,20 +93,6 @@ export interface EventRepository {
   }) => Promise<EventRecord[]>;
 
   /**
-   * Cursor-paginated whole history, `getEventRecords` a page at a time, so a rebuild of a huge
-   * aggregate never holds every payload at once. Optional, as the up-to variant is.
-   */
-  getEventRecordsPaged?: (request: {
-    tenantId: string;
-    aggregateType: string;
-    aggregateId: string;
-    after: { timestamp: number; eventId: string } | undefined;
-    limit: number;
-    /** Partition-pruning lower bound, see {@link EventRepository.getEventRecordsUpTo}. */
-    occurredAtFromMs?: number;
-  }) => Promise<EventRecord[]>;
-
-  /**
    * Counts event records that come before a given event.
    * Returns raw count without validation.
    */

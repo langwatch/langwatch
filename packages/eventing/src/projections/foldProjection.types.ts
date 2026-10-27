@@ -73,16 +73,6 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
   }) => Promise<Event[]>;
-
-  // Paginated whole-history loader, for streaming a hand-off rebuild of a huge aggregate;
-  // auto-wired when the event store supports paginated reads.
-  eventLoaderPaged?: (context: {
-    tenantId: string;
-    aggregateId: string;
-    occurredAtMs?: number;
-    after: { timestamp: number; eventId: string } | undefined;
-    limit: number;
-  }) => Promise<Event[]>;
 }
 
 /**

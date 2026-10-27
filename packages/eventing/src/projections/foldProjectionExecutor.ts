@@ -9,10 +9,8 @@ import {
   incrementEsFoldRefoldTotal,
   observeEsFoldBlindReapplyEvents,
 } from "../metrics.ts";
-import { FoldRebuildIncompleteHistoryError } from "../services/errorHandling.ts";
-import type { PageCursor } from "../stores/eventStore.types.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
-import { MAX_APPLIED_EVENT_IDS, mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
+import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import { type ProjectionStoreContext, readWindowAround } from "./projectionStoreContext.ts";
 import { projectionConsumes } from "./sealedProjection.ts";
@@ -156,46 +154,6 @@ function uniqueByAppliedToken<E extends Event>(events: readonly E[]): E[] {
 function appliedTokensOf(event: Event): string[] {
   const token = appliedTokenOf(event);
   return token === event.id ? [event.id] : [event.id, token];
-}
-
-/** What a history read accounted for: every applied token it carried, and its latest occurredAt. */
-class HistoryAccount {
-  private readonly accounted = new Set<string>();
-  private maxOccurredAt = 0;
-
-  static empty(): HistoryAccount {
-    return new HistoryAccount();
-  }
-
-  add(event: Event): void {
-    // An applied token is accounted for by an event carrying it as its id or as its idempotency
-    // key: the read returns one event per key, which need not be the one this fold applied.
-    for (const token of appliedTokensOf(event)) this.accounted.add(token);
-    this.maxOccurredAt = Math.max(this.maxOccurredAt, event.occurredAt ?? 0);
-  }
-
-  /** Missing applied ids or a missing occurred-at frontier; null when the read is complete. */
-  gap({
-    delivered,
-    loadedAppliedIds,
-    stateFrontierOccurredAtMs,
-  }: {
-    delivered: readonly Event[];
-    loadedAppliedIds: readonly string[];
-    stateFrontierOccurredAtMs: number;
-  }): HistoryReadGap | null {
-    // The delivered events' tokens on their own, so the history's set is never copied.
-    const deliveredTokens = new Set(delivered.flatMap(appliedTokensOf));
-    let maxOccurredAt = this.maxOccurredAt;
-    for (const e of delivered) maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
-    const missingAppliedIds = loadedAppliedIds.filter(
-      (id) => !this.accounted.has(id) && !deliveredTokens.has(id),
-    );
-    const isFrontierMissing =
-      stateFrontierOccurredAtMs > 0 && maxOccurredAt < stateFrontierOccurredAtMs;
-    if (missingAppliedIds.length === 0 && !isFrontierMissing) return null;
-    return { missingAppliedIds, isFrontierMissing };
-  }
 }
 
 function applyUnseenEvents<State, E extends Event>({
@@ -855,18 +813,6 @@ export class FoldProjectionExecutor {
     // the log can account for the key, and the rebuild retries until it does.
     const missedToken = appliedTokenOf(missed);
     const redeliversAppliedKey = missedToken !== missed.id && appliedEventIds.includes(missedToken);
-    // Paged for an order-insensitive fold, as the store-miss re-fold is: a huge aggregate's
-    // whole history in one read is what runs a rebuild out of memory.
-    if (projection.eventLoaderPaged && projection.options?.refoldOnOutOfOrder === false) {
-      return this.streamRebuild({
-        projection,
-        missed,
-        context,
-        delivered: redeliversAppliedKey ? [] : [missed],
-        loadedAppliedIds: appliedEventIds,
-        stateFrontierOccurredAtMs: typeof frontier === "number" ? frontier : 0,
-      });
-    }
     const { history, gap } = await this.readHistoryUntilComplete({
       projection,
       delivered: redeliversAppliedKey ? [] : [missed],
@@ -876,10 +822,9 @@ export class FoldProjectionExecutor {
       stateFrontierOccurredAtMs: typeof frontier === "number" ? frontier : 0,
     });
     if (gap) {
-      throw new FoldRebuildIncompleteHistoryError({
-        projection: projection.name,
-        aggregateId: context.aggregateId,
-      });
+      throw new Error(
+        `Rebuild of ${projection.name} for aggregate ${context.aggregateId} read an incomplete history; retrying`,
+      );
     }
     const consumes = projectionConsumes<E, Event>(projection);
     // By applied token: a redelivery under a new id is the event the log kept.
@@ -1009,151 +954,6 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * Walks a `(timestamp, eventId)`-paged history to its end: a short or empty page ends it. A cap
-   * on pages stops a non-advancing cursor (a repository bug) from hanging the fold worker.
-   */
-  private async walkPages({
-    aggregateId,
-    load,
-    onPage,
-  }: {
-    aggregateId: string;
-    load: (after: PageCursor | undefined, limit: number) => Promise<Event[]>;
-    onPage: (page: Event[]) => void;
-  }): Promise<void> {
-    // 100k pages of 1000 covers a 100M-event aggregate.
-    const MAX_PAGES = 100_000;
-    let after: PageCursor | undefined;
-    for (let pageCount = 1; ; pageCount++) {
-      if (pageCount > MAX_PAGES) {
-        throw new Error(
-          `A paged history read exceeded ${MAX_PAGES} pages for aggregate ${aggregateId}; possible non-advancing cursor`,
-        );
-      }
-      const page = await load(after, this.refoldPageSize);
-      if (page.length === 0) return;
-      onPage(page);
-      const last = page[page.length - 1]!;
-      after = { timestamp: last.createdAt, eventId: last.id };
-      if (page.length < this.refoldPageSize) return;
-    }
-  }
-
-  /**
-   * {@link rebuild} over the paged whole-history loader: one page held at a time, deduped across
-   * pages by applied token, with the same completeness fences. Order-insensitive folds only.
-   */
-  private async streamRebuild<State, E extends Event>({
-    projection,
-    missed,
-    context,
-    delivered,
-    loadedAppliedIds,
-    stateFrontierOccurredAtMs,
-  }: {
-    projection: FoldProjectionDefinition<State, E>;
-    missed: E;
-    context: ProjectionStoreContext;
-    delivered: readonly E[];
-    loadedAppliedIds: readonly string[];
-    stateFrontierOccurredAtMs: number;
-  }): Promise<State> {
-    const consumes = projectionConsumes<E, Event>(projection);
-    let folded = await this.streamHistory({ projection, missed, context, consumes });
-    let gap = folded.read.gap({ delivered, loadedAppliedIds, stateFrontierOccurredAtMs });
-    for (const delayMs of this.refoldHistoryRetryDelaysMs) {
-      if (!gap) break;
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-      folded = await this.streamHistory({ projection, missed, context, consumes });
-      gap = folded.read.gap({ delivered, loadedAppliedIds, stateFrontierOccurredAtMs });
-    }
-    if (gap) {
-      throw new FoldRebuildIncompleteHistoryError({
-        projection: projection.name,
-        aggregateId: context.aggregateId,
-      });
-    }
-    let { state } = folded;
-    const applied = [...folded.applied];
-    const missedToken = appliedTokenOf(missed);
-    const appliesMissed = !folded.seen.has(missedToken) && consumes(missed);
-    if (appliesMissed) {
-      state = projection.apply(state, missed);
-      applied.push(missedToken);
-    }
-    const rebuiltEventCount = folded.appliedCount + (appliesMissed ? 1 : 0);
-    await projection.store.store(
-      state,
-      withAppliedEventIds(context, mergeAppliedEventIds({ previous: [], applied })),
-    );
-    logger.info(
-      {
-        projection: projection.name,
-        aggregateId: context.aggregateId,
-        tenantId: context.tenantId,
-        missedEventId: missed.id,
-        rebuiltEventCount,
-        streamed: true,
-      },
-      "Rebuilt the aggregate for a missed hand-off",
-    );
-    return state;
-  }
-
-  /** Folds the whole history from init, a page at a time, accounting for what it read. */
-  private async streamHistory<State, E extends Event>({
-    projection,
-    missed,
-    context,
-    consumes,
-  }: {
-    projection: FoldProjectionDefinition<State, E>;
-    missed: E;
-    context: ProjectionStoreContext;
-    consumes: (event: Event) => boolean;
-  }): Promise<{
-    state: State;
-    applied: string[];
-    appliedCount: number;
-    seen: Set<string>;
-    read: HistoryAccount;
-  }> {
-    const read = HistoryAccount.empty();
-    const seen = new Set<string>();
-    // `mergeAppliedEventIds` stores only the trailing ids, so only those are kept.
-    let applied: string[] = [];
-    let appliedCount = 0;
-    let state = projection.init();
-    await this.walkPages({
-      aggregateId: context.aggregateId,
-      load: (after, limit) =>
-        // Caller guards eventLoaderPaged is set.
-        projection.eventLoaderPaged!({
-          tenantId: context.tenantId,
-          aggregateId: context.aggregateId,
-          occurredAtMs: missed.occurredAt,
-          after,
-          limit,
-        }),
-      onPage: (page) => {
-        for (const event of page) {
-          read.add(event);
-          const token = appliedTokenOf(event);
-          if (seen.has(token)) continue;
-          seen.add(token);
-          if (!consumes(event)) continue;
-          state = projection.apply(state, event as E);
-          applied.push(token);
-          appliedCount++;
-          if (applied.length > 2 * MAX_APPLIED_EVENT_IDS)
-            applied = applied.slice(-MAX_APPLIED_EVENT_IDS);
-        }
-      },
-    });
-    return { state, applied, appliedCount, seen, read };
-  }
-
-  /**
    * Reads the aggregate's history, re-reading on a short backoff while a fence still
    * reports a gap (see `historyReadGap`). Returns the last read with the gap that
    * stands after retries, null once the read covers everything the loaded state holds.
@@ -1217,9 +1017,27 @@ export class FoldProjectionExecutor {
     loadedAppliedIds: readonly string[];
     stateFrontierOccurredAtMs: number;
   }): HistoryReadGap | null {
-    const read = HistoryAccount.empty();
-    for (const e of history) read.add(e);
-    return read.gap({ delivered, loadedAppliedIds, stateFrontierOccurredAtMs });
+    // An applied token is accounted for by an event carrying it as its id or
+    // as its idempotency key: the read returns one event per key, which need
+    // not be the one this fold applied.
+    const accounted = new Set<string>();
+    for (const e of [...history, ...delivered]) {
+      for (const token of appliedTokensOf(e)) accounted.add(token);
+    }
+    const missingAppliedIds = loadedAppliedIds.filter((id) => !accounted.has(id));
+
+    let maxOccurredAt = 0;
+    for (const e of history) {
+      maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
+    }
+    for (const e of delivered) {
+      maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
+    }
+    const isFrontierMissing =
+      stateFrontierOccurredAtMs > 0 && maxOccurredAt < stateFrontierOccurredAtMs;
+
+    if (missingAppliedIds.length === 0 && !isFrontierMissing) return null;
+    return { missingAppliedIds, isFrontierMissing };
   }
 
   /**
@@ -1358,27 +1176,43 @@ export class FoldProjectionExecutor {
     context: ProjectionStoreContext;
     upToEvent: E;
   }): Promise<State | null> {
+    const PAGE_SIZE = this.refoldPageSize;
+    // Safety net only: the paged loader's cursor is expected to strictly
+    // advance every call. If that contract is ever violated (e.g. a
+    // non-advancing cursor from a repository bug), this bounds the loop
+    // instead of hanging the fold worker for the aggregate indefinitely.
+    // 100k pages * 1000/page default covers a 100M-event aggregate.
+    const MAX_PAGES = 100_000;
     const seen = new Set<string>();
     let state = projection.init();
+    let after: { timestamp: number; eventId: string } | undefined;
     let refoldEventCount = 0;
+    let pageCount = 0;
 
-    await this.walkPages({
-      aggregateId: context.aggregateId,
-      load: (after, limit) =>
-        // Caller guards eventLoaderUpToPaged is set.
-        projection.eventLoaderUpToPaged!({
-          tenantId: context.tenantId,
-          aggregateId: context.aggregateId,
-          upToEvent,
-          after,
-          limit,
-        }),
-      onPage: (page) => {
-        const applied = applyUnseenEvents({ projection, events: page, seen, state });
-        state = applied.state;
-        refoldEventCount += applied.appliedCount;
-      },
-    });
+    for (;;) {
+      if (++pageCount > MAX_PAGES) {
+        throw new Error(
+          `streamRefoldUpToDelivered exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
+        );
+      }
+      // Caller guards eventLoaderUpToPaged is set.
+      const page = await projection.eventLoaderUpToPaged!({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+        upToEvent,
+        after,
+        limit: PAGE_SIZE,
+      });
+      if (page.length === 0) break;
+
+      const applied = applyUnseenEvents({ projection, events: page, seen, state });
+      state = applied.state;
+      refoldEventCount += applied.appliedCount;
+
+      const last = page[page.length - 1]!;
+      after = { timestamp: last.createdAt, eventId: last.id };
+      if (page.length < PAGE_SIZE) break;
+    }
 
     if (refoldEventCount === 0) return null;
 
