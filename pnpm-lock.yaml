@@ -1320,8 +1320,8 @@ importers:
         specifier: ^5.6.2
         version: 5.6.2
       cloudflared:
-        specifier: 0.7.1
-        version: 0.7.1
+        specifier: 0.7.3
+        version: 0.7.3
       commander:
         specifier: ^15.0.0
         version: 15.0.0
@@ -6656,8 +6656,8 @@ packages:
     resolution: {integrity: sha512-3Pe/CF1Nn94hyhIYpjtiLhdCoEoz0DqQ+988E9gmeEdQZlojxnOb74wctFyuwWQHzqyf9X7C7MG8juUpqBJT8w==}
     engines: {node: '>=0.8'}
 
-  cloudflared@0.7.1:
-    resolution: {integrity: sha512-jJn1Gu9Tf4qnIu8tfiHZ25Hs8rNcRYSVf8zAd97wvYdOCzftm1CTs1S/RPhijjGi8gUT1p9yzfDi9zYlU/0RwA==}
+  cloudflared@0.7.3:
+    resolution: {integrity: sha512-dR4QMS4PbD287QqOV/vAoE1BcQCXphLOVrN9vjNUgkLrPDA5qxn9Dz0VId0P7/Czj4Mxu3hoLgbrVx5OtOWr5Q==}
     hasBin: true
 
   clsx@2.1.1:
@@ -18209,7 +18209,7 @@ snapshots:
 
   clone@2.1.2: {}
 
-  cloudflared@0.7.1: {}
+  cloudflared@0.7.3: {}
 
   clsx@2.1.1: {}
 

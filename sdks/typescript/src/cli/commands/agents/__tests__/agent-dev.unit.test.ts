@@ -1,36 +1,16 @@
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The tunnel path verifies the binary it is about to run on every start, and
-// the mock below points at the node executable. Verification fails closed on
-// an unlisted platform, so the tests pin platform and arch to darwin-x64, a
-// named UNVERIFIED_PLATFORMS exception, and verification skips
-// deterministically on any host. These tests exercise the session flow
-// rather than the checksum.
-const realPlatform = process.platform;
-const realArch = process.arch;
-beforeAll(() => {
-  Object.defineProperty(process, "platform", {
-    value: "darwin",
-    configurable: true,
-  });
-  Object.defineProperty(process, "arch", {
-    value: "x64",
-    configurable: true,
-  });
-});
-afterAll(() => {
-  Object.defineProperty(process, "platform", {
-    value: realPlatform,
-    configurable: true,
-  });
-  Object.defineProperty(process, "arch", {
-    value: realArch,
-    configurable: true,
-  });
-});
+// Binary verification has its own tests (cloudflared-binary.unit.test.ts);
+// these exercise the session flow, so the verifier is stubbed out. Running
+// it for real here would match the node executable the cloudflared mock
+// points at against the pinned digest, and remove it on the mismatch.
+const ensureBinaryMock = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("../dev/cloudflared-binary", () => ({
+  ensureCloudflaredBinary: ensureBinaryMock,
+}));
 
 vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
@@ -60,9 +40,7 @@ vi.mock("ora", () => ({
 const fakeTunnels: EventEmitter[] = [];
 const quickMock = vi.hoisted(() => vi.fn());
 vi.mock("cloudflared", () => ({
-  // Points at a path that exists so the session never tries to download.
   bin: process.execPath,
-  install: vi.fn(),
   Tunnel: { quick: quickMock },
 }));
 
@@ -232,23 +210,17 @@ describe("agent dev session", () => {
     });
   });
 
-  describe("when the platform has no pinned cloudflared digest", () => {
-    it("refuses to start rather than running an unverified binary", async () => {
-      Object.defineProperty(process, "platform", {
-        value: "freebsd",
-        configurable: true,
-      });
-      try {
-        await expect(
-          startAgentDevSession({ port: "8000", agent: "agent_abc123" }),
-        ).rejects.toThrow(ProcessExitError);
-        expect(mockUpdate).not.toHaveBeenCalled();
-      } finally {
-        Object.defineProperty(process, "platform", {
-          value: "darwin",
-          configurable: true,
-        });
-      }
+  describe("when the cloudflared binary fails verification", () => {
+    it("refuses to start before touching the agent", async () => {
+      ensureBinaryMock.mockRejectedValueOnce(
+        new Error("No pinned cloudflared release for freebsd-x64."),
+      );
+
+      await expect(
+        startAgentDevSession({ port: "8000", agent: "agent_abc123" }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(quickMock).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 
