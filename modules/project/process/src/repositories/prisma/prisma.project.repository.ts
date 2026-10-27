@@ -843,7 +843,14 @@ export class PrismaProjectRepository
         kind: { notIn: [...UNMANAGED_PROJECT_KEY_KINDS] },
         apiKey: { not: { startsWith: REVOKED_LEGACY_KEY_PREFIX } },
       },
-      select: { id: true, name: true, slug: true, apiKey: true, legacyApiKeyLastUsedAt: true },
+      select: {
+        id: true,
+        teamId: true,
+        name: true,
+        slug: true,
+        apiKey: true,
+        legacyApiKeyLastUsedAt: true,
+      },
       orderBy: { name: "asc" },
     });
 
@@ -851,6 +858,7 @@ export class PrismaProjectRepository
       .filter((project) => !isLegacyKeyRevoked(project.apiKey))
       .map((project) => ({
         projectId: project.id,
+        teamId: project.teamId,
         projectName: project.name,
         projectSlug: project.slug,
         lastUsedAt: project.legacyApiKeyLastUsedAt

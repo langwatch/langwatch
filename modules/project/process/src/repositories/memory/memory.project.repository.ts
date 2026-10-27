@@ -677,6 +677,7 @@ export class MemoryProjectRepository implements ProjectRepository {
       .toSorted((left, right) => left.name.localeCompare(right.name))
       .map((project) => ({
         projectId: project.id,
+        teamId: project.teamId,
         projectName: project.name,
         projectSlug: project.slug,
         lastUsedAt: this.#database.findLegacyKeyUse(project.id) ?? null,

@@ -25,6 +25,13 @@ import {
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectService } from "./project.service.ts";
 
+/**
+ * A live legacy key before anyone's standing is asked about, carrying the owning
+ * team so one batched decision covers the read without a lineage lookup per project.
+ * The team never reaches the wire: the request service projects it off.
+ */
+export type LegacyKeyCandidate = ProjectLegacyKey & Readonly<{ teamId: string }>;
+
 /** The four project operations these use cases orchestrate, and nothing else. */
 export type ProjectOperationsDirectory = Pick<
   ProjectService,
@@ -215,11 +222,12 @@ export class ProjectOperationsService {
    * Every live legacy key in the organisation, as the organisation-wide screen
    * needs them: one revoke speaks for its own project only.
    */
-  async findLegacyKeys(input: Readonly<{ organizationId: string }>): Promise<ProjectLegacyKey[]> {
+  async findLegacyKeys(input: Readonly<{ organizationId: string }>): Promise<LegacyKeyCandidate[]> {
     const live = await this.dependencies.projects.findLiveLegacyKeys(input);
 
     return live.map((entry) => ({
       projectId: entry.projectId,
+      teamId: entry.teamId,
       projectName: entry.projectName,
       projectSlug: entry.projectSlug,
       lastUsedAt: entry.lastUsedAt && toDate(entry.lastUsedAt),

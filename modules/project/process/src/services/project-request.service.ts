@@ -5,20 +5,22 @@ import {
   type ProjectLegacyKey,
 } from "@langwatch/project-contract";
 
+import type { LegacyKeyCandidate } from "./project-operations.service.ts";
+
 type Actor = Readonly<{ id: string }>;
 
 type ProjectRequestOptions = Readonly<{
   projects: ProjectApi;
   /** Every live legacy key in the organisation, before anyone's standing is asked about. */
-  findLegacyKeys: (input: { organizationId: string }) => Promise<ProjectLegacyKey[]>;
+  findLegacyKeys: (input: { organizationId: string }) => Promise<LegacyKeyCandidate[]>;
   /** One decision covering every project read: the manage standing of each, by project id. */
   decideManageable: (input: {
     organizationId: string;
-    projectIds: readonly string[];
+    projects: readonly Readonly<{ projectId: string; teamId: string }>[];
     by: Actor;
   }) => Promise<ReadonlyMap<string, boolean>>;
   probePermission: (input: {
-    permission: "project:delete" | "project:manage";
+    permission: "project:delete";
     scope: { tier: "project"; id: string };
     by: Actor;
   }) => Promise<boolean>;
@@ -74,10 +76,17 @@ export class ProjectRequestService {
 
     const manageable = await this.options.decideManageable({
       organizationId,
-      projectIds: candidates.map((candidate) => candidate.projectId),
+      projects: candidates.map(({ projectId, teamId }) => ({ projectId, teamId })),
       by,
     });
 
-    return candidates.filter((candidate) => manageable.get(candidate.projectId) === true);
+    return candidates
+      .filter((candidate) => manageable.get(candidate.projectId) === true)
+      .map(({ projectId, projectName, projectSlug, lastUsedAt }) => ({
+        projectId,
+        projectName,
+        projectSlug,
+        lastUsedAt,
+      }));
   }
 }

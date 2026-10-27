@@ -134,12 +134,14 @@ describe("MemoryProjectRepository", () => {
       expect(await repository.findLiveLegacyKeys({ organizationId: ORGANIZATION_ID })).toEqual([
         {
           projectId: "project_live_alpha",
+          teamId: TEAM_ID,
           projectName: "Alpha",
           projectSlug: "alpha-live",
           lastUsedAt: null,
         },
         {
           projectId: "project_live",
+          teamId: TEAM_ID,
           projectName: "Beta",
           projectSlug: "beta",
           lastUsedAt: fromDate(new Date("2026-10-25T12:00:00.000Z")),

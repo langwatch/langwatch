@@ -33,6 +33,8 @@ import type { Instant } from "@langwatch/time";
 /** A live project whose legacy `apiKey` still authenticates; never the key itself. */
 export type LiveLegacyProjectKey = Readonly<{
   projectId: string;
+  /** The owning team, so a standing decision needs no lineage read of its own. */
+  teamId: string;
   projectName: string;
   projectSlug: string;
   lastUsedAt: Instant | null;

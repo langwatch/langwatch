@@ -300,11 +300,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   /** `project:manage` for every project read, in one decision off one grant snapshot. */
   async #decideManageable({
     organizationId,
-    projectIds,
+    projects,
     by,
   }: {
     organizationId: string;
-    projectIds: readonly string[];
+    projects: readonly Readonly<{ projectId: string; teamId: string }>[];
     by: Readonly<{ id: string }>;
   }): Promise<ReadonlyMap<string, boolean>> {
     const decision = await this.#authorization.canBatchByIds({
@@ -312,7 +312,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       permission: "project:manage",
       organizationId,
       teams: [],
-      projects: projectIds.map((projectId) => ({ projectId })),
+      projects,
     });
 
     return decision.projects;

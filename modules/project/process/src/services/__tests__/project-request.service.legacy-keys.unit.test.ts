@@ -11,22 +11,36 @@ import { ProjectRequestService } from "../project-request.service.ts";
 
 const ALPHA = {
   projectId: "project_alpha",
+  teamId: "team_alpha",
   projectName: "Alpha",
   projectSlug: "alpha",
   lastUsedAt: new Date("2026-10-25T12:00:00.000Z"),
 };
 const BETA = {
   projectId: "project_beta",
+  teamId: "team_beta",
   projectName: "Beta",
   projectSlug: "beta",
   lastUsedAt: null,
 };
 
+/** The same key as the browser receives it: the owning team is a decision detail. */
+function onTheWire({
+  projectId,
+  projectName,
+  projectSlug,
+  lastUsedAt,
+}: typeof ALPHA | typeof BETA) {
+  return { projectId, projectName, projectSlug, lastUsedAt };
+}
+
 function service({ manageable }: { manageable: readonly string[] }) {
   const findLegacyKeys = vi.fn(async () => [ALPHA, BETA]);
   const decideManageable = vi.fn(
-    async (input: { projectIds: readonly string[] }) =>
-      new Map(input.projectIds.map((projectId) => [projectId, manageable.includes(projectId)])),
+    async (input: { projects: readonly Readonly<{ projectId: string }>[] }) =>
+      new Map(
+        input.projects.map(({ projectId }) => [projectId, manageable.includes(projectId)] as const),
+      ),
   );
   const probePermission = vi.fn(async () => false);
 
@@ -64,12 +78,38 @@ describe("ProjectRequestService legacy keys", () => {
         by: { id: "user_member" },
       });
 
-      expect(keys).toEqual([BETA]);
+      expect(keys).toEqual([onTheWire(BETA)]);
       expect(decideManageable).toHaveBeenCalledWith({
         organizationId: "organization_1",
-        projectIds: ["project_alpha", "project_beta"],
+        projects: [
+          { projectId: "project_alpha", teamId: "team_alpha" },
+          { projectId: "project_beta", teamId: "team_beta" },
+        ],
         by: { id: "user_member" },
       });
+    });
+
+    it("names each project's team so the decision needs no lineage read", async () => {
+      const { requests, decideManageable } = service({ manageable: ["project_alpha"] });
+
+      await requests.findLegacyKeys({
+        organizationId: "organization_1",
+        by: { id: "user_member" },
+      });
+
+      const [call] = decideManageable.mock.calls;
+      expect(call?.[0].projects.every((project) => "teamId" in project)).toBe(true);
+    });
+
+    it("keeps the owning team out of the answer", async () => {
+      const { requests } = service({ manageable: ["project_alpha", "project_beta"] });
+
+      const keys = await requests.findLegacyKeys({
+        organizationId: "organization_1",
+        by: { id: "user_admin" },
+      });
+
+      expect(keys.every((key) => !("teamId" in key))).toBe(true);
     });
 
     it("asks for one decision, not one per project", async () => {
