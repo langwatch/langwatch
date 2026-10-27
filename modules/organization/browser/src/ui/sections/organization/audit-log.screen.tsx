@@ -116,6 +116,20 @@ function auditProjectTree({
   };
 }
 
+/** Names the member behind a user id, by display name or else by address. */
+function auditOwnerNameIn(members: Parameters<typeof matchMemberId>[0]) {
+  return (userId: string | null) => {
+    const member = members.find((candidate) => candidate.userId === userId);
+    return member?.user.name ?? member?.user.email ?? null;
+  };
+}
+
+/** Names a project from the filter tree, falling back to the id it was filtered by. */
+function auditProjectLabelIn(projects: readonly { id: string; name: string }[]) {
+  return (projectId: string) =>
+    projects.find((project) => project.id === projectId)?.name ?? projectId;
+}
+
 /**
  * The page in place of the table: an upsell below Enterprise, or, when a project grant showed the
  * entry but the organization-wide read refuses, who can see it. Null when the table renders.
@@ -290,14 +304,9 @@ export default function AuditLogScreen() {
   const rows: EnrichedAuditLog[] = feed?.auditLogs ?? [];
   const totalHits = feed?.totalCount ?? 0;
   const backLink = auditBackLink({ target, projectSlug: scope.projectSlug });
-  const ownerName = (userId: string | null) => {
-    const member = members.data?.members.find((candidate) => candidate.userId === userId);
-    return member?.user.name ?? member?.user.email ?? null;
-  };
+  const ownerName = auditOwnerNameIn(members.data?.members ?? []);
   const scopeTree = auditProjectTree({ teams: organization?.teams ?? [], ownerName });
-
-  const projectLabel = (projectId: string) =>
-    scopeTree.projects.find((project) => project.id === projectId)?.name ?? projectId;
+  const projectLabel = auditProjectLabelIn(scopeTree.projects);
 
   const logsView = auditLogsView({ isLoading: auditLogs.isLoading, rowCount: rows.length });
 
