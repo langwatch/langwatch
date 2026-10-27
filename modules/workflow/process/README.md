@@ -832,7 +832,7 @@ interface Input {
   sourceProjectId: string;
   newAgentId?: string;
 }
-// Output: agentCopyCreatedSchema, ../../agent/contract/src/agent.queries.ts:202
+// Output: agentCopyCreatedSchema, ../../agent/contract/src/agent.queries.ts:211
 interface Output {
   id: string;
   projectId: string;

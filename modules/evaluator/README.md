@@ -11,16 +11,18 @@ Evaluators: their definitions, and executing them as code or native checks with 
 | Classification | core (`modules/catalogue.json`)                                                                                |
 | Subjects       | evaluator                                                                                                      |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                    |
-| Api token      | `EvaluatorApi` = `moduleApi<EvaluatorApi>()("evaluator")`, `contract/src/evaluator.api.ts:160` (30 operations) |
-| Other token    | `EvaluatorBrowserApi`, `process/src/transport/evaluator.trpc.ts:23`                                            |
+| Api token      | `EvaluatorApi` = `moduleApi<EvaluatorApi>()("evaluator")`, `contract/src/evaluator.api.ts:191` (34 operations) |
+| Other token    | `EvaluatorBrowserApi`, `process/src/transport/evaluator.trpc.ts:25`                                            |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                     |
 
 ## What evaluator owns
 
-| Kind           | Name                        | Declared at                                                         |
-| -------------- | --------------------------- | ------------------------------------------------------------------- |
-| Postgres table | `Evaluator`                 | `process/src/repositories/prisma/prisma.evaluator.repository.ts:76` |
-| Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/evaluator.config.ts:4`                                |
+| Kind           | Name                        | Declared at                                                          |
+| -------------- | --------------------------- | -------------------------------------------------------------------- |
+| Postgres table | `Evaluator`                 | `process/src/repositories/prisma/prisma.evaluator.repository.ts:133` |
+| Postgres table | `EvaluatorVersion`          | `process/src/repositories/prisma/prisma.evaluator.repository.ts:133` |
+| Postgres table | `EvaluatorVersionLabel`     | `process/src/repositories/prisma/prisma.evaluator.repository.ts:133` |
+| Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/evaluator.config.ts:4`                                 |
 
 Anything else evaluator needs belongs to another module and is reached through its `*Api`.
 
