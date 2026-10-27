@@ -4,7 +4,7 @@ import {
   DashboardNotFoundError,
   DashboardScopeAuthorOnlyError,
   isDashboardAuthor,
-  type Dashboard,
+  type Board,
   type DashboardProject,
   type DashboardScope,
   type DashboardScopeImpact,
@@ -53,7 +53,7 @@ export class DashboardScopeService {
     return new DashboardScopeService(options);
   }
 
-  async setScope(input: BoardAsk & { scope: DashboardScope }): Promise<Dashboard> {
+  async setScope(input: BoardAsk & { scope: DashboardScope }): Promise<Board> {
     const scope = dashboardScopeSchema.parse(input.scope);
     const board = await this.#authored(input);
     if (board.scope === scope) return board;
@@ -117,7 +117,7 @@ export class DashboardScopeService {
   }
 
   /** The member's own board, in the project that owns it; anyone else is refused by name. */
-  async #authored(input: BoardAsk): Promise<Dashboard> {
+  async #authored(input: BoardAsk): Promise<Board> {
     const board = await this.#access.getWritable(input);
     if (!isDashboardAuthor({ board, viewer: input.viewer })) {
       throw new DashboardScopeAuthorOnlyError();

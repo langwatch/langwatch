@@ -74,14 +74,23 @@ const WIDGET = {
   rowSpan: 3,
 };
 
-/** One stored board with one widget, and a query door that answers no rows; calls are kept. */
-function boardServer() {
+/**
+ * One stored board with one widget, and a query door that answers no rows; calls are kept.
+ * `boards.update` stores the origins it is sent, as the server does.
+ */
+function boardServer({ excludedOrigins = null }: { excludedOrigins?: string[] | null } = {}) {
   const calls: UiProcedureCall[] = [];
+  const stored = { ...BOARD, excludedOrigins };
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     switch (call.path) {
       case "boards.getAll":
-        return Promise.resolve([{ ...BOARD }]);
+        return Promise.resolve([{ ...stored }]);
+      case "boards.update": {
+        const next = (call.input as { excludedOrigins?: string[] | null }).excludedOrigins;
+        if (next !== undefined) stored.excludedOrigins = next;
+        return Promise.resolve({ ...stored });
+      }
       case "boards.listStarred":
         return Promise.resolve([]);
       case "dashboardWidgets.list":
@@ -104,7 +113,10 @@ function boardServer() {
     calls.flatMap(({ path, input }) =>
       path === "analytics.lwql.query" ? [input as { sql: string; excludeOrigins?: unknown }] : [],
     );
-  return { answer, runs };
+  /** What each `boards.update` was sent. */
+  const updates = () =>
+    calls.flatMap(({ path, input }) => (path === "boards.update" ? [input] : []));
+  return { answer, runs, updates };
 }
 
 /** The host double, with an address that follows each query write as the router's does. */
@@ -158,11 +170,19 @@ async function frameRuns({ frame, queryName }: { frame: Element; queryName: stri
 afterEach(cleanup);
 
 /** Opens the stored board in the project in view, a personal one when asked. */
-function openBoard({ isPersonal = false }: { isPersonal?: boolean } = {}) {
-  const server = boardServer();
+function openBoard({
+  isPersonal = false,
+  excludedOrigins = null,
+  permissions = MEMBER,
+}: {
+  isPersonal?: boolean;
+  excludedOrigins?: string[] | null;
+  permissions?: readonly string[];
+} = {}) {
+  const server = boardServer({ excludedOrigins });
   const host = new AddressedHost({
     flags: FLAGS,
-    permissions: MEMBER,
+    permissions,
     project: { ...PROJECT, isPersonal },
     route: { params: { dashboardId: BOARD.id }, query: {} },
   });
@@ -245,5 +265,63 @@ describe("given a member opens a From LangWatch board", () => {
     expect(server.runs().length).toBe(widgets.length);
     expect(server.runs().length).toBeGreaterThan(0);
     expect(server.runs().map((run) => run.excludeOrigins)).toEqual(widgets.map(() => ["langy"]));
+  });
+});
+
+describe("given a stored board's Langy traces setting", () => {
+  describe("when the board was never changed", () => {
+    /** @scenario "AC200 Langy setting: a board leaves Langy's conversations out until a member includes them" */
+    it("shows Left out beside the period and leaves langy out", async () => {
+      const server = openBoard();
+
+      const control = await screen.findByRole("button", { name: "Langy traces: Left out" });
+      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+      expect(control).toBeTruthy();
+      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([["langy"]]);
+    });
+  });
+
+  describe("when the board stores that it includes Langy", () => {
+    /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
+    it("shows Included and runs every widget with no origin left out", async () => {
+      const server = openBoard({ excludedOrigins: [] });
+
+      await screen.findByRole("button", { name: "Langy traces: Included" });
+      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([[]]);
+    });
+  });
+
+  describe("when a member who may edit the board picks Included", () => {
+    /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
+    it("stores the empty list and runs the widget again with Langy counted", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = openBoard();
+      const frame = await screen.findByTestId("sandboxed-frame");
+      await frameRuns({ frame, queryName: "main" });
+
+      await user.click(await screen.findByRole("button", { name: "Langy traces: Left out" }));
+      await user.click(await screen.findByRole("menuitemradio", { name: "Included" }));
+      await screen.findByRole("button", { name: "Langy traces: Included" });
+      await frameRuns({ frame: screen.getByTestId("sandboxed-frame"), queryName: "main" });
+
+      expect(server.updates()).toEqual([
+        { projectId: PROJECT.id, dashboardId: BOARD.id, excludedOrigins: [] },
+      ]);
+      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([["langy"], []]);
+    });
+  });
+
+  describe("when a member who may not edit the board opens it", () => {
+    /** @scenario "AC200d Langy setting: only a member who can edit the board changes it" */
+    it("shows the value as a badge with no menu", async () => {
+      openBoard({ permissions: MEMBER.filter((grant) => grant !== "analytics:update") });
+
+      await screen.findByText("Langy traces: Left out");
+
+      expect(screen.queryByRole("button", { name: /Langy traces/ })).toBeNull();
+    });
   });
 });

@@ -24,6 +24,7 @@ import {
 import { useBoardAccess } from "../../behavior/use-board-access.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
+import { useBoardOrigins } from "../../behavior/use-board-origins.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
@@ -42,6 +43,7 @@ import { curatedBoardPath, dashboardTemplatesPath, myDashboardId } from "../../m
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
 import { AddBlockCard, EmptyBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
+import { BoardLangyControl } from "../blocks/board-langy-control.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
@@ -74,6 +76,28 @@ function AddWidgetButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+/** The header's Langy setting; a pick that changes it refreshes every widget (AC200b). */
+function BoardLangySetting({
+  origins,
+  canEdit,
+  onChanged,
+}: {
+  origins: ReturnType<typeof useBoardOrigins>;
+  canEdit: boolean;
+  onChanged: () => void;
+}) {
+  if (!canEdit) return <BoardLangyControl includesLangy={origins.includesLangy} />;
+  return (
+    <BoardLangyControl
+      includesLangy={origins.includesLangy}
+      onPick={(includeLangy) => {
+        // A frame re-runs on a refresh, not on new origins alone.
+        if (origins.setIncludesLangy(includeLangy)) onChanged();
+      }}
+    />
+  );
+}
+
 function OpenBoard({ board }: { board: SavedBoard }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
@@ -90,10 +114,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     dashboardId: board.id,
     stored: board.description,
   });
+  const origins = useBoardOrigins({ dashboardId: board.id, stored: board.excludedOrigins });
   const { range } = useBoardRange();
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
   const { grain, period, setRange, setGrain } = useBoardPeriod({
     refreshedAt: autoRefresh.refreshedAt,
+    excludedOrigins: origins.excludedOrigins,
   });
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
@@ -150,6 +176,13 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 ),
               }
             : {})}
+          langyControl={
+            <BoardLangySetting
+              origins={origins}
+              canEdit={canEdit}
+              onChanged={autoRefresh.refreshNow}
+            />
+          }
           periodControl={
             <BoardPeriodControl
               range={range}

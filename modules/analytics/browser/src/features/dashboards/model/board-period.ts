@@ -44,6 +44,34 @@ export function defaultBoardExcludedOrigins({
   return isPersonalProject ? [] : [LANGY_TRACE_ORIGIN];
 }
 
+/** The origins a board leaves out: what it stores, or its default while it stores none (AC200). */
+export function boardExcludedOrigins({
+  stored,
+  isPersonalProject,
+}: {
+  stored: readonly string[] | null;
+  isPersonalProject: boolean;
+}): readonly string[] {
+  return stored ?? defaultBoardExcludedOrigins({ isPersonalProject });
+}
+
+/** Whether a board's widgets count Langy's conversations. */
+export function boardIncludesLangy({ excluded }: { excluded: readonly string[] }): boolean {
+  return !excluded.includes(LANGY_TRACE_ORIGIN);
+}
+
+/** The list to store when the member includes or leaves out Langy; other origins stay. */
+export function boardOriginsWithLangy({
+  excluded,
+  includeLangy,
+}: {
+  excluded: readonly string[];
+  includeLangy: boolean;
+}): readonly string[] {
+  const others = excluded.filter((origin) => origin !== LANGY_TRACE_ORIGIN);
+  return includeLangy ? others : [...others, LANGY_TRACE_ORIGIN];
+}
+
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";
 export const DEFAULT_BOARD_PERIOD_GRAIN: BoardPeriodGrain = "auto";
 
