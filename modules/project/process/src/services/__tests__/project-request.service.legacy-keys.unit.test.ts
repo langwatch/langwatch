@@ -24,16 +24,19 @@ const BETA = {
 
 function service({ manageable }: { manageable: readonly string[] }) {
   const findLegacyKeys = vi.fn(async () => [ALPHA, BETA]);
-  const probePermission = vi.fn(async (input: { scope: { id: string } }) =>
-    manageable.includes(input.scope.id),
+  const decideManageable = vi.fn(
+    async (input: { projectIds: readonly string[] }) =>
+      new Map(input.projectIds.map((projectId) => [projectId, manageable.includes(projectId)])),
   );
+  const probePermission = vi.fn(async () => false);
 
   return {
     findLegacyKeys,
-    probePermission,
+    decideManageable,
     requests: ProjectRequestService.create({
       projects: createApiFixture<ProjectApi>({}),
       findLegacyKeys,
+      decideManageable,
       probePermission,
     }),
   };
@@ -54,7 +57,7 @@ describe("ProjectRequestService legacy keys", () => {
 
     /** @scenario A reader only sees the legacy rows of the projects they can manage */
     it("drops the row of a project the reader cannot manage", async () => {
-      const { requests, probePermission } = service({ manageable: ["project_beta"] });
+      const { requests, decideManageable } = service({ manageable: ["project_beta"] });
 
       const keys = await requests.findLegacyKeys({
         organizationId: "organization_1",
@@ -62,11 +65,22 @@ describe("ProjectRequestService legacy keys", () => {
       });
 
       expect(keys).toEqual([BETA]);
-      expect(probePermission).toHaveBeenCalledWith({
-        permission: "project:manage",
-        scope: { tier: "project", id: "project_alpha" },
+      expect(decideManageable).toHaveBeenCalledWith({
+        organizationId: "organization_1",
+        projectIds: ["project_alpha", "project_beta"],
         by: { id: "user_member" },
       });
+    });
+
+    it("asks for one decision, not one per project", async () => {
+      const { requests, decideManageable } = service({ manageable: ["project_alpha"] });
+
+      await requests.findLegacyKeys({
+        organizationId: "organization_1",
+        by: { id: "user_member" },
+      });
+
+      expect(decideManageable).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario A reader who manages no project receives no legacy keys */

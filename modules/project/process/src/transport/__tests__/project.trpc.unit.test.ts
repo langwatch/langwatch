@@ -52,6 +52,7 @@ function mount({
   const requests = ProjectRequestService.create({
     projects: application,
     findLegacyKeys: async () => [],
+    decideManageable: async () => new Map(),
     probePermission: probe,
   });
 

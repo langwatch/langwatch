@@ -133,6 +133,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #requests = ProjectRequestService.create({
     projects: this,
     findLegacyKeys: (input) => this.#operations.findLegacyKeys(input),
+    decideManageable: (input) => this.#decideManageable(input),
     probePermission: (input) => this.probePermission(input),
   });
   private constructor({
@@ -294,6 +295,27 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     by: Readonly<{ id: string }>;
   }): Promise<ProjectLegacyKey[]> {
     return this.#requests.findLegacyKeys(input);
+  }
+
+  /** `project:manage` for every project read, in one decision off one grant snapshot. */
+  async #decideManageable({
+    organizationId,
+    projectIds,
+    by,
+  }: {
+    organizationId: string;
+    projectIds: readonly string[];
+    by: Readonly<{ id: string }>;
+  }): Promise<ReadonlyMap<string, boolean>> {
+    const decision = await this.#authorization.canBatchByIds({
+      principal: { type: "user", id: by.id },
+      permission: "project:manage",
+      organizationId,
+      teams: [],
+      projects: projectIds.map((projectId) => ({ projectId })),
+    });
+
+    return decision.projects;
   }
 
   getLegacyKeyStatus(input: { projectId: string }): Promise<ProjectLegacyKeyStatus> {

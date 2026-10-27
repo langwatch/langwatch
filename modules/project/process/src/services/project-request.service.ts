@@ -11,6 +11,12 @@ type ProjectRequestOptions = Readonly<{
   projects: ProjectApi;
   /** Every live legacy key in the organisation, before anyone's standing is asked about. */
   findLegacyKeys: (input: { organizationId: string }) => Promise<ProjectLegacyKey[]>;
+  /** One decision covering every project read: the manage standing of each, by project id. */
+  decideManageable: (input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    by: Actor;
+  }) => Promise<ReadonlyMap<string, boolean>>;
   probePermission: (input: {
     permission: "project:delete" | "project:manage";
     scope: { tier: "project"; id: string };
@@ -64,16 +70,14 @@ export class ProjectRequestService {
     by: Actor;
   }): Promise<ProjectLegacyKey[]> {
     const candidates = await this.options.findLegacyKeys({ organizationId });
-    const manageable = await Promise.all(
-      candidates.map((candidate) =>
-        this.options.probePermission({
-          permission: "project:manage",
-          scope: { tier: "project", id: candidate.projectId },
-          by,
-        }),
-      ),
-    );
+    if (candidates.length === 0) return [];
 
-    return candidates.filter((_, index) => manageable[index] === true);
+    const manageable = await this.options.decideManageable({
+      organizationId,
+      projectIds: candidates.map((candidate) => candidate.projectId),
+      by,
+    });
+
+    return candidates.filter((candidate) => manageable.get(candidate.projectId) === true);
   }
 }

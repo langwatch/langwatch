@@ -27,7 +27,7 @@ import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chip
 import { ScopeFilter } from "@langwatch/design-system/scope-filter";
 import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
 import { Key, Plus } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { type LegacyProjectKey, useLegacyKeys } from "../../behavior/use-legacy-keys.ts";
@@ -383,16 +383,20 @@ export default function ApiKeysScreen() {
   // The scopes the reader can see: the filter's options, and the names the
   // per-row chips resolve their ids to.
   const filterAvailable = host.availableScopes();
-  const hierarchy = scopeHierarchyOf(filterAvailable);
+  const hierarchy = useMemo(() => scopeHierarchyOf(filterAvailable), [filterAvailable]);
 
   // READ from the address rather than mirrored into state: the platform hook
   // kept a `useState` synced to `?scope=` by an effect, and a mirror can only
   // ever disagree with the URL it is mirroring. The data-governance and
   // model-provider families made the same correction.
-  const scopeFilter = scopeFilterFromAddress({
-    raw: reading.query[API_KEY_SCOPE_QUERY_KEY],
-    available: filterAvailable,
-  });
+  const scopeFilter = useMemo(
+    () =>
+      scopeFilterFromAddress({
+        raw: reading.query[API_KEY_SCOPE_QUERY_KEY],
+        available: filterAvailable,
+      }),
+    [reading.query, filterAvailable],
+  );
 
   const handleScopeFilterChange = (next: ScopeFilterValue) => {
     const write = scopeFilterAddressWrite(next, {
@@ -411,27 +415,37 @@ export default function ApiKeysScreen() {
   // service API keys. They render in two separate labeled sections. `!= null`
   // catches both null and undefined so keys without the field stay in the
   // regular list.
-  const allApiKeys = apiKeys.data ?? [];
-  const ingestionKeys = allApiKeys.filter((key) => key.ingestSourceType != null);
-  const serviceApiKeys = allApiKeys.filter((key) => key.ingestSourceType == null);
+  const allApiKeys = useMemo(() => apiKeys.data ?? [], [apiKeys.data]);
+  const ingestionKeys = useMemo(
+    () => allApiKeys.filter((k) => k.ingestSourceType != null),
+    [allApiKeys],
+  );
+  const serviceApiKeys = useMemo(
+    () => allApiKeys.filter((k) => k.ingestSourceType == null),
+    [allApiKeys],
+  );
 
   // Client-side filter: map each regular key's grants → scopes so the
   // shared inclusive cascade applies directly. The scope filter only governs
   // the regular API keys section.
-  const filteredKeys = filterRowsByScope(
-    serviceApiKeys.map((k) => ({
-      ...k,
-      scopes: k.grants.map((rb) => ({
-        scopeType: rb.scopeType,
-        scopeId: rb.scopeId,
-      })),
-    })),
-    scopeFilter,
-    {
-      hierarchy,
-      currentTeamId: scope.teamId,
-      currentProjectId: scope.projectId,
-    },
+  const filteredKeys = useMemo(
+    () =>
+      filterRowsByScope(
+        serviceApiKeys.map((k) => ({
+          ...k,
+          scopes: k.grants.map((rb) => ({
+            scopeType: rb.scopeType,
+            scopeId: rb.scopeId,
+          })),
+        })),
+        scopeFilter,
+        {
+          hierarchy,
+          currentTeamId: scope.teamId,
+          currentProjectId: scope.projectId,
+        },
+      ),
+    [serviceApiKeys, scopeFilter, hierarchy, scope.teamId, scope.projectId],
   );
 
   // Deep links land on `#api-key-<id>`, but the rows only exist once the keys

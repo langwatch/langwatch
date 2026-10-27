@@ -143,7 +143,7 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
       permissions: ["project:manage"],
       enforces: {
         organizationId:
-          "findLegacyKeys asks each project it read for project:manage and drops the ones refused",
+          "findLegacyKeys decides project:manage for every project it read and drops the ones refused",
       },
     })
     .handle(({ app, input, actor }) =>
