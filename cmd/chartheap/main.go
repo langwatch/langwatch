@@ -1,11 +1,11 @@
 // Command chartheap asserts the heap ceiling the langwatch chart gives its
-// worker, rendering the chart once per scenario and naming every one that fails.
+// app and worker, rendering the chart once per scenario and naming every one that fails.
 //
 // Usage (helm on PATH, chart dependencies built):
 //
 //	go run ./cmd/chartheap [-chart charts/langwatch]
 //
-// Spec: specs/setup/helm-worker-heap-ceiling.feature
+// Spec: specs/setup/helm-heap-ceiling.feature
 package main
 
 import (

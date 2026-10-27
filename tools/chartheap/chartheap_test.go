@@ -32,10 +32,10 @@ func runScenario(t *testing.T, index int) {
 	}
 }
 
-// @scenario "A worker with a memory limit gets a heap of three quarters of it"
+// @scenario "The app and the worker with a memory limit get a heap of three quarters of it"
 func TestLimitGivesThreeQuarterHeap(t *testing.T) { runScenario(t, 0) }
 
-// @scenario "With no memory limit the worker keeps Node's own heap size"
+// @scenario "With no memory limit the app and the worker keep Node's own heap size"
 func TestNoLimitMeansNoCeiling(t *testing.T) { runScenario(t, 1) }
 
 // @scenario "The operator's own Node options win"
@@ -78,13 +78,24 @@ func TestNodeOptionsRefusesAManifestWithoutADeployment(t *testing.T) {
 }
 
 func TestAssertionsRejectTheWrongValue(t *testing.T) {
-	if Checks[0].Assert([]string{"--max-old-space-size-percentage=50"}) == nil {
+	if Checks[0].Expect[Workers]([]string{"--max-old-space-size-percentage=50"}) == nil {
 		t.Fatal("a 50 percent ceiling passed")
 	}
-	if Checks[1].Assert([]string{Ceiling}) == nil {
+	if Checks[0].Expect[App](nil) == nil {
+		t.Fatal("an app without a ceiling passed where one belongs")
+	}
+	if Checks[1].Expect[App]([]string{Ceiling}) == nil {
 		t.Fatal("a ceiling passed where none belongs")
 	}
-	if Checks[2].Assert([]string{Ceiling, "--max-old-space-size=3000"}) == nil {
+	if Checks[2].Expect[Workers]([]string{Ceiling, "--max-old-space-size=3000"}) == nil {
 		t.Fatal("a duplicate NODE_OPTIONS passed where the operator's must be the only one")
+	}
+}
+
+func TestEveryCheckExpectsBothDeployments(t *testing.T) {
+	for _, check := range Checks {
+		if check.Expect[App] == nil || check.Expect[Workers] == nil {
+			t.Fatalf("%q does not say what both deployments hold", check.Scenario)
+		}
 	}
 }
