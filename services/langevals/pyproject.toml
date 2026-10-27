@@ -73,8 +73,10 @@ exclude-newer = "7 days"
 # 2026-10-20) closes GHSA-6q48-6c7w-9gw2 (critical). Remove both entries once
 # those uploads are older than 7 days (Pillow from 2026-10-24, certifi from
 # 2026-10-28): a timestamp here then holds the package back, not forward.
+# nltk 3.10.4 (uploaded 2026-10-21) closes GHSA-j456-xh4h-cpf2 (high); drop
+# its entry from 2026-10-29.
 required-version = ">=0.9.25"
-exclude-newer-package = { pillow = "2026-10-17T00:00:00Z", certifi = "2026-10-21T00:00:00Z" }
+exclude-newer-package = { pillow = "2026-10-17T00:00:00Z", certifi = "2026-10-21T00:00:00Z", nltk = "2026-10-22T00:00:00Z" }
 override-dependencies = [
   # The langchain family is on the 1.x line, where the advisories affecting it
   # are fixed. Each floor is the highest first-patched version across the
