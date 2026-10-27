@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { withoutUndeclaredKeys } from "../schema.ts";
+import { withoutUndeclaredKeys } from "../output-salvage.ts";
 
 describe("withoutUndeclaredKeys", () => {
   describe("when the schema accepts the value", () => {

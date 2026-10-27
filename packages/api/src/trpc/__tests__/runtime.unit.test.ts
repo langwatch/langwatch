@@ -325,7 +325,7 @@ describe("a mounted contract procedure", () => {
       expect(JSON.stringify(record)).not.toContain("stored-value");
     });
 
-    /** @scenario "A procedure whose answer breaks its output schema is logged and still answered" */
+    /** @scenario "A procedure that declares no output and answers a value is logged and answers nothing" */
     it("logs a value from a procedure that declares no output, and answers nothing", async () => {
       const { runtime } = harness();
       const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };

@@ -4,7 +4,7 @@
  */
 
 import { moduleApi } from "@langwatch/module";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { authorizationPort } from "../../__tests__/api-double.ts";
@@ -12,6 +12,26 @@ import { publicRoute } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
+
+const logged: { fields: Record<string, unknown>; message: string }[] = [];
+
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = (await importOriginal()) as { createLogger: (name: string) => object };
+
+  return {
+    ...actual,
+    createLogger: (name: string) => ({
+      ...actual.createLogger(name),
+      error: (fields: Record<string, unknown>, message: string) => {
+        logged.push({ fields, message });
+      },
+    }),
+  };
+});
+
+beforeEach(() => {
+  logged.length = 0;
+});
 
 interface ThingApi {
   read(): Promise<{ id: string }>;
@@ -50,5 +70,59 @@ describe("given a route whose handler answers a shape its output schema refuses"
     expect(response.status).toBe(200);
     expect(JSON.parse(body)).toEqual({ id: 7 });
     expect(body).not.toContain("stored-value");
+  });
+});
+
+interface ReportApi {
+  check(): Promise<unknown>;
+}
+
+const ReportApi = moduleApi<ReportApi>()("annotation");
+
+const report = z.object({ status: z.string() }).strict();
+
+const reports = defineRestRouter(ReportApi)
+  .withNamespace("reports")
+  .withVersion("2026-09-08")
+  .withAddressing("v1-only")
+  .get("/", "readReport")
+  .withAccess(publicRoute({ reason: "the route's own answer is what is under test" }))
+  .responds({ 200: report, 503: report })
+  .handle(async ({ app }) => ({ status: 503, body: (await app.check()) as never }) as const)
+  .build();
+
+function reportApp(body: unknown) {
+  const runtime = createRestRuntime({
+    authorization: authorizationPort,
+    identity: { authenticate: () => ({ actor: null, scope: null }) },
+  });
+
+  return runtime.mount(reports.router(), {
+    app: () => ({ check: async () => body }),
+    credential: "public",
+    onError: createErrorHandler(),
+  });
+}
+
+describe("given a responds() route whose body its declared status schema refuses", () => {
+  /** @scenario "A procedure whose answer breaks its output schema is logged and still answered" */
+  it("answers the declared status with the body cut to the keys the schema names", async () => {
+    const response = await reportApp({ status: 7, secret: "stored-value" }).request(
+      "/api/v1/reports",
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(503);
+    expect(JSON.parse(body)).toEqual({ status: 7 });
+    expect(body).not.toContain("stored-value");
+    expect(logged[0]?.fields).toMatchObject({ path: "/api/v1/reports", status: 503 });
+    expect(JSON.stringify(logged)).not.toContain("stored-value");
+  });
+
+  it("answers the declared status with no body when the schema leaves nothing", async () => {
+    const response = await reportApp([{ secret: "stored-value" }]).request("/api/v1/reports");
+
+    expect(response.status).toBe(503);
+    expect(await response.text()).toBe("");
   });
 });

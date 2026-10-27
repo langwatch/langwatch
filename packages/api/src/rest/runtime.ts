@@ -55,10 +55,10 @@ import {
   UnsupportedMediaTypeError,
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
-import { withoutUndeclaredKeys } from "../schema.ts";
 import {
   addressesOf,
   basePathOf,
@@ -2848,6 +2848,8 @@ function respondDeclared({
   const body = validation.success
     ? validation.data
     : withoutUndeclaredKeys(schema as z.ZodType, answer.body);
+
+  if (body === undefined) return context.body(null, status as ContentfulStatusCode);
 
   return context.json(body as never, status as ContentfulStatusCode);
 }

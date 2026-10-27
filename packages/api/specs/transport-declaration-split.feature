@@ -89,6 +89,14 @@ Feature: Transport declaration split
     And the caller receives the handler's answer rather than an internal error
     And the answer carries no key the output schema does not name
 
+  @unit
+  Scenario: A procedure that declares no output and answers a value is logged and answers nothing
+    Given a procedure that declares no output
+    When its handler answers a value
+    Then the value is logged as an error with the procedure name and the value's kind
+    And the log carries no response contents
+    And the caller receives nothing
+
   @unit @typecheck
   Scenario: The browser derives its client from the contract
     Given a contract built with defineTrpcContract

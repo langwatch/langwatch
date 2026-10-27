@@ -88,7 +88,7 @@ import {
 } from "../access/input-permission.ts";
 import { promoteStoreFailure } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
-import { withoutUndeclaredKeys } from "../schema.ts";
+import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import {
   auditScopeId,
   auditScopeIds,
