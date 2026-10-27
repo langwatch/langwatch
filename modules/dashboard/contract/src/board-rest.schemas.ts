@@ -6,6 +6,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  boardExcludedOriginsSchema,
   dashboardDescriptionSchema,
   dashboardIdSchema,
   dashboardNameSchema,
@@ -20,6 +21,8 @@ const boardResourceSchemaDefinition = z.object({
   description: z.string().nullable(),
   /** Who sees the dashboard; a project credential never reads one set to Only me. */
   scope: dashboardScopeSchema,
+  /** The trace origins every widget leaves out; null: `langy` out, none in a personal project. */
+  excludedOrigins: boardExcludedOriginsSchema.nullable(),
   /** The member who made it; `null` for a dashboard a project credential made. */
   createdById: z.string().nullable(),
   createdAt: z.string(),
@@ -77,10 +80,15 @@ const updateBoardSchemaDefinition = z
     name: dashboardNameSchema.optional(),
     /** `null` clears it. */
     description: dashboardDescriptionSchema.nullable().optional(),
+    /** The origins every widget leaves out; `[]` includes Langy's, `null` restores the default. */
+    excludedOrigins: boardExcludedOriginsSchema.nullable().optional(),
   })
   .refine(
-    (body) => body.name !== undefined || body.description !== undefined,
-    "Provide at least one of name or description.",
+    (body) =>
+      body.name !== undefined ||
+      body.description !== undefined ||
+      body.excludedOrigins !== undefined,
+    "Provide at least one of name, description or excludedOrigins.",
   )
   .meta({ minProperties: 1 });
 export interface UpdateBoardSchema extends Named<typeof updateBoardSchemaDefinition> {}

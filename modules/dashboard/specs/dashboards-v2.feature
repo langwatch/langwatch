@@ -1664,8 +1664,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # Why: Langy's own turns trace into the member's project with origin "langy" (ADR-061).
   # Counted, they move volume, cost, latency and error widgets because the member used Langy.
   # The project home and the Explorer already leave them out; Dashboards follow (owner, 2026-10-09).
-  # How: analytics ADR-003. This is the server half and the board's default. The built-in Source
-  # parameter that shows the default in the board header and lets the member change it comes next.
+  # How: analytics ADR-003. This is the server half and the board's default. A stored board's
+  # "Langy traces" setting in the header shows the default and changes it (AC200).
 
   @integration
   Scenario: AC190 Langy: every widget on a board leaves out Langy's conversations by default
@@ -1698,8 +1698,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given the context a board runs every query with
     Then it names the origins it leaves out as a list, "langy" by default
     And an empty list makes every widget read Langy's conversations too
-    # Why a list: the built-in Source parameter planned for the header can then show the default
-    # and pick origins without a new shape on the wire
+    # Why a list: the board's "Langy traces" setting (AC200) stores a list, so a later setting can
+    # pick other origins without a new shape on the wire
 
   @unit
   Scenario: AC194 Langy: a query run outside a board is not scoped
@@ -1724,6 +1724,53 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a board in any other project still leaves out "langy" by default (AC190)
     # Owner, 2026-10-10: Langy's traces will live in the person's Me project. The default is
     # the board's own, read from the project; the server takes the list it is sent (AC193)
+
+  # ---------------------------------------------------------------------------
+  # A board's "Langy traces" setting
+  # ---------------------------------------------------------------------------
+  # Why: a widget meant to show Langy's failed or refused requests was always empty, since every
+  # board left Langy's conversations out with no way to change it (owner, 2026-10-27).
+  # How: the board stores the origins it leaves out; none stored keeps the default (AC190, AC198).
+
+  @unit @integration
+  Scenario: AC200 Langy setting: a board leaves Langy's conversations out until a member includes them
+    Given a stored board in a project that holds the member's agent, never changed
+    When a member opens it
+    Then the header shows "Langy traces: Left out" beside the period
+    And every widget leaves out the origin "langy", as before (AC190)
+    # Why: no board changes until a member asks; the stored value is null (the default) until
+    # then, which is not the empty list: an empty list includes Langy (AC200e)
+
+  @unit @integration
+  Scenario: AC200b Langy setting: a board set to include Langy runs every widget with no origin left out
+    Given a stored board a member may edit
+    When they pick "Included" under "Langy traces" in the header
+    Then the board stores that it leaves out no origin
+    And every widget runs again and counts Langy's conversations too
+    And the header shows "Langy traces: Included" for every member who opens the board
+
+  @unit
+  Scenario: AC200c Langy setting: a personal project's board still includes Langy by default
+    Given a stored board in a member's personal project, never changed
+    Then it leaves out no origin, as before (AC198)
+    And picking "Left out" stores "langy" as the origin it leaves out
+
+  @integration
+  Scenario: AC200d Langy setting: only a member who can edit the board changes it
+    Given a member who may read a board but not edit it
+    When they open it
+    Then the header shows the board's "Langy traces" value as a badge with no menu
+    And a write of the setting from them is refused, as any edit of the board is
+
+  @integration
+  Scenario: AC200e Langy setting: the API reads and sets the origins a board leaves out
+    Given a Dashboards board
+    When an API key reads it at /api/v1/dashboards/{dashboardId}
+    Then the board carries "excludedOrigins": null, the default
+    When the key sends PATCH with "excludedOrigins": []
+    Then the board leaves out no origin and reads back "excludedOrigins": []
+    And PATCH with "excludedOrigins": null returns it to the default
+    # The CLI, MCP and Python SDK flags are a follow-up
 
   # ---------------------------------------------------------------------------
   # Guard rails
@@ -1784,3 +1831,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
   # AC 190-195: "Dashboards show your agent, not Langy's work for you" (owner, 2026-10-09) → Scenario: AC190 Langy: every widget on a board leaves out Langy's conversations by default; Scenario: AC191 Langy: a widget's own origin filter keeps its meaning; Scenario: AC192 Langy: data that is Langy's own is not filtered; Scenario: AC193 Langy: the origins a board leaves out are a list a board parameter can set later; Scenario: AC194 Langy: a query run outside a board is not scoped; Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
   # AC 198: "A personal project's boards show Langy" (owner, 2026-10-10) → Scenario: AC198 Langy: a board in a personal project shows Langy's conversations
+  # AC 200: "A board's Langy traces setting" (owner, 2026-10-27) → Scenario: AC200 Langy setting: a board leaves Langy's conversations out until a member includes them; Scenario: AC200b Langy setting: a board set to include Langy runs every widget with no origin left out; Scenario: AC200c Langy setting: a personal project's board still includes Langy by default; Scenario: AC200d Langy setting: only a member who can edit the board changes it; Scenario: AC200e Langy setting: the API reads and sets the origins a board leaves out
