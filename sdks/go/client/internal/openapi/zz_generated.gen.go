@@ -54106,6 +54106,9 @@ type PostApiWorkflowsByIdEvaluateJSONBody struct {
 	// DatasetId Platform dataset id to evaluate; mutually exclusive with data
 	DatasetId *string `json:"dataset_id,omitempty"`
 
+	// DatasetVersion Version of the saved dataset to evaluate (dataset_id, else the workflow's attached dataset); defaults to its current content
+	DatasetVersion *int `json:"dataset_version,omitempty"`
+
 	// Parameters Constant entry inputs applied to every row, e.g. a feature flag or PR number
 	Parameters *map[string]PostApiWorkflowsByIdEvaluateJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
 

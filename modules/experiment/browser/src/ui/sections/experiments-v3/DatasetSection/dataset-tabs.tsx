@@ -1,3 +1,4 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { generate } from "@langwatch/ksuid";
@@ -13,8 +14,10 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 
+import { useDatasetVersionOptions } from "../../../../behavior/experiments-v3/use-dataset-version-options.ts";
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import type { DatasetReference } from "../../../../model/experiments-v3/types.ts";
+import { DatasetVersionSelect } from "../../../elements/experiments-v3/dataset-version-select.tsx";
 
 type DatasetTabsProps = {
   onSelectExisting: () => void;
@@ -77,6 +80,9 @@ export function DatasetTabs({
     addDataset(newDataset);
     setActiveDataset(newId);
   };
+
+  const activeDataset = datasets.find((dataset) => dataset.id === activeDatasetId);
+  const activeSavedDataset = activeDataset?.type === "saved" ? activeDataset : undefined;
 
   const handleRemoveDataset = (datasetId: string) => {
     if (datasets.length <= 1) return;
@@ -153,6 +159,14 @@ export function DatasetTabs({
 
       <Spacer />
 
+      {activeSavedDataset?.datasetId && (
+        <DatasetVersionPin
+          datasetRefId={activeSavedDataset.id}
+          datasetId={activeSavedDataset.datasetId}
+          datasetVersion={activeSavedDataset.datasetVersion}
+        />
+      )}
+
       {/* Edit current dataset button */}
       <Button
         size="xs"
@@ -165,6 +179,29 @@ export function DatasetTabs({
         Edit columns
       </Button>
     </HStack>
+  );
+}
+
+/** The version of the active saved dataset the experiment pins; Latest pins none. */
+function DatasetVersionPin({
+  datasetRefId,
+  datasetId,
+  datasetVersion,
+}: {
+  datasetRefId: string;
+  datasetId: string;
+  datasetVersion: number | null | undefined;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const updateDataset = useEvaluationsV3Store((state) => state.updateDataset);
+  const { versions } = useDatasetVersionOptions({ projectId: project?.id, datasetId });
+
+  return (
+    <DatasetVersionSelect
+      versions={versions}
+      value={datasetVersion}
+      onChange={(version) => updateDataset(datasetRefId, { datasetVersion: version ?? undefined })}
+    />
   );
 }
 

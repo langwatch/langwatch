@@ -117,6 +117,8 @@ export type LoadedExecutionData = {
   loadedWorkflows: Map<string, LoadedWorkflow>;
   /** Absent when the rows came with the request or from an inline dataset. */
   datasetVersion?: LoadedDatasetVersion;
+  /** The row ids of a pinned version, in run order; absent when the run read current content. */
+  pinnedVersionRowIds?: string[];
 };
 
 /**
@@ -232,6 +234,7 @@ export class ExperimentExecutionDataService {
         columns,
         source: "saved",
         datasetVersion: saved.datasetVersion,
+        ...(saved.pinnedVersionRowIds ? { pinnedVersionRowIds: saved.pinnedVersionRowIds } : {}),
       };
     }
 
@@ -264,6 +267,7 @@ export class ExperimentExecutionDataService {
     rows: Record<string, unknown>[];
     columnTypes: DatasetColumns;
     datasetVersion: LoadedDatasetVersion;
+    pinnedVersionRowIds?: string[];
   }> {
     const [maxRows, maxBytes] = await Promise.all([
       services.entitlements.requestBound({ key: "datasetRowsMax", organizationId }),
@@ -295,6 +299,7 @@ export class ExperimentExecutionDataService {
       version: resolved.version,
     });
     const rows: Record<string, unknown>[] = [];
+    const rowIds: string[] = [];
     let bytes = 0;
     for (const row of content.rows) {
       bytes += rowBytesOf(row.entry);
@@ -302,6 +307,7 @@ export class ExperimentExecutionDataService {
         throw new ExperimentDatasetTooLargeToRunError({ maxBytes });
       }
       rows.push(row.entry);
+      rowIds.push(row.id);
     }
     if (rows.length !== rowCount) {
       throw new ExperimentDatasetChangedDuringReadError({ rowCount, rowsRead: rows.length });
@@ -315,6 +321,7 @@ export class ExperimentExecutionDataService {
         versionId: resolved.id,
         version: resolved.version,
       },
+      ...(pinned !== undefined ? { pinnedVersionRowIds: rowIds } : {}),
     };
   }
 
@@ -409,6 +416,9 @@ export class ExperimentExecutionDataService {
       loadedEvaluators,
       loadedWorkflows,
       ...(baseDataset.datasetVersion ? { datasetVersion: baseDataset.datasetVersion } : {}),
+      ...(baseDataset.pinnedVersionRowIds
+        ? { pinnedVersionRowIds: baseDataset.pinnedVersionRowIds }
+        : {}),
     };
   }
 
@@ -464,6 +474,7 @@ export class ExperimentExecutionDataService {
 type BaseDataset = LoadedDataset & {
   source: "inline" | "saved";
   datasetVersion?: LoadedDatasetVersion;
+  pinnedVersionRowIds?: string[];
 };
 
 /** The names of the columns whose cells hold JSON. */

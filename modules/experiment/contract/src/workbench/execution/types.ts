@@ -267,14 +267,13 @@ export interface RunInputsBodySchema extends Named<typeof runInputsBodySchemaDef
 export const runInputsBodySchema: RunInputsBodySchema = runInputsBodySchemaDefinition;
 export type RunInputsBody = z.infer<typeof runInputsBodySchema>;
 
-// True when a run evaluates the experiment's own saved dataset untouched.
+// True when a run evaluates the experiment's own saved dataset, at any version.
 // Only such runs may write cells back; rows sent in request or different
 // dataset make outputs disagree with workbench rows.
 export const runsSavedDataset = (runInputs?: RunInputsBody): boolean => {
   if (!runInputs) return true;
   if (runInputs.data !== undefined) return false;
   if (runInputs.dataset_id !== undefined) return false;
-  if (runInputs.dataset_version !== undefined) return false;
   return Object.keys(runInputs.parameters ?? {}).length === 0;
 };
 
