@@ -7541,6 +7541,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../identity/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid

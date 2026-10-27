@@ -106,7 +106,7 @@ function contractCases(backend: Backend): void {
   });
 
   /** @scenario "The memory and Postgres version repositories answer alike" */
-  it("pages datasets with more than one old version, by dataset id", async () => {
+  it("pages datasets with an old version, by dataset id", async () => {
     const repo = backend.versions();
     const many = `dataset_${nanoid(8)}`;
     const single = `dataset_${nanoid(8)}`;
@@ -114,20 +114,63 @@ function contractCases(backend: Backend): void {
     await repo.create(version(2, { datasetId: many }));
     await repo.create(version(1, { datasetId: single }));
 
-    const page = await repo.findDatasetsWithHistory({
+    const page = await repo.findDatasetsWithVersions({
       afterDatasetId: null,
       olderThanMs: Date.now() + 60_000,
       limit: 1_000,
     });
 
     expect(page).toContainEqual({ projectId: backend.mine, datasetId: many });
-    expect(page.map((entry) => entry.datasetId)).not.toContain(single);
-    const later = await repo.findDatasetsWithHistory({
+    expect(page).toContainEqual({ projectId: backend.mine, datasetId: single });
+    expect(page.filter((entry) => entry.datasetId === many)).toHaveLength(1);
+    const later = await repo.findDatasetsWithVersions({
       afterDatasetId: many,
       olderThanMs: Date.now() + 60_000,
       limit: 1_000,
     });
     expect(later.map((entry) => entry.datasetId)).not.toContain(many);
+    const recent = await repo.findDatasetsWithVersions({
+      afterDatasetId: null,
+      olderThanMs: Date.now() - 60 * 60_000,
+      limit: 1_000,
+    });
+    expect(recent.map((entry) => entry.datasetId)).not.toContain(many);
+  });
+
+  /** @scenario "The memory and Postgres version repositories answer alike" */
+  it("removes run links with their versions and clears an erased author", async () => {
+    const repo = backend.versions();
+    const linked = `dataset_${nanoid(8)}`;
+    const userId = `user_${nanoid(8)}`;
+    const saved = await repo.create(version(1, { datasetId: linked, authorId: userId }));
+    await repo.create(
+      version(1, {
+        datasetId: `dataset_${nanoid(8)}`,
+        projectId: backend.theirs,
+        authorId: userId,
+      }),
+    );
+    await repo.create(version(2, { datasetId: linked, authorKind: "api_key", authorId: userId }));
+    const runId = `run_${nanoid(8)}`;
+    await repo.linkRun({
+      projectId: backend.mine,
+      runId,
+      experimentId: "experiment-1",
+      versions: [{ datasetId: linked, versionId: saved.id }],
+    });
+
+    await expect(repo.forgetAuthor({ userId })).resolves.toBe(2);
+    const [apiKeyVersion, userVersion] = await repo.findAll({
+      projectId: backend.mine,
+      datasetId: linked,
+    });
+    expect(userVersion).toMatchObject({ authorKind: "user", authorId: null });
+    expect(apiKeyVersion).toMatchObject({ authorKind: "api_key", authorId: userId });
+
+    await repo.deleteMany({ projectId: backend.mine, ids: [saved.id] });
+    await expect(repo.findRunLinks({ projectId: backend.mine, runIds: [runId] })).resolves.toEqual(
+      [],
+    );
   });
 }
 

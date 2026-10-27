@@ -108,7 +108,7 @@ export class MemoryDatasetVersionRepository implements DatasetVersionRepository 
       }));
   }
 
-  async findDatasetsWithHistory(input: {
+  async findDatasetsWithVersions(input: {
     afterDatasetId: string | null;
     olderThanMs: number;
     limit: number;
@@ -126,7 +126,6 @@ export class MemoryDatasetVersionRepository implements DatasetVersionRepository 
       counts.set(row.datasetId, entry);
     }
     return [...counts.values()]
-      .filter((entry) => entry.count > 1)
       .toSorted((left, right) => (left.datasetId < right.datasetId ? -1 : 1))
       .slice(0, input.limit)
       .map(({ projectId, datasetId }) => ({ projectId, datasetId }));
@@ -138,7 +137,23 @@ export class MemoryDatasetVersionRepository implements DatasetVersionRepository 
     );
   }
 
+  async forgetAuthor(input: { userId: string }): Promise<number> {
+    let forgotten = 0;
+    this.#versions.forEach((row, index) => {
+      if (row.authorKind !== "user" || row.authorId !== input.userId) return;
+      this.#versions[index] = { ...row, authorId: null };
+      forgotten += 1;
+    });
+    return forgotten;
+  }
+
   async deleteMany(input: { projectId: string; ids: readonly string[] }): Promise<number> {
+    for (let index = this.#runs.length - 1; index >= 0; index--) {
+      const link = this.#runs[index]!;
+      if (link.projectId === input.projectId && input.ids.includes(link.versionId)) {
+        this.#runs.splice(index, 1);
+      }
+    }
     let removed = 0;
     for (let index = this.#versions.length - 1; index >= 0; index--) {
       const row = this.#versions[index]!;

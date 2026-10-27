@@ -104,7 +104,10 @@ import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.
 import { DatasetSingleFileService } from "../services/dataset-single-file.service.ts";
 import { DatasetUploadService } from "../services/dataset-upload.service.ts";
 import { DatasetVersionBackfillService } from "../services/dataset-version-backfill.service.ts";
-import { DatasetVersionRetentionService } from "../services/dataset-version-retention.service.ts";
+import {
+  type DatasetVersionRetentionSummary,
+  DatasetVersionRetentionService,
+} from "../services/dataset-version-retention.service.ts";
 import { DatasetVersionService } from "../services/dataset-version.service.ts";
 import { DatasetService } from "../services/dataset.service.ts";
 
@@ -290,7 +293,12 @@ export class DatasetModule implements DatasetApi {
     });
     this.#versionRetention = DatasetVersionRetentionService.create({
       versions: repositories.versions,
+      datasets: repositories.datasets,
       service: this.#versions,
+      projectArchivedAt: async (projectId) => {
+        const project = await dependencies.projects.findById(projectId);
+        return project ? (project.archivedAt?.getTime() ?? null) : undefined;
+      },
     });
     this.#versionBackfill = DatasetVersionBackfillService.create({
       datasets: repositories.datasets,
@@ -791,11 +799,14 @@ export class DatasetModule implements DatasetApi {
     }
   }
 
-  /** Thins every dataset's old version history. */
-  async sweepVersionRetention(input: {
-    nowMs: number;
-  }): Promise<{ datasets: number; thinned: number }> {
+  /** Thins every dataset's old version history and purges retired datasets' history. */
+  async sweepVersionRetention(input: { nowMs: number }): Promise<DatasetVersionRetentionSummary> {
     return this.#versionRetention.sweep(input);
+  }
+
+  /** Clears an erased user from every version they saved. */
+  async forgetVersionAuthor(input: { userId: string }): Promise<number> {
+    return this.#versions.forgetAuthor(input);
   }
 
   /** The versions pipeline `dataset_versions` registers. */
@@ -804,6 +815,9 @@ export class DatasetModule implements DatasetApi {
       autosave: (input) => this.autosaveVersion(input),
       sweepVersionRetention: async (input) => {
         await this.sweepVersionRetention(input);
+      },
+      forgetVersionAuthor: async (input) => {
+        await this.forgetVersionAuthor(input);
       },
     });
   }

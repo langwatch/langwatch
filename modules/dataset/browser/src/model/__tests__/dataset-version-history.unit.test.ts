@@ -77,6 +77,17 @@ describe("versionAuthorLabel", () => {
     ).toBe("A team member");
   });
 
+  it("names an erased member as a former member", () => {
+    expect(
+      versionAuthorLabel({
+        authorKind: "user",
+        authorId: null,
+        currentUserId: "user-1",
+        authorName: null,
+      }),
+    ).toBe("Former member");
+  });
+
   it("names API keys and the platform", () => {
     expect(
       versionAuthorLabel({

@@ -52,15 +52,18 @@ export interface DatasetVersionRepository {
     projectId: string;
     runIds: readonly string[];
   }): Promise<DatasetVersionRunLink[]>;
-  /** One page, by dataset id, of datasets with more than one version older than `olderThanMs`. */
-  findDatasetsWithHistory(input: {
+  /** One page, by dataset id across projects, of datasets with a version before `olderThanMs`. */
+  findDatasetsWithVersions(input: {
     afterDatasetId: string | null;
     olderThanMs: number;
     limit: number;
   }): Promise<DatasetWithVersionHistory[]>;
   /** Whether the dataset holds any version at all, for the first-version step. */
   hasAny(input: { projectId: string; datasetId: string }): Promise<boolean>;
+  /** Removes the versions and the run links that point at them. */
   deleteMany(input: { projectId: string; ids: readonly string[] }): Promise<number>;
+  /** Clears an erased user from every version they saved, in every project; answers the count. */
+  forgetAuthor(input: { userId: string }): Promise<number>;
 }
 
 /** Another writer saved the same version number first; the service picks the next one. */

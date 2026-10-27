@@ -19,7 +19,7 @@ import {
 
 type DatasetVersionDatabase = Pick<
   PrismaClient,
-  "datasetVersion" | "datasetVersionRun" | "$queryRaw"
+  "datasetVersion" | "datasetVersionRun" | "$queryRaw" | "$executeRaw"
 >;
 
 type VersionRow = Prisma.DatasetVersionGetPayload<Record<string, never>>;
@@ -141,7 +141,7 @@ export class PrismaDatasetVersionRepository implements DatasetVersionRepository 
     });
   }
 
-  async findDatasetsWithHistory(input: {
+  async findDatasetsWithVersions(input: {
     afterDatasetId: string | null;
     olderThanMs: number;
     limit: number;
@@ -156,7 +156,6 @@ export class PrismaDatasetVersionRepository implements DatasetVersionRepository 
        WHERE "createdAt" < ${olderThan}
          AND (${input.afterDatasetId}::text IS NULL OR "datasetId" > ${input.afterDatasetId})
        GROUP BY "projectId", "datasetId"
-      HAVING count(*) > 1
        ORDER BY "datasetId" ASC
        LIMIT ${input.limit}`;
   }
@@ -169,8 +168,20 @@ export class PrismaDatasetVersionRepository implements DatasetVersionRepository 
     return row !== null;
   }
 
+  async forgetAuthor(input: { userId: string }): Promise<number> {
+    return this.database.$executeRaw`${skipTenantCheck({
+      // An erased user is cleared from the versions they saved in every project.
+      SKIP_TENANT_CHECK: true,
+    })}
+      UPDATE "DatasetVersion" SET "authorId" = NULL
+       WHERE "authorKind" = 'user' AND "authorId" = ${input.userId}`;
+  }
+
   async deleteMany(input: { projectId: string; ids: readonly string[] }): Promise<number> {
     if (input.ids.length === 0) return 0;
+    await this.database.datasetVersionRun.deleteMany({
+      where: { projectId: input.projectId, versionId: { in: [...input.ids] } },
+    });
     const deleted = await this.database.datasetVersion.deleteMany({
       where: { projectId: input.projectId, id: { in: [...input.ids] } },
     });
