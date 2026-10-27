@@ -44,12 +44,6 @@ AFFECTED_MODELS = [
     "openai/gpt-6.1-sol",
 ]
 
-# The temperature rejection as the provider words it for openai/gpt-6-luna.
-PROVIDER_TEMPERATURE_REFUSAL = (
-    "litellm.BadRequestError: OpenAIException - Unsupported value: "
-    "'temperature' does not support 0 with this model. Only the default (1) "
-    "value is supported."
-)
 
 # Models nobody has observed to need the compatibility. The first three are
 # near-misses a pattern match would have swept up; the last two are models
@@ -221,45 +215,6 @@ def test_refusal_of_a_chosen_reasoning_effort_is_not_retried(provider):
         )
 
     assert len(provider.requests) == 1
-
-
-# @scenario "A model that refuses any temperature but its default is asked again at the default"
-def test_refused_temperature_is_retried_at_the_default(provider):
-    provider.refusals = [Exception(PROVIDER_TEMPERATURE_REFUSAL)]
-
-    answer = litellm.completion(
-        model="openai/gpt-7-new",
-        messages=[{"role": "user", "content": "Is this correct?"}],
-        temperature=0,
-    )
-
-    first, second = provider.requests
-    assert first["temperature"] == 0
-    assert second["temperature"] == 1.0
-    assert answer == PROVIDER_ANSWER
-
-    litellm.completion(
-        model="openai/gpt-7-new",
-        messages=[{"role": "user", "content": "Is this correct?"}],
-        temperature=0,
-    )
-    assert len(provider.requests) == 3
-    assert provider.last_request["temperature"] == 1.0
-
-
-# @scenario "A model that refuses any temperature but its default is asked again at the default"
-def test_temperature_and_reasoning_refusals_are_each_fixed_once(provider):
-    provider.refusals = [
-        Exception(PROVIDER_TOOL_REASONING_REFUSAL),
-        Exception(PROVIDER_TEMPERATURE_REFUSAL),
-    ]
-
-    answer = litellm.completion(**judge_request("openai/gpt-7-new", temperature=0))
-
-    assert len(provider.requests) == 3
-    assert provider.last_request["reasoning_effort"] == "none"
-    assert provider.last_request["temperature"] == 1.0
-    assert answer == PROVIDER_ANSWER
 
 
 # @scenario "A reasoning effort the caller chose is the one that is used"

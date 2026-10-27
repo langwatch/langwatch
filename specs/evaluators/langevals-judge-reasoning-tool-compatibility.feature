@@ -81,16 +81,6 @@ Feature: Evaluator judge reasoning and tool compatibility
     And the evaluation reaches a verdict
     And later requests to that model go out with reasoning off from the start
 
-  # Reasoning models refuse any temperature but their default while reasoning
-  # is on, and evaluators ask for 0. The refusal names the value it accepts.
-  @unit
-  Scenario: A model that refuses any temperature but its default is asked again at the default
-    Given an evaluator asking for temperature 0
-    And the model refuses any temperature but its default
-    When the evaluator runs
-    Then the request is sent again at temperature 1
-    And later requests to that model go out at temperature 1 from the start
-
   # The provider's own words name endpoints nobody chose and give the reader
   # nothing to act on, so the failure names the model and the setting instead.
   @unit

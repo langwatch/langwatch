@@ -283,9 +283,10 @@ def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
     specific reasoning effort keeps it and gets the provider's own answer
     rather than having its intent silently rewritten. A request carrying no
     tools is left alone, since the incompatibility is only about tools and
-    reasoning is worth having on the calls that can use it. And a model outside
-    the allowlist is left alone, since disabling reasoning is itself rejected by
-    models that only work with it on.
+    reasoning is worth having on the calls that can use it. And a model that is
+    neither in the allowlist nor in `tool_reasoning_off_models` (seen refusing
+    in this process) is left alone, since disabling reasoning is itself
+    rejected by models that only work with it on.
     """
     if kwargs.get(REASONING_EFFORT_PARAM) is not None:
         return kwargs
@@ -372,14 +373,15 @@ def is_temperature_pinned_model(model: Optional[str]) -> bool:
     return "gpt-5" in name
 
 
-def apply_gpt5_temperature_compatibility(
+def apply_temperature_compatibility(
     kwargs: dict, requested_model: Optional[str] = None
 ) -> dict:
     """
-    Pin temperature to the default for the gpt-5-family models that accept only
-    that value and reject every other with a BadRequestError ("'temperature'
-    does not support 0.0 with this model. Only the default (1) value is
-    supported.").
+    Pin temperature to the default for the models that accept only that value
+    and reject every other with a BadRequestError ("'temperature' does not
+    support 0.0 with this model. Only the default (1) value is supported."):
+    the gpt-5 family by name, and any model in `temperature_pinned_models`,
+    seen refusing in this process.
 
     drop_params cannot cover this: it strips parameters a model does not
     support at all, and these models do support temperature — they restrict
@@ -654,7 +656,7 @@ def patch_litellm_params(kwargs):
     # Same position for the same reason: the model name is now final, and an
     # explicit X_LITELLM_temperature has landed — a value the model refuses
     # is normalized rather than sent to fail.
-    kwargs = apply_gpt5_temperature_compatibility(
+    kwargs = apply_temperature_compatibility(
         kwargs, requested_model=requested_model
     )
     # Same position again: both sampling knobs have landed by now, wherever
@@ -763,10 +765,6 @@ def patch_litellm():
             forced_tool_choice_refusers.add(kwargs.get("model"))
             return await acomplete_with_auto_tool_choice(args, kwargs)
 
-    def reported(kwargs: dict, exception: BaseException) -> BaseException:
-        conflict = tool_reasoning_conflict(kwargs, exception)
-        return conflict if conflict is not None else exception
-
     def patched_completion(*args, **kwargs):
         kwargs = patch_litellm_params(kwargs)
         while True:
@@ -775,10 +773,10 @@ def patch_litellm():
             except Exception as exception:
                 adjusted = adjusted_after_refusal(kwargs, exception)
                 if adjusted is None:
-                    error = reported(kwargs, exception)
-                    if error is exception:
-                        raise
-                    raise error from exception
+                    conflict = tool_reasoning_conflict(kwargs, exception)
+                    if conflict is not None:
+                        raise conflict from exception
+                    raise
                 kwargs = adjusted
 
     litellm.completion = patched_completion
@@ -791,10 +789,10 @@ def patch_litellm():
             except Exception as exception:
                 adjusted = adjusted_after_refusal(kwargs, exception)
                 if adjusted is None:
-                    error = reported(kwargs, exception)
-                    if error is exception:
-                        raise
-                    raise error from exception
+                    conflict = tool_reasoning_conflict(kwargs, exception)
+                    if conflict is not None:
+                        raise conflict from exception
+                    raise
                 kwargs = adjusted
 
     litellm.acompletion = patched_acompletion
