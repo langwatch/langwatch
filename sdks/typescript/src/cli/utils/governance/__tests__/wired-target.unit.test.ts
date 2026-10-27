@@ -1,8 +1,5 @@
 /**
- * The target an agent's OWN exporter is wired to, read back from the file the
- * agent loads (#7958). The probe re-sends the token it finds here as a bearer,
- * so what counts as a token is decided in this module and nowhere else.
- *
+ * The target an agent's OWN exporter is wired to, read back from the file the agent loads (#7958).
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
