@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/upgrade/tsconfig.build.json"
     },
     {

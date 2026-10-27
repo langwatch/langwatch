@@ -6,6 +6,7 @@ import type { DatasetLimits } from "./dataset-limits.ts";
 import type {
   CompareDatasetVersionInput,
   DatasetVersion,
+  DatasetVersionHistory,
   DatasetVersionAuthor,
   DatasetVersionComparison,
   DatasetVersionContent,
@@ -206,7 +207,8 @@ export interface DatasetApi {
 
   // Versions (spec: modules/dataset/specs/dataset-versioning.feature).
   /** Every version of the dataset, newest first. */
-  listVersions(input: ListDatasetVersionsInput): Promise<DatasetVersion[]>;
+  /** Newest first, with author names, and whether the layout allows a restore. */
+  listVersions(input: ListDatasetVersionsInput): Promise<DatasetVersionHistory>;
   /** The current content saved by hand, optionally named; unchanged content names the latest. */
   saveVersion(input: SaveDatasetVersionInput & EditedBy): Promise<DatasetVersion>;
   getVersionPage(input: DatasetVersionPageInput): Promise<DatasetVersionPage>;

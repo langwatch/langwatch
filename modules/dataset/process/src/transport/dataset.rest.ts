@@ -589,12 +589,14 @@ export function createDatasetRest(): Readonly<{
       .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
       .withOutput(datasetRestVersionListSchema)
       .withDocs({
+        summary: "List dataset versions",
         description:
           "List a dataset's versions, newest first. A version is an immutable snapshot of the dataset's columns and rows, saved after edits go quiet, when an experiment run starts, by hand, or by a restore.",
       })
-      .handle(async ({ app, input, scope }) => ({
-        data: await app.listVersions({ projectId: scope.id, datasetId: input.slugOrId }),
-      }))
+      .handle(async ({ app, input, scope }) => {
+        const history = await app.listVersions({ projectId: scope.id, datasetId: input.slugOrId });
+        return { data: history.versions, restorable: history.restorable };
+      })
 
       .post("/:slugOrId/versions", "postApiDatasetBySlugOrIdVersions")
       .keepsRecords()
@@ -604,6 +606,7 @@ export function createDatasetRest(): Readonly<{
       .withPermission("datasets:update")
       .withOutput(datasetVersionSchema)
       .withDocs({
+        summary: "Save a dataset version",
         description:
           "Save the dataset's current content as a version, with an optional name. When the content equals the latest version, no version is created and the latest one is answered (named, when a name is given).",
       })
@@ -622,6 +625,7 @@ export function createDatasetRest(): Readonly<{
       .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
       .withOutput(datasetVersionPageSchema)
       .withDocs({
+        summary: "Get a dataset version",
         description:
           "Read one version of a dataset: its metadata and a page of the rows it held. A version the dataset does not have is refused with `dataset_version_not_found`.",
       })
@@ -647,6 +651,7 @@ export function createDatasetRest(): Readonly<{
       .withPermission("datasets:update")
       .withOutput(datasetVersionRestoredSchema)
       .withDocs({
+        summary: "Restore a dataset version",
         description:
           "Restore a version: the dataset's columns and rows become the version's, and the result is saved as a new version. Earlier versions are never changed.",
       })

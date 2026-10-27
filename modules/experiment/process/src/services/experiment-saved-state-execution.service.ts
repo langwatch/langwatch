@@ -46,6 +46,7 @@ interface SavedStateExecution {
   loadedAgents: Map<string, TypedAgent>;
   loadedEvaluators: LoadedExecutionData["loadedEvaluators"];
   loadedWorkflows: LoadedExecutionData["loadedWorkflows"];
+  datasetVersion?: LoadedExecutionData["datasetVersion"];
 }
 
 /**
@@ -181,6 +182,7 @@ export class ExperimentSavedStateExecutionService {
       loadedAgents: dataResult.loadedAgents as Map<string, TypedAgent>,
       loadedEvaluators: dataResult.loadedEvaluators,
       loadedWorkflows: dataResult.loadedWorkflows,
+      ...(dataResult.datasetVersion ? { datasetVersion: dataResult.datasetVersion } : {}),
     };
   }
 }

@@ -39,6 +39,7 @@ import type {
 } from "../../../services/experiment-execution-data.service.ts";
 import { ExperimentExecutionDataService } from "../../../services/experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "../../../services/experiment-result-dispatch.service.ts";
+import { ExperimentRunDatasetVersionService } from "../../../services/experiment-run-dataset-version.service.ts";
 import type { ExperimentService } from "../../../services/experiment.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../../run/services/experiment-run-command-dispatcher.service.ts";
 import { ExperimentRunPlanService } from "../../run/services/experiment-run-plan.service.ts";
@@ -218,6 +219,14 @@ export class WorkflowEvaluationService {
         loadedWorkflows: dataResult.loadedWorkflows,
       }),
       plan,
+    });
+    await ExperimentRunDatasetVersionService.create({
+      datasets: this.dependencies.services.datasets,
+    }).link({
+      projectId: request.tenantId,
+      runId: request.runId,
+      experimentId: request.experimentId,
+      datasetVersion: dataResult.datasetVersion,
     });
   }
 

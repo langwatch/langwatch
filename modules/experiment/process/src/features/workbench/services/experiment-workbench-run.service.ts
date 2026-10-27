@@ -35,7 +35,10 @@ import type {
 } from "../../../repositories/experiment-run-fold.repository.ts";
 import type { ExperimentRunRefusal } from "../../../rules/experiment-run-availability.rules.ts";
 import { getRunUrl } from "../../../rules/experiment-run-url.rules.ts";
-import { workbenchActorFrom } from "../../../rules/experiment-workbench-actor.rules.ts";
+import {
+  datasetVersionAuthorFrom,
+  workbenchActorFrom,
+} from "../../../rules/experiment-workbench-actor.rules.ts";
 import { workbenchRunState } from "../../../rules/experiment-workbench-run-state.rules.ts";
 import {
   ExperimentExecutionDataService,
@@ -164,6 +167,10 @@ export class ExperimentWorkbenchRunService {
       runInputs: {
         data: runInputs.data,
         datasetId: runInputs.dataset_id,
+        ...(runInputs.dataset_version !== undefined
+          ? { datasetVersion: runInputs.dataset_version }
+          : {}),
+        by: datasetVersionAuthorFrom({ credential: input.credential }),
         parameters: runInputs.parameters,
       },
     });
@@ -177,6 +184,7 @@ export class ExperimentWorkbenchRunService {
       loadedAgents: prepared.loadedAgents,
       loadedEvaluators: prepared.loadedEvaluators,
       loadedWorkflows: prepared.loadedWorkflows,
+      ...(prepared.datasetVersion ? { datasetVersion: prepared.datasetVersion } : {}),
     };
     return {
       experimentId: prepared.experiment.id,
@@ -206,7 +214,12 @@ export class ExperimentWorkbenchRunService {
       targets: input.targets,
       evaluators: input.evaluators,
       services: runs.services,
-      inputs: { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
+      inputs: {
+        data: input.data,
+        datasetId: input.dataset_id,
+        parameters: input.parameters,
+        by: { kind: "user", id: by.id },
+      },
     });
     const state = workbenchRunState(input);
 

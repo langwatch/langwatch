@@ -31,9 +31,12 @@ import {
   DATASET_HISTORY_AGGREGATE_TYPE,
   datasetContentEditedEventSchema,
   type DatasetContentEditedEvent,
+  type DatasetVersionRestoredEvent,
+  datasetVersionRestoredEventSchema,
   type DatasetVersionSavedEvent,
   datasetVersionSavedEventSchema,
   RecordDatasetContentEditCommand,
+  RecordDatasetVersionRestoredCommand,
   RecordDatasetVersionSavedCommand,
 } from "./dataset-versions.commands.ts";
 
@@ -50,7 +53,7 @@ export type DatasetVersionWork = {
 };
 
 export type DatasetVersionsDefinition = StaticPipelineDefinition<
-  DatasetContentEditedEvent | DatasetVersionSavedEvent,
+  DatasetContentEditedEvent | DatasetVersionSavedEvent | DatasetVersionRestoredEvent,
   Record<string, Projection>,
   | {
       name: "recordDatasetContentEdit";
@@ -59,6 +62,10 @@ export type DatasetVersionsDefinition = StaticPipelineDefinition<
   | {
       name: "recordDatasetVersionSaved";
       payload: z.infer<typeof datasetVersionSavedEventSchema>["data"] & CommandEnvelope;
+    }
+  | {
+      name: "recordDatasetVersionRestored";
+      payload: z.infer<typeof datasetVersionRestoredEventSchema>["data"] & CommandEnvelope;
     }
 >;
 
@@ -72,9 +79,14 @@ export function buildDatasetVersionsPipeline(work: DatasetVersionWork): DatasetV
     name: DATASET_VERSIONS_PIPELINE_NAME,
     aggregate: defineAggregate({ type: DATASET_HISTORY_AGGREGATE_TYPE }),
   })
-    .withEvents([datasetContentEditedEventSchema, datasetVersionSavedEventSchema])
+    .withEvents([
+      datasetContentEditedEventSchema,
+      datasetVersionSavedEventSchema,
+      datasetVersionRestoredEventSchema,
+    ])
     .withCommand("recordDatasetContentEdit", RecordDatasetContentEditCommand)
     .withCommand("recordDatasetVersionSaved", RecordDatasetVersionSavedCommand)
+    .withCommand("recordDatasetVersionRestored", RecordDatasetVersionRestoredCommand)
     .withProcessManager(DATASET_AUTOSAVE_PROCESS_NAME, (pm) =>
       pm
         .state(datasetAutosaveStateSchema, DATASET_AUTOSAVE_INITIAL_STATE)
@@ -105,5 +117,6 @@ export const datasetVersionsEventing = defineEventingModule({
     app.connectVersions({
       recordContentEdit: commands.recordDatasetContentEdit,
       recordVersionSaved: commands.recordDatasetVersionSaved,
+      recordVersionRestored: commands.recordDatasetVersionRestored,
     }),
 });

@@ -15,6 +15,7 @@ export const DATASET_VERSION_COMPARE_LIST_MAX = 200;
 
 export const DATASET_CONTENT_EDITED_EVENT_TYPE = "lw.dataset.content_edited" as const;
 export const DATASET_VERSION_SAVED_EVENT_TYPE = "lw.dataset.version_saved" as const;
+export const DATASET_VERSION_RESTORED_EVENT_TYPE = "lw.dataset.version_restored" as const;
 export const DATASET_VERSION_EVENT_VERSION = "2026-10-27" as const;
 
 const datasetVersionTriggerSchemaDefinition = z.enum([
@@ -68,6 +69,30 @@ const datasetVersionSchemaDefinition = z.object({
 export interface DatasetVersionSchema extends Named<typeof datasetVersionSchemaDefinition> {}
 export const datasetVersionSchema: DatasetVersionSchema = datasetVersionSchemaDefinition;
 export type DatasetVersion = z.infer<typeof datasetVersionSchema>;
+
+/** A version as the history lists it: with the name of the person who saved it, when known. */
+const datasetVersionListItemSchemaDefinition = z.object({
+  ...datasetVersionSchemaDefinition.shape,
+  authorName: z.string().nullable(),
+});
+export interface DatasetVersionListItemSchema extends Named<
+  typeof datasetVersionListItemSchemaDefinition
+> {}
+export const datasetVersionListItemSchema: DatasetVersionListItemSchema =
+  datasetVersionListItemSchemaDefinition;
+export type DatasetVersionListItem = z.infer<typeof datasetVersionListItemSchema>;
+
+/** A dataset's history, newest first, and whether its layout lets a version be restored. */
+const datasetVersionHistorySchemaDefinition = z.object({
+  versions: z.array(datasetVersionListItemSchema),
+  restorable: z.boolean(),
+});
+export interface DatasetVersionHistorySchema extends Named<
+  typeof datasetVersionHistorySchemaDefinition
+> {}
+export const datasetVersionHistorySchema: DatasetVersionHistorySchema =
+  datasetVersionHistorySchemaDefinition;
+export type DatasetVersionHistory = z.infer<typeof datasetVersionHistorySchema>;
 
 /** One row of a version, under the id it had when the version was saved. */
 const datasetVersionRowSchemaDefinition = z.object({
@@ -251,3 +276,17 @@ export interface DatasetVersionSavedEventDataSchema extends Named<
 export const datasetVersionSavedEventDataSchema: DatasetVersionSavedEventDataSchema =
   datasetVersionSavedEventDataSchemaDefinition;
 export type DatasetVersionSavedEventData = z.infer<typeof datasetVersionSavedEventDataSchema>;
+
+const datasetVersionRestoredEventDataSchemaDefinition = z.object({
+  projectId: z.string().min(1),
+  datasetId: z.string().min(1),
+  versionId: z.string().min(1),
+  version: z.number().int().positive(),
+  restoredFromVersion: z.number().int().positive(),
+});
+export interface DatasetVersionRestoredEventDataSchema extends Named<
+  typeof datasetVersionRestoredEventDataSchemaDefinition
+> {}
+export const datasetVersionRestoredEventDataSchema: DatasetVersionRestoredEventDataSchema =
+  datasetVersionRestoredEventDataSchemaDefinition;
+export type DatasetVersionRestoredEventData = z.infer<typeof datasetVersionRestoredEventDataSchema>;
