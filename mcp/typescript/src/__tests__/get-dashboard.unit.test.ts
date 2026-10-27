@@ -2,11 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../langwatch-api-boards.js", () => ({ getBoard: vi.fn() }));
 vi.mock("../langwatch-api-dashboards.ts", () => ({ getDashboard: vi.fn() }));
-vi.mock("../langwatch-api-projects.js", () => ({ getCurrentProject: vi.fn() }));
 
 import { getBoard } from "../langwatch-api-boards.js";
 import { getDashboard } from "../langwatch-api-dashboards.ts";
-import { getCurrentProject } from "../langwatch-api-projects.js";
 import { LangWatchApiError } from "../langwatch-api.js";
 import { handleGetDashboard } from "../tools/get-dashboard.js";
 
@@ -16,7 +14,6 @@ const notFound = () =>
 describe("handleGetDashboard()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getCurrentProject).mockResolvedValue({ id: "proj_1" } as never);
   });
 
   describe("when the id is a Dashboards board the Reports API does not hold", () => {
