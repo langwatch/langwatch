@@ -100,6 +100,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Decision: Live overrides the refresh choice without changing it; the member's own choice
     # applies again on any other range
 
+  @unit @integration
+  Scenario: AC19d A fixed range moves its end to now on each refresh
+    Given a board on a fixed range such as 24h
+    When the board refreshes, on its interval or from Refresh now
+    Then every widget reads the same length of range, now ending at the minute of the refresh
+    And a trace that arrived since the board opened shows
+    # Decision: the end rounds up to the minute, as Live does, so a re-render does not refetch
+
   # ---------------------------------------------------------------------------
   # Bring-your-own-AI
   # ---------------------------------------------------------------------------
@@ -120,6 +128,16 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the tool returns an error naming the dashboard id
     And no new widget is left in the project
     # Evidence: the MCP call output and the widget count before and after
+
+  @unit
+  Scenario: AC8c An agent reads a Dashboards board by its id
+    Given a project with a Dashboards board and an Analytics Report
+    When an agent reads the board by its id with the get_dashboard tool or `langwatch dashboard get`
+    Then it receives the board's name, id and link from /api/v1/dashboards
+    And the Analytics Report's id there fails with the not found error, with no second request
+    When it reads the report with platform_get_analytics_report or `langwatch analytics-report get`
+    Then it reads only /api/v1/analytics/reports, and a Dashboards board's id there is not found
+    # Evidence: the unit tests for get_dashboard and dashboard get
 
   @unit @unimplemented
   Scenario: AC9 The docs explain how to build boards from an agent
@@ -740,12 +758,20 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the member picks Move up on a board in the sidebar
     Then that board swaps with the one above it and the new order is saved
 
+  @unit @integration
+  Scenario: AC155b Stars the section does not show keep their place in the star order
+    Given the member's star order holds a star the Starred section does not show, such as My dashboard
+    When the member moves a board in the Starred section
+    Then only the two boards that swapped change place
+    And the star it does not show keeps its position in the saved order
+
   @unit
   Scenario: AC156 No board is starred unless the member stars it
     Given a member creates a board, duplicates one, or adds one from a template
     When the board is made
     Then it is starred for nobody, its creator included
     # My dashboard is the one exception: it starts starred for its maker (AC160b)
+    # The LLM Ops sidebar's "+" stars its new board for its maker (product-sidebars.feature)
 
   @unit
   Scenario: AC157 Stars are per member
@@ -1070,12 +1096,15 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit @integration
   Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards
     Given a board made in Analytics Reports and a Dashboards board holding a widget
-    When an API key lists the boards at /api/v1/projects/{projectId}/analytics/boards
+    And Dashboards is switched on for the API key's project
+    When the key lists the boards at /api/v1/dashboards, with no project id in the path
     Then only the Dashboards board is listed, with its widget count and the address it opens at
     And reading the Reports board's id there is not found
-    And /api/v1/dashboards still lists only the Reports board
-    When the key adds a widget to either board
+    And /api/v1/analytics/reports lists only the Reports board
+    When the key creates a widget at /api/v1/dashboards/{dashboardId}/widgets for either board
     Then the Dashboards board takes it, and the Reports board is not found
+    When the CLI reads a board by id with only an API key, so no project is in scope
+    Then it reads the board under the project the key belongs to
 
   @unit @integration
   Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden
@@ -1086,6 +1115,141 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then that board and its charts are not there, as for a board that does not exist
     And the member who made it lists, opens and writes it as before
     And once that member is erased the board is there for nobody
+
+  @integration
+  Scenario: AC199n Split: the public API creates, renames and deletes Dashboards boards
+    Given an API key with analytics:create, analytics:update and analytics:delete
+    And Dashboards is switched on for the key's project
+    When it creates a board at /api/v1/dashboards
+    Then it answers 201 with the board, the board is listed with no widgets and no author
+    When the key renames the board at /api/v1/dashboards/{dashboardId}
+    Then it answers with the new name
+    When the key deletes the board
+    Then it answers with the board's id and name, and the board and its widgets are gone
+    And reading or deleting the board again is not found
+    And deleting a Reports board, another project's board or a member's Only me board is not found
+
+  @integration
+  Scenario: AC199o Split: a member's REST create follows the board scope rules
+    Given a member signed in with analytics:create
+    When they create a board named "My dashboard" at /api/v1/dashboards
+    Then they are recorded as its author, it is at Only me and it is starred for them
+
+  @integration
+  Scenario: AC199p Split: a board's widgets are a sub-resource of the board
+    Given a Dashboards board holding a widget, and a second Dashboards board
+    When an API key lists /api/v1/dashboards/{dashboardId}/widgets
+    Then only the widgets on that board are listed
+    When the key creates a widget at /api/v1/dashboards/{dashboardId}/widgets
+    Then it answers 201 with the widget, placed on that board
+    And the key reads, updates and deletes it at /api/v1/dashboards/{dashboardId}/widgets/{widgetId}
+    And a widget read, updated or deleted through the other board's path is not found
+    And a Langy session key deleting it through the other board's path is shown no card for it
+    And a widget created under a Reports board, another project's board or a missing board is
+      refused with dashboard_not_found
+
+  @integration
+  Scenario: AC199q Split: /api/v1/dashboards is not there while Dashboards is off
+    Given Dashboards is switched off for the API key's project
+    When the key calls any /api/v1/dashboards route, its widget routes included
+    Then it answers 404, and nothing is read or written
+    And a Langy session key deleting a board or a widget there gets the same 404, before any
+      confirmation card is shown or any board name is read
+
+  @integration
+  Scenario: Split: /api/v1/dashboards stays shut when the Dashboards flag cannot be read
+    Given a Dashboards board, and the release_dashboards lookup for the key's project fails
+    When the key calls /api/v1/dashboards or /api/dashboards, a board and its widgets included
+    Then each answers an error, 404 or 5xx, and never a Dashboards board
+
+  @integration
+  Scenario: AC199r Split: the Reports boards answer at /api/v1/analytics/reports
+    Given an API key whose project holds a board made in Analytics Reports
+    When it lists, creates, reorders, reads, renames or deletes Reports boards at
+      /api/v1/analytics/reports
+    Then they answer as /api/v1/dashboards did before Dashboards took that path, whether
+      Dashboards is on or off
+    And every answer carries Deprecation true and a successor-version Link to /api/v1/dashboards
+    And the published document marks each of those operations deprecated
+    And POST /api/v1/analytics still answers the timeseries query, with no Deprecation header
+    And the project-path dashboards read carries no Deprecation header
+
+  @integration
+  Scenario: AC199u Split: /api/v1/dashboards answers by the API version the caller names
+    Given a board made in Analytics Reports and a Dashboards board, with Dashboards switched on
+    When a key lists /api/v1/dashboards naming no version, or X-API-Version 2026-10-26
+    Then the Dashboards board is listed, as the Dashboards API answers it
+    When the key names X-API-Version 2026-08-07, or calls /api/v1/dashboards/2026-08-07
+    Then it answers 404, as for a date before the Dashboards API existed, and lists no board
+    And the Reports boards answer only at /api/v1/analytics/reports
+    When the key names an X-API-Version that is not a real date
+    Then it answers 400 invalid_api_version
+
+  @integration
+  Scenario: AC199v Split: /api/dashboards answers as /api/v1/dashboards, deprecated
+    Given a Dashboards board, with Dashboards switched on
+    When a key calls /api/dashboards, its dated and latest addresses or its widget routes
+    Then each answers as the same /api/v1/dashboards address does
+    And each answer carries Deprecation true and a successor-version Link to /api/v1/dashboards
+    And so does its 404 while Dashboards is switched off
+    And no /api/v1/dashboards answer carries a Deprecation header
+
+  @unit
+  Scenario: AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards
+    Given the langwatch CLI and the LangWatch MCP server
+    Then `langwatch dashboard` lists, reads, creates, renames and deletes dashboards over
+      /api/v1/dashboards
+    And `langwatch dashboard widget` lists, adds, reads, updates and deletes a dashboard's widgets
+    And the MCP tools list_dashboards, get_dashboard, create_dashboard, rename_dashboard,
+      delete_dashboard and list_dashboard_widgets do the same, naming the dashboard dashboardId
+    And `langwatch analytics-report` and the platform_*_analytics_report(s) MCP tools manage
+      Analytics Reports over /api/v1/analytics/reports
+    When the CLI or the MCP `list_dashboards` tool lists dashboards
+    Then it reads /api/v1/dashboards, and only that path
+    And a failure there, a 404 while Dashboards is off included, is reported as it is, with no
+      second request
+
+  @unit
+  Scenario: AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports
+    Given the TypeScript and Python SDKs
+    Then `client.dashboards` and `langwatch.dashboards` manage Dashboards over /api/v1/dashboards,
+      naming the dashboard dashboardId and dashboard_id
+    And `client.analyticsReports` and `langwatch.analytics_reports` manage Analytics Reports over
+      /api/v1/analytics/reports
+    And neither SDK has a `boards` name: `client.boards` and `langwatch.boards` are gone
+
+  @unit
+  Scenario: AC199x Names: the CLI has one dashboard tree and no old command names
+    Given the langwatch CLI
+    Then `langwatch dashboard` manages the Dashboards, with their widgets under
+      `langwatch dashboard widget`
+    And `langwatch analytics-report` manages the Analytics Reports
+    And there is no `langwatch dashboards`, `langwatch dashboard-widget` or
+      `langwatch analytics-reports` command
+
+  @integration
+  Scenario: AC199y Names: the project-path dashboards read answers at /analytics/dashboards
+    Given a Dashboards board, with Dashboards switched on
+    When an API key lists /api/v1/projects/{projectId}/analytics/dashboards or reads one by its id
+    Then it answers with the board, as /analytics/boards did, and carries no Deprecation header
+    And /api/v1/projects/{projectId}/analytics/boards answers the same, with Deprecation true and
+      a successor-version Link to the /analytics/dashboards path
+    And the published document marks the /analytics/boards operations deprecated
+
+  @unit
+  Scenario: AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports
+    Given Langy ran `langwatch dashboard` or `langwatch analytics-report` and shows its card
+    When the card links a dashboard by its id
+    Then a Dashboards dashboard opens at /<project>/dashboards/<id>
+    And an Analytics Report, a custom graph or a saved chart opens at
+      /<project>/analytics/reports?dashboard=<id>, labelled Open in Analytics Reports
+
+  @unit
+  Scenario: AC199t The MCP widget tools use only the board routes
+    Given the MCP tools `add_dashboard_widget` and `update_dashboard_widget`
+    Then they create and change the widget under /api/v1/dashboards/{dashboardId}/widgets, and
+      call no other path
+    And a 404 there is refused naming the dashboard id, and any other failure is reported as it is
 
   # ---------------------------------------------------------------------------
   # Sidebar, My dashboard, From LangWatch and the ask bar (langwatch/tasks#911)
@@ -1154,7 +1318,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: From LangWatch: the heading's (i) says what these boards are
     Given the Dashboards sidebar shows the From LangWatch group
     When the member hovers over the (i) beside its heading, or moves keyboard focus to it
-    Then it says "Boards LangWatch made for you. They are read-only and improve over time.
+    Then it says "Dashboards LangWatch made for you. They are read-only and improve over time.
       Duplicate one to make a copy you can edit."
     And the heading and its fold control stay exactly where they were
     # Owner list, 2026-10-08; the prototype uses the same words
@@ -1579,10 +1743,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 5: "The board uses a wide screen" → Scenario: AC5 The board uses a wide screen
   # AC 6: "Template tables are shorter than template charts" → Scenario: AC6 Template tables are shorter than template charts
   # AC 7: "The board shows data age and can refresh" (changed by langwatch/tasks#911: no data age; Refresh now moves into the period menu) → Scenario: AC7 Refresh sits inside the period menu
-  # AC 8: "An MCP agent adds a widget to a board" → Scenario: AC8 An MCP agent adds a widget to a board; Scenario: AC8b add_dashboard_widget rejects an unknown dashboard
+  # AC 8: "An MCP agent adds a widget to a board" → Scenario: AC8 An MCP agent adds a widget to a board; Scenario: AC8b add_dashboard_widget rejects an unknown dashboard; Scenario: AC8c An agent reads a Dashboards board by its id
   # AC 9: "The docs explain how to build boards from an agent" → Scenario: AC9 The docs explain how to build boards from an agent
   # AC 10: "A non-empty board still offers a way to add a widget" → Scenario: AC10 A non-empty board still offers a way to add a widget
-  # AC 19: "One control for range, grain and refresh, with Live" (added by langwatch/tasks#911: the refresh menu moves into the period control) → Scenario: AC19 One control sets the range, the grain and the refresh; Scenario: AC19b A grain that does not fit the range cannot be picked; Scenario: AC19c Live is the last hour, rolling, refreshed every minute
+  # AC 19: "One control for range, grain and refresh, with Live" (added by langwatch/tasks#911: the refresh menu moves into the period control) → Scenario: AC19 One control sets the range, the grain and the refresh; Scenario: AC19b A grain that does not fit the range cannot be picked; Scenario: AC19c Live is the last hour, rolling, refreshed every minute; Scenario: AC19d A fixed range moves its end to now on each refresh
   # AC 11: "Existing boards are unaffected" → Scenario: AC11 Existing boards are unaffected
   # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add takes the widget off again and does not seed Langy
   # AC 13: "An empty widget tells a quiet period from a missing source" (added by langwatch/tasks#911: no rows no longer means not connected) → Scenario: AC13 A quiet period does not ask the member to connect a source; Scenario: AC13b A source that was never set up shows its setup step; Scenario: AC13c Every template widget checks its own source
@@ -1608,11 +1772,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
   # AC 107c-107e: "Templates library: cards like the prototype" (changed by langwatch/tasks#911 on 2026-10-07: compact cards with no labels, so AC107e is gone; the finder's own scenarios are in dashboards-finder.feature) → Scenario: AC107c Templates library: each card reads like the prototype's; Scenario: AC107d Templates library: a card previews the template's real board
   # AC 107-109: "Sidebar menu" (changed by langwatch/tasks#911: stars replace sharing and the default board; Share and Set as default are gone, Move up/down added) → Scenario: AC107 Sidebar menu: each board offers its actions in order; Scenario: AC107b Sidebar menu: reorder is bounded by the Starred list's ends; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
-  # AC 150-159: "Dashboards page and favourites" (changed by langwatch/tasks#911: the All dashboards page is gone, nothing but My dashboard is starred automatically) → Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC156 No board is starred unless the member stars it; Scenario: AC157 Stars are per member (AC159 "No sharing control appears anywhere" is retired by AC170-186)
+  # AC 150-159: "Dashboards page and favourites" (changed by langwatch/tasks#911: the All dashboards page is gone, nothing but My dashboard is starred automatically) → Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC155b Stars the section does not show keep their place in the star order; Scenario: AC156 No board is starred unless the member stars it; Scenario: AC157 Stars are per member (AC159 "No sharing control appears anywhere" is retired by AC170-186)
   # AC 170-186: "Board scope: Only me, Project, Organization" (owner decisions, 2026-10-09) → Scenario: AC170 Scope: a new board starts at Project and My dashboard at Only me; Scenario: AC171 Scope: an Only me board exists for its author alone; Scenario: AC172 Scope: an Organization board is listed in every project of its organization; Scenario: AC173 Scope: an Organization board is read-only outside the project that owns it; Scenario: AC174 Scope: only the author changes a board's scope; Scenario: AC175 Scope: any board can be set to Only me, My dashboard like any other; Scenario: AC176 Scope: a narrower scope keeps other members' stars; Scenario: AC177 Scope control: the board header shows the scope beside the title; Scenario: AC178 Scope control: the sidebar menu offers the same three choices; Scenario: AC179 Scope change: it asks first only when someone loses the board; Scenario: AC180 Scope change: any other change is made at once and offers Undo; Scenario: AC181 Sidebar: scope marks and the organization's group; Scenario: AC182 Organization board: the Project chip says whose data it shows; Scenario: AC183 A board the reader may not open is not available; Scenario: AC184 View-only: a board the reader cannot edit offers no edit control; Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy; Scenario: AC186 Scope: the migration keeps today's audience
   # AC 187-189: "Board scope: what the access-control review closed" (2026-10-09: automation reads, archived projects, projects with Dashboards off) → Scenario: AC187 Scope: an alert or a scheduled report reads nothing from an Only me board; Scenario: AC188 Scope: an Organization board of an archived project is listed nowhere; Scenario: AC189 Scope: board scope reaches only a project where Dashboards is switched on
   # AC 196-197: "Board scope over REST: a key stands where its person does" (owner, 2026-10-10) → Scenario: AC196 Scope: a key that names a person reads and writes as that person over REST; Scenario: AC197 Scope: a key that names no person stands where a project credential does
-  # AC 199: "Dashboards and Analytics Reports keep their boards apart" (changed on 2026-10-15: Dashboards v2 moves onto DashboardsV2 and DashboardWidget) → Scenario: AC199 Split: Dashboards and Analytics Reports each list and open only their own boards; Scenario: AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart; Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports; Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged; Scenario: AC199e Split: each existing board lands in Dashboards, Reports or both by what it holds; Scenario: AC199f Split: a copied board and widget keep their ids; Scenario: AC199h Split: the LangWatchQL views leave out the stale copies; Scenario: AC199i Split: a board made in Analytics Reports is not starred and not Only me; Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds; Scenario: AC199k Split: a saved workbench chart is placed only on a Reports board; Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards; Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden
+  # AC 199: "Dashboards and Analytics Reports keep their boards apart" (changed on 2026-10-15: Dashboards v2 moves onto DashboardsV2 and DashboardWidget) → Scenario: AC199 Split: Dashboards and Analytics Reports each list and open only their own boards; Scenario: AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart; Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports; Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged; Scenario: AC199e Split: each existing board lands in Dashboards, Reports or both by what it holds; Scenario: AC199f Split: a copied board and widget keep their ids; Scenario: AC199h Split: the LangWatchQL views leave out the stale copies; Scenario: AC199i Split: a board made in Analytics Reports is not starred and not Only me; Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds; Scenario: AC199k Split: a saved workbench chart is placed only on a Reports board; Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards; Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden; Scenario: AC199n Split: the public API creates, renames and deletes Dashboards boards; Scenario: AC199o Split: a member's REST create follows the board scope rules; Scenario: AC199p Split: a board's widgets are a sub-resource of the board; Scenario: AC199q Split: /api/v1/dashboards is not there while Dashboards is off; Scenario: Split: /api/v1/dashboards stays shut when the Dashboards flag cannot be read; Scenario: AC199r Split: the Reports boards answer at /api/v1/analytics/reports; Scenario: AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards; Scenario: AC199t The MCP widget tools use only the board routes; Scenario: AC199u Split: /api/v1/dashboards answers by the API version the caller names; Scenario: AC199v Split: /api/dashboards answers as /api/v1/dashboards, deprecated; Scenario: AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports; Scenario: AC199x Names: the CLI has one dashboard tree and no old command names; Scenario: AC199y Names: the project-path dashboards read answers at /analytics/dashboards; Scenario: AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports
   # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911; changed on 2026-10-08: My dashboard starts starred) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, starred for them; Scenario: AC160c A member who unstars My dashboard keeps it unstarred; Scenario: AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name; Scenario: AC161c Starred shows only when the member has stars, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A star can point at a From LangWatch board
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate

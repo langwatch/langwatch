@@ -122,6 +122,7 @@ describe("the Dashboards screens", () => {
         });
 
         expect(await screen.findByRole("heading", NOT_FOUND)).toBeInTheDocument();
+        expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
         expect(refused.container.innerHTML).toBe(flagOffPage);
       });
     });
@@ -189,6 +190,42 @@ describe("the Dashboards screens", () => {
         expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
         expect(screen.queryByText("Default")).toBeNull();
       });
+    });
+
+    describe("when the member opens a board", () => {
+      /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
+      it("asks if they look for the old Analytics and links to it", async () => {
+        renderDashboards({
+          element: <DashboardBoardScreen />,
+          host: hostOpening({ dashboardId: "board-1", flags: FLAG_ON }),
+          answer: (call) => {
+            if (call.path === "boards.getAll") return Promise.resolve([listed({ id: "board-1" })]);
+            if (call.path === "boards.listStarred") return Promise.resolve([]);
+            if (call.path === "dashboardWidgets.list") return Promise.resolve([]);
+            return NO_PROCEDURES(call);
+          },
+        });
+
+        expect(await screen.findByTestId("old-analytics-banner")).toHaveTextContent(
+          "Looking for the old Analytics? It is still here.",
+        );
+        expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
+          "href",
+          "/test-project/analytics",
+        );
+      });
+    });
+  });
+
+  describe("given the flag is off", () => {
+    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
+    it("shows no old-Analytics banner", () => {
+      renderDashboards({
+        element: <DashboardBoardScreen />,
+        host: hostOpening({ dashboardId: "board-1", flags: FLAG_OFF }),
+      });
+
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 });

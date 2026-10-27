@@ -24,7 +24,7 @@ import {
 import { useBoardAccess } from "../../behavior/use-board-access.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
-import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
@@ -47,6 +47,7 @@ import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
 import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
 import { BoardUnavailable } from "../blocks/board-unavailable.tsx";
+import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardWidgetEditor } from "./board-widget-editor.tsx";
@@ -89,7 +90,11 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     dashboardId: board.id,
     stored: board.description,
   });
-  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
+  const { range } = useBoardRange();
+  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
+  const { grain, period, setRange, setGrain } = useBoardPeriod({
+    refreshedAt: autoRefresh.refreshedAt,
+  });
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
   const { widgets } = boardWidgets;
@@ -97,7 +102,6 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const langy = useLangyAsk();
   useBoardLangyChip(boardContextChip({ board: subject, range, period }));
   const editor = useBoardEditor({ board: subject, period, widgets });
-  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
 
   const openPicker = () => {
     if (!picker.isOpen) picker.open();
@@ -273,7 +277,12 @@ function Board() {
   // A deleted board and one set to Only me read the same: the server tells neither apart.
   if (!board) return <BoardUnavailable />;
   // Keyed so a board's in-flight edits never leak into the next board.
-  return <OpenBoard key={board.id} board={board} />;
+  return (
+    <>
+      <OldAnalyticsBanner />
+      <OpenBoard key={board.id} board={board} />
+    </>
+  );
 }
 
 export default function DashboardBoardScreen() {

@@ -472,6 +472,10 @@ export class ProjectService {
     return this.repository.markLegacyApiKeyUsed({ ...input, at: nowInstant() });
   }
 
+  findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null> {
+    return this.repository.findLegacyApiKeyLastUsedAt(input);
+  }
+
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
     return this.repository.rotateLegacyApiKey(input);
   }

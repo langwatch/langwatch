@@ -17477,7 +17477,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+Personal coding-agent usage needs `langwatch login --device` on a laptop; a project key in `LANGWATCH_API_KEY` stands in for that login only for its own project. A team or application project needs `--project <slug>` on the read commands, which a project key refuses for any project but its own, so reaching one still needs `langwatch login --device`.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -17845,7 +17845,7 @@ This skill answers one question with the user's own data: at what context size d
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on the read commands when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -19405,7 +19405,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -19447,7 +19447,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if whoami reports "Not logged in" or that field is missing, ask the user which project id to use.
 
 If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
@@ -41842,76 +41842,63 @@ Both can also be created with `langwatch trigger create --graph-alert` and `--re
 
 ---
 title: Dashboards
-description: Build boards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
+description: Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
 ---
 
 ## Turn on Dashboards
 
 Dashboards is a product in the product switcher at the top left of LangWatch.
 It sits behind the `release_dashboards` feature flag, which is off by default.
-Building and editing widgets on a board also needs the `release_lwql_workbench`
+Building and editing widgets on a dashboard also needs the `release_lwql_workbench`
 flag, which turns on LangWatchQL. No other flag is needed.
 
-## Your first board
+## Your first dashboard
 
-Opening Dashboards opens your board called "My dashboard", and it starts in your
-starred boards. If you have no such board yet, LangWatch makes one for you. It
+Opening Dashboards opens your dashboard called "My dashboard", and it starts in your
+starred dashboards. If you have no such dashboard yet, LangWatch makes one for you. It
 starts at the scope Only me, so only you see it. You can change its scope like
-any other board's (see [Who can see a board](#who-can-see-a-board)).
+any other dashboard's (see [Who can see a dashboard](#who-can-see-a-dashboard)).
 
 ## The sidebar
 
 The sidebar lists, in order:
 
 - **Your dashboards**: your "My dashboard" first, then the project's other
-  boards by name. The **+** next to the heading makes a blank board at once and
+  dashboards by name. The **+** next to the heading makes a blank dashboard at once and
   opens it.
-- **Starred**: the boards you starred, in your own order. Stars are yours alone.
-  The menu of a starred board has Move up and Move down.
+- **Starred**: the dashboards you starred, in your own order. Stars are yours alone.
+  The menu of a starred dashboard has Move up and Move down.
 - **From your organisation**: the heading reads "From" and your organisation's
-  name. It lists the boards that other projects of your organisation set to
-  Organization, by name, and shows only when there is such a board.
-- **From LangWatch**: boards LangWatch made for you. Click the heading to fold
+  name. It lists the dashboards that other projects of your organisation set to
+  Organization, by name, and shows only when there is such a dashboard.
+- **From LangWatch**: dashboards LangWatch made for you. Click the heading to fold
   the group; it stays folded until you click it again.
 
-A board set to Only me has a small lock next to its name, and a board set to
-Organization has a building. A Project board has no mark.
+A dashboard set to Only me has a small lock next to its name, and a dashboard set to
+Organization has a building. A Project dashboard has no mark.
 
-The **⋮** menu of a board offers Star or Unstar, Rename, Duplicate and Delete.
-On a board you made it also offers the three scope choices. On a board you
+The **⋮** menu of a dashboard offers Star or Unstar, Rename, Duplicate and Delete.
+On a dashboard you made it also offers the three scope choices. On a dashboard you
 cannot edit it offers Star or Unstar and **Duplicate to edit**. "My dashboard"
 cannot be renamed or deleted.
 
-Under that, the sidebar lists, in order:
-
-- **Your dashboards**: your "My dashboard" first, then the project's other
-  boards by name. The **+** next to the heading makes a blank board at once and
-  opens it.
-- **Starred**: the boards you starred, in your own order. Stars are yours alone.
-  The menu of a starred board has Move up and Move down.
-- **From LangWatch**: boards LangWatch made for you. Click the heading to fold
-  the group; it stays folded until you click it again.
-
-The **⋮** menu of a board offers Star or Unstar, Rename, Duplicate and Delete.
-"My dashboard" cannot be renamed or deleted.
-
 ## Start from a template
 
-A board without widgets shows the ask bar, suggested questions, and "Or start
-from a template" with the three From LangWatch boards and a **View all
+A dashboard without widgets shows the ask bar, suggested questions, and "Or start
+from a template" with the three From LangWatch dashboards and a **View all
 templates** link. The templates library lists every ready template by Grow,
 Protect, Profit and Trust, with a search box and filters for the category and
 the agent type.
 
-**Add to this project** on a card creates a new board named after the template
+**Add to this project** on a card creates a new dashboard named after the template
 (numbered "Agent health 2" and so on if the name is taken), at the scope Project,
 with the template's widgets. A template you already added shows **Added**,
-linking to its board.
+linking to its dashboard.
 
 When Langy is enabled for your project, Langy opens with the template's report
 prompt ready in the composer, unsent. The prompt also asks Langy to check what
-the board needs that your project has not set up yet, and names the widgets
-that wait for that data. Without Langy the board is made and no
+the dashboard needs that your project has not set up yet, and names the widgets
+that wait for that data. Without Langy the dashboard is made and no
 prompt is drafted.
 
 A widget whose data is not set up yet says what is missing and links to the
@@ -41925,11 +41912,11 @@ The Agent health template holds five widgets:
 - Top request my agent cannot serve
 - Conversations resolved per day
 
-A new board is yours like any other: every widget on it can be edited,
+A new dashboard is yours like any other: every widget on it can be edited,
 duplicated, moved, resized or deleted, and your changes do not affect the
 template.
 
-## From LangWatch boards
+## From LangWatch dashboards
 
 The From LangWatch group in the sidebar holds Release check, "Can I trust my
 numbers?" and Where my agent breaks. Each is a template shown live over your
@@ -41937,29 +41924,29 @@ data and read-only: you cannot move, edit or add anything on it, and LangWatch
 stores no copy.
 
 To change one, open its **⋮** menu in the sidebar and pick **Duplicate to
-edit**. That makes your own board, named after the template plus "(copy)", with the template's
-widgets and opens it. The board's header has no such button.
+edit**. That makes your own dashboard, named after the template plus "(copy)", with the template's
+widgets and opens it. The dashboard's header has no such button.
 
 ## Period and grain
 
-Every board has a period, from Live (the last hour) up to one year, defaulting
+Every dashboard has a period, from Live (the last hour) up to one year, defaulting
 to 30 days, and a grain: auto, minute, hour, day or week. A grain is offered only
 when it fits the period, and a grain that does not fit is greyed out. Every widget
-on the board reads over that period and grain.
+on the dashboard reads over that period and grain.
 
 ## Keep the data fresh
 
 The header has one period control. Its menu has three columns, Range, Grain and
-Refresh, and ends with **Refresh now**, which reloads every widget on the board.
+Refresh, and ends with **Refresh now**, which reloads every widget on the dashboard.
 The Refresh column reloads every widget every minute, every 5 minutes, or never
 (Off).
 
 Pick **Live** for the last hour, rolling and refreshed every minute. The other
 refresh choices are greyed out until you pick another range.
 
-## Building your own board
+## Building your own dashboard
 
-On a board, you can rename it from the sidebar menu and add a description.
+On a dashboard, you can rename it from the sidebar menu and add a description.
 **Add a widget** opens the picker; **I'll build it myself** there opens the
 widget editor, where you write the widget's code and its LangWatchQL queries.
 Move a widget by its drag handle and resize it from its corner. Each widget's
@@ -41974,76 +41961,76 @@ menu offers:
 - **Duplicate**: adds a copy of the widget.
 - **Delete**: removes the widget.
 
-## Who can see a board
+## Who can see a dashboard
 
-Every board has a scope, shown next to its title:
+Every dashboard has a scope, shown next to its title:
 
-- **Only me**: only you see the board.
-- **Project**: everyone in the project sees it. A new board starts here.
+- **Only me**: only you see the dashboard.
+- **Project**: everyone in the project sees it. A new dashboard starts here.
 - **Organization**: everyone in your organisation sees it, in each of their
-  projects. In each project the board shows that project's own data, and each
+  projects. In each project the dashboard shows that project's own data, and each
   member sees what their role lets them see.
 
-Only the member who made a board can change its scope, from the control next
-to the title or from the board's **⋮** menu in the sidebar. A project admin
-cannot. Everyone else sees the scope as a badge. Who can edit or delete a board
+Only the member who made a dashboard can change its scope, from the control next
+to the title or from the dashboard's **⋮** menu in the sidebar. A project admin
+cannot. Everyone else sees the scope as a badge. Who can edit or delete a dashboard
 does not change: that still follows your role's analytics permissions.
 
-LangWatch asks you to confirm a change only when somebody loses the board: when
-you set a board to Only me that other members starred, and when you lower a
-board from Organization. Every other change happens at once, and the note that
+LangWatch asks you to confirm a change only when somebody loses the dashboard: when
+you set a dashboard to Only me that other members starred, and when you lower a
+dashboard from Organization. Every other change happens at once, and the note that
 follows has an **Undo**. Other members' stars are kept, and come back if you
 widen the scope again.
 
-The project where a board was made owns it. An Organization board can be edited
+The project where a dashboard was made owns it. An Organization dashboard can be edited
 only in that project. In every other project it is read-only: you cannot add,
-move, edit or delete a widget, and the header says which project owns the board.
-To change it, pick **Duplicate to edit** in the board's **⋮** menu in the
+move, edit or delete a widget, and the header says which project owns the dashboard.
+To change it, pick **Duplicate to edit** in the dashboard's **⋮** menu in the
 sidebar. That makes your own copy in the project you are in.
 
-An Organization board also has a **Project** control in its header. It names the
+An Organization dashboard also has a **Project** control in its header. It names the
 project whose data you see, and lists the projects of your organisation that you
-can open. Pick one to open the same board under that project.
+can open. Pick one to open the same dashboard under that project.
 
-If you open the address of a board that you may not see, the page says "This
-dashboard is not available". The board was deleted, or the member who made it
+If you open the address of a dashboard that you may not see, the page says "This
+dashboard is not available". The dashboard was deleted, or the member who made it
 set its scope to Only me.
 
-A project API key reads the project's boards except the ones set to Only me.
+A project API key reads the project's dashboards except the ones set to Only me.
 
-Alerts and scheduled reports do not read a board set to Only me either. An alert
-or a report on a chart of such a board sends no chart until you widen the
-board's scope.
+Alerts and scheduled reports do not read a dashboard set to Only me either. An alert
+or a report on a chart of such a dashboard sends no chart until you widen the
+dashboard's scope.
 
 ## Asking questions
 
-Every board has an ask bar under its header, reading "What do you want to
-know?". On a stored board, clicking it opens **Add a widget** with the cursor in
-its search. On a From LangWatch board, the bar opens Langy when Langy is
-available, with the board as context and no question sent yet.
+Every dashboard has an ask bar under its header, reading "What do you want to
+know?". On a stored dashboard, clicking it opens **Add a widget** with the cursor in
+its search. On a From LangWatch dashboard, the bar opens Langy when Langy is
+available, with the dashboard as context and no question sent yet.
 
 The picker lists suggested questions, grouped by the question tree, with a
 search and filters for the category and the agent type. Picking one adds that
-question's widget to the board, below the widgets already there. When Langy is
+question's widget to the dashboard, below the widgets already there. When Langy is
 enabled for your project, Langy then opens with the question's prompt ready in
-the composer, with the board as context, so you can read it and send it with one
+the composer, with the dashboard as context, so you can read it and send it with one
 click.
 
 Without Langy the picker still lists every question, and picking one adds its
 widget. The pinned **Ask Langy** footer, and the **Ask** button next to the
 search field, send your own question to Langy directly.
 
-On a board that already has widgets, the **Add a widget** box below the widgets
+On a dashboard that already has widgets, the **Add a widget** box below the widgets
 and the **Add a widget** button in the header both open the picker. Every widget
 has an **Ask Langy** button when Langy is available; it drafts a prompt with the
 widget's name, its queries and the period.
 
 ## How the data is read
 
-All board data is read with LangWatchQL, LangWatch's query layer over your
+All dashboard data is read with LangWatchQL, LangWatch's query layer over your
 traces, evaluations and cost data.
 
-## Build boards from your own AI agent
+## Build dashboards from your own AI agent
 
 Your coding assistant can build and edit LangWatch dashboards for you, through
 the [LangWatch MCP server](/integration/mcp).
@@ -42058,17 +42045,28 @@ the server and set your API key.
 
 Once connected, your agent has these dashboard tools:
 
-- `list_dashboard_boards`: list the project's dashboards, with the id each
+- `list_dashboards`: list the project's dashboards, with the id each
   widget tool takes.
+- `get_dashboard`: read one dashboard by its id.
+- `create_dashboard`: create an empty dashboard.
+- `rename_dashboard`: change a dashboard's name.
+- `delete_dashboard`: delete a dashboard and its widgets.
+- `list_dashboard_widgets`: list the widgets of one dashboard. Pass the
+  `dashboardId`.
 - `run_query`: run one read-only LangWatchQL (LWQL) statement and see the rows
   it returns. Use this to check a query before it goes into a widget.
 - `add_dashboard_widget`: create a custom widget and add it to a dashboard.
 - `update_dashboard_widget`: change a widget's name, code, queries or
   description. Pass the dashboard id, the widget id, and only the fields to
   change. Every field you leave out keeps its value.
+- `delete_dashboard_widget`: remove a widget from a dashboard.
 
-The `platform_*_dashboard` tools work on the dashboards in Analytics Reports,
-which hold charts, not widgets.
+The old Analytics Reports have their own tools: `platform_list_analytics_reports`,
+`platform_get_analytics_report`, `platform_create_analytics_report`,
+`platform_rename_analytics_report` and `platform_delete_analytics_report`. The
+tools that act on an existing report (`platform_get_analytics_report`,
+`platform_rename_analytics_report` and `platform_delete_analytics_report`) take
+a `reportId`. Analytics Reports hold charts, not widgets.
 
 ### The widget definition format
 
@@ -42150,13 +42148,13 @@ Treat an absent report as "unknown", not as "complete".
 ### Example prompt
 
 ```
-Add a widget to my Agent health board that shows p95 latency by model
+Add a widget to my Agent health dashboard that shows p95 latency by model
 for the last 7 days.
 ```
 
 Your agent will validate the LWQL with `run_query`, write the widget's TSX
 code against `LW.useChartQuery`, and call `add_dashboard_widget` to add it to
-the board.
+the dashboard.
 
 ### Edit a widget through the REST API
 
@@ -42175,6 +42173,76 @@ is the updated widget. Each widget also records where it came from in
 `definition.source`: a catalogue template, Langy, the code editor or the API.
 A widget you create through the API without a `source` is recorded as `api`.
 
+## Manage dashboards from code
+
+The SDKs, the CLI and the REST API manage the same dashboards and widgets as
+the app.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const client = new LangWatch();
+
+const dashboards = await client.dashboards.list();
+const dashboard = await client.dashboards.create({ name: "Agent health" });
+
+await client.dashboards.update({
+  dashboardId: dashboard.id,
+  name: "Agent health (prod)",
+});
+
+const widgets = await client.dashboards.listWidgets(dashboard.id);
+```
+
+```python Python
+import langwatch
+
+dashboards = langwatch.dashboards.list()
+dashboard = langwatch.dashboards.create(name="Agent health")
+
+langwatch.dashboards.update(dashboard_id=dashboard.id, name="Agent health (prod)")
+
+widgets = langwatch.dashboards.list_widgets(dashboard_id=dashboard.id)
+```
+
+```bash CLI
+langwatch dashboard list
+langwatch dashboard create "Agent health"
+langwatch dashboard update <dashboardId> --name "Agent health (prod)"
+langwatch dashboard widget list <dashboardId>
+langwatch dashboard delete <dashboardId>
+```
+
+```bash REST
+curl "https://app.langwatch.ai/api/v1/dashboards" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY"
+```
+
+</CodeGroup>
+
+A widget has its verbs under `widget`: `langwatch dashboard widget
+list|get|add|update|delete <dashboardId> [<widgetId>]`, and
+`createWidget`, `getWidget`, `updateWidget` and `deleteWidget` in the
+TypeScript SDK (`create_widget`, `get_widget`, `update_widget` and
+`delete_widget` in Python).
+
+### Analytics Reports
+
+The old Analytics Reports are a separate API: `client.analyticsReports` and
+`langwatch.analytics_reports` in the SDKs, `langwatch analytics-report
+list|get|create|update|delete` in the CLI, and `/api/v1/analytics/reports` over
+REST.
+
+### Names that changed
+
+`langwatch dashboard` now manages the new Dashboards (widgets under
+`langwatch dashboard widget`); it used to manage the old Analytics Reports,
+which are now `langwatch analytics-report`. The `dashboards` and
+`dashboard-widget` CLI groups, `client.boards`, `langwatch.boards`,
+`BoardsFacade` and `DashboardWidgetsApiService` are removed, with no alias:
+use `client.dashboards` and `langwatch.dashboards`.
 ---
 
 # FILE: ./features/embedded-analytics.mdx
@@ -56373,7 +56441,7 @@ This skill answers one question with the user's own data: at what context size d
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on the read commands when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -56510,7 +56578,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+Personal coding-agent usage needs `langwatch login --device` on a laptop; a project key in `LANGWATCH_API_KEY` stands in for that login only for its own project. A team or application project needs `--project <slug>` on the read commands, which a project key refuses for any project but its own, so reaching one still needs `langwatch login --device`.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -56660,7 +56728,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -56702,7 +56770,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if whoami reports "Not logged in" or that field is missing, ask the user which project id to use.
 
 If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
@@ -60562,13 +60630,15 @@ langwatch chart run <chart-id> \
 
 `--start`/`--end` fill the reserved period parameters and `--granularity` the datapoint step, which only accepts the offered steps: `1` (second), `60` (minute), `3600` (hour). A chart whose SQL declares the reserved period parameters **requires** `--start` and `--end` on every run — there is no default window, and running without them is refused. Only a chart that declares none of them runs without the flags.
 
-## Step 4: Place it on a dashboard
+## Step 4: Place it on an Analytics Report
 
-**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
+A saved chart goes on an Analytics Report, never on a Dashboards dashboard (those take widgets: the `dashboard-widgets` skill).
+
+**Which report:** place on the Analytics Report in the user's context (the one they are on, or one they named). If none is in context, ask which one with the `question` tool, one option per report with its id in `ref`. Never pick one from `langwatch analytics-report list` on your own.
 
 ```bash
-langwatch dashboard list -f json          # the options for that question
-langwatch chart place <chart-id> --dashboard-id <dashboard-id> -f json
+langwatch analytics-report list -f json  # the options for that question
+langwatch chart place <chart-id> --dashboard-id <report-id> -f json
 ```
 
 With no `--grid-row`, the platform allocates the next free row, so it never lands on top of an existing chart. `langwatch chart unplace <chart-id>` takes it off again without deleting it.
@@ -60647,7 +60717,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Author a Dashboard Widget
 
-Turn a question ("show cost per model as a bar chart") into a saved dashboard widget: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → save it → prove it runs**.
+Turn a question ("show cost per model as a bar chart") into a widget on a dashboard: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → add it to a dashboard → prove it runs**.
 
 Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
 
@@ -60671,14 +60741,14 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
 
-Every `dashboard-widget` command runs against whatever project `LANGWATCH_PROJECT_ID` names in the environment. That variable is normally already set for you — do not invent a `langwatch project ...` command to look it up (there isn't one; `langwatch projects list` is the read command, plural). Only pass `--project <slug-or-id>` on a command yourself when you need to target a *different* project than the one already in scope. If a command fails with "No project is in scope", set `LANGWATCH_PROJECT_ID` or pass `--project` — do not retry the same call unchanged.
+The `langwatch dashboard` commands use the project of your API key. Only `langwatch dashboard widget schema` also reads `LANGWATCH_PROJECT_ID` and accepts `--project <slug-or-id>`; pass `--project` there only when you need a *different* project than the one in scope. Do not invent a `langwatch project ...` command to look the project up (there isn't one; `langwatch projects list` is the read command, plural).
 
 ## Step 1: Discover the schema before writing any SQL
 
 Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
 
 ```bash
-langwatch dashboard-widget schema -f json
+langwatch dashboard widget schema -f json
 ```
 
 Read the datasets, their grain, their time column, and which columns are `available` to you.
@@ -60749,10 +60819,12 @@ More worked examples: `platform/app/scripts/north-star-widgets/`.
 
 `Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
 
-## Step 4: Save the widget, then prove it renders
+## Step 4: Add the widget to a dashboard, then prove it renders
+
+A widget always lives on a dashboard; pick one first (see **Dashboards** below), then:
 
 ```bash
-langwatch dashboard-widget create \
+langwatch dashboard widget add <dashboardId> \
   --name "Cost by model" \
   --code-file widget.tsx \
   --queries-file queries.json \
@@ -60761,22 +60833,32 @@ langwatch dashboard-widget create \
 
 Creating (and updating) validates the queries file's shape and the widget's JS/TSX syntax, but it does not execute the queries or mount the component — a wrong column name or a runtime error in the widget only surfaces when it actually runs. Open the widget's `platformUrl` (printed on success) and confirm it renders with real data before calling the work done.
 
-## Managing saved widgets
+## Dashboards and their widgets
+
+A dashboard is the page widgets live on. **Use an existing dashboard** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new dashboard, or none fits and they agree.
 
 ```bash
-langwatch dashboard-widget list -f json
-langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
-langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
-langwatch dashboard-widget delete <id>
-langwatch dashboard-widget boards -f json                              # the dashboards a widget can go on
-langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
+langwatch dashboard list -f json                          # ids, names, widget counts
+langwatch dashboard get <dashboardId> -f json
+langwatch dashboard create "<name>" -f json               # empty dashboard; prints platformUrl
+langwatch dashboard update <dashboardId> --name "<name>"  # rename; or --description / --clear-description
+langwatch dashboard delete <dashboardId>                  # removes the dashboard and its widgets
+langwatch dashboard widget list <dashboardId> -f json
+langwatch dashboard widget get <dashboardId> <widgetId> -f json   # code, queries, platformUrl
+langwatch dashboard widget add <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
+langwatch dashboard widget update <dashboardId> <widgetId> --code-file widget.tsx --queries-file queries.json
+langwatch dashboard widget delete <dashboardId> <widgetId>
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard-widget boards` for ids. `langwatch dashboard list` lists the Analytics Reports dashboards, which hold no widgets, so `pin` does not find them.
+`add` places the widget at the dashboard's next free row — edit it from the widget's menu on that dashboard. `langwatch analytics-report list` lists the old Analytics Reports, which hold no widgets.
 
-**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board from `langwatch dashboard-widget boards` with its id in `ref`. Never choose a board for the user.
+**Which dashboard:** place on the dashboard in the user's context (the one they are on, or one they named). If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. Never choose a dashboard for the user.
 
-`update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
+- **Never pick a dashboard for the user.** When more than one dashboard fits, ask with the `question` tool (a choices card): one option per dashboard from `langwatch dashboard list`, its id in `ref`.
+- **Confirm before any delete** of a dashboard or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a dashboard takes its widgets with it.
+- The project needs Dashboards switched on. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
+
+`widget update` accepts `--name` or `--description` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
 ## Worked example: bar chart of daily trace counts
 
@@ -60829,10 +60911,10 @@ export default function Widget() {
 ]
 ```
 
-Create it:
+Add it:
 
 ```bash
-langwatch dashboard-widget create \
+langwatch dashboard widget add <dashboardId> \
   --name "Daily traces" \
   --code-file widget.tsx \
   --queries-file queries.json \
@@ -60842,7 +60924,7 @@ langwatch dashboard-widget create \
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
-- `custom_chart_playground_not_enabled` — dashboard widgets are not enabled for this project (they need Dashboards and LangWatchQL); do not retry any `dashboard-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
+- `custom_chart_playground_not_enabled` — dashboard widgets are not enabled for this project (they need Dashboards and LangWatchQL); do not retry any `langwatch dashboard widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
 - A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
 - `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
 - `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
@@ -66431,7 +66513,7 @@ Docker Compose starts the following services:
 | `langevals`     | `langwatch/langevals:latest`            | 5562      | Evaluators, guardrails      |
 | `postgres`      | `postgres:16`                           | 5432      | Control plane database      |
 | `redis`         | `redis:alpine`                          | -         | Job queue, caching          |
-| `clickhouse`    | `langwatch/clickhouse-serverless:0.2.0` | 8123      | Trace and analytics storage |
+| `clickhouse`    | `langwatch/clickhouse-serverless:0.4.0` | 8123      | Trace and analytics storage |
 
 Services with no host port bind no port on the host's interfaces, so they do not answer on `localhost` and are not reachable from another machine. `langwatch_nlp` listens on 5561 inside the Docker network, which is what `LANGWATCH_NLP_SERVICE` points the app and the workers at. A process on the Docker host itself can still reach a container directly on its own network address, so treat this as removing an exposed entry point, not as a network boundary.
 
@@ -70972,7 +71054,7 @@ Add the ClickHouse service to your `compose.yml`:
 ```yaml
 services:
   clickhouse:
-    image: langwatch/clickhouse-serverless:0.2.0
+    image: langwatch/clickhouse-serverless:0.4.0
     environment:
       CLICKHOUSE_PASSWORD: langwatch
     ports:
@@ -72676,73 +72758,6 @@ description: "Read what a coding agent session did and what it cost. Walk one se
 Both authenticate with a project API key and read under the project's [data privacy policy](/platform/data-privacy): an API key resolves as a public viewer, so it reads what the policy captures and never what it restricts or drops.
 
 The same data renders in the product on the [sessions](/coding-agents/sessions) and [pull requests](/coding-agents/pull-requests) views, and over the command line as `langwatch session events <sessionId>` and `langwatch trace transcript <traceId>`.
-
----
-
-# FILE: ./api-reference/dashboards/create-dashboards.mdx
-
----
-title: "Create a new dashboard"
-openapi: "POST /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/delete-dashboards.mdx
-
----
-title: "Delete a dashboard and its graphs"
-openapi: "DELETE /api/v1/dashboards/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/get-dashboards.mdx
-
----
-title: "Get a dashboard by its id, including its graphs"
-openapi: "GET /api/v1/dashboards/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/list-dashboards.mdx
-
----
-title: "List Dashboards"
-openapi: "GET /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/overview.mdx
-
----
-title: "Overview"
-description: "Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs."
----
-
-## Intro
-
-Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.
-
----
-
-# FILE: ./api-reference/dashboards/put-update-reorder-reorder.mdx
-
----
-title: "Update Reorder"
-openapi: "PUT /api/v1/dashboards/reorder"
----
-
----
-
-# FILE: ./api-reference/dashboards/update-dashboards.mdx
-
----
-title: "Rename a dashboard"
-openapi: "PATCH /api/v1/dashboards/{id}"
----
 
 ---
 
@@ -75168,11 +75183,20 @@ openapi: "POST /api/v1/projects"
 
 ---
 
-# FILE: ./api-reference/projects/get-a-dashboards-board.mdx
+# FILE: ./api-reference/projects/get-a-dashboard-boards.mdx
 
 ---
-title: "Get a Dashboards board"
-openapi: "GET /api/v1/projects/{projectId}/analytics/boards/{boardId}"
+title: "Get a dashboard (deprecated path)"
+openapi: "GET /api/v1/projects/{projectId}/analytics/boards/{dashboardId}"
+---
+
+---
+
+# FILE: ./api-reference/projects/get-a-dashboard.mdx
+
+---
+title: "Get a dashboard"
+openapi: "GET /api/v1/projects/{projectId}/analytics/dashboards/{dashboardId}"
 ---
 
 ---
@@ -75198,8 +75222,17 @@ openapi: "GET /api/v1/projects/{id}"
 # FILE: ./api-reference/projects/list-dashboards-boards.mdx
 
 ---
-title: "List Dashboards boards"
+title: "List dashboards (deprecated path)"
 openapi: "GET /api/v1/projects/{projectId}/analytics/boards"
+---
+
+---
+
+# FILE: ./api-reference/projects/list-dashboards.mdx
+
+---
+title: "List dashboards"
+openapi: "GET /api/v1/projects/{projectId}/analytics/dashboards"
 ---
 
 ---
@@ -75247,6 +75280,17 @@ Project API keys (`X-Auth-Token`) cannot be used here, because they lack organiz
 | `DELETE` | `/api/v1/projects/{id}`                    | Archive a project                                            |
 | `GET`    | `/api/v1/projects/{id}/api-key`            | Get the project's API key                                    |
 | `POST`   | `/api/v1/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
+
+## Dashboards
+
+These routes read the dashboards of the Dashboards area in one project. Unlike the routes above, they take the project API key in the `X-Auth-Token` header, not an organization key.
+
+| Method | Path                                                              | Description                                                |
+| ------ | ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| `GET`  | `/api/v1/projects/{projectId}/analytics/dashboards`               | List the project's dashboards, each with its `widgetCount` |
+| `GET`  | `/api/v1/projects/{projectId}/analytics/dashboards/{dashboardId}` | Get one dashboard                                          |
+
+A dashboard in another project answers `404`. The older `/analytics/boards` paths answer the same, but are deprecated: each answer carries `Deprecation: true` and a `Link` to the `/analytics/dashboards` path.
 
 ## Moving a Project to Another Team
 
@@ -75972,6 +76016,73 @@ A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LI
 ---
 title: "Run a LangWatchQL query"
 openapi: "POST /api/v1/query"
+---
+
+---
+
+# FILE: ./api-reference/reports/create-reports.mdx
+
+---
+title: "Create a new dashboard"
+openapi: "POST /api/v1/analytics/reports"
+---
+
+---
+
+# FILE: ./api-reference/reports/delete-reports.mdx
+
+---
+title: "Delete a dashboard and its graphs"
+openapi: "DELETE /api/v1/analytics/reports/{reportId}"
+---
+
+---
+
+# FILE: ./api-reference/reports/get-reports.mdx
+
+---
+title: "Get a dashboard by its id, including its graphs"
+openapi: "GET /api/v1/analytics/reports/{reportId}"
+---
+
+---
+
+# FILE: ./api-reference/reports/list-reports.mdx
+
+---
+title: "List Reports"
+openapi: "GET /api/v1/analytics/reports"
+---
+
+---
+
+# FILE: ./api-reference/reports/overview.mdx
+
+---
+title: "Overview"
+description: "Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs."
+---
+
+## Intro
+
+Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs.
+
+---
+
+# FILE: ./api-reference/reports/update-reorder.mdx
+
+---
+title: "Update Reorder"
+openapi: "PUT /api/v1/analytics/reports/reorder"
+---
+
+---
+
+# FILE: ./api-reference/reports/update-reports.mdx
+
+---
+title: "Rename a dashboard"
+openapi: "PATCH /api/v1/analytics/reports/{reportId}"
 ---
 
 ---
