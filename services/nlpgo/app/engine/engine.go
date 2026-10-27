@@ -1084,12 +1084,24 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 		return nil, &NodeError{Type: "evaluator_missing_slug", Message: "evaluator parameter is required (e.g. langevals/exact_match)"}
 	}
 
+	// Same split as the slug, and the same answer: the Studio writes the
+	// node's name onto the typed `data.name` field and nothing emits a
+	// `name` parameter, so reading only parameters[] sent no name at all
+	// and the evaluation was attributed under the saved evaluator's name.
+	name := ""
+	if node.Data.Name != nil {
+		name = *node.Data.Name
+	}
+	if name == "" {
+		name = paramString(node.Data.Parameters, "name")
+	}
+
 	res, err := e.evaluator.Execute(ctx, evaluatorblock.Request{
 		BaseURL:            e.langwatchBaseURL,
 		APIKey:             req.Workflow.APIKey,
 		EvaluatorSlug:      slug,
-		Name:               paramString(node.Data.Parameters, "name"),
-		Settings:           paramAnyMap(node.Data.Parameters, "settings"),
+		Name:               name,
+		Settings:           evaluatorSettings(node.Data.Parameters),
 		Data:               inputs,
 		TraceID:            req.TraceID,
 		Origin:             req.Origin,
@@ -1625,6 +1637,52 @@ func paramAnyMap(params []dsl.Field, name string) map[string]any {
 		}
 	}
 	return nil
+}
+
+// evaluatorReservedParams are the identifiers runEvaluator reads off an
+// evaluator node's parameters[] in its own right. Nothing else on that
+// list is ever read, so everything else is one flattened setting.
+var evaluatorReservedParams = map[string]struct{}{
+	"evaluator": {},
+	"name":      {},
+	"settings":  {},
+}
+
+// evaluatorSettings assembles the settings dict for an evaluator node.
+//
+// Two wire shapes reach here and both must work. The Studio sender
+// flattens a node's draft settings into one parameter per key —
+// modules/workflow/contract/src/merge-local-configs.ts
+// mergeEvaluatorLocalConfig replaces parameters[] wholesale with
+// `{identifier: "model", value: "openai/gpt-4o"}` entries — so every
+// non-reserved parameter is a setting. A workflow persisted before the
+// Go port instead carries them all under a single `settings` dict
+// parameter. That dict is the base and the flattened entries overlay
+// it, so an older workflow keeps evaluating and an inline edit on the
+// canvas still wins.
+//
+// Reading only `settings` was the whole of the inline-evaluator bug:
+// nothing has ever emitted that parameter, so every setting the canvas
+// showed was dropped and the evaluator ran on its saved defaults.
+func evaluatorSettings(params []dsl.Field) map[string]any {
+	settings := map[string]any{}
+	for identifier, value := range paramAnyMap(params, "settings") {
+		settings[identifier] = value
+	}
+	for _, p := range params {
+		if _, reserved := evaluatorReservedParams[p.Identifier]; reserved {
+			continue
+		}
+		var value any
+		if err := jsonUnmarshalRaw(p.Value, &value); err != nil {
+			continue
+		}
+		settings[p.Identifier] = value
+	}
+	if len(settings) == 0 {
+		return nil
+	}
+	return settings
 }
 
 // paramAny reads a parameter as an arbitrary JSON-decoded value.
