@@ -107,6 +107,7 @@ export class MemoryMonitorRepository implements MonitorRepository {
           evaluatorId: row.evaluatorId,
           checkType: row.checkType,
           parameters: row.parameters,
+          evaluatorLabel: row.evaluatorLabel ?? null,
         }),
       );
   }

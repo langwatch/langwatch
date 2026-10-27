@@ -144,4 +144,25 @@ describe("a monitor pinned to an evaluator label", () => {
 
     expect(thresholdOf(await app.getById({ id: "monitor-1", projectId }))).toBe(3);
   });
+
+  /** @scenario "A guardrail pinned to a label runs that evaluator version" */
+  it("lists a labelled guardrail with the labelled settings, and an unlabelled one as stored", async () => {
+    const guardrail = { executionMode: "AS_GUARDRAIL" as const, parameters: { threshold: 5 } };
+    const { app, evaluators } = harness([
+      monitorRow({ ...guardrail, evaluatorLabel: "production" }),
+      monitorRow({ ...guardrail, id: "monitor-2", slug: "toxicity-monitor-2" }),
+    ]);
+    evaluators.labelled["evaluator-1"] = {
+      production: { evaluatorType: "langevals/toxicity", settings: { threshold: 1 } },
+    };
+
+    const listed = await app.listEnabledGuardrailMonitors({
+      projectId,
+      evaluatorIds: ["evaluator-1"],
+    });
+    expect(listed).toEqual([
+      expect.objectContaining({ id: "monitor-1", parameters: { threshold: 1 } }),
+      expect.objectContaining({ id: "monitor-2", parameters: { threshold: 5 } }),
+    ]);
+  });
 });

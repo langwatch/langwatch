@@ -47,6 +47,7 @@ const guardrailSelect = {
   evaluatorId: true,
   checkType: true,
   parameters: true,
+  evaluatorLabel: true,
 } as const;
 
 /** Switching a monitor on clears a pause it recorded itself. */
