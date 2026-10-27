@@ -152,7 +152,8 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
     BLOCK_LOCAL_HTTP_CALLS says, but unlike cloud internal domains they name
     private infrastructure that hands out no ambient credentials, so an
     operator may name one exact host in the allowlist. Naming a cloud internal
-    domain still fails. TS and Go behave the same.
+    domain still fails. packages/egress and the Go scenario runner behave the
+    same.
 
     @unit
     Scenario: An allowlisted on-premise .local host is reachable
