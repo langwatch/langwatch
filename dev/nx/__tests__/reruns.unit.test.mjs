@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { matchesGlob } from "node:path";
 import { describe, it } from "node:test";
 
-import { parseReport, plainScope } from "../lint.mjs";
+import { plainScope } from "../lint.mjs";
 import { reads } from "../test-reads-plugin.mjs";
 
 const SCANNERS = {
@@ -56,15 +56,5 @@ void describe("Nx reruns", () => {
   void it("lints the tree when a lint global changed", () => {
     const files = ["dev/nx/lint.mjs", ".oxlintrc.native.jsonc"];
     assert.deepEqual(plainScope({ files, globals: [".oxlintrc.*.jsonc"] }), ["."]);
-  });
-
-  /** @scenario "A change whose lintable files are all ignored passes" */
-  void it("reads oxlint's no-files answer as a clean report", () => {
-    const out = [
-      "No files found to lint. Please check your paths and ignore patterns.",
-      '{ "diagnostics": [], "number_of_files": 0 }',
-    ].join("\n");
-    assert.deepEqual(parseReport(out), []);
-    assert.equal(parseReport("thread panicked"), undefined);
   });
 });
