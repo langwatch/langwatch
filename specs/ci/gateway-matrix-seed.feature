@@ -87,6 +87,19 @@ Feature: The live gateway matrix seeds its own control plane
     Then it sets the step output bootstrapped=true
     And when the bootstrap fails it exports nothing and sets no output
 
+  @unit
+  Scenario: A seed create carries no Idempotency-Key
+    Given the seed never retries a request
+    When it creates the organization and the project
+    Then neither request carries an Idempotency-Key
+
+  @unit
+  Scenario: The Vertex cache cell gets a token minted from the service-account key
+    Given the job holds the Vertex service-account key
+    When the seed runs
+    Then it exchanges a signed assertion at the key's token endpoint and exports VERTEX_ACCESS_TOKEN, masked
+    And a refused exchange exports no token and warns, so the cell skips
+
   @unimplemented
   Scenario: A run on main drives every cell with credentials against the seeded stack
     Given the matrix secrets hold provider credentials

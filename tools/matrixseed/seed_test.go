@@ -52,8 +52,18 @@ func TestRunProvisionsOneOrganizationAndProject(t *testing.T) {
 	if got := exported(result)["LW_PROJECT_API_KEY"]; got != serviceKey {
 		t.Fatalf("LW_PROJECT_API_KEY = %q, want the project's service key", got)
 	}
-	if orgs[0].IdempotencyKey != "" || projects[0].IdempotencyKey != "" {
-		t.Fatal("a create must not carry an Idempotency-Key: the seed never retries")
+}
+
+/** @scenario "A seed create carries no Idempotency-Key" */
+func TestSeedCreatesCarryNoIdempotencyKey(t *testing.T) {
+	stub, server := newStub(t, nil)
+	run(t, server.URL, nil)
+	for _, path := range []string{"/api/v1/organizations", "/api/v1/projects"} {
+		for _, c := range stub.calls(http.MethodPost, path) {
+			if c.IdempotencyKey != "" {
+				t.Fatalf("POST %s carried an Idempotency-Key: the seed never retries, so it dedupes nothing", path)
+			}
+		}
 	}
 }
 

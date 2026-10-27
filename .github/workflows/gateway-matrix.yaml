@@ -328,42 +328,11 @@ jobs:
           tail -n 200 /tmp/langwatch-worker.log
           exit 1
 
-      # The Vertex cache cell calls Vertex directly and needs a bearer token.
-      # The secret cannot gate a step, so a step output records it is set. An
-      # empty secret skips these steps and the cell skips.
-      - name: Check for Vertex credentials
-        id: vertex
-        env:
-          VERTEX_SERVICE_ACCOUNT_JSON: ${{ secrets.MATRIX_VERTEX_SERVICE_ACCOUNT_JSON }}
-        run: |
-          if [ -n "$VERTEX_SERVICE_ACCOUNT_JSON" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      # With the runner's own gcloud: google-github-actions is not on the
-      # repo's allowed-actions list. A refusal leaves the token unset, and the
-      # Vertex cache cell skips.
-      - name: Mint the Vertex access token
-        if: ${{ steps.vertex.outputs.present == 'true' }}
-        continue-on-error: true
-        env:
-          VERTEX_SERVICE_ACCOUNT_JSON: ${{ secrets.MATRIX_VERTEX_SERVICE_ACCOUNT_JSON }}
-        run: |
-          set -euo pipefail
-          key="$(mktemp "${RUNNER_TEMP}/vertex-sa.XXXXXX")"
-          trap 'rm -f "$key"' EXIT
-          printf '%s' "$VERTEX_SERVICE_ACCOUNT_JSON" > "$key"
-          export CLOUDSDK_CONFIG="${RUNNER_TEMP}/gcloud"
-          gcloud auth activate-service-account --key-file="$key" --quiet
-          token="$(gcloud auth print-access-token)"
-          echo "::add-mask::$token"
-          echo "VERTEX_ACCESS_TOKEN=$token" >> "$GITHUB_ENV"
-
-      # Mints LW_PROJECT_API_KEY and one TEST_VK_<PROVIDER> per provider with
-      # credentials into $GITHUB_ENV. Bedrock's model provider carries only
-      # the region, so the gateway signs with the session the AWS step above
-      # exported. A control-plane refusal fails this step after the other
-      # providers are seeded, and the matrix still runs on those.
+      # Mints LW_PROJECT_API_KEY, a TEST_VK_<PROVIDER> per provider with
+      # credentials and VERTEX_ACCESS_TOKEN (from the Vertex key) into
+      # $GITHUB_ENV. Bedrock carries only the region: the gateway signs with
+      # the AWS session above. A refusal fails this step after the others are
+      # seeded, and the matrix still runs on those.
       - name: Seed the matrix project and virtual keys
         id: seed
         env:

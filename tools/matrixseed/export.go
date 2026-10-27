@@ -39,4 +39,7 @@ func Report(w io.Writer, r Result) {
 	for _, f := range r.Failures {
 		_, _ = fmt.Fprintf(w, "::error::the control plane refused to seed %s: %v\n", f.Provider.Name, f.Err)
 	}
+	for _, warning := range r.Warnings {
+		_, _ = fmt.Fprintf(w, "::warning::%s\n", warning)
+	}
 }

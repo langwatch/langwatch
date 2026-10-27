@@ -29,9 +29,9 @@ type route struct {
 	method, path string
 	body         any
 	want         int
-	// carriesKeys marks a call whose request held provider credentials: its
-	// refusal never prints the response body.
-	carriesKeys bool
+	// hasSensitiveRequestBody marks a call whose request held provider
+	// credentials: its refusal never prints the response body.
+	hasSensitiveRequestBody bool
 }
 
 // label names the call in errors.
@@ -102,7 +102,7 @@ func (c *client) putModelProvider(ctx context.Context, provider string, keys map
 	}
 	call := "PUT /api/v1/model-providers/" + provider
 	if err := c.call(ctx, route{method: http.MethodPut, path: "/api/v1/model-providers/" + provider,
-		body: map[string]any{"enabled": true, "customKeys": keys}, want: http.StatusOK, carriesKeys: true}, &out); err != nil {
+		body: map[string]any{"enabled": true, "customKeys": keys}, want: http.StatusOK, hasSensitiveRequestBody: true}, &out); err != nil {
 		return "", err
 	}
 	for _, row := range out {
@@ -155,8 +155,8 @@ func (c *client) call(ctx context.Context, r route, out any) error {
 		return fmt.Errorf("%s: reading the answer: %w", name, err)
 	}
 	if resp.StatusCode != r.want {
-		refused := &RefusedError{Call: name, Status: resp.StatusCode, Withheld: r.carriesKeys}
-		if !r.carriesKeys {
+		refused := &RefusedError{Call: name, Status: resp.StatusCode, Withheld: r.hasSensitiveRequestBody}
+		if !r.hasSensitiveRequestBody {
 			refused.Body = snippet(raw, append([]string{c.token}, stringValues(r.body)...))
 		}
 		return refused

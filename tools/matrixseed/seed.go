@@ -34,6 +34,8 @@ type Result struct {
 	Exports  []Export
 	Skipped  []Skipped
 	Failures []Failure
+	// Warnings are gaps that only skip cells, such as no Vertex access token.
+	Warnings []string
 }
 
 // Err is non-nil when a provider with credentials could not be seeded: that is
@@ -74,6 +76,14 @@ func Run(ctx context.Context, opts Options) (Result, error) {
 			continue
 		}
 		result.Exports = append(result.Exports, Export{Name: p.Provider.Export, Value: secret})
+	}
+	if keyJSON := opts.Env("VERTEX_SERVICE_ACCOUNT_JSON"); keyJSON != "" {
+		token, err := mintVertexToken(ctx, c.http, keyJSON)
+		if err != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("no VERTEX_ACCESS_TOKEN, so the Vertex cache cell skips: %v", err))
+		} else {
+			result.Exports = append(result.Exports, Export{Name: "VERTEX_ACCESS_TOKEN", Value: token})
+		}
 	}
 	return result, nil
 }
