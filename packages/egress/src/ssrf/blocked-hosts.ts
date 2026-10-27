@@ -4,6 +4,13 @@
  */
 
 /**
+ * The BLOCKED_CLOUD_DOMAINS suffixes the allowlist may lift for one exact host: private
+ * infrastructure, no ambient credentials. Every other suffix stays refused before the allowlist
+ * is read. Extend only with suffixes meaningless outside a private network.
+ */
+export const ON_PREMISE_SUFFIXES = [".local", ".localhost"] as const;
+
+/**
  * Cloud provider internal domain patterns to block. Matched as suffixes, so `.amazonaws.com`
  * blocks `s3.amazonaws.com` and `ec2.amazonaws.com` alike.
  */
@@ -16,18 +23,9 @@ export const BLOCKED_CLOUD_DOMAINS = [
   // Generic internal domains (catch-all for misconfigured services)
   ".internal",
 
-  // On-premise suffixes. Blocked by default, but an operator may name one exact host under
-  // them in ALLOWED_PROXY_HOSTS; see ON_PREMISE_SUFFIXES.
-  ".local",
-  ".localhost",
+  // Blocked by default; ALLOWED_PROXY_HOSTS may name one exact host under them.
+  ...ON_PREMISE_SUFFIXES,
 ] as const;
-
-/**
- * The BLOCKED_CLOUD_DOMAINS suffixes the allowlist may lift for one exact host: private
- * infrastructure, no ambient credentials. Every other suffix stays refused before the allowlist
- * is read. Extend only with suffixes meaningless outside a private network.
- */
-export const ON_PREMISE_SUFFIXES = [".local", ".localhost"] as const;
 
 /**
  * Cloud metadata endpoint hostnames and IPs to block. These endpoints hand out instance

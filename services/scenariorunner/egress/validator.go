@@ -364,7 +364,10 @@ func isBlockedCloudDomain(hostname string) bool {
 // still read as metadata.google.internal.
 func isOnPremiseDomain(hostname string) bool {
 	labels := strings.Split(hostname, ".")
-	if _, ok := onPremiseLabels[labels[len(labels)-1]]; len(labels) < 2 || !ok {
+	if len(labels) < 2 {
+		return false
+	}
+	if _, ok := onPremiseLabels[labels[len(labels)-1]]; !ok {
 		return false
 	}
 	for len(labels) > 1 {

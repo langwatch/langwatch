@@ -520,7 +520,8 @@ func TestSafeDialer_DialsAnAllowlistedPrivateNameAtTheCheckedAddress(t *testing.
 	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
 		AllowedHosts: []string{"agent.corp.local"},
 		Resolver: func(string) ([]net.IP, error) {
-			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+			// Nothing listens on the IPv6 loopback, so the dial must fall back.
+			return []net.IP{net.ParseIP("::1"), net.ParseIP("127.0.0.1")}, nil
 		},
 	})
 	conn, err := dial(context.Background(), "tcp", net.JoinHostPort("agent.corp.local", port))

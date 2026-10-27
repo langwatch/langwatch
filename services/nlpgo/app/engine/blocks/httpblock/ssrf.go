@@ -165,7 +165,16 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 			if len(ips) == 0 || anyMetadata(ips, opts, host) {
 				return nil, ErrSSRFBlocked
 			}
-			return base.DialContext(ctx, network, net.JoinHostPort(ips[0].String(), port))
+			// Every address was checked, so fall back through them as a dial by name would.
+			var lastErr error
+			for _, ip := range ips {
+				conn, err := base.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+				if err == nil {
+					return conn, nil
+				}
+				lastErr = err
+			}
+			return nil, lastErr
 		}
 		var ips []net.IP
 		if ip := net.ParseIP(host); ip != nil {
