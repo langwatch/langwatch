@@ -3,6 +3,7 @@ import type {
   EventStore,
   EventStoreEventReadInput,
   EventStoreReadContext,
+  PageCursor,
 } from "../stores/eventStore.types.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import type { EventUpcaster } from "./eventUpcast.ts";
@@ -78,12 +79,56 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
   get getEventsUpToPaged(): EventStore<EventType>["getEventsUpToPaged"] {
     const paged = this.store.getEventsUpToPaged?.bind(this.store);
     if (!paged) return undefined;
-    return async (request) => {
-      const merged = await this.#merged(request.aggregateType, (aggregateType) =>
-        paged({ ...request, aggregateType }),
+    return (request) =>
+      this.#page(request, ({ aggregateType, after }) =>
+        paged({ ...request, aggregateType, after }),
       );
-      return merged.slice(0, request.limit);
-    };
+  }
+
+  get getEventsPaged(): EventStore<EventType>["getEventsPaged"] {
+    const paged = this.store.getEventsPaged?.bind(this.store);
+    if (!paged) return undefined;
+    return (request) =>
+      this.#page(request, ({ aggregateType, after }) =>
+        paged({ ...request, aggregateType, after }),
+      );
+  }
+
+  /**
+   * Short only when exhausted. One type: its raw page, the caller dedupes. Several: rows up to the
+   * earliest last row of a full type page (another type may hold unread rows past it), one id
+   * collapsed to its rewritten row, until the page is full or every type is exhausted.
+   */
+  async #page(
+    request: { aggregateType: string; after: PageCursor | undefined; limit: number },
+    read: (page: {
+      aggregateType: string;
+      after: PageCursor | undefined;
+    }) => Promise<readonly EventType[]>,
+  ): Promise<readonly EventType[]> {
+    const types = this.#aggregateTypes(request.aggregateType);
+    if (types.length === 1) {
+      const page = await read({ aggregateType: types[0]!, after: request.after });
+      return page.map((stored) => this.#current(stored));
+    }
+    const byId = new Map<string, EventType>();
+    let after = request.after;
+    for (;;) {
+      const reads = await Promise.all(types.map((aggregateType) => read({ aggregateType, after })));
+      const frontier = reads
+        .filter((page) => page.length >= request.limit)
+        .map((page) => page.at(-1)!)
+        .toSorted(logOrder)[0];
+      for (const stored of reads.flat()) {
+        if (!frontier || logOrder(stored, frontier) <= 0) this.#keepPreferred(byId, stored);
+      }
+      if (!frontier || byId.size >= request.limit) break;
+      after = { timestamp: frontier.createdAt, eventId: frontier.id };
+    }
+    return [...byId.values()]
+      .map((stored) => this.#current(stored))
+      .toSorted(logOrder)
+      .slice(0, request.limit);
   }
 
   async countEventsBefore(
@@ -103,6 +148,12 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
     return aggregateType === own ? [own, ...this.upcaster.formerAggregateTypes] : [aggregateType];
   }
 
+  /** A row rewritten to the current type wins over its stored original. */
+  #keepPreferred(byId: Map<string, EventType>, stored: EventType): void {
+    const known = byId.get(stored.id);
+    if (!known || this.upcaster.declaresFrom(known.type)) byId.set(stored.id, stored);
+  }
+
   async #merged(
     aggregateType: string,
     read: (aggregateType: string) => Promise<readonly EventType[]>,
@@ -110,11 +161,7 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
     const types = this.#aggregateTypes(aggregateType);
     const reads = await Promise.all(types.map(read));
     const byId = new Map<string, EventType>();
-    for (const stored of reads.flat()) {
-      const known = byId.get(stored.id);
-      // A row rewritten to the current type wins over its stored original.
-      if (!known || this.upcaster.declaresFrom(known.type)) byId.set(stored.id, stored);
-    }
+    for (const stored of reads.flat()) this.#keepPreferred(byId, stored);
     const events = [...byId.values()].map((stored) => this.#current(stored));
     return types.length > 1 ? events.toSorted(logOrder) : events;
   }

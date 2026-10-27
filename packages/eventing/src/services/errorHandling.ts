@@ -223,6 +223,21 @@ export class QueuedPayloadInvalidError extends NonRetryableGroupQueueError {
 }
 
 /**
+ * A fold rebuild read a history that does not yet hold what the stored state already applied: the
+ * read lagged the log. Recoverable, so the rebuild job retries until the log catches up.
+ */
+export class FoldRebuildIncompleteHistoryError extends RecoverableError {
+  override readonly name = "FoldRebuildIncompleteHistoryError";
+
+  constructor({ projection, aggregateId }: { projection: string; aggregateId: string }) {
+    super(
+      `Rebuild of ${projection} for aggregate ${aggregateId} read an incomplete history; retrying`,
+      { projection, aggregateId },
+    );
+  }
+}
+
+/**
  * A dequeued event whose type nothing on this worker declares: mid rolling deploy, an older
  * worker took a newer release's event. The queue hands it back unspent for a worker declaring it
  * (Alex, 2026-10-12); past the hand-back window it spends attempts and exhausts like any job (§9).
