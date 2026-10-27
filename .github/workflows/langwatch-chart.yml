@@ -225,6 +225,11 @@ jobs:
       - name: "assert the redis-valkey overlay swaps only the image"
         if: "!cancelled()"
         run: ./tests/redis-valkey.sh
+      # Helm keeps the last of two equal keys without a word, so a label
+      # written beside include "langwatch.labels" only shows in a strict parse.
+      - name: "assert no rendered object repeats a label key"
+        if: "!cancelled()"
+        run: ./tests/no-duplicate-label-keys.sh
 
       # An install taking existing agent objects over in place needs the
       # chart to render their selector, which can never change on a live
