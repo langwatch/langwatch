@@ -15,6 +15,7 @@ import {
 import { type LangyInsightsCardFinding, langyInsightsCardPartsOf } from "@langwatch/langy-contract";
 
 import { DAILY_RUN_GRANULARITY_SECONDS } from "./insight-daily-run.rules.ts";
+import { WEB_ADDRESS } from "./web-address.rules.ts";
 
 /**
  * The title of the finding the daily-insights skill shows the shape with. An answer that hands
@@ -32,7 +33,11 @@ const OPENING_FENCE = new RegExp(`^ {0,3}\`{3,}[ \\t]*${INSIGHT_RUN_FINDINGS_FEN
 const CLOSING_FENCE = /^ {0,3}`{3,}[ \t]*$/;
 
 /** A widget of the board as the run read it, with the queries the board stores for it. */
-type BoardWidget = Readonly<{ id: string; name: string; queries: readonly string[] }>;
+type BoardWidget = Readonly<{
+  id: string;
+  name: string;
+  statements: readonly Readonly<{ sql: string }>[];
+}>;
 
 /**
  * One finding as the run files it: its words, a widget only when the board has it, a query
@@ -57,12 +62,6 @@ type RunAnswerCheck =
   | Readonly<{ ok: false; reason: RunAnswerFault }>;
 
 const REFUSED: RunAnswerCheck = { ok: false, reason: "bad_output" };
-
-/**
- * A web address as a reader could follow it. A finding is read by a person, and a link in it
- * is how text that steered the run would send that person, or their data, somewhere else.
- */
-const WEB_ADDRESS = /https?:\/\/|www\./i;
 
 function holdsWebAddress({ title, body, topic }: InsightRunFinding): boolean {
   return [title, body, topic ?? ""].some((words) => WEB_ADDRESS.test(words));
@@ -171,7 +170,9 @@ export function checkRunAnswer({
       const stored =
         handedBack === undefined
           ? undefined
-          : widget?.queries.find((query) => isHandedBack({ stored: query, handedBack }));
+          : widget?.statements
+              .map(({ sql }) => sql)
+              .find((query) => isHandedBack({ stored: query, handedBack }));
       return {
         ...words,
         topic: topic ?? null,

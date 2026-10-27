@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable, callable Langy capability shared by process transports.
 
-Peers call these through the token, declared at `../contract/src/langy.api.ts:299`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/langy.api.ts:305`; nothing else in this package is public.
 
 #### `ingestInternalTurnResult`
 
@@ -212,6 +212,14 @@ The usage report's figures (ADR-156, section 10).
 
 ```typescript
 countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount>;
+```
+
+#### `findRunConversationIds`
+
+The ids of the project's `run` conversations last active, or opened, at or after `since`, archived ones included (their traces remain). Newest activity first, one with no activity yet ahead of all, at most `LANGY_RUN_CONVERSATION_IDS_LIMIT`.
+
+```typescript
+findRunConversationIds(input: LangyFindRunConversationIdsInput): Promise<string[]>;
 ```
 
 #### `getSetupSkillPrompt`
@@ -1361,7 +1369,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:293`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:294`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

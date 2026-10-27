@@ -12,7 +12,7 @@ const RATE_LIMIT_PREFIX = "member:rate-limit:";
 const rateLimitExceeded = counter({
   name: "rate_limit_exceeded_total",
   description:
-    "Rate-limit checks that returned allowed: false, by the calling scope (the key segment before its first ':')",
+    "Rate-limit checks that returned allowed: false, by the calling scope (the caller's own, else the key segment before its first ':')",
 });
 
 /** The key segment before its first ":", so the label never carries an address or hash. */
@@ -91,7 +91,7 @@ export function redisRateLimiter(
       const used = Number(await redis.eval(COUNT_IN_WINDOW, 1, counter, allowance.seconds));
       if (used <= allowance.requests) return { allowed: true };
 
-      rateLimitExceeded.inc({ scope: scopeOf(key) });
+      rateLimitExceeded.inc({ scope: limit?.scope ?? scopeOf(key) });
       const remaining = await redis.ttl(counter);
       return { allowed: false, retryAfterSeconds: remaining > 0 ? remaining : allowance.seconds };
     },

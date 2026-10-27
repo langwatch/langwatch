@@ -683,6 +683,7 @@ export class AnalyticsModule
     readonly source: AnalyticsMetricSource;
     readonly since: Instant;
     readonly excludeOrigins?: readonly string[];
+    readonly excludeConversationIds?: readonly string[];
   }): Promise<Instant[]> {
     return this.#dependencies.recency.findLastOccurredAt(input);
   }
@@ -854,6 +855,20 @@ export class AnalyticsModule
       });
     }
 
+    return this.#runLangWatchQL({ project, ...run });
+  }
+
+  /** `executeLangWatchQL` admitted at a background caller's third of the project's window. */
+  async executeBackgroundLangWatchQL(
+    input: LangWatchQLExecuteInput,
+  ): Promise<LangWatchQLQueryResult> {
+    await this.#dependencies.lwqlBounds.assertBackgroundQueryWithinBounds({
+      projectId: input.project.id,
+    });
+    return this.#runLangWatchQL(input);
+  }
+
+  async #runLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     // Resolved before the engine validates, because whether an eval function
     // may be called is part of that verdict — and only for a statement that
     // names one, since the answer costs a project read and a flag evaluation.
@@ -861,7 +876,7 @@ export class AnalyticsModule
       statementMightCallEvalFunction(input.sql) &&
       (await this.#isInstantEvalsEnabled(input.project.id));
 
-    return this.#dependencies.langWatchQL.execute({ project, ...run, isInstantEvalsEnabled });
+    return this.#dependencies.langWatchQL.execute({ ...input, isInstantEvalsEnabled });
   }
 
   /**

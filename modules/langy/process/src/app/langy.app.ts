@@ -43,6 +43,7 @@ import {
   type LangyGetPageInput,
   type LangyGetEventsAfterInput,
   type LangyFindByIdVisibleInput,
+  type LangyFindRunConversationIdsInput,
   type LangyGetAllByConversationInput,
   type LangyDeleteByIdInput,
   type LangyUpdateByIdInput,
@@ -865,6 +866,10 @@ export class LangyModule implements LangyApiContract {
 
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {
     return this.dependencies.langy.countUsage(input);
+  }
+
+  findRunConversationIds(input: LangyFindRunConversationIdsInput): Promise<string[]> {
+    return this.dependencies.langy.findRunConversationIds(input);
   }
 
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }> {

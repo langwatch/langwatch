@@ -90,10 +90,10 @@ appendEvaluationAnalyticsRollupBatch(input: AnalyticsEvaluationRollupAppendBatch
 
 #### `findLastOccurredAt`
 
-When the project's newest trace or evaluation since `since` occurred, from the analytics tables this module owns; empty when none did. The graph-alert heartbeat reads it. `excludeOrigins` leaves out traces of those origins; an evaluation read ignores it.
+When the project's newest trace or evaluation since `since` occurred; empty when none did. `excludeOrigins` leaves out traces of those origins and `excludeConversationIds` traces in those conversations, keeping a trace with none; an evaluation read ignores both.
 
 ```typescript
-findLastOccurredAt(input: { readonly projectId: string; readonly source: AnalyticsMetricSource; readonly since: Instant; readonly excludeOrigins?: readonly string[]; }): Promise<Instant[]>;
+findLastOccurredAt(input: { readonly projectId: string; readonly source: AnalyticsMetricSource; readonly since: Instant; readonly excludeOrigins?: readonly string[]; readonly excludeConversationIds?: readonly string[]; }): Promise<Instant[]>;
 ```
 
 #### `isLangWatchQLAvailable`
@@ -162,6 +162,14 @@ langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[
 
 ```typescript
 executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+```
+
+#### `executeBackgroundLangWatchQL`
+
+`executeLangWatchQL` for a check with nobody waiting, such as the daily board health check: it may use only a third of the project's window, so people reading boards keep the rest.
+
+```typescript
+executeBackgroundLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
 ```
 
 #### `executeLangWatchQLPass`

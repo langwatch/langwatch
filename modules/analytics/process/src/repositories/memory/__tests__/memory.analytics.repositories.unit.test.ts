@@ -163,6 +163,21 @@ describe("the analytics memory tier", () => {
       ).resolves.toEqual([]);
     });
 
+    /** @scenario "A recency read binds the left-out conversations as a parameter" */
+    it("ignores left-out conversations on an evaluation read, as the live read does", async () => {
+      const { evaluations, recency } = memoryTier();
+      await evaluations.upsert({ row: evaluationRow({ conversationId: "conversation-run-1" }) });
+
+      await expect(
+        recency.findLastOccurredAt({
+          projectId: "project-1",
+          source: "evaluation",
+          since: Temporal.Instant.fromEpochMilliseconds(0),
+          excludeConversationIds: ["conversation-run-1"],
+        }),
+      ).resolves.toEqual([Temporal.Instant.fromEpochMilliseconds(OCCURRED_AT_MS)]);
+    });
+
     it("answers nothing for traces, which another module writes", async () => {
       await expect(
         memoryTier().recency.findLastOccurredAt({

@@ -1,5 +1,7 @@
 import type { StoredProjection } from "@langwatch/eventing";
 import {
+  LANGY_CONVERSATION_ORIGIN,
+  LANGY_RUN_CONVERSATION_IDS_LIMIT,
   LangyConversationNotFoundError,
   type LangyConversationStateData,
   type LangyUsageCount,
@@ -52,6 +54,19 @@ function byRecentActivity(a: Projection, b: Projection): number {
   return compareIds(b.state.ConversationId, a.state.ConversationId);
 }
 
+/** Activity descending with null first, then creation and id descending, as Postgres orders. */
+function byRunActivity(a: Projection, b: Projection): number {
+  const left = a.state.LastActivityAt;
+  const right = b.state.LastActivityAt;
+  if (left !== right) {
+    if (left === null) return -1;
+    if (right === null) return 1;
+    return right - left;
+  }
+  if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;
+  return compareIds(b.state.ConversationId, a.state.ConversationId);
+}
+
 function isAfter(projection: Projection, cursor: LangyConversationListCursor): boolean {
   const activity = projection.state.LastActivityAt;
   const id = projection.state.ConversationId;
@@ -101,6 +116,19 @@ export class MemoryLangyConversationRepository extends LangyConversationReposito
       activeUsers: owners.size,
       ...(first !== undefined ? { firstTurnAt: first } : {}),
     };
+  }
+
+  async findRunConversationIds(params: { projectId: string; since: number }): Promise<string[]> {
+    return this.inProject(params.projectId)
+      .filter((projection) => projection.state.Origin === LANGY_CONVERSATION_ORIGIN.RUN)
+      .filter(
+        (projection) =>
+          (projection.state.LastActivityAt ?? -Infinity) >= params.since ||
+          projection.createdAt >= params.since,
+      )
+      .toSorted(byRunActivity)
+      .slice(0, LANGY_RUN_CONVERSATION_IDS_LIMIT)
+      .map((projection) => projection.state.ConversationId);
   }
 
   async getVisibleById(params: {

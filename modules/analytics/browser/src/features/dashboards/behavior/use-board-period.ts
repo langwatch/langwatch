@@ -5,6 +5,7 @@
  */
 
 import { nowInstant } from "@langwatch/time";
+import { defaultBoardExcludedOrigins } from "@langwatch/trace-contract";
 import { useMemo, useState } from "react";
 
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
@@ -16,7 +17,6 @@ import {
   type BoardPeriodGrain,
   type BoardPeriodRange,
   boardWindowEnd,
-  defaultBoardExcludedOrigins,
   parseBoardPeriodGrain,
   parseBoardPeriodRange,
 } from "../model/board-period.ts";

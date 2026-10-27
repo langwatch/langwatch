@@ -15,9 +15,9 @@ const AGGREGATE_ID_COLUMN_BY_SOURCE: Record<AnalyticsMetricSource, string> = {
 };
 
 /**
- * Reads the newest `OccurredAt` of the deduped slim table (ADR-034 §6), bounded
- * on the partition column, with the IN-tuple dedup over `ReplacingMergeTree(UpdatedAt)`.
- * Origins are left out of the newest versions only: origin is stamped late.
+ * Reads the newest `OccurredAt` of the deduped slim table (ADR-034 §6), bounded on the partition
+ * column, with the IN-tuple dedup. Origins and conversations are left out of the newest versions
+ * only, as origin is stamped late; `ifNull` keeps a trace with no conversation.
  */
 export class ClickHouseAnalyticsRecencyRepository extends AnalyticsRecencyRepository {
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {
@@ -33,12 +33,19 @@ export class ClickHouseAnalyticsRecencyRepository extends AnalyticsRecencyReposi
     source: AnalyticsMetricSource;
     since: Instant;
     excludeOrigins?: readonly string[];
+    excludeConversationIds?: readonly string[];
   }): Promise<Instant[]> {
     const table = SLIM_TABLE_BY_SOURCE[input.source];
     const idColumn = AGGREGATE_ID_COLUMN_BY_SOURCE[input.source];
     const excludeOrigins = input.source === "trace" ? (input.excludeOrigins ?? []) : [];
     const byOrigin =
       excludeOrigins.length > 0 ? "AND Origin NOT IN ({excludeOrigins:Array(String)})" : "";
+    const excludeConversationIds =
+      input.source === "trace" ? (input.excludeConversationIds ?? []) : [];
+    const byConversation =
+      excludeConversationIds.length > 0
+        ? "AND ifNull(ConversationId, '') NOT IN ({excludeConversationIds:Array(String)})"
+        : "";
     const { rows } = await this.clickhouse.query<{ lastMs: string | number | null }>({
       tenantId: input.projectId,
       table,
@@ -57,12 +64,14 @@ export class ClickHouseAnalyticsRecencyRepository extends AnalyticsRecencyReposi
               GROUP BY TenantId, ${idColumn}
             )
             ${byOrigin}
+            ${byConversation}
         )
       `,
       params: {
         tenantId: input.projectId,
         startMs: input.since.epochMilliseconds,
         ...(excludeOrigins.length > 0 ? { excludeOrigins } : {}),
+        ...(excludeConversationIds.length > 0 ? { excludeConversationIds } : {}),
       },
     });
 

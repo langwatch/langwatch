@@ -155,6 +155,10 @@ export class LangyConversationService {
     return this.repository.countUsage(input);
   }
 
+  findRunConversationIds(input: { projectId: string; since: number }): Promise<string[]> {
+    return this.repository.findRunConversationIds(input);
+  }
+
   getPage(
     input: Parameters<LangyConversationReadService["getPage"]>[0],
   ): ReturnType<LangyConversationReadService["getPage"]> {

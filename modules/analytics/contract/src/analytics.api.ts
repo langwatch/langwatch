@@ -123,15 +123,16 @@ export interface AnalyticsApi {
     input: AnalyticsEvaluationRollupAppendBatchInput,
   ): Promise<void>;
   /**
-   * When the project's newest trace or evaluation since `since` occurred, from the analytics
-   * tables this module owns; empty when none did. The graph-alert heartbeat reads it.
-   * `excludeOrigins` leaves out traces of those origins; an evaluation read ignores it.
+   * When the project's newest trace or evaluation since `since` occurred; empty when none did.
+   * `excludeOrigins` leaves out traces of those origins and `excludeConversationIds` traces in
+   * those conversations, keeping a trace with none; an evaluation read ignores both.
    */
   findLastOccurredAt(input: {
     readonly projectId: string;
     readonly source: AnalyticsMetricSource;
     readonly since: Instant;
     readonly excludeOrigins?: readonly string[];
+    readonly excludeConversationIds?: readonly string[];
   }): Promise<Instant[]>;
   isLangWatchQLAvailable(): boolean;
   /**
@@ -182,6 +183,11 @@ export interface AnalyticsApi {
    */
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  /**
+   * `executeLangWatchQL` for a check with nobody waiting, such as the daily board health check:
+   * it may use only a third of the project's window, so people reading boards keep the rest.
+   */
+  executeBackgroundLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
   /**
    * Re-validates the statement with the full policy, eval gate taken from the caller's
    * answer, then runs it inside the fixed wrapper its pass names: an instant-eval read.

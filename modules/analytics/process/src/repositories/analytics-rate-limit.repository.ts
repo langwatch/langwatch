@@ -3,9 +3,9 @@ export type AnalyticsRateLimitDecision = Readonly<{ allowed: boolean; retryAfter
 
 /** Fixed-window counters for the LangWatchQL execution window. */
 export abstract class AnalyticsRateLimitRepository {
-  /** Counts one request against `key` in the caller's own window. */
+  /** Counts one request against `key` in the caller's own window; `scope` labels a refusal. */
   abstract check(
     key: string,
-    limit: Readonly<{ requests: number; seconds: number }>,
+    limit: Readonly<{ requests: number; seconds: number; scope?: string }>,
   ): Promise<AnalyticsRateLimitDecision>;
 }

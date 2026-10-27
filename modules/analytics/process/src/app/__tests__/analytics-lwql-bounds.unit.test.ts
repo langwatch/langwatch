@@ -68,20 +68,22 @@ async function harness() {
     secrets: {} as never,
   });
 
-  const execute = (projectId: string) =>
-    app
-      .executeLangWatchQL({
-        project: { id: projectId, lwqlKey: "lwql-key" },
-        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
-        sql: "SELECT 1",
-      })
-      .then(
-        () => "executed",
-        (error: unknown) =>
-          error instanceof Error && "code" in error ? String(error.code) : "unknown",
-      );
+  const input = (projectId: string) => ({
+    project: { id: projectId, lwqlKey: "lwql-key" },
+    protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+    sql: "SELECT 1",
+  });
+  const outcome = (run: Promise<unknown>) =>
+    run.then(
+      () => "executed",
+      (error: unknown) =>
+        error instanceof Error && "code" in error ? String(error.code) : "unknown",
+    );
+  const execute = (projectId: string) => outcome(app.executeLangWatchQL(input(projectId)));
+  const executeBackground = (projectId: string) =>
+    outcome(app.executeBackgroundLangWatchQL(input(projectId)));
 
-  return { execute };
+  return { execute, executeBackground };
 }
 
 const FREE_QUERIES_PER_MINUTE = resolveRequestBound("lwqlPerMinute", "FREE");
@@ -105,6 +107,19 @@ describe("AnalyticsModule.executeLangWatchQL", () => {
       }
 
       expect(await execute("project-free")).toBe("lwql_rate_limited");
+    });
+  });
+
+  describe("given a background check on a free-tier project", () => {
+    /** @scenario "A background execution is refused once the window holds a third of the bound" */
+    it("is refused 429 once the window holds a third of the ceiling", async () => {
+      const { executeBackground } = await harness();
+      const backgroundShare = Math.floor(FREE_QUERIES_PER_MINUTE / 3);
+      for (let index = 0; index < backgroundShare; index++) {
+        expect(await executeBackground("project-free")).toBe("lwql_unavailable");
+      }
+
+      expect(await executeBackground("project-free")).toBe("lwql_rate_limited");
     });
   });
 

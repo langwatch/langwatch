@@ -249,3 +249,33 @@ Feature: Unattended Langy turns
       When a conversation's events are read there
       Then the tail is empty
       And the event store is never asked
+
+  Rule: A run's own conversations are found by id
+
+    # The insights run leaves the traces of its own Langy turns out of "did the project take a new trace".
+    @unit
+    Scenario: The run conversations active since a time are found by id, newest first
+      Given a project with run conversations active before and since a time
+      And a chat conversation of that project and a run conversation of another project, both active since that time
+      When the project's run conversations since that time are found
+      Then the ids of its run conversations active since that time are answered, newest activity first
+      And the chat conversation and the other project's run conversation are left out
+
+    @unit
+    Scenario: A run conversation opened since the time with no activity yet is found first
+      Given a run conversation opened since a time that has no activity stamp yet
+      And a run conversation active since that time
+      When the project's run conversations since that time are found
+      Then both ids are answered, the one with no activity yet first
+
+    @unit
+    Scenario: An archived run conversation is still found
+      Given a run conversation active since a time that was archived
+      When the project's run conversations since that time are found
+      Then its id is answered, because its traces remain
+
+    @unit
+    Scenario: At most a thousand run conversation ids are answered
+      Given a project with 1,001 run conversations active since a time
+      When the project's run conversations since that time are found
+      Then the 1,000 with the newest activity are answered

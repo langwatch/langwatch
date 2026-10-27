@@ -36,6 +36,7 @@ import {
   type InsightPipelineDefinition,
 } from "../eventing/insight.pipeline.ts";
 import type { InsightRepositories } from "../repositories/insight.repositories.ts";
+import { InsightBoardHealthService } from "../services/insight-board-health.service.ts";
 import { InsightCommandsService } from "../services/insight-commands.service.ts";
 import { InsightDailyRunAuditService } from "../services/insight-daily-run-audit.service.ts";
 import { InsightDailyRunCommandsService } from "../services/insight-daily-run-commands.service.ts";
@@ -66,7 +67,10 @@ export class InsightModule implements InsightApiContract {
     dashboards: DashboardApi,
     /** The turn a daily run reads the board with, as the person and read-only. */
     langy: LangyApi,
-    /** Admits the query a finding keeps, and says whether the project took any trace. */
+    /**
+     * Admits the query a finding keeps, runs the board check's statements as the person, and
+     * says whether the project took any trace.
+     */
     analytics: AnalyticsApi,
     /** Where each run's outcome is written down, for the person it acted for. */
     auditLog: AuditLogApi,
@@ -112,6 +116,7 @@ export class InsightModule implements InsightApiContract {
       featureFlags: dependencies.featureFlags,
       projects: dependencies.projects,
     });
+    const metrics = InsightDailyRunMetricsService.create();
     const runs = InsightDailyRunService.create({
       gate: InsightRunGateService.create({
         rollout,
@@ -120,13 +125,19 @@ export class InsightModule implements InsightApiContract {
         authz: dependencies.authz,
         dashboards: dependencies.dashboards,
       }),
+      boardHealth: InsightBoardHealthService.create({
+        analytics: dependencies.analytics,
+        insights: repositories.insights,
+        commands,
+        metrics,
+      }),
       langy: dependencies.langy,
       insights: repositories.insights,
       traces: dependencies.analytics,
       queries: InsightRunQueryService.create({ analytics: dependencies.analytics }),
       insightCommands: commands,
       runCommands: dailyRunCommands,
-      metrics: InsightDailyRunMetricsService.create(),
+      metrics,
     });
     const scheduleReconcile = InsightDailyScheduleReconcileService.create({
       schedules: repositories.dailySchedules,

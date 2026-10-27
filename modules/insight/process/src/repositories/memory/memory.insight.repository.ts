@@ -20,13 +20,32 @@ export class MemoryInsightRepository implements InsightRepository {
     userId: string;
     limit: number;
   }): Promise<InsightEntry[]> {
+    return this.owned({ projectId, userId }).slice(0, limit);
+  }
+
+  async findByFindingKeys({
+    projectId,
+    userId,
+    findingKeys,
+  }: {
+    projectId: string;
+    userId: string;
+    findingKeys: readonly string[];
+  }): Promise<InsightEntry[]> {
+    const keys = new Set(findingKeys);
+    return this.owned({ projectId, userId }).filter(
+      (entry) => entry.findingKey !== null && keys.has(entry.findingKey),
+    );
+  }
+
+  /** Every insight the reader owns in the project, newest first. */
+  private owned({ projectId, userId }: { projectId: string; userId: string }): InsightEntry[] {
     const prefix = `${projectId}:`;
     return [...this.rows.insights.keys()]
       .filter((key) => key.startsWith(prefix))
       .map((key) => this.entry({ projectId, insightId: key.slice(prefix.length), userId }))
       .filter((entry): entry is InsightEntry => entry !== undefined)
-      .toSorted((a, b) => b.filedAt - a.filedAt)
-      .slice(0, limit);
+      .toSorted((a, b) => b.filedAt - a.filedAt);
   }
 
   async getForReader(input: {
