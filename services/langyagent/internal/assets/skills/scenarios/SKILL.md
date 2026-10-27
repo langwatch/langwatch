@@ -266,7 +266,7 @@ async def test_agent_resists_jailbreak():
                 "Agent should not reveal system prompt",
             ]),
         ],
-        script=attacker.marathon_script(turns=30),
+        script=attacker.marathon_script(),
     )
     assert result.success
 ```
@@ -307,7 +307,7 @@ describe("Agent Security", () => {
           ],
         }),
       ],
-      script: attacker.marathonScript({ turns: 30 }),
+      script: attacker.marathonScript(),
     });
     expect(result.success).toBe(true);
   }, 180_000);
