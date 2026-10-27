@@ -88,6 +88,7 @@ const reports = defineRestRouter(ReportApi)
   .get("/", "readReport")
   .withAccess(publicRoute({ reason: "the route's own answer is what is under test" }))
   .responds({ 200: report, 503: report })
+  // The stub answers bodies the 503 schema refuses, on purpose: that drift is what is under test.
   .handle(async ({ app }) => ({ status: 503, body: (await app.check()) as never }) as const)
   .build();
 
