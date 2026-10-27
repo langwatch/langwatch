@@ -5,21 +5,27 @@ import { createServer, type Server } from "node:http";
 import { connect, type AddressInfo, type Socket } from "node:net";
 import { fileURLToPath } from "node:url";
 
+import { VOICE_MEDIA_SOCKET_MESSAGE } from "@langwatch/scenario-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import WebSocket, { type RawData } from "ws";
+import WebSocket from "ws";
 
 import {
   InMemoryPendingVoiceCallStore,
-  VOICE_CLAIM_HANDSHAKE_BUDGET_MS,
   VoiceCallClaimService,
 } from "../voice-call-claim.service.ts";
+import { frameText } from "./fixtures/frame-text.ts";
+import { FIXTURE_MEDIA_SOCKET_MESSAGE } from "./fixtures/media-socket-message.ts";
 
 const CHILD_FIXTURE = fileURLToPath(new URL("./fixtures/voice-echo-child.ts", import.meta.url));
 const TEST_TIMEOUT_MS = 15_000;
 const NONCE = "nonce-a";
+// Time a claiming pod has to spawn the child and finish the media handshake.
+const VOICE_CLAIM_HANDSHAKE_BUDGET_MS = 5000;
 
 let server: Server;
 let children: ChildProcess[];
+let clients: WebSocket[];
+let rawSockets: Socket[];
 let spawnedAt: number[];
 let store: InMemoryPendingVoiceCallStore;
 
@@ -50,27 +56,27 @@ async function listen(): Promise<number> {
   return (server.address() as AddressInfo).port;
 }
 
-function frameText(data: RawData): string {
-  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  if (Buffer.isBuffer(data)) return data.toString("utf8");
-  return Buffer.from(data).toString("utf8");
-}
-
 /** Resolves with the first status the upgrade got, and the ws if it opened. */
 function dial(port: number, nonce: string): Promise<{ status: number; ws?: WebSocket }> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/twilio/${nonce}`);
+    clients.push(ws);
     ws.on("open", () => resolve({ status: 101, ws }));
     ws.on("unexpected-response", (_req, res) => {
       resolve({ status: res.statusCode ?? 0 });
       ws.terminate();
     });
-    ws.on("error", reject);
+    ws.on("error", (error) => {
+      ws.terminate();
+      reject(error);
+    });
   });
 }
 
+// One-byte length form only (payload < 126 bytes); enough for the spike frames.
 function maskedTextFrame(text: string): Buffer {
   const payload = Buffer.from(text);
+  if (payload.length >= 126) throw new Error("maskedTextFrame supports payloads under 126 bytes");
   const mask = Buffer.from([1, 2, 3, 4]);
   const masked = Buffer.from(payload.map((byte, i) => byte ^ mask[i % 4]!));
   return Buffer.concat([Buffer.from([0x81, 0x80 | payload.length]), mask, masked]);
@@ -78,17 +84,35 @@ function maskedTextFrame(text: string): Buffer {
 
 beforeEach(() => {
   children = [];
+  clients = [];
+  rawSockets = [];
   spawnedAt = [];
   store = new InMemoryPendingVoiceCallStore();
 });
 
 afterEach(async () => {
-  for (const child of children) child.kill();
-  await new Promise<void>((resolve) => (server ? server.close(() => resolve()) : resolve()));
-  server?.closeAllConnections();
+  for (const ws of clients) ws.terminate();
+  for (const raw of rawSockets) raw.destroy();
+  const running = children.filter((child) => child.exitCode === null && child.signalCode === null);
+  await Promise.all(
+    running.map((child) => {
+      const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+      child.kill("SIGKILL");
+      return exited;
+    }),
+  );
+  if (server) {
+    // Not awaited: a socket handed to a child never closes in this process, so close() would wait.
+    server.close();
+    server.closeAllConnections();
+  }
 });
 
 describe("VoiceCallClaimService", () => {
+  it("keeps the child fixture message type equal to the contract constant", () => {
+    expect(FIXTURE_MEDIA_SOCKET_MESSAGE).toBe(VOICE_MEDIA_SOCKET_MESSAGE);
+  });
+
   describe("given a pending call for a nonce", () => {
     beforeEach(() => {
       store.add({ nonce: NONCE });
@@ -120,7 +144,8 @@ describe("VoiceCallClaimService", () => {
         "echoes a start frame through the child",
         async () => {
           const port = await listen();
-          const { ws } = await dial(port, NONCE);
+          const { status, ws } = await dial(port, NONCE);
+          expect(status).toBe(101);
           const echoed = new Promise<string>((resolve) =>
             ws!.once("message", (d) => resolve(frameText(d))),
           );
@@ -164,6 +189,7 @@ describe("VoiceCallClaimService", () => {
         async () => {
           const port = await listen();
           const raw: Socket = connect(port, "127.0.0.1");
+          rawSockets.push(raw);
           const request =
             `GET /twilio/${NONCE} HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n` +
             `Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n`;

@@ -3,15 +3,10 @@
 // Imports only `ws` and node: plain `node` cannot load the workspace contract graph.
 import { IncomingMessage } from "node:http";
 import { Socket } from "node:net";
-import { WebSocketServer, type RawData } from "ws";
+import { WebSocketServer } from "ws";
 
-function frameText(data: RawData): string {
-  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  if (Buffer.isBuffer(data)) return data.toString("utf8");
-  return Buffer.from(data).toString("utf8");
-}
-
-const MEDIA_SOCKET_MESSAGE = "voice:twilio-media-socket";
+import { frameText } from "./frame-text.ts";
+import { FIXTURE_MEDIA_SOCKET_MESSAGE } from "./media-socket-message.ts";
 
 interface MediaSocketMessage {
   type: string;
@@ -24,7 +19,7 @@ interface MediaSocketMessage {
 const server = new WebSocketServer({ noServer: true });
 
 process.on("message", (message: MediaSocketMessage, handle: unknown) => {
-  if (message?.type !== MEDIA_SOCKET_MESSAGE || !(handle instanceof Socket)) return;
+  if (message?.type !== FIXTURE_MEDIA_SOCKET_MESSAGE || !(handle instanceof Socket)) return;
   const request = Object.assign(new IncomingMessage(handle), {
     url: message.url,
     method: message.method,
