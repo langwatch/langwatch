@@ -127,6 +127,7 @@ jobs:
               # The runner behind `pnpm lint`: a change to it must reach the lint job.
               - 'tools/lintrun/**'
               - 'cmd/lintrun/**'
+              - 'go.work'
               # NOTE: 'charts/**' is deliberately NOT listed. Integration suites
               # do render the chart and assert on the output, so a chart-only
               # edit can break a package test without touching a file
@@ -1024,7 +1025,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null && ! git diff --name-only "$BASE" HEAD \
-            | grep -qE '^(\.oxlintrc(\.[a-z]+)?\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig(\.[a-z]+)?\.json|dev/nx/|tools/lintrun/|cmd/lintrun/)' \
+            | grep -qE '^(\.oxlintrc(\.[a-z]+)?\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig(\.[a-z]+)?\.json|dev/nx/|tools/lintrun/|cmd/lintrun/|go\.work)' \
             && ! git diff "$BASE" HEAD -- pnpm-lock.yaml | grep -qE '^[-+].*oxlint'; then
             echo "base=$BASE" >> "$GITHUB_OUTPUT"
           fi

@@ -88,7 +88,7 @@ Read in `node_modules/nx/dist/src`: `NxPlugin` exposes `createNodes`,
 **Launchers already cover Nx-run tasks.** All but one `test` target are `vitest run` (one is Playwright)
 and every typecheck is `tsc`, started through `node_modules/.bin` by the
 script Nx runs, so each task meets its launcher. Not covered: targets that
-start Go tools directly (`golangci-lint`, `go build`, the lint runner `go run ./cmd/lintrun`);
+start Go tools directly (`golangci-lint`, `go build`, the lint runner `.bin/lintrun/lintrun` (built with `go build -o .bin/lintrun/lintrun ./cmd/lintrun`));
 those stay with the gate.
 
 Parallelism therefore comes from the environment before Nx starts

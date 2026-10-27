@@ -12,6 +12,7 @@ app:
   - ".npmrc"
   - "tools/lintrun/**"
   - "cmd/lintrun/**"
+  - "go.work"
   - ".github/workflows/langwatch-app-ci.yml"
   - ".github/workflows/nightly.yml"
   - ".github/workflows/codebase-health.yml"

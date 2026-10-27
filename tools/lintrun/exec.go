@@ -15,36 +15,52 @@ import (
 
 // The impure half: git, nx and the oxlint processes.
 
-func (r runner) git(args ...string) []string {
+// git is the lines of a git command's stdout; a failing git returns its stderr in the error.
+func (r runner) git(args ...string) ([]string, error) {
 	cmd := exec.CommandContext(r.ctx, "git", args...)
 	cmd.Dir = r.root
 	out, err := cmd.Output()
 	if err != nil {
-		return nil
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			return nil, fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, exit.Stderr)
+		}
+		return nil, fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
 	}
-	return slices.DeleteFunc(strings.Split(string(out), "\n"), func(s string) bool { return s == "" })
+	return slices.DeleteFunc(strings.Split(string(out), "\n"), func(s string) bool { return s == "" }), nil
 }
 
-func (r runner) mergeBase() string {
+// mergeBase is the merge base with the branch's upstream (else upstreamFallback),
+// then with origin/main. A branch without an upstream is normal; no merge base is an error.
+func (r runner) mergeBase() (string, error) {
 	upstream := upstreamFallback
-	if found := r.git("rev-parse", "--abbrev-ref", "@{upstream}"); len(found) > 0 {
+	if found, err := r.git("rev-parse", "--abbrev-ref", "@{upstream}"); err == nil && len(found) > 0 {
 		upstream = found[0]
 	}
-	if found := r.git("merge-base", "HEAD", upstream); len(found) > 0 {
-		return found[0]
+	var last error
+	for _, ref := range []string{upstream, "origin/main"} {
+		found, err := r.git("merge-base", "HEAD", ref)
+		if err == nil && len(found) > 0 {
+			return found[0], nil
+		}
+		last = err
 	}
-	if found := r.git("merge-base", "HEAD", "origin/main"); len(found) > 0 {
-		return found[0]
-	}
-	return ""
+	return "", fmt.Errorf("no merge base with %s or origin/main; fetch it or pass --base: %w", upstream, last)
 }
 
 // changedFiles is every committed, staged, unstaged and untracked change since base.
-func (r runner) changedFiles(base string) []string {
-	files := slices.Concat(r.git("diff", "--name-only", "--diff-filter=ACMRD", base),
-		r.git("ls-files", "--others", "--exclude-standard"))
+func (r runner) changedFiles(base string) ([]string, error) {
+	tracked, err := r.git("diff", "--name-only", "--diff-filter=ACMRD", base)
+	if err != nil {
+		return nil, err
+	}
+	untracked, err := r.git("ls-files", "--others", "--exclude-standard")
+	if err != nil {
+		return nil, err
+	}
+	files := slices.Concat(tracked, untracked)
 	slices.Sort(files)
-	return slices.Compact(files)
+	return slices.Compact(files), nil
 }
 
 // affectedProjects is the package names `nx show projects --affected` lists; nx's own
@@ -89,7 +105,11 @@ func (r runner) printedConfig(config string) (map[string]json.RawMessage, error)
 	cmd.Dir = r.root
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("oxlint --print-config failed:\n%s", out)
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			return nil, fmt.Errorf("oxlint --print-config -c %s failed: %w\n%s%s", config, err, out, exit.Stderr)
+		}
+		return nil, fmt.Errorf("oxlint --print-config -c %s: %w", config, err)
 	}
 	var printed map[string]json.RawMessage
 	if err := json.Unmarshal(out, &printed); err != nil {

@@ -14,6 +14,7 @@ import (
 	"github.com/langwatch/langwatch/tools/lintrun"
 )
 
+// no-test: a thin wrapper over lintrun.Run, which tools/lintrun/run_test.go covers.
 func main() {
 	os.Exit(lintrun.Run(os.Args[1:], os.Stdout, os.Stderr))
 }

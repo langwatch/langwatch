@@ -73,8 +73,8 @@ also holds the `ignorePatterns`, which the runner passes to every process.
 Each process reports every disable directive its own rules did not use, so the
 runner keeps an unused-directive report only when every process made it
 (`tools/lintrun/diagnostic.go`). Plain `pnpm lint` has no
-type-aware process, so a directive naming only a type-aware rule reads as unused
-there, as it always has. When every path in scope matches an ignore pattern,
+type-aware process, so a directive naming only a type-aware rule is left unjudged
+there; the `--types` run reports it when it is unused. When every path in scope matches an ignore pattern,
 oxlint answers "No files found to lint." and the runner reads that as a clean run.
 
 `--changed` and `--base <sha>` narrow every process to the projects

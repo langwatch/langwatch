@@ -77,7 +77,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		if flags.NArg() == 0 {
 			break
 		}
-		rest = flags.Args()[1:] // a positional is ignored, as the JS runner did; flags may follow it
+		rest = flags.Args()[1:] // a positional argument is ignored; flags may follow it
 	}
 	q := request{changed: *changed, types: *types}
 	flags.Visit(func(f *flag.Flag) {
@@ -109,7 +109,14 @@ func run(q request, stdout, stderr io.Writer) (int, error) {
 	}
 	r := runner{ctx: context.Background(), root: root, oxlint: filepath.Join(root, "node_modules", ".bin", "oxlint"), stderr: stderr}
 	if q.changed {
-		if q.files = r.changedFiles(r.mergeBase()); len(q.files) == 0 {
+		base, err := r.mergeBase()
+		if err != nil {
+			return 0, err
+		}
+		if q.files, err = r.changedFiles(base); err != nil {
+			return 0, err
+		}
+		if len(q.files) == 0 {
 			return 0, nil
 		}
 	}
@@ -160,7 +167,10 @@ func (r runner) scope(q request) ([]string, error) {
 	}
 	files := q.files
 	if !q.changed {
-		files = r.changedFiles(*q.base)
+		var err error
+		if files, err = r.changedFiles(*q.base); err != nil {
+			return nil, err
+		}
 	}
 	nxJSON, err := os.ReadFile(filepath.Join(r.root, "nx.json"))
 	if err != nil {

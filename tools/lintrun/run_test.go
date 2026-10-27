@@ -138,6 +138,7 @@ func TestRunWithTypesAddsTheTypeAwareProcess(t *testing.T) {
 
 func TestRunChangedWithNothingChangedExitsQuietly(t *testing.T) {
 	w := newWorkspace(t)
+	w.git(t, "update-ref", "refs/remotes/origin/main", "HEAD")
 	if err := os.RemoveAll(filepath.Join(w.root, "generated")); err != nil {
 		t.Fatal(err)
 	}
@@ -145,6 +146,104 @@ func TestRunChangedWithNothingChangedExitsQuietly(t *testing.T) {
 
 	if code != 0 || stdout != "" || len(w.lintCalls(t)) != 0 {
 		t.Errorf("exit %d, stdout %q, calls %q; want a silent exit 0", code, stdout, w.lintCalls(t))
+	}
+}
+
+func (w workspace) git(t *testing.T, args ...string) {
+	t.Helper()
+	argv := append([]string{"-c", "user.name=t", "-c", "user.email=t@example.com"}, args...)
+	cmd := exec.Command("git", argv...)
+	cmd.Dir = w.root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+// commitChange commits apps/api/src/a.ts on a new branch and drops the untracked fixture,
+// so the tracked git diff is the only source of changed files.
+func (w workspace) commitChange(t *testing.T) {
+	t.Helper()
+	if err := os.RemoveAll(filepath.Join(w.root, "generated")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(w.root, "apps", "api", "src"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(w.root, "apps", "api", "src", "a.ts"), []byte("export {};\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	w.git(t, "checkout", "-q", "-b", "work")
+	w.git(t, "add", "apps/api/src/a.ts")
+	w.git(t, "commit", "-qm", "change")
+}
+
+func (w workspace) wantLinted(t *testing.T, file string, code int, stderr string) {
+	t.Helper()
+	want := "--quiet -f json -c .oxlintrc.native.jsonc --ignore-pattern generated/** " + file
+	if code != 0 || !slices.Contains(w.lintCalls(t), want) {
+		t.Errorf("exit %d, stderr %q, calls %q; want the committed change linted as %q", code, stderr, w.lintCalls(t), want)
+	}
+}
+
+func TestRunChangedLintsACommitSinceTheUpstream(t *testing.T) {
+	w := newWorkspace(t)
+	w.git(t, "branch", "trunk")
+	w.commitChange(t)
+	w.git(t, "branch", "--set-upstream-to=trunk")
+	code, _, stderr := w.run(t, `{"diagnostics":[]}`, "0", "--changed")
+
+	w.wantLinted(t, "apps/api/src/a.ts", code, stderr)
+}
+
+func TestRunChangedFallsBackToOriginMain(t *testing.T) {
+	w := newWorkspace(t)
+	w.git(t, "update-ref", "refs/remotes/origin/main", "HEAD")
+	w.commitChange(t)
+	code, _, stderr := w.run(t, `{"diagnostics":[]}`, "0", "--changed")
+
+	w.wantLinted(t, "apps/api/src/a.ts", code, stderr)
+}
+
+func TestRunChangedFallsBackToTheNamedIntegrationBranch(t *testing.T) {
+	w := newWorkspace(t)
+	w.git(t, "update-ref", "refs/remotes/origin/feat/strict-feature-layout-v0", "HEAD")
+	w.commitChange(t)
+	code, _, stderr := w.run(t, `{"diagnostics":[]}`, "0", "--changed")
+
+	w.wantLinted(t, "apps/api/src/a.ts", code, stderr)
+}
+
+func TestRunChangedFailsWhenNoMergeBaseExists(t *testing.T) {
+	w := newWorkspace(t)
+	w.commitChange(t)
+	code, _, stderr := w.run(t, `{"diagnostics":[]}`, "0", "--changed")
+
+	if code != 1 || !strings.Contains(stderr, "no merge base") || len(w.lintCalls(t)) != 0 {
+		t.Errorf("exit %d, stderr %q, calls %q; want a loud failure and no oxlint run", code, stderr, w.lintCalls(t))
+	}
+}
+
+func TestRunBaseFailsWhenGitCannotReadTheBase(t *testing.T) {
+	w := newWorkspace(t)
+	code, stdout, stderr := w.run(t, `{"diagnostics":[]}`, "0", "--base", "0123456789abcdef0123456789abcdef01234567")
+
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "git diff --name-only") || len(w.lintCalls(t)) != 0 {
+		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 naming the failed git diff", code, stdout, stderr)
+	}
+}
+
+func TestRunFailsWithOxlintsReasonWhenPrintConfigFails(t *testing.T) {
+	w := newWorkspace(t)
+	script := "#!/bin/sh\necho 'Failed to parse configuration file.' >&2\nexit 3\n"
+	if err := os.WriteFile(filepath.Join(w.root, "node_modules", ".bin", "oxlint"), []byte(script), 0o755); err != nil { //nolint:gosec // a test stand-in must be executable
+		t.Fatal(err)
+	}
+	code, _, stderr := w.run(t, "", "0", "--base", "HEAD")
+
+	for _, want := range []string{"oxlint --print-config -c .oxlintrc.jsonc failed", "exit status 3", "Failed to parse configuration file."} {
+		if code != 1 || !strings.Contains(stderr, want) {
+			t.Errorf("exit %d, stderr %q; want it to contain %q", code, stderr, want)
+		}
 	}
 }
 

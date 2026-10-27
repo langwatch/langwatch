@@ -93,7 +93,7 @@ func MergeDiagnostics(reports [][]Diagnostic) []Diagnostic {
 	return out
 }
 
-// uniqueDirectives is one report per key, in first-seen order, holding the last seen, as a JS Map does.
+// uniqueDirectives is one report per key, in first-seen order, holding the last seen.
 func uniqueDirectives(directives [][]Diagnostic) []Diagnostic {
 	index := map[string]int{}
 	var out []Diagnostic
@@ -118,7 +118,7 @@ func agreed(d Diagnostic, directives [][]Diagnostic) bool {
 }
 
 // SortByPosition orders diagnostics by file, line and column, keeping ties in place.
-// Files compare byte-wise; the JS runner used localeCompare.
+// Files compare byte-wise, not by locale.
 func SortByPosition(ds []Diagnostic) {
 	sort.SliceStable(ds, func(i, j int) bool {
 		a, b := ds[i], ds[j]

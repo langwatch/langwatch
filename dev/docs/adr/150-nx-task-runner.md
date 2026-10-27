@@ -354,7 +354,7 @@ rules did not use. The runner keeps a report only when every process made it; a
 per-rule report ("from `<rule>`") also stands where another process found the
 whole directive unused (`tools/lintrun/diagnostic.go`). Plain
 `pnpm lint` has no type-aware process, so a directive naming only type-aware
-rules reads as unused there, as it did before the split.
+rules is left unjudged there; the `--types` run reports it when it is unused.
 
 Measured on a frozen `git archive` copy, 4 shared cores; findings byte-identical
 (52 plain, 740 type-aware, unused directives included):
