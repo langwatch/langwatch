@@ -21,6 +21,7 @@ import {
 
 import {
   applyParametersToRows,
+  fillDeclaredColumns,
   JSON_COLUMN_TYPES,
   type LoadedDataset,
   normalizeColumnIdsToNames,
@@ -327,7 +328,7 @@ export class ExperimentExecutionDataService {
     // Caller parameters become constant columns across every row, and a single
     // synthetic row when there is no dataset.
     const { rows: datasetRows, columns: datasetColumns } = applyParametersToRows({
-      rows: baseDataset.rows,
+      rows: fillDeclaredColumns({ rows: baseDataset.rows, columns: baseDataset.columns }),
       columns: baseDataset.columns,
       parameters: inputs?.parameters,
     });

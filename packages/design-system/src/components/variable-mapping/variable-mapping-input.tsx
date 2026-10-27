@@ -263,6 +263,22 @@ function sourceTagLabel({ source, path }: { source: AvailableSource; path: strin
   return `${source.name || source.id}.${path.join(".")}`;
 }
 
+/**
+ * Whether a dataset mapping names a column the dataset does not have. Such a
+ * mapping reads nothing; a column that is only empty is still a column.
+ */
+function isMissingDatasetColumn({
+  source,
+  path,
+}: {
+  source: AvailableSource;
+  path: string[];
+}): boolean {
+  const column = path[0];
+  if (source.type !== "dataset" || column === undefined) return false;
+  return !source.fields.some((field) => field.name === column);
+}
+
 // ============================================================================
 // State transitions
 // ============================================================================
@@ -782,10 +798,25 @@ function SourceMappingTag({
   renderSourceIcon: RenderSourceIcon | undefined;
   onClear: () => void;
 }) {
+  const isMissingColumn = isMissingDatasetColumn(sourceInfo);
   return (
-    <Tag.Root size="md" colorPalette="blue" variant="subtle" data-testid="source-mapping-tag">
+    <Tag.Root
+      size="md"
+      colorPalette={isMissingColumn ? "red" : "blue"}
+      variant="subtle"
+      data-testid="source-mapping-tag"
+      {...(isMissingColumn
+        ? {
+            title: "This column is not in the dataset, so nothing is sent for it",
+            "data-missing-column": "true",
+          }
+        : {})}
+    >
       {renderSourceIcon?.(sourceInfo.source.type)}
-      <Tag.Label textStyle="monoSm">{sourceTagLabel(sourceInfo)}</Tag.Label>
+      <Tag.Label textStyle="monoSm">
+        {sourceTagLabel(sourceInfo)}
+        {isMissingColumn ? " (not in dataset)" : ""}
+      </Tag.Label>
       <Tag.EndElement>
         <Tag.CloseTrigger
           onClick={(e) => {

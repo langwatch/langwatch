@@ -40,6 +40,21 @@ export type MissingMapping = {
   fieldName: string;
   /** Whether this field is required (optional fields don't block execution) */
   isRequired: boolean;
+  /**
+   * Why it is reported: no mapping at all, or a mapping to a column the active
+   * dataset does not have. An empty column is a column and is never reported.
+   */
+  reason?: MissingMappingReason;
+  /** The column a `column_not_in_dataset` mapping names. */
+  columnName?: string;
+};
+
+export type MissingMappingReason = "unmapped" | "column_not_in_dataset";
+
+/** A dataset as column validation reads it: its id and its column names. */
+export type DatasetColumnsReference = {
+  id: string;
+  columns: readonly { name: string }[];
 };
 
 export type TargetValidationResult = {
@@ -69,6 +84,11 @@ export type PromptTemplateFieldsLookup = (target: TargetConfig) => Set<string> |
 
 export type MappingValidationOptions = {
   promptTemplateFields?: PromptTemplateFieldsLookup;
+  /**
+   * The workbench datasets. Given, a mapping to a column the validated dataset
+   * lacks is reported as `column_not_in_dataset`; a dataset not listed is not checked.
+   */
+  datasets?: readonly DatasetColumnsReference[];
 };
 
 export type WorkbenchValidationResult = {
@@ -190,6 +210,41 @@ export const getUsedFields = (
 
 type DatasetMappings = TargetConfig["mappings"][string];
 
+/**
+ * The mappings among `fieldIds` that read a dataset column the active dataset
+ * does not have. Such a field reads nothing, so it blocks the run like a gap,
+ * unless it is in `defaultedIds` (an input the target fills with its own default).
+ * @see specs/experiments-v3/mapping-validation.feature
+ */
+const mappingsToMissingColumns = ({
+  fieldIds,
+  datasetMappings,
+  dataset,
+  defaultedIds = new Set(),
+}: {
+  fieldIds: Iterable<string>;
+  datasetMappings: DatasetMappings;
+  dataset: DatasetColumnsReference | undefined;
+  defaultedIds?: ReadonlySet<string>;
+}): MissingMapping[] => {
+  if (!dataset) return [];
+  const columnNames = new Set(dataset.columns.map((column) => column.name));
+  const gaps: MissingMapping[] = [];
+  for (const fieldId of fieldIds) {
+    const mapping = datasetMappings[fieldId];
+    if (mapping?.type !== "source" || mapping.source !== "dataset") continue;
+    if (columnNames.has(mapping.sourceField)) continue;
+    gaps.push({
+      fieldId,
+      fieldName: fieldId,
+      isRequired: !defaultedIds.has(fieldId),
+      reason: "column_not_in_dataset",
+      columnName: mapping.sourceField,
+    });
+  }
+  return gaps;
+};
+
 const requiredGap = (fieldId: string): MissingMapping => ({
   fieldId,
   fieldName: fieldId,
@@ -250,10 +305,12 @@ const httpAgentValidation = ({
   target,
   inputs,
   datasetMappings,
+  dataset,
 }: {
   target: TargetConfig;
   inputs: readonly { identifier: string }[];
   datasetMappings: DatasetMappings;
+  dataset: DatasetColumnsReference | undefined;
 }): TargetValidationResult => {
   const templateVars = extractVariablesFromBodyTemplate(target.httpConfig?.bodyTemplate);
   const httpFieldIds = new Set(
@@ -263,11 +320,24 @@ const httpAgentValidation = ({
   const hasAtLeastOneMapping = Object.entries(datasetMappings).some(
     ([fieldId, mapping]) => mapping !== undefined && httpFieldIds.has(fieldId),
   );
-  const missingMappings = [...httpFieldIds]
+  const unmapped = [...httpFieldIds]
     .filter((fieldId) => datasetMappings[fieldId] === undefined)
-    .map((fieldId) => ({ fieldId, fieldName: fieldId, isRequired: false }));
+    .map((fieldId): MissingMapping => ({
+      fieldId,
+      fieldName: fieldId,
+      isRequired: false,
+      reason: "unmapped",
+    }));
+  const missingColumns = mappingsToMissingColumns({
+    fieldIds: httpFieldIds,
+    datasetMappings,
+    dataset,
+  });
 
-  return { isValid: httpFieldIds.size === 0 || hasAtLeastOneMapping, missingMappings };
+  return {
+    isValid: (httpFieldIds.size === 0 || hasAtLeastOneMapping) && missingColumns.length === 0,
+    missingMappings: [...unmapped, ...missingColumns],
+  };
 };
 
 /** Prompts and code/connected agents: every used, declared field must be mapped. */
@@ -275,11 +345,13 @@ const usedFieldsValidation = ({
   target,
   inputs,
   datasetMappings,
+  dataset,
   options,
 }: {
   target: TargetConfig;
   inputs: readonly { identifier: string }[];
   datasetMappings: DatasetMappings;
+  dataset: DatasetColumnsReference | undefined;
   options?: MappingValidationOptions;
 }): TargetValidationResult => {
   const { usedFields, isProven } = resolveUsedFields(target, options);
@@ -296,10 +368,24 @@ const usedFieldsValidation = ({
   // so its gaps are advisory: a scaffolded but unreferenced variable neither warns nor blocks.
   const isRequired = !(target.type === "prompt" && !isProven);
 
-  const missingMappings = [...usedFields]
+  const unmapped = [...usedFields]
     .filter((fieldId) => inputIds.has(fieldId) && !defaultedIds.has(fieldId))
     .filter((fieldId) => datasetMappings[fieldId] === undefined)
-    .map((fieldId) => ({ fieldId, fieldName: fieldId, isRequired }));
+    .map((fieldId): MissingMapping => ({
+      fieldId,
+      fieldName: fieldId,
+      isRequired,
+      reason: "unmapped",
+    }));
+  const missingMappings = [
+    ...unmapped,
+    ...mappingsToMissingColumns({
+      fieldIds: [...inputIds].filter((fieldId) => usedFields.has(fieldId)),
+      datasetMappings,
+      dataset,
+      defaultedIds,
+    }),
+  ];
 
   return {
     isValid: missingMappings.filter((m) => m.isRequired).length === 0,
@@ -317,6 +403,7 @@ export const getTargetMissingMappings = (
   options?: MappingValidationOptions,
 ): TargetValidationResult => {
   const datasetMappings = target.mappings[datasetId] ?? {};
+  const dataset = options?.datasets?.find((candidate) => candidate.id === datasetId);
   // localPromptConfig.inputs carries the latest form state; target.inputs is the fallback.
   const inputs = target.localPromptConfig?.inputs ?? target.inputs ?? [];
 
@@ -324,10 +411,10 @@ export const getTargetMissingMappings = (
   if (targetComparison) return comparisonTargetValidation(targetComparison);
   if (target.type === "evaluator") return evaluatorTargetValidation({ target, datasetMappings });
   if (target.type === "agent" && "agentType" in target && target.agentType === "http") {
-    return httpAgentValidation({ target, inputs, datasetMappings });
+    return httpAgentValidation({ target, inputs, datasetMappings, dataset });
   }
 
-  return usedFieldsValidation({ target, inputs, datasetMappings, options });
+  return usedFieldsValidation({ target, inputs, datasetMappings, dataset, options });
 };
 
 /** Whether `target` is still missing a mapping it needs against `datasetId`. */
@@ -547,6 +634,7 @@ export const validateWorkbench = ({
   evaluators,
   activeDatasetId,
   promptTemplateFields,
+  datasets,
 }: {
   targets: TargetConfig[];
   evaluators: EvaluatorConfig[];
@@ -556,6 +644,7 @@ export const validateWorkbench = ({
   for (const target of targets) {
     const validation = getTargetMissingMappings(target, activeDatasetId, {
       promptTemplateFields,
+      ...(datasets ? { datasets } : {}),
     });
     if (!validation.isValid) {
       return {
