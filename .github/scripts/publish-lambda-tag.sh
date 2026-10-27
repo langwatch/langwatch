@@ -38,6 +38,14 @@ is_single_manifest() {
   esac
 }
 
+# Succeeds when tag $1 is in ECR, fails when it is not; a lookup that does not
+# answer stops the script.
+tag_exists() {
+  local found
+  found=$(bash "${SCRIPT_DIR}/ecr-tag-exists.sh" "${image}" "$1") || exit 1
+  [ "${found}" = "true" ]
+}
+
 media_type_of() {
   aws ecr describe-images --repository-name "${image}" --image-ids imageTag="$1" \
     --query 'imageDetails[0].imageManifestMediaType' --output text
@@ -57,6 +65,10 @@ put_manifest() {
   fi
   if grep -q ImageAlreadyExistsException <<<"${out}"; then
     return 0
+  fi
+  # The tag already names another image, and the repository's tags are immutable.
+  if grep -q ImageTagAlreadyExistsException <<<"${out}"; then
+    echo "::error::${image}:${to} already names another image and cannot be moved"
   fi
   echo "${out}" >&2
   return 1
@@ -79,6 +91,9 @@ if [ "${IMAGE_WAS_BUILT}" = "true" ]; then
     echo "::error::${image}:${IMAGE_TAG} is ${media_type}, not a single manifest; see build-and-push-lambda"
     exit 1
   fi
+elif tag_exists "${IMAGE_TAG}"; then
+  # An earlier run already published it, and the tag cannot be moved.
+  echo "${image}:${IMAGE_TAG} is already in ECR; nothing to re-tag"
 else
   # Not rebuilt: re-tag the image built from the nearest ancestor of this
   # commit (see nearest-ancestor-tag.sh).

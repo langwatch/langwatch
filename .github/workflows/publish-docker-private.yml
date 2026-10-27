@@ -129,8 +129,36 @@ jobs:
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${REGISTRY}"
 
+      # The tags are immutable. A second dispatch of the same ref finds its
+      # default ref-<sha10> and skips the build; a custom tag already there names
+      # another build and cannot be moved. Inline, not ecr-tag-exists.sh: the
+      # checkout is the built ref, which may predate that script.
+      - name: Check whether the tag is already published
+        id: exists
+        env:
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+          SHA: ${{ steps.meta.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if aws ecr describe-images --repository-name "${IMAGE}" --image-ids imageTag="${IMAGE_TAG}" \
+              >/dev/null 2>"${RUNNER_TEMP}/describe.err"; then
+            if [ "${IMAGE_TAG}" != "ref-${SHA:0:10}" ]; then
+              echo "::error::${IMAGE}:${IMAGE_TAG} already exists and ECR tags cannot be moved; pick a new ref- tag"
+              exit 1
+            fi
+            echo "::notice::${IMAGE}:${IMAGE_TAG} is already in ECR; skipping the build"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif grep -q ImageNotFoundException "${RUNNER_TEMP}/describe.err"; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            cat "${RUNNER_TEMP}/describe.err" >&2
+            echo "::error::could not look up ${IMAGE}:${IMAGE_TAG} in ECR"
+            exit 1
+          fi
+
       - name: Build and push
         id: build
+        if: steps.exists.outputs.exists != 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -151,9 +179,14 @@ jobs:
         env:
           IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          EXISTS: ${{ steps.exists.outputs.exists }}
           REF: ${{ inputs.ref }}
           SHA: ${{ steps.meta.outputs.sha }}
         run: |
+          if [ "${EXISTS}" = "true" ]; then
+            echo "\`${IMAGE}:${IMAGE_TAG}\` was already in ECR (ref \`${REF}\`, \`${SHA}\`); nothing was built" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           {
             echo "Published \`${IMAGE}:${IMAGE_TAG}\` to ECR (ref \`${REF}\`, \`${SHA}\`)"
             echo ""

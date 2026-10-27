@@ -87,3 +87,36 @@ Feature: Publish every deployable image to the artifacts registry
     Given a Lambda image whose base sets a home directory only its own user may enter
     When the image's Dockerfile is checked
     Then its runtime stage sets a working directory outside every home directory
+
+  # The artifacts repositories' tags are immutable, so every push checks first.
+  # The lookup is .github/scripts/ecr-tag-exists.sh, bound by
+  # .github/scripts/__tests__/ecr-tag-exists.test.sh; the Lambda re-tag by
+  # publish-lambda-tag.test.sh. The build steps' gates are proved by a re-run.
+
+  @unit
+  Scenario: A re-run publishes nothing that is already there
+    Given an earlier run published the git-<short sha> tags of a commit
+    When publish-docker-ecr runs again for that commit, by a re-run or a dispatch
+    Then it builds, pushes and re-tags no image whose tag is already in the registry
+    And every tag already there still names the image it named before
+    And the run succeeds
+
+  @unit
+  Scenario: A lookup that does not answer whether a tag is there fails the run
+    Given the registry answers a tag lookup with an error other than "image not found"
+    When publish-docker-ecr checks whether a tag is already published
+    Then it fails and shows the registry's error
+    And it writes no tag
+
+  @unit
+  Scenario: A tag that already names another image fails the run
+    Given the commit tag of an evaluator image appears between the check and the write, naming another image
+    When publish-docker-ecr re-tags that image
+    Then it fails, saying the tag cannot be moved, instead of counting the image as published
+
+  @unimplemented
+  Scenario: A private build never reuses a custom tag
+    Given publish-docker-private already published langwatch-app under a tag
+    When it is dispatched again
+    Then with the default ref-<sha10> tag it skips the build and succeeds
+    And with a custom tag it fails and asks for a new ref- tag

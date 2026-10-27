@@ -199,6 +199,50 @@ test_an_older_ancestor_pushed_later_does_not_win() {
   fi
 }
 
+# @scenario "A re-run publishes nothing that is already there"
+test_a_tag_already_in_ecr_is_left_as_it_is() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
+  # An earlier run published this commit, from an image the re-tag would not pick.
+  push "$reg" "git-$HEAD_SHA" "$PLAIN" '{"published":true}'
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=false
+  if [ "$LAST_STATUS" -eq 0 ] && [ "$(manifest_at "$reg" "git-$HEAD_SHA")" = '{"published":true}' ] \
+      && [ ! -f "$reg/calls" ]; then
+    record yes "a tag already in ECR succeeds and is not written again"
+  else
+    record no "a tag already in ECR succeeds and is not written again"
+  fi
+}
+
+# @scenario "A lookup that does not answer whether a tag is there fails the run"
+test_a_failed_existence_check_fails_and_writes_nothing() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=false STUB_DESCRIBE_ERROR=AccessDeniedException
+  if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q AccessDeniedException \
+      && [ ! -f "$reg/calls" ]; then
+    record yes "a failed existence check fails, shows the registry error and writes nothing"
+  else
+    record no "a failed existence check fails, shows the registry error and writes nothing"
+  fi
+}
+
+# @scenario "A tag that already names another image fails the run"
+test_a_tag_holding_another_image_fails() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
+  # The tag appears between the check and the write, holding another digest.
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=false STUB_PUT_ERROR=ImageTagAlreadyExistsException
+  if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q "cannot be moved"; then
+    record yes "ImageTagAlreadyExistsException fails instead of counting as published"
+  else
+    record no "ImageTagAlreadyExistsException fails instead of counting as published"
+  fi
+}
+
 # @scenario "A Lambda image is never re-tagged from an index"
 test_a_lambda_image_is_never_retagged_from_an_index() {
   local reg
@@ -308,6 +352,9 @@ test_a_tag_that_cannot_be_written_fails() {
 
 test_an_unchanged_image_gets_the_commit_tag
 test_an_image_from_another_line_is_never_retagged
+test_a_tag_already_in_ecr_is_left_as_it_is
+test_a_failed_existence_check_fails_and_writes_nothing
+test_a_tag_holding_another_image_fails
 test_an_older_ancestor_pushed_later_does_not_win
 test_an_image_with_no_earlier_image_warns_and_writes_nothing
 test_a_tag_that_cannot_be_written_fails
