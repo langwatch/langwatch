@@ -20,7 +20,13 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { bootLiveApi, liveDatabaseUrl, liveStoresConfigured } from "./api-live.fixture.ts";
+import {
+  bootLiveApi,
+  liveDatabaseUrl,
+  liveStoresConfigured,
+  removeSeededTraces,
+  seedTraceSummary,
+} from "./api-live.fixture.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -41,6 +47,8 @@ const connection = stores
 const prisma = connection?.client as PrismaClient;
 
 const ns = generate("test").toString().toLowerCase();
+
+const TRACE_ID = `trace-${ns}`;
 
 const RUN_KEY_PERMISSIONS = ["traces:create", "traces:view", "scenarios:create"];
 
@@ -149,6 +157,7 @@ describe.skipIf(!stores)("given a scenario run started with a service key", () =
       },
     });
     projectId = project.id;
+    await seedTraceSummary({ tenantId: projectId, traceId: TRACE_ID });
     serviceKey = await seedKey({ name: `service ${ns}`, permissions: RUN_KEY_PERMISSIONS });
     runKey = (
       await seedKey({
@@ -170,6 +179,7 @@ describe.skipIf(!stores)("given a scenario run started with a service key", () =
 
   afterAll(async () => {
     await api?.close();
+    if (projectId) await removeSeededTraces({ tenantIds: [projectId] });
     if (organizationId) {
       await prisma.grant.deleteMany({ where: { organizationId } });
       await prisma.role.deleteMany({ where: { organizationId } });
@@ -177,8 +187,10 @@ describe.skipIf(!stores)("given a scenario run started with a service key", () =
       // Children first: a run key holds its parent by a foreign key.
       await prisma.apiKey.deleteMany({ where: { organizationId, parentApiKeyId: { not: null } } });
       await prisma.apiKey.deleteMany({ where: { organizationId } });
-      await prisma.project.deleteMany({ where: { teamId } });
-      await prisma.team.deleteMany({ where: { id: teamId } });
+      if (teamId) {
+        await prisma.project.deleteMany({ where: { teamId } });
+        await prisma.team.deleteMany({ where: { id: teamId } });
+      }
       await prisma.organization.deleteMany({ where: { id: organizationId } });
     }
     await connection?.closeOnce();
@@ -187,18 +199,19 @@ describe.skipIf(!stores)("given a scenario run started with a service key", () =
   describe("when the run's key was minted under the service key", () => {
     /** @scenario "A run started with a service key reads its own project's traces" */
     it.each([
-      ["the legacy single-trace read", () => `/api/trace/trace-${ns}`],
-      ["the v1 trace read", () => `/api/traces/trace-${ns}`],
-    ])("passes the door on %s and answers the trace's absence", async (_, path) => {
+      ["the legacy single-trace read", () => `/api/trace/${TRACE_ID}`],
+      ["the v1 trace read", () => `/api/traces/${TRACE_ID}`],
+    ])("reads the trace on %s", async (_, path) => {
       const read = await readTrace({ token: runKey, path: path() });
 
-      expect(read.status, read.body).toBe(404);
+      expect(read.status, read.body).toBe(200);
+      expect(read.body).toContain(TRACE_ID);
     });
   });
 
   describe("when the run's key names neither a person nor a starting key", () => {
     it("is refused with permission_denied", async () => {
-      const read = await readTrace({ token: unattendedRunKey, path: `/api/trace/trace-${ns}` });
+      const read = await readTrace({ token: unattendedRunKey, path: `/api/trace/${TRACE_ID}` });
 
       expect(read.status).toBe(403);
       expect(read.body).toContain("permission_denied");
