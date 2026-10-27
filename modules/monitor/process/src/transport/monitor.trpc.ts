@@ -4,6 +4,8 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { MonitorApi, monitorTrpc } from "@langwatch/monitor-contract";
 
+import { monitorWriterOf } from "../rules/monitor-actor.rules.ts";
+
 export const monitorTrpcTransport: TrpcRouterDeclaration<MonitorApi, typeof monitorTrpc> =
   defineTrpcRouter(MonitorApi, monitorTrpc)
     .procedure("getAllForProject")
@@ -20,20 +22,20 @@ export const monitorTrpcTransport: TrpcRouterDeclaration<MonitorApi, typeof moni
 
     .procedure("create")
     .withPermission("evaluations:create")
-    .handle(async ({ app, input }) => {
+    .handle(async ({ app, input, actor }) => {
       const { settings: parameters, ...rest } = input;
       await app.assertCheckRunnable({ checkType: input.checkType, parameters });
 
-      return app.create({ ...rest, parameters });
+      return app.create({ ...rest, parameters, ...monitorWriterOf(actor) });
     })
 
     .procedure("update")
     .withPermission("evaluations:update")
-    .handle(async ({ app, input }) => {
+    .handle(async ({ app, input, actor }) => {
       const { settings: parameters, ...rest } = input;
       await app.assertCheckRunnable({ checkType: input.checkType, parameters });
 
-      return app.update({ ...rest, parameters });
+      return app.update({ ...rest, parameters, ...monitorWriterOf(actor) });
     })
 
     .procedure("toggle")

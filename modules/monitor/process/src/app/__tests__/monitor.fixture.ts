@@ -67,6 +67,16 @@ export class FakeMonitorEvaluators {
     return this.#known.has(input.id) ? this.getById(input) : undefined;
   }
 
+  /** Config each evaluator holds at a deploy label, as `labelled[evaluatorId][label]`. */
+  readonly labelled: Record<string, Record<string, unknown>> = {};
+
+  async atLabelOrLatest(input: { evaluator: Evaluator; label: string }): Promise<Evaluator> {
+    const config = this.labelled[input.evaluator.id]?.[input.label];
+    return config === undefined
+      ? input.evaluator
+      : evaluatorSchema.parse({ ...input.evaluator, config });
+  }
+
   async archive(input: { id: string; projectId: string }): Promise<Evaluator> {
     this.archived.push(input);
 
@@ -149,6 +159,7 @@ export function createMonitorTestApp(
       evaluators: createApiFixture<EvaluatorApi>({
         getById: (scope) => evaluators.getById(scope),
         findById: (scope) => evaluators.findById(scope),
+        atLabelOrLatest: (pinned) => evaluators.atLabelOrLatest(pinned),
         archive: (scope) => evaluators.archive(scope),
         copy: (copy) => replication.copy(copy),
       }),

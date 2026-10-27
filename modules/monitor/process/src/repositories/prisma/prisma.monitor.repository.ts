@@ -228,6 +228,9 @@ export class PrismaMonitorRepository
         level: input.level ?? "trace",
         threadIdleTimeout: input.threadIdleTimeout,
         slug: input.slug,
+        evaluatorLabel: input.evaluatorLabel ?? null,
+        createdById: input.actorId ?? null,
+        updatedById: input.actorId ?? null,
       },
     });
 
@@ -252,6 +255,9 @@ export class PrismaMonitorRepository
         level: input.level,
         threadIdleTimeout: input.threadIdleTimeout,
         slug: input.slug,
+        evaluatorLabel: input.evaluatorLabel ?? null,
+        createdById: input.createdById ?? null,
+        updatedById: input.createdById ?? null,
       },
     });
 
@@ -280,6 +286,8 @@ export class PrismaMonitorRepository
           ...(input.threadIdleTimeout !== undefined
             ? { threadIdleTimeout: input.threadIdleTimeout }
             : {}),
+          ...(input.evaluatorLabel !== undefined ? { evaluatorLabel: input.evaluatorLabel } : {}),
+          ...(input.actorId !== undefined ? { updatedById: input.actorId } : {}),
           slug: input.slug,
         },
       }),

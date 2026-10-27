@@ -105,6 +105,7 @@ export class MonitorModule implements MonitorApi {
       repository: repositories.monitors,
       evaluators: dependencies.evaluators,
       featureFlags: dependencies.featureFlags,
+      users: dependencies.users,
       generateId: () => generate(MONITOR_KSUID_RESOURCE).toString(),
     });
     this.#catalogue = MonitorCatalogService.create({ repository: repositories.monitors });
@@ -238,6 +239,8 @@ export class MonitorModule implements MonitorApi {
       sample: changes.sample ?? existing.sample,
       enabled: changes.enabled,
       evaluatorId: changes.evaluatorId,
+      evaluatorLabel: changes.evaluatorLabel,
+      actorId: input.actorId,
       level: changes.level ?? (existing.level as "trace" | "thread"),
       threadIdleTimeout:
         changes.threadIdleTimeout !== undefined
@@ -294,6 +297,7 @@ export class MonitorModule implements MonitorApi {
         sourceProjectId,
         targetProjectId,
         evaluatorId: newEvaluatorId,
+        actorId: actor.id,
       });
     } catch (createError) {
       await this.#replication.rollback({
