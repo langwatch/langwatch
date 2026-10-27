@@ -1657,6 +1657,15 @@ containers:
       value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
     - name: LANGWATCH_ENDPOINT
       value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+    {{- /* Node sizes the heap at about half of the memory it sees, so a 4Gi worker
+           died of heap exhaustion with 2 GiB of its container free. Three quarters leaves a quarter for memory outside the
+           heap. Only with a limit: without one the percentage is of the whole
+           node. Before the extraEnvs, so an operator's NODE_OPTIONS wins.
+           specs/setup/helm-worker-heap-ceiling.feature */}}
+    {{- if dig "limits" "memory" "" (.Values.workers.resources | default dict) }}
+    - name: NODE_OPTIONS
+      value: "--max-old-space-size-percentage=75"
+    {{- end }}
     {{- /* Everything the app is given beyond its port and its own address:
            the worker parses the same config over the same modules (Alex,
            2026-09-30), including the Langy pair its turns are dispatched

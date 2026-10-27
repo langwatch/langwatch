@@ -282,6 +282,18 @@ jobs:
         if: "!cancelled()"
         run: ./tests/redis-maxmemory.sh
 
+      # The worker's heap ceiling follows its memory limit, so a heavy job
+      # does not exhaust a half-size heap with the container half empty.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: "!cancelled()"
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      - name: "assert worker heap ceiling follows the memory limit"
+        if: "!cancelled()"
+        working-directory: .
+        run: go run ./cmd/chartheap
+
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
       # hook that orders them is a template over several values, so which
