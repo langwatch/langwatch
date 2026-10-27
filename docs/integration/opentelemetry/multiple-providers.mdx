@@ -50,7 +50,7 @@ langwatch.setup(api_key="...", tracer_provider=langwatch_provider)
 @langwatch.trace(name="llm-call")
 def chat(user_message: str):
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[{"role": "user", "content": user_message}],
     )
     return response.choices[0].message.content

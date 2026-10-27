@@ -239,7 +239,7 @@ client = OpenAI()
 
 def chat(message: str):
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[{"role": "user", "content": message}]
     )
     return response.choices[0].message.content
@@ -261,7 +261,7 @@ def chat(message: str):
     )
 
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[{"role": "user", "content": message}]
     )
     return response.choices[0].message.content
@@ -488,7 +488,7 @@ Create a new prompt in the LangWatch project.
 **Parameters:**
 - `name` (required): Prompt name
 - `messages` (required): Array of `{role, content}` messages
-- `model` (required): Model name (e.g., `"gpt-5-mini"`, `"claude-sonnet-4-5-20250929"`)
+- `model` (required): Model name (e.g., `"gpt-6-luna"`, `"claude-sonnet-4-5-20250929"`)
 - `modelProvider` (required): Provider name (e.g., `"openai"`, `"anthropic"`)
 - `handle` (optional): URL-friendly handle
 - `description` (optional): Prompt description

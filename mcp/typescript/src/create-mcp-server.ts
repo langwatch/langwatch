@@ -38,7 +38,7 @@ import { handleUpdateTestSuite } from "./tools/update-test-suite.ts";
 const modelSchema = z
   .string()
   .describe(
-    'Model in "provider/model-name" format, e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-5-20250929"',
+    'Model in "provider/model-name" format, e.g., "openai/gpt-6-luna", "anthropic/claude-sonnet-4-5-20250929"',
   );
 
 /**

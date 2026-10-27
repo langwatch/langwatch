@@ -23,7 +23,7 @@ curl https://gateway.langwatch.ai/v1/responses \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-5-mini",
+    "model": "gpt-6-luna",
     "input": "Hi",
     "stream": false
   }'
@@ -35,7 +35,7 @@ curl https://gateway.langwatch.ai/v1/responses \
 {
   "id": "resp_abc123",
   "object": "response",
-  "model": "gpt-5-mini",
+  "model": "gpt-6-luna",
   "status": "completed",
   "output": [
     {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "Hello!"}]}

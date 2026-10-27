@@ -23,8 +23,8 @@ OpenAI's own `list` shape:
   "data": [
     { "id": "claude-sonnet-4-5", "object": "model", "created": 0, "owned_by": "anthropic" },
     { "id": "complex", "object": "model", "created": 0, "owned_by": "anthropic" },
-    { "id": "europe/gpt-5-mini", "object": "model", "created": 0, "owned_by": "openai" },
-    { "id": "gpt-5-mini", "object": "model", "created": 0, "owned_by": "openai" }
+    { "id": "europe/gpt-6-luna", "object": "model", "created": 0, "owned_by": "openai" },
+    { "id": "gpt-6-luna", "object": "model", "created": 0, "owned_by": "openai" }
   ]
 }
 ```
@@ -54,7 +54,7 @@ When the key runs on a routing policy, the reserved tier names `complex`, `reaso
 
 ### Providers with an instance handle
 
-A model from a provider that has an [instance handle](/ai-gateway/model-naming#instance-handles) is listed under the handle-qualified id, for example `europe/gpt-5-mini`. That id is the only name that reaches that provider when the key holds two of the same family. `owned_by` stays the provider family, because that is what a model picker groups by.
+A model from a provider that has an [instance handle](/ai-gateway/model-naming#instance-handles) is listed under the handle-qualified id, for example `europe/gpt-6-luna`. That id is the only name that reaches that provider when the key holds two of the same family. `owned_by` stays the provider family, because that is what a model picker groups by.
 
 ## Incomplete discovery
 

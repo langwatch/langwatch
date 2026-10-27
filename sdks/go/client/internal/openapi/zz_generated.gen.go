@@ -48934,7 +48934,7 @@ type PostApiScenariosJSONBody struct {
 	// Fields The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field.
 	Fields *map[string]PostApiScenariosJSONBody_Fields_AdditionalProperties `json:"fields,omitempty"`
 
-	// JudgeModel Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+	// JudgeModel Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
 	JudgeModel *PostApiScenariosJSONBody_JudgeModel `json:"judgeModel,omitempty"`
 	Labels     *[]string                            `json:"labels,omitempty"`
 
@@ -48956,7 +48956,7 @@ type PostApiScenariosJSONBody struct {
 		Type         *PostApiScenariosJSONBodyParametersType             `json:"type,omitempty"`
 	} `json:"parameters,omitempty"`
 
-	// SimulatorModel Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.
+	// SimulatorModel Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.
 	SimulatorModel *PostApiScenariosJSONBody_SimulatorModel `json:"simulatorModel,omitempty"`
 	Situation      string                                   `json:"situation"`
 
@@ -49170,7 +49170,7 @@ type PatchApiScenariosByIdJSONBody struct {
 	// Fields The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value.
 	Fields *map[string]PatchApiScenariosByIdJSONBody_Fields_AdditionalProperties `json:"fields,omitempty"`
 
-	// JudgeModel Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+	// JudgeModel Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
 	JudgeModel *PatchApiScenariosByIdJSONBody_JudgeModel `json:"judgeModel,omitempty"`
 	Labels     *[]string                                 `json:"labels,omitempty"`
 
@@ -49192,7 +49192,7 @@ type PatchApiScenariosByIdJSONBody struct {
 		Type         *PatchApiScenariosByIdJSONBodyParametersType             `json:"type,omitempty"`
 	} `json:"parameters,omitempty"`
 
-	// SimulatorModel Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.
+	// SimulatorModel Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.
 	SimulatorModel *PatchApiScenariosByIdJSONBody_SimulatorModel `json:"simulatorModel,omitempty"`
 	Situation      *string                                       `json:"situation,omitempty"`
 
@@ -49345,7 +49345,7 @@ type PutApiScenariosByIdJSONBody struct {
 	// Fields The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value.
 	Fields *map[string]PutApiScenariosByIdJSONBody_Fields_AdditionalProperties `json:"fields,omitempty"`
 
-	// JudgeModel Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+	// JudgeModel Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
 	JudgeModel *PutApiScenariosByIdJSONBody_JudgeModel `json:"judgeModel,omitempty"`
 	Labels     *[]string                               `json:"labels,omitempty"`
 
@@ -49367,7 +49367,7 @@ type PutApiScenariosByIdJSONBody struct {
 		Type         *PutApiScenariosByIdJSONBodyParametersType             `json:"type,omitempty"`
 	} `json:"parameters,omitempty"`
 
-	// SimulatorModel Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.
+	// SimulatorModel Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.
 	SimulatorModel *PutApiScenariosByIdJSONBody_SimulatorModel `json:"simulatorModel,omitempty"`
 	Situation      *string                                     `json:"situation,omitempty"`
 
