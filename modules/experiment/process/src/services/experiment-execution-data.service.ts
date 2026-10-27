@@ -118,6 +118,7 @@ type TargetForLoading = {
   promptId?: string;
   promptVersionNumber?: number;
   dbAgentId?: string;
+  agentLabel?: string;
   /** For evaluator targets: the database evaluator ID */
   targetEvaluatorId?: string;
   /** For workflow targets: the studio workflow ID and pinned version */

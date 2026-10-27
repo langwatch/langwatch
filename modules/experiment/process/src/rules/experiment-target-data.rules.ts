@@ -9,7 +9,7 @@ import type { TargetConfig } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 import type { LoadedWorkflow } from "../services/experiment-execution-data.service.ts";
-import { promptLoadKey, workflowLoadKey } from "./experiment-execution-data.rules.ts";
+import { agentLoadKey, promptLoadKey, workflowLoadKey } from "./experiment-execution-data.rules.ts";
 
 /** A loaded agent, with the Studio workflow it wraps when it is a workflow-type agent. */
 function loadedDataForAgent({
@@ -55,7 +55,7 @@ export function loadedDataForTarget({
   }
 
   if (targetConfig.type === "agent" && targetConfig.dbAgentId) {
-    const agent = loadedAgents.get(targetConfig.dbAgentId);
+    const agent = loadedAgents.get(agentLoadKey(targetConfig));
     if (agent) {
       return loadedDataForAgent({ agent, loadedWorkflows });
     }

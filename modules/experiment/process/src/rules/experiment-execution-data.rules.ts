@@ -188,6 +188,13 @@ export function promptLoadKey(target: { promptId?: string; promptVersionNumber?:
   return `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
 }
 
+/** The loaded-agents key: the agent id, plus the deploy label when the target pins one. */
+export function agentLoadKey(target: { dbAgentId?: string; agentLabel?: string }): string {
+  return target.agentLabel
+    ? `${target.dbAgentId ?? ""}@${target.agentLabel}`
+    : (target.dbAgentId ?? "");
+}
+
 /** The bytes one row holds, as the JSON it is stored and sent as. */
 export function rowBytesOf(entry: Record<string, unknown>): number {
   return Buffer.byteLength(JSON.stringify(entry) ?? "");
