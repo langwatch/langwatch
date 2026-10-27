@@ -1,4 +1,3 @@
-import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
 /**
  * `/api/v1/dashboards` and the Reports boards at `/api/v1/analytics/reports`, over the real
  * dashboard application and memory repositories. The project comes from the key;
@@ -7,6 +6,7 @@ import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytic
  * @see specs/analytics/dashboard-rest-api.feature
  * @vitest-environment node
  */
+import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
 import {
   bindMiddlewareContext,
   canonicalErrorResponse,

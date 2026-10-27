@@ -1,3 +1,4 @@
+import { curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
 import { type DashboardWidget, DashboardWidgetNotFoundError } from "@langwatch/analytics-contract";
 import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 /**
@@ -284,12 +285,15 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     resource: "dashboard widget",
     action: "delete",
     idParam: "widgetId",
-    name: ({ app, projectId, id, ownerUserId }) =>
-      nameUnlessMissing({
-        read: app.getDashboardWidget({ projectId, id, ...viewerOfOwner({ ownerUserId }) }),
-        missing: DashboardWidgetNotFoundError,
-        nameOf: (widget) => widget.name,
-      }),
+    // A From LangWatch widget can never be deleted, so it gets no card: the delete answers 404.
+    name: async ({ app, projectId, id, ownerUserId }) =>
+      curatedBoardWidgetById(id)
+        ? undefined
+        : nameUnlessMissing({
+            read: app.getDashboardWidget({ projectId, id, ...viewerOfOwner({ ownerUserId }) }),
+            missing: DashboardWidgetNotFoundError,
+            nameOf: (widget) => widget.name,
+          }),
   })
   .withOutput(z.void())
   .withDocs({
