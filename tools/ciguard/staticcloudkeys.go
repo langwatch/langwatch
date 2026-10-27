@@ -19,8 +19,9 @@ const awsKeyName = `aws[_-](?:access[_-]key[_-]id|secret[_-]access[_-]key|sessio
 // awsKeyAssignment finds where a line sets an AWS key: a YAML key, `X=`,
 // `export X=`, `-e X=`, or `aws configure set [profile.]x`. A read
 // (`env.X`, `outputs.x`, `$X`, `${X}`) is not an assignment.
-var awsKeyAssignment = regexp.MustCompile(`(?i)(?:(?:^|[^\w.${-]|[^$]\{|\\n)['"]?` + awsKeyName + `['"]?\s*[:=]` +
-	`|\bset\s+(?:[\w.-]+\.)?` + awsKeyName + `\s)\s*`)
+var awsKeyAssignment = regexp.MustCompile(`(?i)(?:(?:^|[^\w.${-]|[^$]\{|\\(?:n|x0a|012)|-e|--|process\.env\.)['"]?` + awsKeyName + `['"]?\s*(?:[:=]|<<|\+=)` +
+	`|\$\{` + awsKeyName + `:=` +
+	`|\bset\s+['"]?(?:[\w.-]+\.)?` + awsKeyName + `['"]?\s)\s*`)
 
 // awsKeyFromSession is the only value an AWS key may take: an OIDC step's
 // output or a shell variable, whole. Anything else (secrets, vars, inputs,
@@ -29,8 +30,10 @@ var awsKeyFromSession = regexp.MustCompile(`(?i)^['"]?(?:\$\{\{\s*steps\.[\w-]+\
 
 // storedAWSKey is refused anywhere: a secret or var named for a key, the
 // whole secrets context as JSON, or the shared credentials file.
-var storedAWSKey = regexp.MustCompile(`(?i)\b(?:secrets|vars)\s*(?:\.\s*|\[\s*['"])[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)\b` +
-	`|\btoJSON\(\s*secrets\s*\)|\bfromJSON\(\s*secrets\s*[.\[]|\.aws/credentials`)
+var storedAWSKey = regexp.MustCompile(`(?i)\b(?:secrets|vars)\s*(?:\.\s*|\[\s*['"])[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)\w*` +
+	`|\b(?:fromJSON|toJSON)\(.*\bsecrets\b|\.aws/credentials` +
+	`|\bos\.environ\[\s*['"]` + awsKeyName + `['"]\s*\]\s*=(?:[^=]|$)` +
+	`|\bSetEnvironmentVariable\(\s*['"]` + awsKeyName + `|\bSet-Item\b.*\bEnv:` + awsKeyName)
 
 // IsStoredAWSKeyLine reports whether a non-comment line sets an AWS key from
 // anything but an OIDC session, or names a stored key outright. A tripwire for
