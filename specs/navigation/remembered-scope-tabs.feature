@@ -15,6 +15,13 @@ Feature: Tabs in different projects stay independent
     And this tab does not render again for that write
 
   @integration
+  Scenario: A write of another key in this tab keeps the project this tab read
+    Given a tab that read project X as the remembered scope
+    And another tab has since remembered project Y
+    When this tab remembers a team
+    Then this tab still reads project X
+
+  @integration
   Scenario: A write in this tab is still seen by its own readers
     Given a tab that read project X as the remembered scope
     When this tab remembers project Y

@@ -63,7 +63,7 @@ describe("given a tab that read project X as the remembered scope", () => {
   });
 
   describe("when another tab remembers project Y, then this tab remembers a team", () => {
-    /** @scenario "A write in another tab leaves this tab's remembered scope alone" */
+    /** @scenario "A write of another key in this tab keeps the project this tab read" */
     it("takes the team and still reads project X", () => {
       const storage = sharedStorage("project-x");
       const { hook } = mountReader(storage);

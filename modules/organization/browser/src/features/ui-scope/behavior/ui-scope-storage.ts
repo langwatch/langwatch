@@ -132,6 +132,7 @@ class UiScopeMemoryStore {
     const field = SELECTION_FIELDS[key ?? ""];
     if (this.stale || !field) return;
     const value = readUiScopeMemory(this.storage).selection[field];
+    if (value === this.cached.selection[field]) return;
     this.cached = { selection: { ...this.cached.selection, [field]: value } };
   }
 
