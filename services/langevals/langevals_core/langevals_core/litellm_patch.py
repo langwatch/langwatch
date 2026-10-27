@@ -1,7 +1,7 @@
 import copy
 import os
 from tempfile import mkdtemp
-from typing import Optional
+from typing import Optional, Tuple
 import warnings
 
 import langevals_core.offline_defaults  # noqa: F401  (before litellm, see module)
@@ -90,7 +90,9 @@ class ToolReasoningConflictError(Exception):
 
 
 def tool_reasoning_conflict(
-    kwargs: dict, exception: BaseException
+    kwargs: dict,
+    exception: BaseException,
+    requested_model: Optional[str] = None,
 ) -> Optional[ToolReasoningConflictError]:
     """
     The error to report in place of a provider rejection that is the
@@ -110,7 +112,7 @@ def tool_reasoning_conflict(
     if REASONING_EFFORT_PARAM not in message or "tool" not in message:
         return None
 
-    return ToolReasoningConflictError(kwargs.get("model"))
+    return ToolReasoningConflictError(requested_model or kwargs.get("model"))
 
 
 # Models seen refusing a forced tool_choice in this process, so later calls go
@@ -524,6 +526,14 @@ def refuse_request_endpoint_without_key(kwargs: dict, env: dict) -> None:
 
 
 def patch_litellm_params(kwargs):
+    return patch_litellm_params_with_requested_model(kwargs)[0]
+
+
+def patch_litellm_params_with_requested_model(
+    kwargs,
+) -> Tuple[dict, Optional[str]]:
+    """The patched kwargs, and the model the evaluator asked for before any
+    Azure deployment rewrite replaced it with a deployment name."""
     kwargs["drop_params"] = True
     # Caching on disk is timing out for some reason, disable it
     kwargs["cache"] = {"no-cache": True, "no-store": True}
@@ -610,7 +620,7 @@ def patch_litellm_params(kwargs):
     # setting — so this is the first point the conflict is even visible.
     kwargs = apply_anthropic_sampling_compatibility(kwargs)
 
-    return kwargs
+    return kwargs, requested_model
 
 
 def patch_litellm_embedding_params(kwargs):
@@ -621,8 +631,6 @@ def patch_litellm_embedding_params(kwargs):
     embeddings_deployment = request_env.get(
         "AZURE_EMBEDDINGS_DEPLOYMENT_NAME"
     ) or os.environ.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
-    if embeddings_deployment is not None:
-        kwargs["model"] = "azure/" + embeddings_deployment
 
     request_credentials(kwargs)
 
@@ -633,6 +641,15 @@ def patch_litellm_embedding_params(kwargs):
             if replaced_key.isupper():
                 continue
             kwargs[replaced_key] = convert_param_type(replaced_key, value)
+
+    # Apply the deployment after X_LITELLM_EMBEDDINGS_model has landed, just
+    # like the completion path. Otherwise the catalog model id overwrites the
+    # mapped Azure deployment selected by the platform.
+    if (
+        embeddings_deployment is not None
+        and (kwargs.get("model") or "").startswith("azure/")
+    ):
+        kwargs["model"] = "azure/" + embeddings_deployment
 
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
@@ -686,7 +703,7 @@ def patch_litellm():
         return with_usage_of(retry, [response])
 
     def patched_completion(*args, **kwargs):
-        kwargs = patch_litellm_params(kwargs)
+        kwargs, requested_model = patch_litellm_params_with_requested_model(kwargs)
 
         try:
             if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
@@ -701,7 +718,9 @@ def patch_litellm():
                 forced_tool_choice_refusers.add(kwargs.get("model"))
                 return complete_with_auto_tool_choice(args, kwargs)
         except Exception as exception:
-            conflict = tool_reasoning_conflict(kwargs, exception)
+            conflict = tool_reasoning_conflict(
+                kwargs, exception, requested_model=requested_model
+            )
             if conflict is not None:
                 raise conflict from exception
             raise
@@ -709,7 +728,7 @@ def patch_litellm():
     litellm.completion = patched_completion
 
     async def patched_acompletion(*args, **kwargs):
-        kwargs = patch_litellm_params(kwargs)
+        kwargs, requested_model = patch_litellm_params_with_requested_model(kwargs)
 
         try:
             if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
@@ -724,7 +743,9 @@ def patch_litellm():
                 forced_tool_choice_refusers.add(kwargs.get("model"))
                 return await acomplete_with_auto_tool_choice(args, kwargs)
         except Exception as exception:
-            conflict = tool_reasoning_conflict(kwargs, exception)
+            conflict = tool_reasoning_conflict(
+                kwargs, exception, requested_model=requested_model
+            )
             if conflict is not None:
                 raise conflict from exception
             raise
