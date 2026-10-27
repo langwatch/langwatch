@@ -171,7 +171,7 @@ Each test spends tokens on the attacker, the judge and the agent for up to `tota
 
 Scenario writes one JSON report per red-team run to `./redteam-reports/<batch>/`; add the folder to `.gitignore`. Python reports carry a severity and suggested fixes, and `pip install 'langwatch-scenario[report]'` then `scenario redteam-report` opens a dashboard over the batch. With `LANGWATCH_API_KEY` set, every run also shows up in LangWatch under Simulations.
 
-If the output shows `Scorer failed` warnings, or every turn scores 0, the attacker's planner calls are failing and the attack ran blind. Fix the model or key and run again before reporting a pass.
+A `Scorer failed` warning means the attacker's planner calls are failing and the attack ran blind. With per-turn scoring on, every turn scoring 0 means the same; with `score_responses=False` zero scores are expected. Fix the model or key and run again before reporting a pass.
 
 ## Step 7: Report
 

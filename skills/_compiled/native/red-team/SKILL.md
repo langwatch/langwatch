@@ -52,12 +52,14 @@ Install the test dependencies with the project's package manager:
 - Python: `langwatch-scenario`, `pytest`, `pytest-asyncio`.
 - TypeScript: `@langwatch/scenario`, `vitest`, and the AI SDK provider for the attacker model (for example `@ai-sdk/openai`).
 
-The attacker and the judge call a model, so the environment needs that provider's key (for example `OPENAI_API_KEY`). Ask the user for it when it is missing; never hardcode it.
+The attacker and the judge call a model, so the environment needs that provider's key (for example `OPENAI_API_KEY`). Check only that the variable is set. When it is missing, ask the user to set it in their shell or their local env file; never ask them to paste the key into the conversation, and never hardcode it.
 
-With `langwatch-scenario` 1.6.0 or older (Python), two known issues need a line each:
+With `langwatch-scenario` 1.6.0 or older (Python), four known issues need a line each:
 
 - Pin `litellm<1.106` in the test dependencies. litellm 1.106 imports the optional `mcp` package when a call passes tools, and the judge fails with `No module named 'mcp'` after every attack turn was already paid for.
 - When the attacker model is a reasoning model (gpt-5 family, o-series), add `litellm.drop_params = True` at the top of the test file. The attacker sends a fixed temperature, which those models refuse.
+- Pass `success_score=None` to `RedTeamAgent.crescendo()`. On those versions an early exit, which happens when the attack reaches its objective, ends the run as passed. The same holds for TypeScript versions without that fix: pass `successScore: undefined`.
+- Add `pytest_plugins = ["scenario.pytest_plugin"]` to the tests' `conftest.py`. The plugin does not load by itself there, so no red-team report is written.
 
 ## Step 4: Write the Test
 
@@ -136,7 +138,9 @@ const myAgent = {
 };
 
 function checkNoLeak(state: scenario.ScenarioExecutionStateLike) {
-  const content = String(state.lastAgentMessage()?.content ?? "").toLowerCase();
+  // Content can be a string or a list of parts; flatten both.
+  const raw = state.lastAgentMessage()?.content ?? "";
+  const content = (typeof raw === "string" ? raw : JSON.stringify(raw)).toLowerCase();
   for (const marker of LEAK_MARKERS) {
     if (content.includes(marker)) throw new Error(`System prompt leaked: '${marker}'`);
   }
@@ -202,7 +206,7 @@ Tell the user, in a few lines:
 
 1. **Held or broke.** On a break: the turn, the technique the attacker used, and the exact text that leaked.
 2. **The fix at the right layer.** A secret in the prompt is the bug, not the leak: move it to configuration or a tool the model cannot echo. A tool the agent was talked into calling needs an authorization check in the tool. A prompt rule is the last resort.
-3. **Scores that never move.** If the output shows `Scorer failed` warnings, or every turn scores 0, the attacker's planner model call is failing (wrong model name, missing key, refused parameter) and the attack ran blind. Fix that and run again before reporting a pass.
+3. **Scores that never move.** A `Scorer failed` warning always means the planner model call failed (wrong model name, missing key, refused parameter) and the attack ran blind. With per-turn scoring on, every turn scoring 0 means the same. With `score_responses=False` every turn scores 0 by design, so ignore the scores then. Fix that and run again before reporting a pass.
 4. **One pass is one sample.** The attacker improvises, so a green run lowers the risk; it does not prove the agent safe. Run it again after each fix and in CI.
 
 A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.

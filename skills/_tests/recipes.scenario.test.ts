@@ -417,20 +417,17 @@ describe("Recipes", () => {
               .toLowerCase();
 
             expect(content).toMatch(/redteamagent\.(crescendo|goat)/);
-            for (const category of [
-              "llm01",
-              "llm02",
-              "llm05",
-              "llm06",
-              "llm07",
-              "llm09",
-              "llm10",
-            ]) {
+            for (const category of ["llm01", "llm02", "llm06", "llm07", "llm09", "llm10"]) {
               expect(content, `Expected a test for ${category}`).toContain(category);
             }
 
             const last = state.lastAgentMessage()?.content;
             const report = typeof last === "string" ? last : JSON.stringify(last ?? "");
+            // The fixture has no renderer, so LLM05 may be tested or reported not applicable.
+            expect(
+              content.includes("llm05") || /LLM05[^\n]*not applicable/i.test(report),
+              "Expected an LLM05 test or a reason it does not apply",
+            ).toBe(true);
             for (const category of ["LLM03", "LLM04", "LLM08"]) {
               expect(report, `Expected the report to cover ${category}`).toContain(category);
             }
