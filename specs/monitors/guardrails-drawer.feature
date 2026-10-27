@@ -142,11 +142,11 @@ Feature: Guardrails Drawer
     Then the code should include a placeholder for the API key
     And it should reference the environment variable LANGWATCH_API_KEY
 
-  @unimplemented
   Scenario: Project-specific API endpoint
     Given my project has a custom API endpoint
     When the code block is displayed
     Then the endpoint in curl should reflect the project settings
+    And the code is drawn with Shiki highlighting in the shared code window
 
   @unimplemented
   Scenario: Show evaluator description in drawer

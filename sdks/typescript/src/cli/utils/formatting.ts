@@ -8,13 +8,23 @@ export const stripAnsi = (str: string): string => {
   return str.replace(/\u001b\[[0-9;]*m/g, "");
 };
 
+/**
+ * Neutralises terminal control sequences in server-supplied text before
+ * printing: an embedded escape or C0/C1 byte could rewrite the line or hide
+ * output (CWE-150). Remaining control bytes become the replacement character.
+ */
+export const sanitizeTerminalText = (value: string): string =>
+  value
+    .replace(/[\t\n\r]+/g, " ")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "\uFFFD");
+
 export type ColumnColorMap = Record<string, (value: string) => string>;
 
 /**
- * Prints a formatted table to stdout with column-aligned headers, separator,
- * and optional per-column color functions.
- *
- * Columns not in the colorMap default to chalk.gray.
+ * Prints a formatted table to stdout with column-aligned headers, separator
+ * and optional per-column color functions. Columns not in the colorMap
+ * default to chalk.gray.
  */
 export const formatTable = ({
   data,
@@ -22,7 +32,7 @@ export const formatTable = ({
   colorMap = {},
   emptyMessage = "No data found",
 }: {
-  data: Array<Record<string, string>>;
+  data: Record<string, string>[];
   headers: string[];
   colorMap?: ColumnColorMap;
   emptyMessage?: string;
@@ -45,9 +55,7 @@ export const formatTable = ({
     .join("  ");
   console.log(headerRow);
 
-  const separator = headers
-    .map((header) => "─".repeat(colWidths[header]!))
-    .join("  ");
+  const separator = headers.map((header) => "─".repeat(colWidths[header]!)).join("  ");
   console.log(chalk.gray(separator));
 
   data.forEach((row) => {
@@ -73,7 +81,8 @@ export const formatTable = ({
  */
 export const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "—";
+  const dateMs = date.getTime();
+  if (Number.isNaN(dateMs)) return "—";
 
   const now = new Date();
   const diffMs = Math.max(0, now.getTime() - date.getTime());

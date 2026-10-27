@@ -9,15 +9,13 @@ Feature: Telemetry — every span carries the correct origin
   # → provider call. Sarah's engine threads it through context.Context; this spec
   # pins down the wire format and the attribute name.
 
-  # All scenarios are @unimplemented because the origin-threading work is still
-  # incomplete: AI Gateway origin propagation and the matching nlpgo HTTP-handler
-  # → engine → block executor → gateway-client chain do not yet emit
-  # langwatch.origin on every child span. services/nlpgo/ exists; the missing
-  # piece is the cross-service threading work plus parity-binding (the TS
-  # checker only scans TS test roots, so Go-side OTel attribute scenarios
-  # cannot be bound via @scenario JSDoc). TS entrypoint origin emission lives
-  # in nlpgoFetch / studio routes but lacks dedicated tests. Aspirational
-  # pending the threading work + parity-binder coverage.
+  # Most scenarios are @unimplemented because the origin-threading work is
+  # still incomplete: AI Gateway origin propagation and the matching nlpgo
+  # HTTP-handler -> engine -> block executor -> gateway-client chain do not yet
+  # emit langwatch.origin on every child span. TS entrypoint origin emission
+  # lives in nlpgoFetch / studio routes but lacks dedicated tests. The parity
+  # checker scans Go test roots too, so a Go-side scenario is bound with an
+  # @scenario comment on its test, as the model id scenario below is.
 
   Background:
     Given nlpgo is running and the AI Gateway is reachable
@@ -35,12 +33,12 @@ Feature: Telemetry — every span carries the correct origin
 
     Examples:
       | call_site                                                        | origin           |
-      | platform/app/src/server/workflows/runWorkflow.ts                 | workflow         |
-      | platform/app/src/server/routes/playground.ts                     | playground       |
-      | platform/app/src/server/scenarios/.../workflow-agent.adapter.ts  | scenario         |
-      | platform/app/src/server/scenarios/.../code-agent.adapter.ts      | scenario         |
-      | platform/app/src/server/app-layer/topic-clustering/clustering.ts | topic_clustering |
-      | platform/app/src/server/evaluations/runEvaluation.ts             | evaluation       |
+      | modules/workflow/process/src/services/workflow-studio-dispatch.service.ts | workflow |
+      | modules/model-provider/process/src/transport/api-rest/playground.api.ts   | playground |
+      | modules/scenario/process/src/adapters/serialized-workflow-agent.adapter.ts | scenario |
+      | modules/scenario/process/src/adapters/serialized-code-agent.adapter.ts     | scenario |
+      | modules/topic/process/src/intents/topic-clustering-runner.intent.ts | topic_clustering |
+      | modules/evaluation/process/src/                                           | evaluation |
 
   @integration @v1 @unimplemented
   Scenario: missing X-LangWatch-Origin header defaults to "unknown" and emits a warning log
@@ -130,10 +128,17 @@ Feature: Telemetry — every span carries the correct origin
     Given a signature node calls openai/gpt-5-mini through the gateway
     When the response returns
     Then the gateway-call span has attribute "gen_ai.system" = "openai"
-    And the span has attribute "gen_ai.request.model" = "gpt-5-mini"
+    And the span has attribute "gen_ai.request.model" = "openai/gpt-5-mini"
     And the span has attribute "gen_ai.usage.input_tokens" set
     And the span has attribute "gen_ai.usage.output_tokens" set
     And the span duration matches the wall-clock time from the request to the gateway's response
+
+  @unit
+  Scenario: A Studio or playground model call names the model with its provider
+    Given a signature node calls gpt-5.6-terra through the openai provider
+    When its model call is recorded
+    Then the trace lists the model as "openai/gpt-5.6-terra"
+    And grouping traces by model shows it in the same row as SDK traces of that model
 
   # ============================================================================
   # Cost attribution — origin tag flows to billing-relevant traces

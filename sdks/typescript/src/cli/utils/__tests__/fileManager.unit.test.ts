@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
 import { FileManager } from "../fileManager";
 
 describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
@@ -10,9 +12,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
 
   beforeEach(() => {
     originalCwd = process.cwd();
-    scratchRoot = fs.realpathSync(
-      fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-fm-")),
-    );
+    scratchRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-fm-")));
     FileManager._resetProjectRootCache();
   });
 
@@ -31,9 +31,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
       fs.mkdirSync(sub);
       process.chdir(sub);
 
-      expect(FileManager.getPromptsConfigPath()).toBe(
-        path.join(sub, "prompts.json"),
-      );
+      expect(FileManager.getPromptsConfigPath()).toBe(path.join(sub, "prompts.json"));
     });
   });
 
@@ -45,9 +43,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
       fs.mkdirSync(sub, { recursive: true });
       process.chdir(sub);
 
-      expect(FileManager.getPromptsConfigPath()).toBe(
-        path.join(scratchRoot, "prompts.json"),
-      );
+      expect(FileManager.getPromptsConfigPath()).toBe(path.join(scratchRoot, "prompts.json"));
     });
   });
 
@@ -64,9 +60,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
       fs.mkdirSync(sub);
       process.chdir(sub);
 
-      expect(FileManager.getPromptsConfigPath()).toBe(
-        path.join(project, "prompts.json"),
-      );
+      expect(FileManager.getPromptsConfigPath()).toBe(path.join(project, "prompts.json"));
     });
   });
 
@@ -77,23 +71,14 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
       fs.mkdirSync(sub);
       process.chdir(sub);
 
-      expect(FileManager.getPromptsConfigPath()).toBe(
-        path.join(sub, "prompts.json"),
-      );
+      expect(FileManager.getPromptsConfigPath()).toBe(path.join(sub, "prompts.json"));
     });
   });
 
   /**
-   * Regression: the project root is memoised, and the cache MUST be keyed by the
-   * cwd it was derived from.
-   *
-   * In a process that serves one command and exits, an unkeyed cache is
-   * invisible. In one that serves many from different directories — the CLI
-   * daemon, but equally a test runner or any embedding host — the second caller
-   * silently inherits the first caller's project root, and `prompt init` writes
-   * prompts.json into someone else's directory while `prompt sync` then fails to
-   * find it. Note there is no `_resetProjectRootCache()` below: that is the
-   * point.
+   * Regression: the project-root cache MUST be keyed by the cwd it was derived
+   * from, or a second caller from a different directory silently inherits the
+   * first's root. No `_resetProjectRootCache()` below -- that is the point.
    */
   describe("given one process serving callers from different directories", () => {
     describe("when the cwd changes between calls", () => {
@@ -104,14 +89,10 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
         fs.mkdirSync(second);
 
         process.chdir(first);
-        expect(FileManager.getPromptsConfigPath()).toBe(
-          path.join(first, "prompts.json"),
-        );
+        expect(FileManager.getPromptsConfigPath()).toBe(path.join(first, "prompts.json"));
 
         process.chdir(second);
-        expect(FileManager.getPromptsConfigPath()).toBe(
-          path.join(second, "prompts.json"),
-        );
+        expect(FileManager.getPromptsConfigPath()).toBe(path.join(second, "prompts.json"));
       });
     });
 

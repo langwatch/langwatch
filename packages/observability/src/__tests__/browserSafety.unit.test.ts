@@ -6,7 +6,7 @@ vi.mock("@opentelemetry/api", () => {
 
 describe("browser-safe package root", () => {
   it("loads without evaluating OpenTelemetry", async () => {
-    const telemetry = await import("../index");
+    const telemetry = await import("../index.ts");
 
     expect(telemetry.createLogger).toBeTypeOf("function");
     expect(telemetry.logHttpRequest).toBeTypeOf("function");

@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
     from ..models.get_api_model_defaults_response_200_effective_default_type_0 import (
@@ -15,6 +14,9 @@ if TYPE_CHECKING:
     )
     from ..models.get_api_model_defaults_response_200_effective_fast_type_0 import (
         GetApiModelDefaultsResponse200EffectiveFASTType0,
+    )
+    from ..models.get_api_model_defaults_response_200_effective_instantevals_type_0 import (
+        GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0,
     )
 
 
@@ -28,12 +30,13 @@ class GetApiModelDefaultsResponse200Effective:
         default (GetApiModelDefaultsResponse200EffectiveDEFAULTType0 | None):
         fast (GetApiModelDefaultsResponse200EffectiveFASTType0 | None):
         embeddings (GetApiModelDefaultsResponse200EffectiveEMBEDDINGSType0 | None):
+        instant_evals (GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0 | None):
     """
 
     default: GetApiModelDefaultsResponse200EffectiveDEFAULTType0 | None
     fast: GetApiModelDefaultsResponse200EffectiveFASTType0 | None
     embeddings: GetApiModelDefaultsResponse200EffectiveEMBEDDINGSType0 | None
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    instant_evals: GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0 | None
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_model_defaults_response_200_effective_default_type_0 import (
@@ -44,6 +47,9 @@ class GetApiModelDefaultsResponse200Effective:
         )
         from ..models.get_api_model_defaults_response_200_effective_fast_type_0 import (
             GetApiModelDefaultsResponse200EffectiveFASTType0,
+        )
+        from ..models.get_api_model_defaults_response_200_effective_instantevals_type_0 import (
+            GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0,
         )
 
         default: dict[str, Any] | None
@@ -64,13 +70,20 @@ class GetApiModelDefaultsResponse200Effective:
         else:
             embeddings = self.embeddings
 
+        instant_evals: dict[str, Any] | None
+        if isinstance(self.instant_evals, GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0):
+            instant_evals = self.instant_evals.to_dict()
+        else:
+            instant_evals = self.instant_evals
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "DEFAULT": default,
                 "FAST": fast,
                 "EMBEDDINGS": embeddings,
+                "INSTANT_EVALS": instant_evals,
             }
         )
 
@@ -86,6 +99,9 @@ class GetApiModelDefaultsResponse200Effective:
         )
         from ..models.get_api_model_defaults_response_200_effective_fast_type_0 import (
             GetApiModelDefaultsResponse200EffectiveFASTType0,
+        )
+        from ..models.get_api_model_defaults_response_200_effective_instantevals_type_0 import (
+            GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0,
         )
 
         d = dict(src_dict)
@@ -135,27 +151,26 @@ class GetApiModelDefaultsResponse200Effective:
 
         embeddings = _parse_embeddings(d.pop("EMBEDDINGS"))
 
+        def _parse_instant_evals(data: object) -> GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0 | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                instant_evals_type_0 = GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0.from_dict(data)
+
+                return instant_evals_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(GetApiModelDefaultsResponse200EffectiveINSTANTEVALSType0 | None, data)
+
+        instant_evals = _parse_instant_evals(d.pop("INSTANT_EVALS"))
+
         get_api_model_defaults_response_200_effective = cls(
             default=default,
             fast=fast,
             embeddings=embeddings,
+            instant_evals=instant_evals,
         )
 
-        get_api_model_defaults_response_200_effective.additional_properties = d
         return get_api_model_defaults_response_200_effective
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

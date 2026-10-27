@@ -95,7 +95,7 @@ Feature: Creating an evaluator with an unknown type is recoverable
   # The ambiguous ask is a question card, not prose
   # ============================================================================
 
-  Scenario: An ambiguous evaluation request is asked as a choices block
+  Scenario: An ambiguous evaluation request is asked with the question tool
     Given a request that names neither a dataset nor live traffic
     Then the router asks with a choices block offering the two options
     And nothing is created before the answer arrives

@@ -1,19 +1,18 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { z } from "zod";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
-import {
-  printResult,
-  type RawOutputFlags,
-} from "../../utils/output";
-import { createCommandEvents } from "../../telemetry/events";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { createCommandEvents } from "../../telemetry/events";
+import { resolveCredentials } from "../../utils/apiKey";
+import { cliAuthHeaders } from "../../utils/authHeaders";
+import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { printResult, type RawOutputFlags } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /** Bound the request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -39,9 +38,7 @@ const transcriptDocumentSchema = z.object({
     tokens: z.number(),
     costUsd: z.number(),
   }),
-  subAgents: z.array(
-    z.looseObject({ agentId: z.string(), toolCalls: z.number() }),
-  ),
+  subAgents: z.array(z.looseObject({ agentId: z.string(), toolCalls: z.number() })),
 });
 
 type TranscriptEntry = z.infer<typeof transcriptEntrySchema>;
@@ -49,9 +46,9 @@ type TranscriptDocument = z.infer<typeof transcriptDocumentSchema>;
 
 export const transcriptTraceCommand = async (
   traceId: string,
-  options: RawOutputFlags,
+  options: RawOutputFlags & { project?: string },
 ): Promise<void> => {
-  await resolveCredentials();
+  await resolveCredentials({ project: options.project });
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
@@ -62,10 +59,10 @@ export const transcriptTraceCommand = async (
   try {
     events.started("Fetching transcript…");
 
-    const response = await fetch(
-      `${endpoint}/api/traces/${encodeURIComponent(traceId)}/transcript`,
+    const response = await langwatchFetch(
+      `${endpoint}/api/v1/traces/${encodeURIComponent(traceId)}/transcript`,
       {
-        headers: buildAuthHeaders({ apiKey }),
+        headers: cliAuthHeaders({ apiKey }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       },
     );
@@ -150,9 +147,7 @@ const renderEntry = (entry: TranscriptEntry): string => {
           (entry.costUsd != null ? ` $${entry.costUsd.toFixed(4)}` : ""),
       )}`;
     default: {
-      const label = [entry.kind, entry.name ?? entry.text ?? ""]
-        .filter(Boolean)
-        .join(" ");
+      const label = [entry.kind, entry.name ?? entry.text ?? ""].filter(Boolean).join(" ");
       return `${stamp} ${chalk.gray(`· ${label}`)}`;
     }
   }

@@ -1,0 +1,175 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
+/**
+ * When a personal workspace goes, and what happens if its owner comes back.
+ * @vitest-environment node
+ * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
+ */
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaTenancyGuardService,
+} from "@langwatch/prisma-client";
+import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { PersonalWorkspaceIdentityService } from "../../../features/personal-workspace/services/personal-workspace-identity.service.ts";
+import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
+import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
+
+const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
+
+const noopGrantsWriter = createApiFixture<AuthzGrantsService>({
+  attachBindings: async () => ({ attached: [], duplicates: [] }),
+  revokeBindingsWhere: async () => 0,
+});
+
+describe.skipIf(!DB_URL)("given a member with a personal workspace in an organization", () => {
+  const identities = PersonalWorkspaceIdentityService.create();
+  const testNamespace = `pw-lifecycle-${nanoid(8)}`;
+
+  let organizationId: string;
+  let leaverUserId: string;
+  let personalTeamId: string;
+  let personalProjectId: string;
+
+  const connection = PrismaConnectionService.create({
+    guard: PrismaTenancyGuardService.create(),
+    logger: createLogger(
+      "langwatch:organization:test:organization-membership-repository-personal-workspace-lifecycle",
+    ),
+  }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
+  const prisma = connection.client as PrismaClient;
+  const membershipRepository = PrismaOrganizationMembershipRepository.create({
+    database: prisma,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+    grants: noopGrantsWriter,
+  });
+  const organizationRepository = PrismaOrganizationRepository.create({
+    database: prisma,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+  });
+
+  async function ensureLeaverWorkspace() {
+    const resources = identities.create({ userId: leaverUserId, organizationId });
+    return organizationRepository.ensurePersonalWorkspace({
+      workspace: { userId: leaverUserId, organizationId, displayName: "Leaver" },
+      resources,
+    });
+  }
+
+  const workspaceRows = () =>
+    prisma!.team.findUnique({
+      where: { id: personalTeamId },
+      select: { archivedAt: true, projects: { select: { id: true, archivedAt: true } } },
+    });
+
+  beforeAll(async () => {
+    const leaver = await prisma!.user.create({
+      data: { name: "Leaver", email: `leaver-${testNamespace}@example.com` },
+    });
+    leaverUserId = leaver.id;
+
+    const organization = await prisma!.organization.create({
+      data: { name: `ACME ${testNamespace}`, slug: `--test-org-${testNamespace}` },
+    });
+    organizationId = organization.id;
+
+    await prisma!.organizationUser.create({
+      data: { userId: leaverUserId, organizationId, role: OrganizationUserRole.MEMBER },
+    });
+
+    const first = await ensureLeaverWorkspace();
+    if (first.kind !== "pending") throw new Error("a first ensure leaves the project to project");
+    personalTeamId = first.team.id;
+    personalProjectId = identities.newProjectId();
+    // Stands in for project's subscriber, which creates the personal project.
+    await prisma!.project.create({
+      data: {
+        id: personalProjectId,
+        name: "Personal",
+        slug: `personal-${testNamespace}`,
+        apiKey: `sk-lw-${testNamespace}`,
+        teamId: personalTeamId,
+        language: "other",
+        framework: "other",
+      },
+    });
+  });
+
+  afterAll(async () => {
+    if (!prisma) return;
+    await cleanupTestRows(prisma, [
+      ["project", { teamId: personalTeamId }],
+      ["teamUser", { teamId: personalTeamId }],
+      ["roleBinding", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: leaverUserId }],
+    ]);
+    await prisma.$disconnect();
+  });
+
+  describe("when an admin removes that member from the organization", () => {
+    let archivedTeamIds: string[] = [];
+    beforeAll(async () => {
+      archivedTeamIds = await membershipRepository.deleteMember({
+        organizationId,
+        userId: leaverUserId,
+      });
+    });
+
+    /** @scenario Removing a member takes their personal workspace with them */
+    it("archives the workspace team", async () => {
+      await expect(workspaceRows()).resolves.toMatchObject({ archivedAt: expect.any(Date) });
+    });
+
+    /** @scenario Removing a member takes their personal workspace with them */
+    it("answers the archived team and leaves the project to project", async () => {
+      expect(archivedTeamIds).toEqual([personalTeamId]);
+      const rows = await workspaceRows();
+      expect(rows?.projects).toEqual([{ id: personalProjectId, archivedAt: null }]);
+    });
+
+    /** @scenario Removing a member takes their personal workspace with them */
+    it("leaves nothing an admin still has to clean up", async () => {
+      await expect(
+        prisma!.team.findFirst({
+          where: {
+            organizationId,
+            ownerUserId: leaverUserId,
+            isPersonal: true,
+            archivedAt: null,
+          },
+        }),
+      ).resolves.toBeNull();
+    });
+
+    describe("when that member joins the organization again", () => {
+      beforeAll(async () => {
+        await prisma!.organizationUser.create({
+          data: { userId: leaverUserId, organizationId, role: OrganizationUserRole.MEMBER },
+        });
+      });
+
+      /** @scenario Inviting a removed member back gives them their workspace again */
+      it("hands back the same workspace rather than a new one", async () => {
+        const result = await ensureLeaverWorkspace();
+
+        // Pending until project revives the personal project on organization's fact.
+        expect(result).toMatchObject({ kind: "pending", team: { id: personalTeamId } });
+      });
+
+      /** @scenario Inviting a removed member back gives them their workspace again */
+      it("clears the archived-at stamp on revival", async () => {
+        await ensureLeaverWorkspace();
+
+        await expect(workspaceRows()).resolves.toMatchObject({ archivedAt: null });
+      });
+    });
+  });
+});

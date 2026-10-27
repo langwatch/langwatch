@@ -1,5 +1,5 @@
 // Package egress is the per-worker egress seam and its implementations. The
-// pool consults a Guard before a worker's opencode subprocess starts:
+// pool consults a Guard before a worker subprocess starts:
 // PrepareWorker sets up this worker's egress policy and returns the loopback
 // forward-proxy the worker's HTTPS_PROXY must point at, and may fail the spawn
 // closed. Per-worker teardown rides the returned WorkerEgress.Close, not the

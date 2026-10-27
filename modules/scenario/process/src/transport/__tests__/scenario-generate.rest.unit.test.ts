@@ -1,0 +1,97 @@
+/**
+ * `POST /api/scenario/generate` binds body projectId to the declared permission target.
+ * @vitest-environment node
+ */
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { type ScenarioApi, type ScenarioGenerateResponse } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import { describe, expect, it, vi } from "vitest";
+
+import { scenarioGenerateRest } from "../scenario-generate.rest.ts";
+
+function buildApi(permitted = true) {
+  const generateScenario = vi.fn<ScenarioApi["generateScenario"]>(async () => ({
+    scenario: {
+      name: "Refund request",
+      situation: "A customer needs a refund.",
+      criteria: ["The agent confirms the request."],
+    },
+  }));
+  const app = createApiFixture<ScenarioApi>({ generateScenario });
+  const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
+  const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
+    identity: {
+      authenticate: () => ({ actor: null, scope: null }),
+      identify: () => ({ actor: { type: "user", id: "user_1" }, scope: null }),
+      authorize,
+    },
+  });
+  const hono = runtime.mount(scenarioGenerateRest.router(), {
+    app: () => app,
+    onError: canonicalErrorResponse,
+  });
+  const generate = (projectId = "project_1") =>
+    hono.request("http://api.test/api/scenario/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: "a grumpy refund requester",
+        currentScenario: null,
+        projectId,
+      }),
+    });
+
+  return { authorize, generate, generateScenario };
+}
+
+describe("POST /api/scenario/generate", () => {
+  describe("given the caller may manage the body project", () => {
+    /** @scenario "Generate scenario with AI using custom description" */
+    it("forwards the parsed request to the composed Scenario API", async () => {
+      const { authorize, generate, generateScenario } = buildApi();
+
+      const response = await generate("project_other");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual<ScenarioGenerateResponse>({
+        scenario: {
+          name: "Refund request",
+          situation: "A customer needs a refund.",
+          criteria: ["The agent confirms the request."],
+        },
+      });
+      expect(generateScenario).toHaveBeenCalledWith({
+        prompt: "a grumpy refund requester",
+        currentScenario: null,
+        projectId: "project_other",
+      });
+      expect(authorize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permission: "scenarios:manage",
+          target: { tier: "project", id: "project_other" },
+        }),
+      );
+    });
+  });
+
+  describe("given the caller lacks scenarios:manage on the body project", () => {
+    /** @scenario "Generate scenario with AI using custom description" */
+    it("refuses before calling the composed application", async () => {
+      const { authorize, generate, generateScenario } = buildApi(false);
+
+      const response = await generate();
+
+      expect(response.status).toBe(403);
+      expect(generateScenario).not.toHaveBeenCalled();
+      expect(authorize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permission: "scenarios:manage",
+          target: { tier: "project", id: "project_1" },
+        }),
+      );
+    });
+  });
+});

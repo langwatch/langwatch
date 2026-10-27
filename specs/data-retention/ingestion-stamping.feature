@@ -33,6 +33,46 @@ Feature: Retention stamping at ingestion time
     Then the experiment_runs record has _retention_days = 91
     And the experiment_run_items record has _retention_days = 91
 
+  @unit
+  Scenario: Event log rows use the workload's retention category
+    When simulation and suite run events are recorded for this project
+    Then their event_log records have _retention_days = 63
+    When an experiment run event is recorded for this project
+    Then its event_log record has _retention_days = 91
+
+  @unit
+  Scenario: Security events are retained indefinitely
+    When identity, MFA, SSO, join-request, SCIM, authorization, or virtual-key lifecycle events are recorded
+    Then their event_log records have _retention_days = 0
+
+  @unit
+  Scenario: Tenant retention never enrolls durable security projections
+    When the ClickHouse retention table registry is built
+    Then identity, credential, SSO, SCIM, membership, and authorization projection stores are absent
+    And explicit revocation, teardown, erasure, session expiry, and proof expiry remain unchanged
+
+  # Only customer telemetry expires (Alex, 2026-10-09); every other event is kept forever.
+  @unit
+  Scenario: Customer telemetry event families remain policy-bound
+    When trace, log, metric, evaluation, collector-evaluation, Langy-conversation, topic-model, gateway-spend, automation-trigger-match, coding-agent-fact, later-trace milestone, evaluation-lifecycle completion, Instant Eval run, pulled-usage, webhook spend-delivery, or ingestion-pull run and listing events are recorded
+    Then their event_log records use the traces retention category
+
+  @unit
+  Scenario: Every other event family is retained indefinitely
+    When organization, project, user, prompt, workflow, billing, entitlement, governance, annotation, Instant Eval judge spend, aggregate-read audit, first-trace milestone, manual evaluation run, ingestion-pull configuration, or report-schedule configuration events are recorded
+    Then their event_log records have _retention_days = 0
+
+  @unit
+  Scenario: An aggregate type the policy does not list is retained indefinitely
+    When an event of an aggregate type the policy does not list is recorded
+    Then its event_log record has _retention_days = 0
+
+  @integration
+  Scenario: Every aggregate type the worker registers is classified
+    When the worker boots every installed module
+    Then each registered pipeline's aggregate type is listed in the event-log retention policy
+    And a new telemetry pipeline cannot reach the event log without naming its category
+
   Scenario: No retention policy defaults to the platform default
     Given the project has no retention policy
     And the organization has no default retention policy

@@ -1,0 +1,37 @@
+---
+title: "Use Prompts in Workflows"
+sidebarTitle: "Prompts in workflows"
+keywords: langwatch, prompts, workflows, llm node, prompt library, prompt versions
+description: "Pick a prompt from the prompt library in an LLM node of a workflow, edit it in the same drawer, and save the result as a new prompt version."
+---
+
+## Pick a prompt for an LLM node
+
+Drag **Prompt** from the **Components** panel onto the canvas. The **Choose Prompt** drawer lists the prompts of the project. Pick one, or click **New Prompt** to start from an empty prompt. The node on the canvas is named after the prompt.
+
+<Frame>
+<img className="block" src="/images/workflows/prompt-picker.png" alt="The Choose Prompt drawer listing the prompts of the project" />
+</Frame>
+
+Click the node to open the prompt in the drawer. It is the same editor as the prompt page: the model, the system prompt, the messages, the variables and the outputs.
+
+## Apply or save
+
+The drawer has two ways to keep a change:
+
+| Button | Effect |
+|---|---|
+| **Apply** | Keeps the change on this node only. The prompt in the library does not change. An orange dot on the node marks a node whose prompt differs from the saved version. |
+| **Save** | Creates a new version of the prompt in the library, with the model, the messages and the variables the drawer holds. Every place that uses the prompt can move to the new version. |
+
+The first **Save** on a node that started from **New Prompt** opens **Save Prompt**, which asks for the prompt identifier, for example `support-answer` or `marketing/tone-of-voice`, and the scope of the prompt.
+
+<Frame>
+<img className="block" src="/images/workflows/prompt-save.png" alt="The Save Prompt dialog asking for the prompt identifier and the scope" />
+</Frame>
+
+## Run the workflow with the prompt
+
+The workflow runs the node with the prompt the drawer shows: the applied changes when there are any, otherwise the saved version. Evaluate the workflow on a dataset to compare prompt versions on the same rows, see [Building a workflow](/workflows/building-a-workflow).
+
+**Also check:** [Version control](/prompt-management/features/essential/version-control) for how prompt versions work, and [Workflows](/workflows/overview).

@@ -1,25 +1,6 @@
 /**
- * Structured metadata describing why a payload failed validation, built so it
- * can be logged and aggregated without carrying any of the payload.
- *
- * The question this exists to answer is "is the sender wrong, or is our schema
- * too strict?". Answering it needs the shape of the failure — which field, and
- * what we demanded of it — and never needs the value. So the split this module
- * enforces is by authorship: a path, an issue code, a bound and a list of
- * allowed options are our own schema's vocabulary and are safe to emit; the
- * value that arrived is the customer's and is not.
- *
- * That split is why fields are copied by an allow-list per issue code rather
- * than spread. Two of Zod's own fields would otherwise leak content:
- *
- *   - `message` embeds the received value for several codes ("Invalid enum
- *     value. Expected 'a' | 'b', received '<their value>'").
- *   - `received` is a type name for `invalid_type` and the literal value for
- *     `invalid_literal` / `invalid_enum_value`.
- *
- * Duck-typed on purpose: this package does not depend on zod, the same way
- * `handledFaultOf` does not depend on the HandledError class. Anything with an
- * `issues` array of the documented shape works.
+ * Structured metadata for validation failures: schema details without customer
+ * values, logged and aggregated to diagnose sender vs schema strictness.
  */
 
 /** The most issues one record carries before it is truncated. */
@@ -35,12 +16,9 @@ export interface ValidationIssueMeta {
   /** Type name that arrived. Only ever set for `invalid_type`. */
   received?: string;
   /**
-   * Keys the schema refused.
-   *
-   * These are field NAMES, chosen by the sender's instrumentation rather than
-   * carried as content, and they are the single most useful signal here: the
-   * same key refused across many projects means an SDK emits something we have
-   * not modelled, and the fix is ours.
+   * Keys the schema refused — field NAMES chosen by the sender's
+   * instrumentation, not content, and the single most useful signal here:
+   * the same key across many projects means an unmodelled SDK field we must fix.
    */
   keys?: string[];
   /** Values the schema allows. Ours, from the schema definition. */
@@ -67,16 +45,20 @@ interface RawIssue {
   keys?: unknown;
   options?: unknown;
   validation?: unknown;
+  /** Zod 4 spellings: the permitted set, and the named string format. */
+  values?: unknown;
+  format?: unknown;
   minimum?: unknown;
   maximum?: unknown;
+  /** Zod 3 spelling of a union's per-arm failures: one `ZodError` per arm. */
   unionErrors?: unknown;
+  /** Zod 4 spelling of the same: one array of issues per arm. */
+  errors?: unknown;
 }
 
 function hasIssues(error: unknown): error is { issues: RawIssue[] } {
   return (
-    !!error &&
-    typeof error === "object" &&
-    Array.isArray((error as { issues?: unknown }).issues)
+    !!error && typeof error === "object" && Array.isArray((error as { issues?: unknown }).issues)
   );
 }
 
@@ -103,91 +85,107 @@ function stringList(value: unknown): string[] | undefined {
   return value.map((entry) => String(entry));
 }
 
+type IssueFieldReader = (issue: RawIssue, schemaOnly: boolean) => Partial<ValidationIssueMeta>;
+
+const optionsFrom: IssueFieldReader = (issue) => ({ options: stringList(issue.options) });
+
+/** The fields each issue code carries in our own vocabulary; see `metaForIssue`. */
+const ISSUE_FIELD_READERS: ReadonlyMap<string, IssueFieldReader> = new Map<
+  string,
+  IssueFieldReader
+>([
+  [
+    "invalid_type",
+    // Both sides are type names here ("string", "undefined"), not values.
+    (issue) => ({
+      ...(typeof issue.expected === "string" ? { expected: issue.expected } : {}),
+      ...(typeof issue.received === "string" ? { received: issue.received } : {}),
+    }),
+  ],
+  [
+    "unrecognized_keys",
+    (issue, schemaOnly) => (schemaOnly ? {} : { keys: stringList(issue.keys) }),
+  ],
+  // `options` is the schema list; `received` holds the value that arrived, so it is not copied.
+  ["invalid_enum_value", optionsFrom],
+  ["invalid_union_discriminator", optionsFrom],
+  // Zod 4 folds enum and literal mismatches into one code carrying the permitted set as `values`.
+  ["invalid_value", (issue) => ({ options: stringList(issue.values) })],
+  ["invalid_union", (issue) => (issue.options === undefined ? {} : optionsFrom(issue, false))],
+  [
+    "invalid_literal",
+    // `expected` is the literal our schema declares, so it is ours to log.
+    (issue) =>
+      typeof issue.expected === "string" || typeof issue.expected === "number"
+        ? { expected: String(issue.expected) }
+        : {},
+  ],
+  // `invalid_string` in zod 3, `invalid_format` in zod 4; the rule name moved to `format`.
+  ["invalid_format", (issue) => (typeof issue.format === "string" ? { rule: issue.format } : {})],
+  [
+    "invalid_string",
+    (issue) => (typeof issue.validation === "string" ? { rule: issue.validation } : {}),
+  ],
+  ["too_small", (issue) => (typeof issue.minimum === "number" ? { limit: issue.minimum } : {})],
+  ["too_big", (issue) => (typeof issue.maximum === "number" ? { limit: issue.maximum } : {})],
+]);
+
 /**
  * Copy only the fields this issue code is known to populate with our own
  * vocabulary. Anything not named here is dropped, so a Zod version that adds a
  * field cannot start leaking content without this list changing first.
  */
-function metaForIssue(issue: RawIssue): ValidationIssueMeta {
+function metaForIssue(issue: RawIssue, schemaOnly: boolean): ValidationIssueMeta {
   const meta: ValidationIssueMeta = {
-    path: formatPath(issue.path),
+    // Record-map keys and unrecognised keys can be caller content. Output
+    // validation therefore uses schema-only metadata and omits every path.
+    path: schemaOnly ? "<redacted>" : formatPath(issue.path),
     code: typeof issue.code === "string" ? issue.code : "unknown",
   };
 
-  switch (meta.code) {
-    case "invalid_type":
-      // Both sides are type names here ("string", "undefined"), not values.
-      if (typeof issue.expected === "string") meta.expected = issue.expected;
-      if (typeof issue.received === "string") meta.received = issue.received;
-      break;
-
-    case "unrecognized_keys":
-      meta.keys = stringList(issue.keys);
-      break;
-
-    case "invalid_enum_value":
-    case "invalid_union_discriminator":
-      // `options` is the schema's own list. `received` is deliberately not
-      // copied: for these codes it holds the value that arrived.
-      meta.options = stringList(issue.options);
-      break;
-
-    case "invalid_literal":
-      // `expected` is the literal our schema declares, so it is ours to log.
-      if (
-        typeof issue.expected === "string" ||
-        typeof issue.expected === "number"
-      ) {
-        meta.expected = String(issue.expected);
-      }
-      break;
-
-    case "invalid_string":
-      if (typeof issue.validation === "string") meta.rule = issue.validation;
-      break;
-
-    case "too_small":
-      if (typeof issue.minimum === "number") meta.limit = issue.minimum;
-      break;
-
-    case "too_big":
-      if (typeof issue.maximum === "number") meta.limit = issue.maximum;
-      break;
-
-    default:
-      break;
-  }
+  const readFields = ISSUE_FIELD_READERS.get(meta.code);
+  if (readFields) Object.assign(meta, readFields(issue, schemaOnly));
 
   return meta;
 }
 
 /**
- * Flatten a Zod error into issues, following `invalid_union` into the branch
- * errors it nests. A union failure whose branches are hidden reports only that
- * "something did not match", which is the least useful thing it could say.
- *
- * Counts every issue but only builds the ones that will be kept. The input here
- * is an untrusted body - up to 10 MiB and a couple of hundred spans, each
- * checked against union schemas that fan out a branch of issues per arm - so
- * the difference between counting a large tree and materialising one is worth
- * having on a path that runs per rejected request.
+ * The per-arm issues of a union failure: handles both Zod 3 `unionErrors` and
+ * Zod 4 `errors` spellings.
  */
-function collectIssues(
-  issues: RawIssue[],
-  into: ValidationIssueMeta[],
-  counter: { total: number },
-  maxIssues: number,
-): void {
+function unionBranches(issue: RawIssue): RawIssue[][] {
+  if (Array.isArray(issue.unionErrors)) {
+    return issue.unionErrors.filter(hasIssues).map((nested) => nested.issues);
+  }
+  if (Array.isArray(issue.errors)) {
+    return issue.errors.filter((branch): branch is RawIssue[] => Array.isArray(branch));
+  }
+  return [];
+}
+
+/**
+ * Flatten a Zod error into issues: follows invalid_union branches and counts
+ * all issues but only materializes kept ones.
+ */
+function collectIssues({
+  issues,
+  into,
+  counter,
+  maxIssues,
+  schemaOnly,
+}: {
+  issues: RawIssue[];
+  into: ValidationIssueMeta[];
+  counter: { total: number };
+  maxIssues: number;
+  schemaOnly: boolean;
+}): void {
   for (const issue of issues) {
     counter.total += 1;
-    if (into.length < maxIssues) into.push(metaForIssue(issue));
+    if (into.length < maxIssues) into.push(metaForIssue(issue, schemaOnly));
 
-    if (Array.isArray(issue.unionErrors)) {
-      for (const nested of issue.unionErrors) {
-        if (hasIssues(nested)) {
-          collectIssues(nested.issues, into, counter, maxIssues);
-        }
-      }
+    for (const branch of unionBranches(issue)) {
+      collectIssues({ issues: branch, into, counter, maxIssues, schemaOnly });
     }
   }
 }
@@ -199,13 +197,22 @@ function collectIssues(
  */
 export function validationMeta(
   error: unknown,
-  { maxIssues = MAX_VALIDATION_ISSUES }: { maxIssues?: number } = {},
+  {
+    maxIssues = MAX_VALIDATION_ISSUES,
+    privacy = "standard",
+  }: { maxIssues?: number; privacy?: "standard" | "schema-only" } = {},
 ): ValidationMeta | undefined {
   if (!hasIssues(error)) return undefined;
 
   const issues: ValidationIssueMeta[] = [];
   const counter = { total: 0 };
-  collectIssues(error.issues, issues, counter, maxIssues);
+  collectIssues({
+    issues: error.issues,
+    into: issues,
+    counter,
+    maxIssues,
+    schemaOnly: privacy === "schema-only",
+  });
 
   const meta: ValidationMeta = { issueCount: counter.total, issues };
   if (counter.total > issues.length) meta.truncated = true;

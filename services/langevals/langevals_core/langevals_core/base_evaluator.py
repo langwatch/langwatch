@@ -24,7 +24,11 @@ from tenacity import (
 )
 from tqdm.auto import tqdm as tqdm_auto
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from langevals_core.litellm_patch import patch_litellm
+from langevals_core.litellm_patch import (
+    RequestEndpointWithoutKeyError,
+    patch_litellm,
+)
+from langevals_core.request_env import bind_request_env, request_env
 
 import time
 import warnings
@@ -57,9 +61,9 @@ class LLMEvaluatorSettings(EvaluatorSettings):
         default="openai/gpt-5-mini",
         description="The model to use for evaluation",
     )
-    max_tokens: int = Field(
-        default=DEFAULT_MAX_TOKENS,
-        description="Max tokens allowed for evaluation",
+    max_tokens: Optional[int] = Field(
+        default=None,
+        description="Max tokens allowed for evaluation; unset reads as 128000",
     )
 
 
@@ -181,6 +185,37 @@ class EvaluationResultError(BaseModel):
     traceback: List[str] = Field(description="Traceback information for debugging")
 
 
+# The retry shape one entry spends on its model call.
+#
+# A caller that has to size a deadline around the retryer reads these rather
+# than restating them: `evaluate_batch` dials a failing provider
+# DEFAULT_RETRIES times and waits up to RETRY_MAX_WAIT_SECONDS between the
+# attempts, so the wall time of one entry is bounded by
+# `attempts * per_call_timeout + (attempts - 1) * RETRY_MAX_WAIT_SECONDS`.
+DEFAULT_RETRIES = 3
+RETRY_MIN_WAIT_SECONDS = 4
+RETRY_MAX_WAIT_SECONDS = 10
+
+
+def evaluation_timed_out_result(
+    max_seconds: Optional[float],
+) -> EvaluationResultError:
+    """The answer for an entry the batch stopped waiting for.
+
+    Shared, so an evaluator that overrides `evaluate_batch` and enforces the
+    deadline itself reports the same `EvaluationTimeout` the base class does.
+    """
+    return EvaluationResultError(
+        error_type="EvaluationTimeout",
+        details=(
+            f"The evaluation did not finish within {max_seconds} seconds and "
+            "was abandoned. The model call it waits on is unreachable or "
+            "slower than the evaluation timeout allows."
+        ),
+        traceback=[],
+    )
+
+
 TResult = TypeVar("TResult", bound=EvaluationResult)
 
 SingleEvaluationResult = Union[
@@ -213,6 +248,9 @@ models_providers_env_vars = {
 
 models_env_vars = [env for envs in models_providers_env_vars.values() for env in envs]
 
+# Evaluator env vars that choose where the evaluator's own calls are sent.
+ENDPOINT_ENV_SUFFIXES = ("_ENDPOINT", "_BASE_URL", "_API_BASE", "_URL")
+
 
 class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
     default_settings: ClassVar[TSettings]  # type: ignore
@@ -238,7 +276,11 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
         super().__init__(**kwargs)
         if not self.__preloaded:
             self.__class__.preload()
-        self.set_model_envs()
+        # Library callers construct an evaluator and call `evaluate` directly
+        # on the same thread; binding here is what makes their `env` reach the
+        # model call. `evaluate_batch` does not rely on it: every entry is
+        # scoped explicitly, whichever worker thread it lands on.
+        bind_request_env(self.env)
 
     @classmethod
     def preload(cls):
@@ -254,38 +296,34 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                 f"Variable {var} not defined in evaluator env_vars, cannot access it."
             )
 
-        try:
-            return (
-                self.env[var]
-                if self.env is not None and var in self.env
-                else os.environ[var]
+        if self.env is not None and var in self.env:
+            return self.env[var]
+        # The server's own values never pair with an endpoint the request chose.
+        if self.env and any(
+            name.endswith(ENDPOINT_ENV_SUFFIXES) and name in self.env
+            for name in self.env_vars
+        ):
+            raise RequestEndpointWithoutKeyError(
+                f"Variable {var} must be supplied with the request that sets the endpoint."
             )
-
+        try:
+            return os.environ[var]
         except KeyError:
             raise EnvMissingException(f"Variable {var} not defined in environment.")
-
-    def set_model_envs(self):
-        # Those variables may be used non-explicitly, so we need to set them globally here for the arguments given
-        for key, value in (self.env or {}).items():
-            if key in models_env_vars or key.startswith("X_LITELLM_"):
-                os.environ[key] = value
-
-        # azure alias for litellm
-        if os.environ.get("AZURE_OPENAI_API_KEY") is not None:
-            os.environ["AZURE_API_KEY"] = os.environ["AZURE_OPENAI_API_KEY"]
-        if os.environ.get("AZURE_OPENAI_ENDPOINT") is not None:
-            os.environ["AZURE_API_BASE"] = os.environ["AZURE_OPENAI_ENDPOINT"]
-        # reverse azure alias for litellm
-        if os.environ.get("AZURE_API_KEY") is not None:
-            os.environ["AZURE_OPENAI_API_KEY"] = os.environ["AZURE_API_KEY"]
-        if os.environ.get("AZURE_API_BASE") is not None:
-            os.environ["AZURE_OPENAI_ENDPOINT"] = os.environ["AZURE_API_BASE"]
 
     def evaluate(self, entry: TEntry) -> SingleEvaluationResult:
         raise NotImplementedError("This method should be implemented by subclasses.")
 
     def _evaluate_entry(self, entry, retries=0, restore_tqdm=True):
         _disable_tqdm()
+        # Every entry runs through here, on whatever worker thread the batch
+        # executor picked, so this is the one place that binds the request env
+        # for the model call underneath. Scoped, because executor threads are
+        # reused and must not carry one request's credentials into the next.
+        with request_env(self.env):
+            return self.__evaluate_entry_bound(entry, retries, restore_tqdm)
+
+    def __evaluate_entry_bound(self, entry, retries, restore_tqdm):
         try:
             retryer = Retrying(
                 # A 400 from the model provider is deterministic: a content
@@ -296,7 +334,11 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                 # real error instead.
                 retry=retry_if_not_exception_type(litellm.BadRequestError),
                 stop=stop_after_attempt(retries),
-                wait=wait_random_exponential(multiplier=1, min=4, max=10),
+                wait=wait_random_exponential(
+                    multiplier=1,
+                    min=RETRY_MIN_WAIT_SECONDS,
+                    max=RETRY_MAX_WAIT_SECONDS,
+                ),
                 reraise=True,
             )
             return retryer(self.evaluate, entry)
@@ -317,14 +359,30 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
         data: List[TEntry],
         index=0,
         max_evaluations_in_parallel=50,
-        retries=3,
+        retries=DEFAULT_RETRIES,
+        max_seconds: Optional[float] = None,
         _executor_ref: Optional[Callable[[ThreadPoolExecutor], None]] = None,
     ) -> BatchEvaluationResult:
+        """Evaluate every entry, and give up on the ones that overrun.
+
+        `max_seconds` bounds the whole batch. An entry waits on a model call
+        over the network, and that call can stall for as long as the socket
+        stays open, so without a bound this method can wait forever. On a
+        long-lived server the caller of this method holds a concurrency slot
+        while it waits, and slots lost this way never come back.
+
+        A batch that runs out of time keeps the results it has, reports the
+        rest as `EvaluationTimeout` errors, and returns. The overrunning work
+        is abandoned rather than waited on: a thread parked in a socket read
+        cannot be interrupted, and waiting for it is the hang itself.
+        """
         _restore_tqdm()
         results: list[SingleEvaluationResult] = [
             EvaluationResultSkipped(details="not processed")
         ] * len(data)
-        with ThreadPoolExecutor(max_workers=max_evaluations_in_parallel) as executor:
+        deadline = None if max_seconds is None else time.monotonic() + max_seconds
+        executor = ThreadPoolExecutor(max_workers=max_evaluations_in_parallel)
+        try:
             future_to_index = {
                 executor.submit(
                     self._evaluate_entry, entry, retries, restore_tqdm=False
@@ -343,6 +401,8 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                             executor, "interrupted"
                         ) and executor.__getattribute__("interrupted"):
                             raise KeyboardInterrupt()
+                        if deadline is not None and time.monotonic() >= deadline:
+                            break
                         done, not_done = wait(
                             not_done, timeout=0.1, return_when=FIRST_COMPLETED
                         )
@@ -353,6 +413,21 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                 except KeyboardInterrupt:
                     executor.shutdown(wait=False, cancel_futures=True)
                     raise
+
+            for future in not_done:
+                idx = future_to_index[future]
+                # A future can land between the deadline check and here. Its
+                # answer is real work already paid for, so keep it.
+                results[idx] = (
+                    future.result()
+                    if future.done() and not future.cancelled()
+                    else evaluation_timed_out_result(max_seconds)
+                )
+        finally:
+            # Never wait: the entries still running are the ones that
+            # overran, and blocking on them here would hold the slot this
+            # deadline exists to give back.
+            executor.shutdown(wait=False, cancel_futures=True)
 
         _restore_tqdm()
         return results

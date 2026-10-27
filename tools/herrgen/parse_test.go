@@ -35,7 +35,7 @@ func tree(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
 	all := map[string]string{
-		"go.mod":                                 "module example.com/repo\n\ngo 1.26\n",
+		"pkg/go.mod":                             "module example.com/repo/pkg\n\ngo 1.26\n",
 		"services/nlpgo/app/engine/nodeerror.go": nodeErrorDeclaration,
 	}
 	for path, source := range files {
@@ -640,7 +640,7 @@ func TestParseSkipsUnparseableSnippetsWithAWarning(t *testing.T) {
 	// not take the drift check down with it.
 	root := tree(t, map[string]string{
 		"pkg/herr/herr.go": herrPackage,
-		"platform/app/src/features/onboarding/regions/observability/codegen/snippets/go/openai.snippet.go": `package main
+		"modules/onboarding/browser/src/ui/sections/observability/codegen/snippets/go/openai.snippet.go": `package main
 
 func main() { this is not Go
 `,
@@ -686,12 +686,12 @@ const ErrBusy = herr.Code( this is not Go
 
 // @scenario "A source file that does not parse stops the run"
 func TestParseFailsOnAnUnparseableFileOutsideTheSnippets(t *testing.T) {
-	// The tolerance is scoped by path, not by tree: langwatch/ also holds real,
+	// The tolerance is scoped by path: the packages tree also holds real,
 	// compiled Go, and dropping one of those files drops its codes. Only the
 	// hand-written onboarding snippets under /codegen/snippets/ are exempt.
 	root := tree(t, map[string]string{
 		"pkg/herr/herr.go": herrPackage,
-		"platform/app/src/server/background/probe.go": `package background
+		"modules/trace/process/src/background/probe.go": `package background
 
 func main() { this is not Go
 `,
@@ -708,7 +708,7 @@ const ErrBusy = herr.Code("busy")
 	if err == nil {
 		t.Fatal("Parse() error = nil, want an unparseable non-snippet file to fail the run")
 	}
-	if !strings.Contains(err.Error(), "platform/app/src/server/background/probe.go") {
+	if !strings.Contains(err.Error(), "modules/trace/process/src/background/probe.go") {
 		t.Errorf("Parse() error = %q, want it to name the file", err)
 	}
 	if warnings.String() != "" {
@@ -1399,13 +1399,13 @@ func assertKeysAscendingInOutput(t *testing.T, run int, rendered string, codes [
 	}
 }
 
-func TestParseFailsWithoutAGoModAtTheRoot(t *testing.T) {
+func TestParseFailsWithoutThePkgModule(t *testing.T) {
 	root := t.TempDir()
 	// Named for what it asserts. It used to be called
 	// TestParseSkipsDirectoriesOutsideAnyModule, which described a walk-level
-	// skip that could never fire — `Parse` reads the root's go.mod first, so a
-	// root without one never reaches the walk at all.
+	// skip that could never fire — `Parse` reads pkg/go.mod first, so a root
+	// without one never reaches the walk at all.
 	if _, _, err := herrgen.Parse(root, io.Discard); err == nil {
-		t.Fatal("Parse() error = nil, want a missing-go.mod failure")
+		t.Fatal("Parse() error = nil, want a missing pkg/go.mod failure")
 	}
 }

@@ -1,3 +1,4 @@
+# Stored Objects persistence and accounting: ../../modules/stored-object/adrs/001-package-boundary.md
 Feature: Trace media blob extraction at the ingestion edge
   As the LangWatch trace ingestion pipeline receiving spans whose message
   content embeds inline media bytes (base64 audio turns, data-URI images,
@@ -5,7 +6,7 @@ Feature: Trace media blob extraction at the ingestion edge
   I want those bytes externalized to the content-addressed stored-objects
   store at the earliest edge point, before the command is staged on the queue
   So that the queue, event_log, fold state, and ClickHouse carry lightweight
-  /api/files references instead of megabytes of base64, the same recording
+  durable StoredObjectReferences instead of megabytes of base64, the same recording
   captured by a scenario run and by its trace is stored exactly once, and the
   trace UIs can render players and previews instead of raw base64 dumps.
 
@@ -31,6 +32,9 @@ Feature: Trace media blob extraction at the ingestion edge
   #     content-addressing namespaced by project. A scenario run's audio turn
   #     and the same turn observed on a trace resolve to the same stored
   #     object id — stored once, referenced twice.
+  #   - Persisted trace shapes carry StoredObjectReference values. Trace read
+  #     and rendering adapters resolve fresh service-delivery capabilities at
+  #     the presentation boundary; `/api/files/...` is not persisted authority.
   #
   # Privacy interlock: the data-privacy content drop runs later, at the
   #   RecordSpanCommand choke point. Extracting at the edge for a project
@@ -39,14 +43,14 @@ Feature: Trace media blob extraction at the ingestion edge
   #   skips extraction entirely when any drop rule is configured — those
   #   projects keep today's behavior end to end.
   #
-  # Retention: stored_objects is content-addressed and currently GC-free — it
-  #   is not in RETENTION_TABLE_CATEGORY_MAP and not counted by the storage
-  #   meter, so extracted media outlives the trace's retention TTL. Until
-  #   stored-objects retention lands, the feature flag ships default OFF and
-  #   enabling it is an explicit per-project / per-deployment opt-in.
+  # Retention: Stored Objects is content-addressed and currently GC-free, so
+  #   extracted media outlives the trace's retention TTL. It is still counted
+  #   once in the project byte ledger. Until trace-owned retention cleanup lands,
+  #   the feature flag ships default OFF and enabling it is an explicit
+  #   per-project / per-deployment opt-in.
   #
   # Related: specs/features/scenarios/externalize-event-byte-content.feature
-  #   (scenario edge extraction), specs/event-sourcing/large-trace-blob-offload.feature
+  #   (scenario edge extraction), specs/trace-processing/large-trace-blob-offload.feature
   #   (ADR-022 spool + previews), specs/trace-processing/audio-player-in-traces.feature.
 
   Background:
@@ -64,7 +68,7 @@ Feature: Trace media blob extraction at the ingestion edge
       with a part {type:"file", mediaType:"audio/pcm16", data:"<base64 pcm>"}
     When the span is ingested through the collector
     Then the staged command's "langwatch.input" carries an input_audio part
-      referencing "/api/files/{projectId}/{id}" with no inline base64 data
+      carrying a durable StoredObjectReference with no inline base64 data
     And the decoded bytes are stored once under the project, addressed by their SHA-256
 
   @integration
@@ -80,14 +84,14 @@ Feature: Trace media blob extraction at the ingestion edge
   Scenario: A data-URI image inside an image_url part is externalized
     Given a span input message with a part {type:"image_url", image_url:{url:"data:image/png;base64,..."}}
     When the span is ingested
-    Then the staged part's image_url.url is "/api/files/{projectId}/{id}"
+    Then the staged part carries a durable StoredObjectReference instead of a delivery URL
     And the PNG bytes are stored content-addressed under the project
 
   @integration
   Scenario: A PDF file part is externalized to a binary reference preserving the filename
     Given a span output message with a part {type:"file", file:{filename:"report.pdf", file_data:"data:application/pdf;base64,..."}}
     When the span is ingested
-    Then the staged part is a binary reference with url "/api/files/{projectId}/{id}" and filename "report.pdf"
+    Then the staged part is a StoredObjectReference with filename "report.pdf"
     And no base64 remains in the staged command
 
   @integration
@@ -100,7 +104,7 @@ Feature: Trace media blob extraction at the ingestion edge
 
   @integration
   Scenario: Media carried on span events is externalized like span attributes
-    Given a span whose gen_ai prompt rides in a span event attribute containing an inline image
+    Given an instrumentation that records the prompt on a span event, with an inline image in it
     When the span is ingested
     Then the event attribute is rewritten to reference the stored object
 
@@ -112,6 +116,61 @@ Feature: Trace media blob extraction at the ingestion edge
     Then every attribute value passes through byte-identical
     And no JSON parse of those values is attempted (cheap marker gate)
 
+  # Provider wire shapes. Instrumentation for the Anthropic and Google SDKs
+  # records the request the customer sent, not a normalized one, so the media
+  # part arrives in that provider's own vocabulary. Both name the media type
+  # with an underscore, which the camelCase markers and the AG-UI source
+  # decoder do not recognise, so before this the bytes passed the whole
+  # pipeline untouched and landed inline in ClickHouse.
+
+  @unit
+  Scenario: An Anthropic image block carries its bytes in a base64 source
+    Given a content part {type:"image", source:{type:"base64", media_type:"image/png", data:"<base64>"}}
+    When the content-part decoder reads it
+    Then it resolves to an image part with inline data of media type "image/png"
+    And the extractor treats it as extractable, exactly like a data-URI image_url part
+
+  @unit
+  Scenario: An Anthropic document block carries its bytes in a base64 source
+    Given a content part {type:"document", source:{type:"base64", media_type:"application/pdf", data:"<base64>"}}
+    When the content-part decoder reads it
+    Then it resolves to a document part with inline data of media type "application/pdf"
+
+  @unit
+  Scenario: An Anthropic image block pointing at a hosted URL keeps that URL
+    Given a content part {type:"image", source:{type:"url", url:"https://example.com/a.png"}}
+    When the content-part decoder reads it
+    Then it resolves to an image part sourced from that URL
+    And the extractor leaves it alone, because there are no inline bytes to store
+
+  @unit
+  Scenario: A Gemini inline-data part carries its bytes with no part type at all
+    Given a content part {inline_data:{mime_type:"application/pdf", data:"<base64>"}}
+    When the content-part decoder reads it
+    Then it resolves to a document part with inline data of media type "application/pdf"
+    And the camelCase spelling {inlineData:{mimeType, data}} resolves identically
+
+  @unit
+  Scenario: The media type of a Gemini inline-data part decides how it renders
+    Given inline-data parts of media type "image/png", "audio/wav" and "text/plain"
+    When the content-part decoder reads each of them
+    Then they resolve to an image part, an audio part and a document part
+
+  @integration
+  Scenario: An Anthropic image block inside a span input is externalized before staging
+    Given an OTLP span whose "langwatch.input" attribute is the Anthropic request,
+      carrying a {type:"image", source:{type:"base64", media_type, data}} block
+    When the span is ingested through the collector
+    Then the staged block references "/api/files/{projectId}/{id}" with no inline base64 data
+    And the trace summary carries a media reference for the image
+
+  @integration
+  Scenario: A Gemini inline-data part inside a span input is externalized before staging
+    Given an OTLP span whose "langwatch.input" attribute is the Gemini request,
+      carrying an {inline_data:{mime_type, data}} part
+    When the span is ingested through the collector
+    Then the staged part references "/api/files/{projectId}/{id}" with no inline base64 data
+
   # ===========================================================================
   # Track 2 — dedup and cost
   # ===========================================================================
@@ -122,6 +181,17 @@ Feature: Trace media blob extraction at the ingestion edge
     When a trace span carrying the byte-identical recording is ingested
     Then the span's reference resolves to the same stored object id
     And no second copy is written to storage
+
+  @integration
+  Scenario: The same bytes in two attributes of one span are stored once
+    Given a span that carries the same image both in its chat content and in a
+      prompt-variables attribute, as a managed-prompt run does
+    When the span is ingested
+    Then both attributes reference the same stored object id
+    And only one copy is written to storage
+    # The engine compiles the prompt from the dataset value and then sends the
+    # message, so the same picture legitimately appears twice in one span. It
+    # must cost one object, not two.
 
   @integration
   Scenario: Extraction before the spool check keeps the queue light
@@ -160,7 +230,7 @@ Feature: Trace media blob extraction at the ingestion edge
     Given a span whose media was externalized at the edge
     When the staged command is retried by the group queue
     Then the command still carries only the stored-object references
-    And re-running extraction over it is a no-op (parts already reference urls)
+    And re-running extraction over it is a no-op because parts already carry durable references
 
   @unit
   Scenario: Redacted trace content never leaks its media references
@@ -180,3 +250,11 @@ Feature: Trace media blob extraction at the ingestion edge
     And once the deadline passes no further parts are stored, parts already
       externalized keep their references (no orphaned bytes), and the drop is
       logged and counted rather than silent
+
+  @integration
+  Scenario: The receiver publishes the edge media fail-open series
+    Given a project whose feature-flag store cannot be read
+    When a span carrying inline media is exported to the OTLP receiver
+    Then the span is still ingested unmodified
+    And the fail-open is counted under the stage that failed, so a hook that
+      stood down for every span is distinguishable from one with nothing to do

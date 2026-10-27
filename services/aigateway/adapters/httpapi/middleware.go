@@ -29,12 +29,12 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 			token := extractToken(r)
 			if token == "" {
 				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidAPIKey, herr.M{
-					"message": "missing API key; supply Authorization: Bearer <key>, x-api-key, or x-goog-api-key header",
+					"message": "missing API key; supply Authorization: Bearer <key>, x-api-key, x-goog-api-key, or xi-api-key header",
 				}))
 				return
 			}
 
-			bundle, err := resolver.Resolve(r.Context(), token)
+			bundle, err := resolver.Resolve(r.Context(), presentedKey(r, token))
 			if err != nil {
 				herr.WriteHTTP(w, err)
 				return
@@ -126,6 +126,13 @@ func CustomerTraceMiddleware() func(http.Handler) http.Handler {
 			r.Header.Del(headerEndUserIDLiteLLM)
 			r.Header.Del(headerRequestMetadata)
 
+			// The Langy relay's per-turn mirror withhold (ADR-061): consumed
+			// here and never forwarded upstream.
+			if r.Header.Get(customertracebridge.HeaderLangyMirror) == customertracebridge.LangyMirrorWithheld {
+				ctx = customertracebridge.WithMirrorWithheld(ctx)
+			}
+			r.Header.Del(customertracebridge.HeaderLangyMirror)
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -152,6 +159,17 @@ func BundleFromContext(ctx context.Context) *domain.Bundle {
 	return nil
 }
 
+// presentedKey pairs a license token with the install that sent it. The
+// instance header is read for a license token only, so a virtual key resolves
+// and caches exactly as it would without the header.
+func presentedKey(r *http.Request, token string) domain.PresentedKey {
+	key := domain.PresentedKey{Token: token}
+	if key.IsLicenseToken() {
+		key.InstanceID = strings.TrimSpace(r.Header.Get(headerInstanceID))
+	}
+	return key
+}
+
 func extractToken(r *http.Request) string {
 	if a := r.Header.Get("Authorization"); a != "" {
 		if len(a) > 7 && strings.EqualFold(a[:7], "Bearer ") {
@@ -168,10 +186,17 @@ func extractToken(r *http.Request) string {
 	if k := r.Header.Get("X-Goog-Api-Key"); k != "" {
 		return strings.TrimSpace(k)
 	}
-	return ""
+	// xi-api-key — the ElevenLabs SDKs' auth header. The realtime session
+	// mint mirrors that vendor's own path, so an SDK reaches it by base URL
+	// alone; without this header it would also need its auth rewired.
+	if k := r.Header.Get("Xi-Api-Key"); k != "" {
+		return strings.TrimSpace(k)
+	}
+	return socketToken(r)
 }
 
 const (
+	headerInstanceID       = "X-LangWatch-Instance"
 	headerEndUserID        = "X-LangWatch-End-User-Id"
 	headerEndUserIDLiteLLM = "X-Litellm-End-User-Id"
 	headerRequestMetadata  = "X-LangWatch-Metadata"

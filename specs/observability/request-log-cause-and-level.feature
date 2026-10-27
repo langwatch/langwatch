@@ -25,6 +25,48 @@ Feature: Request log level and where the cause is attached
   # The level
   # ---------------------------------------------------------------------------
 
+  # ---------------------------------------------------------------------------
+  # The logger name
+  #
+  # The request-failure alerts ("CLI / SDK Request Failures", "Dashboard Request
+  # Failures") filter on logger_name="langwatch:api:hono". Naming the logger per
+  # family made every one of them blind. The family is a field, not the name.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: Every API family's request record is written under one logger name
+    Given a request answered by a REST family with its own namespace
+    When its request record is written
+    Then the record's logger is "langwatch:api:hono"
+    And the family is carried as a field on the record
+
+  # The tRPC and SSE lanes wrote no access record at all, so a dashboard 5xx was
+  # invisible to the request-failure alerts.
+
+  @unit @regression
+  Scenario: A dashboard tRPC request writes the same access record as a REST request
+    Given a tRPC procedure that answers successfully
+    When the dashboard calls it
+    Then one access record is written under "langwatch:api:hono" with the method, path, status and duration
+    And the record's family is "trpc"
+
+  @unit @regression
+  Scenario: A tRPC failure with a handled cause is logged by its fault
+    Given a tRPC procedure that fails with a handled platform error
+    When the dashboard calls it
+    Then the access record carries the handled code and fault
+    And it does not say the request failed without a cause attached
+
+  # A client that gave up mid-upload made the body read throw, which answered
+  # 500 and logged "error handling request" at error: hundreds a day, none ours.
+
+  @unit @regression
+  Scenario: A request whose body stopped arriving is the sender's 400, not a 500
+    Given a route that reads the whole request body
+    When the client's upload breaks off before the body is complete
+    Then the answer is 400 request_body_unreadable, attributed to the customer
+    And the same holds for a body measured against the ingestion size cap
+
   @unit @regression
   Scenario: A handled customer failure is logged below error
     When the failure is attributed to the customer
@@ -103,3 +145,56 @@ Feature: Request log level and where the cause is attached
     When the record is logged at error level
     Then the emitted line carries the failure's message
     And the emitted line carries the failure's stack
+
+  # ---------------------------------------------------------------------------
+  # The cause stays small
+  #
+  # Issue #8483. Loki accepts at most 128 structured-metadata keys per record,
+  # and every nested key of a logged cause becomes one. A validation error with
+  # a list of issues, or a database error with metadata, pushed records past 250
+  # keys, and Loki dropped them whole - the failure vanished exactly when it was
+  # widest. The cause is therefore a bounded summary, never the error object.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: A wide failure is logged as a bounded summary
+    When a failure carrying many fields is logged at warning or error level
+    Then the emitted record has fewer than 20 keys once flattened
+    And the cause carries only its type, message, code and stack
+
+  @unit @regression
+  Scenario: Error records carry no superjson metadata
+    When any failure is logged
+    Then no field named "_superjson" is emitted
+
+  @unit @regression
+  Scenario: A thrown string is logged as its message
+    When a string is thrown
+    Then the cause has type "string" and the string as its message
+
+  @unit @regression
+  Scenario: An error-like object keeps its message and code
+    When an object with a message and a code is thrown
+    Then the cause keeps that message and code
+
+  @unit @regression
+  Scenario: A thrown plain object is described without its contents
+    When a plain object without a message is thrown
+    Then the cause states only how many keys the object has
+    And neither its keys nor its values are emitted
+
+  @unit @regression
+  Scenario: Long messages and stacks are cut with a marker
+    When a message longer than the cap is thrown
+    Then the cause stays within the cap
+    And it ends with a truncation marker
+
+  @unit @regression
+  Scenario: A value that cannot be described still produces a record
+    When a circular object with a throwing toString is thrown
+    Then a record is still emitted
+
+  @unit @regression
+  Scenario: Credentials in a failed Redis command never reach the summary
+    When a failed AUTH command error is logged
+    Then the emitted line does not contain the password

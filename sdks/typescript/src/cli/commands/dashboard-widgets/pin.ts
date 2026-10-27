@@ -1,0 +1,119 @@
+import chalk from "chalk";
+
+import {
+  type DashboardBoard,
+  DashboardWidgetsApiError,
+  DashboardWidgetsApiService,
+} from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+
+import { resolveCredentials } from "../../utils/apiKey";
+import { sanitizeTerminalText } from "../../utils/formatting";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+
+/**
+ * Resolves a widget reference (id or name) to the widget it names. Tries it
+ * as an id first (cheapest), then falls back to a name match across the
+ * project's widgets.
+ */
+async function resolveWidgetRef({
+  widgets,
+  ref,
+}: {
+  widgets: DashboardWidgetsApiService;
+  ref: string;
+}) {
+  try {
+    return await widgets.get(ref);
+  } catch (error) {
+    // Only a genuine "no widget with this id" (404) may fall through to a name
+    // match. Auth, network, and 5xx failures are real and must reach the
+    // caller — swallowing them would silently reinterpret the ref as a name
+    // and hide the actual problem.
+    if (!(error instanceof DashboardWidgetsApiError) || error.status !== 404) {
+      throw error;
+    }
+  }
+
+  const { data } = await widgets.list();
+  const matches = data.filter((w) => w.name === ref);
+  if (matches.length === 0) {
+    throw new Error(`No widget named "${ref}"`);
+  }
+  if (matches.length > 1) {
+    throw new Error(`Multiple widgets named "${ref}" — pass the id`);
+  }
+  return matches[0]!;
+}
+
+/**
+ * Resolves a dashboard reference (id or name) among the Dashboards boards; an Analytics Reports
+ * board holds no widget, so it is never matched.
+ */
+async function resolveDashboardRef({
+  widgets,
+  ref,
+}: {
+  widgets: DashboardWidgetsApiService;
+  ref: string;
+}): Promise<DashboardBoard> {
+  const { data } = await widgets.listBoards();
+  const byId = data.find((d) => d.id === ref);
+  if (byId) return byId;
+
+  const matches = data.filter((d) => d.name === ref);
+  if (matches.length === 0) {
+    throw new Error(`No dashboard named "${ref}"`);
+  }
+  if (matches.length > 1) {
+    throw new Error(`Multiple dashboards named "${ref}" — pass the id`);
+  }
+  return matches[0]!;
+}
+
+/**
+ * Returns the pinned widget rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
+export const pinDashboardWidgetCommand = async (
+  widgetRef: string,
+  options: { dashboard?: string; project?: string },
+): Promise<CommandResult | void> => {
+  if (!options.dashboard) {
+    console.error(chalk.red("Error: --dashboard is required"));
+    process.exit(1);
+  }
+
+  await resolveCredentials({ project: options.project });
+
+  const widgets = new DashboardWidgetsApiService();
+  const spinner = createSpinner(`Adding "${widgetRef}" to dashboard...`).start();
+
+  try {
+    const widgetBefore = await resolveWidgetRef({ widgets, ref: widgetRef });
+    const dashboard = await resolveDashboardRef({ widgets, ref: options.dashboard });
+
+    const widget = await widgets.assignDashboard({
+      id: widgetBefore.id,
+      dashboardId: dashboard.id,
+    });
+
+    const safeWidgetName = sanitizeTerminalText(widget.name);
+    const safeDashboardName = sanitizeTerminalText(dashboard.name);
+    spinner.succeed(`Added "${safeWidgetName}" to dashboard "${safeDashboardName}"`);
+
+    return {
+      data: { widget, dashboard },
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("Widget:")}    ${chalk.cyan(safeWidgetName)}`);
+        console.log(`  ${chalk.gray("Dashboard:")} ${chalk.cyan(safeDashboardName)}`);
+        console.log();
+      },
+    };
+  } catch (error) {
+    failSpinner({ spinner, error, action: "pin dashboard widget" });
+    process.exit(1);
+  }
+};

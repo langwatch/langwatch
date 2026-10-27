@@ -44,6 +44,9 @@ type MemStat struct {
 	CompressedBytes uint64
 	SwapUsedBytes   uint64
 	SwapTotalBytes  uint64
+	// AvailableBytes is free, inactive and speculative pages: what the machine
+	// can hand out without paging. Zero when unread.
+	AvailableBytes uint64
 }
 
 // Pressure thresholds, as fractions. Picked from what was observed on a
@@ -51,7 +54,6 @@ type MemStat struct {
 // they are a heuristic, and ADR-090 says so rather than implying it measured
 // a limit the system actually applies.
 const (
-	amberSwapFraction = 0.40
 	redSwapFraction   = 0.75
 	amberCompFraction = 0.10
 	redCompFraction   = 0.20
@@ -60,9 +62,9 @@ const (
 // ClassifyPressure reads a level off the machine. An undetectable machine is
 // green: a governor that cannot see must not throttle.
 //
-// Either signal alone can raise the level. A machine with swap disabled has a
-// permanently zero swap term and still thrashes its compressor, so requiring
-// both would never fire there.
+// The compressor alone can raise the level; swap only escalates a busy
+// compressor to red. macOS keeps swap in use for hours after pressure ends, so
+// swap alone throttled every unfocused stack 20x on a machine 86% free.
 func ClassifyPressure(m MemStat) Pressure {
 	if m.TotalBytes == 0 {
 		return Green
@@ -73,9 +75,9 @@ func ClassifyPressure(m MemStat) Pressure {
 		swapFraction = float64(m.SwapUsedBytes) / float64(m.SwapTotalBytes)
 	}
 	switch {
-	case swapFraction > redSwapFraction || compFraction > redCompFraction:
+	case compFraction > redCompFraction || (swapFraction > redSwapFraction && compFraction > amberCompFraction):
 		return Red
-	case swapFraction > amberSwapFraction || compFraction > amberCompFraction:
+	case compFraction > amberCompFraction:
 		return Amber
 	default:
 		return Green
@@ -86,35 +88,6 @@ func ClassifyPressure(m MemStat) Pressure {
 // measured 573 MB per vitest fork times a default width, rounded to something
 // a reader can hold in their head.
 const heavyRunBudget = uint64(3) << 30
-
-// HeavySlots is how many heavy runs may be in flight across the whole machine.
-//
-// Sized from total RAM MINUS compressor occupancy — which is a partial answer,
-// and the honest description of it. What the limit should discount is everything
-// another tenant is already holding: on a laptop with a container VM holding
-// 8 GiB, total memory overstates what this process can have by nearly half. Only
-// the compressed part of that is visible here, because MemStat deliberately
-// carries no summed-RSS figure (it double-counts shared pages by several GB, so
-// it is worse than nothing as a control input). A free-memory signal would close
-// the gap; until MemStat carries one, this over-admits by whatever a quiet
-// tenant holds uncompressed, and the cores cap below is what bounds the damage.
-//
-// Capped by cores as well, because these runs saturate CPU as readily as RAM,
-// and never below one, or nothing would ever run.
-func HeavySlots(m MemStat, numCPU int) int {
-	usable := m.TotalBytes
-	if m.CompressedBytes < usable {
-		usable -= m.CompressedBytes
-	}
-	slots := 1
-	if usable >= heavyRunBudget {
-		slots = int(usable / heavyRunBudget)
-	}
-	if numCPU > 0 {
-		slots = min(slots, max(numCPU/4, 1))
-	}
-	return max(slots, 1)
-}
 
 // CallerKind is who asked for a heavy run. It decides the wait ceiling, because
 // it decides the prompt-cache floor.
@@ -188,6 +161,9 @@ type PressureRecord struct {
 	Version   int       `json:"version"`
 	Level     string    `json:"level"`
 	WrittenAt time.Time `json:"writtenAt"`
+	// Capacity is the idle-headroom tier (domain/capacity.go); an older daemon
+	// leaves it empty, which readers treat as no reading.
+	Capacity CapacityReading `json:"capacity,omitzero"`
 }
 
 // PressureRecordVersion is the current record shape. A reader that does not

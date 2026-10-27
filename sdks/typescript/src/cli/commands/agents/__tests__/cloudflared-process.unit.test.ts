@@ -1,11 +1,10 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  launchQuickTunnel,
-  type TunnelHandle,
-} from "../dev/cloudflared-process";
+
+import { launchQuickTunnel, type TunnelHandle } from "../tunnel/cloudflared-process";
 
 const TUNNEL_URL = "https://lively-otter.trycloudflare.com";
 
@@ -53,9 +52,7 @@ describe.skipIf(process.platform === "win32")("launchQuickTunnel", () => {
       });
       started.push(tunnel);
 
-      const url = await new Promise<string>((resolve) =>
-        tunnel.once("url", resolve),
-      );
+      const url = await new Promise<string>((resolve) => tunnel.once("url", resolve));
       const exited = new Promise<unknown>((resolve) =>
         tunnel.once("exit", (_code, signal) => resolve(signal)),
       );
@@ -80,9 +77,7 @@ describe.skipIf(process.platform === "win32")("launchQuickTunnel", () => {
         localUrl: "http://127.0.0.1:4321",
       });
 
-      const error = await new Promise<Error>((resolve) =>
-        tunnel.once("error", resolve),
-      );
+      const error = await new Promise<Error>((resolve) => tunnel.once("error", resolve));
 
       expect((error as NodeJS.ErrnoException).code).toBe("ENOENT");
     });

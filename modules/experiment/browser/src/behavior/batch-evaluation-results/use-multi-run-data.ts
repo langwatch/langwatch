@@ -1,0 +1,120 @@
+import { system } from "@langwatch/design-system/system";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
+/**
+ * useMultiRunData - Hook for fetching multiple run data in compare mode
+ */
+import { useMemo } from "react";
+
+import { experimentApi } from "../experiment-api.ts";
+
+// Run colors for comparison mode - distinct, accessible colors
+export const RUN_COLORS = [
+  "chart.2",
+  "chart.1",
+  "chart.3",
+  "chart.8",
+  "chart.5",
+  "red.solid",
+  "chart.6",
+  "fg.subtle",
+].map((token) => system.token.var(`colors.${token}`));
+
+export type RunWithColor = {
+  runId: string;
+  color: string;
+  data: ExperimentRunWithItems | null;
+  isLoading: boolean;
+  error: unknown;
+};
+
+type UseMultiRunDataOptions = {
+  projectId: string;
+  experimentId: string;
+  runIds: string[];
+  enabled?: boolean;
+  /** Stable color map for runs (key: runId, value: color) */
+  runColorMap?: Record<string, string>;
+};
+
+type UseMultiRunDataReturn = {
+  runs: RunWithColor[];
+  isLoading: boolean;
+  isAllLoaded: boolean;
+  hasError: boolean;
+};
+
+/**
+ * Fetches data for multiple runs in parallel
+ */
+export const useMultiRunData = ({
+  projectId,
+  experimentId,
+  runIds,
+  enabled = true,
+  runColorMap = {},
+}: UseMultiRunDataOptions): UseMultiRunDataReturn => {
+  // We need to call hooks unconditionally, so we set up the max number
+  // and enable/disable based on whether we have that many runs
+  const run0 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
+    { projectId, experimentId, runId: runIds[0] ?? "" },
+    { enabled: enabled && !!runIds[0] },
+  );
+  const run1 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
+    { projectId, experimentId, runId: runIds[1] ?? "" },
+    { enabled: enabled && !!runIds[1] },
+  );
+  const run2 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
+    { projectId, experimentId, runId: runIds[2] ?? "" },
+    { enabled: enabled && !!runIds[2] },
+  );
+  const run3 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
+    { projectId, experimentId, runId: runIds[3] ?? "" },
+    { enabled: enabled && !!runIds[3] },
+  );
+  const run4 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
+    { projectId, experimentId, runId: runIds[4] ?? "" },
+    { enabled: enabled && !!runIds[4] },
+  );
+  const run5 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
+    { projectId, experimentId, runId: runIds[5] ?? "" },
+    { enabled: enabled && !!runIds[5] },
+  );
+  const run6 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
+    { projectId, experimentId, runId: runIds[6] ?? "" },
+    { enabled: enabled && !!runIds[6] },
+  );
+  const run7 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
+    { projectId, experimentId, runId: runIds[7] ?? "" },
+    { enabled: enabled && !!runIds[7] },
+  );
+
+  const runs: RunWithColor[] = useMemo(() => {
+    const queries = [run0, run1, run2, run3, run4, run5, run6, run7];
+    return runIds.slice(0, 8).map((runId, idx) => ({
+      runId,
+      // Use stable color from map, or fallback to index-based color
+      color: runColorMap[runId] ?? RUN_COLORS[idx % RUN_COLORS.length]!,
+      data: queries[idx]?.data ?? null,
+      isLoading: queries[idx]?.isLoading ?? false,
+      error: queries[idx]?.error ?? null,
+    }));
+  }, [runIds, run0, run1, run2, run3, run4, run5, run6, run7, runColorMap]);
+
+  const isLoading = runs.some((r) => r.isLoading);
+  const isAllLoaded = runs.every((r) => !r.isLoading && r.data !== null);
+  const hasError = runs.some((r) => r.error !== null);
+
+  return {
+    runs,
+    isLoading,
+    isAllLoaded,
+    hasError,
+  };
+};
+
+/**
+ * Get color for a run by index
+ */
+export const getRunColor = (index: number): string => {
+  return RUN_COLORS[index % RUN_COLORS.length]!;
+};

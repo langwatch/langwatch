@@ -6,13 +6,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appSettingsTargetFor } from "../app-settings";
 import { installTelemetryWiring } from "../instrument-wiring";
+import { runningCodeRestartNotice } from "../running-code";
 import { baseCfg, installTempHomeAndCwd } from "./telemetry-refresh-test-helpers";
 
 const temp = installTempHomeAndCwd();
+
+vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
 
 const ENDPOINT = "http://app.example.com/api/otel";
 const TOKEN = "ik-lw-wiring0000000000_secret";
@@ -20,95 +23,243 @@ const TOKEN = "ik-lw-wiring0000000000_secret";
 let origShell: string | undefined;
 
 beforeEach(() => {
-	origShell = process.env.SHELL;
-	process.env.SHELL = "/bin/zsh";
+  origShell = process.env.SHELL;
+  process.env.SHELL = "/bin/zsh";
 });
 
 afterEach(() => {
-	if (origShell === undefined) delete process.env.SHELL;
-	else process.env.SHELL = origShell;
+  if (origShell === undefined) delete process.env.SHELL;
+  else process.env.SHELL = origShell;
 });
 
 describe("installTelemetryWiring", () => {
-	describe("when the tool is claude", () => {
-		/** @scenario "The wiring targets are the same files a wrapped run manages" */
-		it("writes the OTel env into the user settings.json on a fresh machine", () => {
-			const result = installTelemetryWiring({
-				cfg: baseCfg(),
-				tool: "claude",
-				endpoint: ENDPOINT,
-				token: TOKEN,
-			});
+  describe("when a Copilot surface is wired", () => {
+    it.each(["copilot", "code"])(
+      "writes the one hook file both Copilot surfaces load, for %s",
+      (tool) => {
+        installTelemetryWiring({ cfg: baseCfg(), tool, endpoint: ENDPOINT, token: TOKEN });
 
-			expect(result.warnings).toEqual([]);
-			expect(result.labels).toHaveLength(1);
-			const target = appSettingsTargetFor("claude")!;
-			const written = JSON.parse(fs.readFileSync(target.path, "utf8")) as {
-				env: Record<string, string>;
-			};
-			expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(ENDPOINT);
-			expect(written.env.OTEL_EXPORTER_OTLP_HEADERS).toContain(TOKEN);
-		});
-	});
+        const hookFile = path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+        expect(JSON.parse(fs.readFileSync(hookFile, "utf8"))).toMatchObject({
+          hooks: {
+            sessionStart: [{ bash: "langwatch ingest hook copilot" }],
+            agentStop: [{ bash: "langwatch ingest hook copilot" }],
+          },
+        });
+      },
+    );
 
-	describe("when the tool is codex", () => {
-		it("writes the [otel] block with the Authorization header inline", () => {
-			const result = installTelemetryWiring({
-				cfg: baseCfg(),
-				tool: "codex",
-				endpoint: ENDPOINT,
-				token: TOKEN,
-			});
+    describe("given a langwatch.json the user wrote at the hook file's path", () => {
+      const theirs = JSON.stringify({ hooks: { preToolUse: [{ bash: "echo guard" }] } });
+      const hookFile = () => path.join(temp.home, ".copilot", "hooks", "langwatch.json");
 
-			expect(result.warnings).toEqual([]);
-			expect(result.labels).toHaveLength(1);
-			const toml = fs.readFileSync(
-				path.join(temp.home, ".codex", "config.toml"),
-				"utf8",
-			);
-			// codex's exporter posts to the endpoint verbatim, so the trace
-			// suffix is spelled out; the header makes a plain `codex` capture.
-			expect(toml).toContain(`${ENDPOINT}/v1/traces`);
-			expect(toml).toContain(`Bearer ${TOKEN}`);
-		});
-	});
+      beforeEach(() => {
+        fs.mkdirSync(path.dirname(hookFile()), { recursive: true });
+        fs.writeFileSync(hookFile(), theirs);
+      });
 
-	describe("when the tool persists as a scoped shell function (gemini)", () => {
-		it("writes the marker-managed function into the shell rc", () => {
-			const result = installTelemetryWiring({
-				cfg: baseCfg(),
-				tool: "gemini",
-				endpoint: ENDPOINT,
-				token: TOKEN,
-			});
+      /** @scenario "Instrumenting Copilot over the user's langwatch.json says repository linking is off" */
+      it.each(["copilot", "code"])(
+        "leaves it alone and warns that repository linking is off, for %s",
+        (tool) => {
+          const result = installTelemetryWiring({
+            cfg: baseCfg(),
+            tool,
+            endpoint: ENDPOINT,
+            token: TOKEN,
+          });
 
-			expect(result.warnings).toEqual([]);
-			const rc = fs.readFileSync(path.join(temp.home, ".zshrc"), "utf8");
-			expect(rc).toContain("gemini()");
-			expect(rc).toContain(ENDPOINT);
-			expect(rc).toContain(TOKEN);
-		});
-	});
+          expect(fs.readFileSync(hookFile(), "utf8")).toBe(theirs);
+          const warning = result.warnings.find((line) => line.includes("langwatch.json"));
+          expect(warning).toContain("~/.copilot/hooks/langwatch.json is not a LangWatch file");
+          expect(warning).toContain("will not report their repository or branch");
+          expect(warning).toContain(`langwatch instrument ${tool}`);
+        },
+      );
+    });
 
-	describe("when the login shell is unrecognized", () => {
-		it("falls back to the platform default rc instead of giving up", () => {
-			// A headless VPS whose SHELL is /bin/sh (or tcsh) still gets wired:
-			// zsh on macOS, bash on linux. `instrument` exists for exactly
-			// these machines.
-			process.env.SHELL = "/bin/tcsh";
+    describe("given a langwatch.json the user wrote that runs the LangWatch hook", () => {
+      const theirs = JSON.stringify({
+        hooks: {
+          sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+          preToolUse: [{ bash: "echo guard" }],
+        },
+      });
+      const hookFile = () => path.join(temp.home, ".copilot", "hooks", "langwatch.json");
 
-			const result = installTelemetryWiring({
-				cfg: baseCfg(),
-				tool: "gemini",
-				endpoint: ENDPOINT,
-				token: TOKEN,
-			});
+      beforeEach(() => {
+        fs.mkdirSync(path.dirname(hookFile()), { recursive: true });
+        fs.writeFileSync(hookFile(), theirs);
+      });
 
-			expect(result.warnings).toEqual([]);
-			expect(result.labels).toHaveLength(1);
-			const rcName = process.platform === "darwin" ? ".zshrc" : ".bashrc";
-			const rc = fs.readFileSync(path.join(temp.home, rcName), "utf8");
-			expect(rc).toContain(TOKEN);
-		});
-	});
+      /** @scenario "A user's langwatch.json that runs the LangWatch hook is not reported as turning linking off" */
+      it("leaves it alone without saying repository linking is off", () => {
+        const result = installTelemetryWiring({
+          cfg: baseCfg(),
+          tool: "copilot",
+          endpoint: ENDPOINT,
+          token: TOKEN,
+        });
+
+        expect(fs.readFileSync(hookFile(), "utf8")).toBe(theirs);
+        expect(result.warnings.join("\n")).not.toContain("langwatch.json");
+      });
+    });
+
+    it("writes no Copilot hook file for another tool", () => {
+      installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "opencode",
+        endpoint: ENDPOINT,
+        token: TOKEN,
+      });
+
+      expect(fs.existsSync(path.join(temp.home, ".copilot"))).toBe(false);
+    });
+  });
+
+  describe("when langwatch code is running", () => {
+    const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
+    const install = (token = TOKEN) =>
+      installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "code",
+        endpoint: ENDPOINT,
+        token,
+      });
+
+    beforeEach(() => {
+      vi.mocked(runningCodeRestartNotice).mockReturnValue(notice);
+    });
+
+    /** @scenario "A running langwatch code command needs a restart after reconfiguration" */
+    it("reports restart advice after changing the ingest key", () => {
+      install();
+      expect(install("ik-lw-replacement_secret").warnings).toContain(notice);
+    });
+
+    it("reports restart advice after changing the endpoint", () => {
+      install();
+      const result = installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "code",
+        endpoint: "https://new.example.com/api/otel",
+        token: TOKEN,
+      });
+      expect(result.warnings).toContain(notice);
+    });
+
+    it("stays quiet when no LangWatch code launcher is detected", () => {
+      install();
+      vi.mocked(runningCodeRestartNotice).mockReturnValue(undefined);
+      expect(install("ik-lw-replacement_secret").warnings).toEqual([]);
+    });
+
+    /** @scenario "Unchanged wiring needs no restart notice" */
+    it("does not inspect processes or advise restarting unchanged wiring", () => {
+      install();
+      vi.mocked(runningCodeRestartNotice).mockClear();
+      expect(install().warnings).toEqual([]);
+      expect(runningCodeRestartNotice).not.toHaveBeenCalled();
+    });
+
+    it("does not report a restart when the wiring write fails", () => {
+      fs.mkdirSync(path.join(temp.home, ".zshrc"));
+      expect(install().warnings).not.toContain(notice);
+    });
+
+    it.skipIf(process.platform === "win32")(
+      "does not report a restart when VS Code's companion write fails",
+      () => {
+        const settingsParent =
+          process.platform === "darwin"
+            ? path.join(temp.home, "Library", "Application Support", "Code", "User")
+            : path.join(temp.home, ".config", "Code", "User");
+        fs.mkdirSync(path.join(settingsParent, "settings.json"), {
+          recursive: true,
+        });
+        const result = install();
+        expect(result.requiredFailures).not.toEqual([]);
+        expect(result.warnings).not.toContain(notice);
+      },
+    );
+  });
+  describe("when the tool is claude", () => {
+    /** @scenario "The wiring targets are the same files a wrapped run manages" */
+    it("writes the OTel env into the user settings.json on a fresh machine", () => {
+      const result = installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "claude",
+        endpoint: ENDPOINT,
+        token: TOKEN,
+      });
+
+      expect(result.warnings).toEqual([]);
+      expect(result.labels).toHaveLength(1);
+      const target = appSettingsTargetFor("claude")!;
+      const written = JSON.parse(fs.readFileSync(target.path, "utf8")) as {
+        env: Record<string, string>;
+      };
+      expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(ENDPOINT);
+      expect(written.env.OTEL_EXPORTER_OTLP_HEADERS).toContain(TOKEN);
+    });
+  });
+
+  describe("when the tool is codex", () => {
+    it("writes the [otel] block with the Authorization header inline", () => {
+      const result = installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "codex",
+        endpoint: ENDPOINT,
+        token: TOKEN,
+      });
+
+      expect(result.warnings).toEqual([]);
+      expect(result.labels).toHaveLength(1);
+      const toml = fs.readFileSync(path.join(temp.home, ".codex", "config.toml"), "utf8");
+      // codex's exporter posts to the endpoint verbatim, so the trace
+      // suffix is spelled out; the header makes a plain `codex` capture.
+      expect(toml).toContain(`${ENDPOINT}/v1/traces`);
+      expect(toml).toContain(`Bearer ${TOKEN}`);
+    });
+  });
+
+  describe("when the tool persists as a scoped shell function (gemini)", () => {
+    it("writes the marker-managed function into the shell rc", () => {
+      const result = installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "gemini",
+        endpoint: ENDPOINT,
+        token: TOKEN,
+      });
+
+      expect(result.warnings).toEqual([]);
+      const rc = fs.readFileSync(path.join(temp.home, ".zshrc"), "utf8");
+      expect(rc).toContain("gemini()");
+      expect(rc).toContain(ENDPOINT);
+      expect(rc).toContain(TOKEN);
+    });
+  });
+
+  describe("when the login shell is unrecognized", () => {
+    it("falls back to the platform default rc instead of giving up", () => {
+      // A headless VPS whose SHELL is /bin/sh (or tcsh) still gets wired:
+      // zsh on macOS, bash on linux. `instrument` exists for exactly
+      // these machines.
+      process.env.SHELL = "/bin/tcsh";
+
+      const result = installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "gemini",
+        endpoint: ENDPOINT,
+        token: TOKEN,
+      });
+
+      expect(result.warnings).toEqual([]);
+      expect(result.labels).toHaveLength(1);
+      const rcName = process.platform === "darwin" ? ".zshrc" : ".bashrc";
+      const rc = fs.readFileSync(path.join(temp.home, rcName), "utf8");
+      expect(rc).toContain(TOKEN);
+    });
+  });
 });

@@ -6,11 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.delete_api_suites_by_id_response_200 import DeleteApiSuitesByIdResponse200
-from ...models.delete_api_suites_by_id_response_400 import DeleteApiSuitesByIdResponse400
-from ...models.delete_api_suites_by_id_response_401 import DeleteApiSuitesByIdResponse401
 from ...models.delete_api_suites_by_id_response_404 import DeleteApiSuitesByIdResponse404
-from ...models.delete_api_suites_by_id_response_422 import DeleteApiSuitesByIdResponse422
-from ...models.delete_api_suites_by_id_response_500 import DeleteApiSuitesByIdResponse500
 from ...types import Response, safe_http_status
 
 
@@ -20,7 +16,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/suites/{id}".format(
+        "url": "/api/v1/suites/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }
@@ -30,44 +26,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    DeleteApiSuitesByIdResponse200
-    | DeleteApiSuitesByIdResponse400
-    | DeleteApiSuitesByIdResponse401
-    | DeleteApiSuitesByIdResponse404
-    | DeleteApiSuitesByIdResponse422
-    | DeleteApiSuitesByIdResponse500
-    | None
-):
+) -> DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404 | None:
     if response.status_code == 200:
         response_200 = DeleteApiSuitesByIdResponse200.from_dict(response.json())
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = DeleteApiSuitesByIdResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = DeleteApiSuitesByIdResponse401.from_dict(response.json())
-
-        return response_401
-
     if response.status_code == 404:
         response_404 = DeleteApiSuitesByIdResponse404.from_dict(response.json())
 
         return response_404
-
-    if response.status_code == 422:
-        response_422 = DeleteApiSuitesByIdResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = DeleteApiSuitesByIdResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -77,14 +45,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    DeleteApiSuitesByIdResponse200
-    | DeleteApiSuitesByIdResponse400
-    | DeleteApiSuitesByIdResponse401
-    | DeleteApiSuitesByIdResponse404
-    | DeleteApiSuitesByIdResponse422
-    | DeleteApiSuitesByIdResponse500
-]:
+) -> Response[DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -99,16 +60,10 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> Response[
-    DeleteApiSuitesByIdResponse200
-    | DeleteApiSuitesByIdResponse400
-    | DeleteApiSuitesByIdResponse401
-    | DeleteApiSuitesByIdResponse404
-    | DeleteApiSuitesByIdResponse422
-    | DeleteApiSuitesByIdResponse500
-]:
-    """Archive (soft-delete) a suite (run plan)
+    client: AuthenticatedClient,
+) -> Response[DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404]:
+    """Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in
+    one transaction. Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
@@ -118,7 +73,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse400 | DeleteApiSuitesByIdResponse401 | DeleteApiSuitesByIdResponse404 | DeleteApiSuitesByIdResponse422 | DeleteApiSuitesByIdResponse500]
+        Response[DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -135,17 +90,10 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> (
-    DeleteApiSuitesByIdResponse200
-    | DeleteApiSuitesByIdResponse400
-    | DeleteApiSuitesByIdResponse401
-    | DeleteApiSuitesByIdResponse404
-    | DeleteApiSuitesByIdResponse422
-    | DeleteApiSuitesByIdResponse500
-    | None
-):
-    """Archive (soft-delete) a suite (run plan)
+    client: AuthenticatedClient,
+) -> DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404 | None:
+    """Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in
+    one transaction. Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
@@ -155,7 +103,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse400 | DeleteApiSuitesByIdResponse401 | DeleteApiSuitesByIdResponse404 | DeleteApiSuitesByIdResponse422 | DeleteApiSuitesByIdResponse500
+        DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404
     """
 
     return sync_detailed(
@@ -167,16 +115,10 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> Response[
-    DeleteApiSuitesByIdResponse200
-    | DeleteApiSuitesByIdResponse400
-    | DeleteApiSuitesByIdResponse401
-    | DeleteApiSuitesByIdResponse404
-    | DeleteApiSuitesByIdResponse422
-    | DeleteApiSuitesByIdResponse500
-]:
-    """Archive (soft-delete) a suite (run plan)
+    client: AuthenticatedClient,
+) -> Response[DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404]:
+    """Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in
+    one transaction. Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
@@ -186,7 +128,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse400 | DeleteApiSuitesByIdResponse401 | DeleteApiSuitesByIdResponse404 | DeleteApiSuitesByIdResponse422 | DeleteApiSuitesByIdResponse500]
+        Response[DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -201,17 +143,10 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> (
-    DeleteApiSuitesByIdResponse200
-    | DeleteApiSuitesByIdResponse400
-    | DeleteApiSuitesByIdResponse401
-    | DeleteApiSuitesByIdResponse404
-    | DeleteApiSuitesByIdResponse422
-    | DeleteApiSuitesByIdResponse500
-    | None
-):
-    """Archive (soft-delete) a suite (run plan)
+    client: AuthenticatedClient,
+) -> DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404 | None:
+    """Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in
+    one transaction. Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
@@ -221,7 +156,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse400 | DeleteApiSuitesByIdResponse401 | DeleteApiSuitesByIdResponse404 | DeleteApiSuitesByIdResponse422 | DeleteApiSuitesByIdResponse500
+        DeleteApiSuitesByIdResponse200 | DeleteApiSuitesByIdResponse404
     """
 
     return (

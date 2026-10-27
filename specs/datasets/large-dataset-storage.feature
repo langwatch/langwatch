@@ -83,6 +83,15 @@ Feature: Large dataset storage
     When I retry the preparation
     Then the dataset reports the correct row count with no duplicates
 
+  @integration
+  Scenario: Two finalize calls for one upload start one preparation
+    Given an uploaded file whose dataset has not started preparing
+    When the upload is finalized twice at the same moment
+    Then exactly one of the two starts the preparation
+    And the other is told it was already started
+    # A double click or a client retry must not run two preparations over the
+    # same staged file: in inline mode they would write the same chunk keys.
+
   # ============================================================================
   # Consumers keep working
   # ============================================================================
@@ -176,3 +185,9 @@ Feature: Large dataset storage
     When I edit the dataset and change that column to an image
     Then the column is reported as an image
     And each stored data URL is kept exactly as it was
+
+  @unit
+  Scenario: A file queued for preparation before an upgrade is still prepared
+    Given a dataset file was queued for preparation by the previous release
+    When the upgraded worker picks the job up
+    Then the file is still prepared into the dataset's rows

@@ -1,11 +1,7 @@
 /**
- * The single-driver lease: one process runs a migration pass at a time,
- * fleet-wide. The app implements this on Redis (`SET NX PX` + delete);
- * tests use an in-memory fake.
- *
- * Losing the lease mid-pass is safe by construction - every migration is
- * idempotent and the state machine is re-entrant - so the runner treats a
- * failed renewal as "stop early", never as corruption.
+ * Named leases for the runner's per-organization claims, so any number of
+ * processes share the fleet. Losing a claim mid-tenant is safe by
+ * construction, so a failed renewal is treated as handing off, never corruption.
  */
 export interface MigrationLeaseRepository {
   /** True when this process now holds the lease. */

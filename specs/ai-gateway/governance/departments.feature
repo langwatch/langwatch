@@ -30,10 +30,10 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     - specs/ai-gateway/governance/ingestion-attribution.feature (principal attribution)
 
   Implementation lives under:
-    - platform/app/ee/governance/services/department/                  (attribution + service)
-    - platform/app/ee/governance/routers/departments.ts                (tRPC)
-    - platform/app/ee/governance/services/activity-monitor/            (bird-eye rollup)
-    - platform/app/ee/scim/scim.service.ts                     (SCIM auto-assignment)
+    - enterprise/modules/governance/process/src/ (department)                  (attribution + service)
+    - enterprise/modules/governance/contract/src/department.ts                (tRPC)
+    - enterprise/modules/governance/process/src/ (activity-monitor)            (bird-eye rollup)
+    - enterprise/modules/scim/process/src/services/scim.service.ts                     (SCIM auto-assignment)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"
@@ -111,6 +111,42 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
       rather than disappearing
 
   # ---------------------------------------------------------------------------
+  # Dated department links (ADR-128 §13): who was where, and when.
+  # The pointer on the membership answers "where are they now"; the dated
+  # links answer "where were they in January", which is what month-old spend
+  # resolves against.
+  # ---------------------------------------------------------------------------
+
+  @bdd @departments @integration
+  Scenario: A reorg closes the old dated link and opens a new one
+    Given a member assigned to "Support"
+    When the admin reassigns them to "Legal"
+    Then the "Support" link is closed at that moment
+    And an open "Legal" link starts there
+    And re-asserting the standing assignment neither closes nor reopens anything
+    And clearing the assignment closes the link and opens none
+    # "Unassigned" is the absence of a link, not a link to an absence.
+
+  @bdd @departments @integration
+  Scenario: A past day resolves to the department whose link covered it
+    Given a member whose closed "January Dept" link covered January
+    And a closed "February Dept" link that covered February
+    When each month's day is resolved to a department
+    Then January answers "January Dept" and February answers "February Dept"
+    And a day before any link answers by absence, never an error
+    # The dated-link read that month-by-month attribution needs. The links are
+    # written on every reorg, but nothing on the cost screens reads this yet —
+    # the read has no production caller until spend grouping arrives.
+
+  @bdd @departments @integration
+  Scenario: A standing assignment from before dated links gets its link seeded
+    Given a member whose department pointer predates the dated links
+    When the daily directory read re-asserts that same assignment
+    Then a dated link is seeded for the standing assignment
+    # Skipping them because the pointer already matches would leave "who was
+    # here in January" answering "unassigned" until a real reorg.
+
+  # ---------------------------------------------------------------------------
   # Where assignment happens (UI surface - the redesign)
   # An org can have tens of thousands of members, so assignment lives on the
   # pages that already paginate the org chart, not as one flat list.
@@ -144,6 +180,15 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     Then the members and teams pages show no department column
     When the admin creates the first department
     Then the department column appears on the members and teams pages
+
+  # The control also sits on settings pages every member can open, while the
+  # department lists need `governance:view`.
+  @bdd @departments @ui
+  Scenario: The department lists are not requested without the grant to read them
+    Given a member of acme-corp who does not hold `governance:view`
+    When they open a settings page that carries the department control
+    Then neither the departments nor their assignments are requested
+    And the page shows no department column
 
   # ---------------------------------------------------------------------------
   # SCIM auto-assignment (enterprise standard)
@@ -201,6 +246,13 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     When acme-corp's admin loads the dashboard
     Then the department rollup contains zero spend from the other org
     And every underlying ClickHouse query filters by TenantId first
+
+  @bdd @departments @birds-eye @unit
+  Scenario: Spend by department reads the organization's projects as one declared tenant set
+    Given an organization with two projects
+    When the dashboard asks for spend by department
+    Then the read binds one tenant parameter per project and declares exactly that set
+    And the tenant guard accepts it rather than failing the card
 
   @bdd @departments @birds-eye @integration
   Scenario: Marketing-versus-engineering comparison reads from departments

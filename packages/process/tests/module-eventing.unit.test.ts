@@ -1,0 +1,554 @@
+import {
+  createTenantId,
+  EventUtils,
+  type FeatureEventing,
+  type FeatureEventingSetup,
+} from "@langwatch/eventing";
+import { moduleApi } from "@langwatch/module";
+/**
+ * The module/eventing seam, with structural shapes standing in for a runtime.
+ * Spec: specs/server/declarative-process-composition.feature
+ */
+import { describe, expect, it, vi } from "vitest";
+
+import { ApplicationBuilder } from "../src/application.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineRepositories } from "../src/repository-registry.ts";
+import { liveMemberSourceOf } from "./member-source.ts";
+
+/** One stored event of the given aggregate type, for the pipeline's own store to append. */
+function eventFixture({ aggregateType }: { aggregateType: string }) {
+  return EventUtils.createEvent({
+    aggregateType,
+    aggregateId: "run_1",
+    tenantId: createTenantId("project_1"),
+    type: "lw.test.run_queued",
+    version: "2026-10-05",
+    data: {},
+  });
+}
+
+/** One row store, so two graphs over the same rows are distinguishable. */
+class KeyDatabase {
+  readonly revoked: string[] = [];
+}
+
+interface KeyRepositories {
+  readonly keys: KeyDatabase;
+}
+
+class MemoryKeyRepositories {
+  static readonly requires = [] as const;
+  static create(): KeyRepositories {
+    return { keys: new KeyDatabase() };
+  }
+}
+
+const keyRepositories = defineRepositories({
+  live: MemoryKeyRepositories,
+  memory: MemoryKeyRepositories,
+});
+
+abstract class KeyApp {
+  abstract readonly repositories: KeyRepositories;
+  abstract reap(): void;
+}
+
+class ComposedKeyApp extends KeyApp {
+  static readonly contract = KeyApp;
+  static readonly dependencies = {};
+
+  /** What `connect` handed back, so the test can see the senders arrive. */
+  sender: unknown;
+
+  private constructor(readonly repositories: KeyRepositories) {
+    super();
+  }
+
+  static create(
+    setup: FeatureSetup<typeof ComposedKeyApp.dependencies, undefined, KeyRepositories>,
+  ): ComposedKeyApp {
+    return new ComposedKeyApp(setup.repositories);
+  }
+
+  reap(): void {
+    this.repositories.keys.revoked.push("reaped");
+  }
+}
+
+type KeySetup = FeatureEventingSetup<KeyRepositories, KeyApp, { pruned: string[] }>;
+
+/** What the module declares: one pipeline, built over its own two halves. */
+function keyEventing(): FeatureEventing<KeyRepositories, KeyApp, { pruned: string[] }> & {
+  readonly built: KeySetup[];
+} {
+  const built: KeySetup[] = [];
+  return {
+    pipeline: "agent_sandbox_maintenance",
+    built,
+    build(setup: KeySetup) {
+      built.push(setup);
+      setup.processStore.pruned.push(this.pipeline);
+      return { name: this.pipeline, sweep: () => setup.repositories.keys.revoked.push("swept") };
+    },
+    connect({ app, commands }) {
+      (app as ComposedKeyApp).sender = commands.startSweep;
+    },
+  };
+}
+
+function eventingHost(participation: "produce" | "consume") {
+  const registered: { name: string }[] = [];
+  const startSweep = { send: vi.fn() };
+  return {
+    registered,
+    startSweep,
+    host: {
+      participation,
+      processStore: { pruned: [] as string[] },
+      register: (definition: unknown) => {
+        registered.push(definition as { name: string });
+        return { commands: { startSweep } };
+      },
+    },
+  };
+}
+
+/** An eventing runtime as every normal process holds one: it states no half. */
+function runtimeStatingNothing() {
+  return {
+    processStore: { pruned: [] as string[] },
+    register: () => ({ commands: { startSweep: { send: vi.fn() } } }),
+  };
+}
+
+describe("given a module that declares its event sourcing with withEventing", () => {
+  describe("when the process holds an eventing runtime", () => {
+    /** @scenario "A module declares its event sourcing beside its transports" */
+    it("registers the pipeline the module named", async () => {
+      const eventing = eventingHost("consume");
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(keyEventing());
+
+      await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: eventing.host }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(eventing.registered.map((definition) => definition.name)).toEqual([
+        "agent_sandbox_maintenance",
+      ]);
+    });
+
+    /** @scenario "A module declares its event sourcing beside its transports" */
+    it("builds the pipeline over the repositories the app itself was given", async () => {
+      const eventing = eventingHost("consume");
+      const declaration = keyEventing();
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(declaration);
+
+      const runtime = await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: eventing.host }),
+      })
+        .withModules([module])
+        .boot();
+
+      const app = runtime.service(KeyApp);
+      expect(declaration.built).toHaveLength(1);
+      expect(declaration.built[0]!.repositories.keys).toBe(app.repositories.keys);
+      expect(declaration.built[0]!.app).toBe(app);
+      expect(declaration.built[0]!.participation).toBe("consume");
+    });
+
+    /** @scenario "An enqueue that stores a send wakes the outbox once" */
+    it("hands the module the runtime's outbox wake, bound to the runtime", async () => {
+      const eventing = eventingHost("consume");
+      const notifyOutbox = vi.fn();
+      const declaration = keyEventing();
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(declaration);
+
+      await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: { ...eventing.host, notifyOutbox } }),
+      })
+        .withModules([module])
+        .boot();
+
+      declaration.built[0]!.notifyOutbox?.("notification_web_push");
+      expect(notifyOutbox).toHaveBeenCalledWith("notification_web_push");
+    });
+
+    /** @scenario "A module declares its event sourcing beside its transports" */
+    it("hands the module the senders registration answered with", async () => {
+      const eventing = eventingHost("produce");
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(keyEventing());
+
+      const runtime = await new ApplicationBuilder({
+        role: "api",
+        stores: liveMemberSourceOf({ eventing: eventing.host }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect((runtime.service(KeyApp) as ComposedKeyApp).sender).toBe(eventing.startSweep);
+    });
+
+    /** @scenario "A module declares its event sourcing beside its transports" */
+    it("builds against the process store of the graph that installs it", async () => {
+      const eventing = eventingHost("consume");
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(keyEventing());
+
+      await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: eventing.host }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(eventing.host.processStore.pruned).toEqual(["agent_sandbox_maintenance"]);
+    });
+  });
+
+  describe("when a pipeline reads its own aggregate's earlier events", () => {
+    /** @scenario "A pipeline reads its own aggregate's earlier events" */
+    it("reads the event log under the aggregate type its definition declares", async () => {
+      const reads: unknown[] = [];
+      const setups: FeatureEventingSetup<KeyRepositories, KeyApp, unknown>[] = [];
+      const pipeline = (
+        name: string,
+        aggregate: string,
+      ): FeatureEventing<KeyRepositories, KeyApp> => ({
+        pipeline: name,
+        build: (setup) => {
+          setups.push(setup);
+          return { name, aggregate: { type: aggregate } };
+        },
+      });
+      const host = {
+        processStore: {},
+        eventStore: {
+          getEvents: (request: unknown) => {
+            reads.push(request);
+            return Promise.resolve([{ type: "queued" }, "not an event", { type: "finished" }]);
+          },
+          storeEvents: () => Promise.resolve(),
+        },
+        register: () => ({}),
+      };
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(pipeline("scenario_lifecycle", "scenario"))
+        .withEventing(pipeline("simulation_processing", "simulation_run"));
+
+      await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: host }),
+      })
+        .withModules([module])
+        .boot();
+
+      const events = await setups[1]!.priorEvents!({
+        tenantId: "project_1",
+        aggregateId: "run_1",
+        accepts: (event): event is { type: string } =>
+          typeof event === "object" && event !== null && "type" in event,
+      });
+      expect(reads).toEqual([
+        {
+          aggregateId: "run_1",
+          context: { tenantId: "project_1" },
+          aggregateType: "simulation_run",
+        },
+      ]);
+      expect(events).toEqual([{ type: "queued" }, { type: "finished" }]);
+    });
+  });
+
+  describe("when a pipeline is handed its own event store", () => {
+    /** @scenario "A pipeline is handed its own event store" */
+    it("appends under the aggregate its definition declares and refuses another", async () => {
+      const appended: unknown[] = [];
+      const setups: FeatureEventingSetup<KeyRepositories, KeyApp, unknown>[] = [];
+      const host = {
+        processStore: {},
+        eventStore: {
+          getEvents: () => Promise.resolve([]),
+          storeEvents: (events: readonly unknown[], context: unknown, aggregateType: string) => {
+            appended.push({ events, context, aggregateType });
+            return Promise.resolve();
+          },
+        },
+        register: () => ({}),
+      };
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing({
+          pipeline: "simulation_processing",
+          build: (setup) => {
+            setups.push(setup);
+            return { name: "simulation_processing", aggregate: { type: "simulation_run" } };
+          },
+        });
+
+      await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: host }),
+      })
+        .withModules([module])
+        .boot();
+
+      const eventStore = setups[0]!.eventStore!;
+      const own = eventFixture({ aggregateType: "simulation_run" });
+      await eventStore.append({ tenantId: "project_1", events: [own] });
+      expect(appended).toEqual([
+        { events: [own], context: { tenantId: "project_1" }, aggregateType: "simulation_run" },
+      ]);
+
+      const foreign = eventFixture({ aggregateType: "scenario" });
+      await expect(eventStore.append({ tenantId: "project_1", events: [foreign] })).rejects.toThrow(
+        /appends only its own "simulation_run" aggregate/,
+      );
+      expect(appended).toHaveLength(1);
+    });
+  });
+
+  describe("when the runtime states no participation of its own", () => {
+    /** @scenario "The role decides which half a process installs" */
+    it("installs the worker's declaration as a consumer", async () => {
+      const declaration = keyEventing();
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(declaration);
+
+      await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: runtimeStatingNothing() }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(declaration.built[0]!.participation).toBe("consume");
+    });
+
+    /** @scenario "The role decides which half a process installs" */
+    it("installs the api's declaration as a producer", async () => {
+      const declaration = keyEventing();
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(declaration);
+
+      await new ApplicationBuilder({
+        role: "api",
+        stores: liveMemberSourceOf({ eventing: runtimeStatingNothing() }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(declaration.built[0]!.participation).toBe("produce");
+    });
+  });
+
+  describe("when the module hosts several pipelines", () => {
+    /** @scenario "A module hosts several pipelines" */
+    it("registers each in the order declared and connects each to its own senders", async () => {
+      const connected: string[] = [];
+      const pipeline = (name: string): FeatureEventing<KeyRepositories, KeyApp> => ({
+        pipeline: name,
+        build: () => ({ name }),
+        connect: ({ commands }) => {
+          connected.push(`${name}:${String(commands.owner)}`);
+        },
+      });
+      const registered: string[] = [];
+      const host = {
+        participation: "consume" as const,
+        processStore: { pruned: [] as string[] },
+        register: (definition: unknown) => {
+          const { name } = definition as { name: string };
+          registered.push(name);
+          return { commands: { owner: name } };
+        },
+      };
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(pipeline("agent_sandbox_maintenance"))
+        .withEventing(pipeline("key_rotation"))
+        .withEventing(pipeline("key_audit"));
+
+      await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: host }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(registered).toEqual(["agent_sandbox_maintenance", "key_rotation", "key_audit"]);
+      expect(connected).toEqual([
+        "agent_sandbox_maintenance:agent_sandbox_maintenance",
+        "key_rotation:key_rotation",
+        "key_audit:key_audit",
+      ]);
+    });
+  });
+
+  describe("when the runtime can hold its consumers", () => {
+    /** @scenario "Eventing consumers start only once the booted runtime starts" */
+    it("holds them through construction and starts them with the booted runtime", async () => {
+      const calls: string[] = [];
+      const host = {
+        participation: "consume" as const,
+        processStore: { pruned: [] as string[] },
+        register: (definition: unknown) => {
+          calls.push(`register ${(definition as { name: string }).name}`);
+          return { commands: {} };
+        },
+        holdConsumers: () => calls.push("hold"),
+        startConsumers: () => calls.push("start"),
+      };
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(keyEventing());
+
+      const runtime = await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: host }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(calls).toEqual(["hold", "register agent_sandbox_maintenance"]);
+      await runtime.start();
+      expect(calls).toEqual(["hold", "register agent_sandbox_maintenance", "start"]);
+      await runtime.stop();
+    });
+  });
+
+  describe("when the worker stops with a handler still in flight", () => {
+    interface ProjectApi {
+      classify(): string;
+    }
+    const ProjectApi = moduleApi<ProjectApi>()("project");
+    class ProjectModule implements ProjectApi {
+      static readonly contract = ProjectApi;
+      static readonly dependencies = {};
+      static create(): ProjectModule {
+        return new ProjectModule();
+      }
+      classify(): string {
+        return "kept";
+      }
+    }
+
+    /** @scenario "Shutdown drains in-flight work before releasing infrastructure" */
+    it("drains the consumers before the peer Apis close", async () => {
+      let release = (): void => void 0;
+      let inFlight: Promise<string> | undefined;
+      const host = {
+        participation: "consume" as const,
+        processStore: { pruned: [] as string[] },
+        register: () => ({ commands: {} }),
+        holdConsumers: () => void 0,
+        startConsumers: () => {
+          const gate = new Promise<void>((resolve) => (release = resolve));
+          inFlight = gate.then(() => runtime.service(ProjectApi).classify());
+        },
+        stopConsumers: async () => {
+          release();
+          await inFlight;
+        },
+      };
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(keyEventing());
+      const runtime = await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: host }),
+      })
+        .withModules([module, defineProcessModule("project").withApi(ProjectModule).build()])
+        .boot();
+
+      await runtime.start();
+      await runtime.stop();
+
+      await expect(inFlight).resolves.toBe("kept");
+    });
+  });
+
+  describe("when the runtime offers its own maintenance pipelines", () => {
+    const bootOver = async (participation: "produce" | "consume") => {
+      const eventing = eventingHost(participation);
+      const host = {
+        ...eventing.host,
+        maintenancePipelines: () => [
+          { name: "blob_maintenance" },
+          { name: "process_manager_maintenance" },
+        ],
+      };
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(keyEventing());
+      await new ApplicationBuilder({
+        role: "worker",
+        stores: liveMemberSourceOf({ eventing: host }),
+      })
+        .withModules([module])
+        .boot();
+      return eventing.registered.map((definition) => definition.name);
+    };
+
+    /** @scenario "The draining role installs the framework's maintenance pipelines" */
+    it("registers them after the modules' own only where the role drains", async () => {
+      expect(await bootOver("consume")).toEqual([
+        "agent_sandbox_maintenance",
+        "blob_maintenance",
+        "process_manager_maintenance",
+      ]);
+      expect(await bootOver("produce")).toEqual(["agent_sandbox_maintenance"]);
+    });
+  });
+
+  describe("when the process runs no event sourcing", () => {
+    /** @scenario "A role that runs no event sourcing ignores the declaration" */
+    it("boots without building or registering anything", async () => {
+      const declaration = keyEventing();
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing(declaration);
+
+      const runtime = await new ApplicationBuilder({
+        role: "tasks",
+        stores: liveMemberSourceOf({}),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(runtime.service(KeyApp)).toBeInstanceOf(ComposedKeyApp);
+      expect(declaration.built).toEqual([]);
+    });
+  });
+});

@@ -384,6 +384,31 @@ func TestRouter_PeekLane_CompressionBombPastThePeekWindow(t *testing.T) {
 	assert.Equal(t, string(domain.ErrPayloadTooLarge), errResp.Error.Type)
 }
 
+/** @scenario "a model field past the peek window still routes the request" */
+func TestRouter_PeekLane_ModelPastThePeekWindow(t *testing.T) {
+	var got domain.Request
+	router := encodingRouter(t, &got)
+
+	chunks := make([]string, 3000)
+	for i := range chunks {
+		chunks[i] = "a chunk of text to embed"
+	}
+	input, err := json.Marshal(chunks)
+	require.NoError(t, err)
+	require.Greater(t, len(input), defaultPeekBytes)
+	payload := []byte(`{"input":` + string(input) + `,"model":"text-embedding-3-small"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, "text-embedding-3-small", got.Model)
+	assert.Equal(t, payload, dispatchedBody(t, &got))
+}
+
 // The passthrough lane forwards the client's headers upstream. Once the
 // gateway has decoded the body, a surviving Content-Encoding would describe
 // bytes the provider never receives.

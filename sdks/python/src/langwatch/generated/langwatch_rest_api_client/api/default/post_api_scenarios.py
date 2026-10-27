@@ -6,26 +6,21 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_scenarios_body import PostApiScenariosBody
 from ...models.post_api_scenarios_response_201 import PostApiScenariosResponse201
-from ...models.post_api_scenarios_response_400 import PostApiScenariosResponse400
-from ...models.post_api_scenarios_response_401 import PostApiScenariosResponse401
-from ...models.post_api_scenarios_response_422 import PostApiScenariosResponse422
-from ...models.post_api_scenarios_response_500 import PostApiScenariosResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiScenariosBody | Unset = UNSET,
+    body: PostApiScenariosBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/scenarios",
+        "url": "/api/v1/scenarios",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -35,38 +30,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiScenariosResponse201
-    | PostApiScenariosResponse400
-    | PostApiScenariosResponse401
-    | PostApiScenariosResponse422
-    | PostApiScenariosResponse500
-    | None
-):
+) -> PostApiScenariosResponse201 | None:
     if response.status_code == 201:
         response_201 = PostApiScenariosResponse201.from_dict(response.json())
 
         return response_201
-
-    if response.status_code == 400:
-        response_400 = PostApiScenariosResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = PostApiScenariosResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 422:
-        response_422 = PostApiScenariosResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = PostApiScenariosResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -76,13 +44,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PostApiScenariosResponse201
-    | PostApiScenariosResponse400
-    | PostApiScenariosResponse401
-    | PostApiScenariosResponse422
-    | PostApiScenariosResponse500
-]:
+) -> Response[PostApiScenariosResponse201]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -96,26 +58,20 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenariosBody | Unset = UNSET,
-) -> Response[
-    PostApiScenariosResponse201
-    | PostApiScenariosResponse400
-    | PostApiScenariosResponse401
-    | PostApiScenariosResponse422
-    | PostApiScenariosResponse500
-]:
+    client: AuthenticatedClient,
+    body: PostApiScenariosBody,
+) -> Response[PostApiScenariosResponse201]:
     """Create a new scenario
 
     Args:
-        body (PostApiScenariosBody | Unset):
+        body (PostApiScenariosBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiScenariosResponse201 | PostApiScenariosResponse400 | PostApiScenariosResponse401 | PostApiScenariosResponse422 | PostApiScenariosResponse500]
+        Response[PostApiScenariosResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -131,27 +87,20 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenariosBody | Unset = UNSET,
-) -> (
-    PostApiScenariosResponse201
-    | PostApiScenariosResponse400
-    | PostApiScenariosResponse401
-    | PostApiScenariosResponse422
-    | PostApiScenariosResponse500
-    | None
-):
+    client: AuthenticatedClient,
+    body: PostApiScenariosBody,
+) -> PostApiScenariosResponse201 | None:
     """Create a new scenario
 
     Args:
-        body (PostApiScenariosBody | Unset):
+        body (PostApiScenariosBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiScenariosResponse201 | PostApiScenariosResponse400 | PostApiScenariosResponse401 | PostApiScenariosResponse422 | PostApiScenariosResponse500
+        PostApiScenariosResponse201
     """
 
     return sync_detailed(
@@ -162,26 +111,20 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenariosBody | Unset = UNSET,
-) -> Response[
-    PostApiScenariosResponse201
-    | PostApiScenariosResponse400
-    | PostApiScenariosResponse401
-    | PostApiScenariosResponse422
-    | PostApiScenariosResponse500
-]:
+    client: AuthenticatedClient,
+    body: PostApiScenariosBody,
+) -> Response[PostApiScenariosResponse201]:
     """Create a new scenario
 
     Args:
-        body (PostApiScenariosBody | Unset):
+        body (PostApiScenariosBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiScenariosResponse201 | PostApiScenariosResponse400 | PostApiScenariosResponse401 | PostApiScenariosResponse422 | PostApiScenariosResponse500]
+        Response[PostApiScenariosResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -195,27 +138,20 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenariosBody | Unset = UNSET,
-) -> (
-    PostApiScenariosResponse201
-    | PostApiScenariosResponse400
-    | PostApiScenariosResponse401
-    | PostApiScenariosResponse422
-    | PostApiScenariosResponse500
-    | None
-):
+    client: AuthenticatedClient,
+    body: PostApiScenariosBody,
+) -> PostApiScenariosResponse201 | None:
     """Create a new scenario
 
     Args:
-        body (PostApiScenariosBody | Unset):
+        body (PostApiScenariosBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiScenariosResponse201 | PostApiScenariosResponse400 | PostApiScenariosResponse401 | PostApiScenariosResponse422 | PostApiScenariosResponse500
+        PostApiScenariosResponse201
     """
 
     return (

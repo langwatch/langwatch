@@ -1,0 +1,22 @@
+-- The cost rollup comparator no longer keeps a calendar entry.
+--
+-- Its daily check is now driven by the `costRollupWatch` process manager on
+-- the pulled-usage pipeline: a pulled charge arms a per-tenant wake, and the
+-- wake emits one compare intent per touched day. Nothing registers a handler
+-- for this targetType any more, so every row left behind would make the
+-- scheduler claim a slot, find no handler registered, and log the same
+-- warning once a day per tenant for as long as the row exists.
+--
+-- The rows carry no data of their own: a schedule is re-derivable, and this
+-- one is not re-derived because the process replaces it.
+DELETE FROM "ScheduledJob" WHERE "targetType" = 'governanceCostRollupComparator';
+
+-- IRREVERSIBLE: there is no down migration, and none is needed.
+--
+-- The deleted rows cannot be re-inserted by SQL, because they were never
+-- written by SQL: one was minted per project at worker boot by the reconciler
+-- this change deletes. Rolling the code back re-creates them on the next boot
+-- from the same reconciler, so a down step here would either duplicate that
+-- work or guess at project ids it does not have.
+--
+-- Nothing is lost either way. A schedule carries no data of its own.

@@ -83,7 +83,7 @@ Feature: Cross-scope ModelProvider reuse
 
   Scenario: VK create drawer lists eligible ModelProviders from every in-scope ladder
     Given the setup from the mixed-scope scenario above
-    When alice opens the VK create drawer at /settings/gateway/virtual-keys/new and picks scope PROJECT "acme-api"
+    When alice opens the VK create drawer at /gateway/virtual-keys/new and picks scope PROJECT "acme-api"
     Then the "Eligible Model Providers" panel shows 3 entries
     And each entry's caption shows "Org: acme" / "Team: acme-platform" / "Project: acme-api" respectively (the "via" scope chip)
     And hovering an entry shows a tooltip with the scope-ladder rationale

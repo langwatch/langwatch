@@ -30,12 +30,13 @@ type Herrer interface {
 
 // E is a structured error with code, metadata, stack trace, and OTel context.
 type E struct {
-	Code    Code               `json:"code"`
-	Meta    M                  `json:"meta"`
-	TraceID trace.TraceID      `json:"trace_id"`
-	SpanID  trace.SpanID       `json:"span_id"`
-	Stack   []stacktrace.Frame `json:"stack"`
-	Reasons []error            `json:"reasons"`
+	Code      Code               `json:"code"`
+	Meta      M                  `json:"meta"`
+	Retryable bool               `json:"retryable"`
+	TraceID   trace.TraceID      `json:"trace_id"`
+	SpanID    trace.SpanID       `json:"span_id"`
+	Stack     []stacktrace.Frame `json:"stack"`
+	Reasons   []error            `json:"reasons"`
 }
 
 // M is error metadata.
@@ -99,13 +100,23 @@ func NewLight(ctx context.Context, code Code, meta M, reasons ...error) E {
 
 func (e E) Herr() E { return e }
 
+// WithRetryable marks this error as safe for a caller to retry.
+//
+// New and NewLight deliberately keep their existing signatures. Errors are
+// terminal unless a producer explicitly opts in with New(...).WithRetryable(true).
+func (e E) WithRetryable(retryable bool) E {
+	e.Retryable = retryable
+	return e
+}
+
 // Fields returns the error as a map suitable for structured logging.
 func (e E) Fields() map[string]any {
 	return map[string]any{
-		"code":    e.Code,
-		"meta":    e.Meta,
-		"stack":   e.Stack,
-		"reasons": e.Reasons,
+		"code":      e.Code,
+		"meta":      e.Meta,
+		"retryable": e.Retryable,
+		"stack":     e.Stack,
+		"reasons":   e.Reasons,
 	}
 }
 

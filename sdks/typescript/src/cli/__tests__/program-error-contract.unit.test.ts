@@ -1,19 +1,6 @@
 /**
- * A command that FAILS still has to answer in the format it was asked for.
- *
- * Every command in `program.ts` wraps its lazily-imported implementation in a
- * try/catch. Those catches used to end in
- * `console.error(\`Error: …\`)` + `process.exit(1)` — human prose on stderr and
- * NOTHING on stdout. So `lw evaluator list -o json` answered a machine caller
- * with an empty stdout and an unparseable stderr line: the caller cannot tell a
- * network blip from a bad slug without reading English, which is exactly the
- * failure the output contract exists to end. It is also invisible to a
- * happy-path test, because the happy path never enters the catch.
- *
- * So the catch is exercised here for real — the implementation module is mocked
- * to throw, the command is parsed the way a caller spells it, and stdout is
- * parsed as JSON. Asserting on program.ts's SOURCE would not do: it would pass
- * against a renderer that emits the wrong document, or none.
+ * Failed commands must answer in requested format (e.g., -o json). Exercise
+ * the error catch with mocked throws to verify the output contract.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 

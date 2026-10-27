@@ -1,0 +1,46 @@
+/**
+ * `langwatch instant-eval sample <id>`: a few rows with the judged text beside the verdict, re-read
+ * through the statement's extraction functions, so it costs nothing.
+ * @see specs/features/instant-eval-cli.feature
+ */
+
+import { resolveCredentials } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { createCliInstantEvalsService } from "./cli-instant-evals-service";
+import { INSTANT_EVAL_SAMPLE_CEILING, readCountFlag } from "./countFlag";
+import { printSample } from "./render";
+
+export const sampleInstantEvalCommand = async (
+  id: string,
+  options: { number?: string },
+): Promise<CommandResult | void> => {
+  await resolveCredentials();
+
+  const n = readCountFlag({
+    raw: options.number,
+    flag: "-n",
+    max: INSTANT_EVAL_SAMPLE_CEILING,
+  });
+  const service = createCliInstantEvalsService();
+  const spinner = createSpinner(`Sampling run ${id}...`).start();
+
+  try {
+    const sample = await service.sample(id, n === undefined ? {} : { n });
+
+    spinner.succeed(`Read ${sample.rows.length} row${sample.rows.length === 1 ? "" : "s"}`);
+
+    return {
+      data: sample,
+      table: () =>
+        printSample({
+          rows: sample.rows as Record<string, unknown>[],
+          judgments: sample.judgments,
+        }),
+    };
+  } catch (error) {
+    failSpinner({ spinner, error, action: "sample an instant eval run" });
+    process.exit(1);
+  }
+};

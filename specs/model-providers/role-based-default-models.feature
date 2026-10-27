@@ -6,7 +6,7 @@ Feature: Role-based default models with per-scope overrides
   # The data, resolver, and ModelNotConfiguredError shape live with B3.1
   # (specs/model-providers/model-resolver-and-registry.feature). This file
   # describes the settings UI in
-  # `platform/app/src/components/settings/DefaultModelsSection.tsx` and the
+  # `modules/model-provider/browser/src/ui/sections/default-models-section.tsx` and the
   # tRPC payload that drives it.
   #
   # Mental model:
@@ -170,6 +170,16 @@ Feature: Role-based default models with per-scope overrides
     # The backend deletes an all-inherit config (see
     # model-default-config-cascade.feature); toasting "Config updated"
     # while the row disappears reads as data loss.
+
+  @integration
+  Scenario: A cache refresh that fails after the write still reads as saved
+    Given the drawer saved a config
+    When the follow-up cache refresh fails
+    Then the toast still says the config was saved
+    And no error is shown for a write that landed
+    # Saving also refreshes the default-model caches and re-points Langy's
+    # model pill. That refresh runs after the write; a failure there is a
+    # stale open panel, never a failed save.
 
   @integration
   Scenario: Adding a config for a scope that already has one says it will replace it

@@ -1,13 +1,19 @@
-# Smoke job for `npx @langwatch/server`. Builds the workspace package as a
-# tarball, then runs it from a fresh sandbox dir on every supported platform.
+# Smoke job for `npx @langwatch/server`. Packs the npm package (the CLI) and builds
+# this runner's prebuilt app archive (ADR-180), then runs the CLI from a fresh
+# sandbox dir with LANGWATCH_APP_ARCHIVE pointing at that archive, on every
+# supported platform.
 # Asserts the full stack (postgres + redis + clickhouse + nlpgo + langevals
-# + ai-gateway + langwatch app) reaches healthy state and that the critical
-# user paths — workflow execution, evaluator run — return 200.
+# + ai-gateway + the langwatch backend) reaches healthy state and that the
+# backend serves the browser bundle at `/`.
 #
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
-# - nightly schedule (04:00 UTC)
-# - push to non-main branches when key files change (PR validation)
+# - nightly, called from .github/workflows/nightly.yml (01:00 UTC)
+# - push to main, when key files change
+#
+# Branch pushes no longer run it: it is a signal, not a gate, and it ran on
+# every dependabot, release-please and feature push. A defect a branch brings in
+# shows on main's run for that merge, rather than sitting until the nightly.
 #
 # This workflow is intentionally not in the langwatch-app-complete required
 # checks — postgres/clickhouse/uv downloads are heavy and flaky-prone. Treat
@@ -22,29 +28,41 @@ on:
         description: "Port base to test (default 5560)"
         required: false
         default: "5560"
-  schedule:
-    - cron: "0 4 * * *"
+  # The nightly suite (.github/workflows/nightly.yml) calls this; it owns the schedule.
+  workflow_call:
+    inputs:
+      port_base:
+        description: "Port base to test (default 5560)"
+        type: string
+        required: false
+        default: "5560"
   push:
-    branches-ignore:
-      - main
+    branches: [main]
     paths:
       - "package.json"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
-      - "packages/server/**"
+      - "apps/server/**"
+      # The one process the CLI spawns: the api and the worker together.
+      - "apps/backend/**"
       - "services/langevals/pyproject.toml"
       - "services/langevals/uv.lock"
       - "services/aigateway/**"
       - "cmd/service/**"
-      - "platform/app/package.json"
-      - "platform/app/scripts/start.sh"
-      - "platform/app/scripts/check-ports.sh"
+      - "apps/api/package.json"
+      - "apps/worker/package.json"
+      - "apps/ui/package.json"
       - ".github/workflows/npx-server-smoke.yml"
-      # The script that assembles the tarball. It decides what every npm user
-      # receives, so a change to it is precisely what this job exists to
-      # validate — but it was missing from this list, so two packaging bugs
-      # went out on a push that started no smoke run at all and looked green.
+      # The scripts that assemble the npm package and the app archive. They
+      # decide what every npx user receives, so a change to them is precisely
+      # what this job exists to validate.
       - "dev/scripts/pack-npm.sh"
+      - "dev/scripts/build-app-archive.sh"
+      - "dev/scripts/check-app-archive.sh"
+      - "infra/docker/prune-runtime-tree.sh"
+      - "infra/docker/image.pnpmfile.cjs"
+      - "infra/docker/check-links.mjs"
+      - "infra/docker/check-locked-versions.mjs"
       # The manifests of every workspace member the app resolves. Since
       # ADR-076 they are all in one workspace and the app depends on the SDK
       # with `workspace:*`, so their dependencies — and their lifecycle
@@ -53,13 +71,16 @@ on:
       # served a request, on a push this job did not watch.
       - "sdks/typescript/package.json"
       - "packages/*/package.json"
+      - "apps/*/package.json"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A literal name, not github.workflow: called from the nightly, that is the
+  # nightly's name. The event is in the group so a nightly run and a push run
+  # never share one.
+  group: npx-server-smoke-${{ github.ref }}-${{ github.event_name }}
+  # A newer push supersedes an older run, on main too: the newest verdict covers
+  # the commits before it. A nightly or manual run is never cancelled.
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 permissions:
   contents: read
@@ -69,12 +90,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          - macos-latest
-          - ubuntu-latest
-          - ubuntu-24.04-arm
+        runner: [macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       PORT_BASE: ${{ inputs.port_base || '5560' }}
       CI: "true"
@@ -87,7 +105,7 @@ jobs:
         # Outside $GITHUB_WORKSPACE on purpose (see the "Run npx @langwatch/server
         # in a sandbox" step below): Node walks every ancestor directory looking
         # for a node_modules, and the checkout's own workspace install would sit
-        # on that ancestor chain if LANGWATCH_HOME or the extracted tarball lived
+        # on that ancestor chain if LANGWATCH_HOME or the extracted package lived
         # under the workspace. jobs.<job_id>.env only allows the github, inputs,
         # matrix, needs, secrets, strategy and vars expression contexts, not
         # runner, so $RUNNER_TEMP is resolved here as a shell variable instead
@@ -100,14 +118,15 @@ jobs:
           node --version || true
           go version || true
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
-        with:
-          node-version: "24"
-
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
+        with:
+          node-version: "24.22.1"
+          cache: pnpm
 
       # No Go setup. The npx flow ships only the prebuilt aigateway monobinary
       # download path; LANGWATCH_AIGATEWAY_DEV_BUILD is intentionally unset
@@ -163,12 +182,16 @@ jobs:
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
 
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: npx-smoke
+
       - name: Build @langwatch/server CLI
-        run: pnpm --filter @langwatch/server-cli build
+        run: pnpm exec nx run @langwatch/server:build --outputStyle=static
 
       # Runs here because this job's path filter is already the exact set of
       # files these assert about (the root manifest, the workspace definition,
-      # the lockfile, packages/server/**, the packing script) — and because
+      # the lockfile, apps/server/**, the packing script) — and because
       # nothing else in CI runs the CLI's tests at all, which would leave them
       # reading as coverage while never executing. Placed before the boot so a
       # workspace regression fails in seconds rather than 25 minutes.
@@ -177,60 +200,40 @@ jobs:
       # and surfacing those here would be a different change.
       - name: Check the workspace invariants (ADR-076)
         run: >
-          pnpm --filter @langwatch/server-cli run test:invariants
+          pnpm --filter @langwatch/server run test:invariants
 
-      # Same prebuild as npx-server-publish.yml: every published artifact
-      # ships platform/app/dist + mcp/typescript/dist (the publish sanity check
-      # asserts both), so the artifact THIS job boots must carry them too —
-      # otherwise the smoke exercises a tree shape no npm user ever receives
-      # and pays a full on-runner vite build for it inside the health budget.
-      # No separate app install: since ADR-076 langwatch/ is a member of the
-      # single root workspace, so "Install pnpm dependencies (workspace)"
-      # above already covers it. Same redundancy that was removed from
-      # npx-server-publish.yml.
-      - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm --filter "@langwatch/web..." run build
+      # Same prebuild as npx-server-publish.yml (the root `build:server`), so the
+      # archive this job boots is built exactly as a published one is.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Build what the backend serves (build:server)
+        run: pnpm run build:server
         env:
           NODE_ENV: production
 
-      - name: Pack the npm tarball
-        id: pack
-        # Use the same wrapper as npx-server-publish.yml so the smoke tarball
-        # matches what end users get from npm (exact files[] from
-        # package.json — no go.mod/cmd/, etc).
+      # The publish job builds and checks each archive with these two scripts.
+      - name: Build and check this runner's app archive
+        id: archive
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/_pack"
+          set -e
+          bash dev/scripts/build-app-archive.sh --out "$GITHUB_WORKSPACE/_pack"
+          archive="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-app-*.tar.gz | head -n1)"
+          bash dev/scripts/check-app-archive.sh "$archive"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+
+      # The same script as npx-server-publish.yml, which refuses a package that
+      # holds anything but the CLI.
+      - name: Pack the npm package
+        id: pack
+        run: |
           bash dev/scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
           tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
-          echo "Tarball: $tarball"
           ls -lh "$tarball"
-          # Belt-and-suspenders: tarball must NOT ship Go source (silent
-          # local-build foot-gun from beta.8 era).
-          #
-          # Anchored at package/app/ since ADR-076 — the artifact is staged
-          # one level down so the workspace root is not the package root. The
-          # old `^package/(...)` anchor cannot match any path in the staged
-          # layout, so it would have passed unconditionally and stopped
-          # guarding anything.
-          #
-          # `services/` alone is too broad post-restructure: services/langevals
-          # is Python and IS in package.json's `files[]` (deliberately shipped),
-          # so a blanket services/ match false-positives on every run. Grep for
-          # go.mod/cmd/pkg/services, then subtract the known-non-Go services/
-          # subdirs — anything left under services/ is an unlisted (and thus
-          # unreviewed) directory, which stays worth failing on.
-          if tar -tzf "$tarball" | grep -E "^package/app/(go\.mod|cmd/|pkg/|services/)" \
-              | grep -v "^package/app/services/langevals/" | grep -q .; then
-            echo "✗ tarball ships Go source dirs — local-build fallback regression."
-            exit 1
-          fi
-          # The lockfile is the whole reason for the staged layout: npm strips
-          # it from the package ROOT. Assert it arrived.
-          if ! tar -tzf "$tarball" | grep -qx "package/app/pnpm-lock.yaml"; then
-            echo "✗ tarball ships no lockfile — the end-user install would not be reproducible."
-            exit 1
-          fi
 
       - name: Run npx @langwatch/server in a sandbox
         id: start
@@ -239,25 +242,19 @@ jobs:
         run: |
           set -e
           mkdir -p "$LANGWATCH_HOME"
-          # Boot from the EXTRACTED TARBALL, laid out the way npx lays it out
-          # (node_modules/@langwatch/server), so the run exercises the same
-          # relocation + install path npm users get and the app tree is
-          # exactly the published artifact. Booting the checkout instead
-          # masks packaging gaps: 3.6.0 shipped without the runtime packages/*
-          # (both .npmignore files still excluded the dir after runtime
-          # packages moved in), every install died at first boot with
-          # MODULE_NOT_FOUND, and every checkout-based smoke run passed.
+          # Boot the EXTRACTED PACKAGE, laid out the way npx lays it out
+          # (node_modules/@langwatch/server), and let its `app` predep install
+          # this runner's archive through LANGWATCH_APP_ARCHIVE: the same
+          # verify, extract and rename path a release download takes. Booting
+          # the checkout instead masks packaging gaps: a file the archive lacks
+          # would be found in the checkout.
           #
           # Extracted under $RUNNER_TEMP, not $GITHUB_WORKSPACE: Node's module
           # resolution walks every ancestor directory looking for a
-          # node_modules to check, and the "Install pnpm dependencies
-          # (workspace)" step above left $GITHUB_WORKSPACE/node_modules on
-          # disk. An install_dir nested under $GITHUB_WORKSPACE would still
-          # have carried that as an ancestor and could silently satisfy a
-          # module the tarball forgot to ship, masking the exact tsx
-          # alias-skip bug this job exists to catch. $RUNNER_TEMP is a
-          # sibling of the checkout, matching what a real npx cache dir
-          # looks like.
+          # node_modules, and the workspace install left one at
+          # $GITHUB_WORKSPACE/node_modules that could silently satisfy a module
+          # the archive forgot to ship. $RUNNER_TEMP is a sibling of the
+          # checkout, matching what a real npx cache dir looks like.
           install_dir="$RUNNER_TEMP/npx-server-smoke/node_modules/@langwatch/server"
           mkdir -p "$install_dir"
           tar -xzf "${{ steps.pack.outputs.tarball }}" -C "$install_dir" --strip-components=1
@@ -267,7 +264,7 @@ jobs:
           # which is exactly what this job exists to catch.
           cli="$install_dir/$(node -p "Object.values(require('$install_dir/package.json').bin)[0]")"
           test -f "$cli" || { echo "✗ bin entry does not resolve: $cli"; exit 1; }
-          node "$cli" start \
+          LANGWATCH_APP_ARCHIVE="${{ steps.archive.outputs.archive }}" node "$cli" start \
             --yes \
             --no-open \
             --port-base "$PORT_BASE" \
@@ -281,9 +278,8 @@ jobs:
           base=${PORT_BASE}
           # CI runners have nothing cached — predep download (postgres ~80MB,
           # clickhouse ~100MB, redis tarball, uv installer) + uv venv install
-          # for langevals + aigateway/nlpgo monobinary download + relocation
-          # of the extracted tarball + pnpm install + vite build of the
-          # langwatch app together can take 15-25 minutes on a cold runner.
+          # for langevals + aigateway/nlpgo monobinary download + extracting
+          # the app archive can take several minutes on a cold runner.
           # Be generous so the smoke isn't flaky on the initial provisioning
           # window. Subsequent runs hit the cached ~/.langwatch and finish
           # in <1 min.
@@ -306,6 +302,14 @@ jobs:
                 exit 0
               fi
             done
+            # The CLI gave up (or died): print the app's own lines now, since
+            # the trailing service shutdown buries the first app error.
+            if grep -q "langwatch did not become healthy" "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null \
+              || ! kill -0 "$(cat "$GITHUB_WORKSPACE/_smoke.pid")" 2>/dev/null; then
+              echo "✗ the CLI reported a failed boot after ${SECONDS}s — langwatch lines:"
+              grep -E "langwatch|migrat|exited|Error" "$GITHUB_WORKSPACE/_smoke.log" | tail -n 300 || true
+              exit 1
+            fi
             if [ $((i % 24)) -eq 0 ]; then
               echo "  …still waiting at ${SECONDS}s — last cli.log lines:"
               tail -n 10 "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null | sed 's/^/    /' || true
@@ -313,6 +317,7 @@ jobs:
             sleep 5
           done
           echo "✗ langwatch never reported healthy on any port slot within ${SECONDS}s"
+          grep -E "langwatch|migrat|exited|Error" "$GITHUB_WORKSPACE/_smoke.log" | tail -n 300 || true
           exit 1
 
       - name: Probe service health endpoints
@@ -401,7 +406,7 @@ jobs:
             echo "✗ no aigateway binary at $bin — predep install must have failed silently"
             exit 1
           fi
-          expected_version="$(node -p "require('$GITHUB_WORKSPACE/package.json').version")"
+          expected_version="$(node -p "require('$GITHUB_WORKSPACE/apps/server/package.json').version")"
           actual_version="$("$bin" --version 2>&1 | head -n1 | tr -d '\r')"
           echo "aigateway --version: $actual_version"
           echo "expected:            $expected_version"
@@ -437,27 +442,47 @@ jobs:
             fi
           fi
 
-      - name: Probe a workflow execution end-to-end
-        # `secrets.*` is not available in step-level `if:` expressions
-        # (only `env`, `inputs`, `github`, `runner`, etc. are valid there).
-        # We expose the secret as a step-env var, then short-circuit inside
-        # the script when it's empty. Net effect matches the original
-        # "skip if no key" intent without invalid YAML.
-        env:
-          OPENAI_API_KEY: ${{ secrets.NPX_SERVER_OPENAI_API_KEY }}
+      # The app the CLI runs is the archive this job built, installed under
+      # app/<version>, and no install ran on the machine.
+      - name: Assert the app came from the archive
         run: |
           set -e
-          if [[ -z "$OPENAI_API_KEY" ]]; then
-            echo "NPX_SERVER_OPENAI_API_KEY not set — skipping workflow execution probe."
-            exit 0
+          version="$(node -p "require('$GITHUB_WORKSPACE/apps/server/package.json').version")"
+          app="$LANGWATCH_HOME/app/$version"
+          test -f "$app/.langwatch-app-complete" || { echo "✗ no completed app at $app"; ls -la "$LANGWATCH_HOME/app" || true; exit 1; }
+          if [ -e "$app/pnpm-workspace.yaml" ] || [ -e "$app/pnpm-lock.yaml" ]; then
+            echo "✗ $app carries install inputs: something installed or relocated a workspace there"
+            exit 1
           fi
-          # Placeholder until the real workflow-execution fixture lands.
-          # We hit nlpgo's /healthz (chi-routed liveness) — the only path
-          # that is actually wired. Earlier drafts hit /health and either
-          # 502'd (POST) or hung 5+min (GET → proxypass self-loop).
+          echo "✓ the app at $app is the prebuilt archive"
+
+      # The api half serves apps/ui/dist/client: `/` must answer with the
+      # built shell, and the hashed script it names must load. The first boot's
+      # upgrade can still hold product paths at 503, so this retries.
+      - name: Assert the backend serves the browser bundle at /
+        run: |
+          set -eo pipefail
           base=${RESOLVED_BASE}
-          curl -fsS --max-time 10 "http://127.0.0.1:$((base + 1))/healthz" >/dev/null
-          echo "(placeholder workflow probe — real fixture pending)"
+          for i in $(seq 1 180); do
+            if curl -fsSL --connect-timeout 2 --max-time 10 "http://127.0.0.1:$base/" > /tmp/index.html 2>/dev/null \
+                && grep -q '<div id="root">' /tmp/index.html; then
+              break
+            fi
+            if [ "$i" -eq 180 ]; then
+              echo "✗ / never answered with the UI shell"
+              head -c 2000 /tmp/index.html 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "✓ / answered with the UI shell after ${i}s"
+          asset="$(grep -oE 'src="/assets/[^"]+\.js"' /tmp/index.html | head -n1 | sed -E 's/^src="(.*)"$/\1/' || true)"
+          if [ -z "$asset" ]; then
+            echo "✗ the shell names no hashed /assets/*.js script — not the vite build"
+            exit 1
+          fi
+          curl -fsS --connect-timeout 2 --max-time 10 -o /dev/null "http://127.0.0.1:$base$asset"
+          echo "✓ $asset loads"
 
       - name: Tear down
         if: always()
@@ -486,7 +511,7 @@ jobs:
       - name: Upload logs on failure or cancellation
         # The `failure()` filter doesn't fire on timeout-cancellation, so we
         # widen to `!success()` — that catches both genuine failures and
-        # 35-minute-job-cap cancellations, which is when we most want logs.
+        # 45-minute-job-cap cancellations, which is when we most want logs.
         if: ${{ !success() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

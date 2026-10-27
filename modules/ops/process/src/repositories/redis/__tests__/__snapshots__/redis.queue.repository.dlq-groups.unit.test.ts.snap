@@ -1,0 +1,54 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`QueueRedisRepository.findDlqGroups > lists every dead-lettered group with its error, head-job pipeline and job count, newest first 1`] = `
+[
+  {
+    "error": "boom",
+    "errorStack": "at x",
+    "groupId": "g-full",
+    "jobCount": 2,
+    "movedAt": 2000.5,
+    "pipelineName": "trace",
+  },
+  {
+    "error": null,
+    "errorStack": null,
+    "groupId": "g-plain",
+    "jobCount": 1,
+    "movedAt": 500,
+    "pipelineName": null,
+  },
+  {
+    "error": "old",
+    "errorStack": null,
+    "groupId": "g-old",
+    "jobCount": 1,
+    "movedAt": 10,
+    "pipelineName": "eval",
+  },
+  {
+    "error": null,
+    "errorStack": null,
+    "groupId": "g-bare",
+    "jobCount": 0,
+    "movedAt": null,
+    "pipelineName": null,
+  },
+  {
+    "error": null,
+    "errorStack": null,
+    "groupId": "g-no-data",
+    "jobCount": 1,
+    "movedAt": null,
+    "pipelineName": null,
+  },
+  {
+    "error": null,
+    "errorStack": null,
+    "groupId": "g-null-p",
+    "jobCount": 1,
+    "movedAt": null,
+    "pipelineName": null,
+  },
+]
+`;

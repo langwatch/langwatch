@@ -21,7 +21,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/traces/{trace_id}/transcript".format(
+        "url": "/api/v1/traces/{trace_id}/transcript".format(
             trace_id=quote(str(trace_id), safe=""),
         ),
     }
@@ -107,7 +107,7 @@ def _build_response(
 def sync_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiTracesByTraceIdTranscriptResponse200
     | GetApiTracesByTraceIdTranscriptResponse400
@@ -145,7 +145,7 @@ def sync_detailed(
 def sync(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiTracesByTraceIdTranscriptResponse200
     | GetApiTracesByTraceIdTranscriptResponse400
@@ -179,7 +179,7 @@ def sync(
 async def asyncio_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiTracesByTraceIdTranscriptResponse200
     | GetApiTracesByTraceIdTranscriptResponse400
@@ -215,7 +215,7 @@ async def asyncio_detailed(
 async def asyncio(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiTracesByTraceIdTranscriptResponse200
     | GetApiTracesByTraceIdTranscriptResponse400

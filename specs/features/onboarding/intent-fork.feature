@@ -61,6 +61,12 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       When the user has not selected an intent
       Then the user cannot proceed to the next step
 
+    @integration
+    Scenario: Going back to the organization step keeps what was typed
+      Given the user named the organization, ticked the terms and picked an intent
+      When the user presses Back on the intent screen
+      Then the organization name and the terms tick are still filled in
+
   # ============================================================================
   # Governance track
   # ============================================================================
@@ -80,6 +86,18 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       When onboarding finishes
       Then the user is taken to their personal usage page
       And the CLI setup guidance they see there is the existing personal-page surface, unchanged by onboarding
+
+  Rule: founder access is available only after its grants are confirmed
+
+    @integration @regression
+    Scenario: Founder organization is committed before grants and stays inaccessible until confirmation
+      Given a new founder organization is being initialized
+      When its grants are still being projected
+      Then the organization exists for tenant routing
+      And the founder membership remains disabled
+      And the shared authorization reader returns no founder bindings
+      When both founder grants are confirmed
+      Then the founder membership becomes active
 
   Rule: the governance track provisions the organization without a shared project (v6)
 

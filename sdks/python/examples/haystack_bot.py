@@ -11,8 +11,9 @@ from haystack import Pipeline, Document, component
 from haystack.utils import Secret
 from haystack.document_stores.in_memory import InMemoryDocumentStore
 from haystack.components.retrievers.in_memory import InMemoryBM25Retriever
-from haystack.components.generators import OpenAIGenerator
-from haystack.components.builders.prompt_builder import PromptBuilder
+from haystack.components.generators.chat import OpenAIChatGenerator
+from haystack.components.builders import ChatPromptBuilder
+from haystack.dataclasses import ChatMessage
 
 import os
 import langwatch
@@ -66,39 +67,43 @@ class TrackedInMemoryBM25Retriever(InMemoryBM25Retriever):
 retriever = TrackedInMemoryBM25Retriever(document_store=document_store)
 
 
-class TrackedPromptBuilder(PromptBuilder):
+class TrackedChatPromptBuilder(ChatPromptBuilder):
     @langwatch.span()
-    @component.output_types(prompt=str)
+    @component.output_types(prompt=List[ChatMessage])
     def run(self, template=None, template_variables=None, **kwargs):
         return super().run(template, template_variables, **kwargs)
 
-    @component.output_types(prompt=str)
+    @component.output_types(prompt=List[ChatMessage])
     async def run_async(self, template=None, template_variables=None, **kwargs):
         return self.run(template, template_variables, **kwargs)
 
 
-prompt_builder = TrackedPromptBuilder(template=prompt_template)
+prompt_builder = TrackedChatPromptBuilder(
+    template=[ChatMessage.from_user(prompt_template)]
+)
 
 
-class TrackedOpenAIGenerator(OpenAIGenerator):
+class TrackedOpenAIChatGenerator(OpenAIChatGenerator):
     @langwatch.span(type="llm")
-    def run(self, prompt: str, **kwargs):
-        result = super().run(prompt, **kwargs)
+    def run(self, messages: List[ChatMessage], **kwargs):
+        result = super().run(messages, **kwargs)
+        reply = result["replies"][0]
+        usage = reply.meta.get("usage", {})
         langwatch.get_current_span().update(
             model=self.model,
-            output=result["replies"][0],
+            output=reply.text,
             metrics={
-                "prompt_tokens": result["meta"][0]["usage"]["prompt_tokens"],
-                "completion_tokens": result["meta"][0]["usage"]["completion_tokens"],
+                "prompt_tokens": usage.get("prompt_tokens"),
+                "completion_tokens": usage.get("completion_tokens"),
             },
         )
         return result
 
-    async def run_async(self, prompt: str, **kwargs):
-        return self.run(prompt, **kwargs)
+    async def run_async(self, messages: List[ChatMessage], **kwargs):
+        return self.run(messages, **kwargs)
 
 
-llm = TrackedOpenAIGenerator(
+llm = TrackedOpenAIChatGenerator(
     api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-5-mini"
 )
 
@@ -107,7 +112,7 @@ rag_pipeline.add_component("retriever", retriever)
 rag_pipeline.add_component("prompt_builder", prompt_builder)
 rag_pipeline.add_component("llm", llm)
 rag_pipeline.connect("retriever", "prompt_builder.documents")
-rag_pipeline.connect("prompt_builder", "llm")
+rag_pipeline.connect("prompt_builder.prompt", "llm.messages")
 
 
 @cl.on_message
@@ -137,5 +142,5 @@ async def main(message: cl.Message):
         }
     )
 
-    msg.content = results["llm"]["replies"][0]
+    msg.content = results["llm"]["replies"][0].text
     await msg.send()

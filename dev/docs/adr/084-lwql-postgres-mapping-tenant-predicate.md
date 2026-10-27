@@ -6,7 +6,7 @@
 
 **Relates to:** [ADR-081](./081-lwql-table-function-and-ssrf-policy.md) (why the caller can never write `postgresql()` themselves), [ADR-082](./082-lwql-analytics-views-invoker-column-grants-final-dedup.md) (the invoker-view and column-grant model this extends across a second residence).
 
-Behavioural contract: [specs/analytics/lwql-api.feature](../../../specs/analytics/lwql-api.feature).
+Behavioural contract: [specs/lwql/api.feature](../../../specs/lwql/api.feature).
 
 ## Context
 
@@ -44,11 +44,11 @@ Two mechanisms were measured and rejected before the one below:
 
 - **`additional_table_filters`, sent as a per-query setting.** It does not push
   down (the filter is applied inside ClickHouse, exactly like the policy), and
-  it *breaks* any query that does not already read the tenant column, with
+  it _breaks_ any query that does not already read the tenant column, with
   `NOT_FOUND_COLUMN_IN_BLOCK`. Worse on both counts.
 - **Rewriting the caller's SQL at the gateway to add the predicate.** This
   works, and it is forbidden: `Scenario: Submitted SQL is never automatically
-  rewritten` is a bound scope guard for this issue, and its test asserts that
+rewritten` is a bound scope guard for this issue, and its test asserts that
   the statement in `system.query_log` is the submitted one with nothing but
   `FORMAT JSON` appended.
 
@@ -87,6 +87,21 @@ identity sees exactly the row its own hash matches — so it yields this caller'
 tenant, and an unknown or empty key yields no row, which folds to `NULL` and
 matches nothing in PostgreSQL.
 
+**Amended for group projects (tasks#935).** A group project's session carries one
+key hash per member project, so the self-policed key map admits one row per
+member and an equality could only ever keep one of them. The predicate is now a
+range of two scalars, which still fold to constants and still push down:
+
+```sql
+WHERE src.`TenantId` >= (SELECT min(km.`TenantId`) FROM analytics.api_key_tenants AS km)
+  AND src.`TenantId` <= (SELECT max(km.`TenantId`) FROM analytics.api_key_tenants AS km)
+```
+
+One project sends `>= 'a' AND <= 'a'`, the same rows as before. A group sends
+the span of its member ids, so PostgreSQL may also read projects whose ids fall
+between two members; the row policy drops those, as with the foreign-tenant
+probe below. An unknown key folds both bounds to `''` and reads nothing.
+
 Nothing about the caller's statement changes. The predicate lives in a
 server-side view definition, which is where every other LangWatchQL view's body
 already lives, so the `never rewritten` guard is untouched.
@@ -95,8 +110,8 @@ already lives, so the `never rewritten` guard is untouched.
 
 **The predicate is a performance control and must never be mistaken for a second
 security boundary.** The row policy on the engine table underneath still decides
-the answer, so getting the predicate wrong costs a wrong *read* and never a wrong
-*result*. This is proven rather than argued: with a view's predicate hard-coded
+the answer, so getting the predicate wrong costs a wrong _read_ and never a wrong
+_result_. This is proven rather than argued: with a view's predicate hard-coded
 to a foreign tenant, PostgreSQL demonstrably received `WHERE "TenantId" =
 'tenant-b'` and really did read those rows, and the caller received zero. That
 split — isolation assertions green while the load assertion moves — is what
@@ -106,15 +121,15 @@ Measured against the objects the shipped generators provision, over a
 10,016-row annotation table across 42 tenants where the asking tenant owns two,
 from PostgreSQL's own `pg_stat_user_tables` accounting:
 
-| read                                    | rows returned | rows PostgreSQL read | statement PostgreSQL received |
-| --------------------------------------- | ------------- | -------------------- | ----------------------------- |
-| engine table, policy only               | 2             | 10,016               | no `WHERE` |
-| LangWatchQL view, valid key                | 2             | 2                    | `WHERE "TenantId" = 'tenant-a'` |
-| LangWatchQL view, unknown key              | 0             | 0                    | `WHERE "TenantId" = NULL` |
-| LangWatchQL view, foreign-tenant predicate | 0             | >0 (the foreign rows)| `WHERE "TenantId" = 'tenant-b'` |
+| read                                       | rows returned | rows PostgreSQL read  | statement PostgreSQL received   |
+| ------------------------------------------ | ------------- | --------------------- | ------------------------------- |
+| engine table, policy only                  | 2             | 10,016                | no `WHERE`                      |
+| LangWatchQL view, valid key                | 2             | 2                     | `WHERE "TenantId" = 'tenant-a'` |
+| LangWatchQL view, unknown key              | 0             | 0                     | `WHERE "TenantId" = NULL`       |
+| LangWatchQL view, foreign-tenant predicate | 0             | >0 (the foreign rows) | `WHERE "TenantId" = 'tenant-b'` |
 
 Five thousand fold on this fixture, and the ratio is the tenant's share of the
-table — which is the point: the cost stops scaling with how many *other*
+table — which is the point: the cost stops scaling with how many _other_
 tenants exist. The unknown-key row is the one worth noticing beyond that: the
 shape that returns nothing used to cost a full scan of the primary.
 
@@ -152,7 +167,7 @@ this module.
   publishing both would let one caller ask the same question two ways and get
   two answers with nothing saying which is authoritative. The underlying
   `trace_summaries.AnnotationIds` column stays — the product's has-annotation
-  filter reads it — so this removes the second *source*, not the projection. The
+  filter reads it — so this removes the second _source_, not the projection. The
   projection's own end state remains open.
 - No table has failed the measured bar, so **no projection fallback is built**,
   per the issue's instruction not to build one speculatively.
@@ -170,12 +185,12 @@ measurements above show the live mapping reading exactly the caller's rows — s
 building one now would be speculative work against a bar no table failed.
 
 **Put the pushdown predicate in the row policy, in scalar form.** Measured: a
-row policy's predicate does not push down in *any* form, scalar included. The
+row policy's predicate does not push down in _any_ form, scalar included. The
 policy is applied after the read regardless.
 
 **Send the tenant as a second custom setting and reference it in the view.** The
 view would then read `getSetting('custom_tenant_id')` rather than the key map.
-Rejected: it puts a *tenant id* on the wire where today only an opaque key hash
+Rejected: it puts a _tenant id_ on the wire where today only an opaque key hash
 travels, and the key map already resolves the same fact server-side with a policy
 proving it cannot be probed.
 
@@ -183,6 +198,6 @@ proving it cannot be probed.
 
 - Issue: [#6480](https://github.com/langwatch/langwatch/issues/6480)
 - `platform/app/src/server/analytics/lwql/catalog/postgresViews.ts` — the six entries
-- `platform/app/src/server/analytics/lwql/views.ts` — `postgresTenantPredicate`
-- `platform/app/src/server/analytics/lwql/provisioning.ts` — approved views, engine tables, reader role
+- `platform/app/src/server/analytics/lwql/provisioning/catalogStatements.ts` — `postgresTenantPredicate`
+- `platform/app/src/server/analytics/lwql/provisioning/accessModel.ts` — approved views, engine tables, reader role
 - `platform/app/src/server/analytics/lwql/__tests__/postgresEngineIsolation.integration.test.ts` — the proof and the measurements

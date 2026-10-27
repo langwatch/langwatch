@@ -1,0 +1,18 @@
+---
+title: Releases and support
+description: "How LangWatch is versioned, which releases get fixes, and why you can upgrade to the latest release from any version."
+---
+
+## Versioning
+
+LangWatch is released from one line. Every release has a version number such as `3.20.1`, and the images and the Helm chart carry the same number. A higher number is always a newer release on that line. A patch number (the last digit) is a smaller release on the same line, not a fix to an older one.
+
+## Only the latest release gets fixes
+
+Fixes, security fixes included, ship in the next release and only there. No older release is ever patched. To get a fix, upgrade to the latest release.
+
+## Upgrade from any version
+
+Upgrade to the latest release from any version; the worker rolls through every step. There is no release you must stop at first and no long-term-support line: an installation on any older release, however old, upgrades **straight to the latest release**, and the upgrade applies every release in between, in order. See the [upgrade guide](/self-hosting/upgrade) for how to run it.
+
+To see where you are, **Ops > Upgrades** shows the installed release and the release of the image; `pnpm task upgrade status` shows the installed release in the terminal, and `pnpm task upgrade plan` lists every release the upgrade will apply.

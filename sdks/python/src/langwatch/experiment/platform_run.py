@@ -10,12 +10,12 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, 
 from urllib.parse import quote, urlparse, urlunparse
 import sys
 import time
-import httpx
 
 import langwatch
 from langwatch.experiment._results_df import build_results_df
+from langwatch.http_client import create_client
 from langwatch.state import get_api_key, get_endpoint
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -185,8 +185,8 @@ class ExperimentRunResult:
 
         for attempt in range(retries):
             try:
-                with httpx.Client(timeout=30) as client:
-                    response = client.get(url, headers=build_auth_headers(api_key))
+                with create_client(timeout=30) as client:
+                    response = client.get(url, headers=build_request_headers(api_key))
 
                 if response.status_code == 404:
                     if attempt < retries - 1:
@@ -505,10 +505,10 @@ def _start_run(
     ``body`` carries the optional inline data / dataset_id / parameters / row_indices.
     When empty we send ``json=None`` so the historical no-body request is preserved.
     """
-    with httpx.Client(timeout=60) as client:
+    with create_client(timeout=60) as client:
         response = client.post(
             f"{endpoint}/api/evaluations/v3/{slug}/run",
-            headers=build_auth_headers(api_key),
+            headers=build_request_headers(api_key),
             json=body or None,
         )
 
@@ -528,10 +528,10 @@ def _start_run(
 
 def _get_run_status(run_id: str, endpoint: str, api_key: str) -> dict:
     """Get the status of a run."""
-    with httpx.Client(timeout=60) as client:
+    with create_client(timeout=60) as client:
         response = client.get(
             f"{endpoint}/api/evaluations/v3/runs/{run_id}",
-            headers=build_auth_headers(api_key),
+            headers=build_request_headers(api_key),
         )
 
     if response.status_code == 404:
@@ -664,5 +664,4 @@ def _print_summary(result: ExperimentRunResult) -> None:
     print("─" * 60)
     print(f"  View details: {result.run_url}")
     print("═" * 60 + "\n")
-
 

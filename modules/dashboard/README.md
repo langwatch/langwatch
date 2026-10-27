@@ -1,0 +1,51 @@
+# dashboard
+
+Dashboards and the graphs and saved workbench charts on them.
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## At a glance
+
+|                |                                                                                                                |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                                |
+| Subjects       | dashboard, graph, saved-workbench-chart                                                                        |
+| Halves         | [contract](contract) · [process](process/README.md)                                                            |
+| Api token      | `DashboardApi` = `moduleApi<DashboardApi>()("dashboard")`, `contract/src/dashboard.api.ts:408` (58 operations) |
+| Installed by   | api, worker, tasks (process)                                                                                   |
+
+## What dashboard owns
+
+| Kind           | Name                        | Declared at                                                                |
+| -------------- | --------------------------- | -------------------------------------------------------------------------- |
+| Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
+| Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
+| Postgres table | `DashboardFavourite`        | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
+| Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
+| Postgres table | `Dashboard`                 | `process/src/repositories/prisma/prisma.board.repository.ts:73`            |
+| Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:59` |
+| Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:59` |
+| Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:59` |
+| Postgres table | `Dashboard`                 | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
+| Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
+| Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
+| Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
+| Postgres table | `SavedView`                 | `process/src/repositories/prisma/prisma.saved-view.repository.ts:20`       |
+| Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/dashboard.config.ts:5`                                       |
+
+Anything else dashboard needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+| Name         | Token           | Module                                |
+| ------------ | --------------- | ------------------------------------- |
+| `analytics`  | `AnalyticsApi`  | [analytics](../analytics/README.md)   |
+| `authz`      | `AuthzApi`      | [authz](../authz/README.md)           |
+| `automation` | `AutomationApi` | [automation](../automation/README.md) |
+| `projects`   | `ProjectApi`    | [project](../project/README.md)       |
+
+## Who depends on dashboard
+
+[insight](../insight/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md) (as a peer).
+
+<!-- readme:generated:end -->

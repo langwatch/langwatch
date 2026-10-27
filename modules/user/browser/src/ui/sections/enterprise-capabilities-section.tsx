@@ -1,0 +1,229 @@
+/**
+ * Enterprise capabilities section (features, SSO, usage limits).
+ * Cloud only; self-hosted shows capabilities and setup guide.
+ */
+
+import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
+import {
+  Alert,
+  Badge,
+  Button,
+  Heading,
+  HStack,
+  Separator,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
+import type { LucideIcon } from "lucide-react";
+import { ExternalLink, FileClock, KeyRound, Users } from "lucide-react";
+
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
+
+const DOCS_BASE = "https://docs.langwatch.ai";
+
+type Capability = {
+  key: string;
+  name: string;
+  icon: LucideIcon;
+  description: string;
+  docsPath: string;
+};
+
+/**
+ * The capabilities a license unlocks that an operator would otherwise never
+ * see. Kept to the ones with a real setup guide behind them, so every row leads
+ * somewhere useful rather than to a sales page.
+ */
+const CAPABILITIES = [
+  {
+    key: "sso",
+    name: "Single sign-on",
+    icon: KeyRound,
+    description:
+      "Let your team sign in with Okta, Auth0, Azure AD, Google, or another identity provider instead of a password.",
+    docsPath: "/self-hosting/configuration/sso",
+  },
+  {
+    key: "scim",
+    name: "SCIM provisioning",
+    icon: Users,
+    description:
+      "Create, update, and deactivate members automatically from your directory, so leavers lose access without a manual step.",
+    docsPath: "/platform/scim",
+  },
+  {
+    key: "audit-logs",
+    name: "Audit logs",
+    icon: FileClock,
+    description: "A record of who changed what, exportable to your SIEM for compliance reviews.",
+    docsPath: "/ai-governance/audit-log",
+  },
+] as const satisfies readonly Capability[];
+
+function CapabilityRow({
+  capability,
+  isLicensed,
+}: {
+  capability: Capability;
+  isLicensed: boolean;
+}) {
+  const Icon = capability.icon;
+
+  return (
+    <Card
+      titleLevel={3}
+      padding="lg"
+      bodyLayout="spaced"
+      icon={<Icon size={20} />}
+      title={capability.name}
+      badge={
+        isLicensed ? (
+          <Badge colorPalette="green" size="sm" variant="surface">
+            Available
+          </Badge>
+        ) : (
+          <Badge colorPalette="orange" size="sm" variant="surface">
+            Enterprise license
+          </Badge>
+        )
+      }
+      footer={
+        <Link
+          href={`${DOCS_BASE}${capability.docsPath}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          fontSize="sm"
+          color="blue.fg"
+        >
+          <HStack gap={1}>
+            <Text>Setup guide</Text>
+            <ExternalLink size={12} />
+          </HStack>
+        </Link>
+      }
+    >
+      <Text color="fg.muted" fontSize="sm">
+        {capability.description}
+      </Text>
+    </Card>
+  );
+}
+
+/**
+ * SSO configured but not in use — diagnose license vs. provider startup issues.
+ */
+function SsoConfiguredButNotInUseNotice() {
+  const ssoGate = api.license.getSsoGateStatus.useQuery({}, { refetchOnWindowFocus: false });
+
+  const gate = ssoGate.data;
+  if (!gate?.configuredProvider) return null;
+  if (gate.licensed && gate.mounted) return null;
+
+  // An unlicensed deployment has not tried to mount anything, so the license is
+  // the cause to report even when both look unsatisfied.
+  const unlicensed = !gate.licensed;
+
+  return (
+    <Alert.Root
+      status="warning"
+      width="full"
+      data-testid={unlicensed ? "sso-unlicensed-notice" : "sso-not-started-notice"}
+    >
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>
+          {unlicensed
+            ? "Single sign-on is configured but not licensed on this deployment"
+            : "Single sign-on is configured but could not be started"}
+        </Alert.Title>
+        <Alert.Description>
+          This deployment is set up for <b>{gate.configuredProvider}</b>,{" "}
+          {unlicensed ? (
+            <>
+              so everyone is signing in by email until a license is activated. Activate one and
+              single sign-on turns on within a minute, no restart needed.
+            </>
+          ) : (
+            <>
+              but it could not be started, so everyone is signing in by email. Check that the
+              provider name is one LangWatch supports and that its client credentials are set, then
+              restart the server.
+            </>
+          )}
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+export function EnterpriseCapabilitiesSection() {
+  const host = usePersonalWorkspaceHost();
+  const organizationId = host.scope().organizationId ?? "";
+  const activePlan = api.plan.getActivePlan.useQuery(
+    { organizationId },
+    {
+      enabled: !!organizationId && host.hasPermission("organization:view"),
+      retry: false,
+    },
+  );
+  const isEnterprise = activePlan.data?.type === "ENTERPRISE";
+  const accent = useProductAccent();
+
+  if (host.deployment().isSaas) return null;
+
+  return (
+    <>
+      <Separator />
+      <VStack align="start" gap={4} width="full" data-testid="enterprise-capabilities">
+        <SsoConfiguredButNotInUseNotice />
+
+        <VStack align="start" gap={1}>
+          <Heading as="h2" size="sm">
+            Organization sign-in and governance
+          </Heading>
+          <Text color="fg.muted" fontSize="sm">
+            {isEnterprise
+              ? "Your license includes these capabilities. Each guide covers how to configure it on your deployment."
+              : "These run on the deployment you already have, unlocked by an Enterprise license. Everything else in LangWatch, including unlimited members, teams, and projects, stays uncapped without one."}
+          </Text>
+        </VStack>
+
+        <VStack align="start" gap={3} width="full">
+          {CAPABILITIES.map((capability) => (
+            <CapabilityRow key={capability.key} capability={capability} isLicensed={isEnterprise} />
+          ))}
+        </VStack>
+
+        {!isEnterprise && (
+          <HStack gap={3}>
+            <Button
+              asChild
+              size="sm"
+              colorPalette={accent.colorPalette}
+              variant="outline"
+              color={accent.roles.fg}
+              bg={accent.roles.subtle}
+              _hover={{ bg: accent.roles.muted }}
+            >
+              <Link unstyled href="/settings/license">
+                Activate a license
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a
+                href={`${DOCS_BASE}/self-hosting/licensing`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                How licensing works
+              </a>
+            </Button>
+          </HStack>
+        )}
+      </VStack>
+    </>
+  );
+}

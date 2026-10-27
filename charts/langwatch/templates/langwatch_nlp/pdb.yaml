@@ -1,4 +1,4 @@
-{{- if .Values.langwatch_nlp.enabled }}
+{{- if and .Values.langwatch_nlp.enabled (include "langwatch.pdbRenders" (dict "name" "langwatch_nlp" "spec" .Values.langwatch_nlp.podDisruptionBudget "replicas" .Values.langwatch_nlp.replicaCount)) }}
 {{- with .Values.langwatch_nlp.podDisruptionBudget }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget

@@ -10,12 +10,12 @@ import (
 )
 
 // The process watch (ADR-095): every daemon tick samples the machine's
-// dev-tooling processes — tsgo, gopls, biome, vitest workers, node, bun,
-// claude — however they were spawned, ships the footprint to the local
-// observability stack, and enforces limits on the one class that has them
-// (tsgo). Admission controls bound how much tooling *starts*; this bounds how
-// much *exists*, and records enough history to decide which class earns
-// limits next.
+// dev-tooling processes — the TypeScript compiler (`tsc` or `tsgo`, one
+// class), gopls, oxlint, vitest workers, node, bun, claude — however they were
+// spawned, ships the footprint to the local observability stack, and enforces
+// limits on the one class that has them (the compiler). Admission controls
+// bound how much tooling *starts*; this bounds how much *exists*, and records
+// enough history to decide which class earns limits next.
 
 // tsgoSeen is the cross-tick memory behind idle detection: a process whose CPU
 // clock moved since the last tick was active then.
@@ -27,23 +27,31 @@ type tsgoSeen struct {
 // governProcesses runs on every daemon tick. Sampling is one ps invocation;
 // with nothing watched alive it records an empty sample and does no more.
 func (o *Orchestrator) governProcesses() {
-	if o.cfg.Tsgo.RunMaxRSS <= 0 {
+	tsgoOn, browserOn := o.cfg.Tsgo.RunMaxRSS > 0, o.cfg.Browser.MaxRSS > 0
+	if !tsgoOn && !browserOn {
+		return
+	}
+	now := o.sys.Now()
+	samples := o.processSamples()
+	if browserOn {
+		o.governBrowser(samples, now)
+	}
+	if !tsgoOn {
 		return
 	}
 	if o.procActivity == nil {
 		o.procActivity = map[int]tsgoSeen{}
 	}
-	now := o.sys.Now()
-	watched, tsgo := o.sampleWatched(now)
+	watched, tsgo := o.sampleWatched(samples, now)
 	if o.procTel != nil {
 		o.procTel.RecordSample(watched)
 	}
 	for _, k := range domain.GovernTsgo(tsgo, o.cfg.Tsgo) {
 		o.sys.Kill(k.PID)
 		if o.procTel != nil {
-			o.procTel.RecordKill("tsgo", k.Reason)
+			o.procTel.RecordKill(domain.TypeScriptCompilerClass, k.Reason)
 		}
-		o.recordReap("tsgo", fmt.Sprintf("pid %d (%s, %s)", k.PID, k.Class, domain.HumanBytes(k.RSS)), k.Reason)
+		o.recordReap(domain.TypeScriptCompilerClass, fmt.Sprintf("pid %d (%s, %s)", k.PID, k.Class, domain.HumanBytes(k.RSS)), k.Reason)
 		o.log.Warn("process governor reclaimed tsgo",
 			zap.Int("pid", k.PID),
 			zap.String("role", string(k.Class)),
@@ -54,11 +62,12 @@ func (o *Orchestrator) governProcesses() {
 }
 
 // sampleWatched classifies the live process listing and maintains the
-// cross-tick idle memory. Returns every watched process plus the tsgo subset
-// the governor rules on.
-func (o *Orchestrator) sampleWatched(now time.Time) (watched []domain.WatchedProcess, tsgo []domain.TsgoProcess) {
+// cross-tick idle memory. Returns every watched process plus the compiler
+// subset the governor rules on — both binary names land in that one subset, so
+// a `tsc` run and a `tsgo` run are weighed against one combined budget.
+func (o *Orchestrator) sampleWatched(samples []ProcessSample, now time.Time) (watched []domain.WatchedProcess, tsgo []domain.TsgoProcess) {
 	live := map[int]bool{}
-	for _, s := range o.sys.ProcessSamples() {
+	for _, s := range samples {
 		w, ok := domain.ClassifyWatchedProcess(s.Command)
 		if !ok {
 			continue
@@ -76,7 +85,7 @@ func (o *Orchestrator) sampleWatched(now time.Time) (watched []domain.WatchedPro
 		w.PID, w.RSS = s.PID, s.RSSBytes
 		w.Started, w.IdleFor = now.Add(-s.Elapsed), now.Sub(seen.activeAt)
 		watched = append(watched, w)
-		if w.Class == "tsgo" {
+		if w.Class == domain.TypeScriptCompilerClass {
 			tsgo = append(tsgo, domain.TsgoProcess{
 				PID: w.PID, Class: w.Role, RSS: w.RSS, Started: w.Started, IdleFor: w.IdleFor,
 			})

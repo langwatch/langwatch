@@ -32,25 +32,24 @@ on:
       - "services/aigateway/**"
       - "pkg/**"
       - "cmd/**"
-      - "go.mod"
-      - "go.sum"
+      - "*/go.mod"
+      - "*/go.sum"
       - "infra/docker/Dockerfile.go_service"
       - ".github/workflows/go-services.yaml"
       # from `chart`
       - "charts/gateway/**"
       # from `langyagent`
       - "services/langyagent/**"
+      - "services/langyworker/**"
       - "sdks/go/**"
       - "infra/docker/Dockerfile.langyagent"
       - "sdks/typescript/**"
-      - "packages/langy/**"
+      - "modules/langy/contract/**"
       - "skills/**"
       - "feature-map.json"
-      - "platform/app/src/server/tracer/types.ts"
-      - "platform/app/src/server/filters/types.ts"
-      - "platform/app/src/server/evaluations/types.ts"
-      - "platform/app/src/server/modelProviders/llmModels.json"
-      - "platform/app/src/app/api/openapiLangWatch.json"
+      - "modules/trace/contract/src/trace-format.schemas.ts"
+      - "modules/evaluator/contract/src/evaluators.native.ts"
+      - "modules/model-provider/contract/src/catalog/model-catalog.json"
       - "services/langevals/ts-integration/evaluators.generated.ts"
   workflow_dispatch:
 
@@ -76,22 +75,33 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
+          # The gate reads no working-tree content: dorny/paths-filter lists
+          # changed paths from git trees, and every file this job needs on disk
+          # lives under .github/. Checking out the rest of the tree is pure
+          # runner time.
           sparse-checkout: .github
+      # dorny diffs a pull request from the event's base commit, which can be
+      # older than the main this merge commit is built on, and so counts main's
+      # newer commits as changed. Diff from the merge commit's first parent.
+      - name: Diff from the main the merge commit is built on
+        if: github.event_name == 'pull_request'
+        id: diff-base
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/pull-request-diff-base.sh" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name != 'workflow_dispatch'
         id: filter
         with:
+          # Empty: diff with git, never the files API, which stops at 3,000
+          # files (specs/ci/path-filters.feature).
+          token: ""
+          base: ${{ steps.diff-base.outputs.sha }}
           filters: |
             service:
               - 'services/aigateway/**'
               - 'pkg/**'
               - 'cmd/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'infra/docker/Dockerfile.go_service'
               - '.github/workflows/go-services.yaml'
             chart:
@@ -107,28 +117,27 @@ jobs:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
               # sdks/typescript/ + skills/ + feature-map.json + a handful of
-              # platform/app + services/langevals source files (sdks/typescript/copy-types.sh +
+              # packages + apps/api + services/langevals source files (sdks/typescript/copy-types.sh +
               # generate-skills-bundle.mjs). A change to any of those can break
               # `docker build -f infra/docker/Dockerfile.langyagent` with no Go source
               # touched — exactly the gap that shipped a broken build once
               # (a new copy-types.sh input was never COPYed into the image).
               # Validate the image build whenever any build input moves.
               - 'services/langyagent/**'
+              - 'services/langyworker/**'
               - 'pkg/**'
               - 'cmd/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'infra/docker/Dockerfile.langyagent'
               - 'sdks/typescript/**'
-              - 'packages/langy/**'
+              - 'modules/langy/contract/**'
               - 'skills/**'
               - 'feature-map.json'
-              - 'platform/app/src/server/tracer/types.ts'
-              - 'platform/app/src/server/filters/types.ts'
-              - 'platform/app/src/server/evaluations/types.ts'
-              - 'platform/app/src/server/modelProviders/llmModels.json'
-              - 'platform/app/src/app/api/openapiLangWatch.json'
+              - 'modules/trace/contract/src/trace-format.schemas.ts'
+              - 'modules/evaluator/contract/src/evaluators.native.ts'
+              - 'modules/model-provider/contract/src/catalog/model-catalog.json'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 
@@ -178,7 +187,7 @@ jobs:
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha_tag }}
             ${{ steps.meta.outputs.image }}:latest
           cache-from: type=gha,scope=gateway
-          cache-to: type=gha,scope=gateway,mode=max
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=gateway,mode=max' || '' }}
 
   langyagent:
     needs: changes
@@ -211,7 +220,7 @@ jobs:
           build-args: |
             SERVICE_VERSION=${{ github.sha }}
           cache-from: type=gha,scope=langyagent-amd64
-          cache-to: type=gha,scope=langyagent-amd64,mode=max
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=langyagent-amd64,mode=max' || '' }}
 
   helm:
     needs: changes
@@ -255,6 +264,12 @@ jobs:
       # resolve against; inline YAML steps bind nothing.
       - name: Assert shutdown values render as the pod needs them
         run: ./charts/gateway/tests/shutdown-values.sh
+
+      # A plain install creates no gateway Ingress and no ingress-nginx
+      # annotations, an enabled one carries the class the operator picked,
+      # and the PDB never blocks a node drain at any replica count.
+      - name: Assert the gateway Ingress is opt-in and the PDB allows drains
+        run: ./charts/gateway/tests/ingress-and-pdb.sh
 
       # The chart's graceful window has to stay above the gateway's 45s
       # non-streaming heartbeat interval (pkg/config.DefaultNonStreamingHeartbeatInterval),

@@ -1,20 +1,21 @@
 Feature: License Generation
 
-  # All scenarios in this file describe admin-side UI flows on the license
-  # generation drawer (form validation, plan-template auto-population,
-  # download filename, "Generate Another" reset). The underlying
-  # generateLicenseKey function is unit-tested in
-  # ee/licensing/__tests__/licenseGenerationService.unit.test.ts but the
-  # drawer UI itself has no component-level test fixture yet — all
-  # aspirational pending that harness.
+  # Licenses are issued by a LangWatch operator on the Backoffice Licenses
+  # screen, signed with the server's signing key. No private key is ever typed
+  # or pasted into a form. What the registry records for each issued license is
+  # specified in specs/self-hosting/connected-services/license-registry.feature.
+  #
+  # The UI scenarios below describe the issue drawer on that screen and have no
+  # component-level harness yet. The underlying generateLicenseKey function is
+  # unit-tested in ee/licensing/__tests__/licenseGenerationService.unit.test.ts.
 
-  As an administrator
-  I want to generate licenses for organizations
+  As a LangWatch operator
+  I want to issue licenses for customer organizations
   So that I can provide valid license keys for self-hosted deployments
 
   Background:
-    Given I am logged in as an administrator
-    And I am on the licensing settings page
+    Given I am signed in as a LangWatch operator
+    And I am on the Backoffice Licenses screen
 
   # Happy path - full system flow
   @e2e @unimplemented
@@ -111,15 +112,3 @@ Feature: License Generation
       When the license is mapped to the active PlanInfo
       Then webhook endpoints stay available
       And they are available too on an enterprise license that never mentioned them
-
-    @unit
-    Scenario: The generator form mints what it shows
-      Given the license generator form on the enterprise plan
-      When its defaults are read
-      Then webhook endpoints are ticked, and switching to a lesser plan clears them
-
-    @unit
-    Scenario: A custom contract carries only what it was given
-      Given the custom plan, which has no template to inherit from
-      When its form defaults are read
-      Then nothing is filled in on its behalf

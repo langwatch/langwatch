@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { GroupsApiService } from "@/client-sdk/services/groups/groups-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import { parseRole, parseScopeType } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
@@ -19,9 +21,7 @@ export interface AddGroupBindingOptions {
   scopeId: string;
 }
 
-export const listGroupBindingsCommand = async (
-  groupId: string,
-): Promise<CommandResult | void> =>
+export const listGroupBindingsCommand = async (groupId: string): Promise<CommandResult | void> =>
   runManagement({
     action: "list group bindings",
     pending: `Fetching bindings of group "${groupId}"...`,
@@ -61,9 +61,7 @@ export const addGroupBindingCommand = async ({
 }): Promise<CommandResult | void> => {
   const input = withParsedFlags(() => ({
     role: parseRole(options.role),
-    ...(options.customRoleId !== undefined
-      ? { customRoleId: options.customRoleId }
-      : {}),
+    ...(options.customRoleId !== undefined ? { customRoleId: options.customRoleId } : {}),
     scopeType: parseScopeType(options.scopeType),
     scopeId: options.scopeId,
   }));
@@ -98,9 +96,7 @@ export const removeGroupBindingCommand = async ({
     succeed: () => `Removed binding "${bindingId}" from group "${groupId}"`,
     table: () => {
       console.log();
-      console.log(
-        chalk.gray("The group no longer grants that role at that scope."),
-      );
+      console.log(chalk.gray("The group no longer grants that role at that scope."));
       console.log();
     },
   });

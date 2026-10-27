@@ -43,12 +43,8 @@ class PostApiGatewayV1BudgetsBody:
         provider_key (None | str | Unset):
         external_id (None | str | Unset):
         metadata (PostApiGatewayV1BudgetsBodyMetadata | Unset):
-        cycle_anchor_at (datetime.datetime | Unset): Phases the budget's cycle off this instant instead of the calendar,
-            so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for
-            calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps
-            into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create,
-            since moving it would redraw periods the budget has already reported and enforced on. Rejected with
-            `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle.
+        cycle_anchor_at (datetime.datetime | Unset):
+        allow_unreachable (bool | Unset):
     """
 
     scope: (
@@ -70,6 +66,7 @@ class PostApiGatewayV1BudgetsBody:
     external_id: None | str | Unset = UNSET
     metadata: PostApiGatewayV1BudgetsBodyMetadata | Unset = UNSET
     cycle_anchor_at: datetime.datetime | Unset = UNSET
+    allow_unreachable: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -135,6 +132,8 @@ class PostApiGatewayV1BudgetsBody:
         if not isinstance(self.cycle_anchor_at, Unset):
             cycle_anchor_at = self.cycle_anchor_at.isoformat()
 
+        allow_unreachable = self.allow_unreachable
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -159,6 +158,8 @@ class PostApiGatewayV1BudgetsBody:
             field_dict["metadata"] = metadata
         if cycle_anchor_at is not UNSET:
             field_dict["cycle_anchor_at"] = cycle_anchor_at
+        if allow_unreachable is not UNSET:
+            field_dict["allow_unreachable"] = allow_unreachable
 
         return field_dict
 
@@ -301,6 +302,8 @@ class PostApiGatewayV1BudgetsBody:
         else:
             cycle_anchor_at = isoparse(_cycle_anchor_at)
 
+        allow_unreachable = d.pop("allow_unreachable", UNSET)
+
         post_api_gateway_v1_budgets_body = cls(
             scope=scope,
             name=name,
@@ -313,6 +316,7 @@ class PostApiGatewayV1BudgetsBody:
             external_id=external_id,
             metadata=metadata,
             cycle_anchor_at=cycle_anchor_at,
+            allow_unreachable=allow_unreachable,
         )
 
         post_api_gateway_v1_budgets_body.additional_properties = d

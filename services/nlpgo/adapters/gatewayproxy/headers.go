@@ -5,9 +5,9 @@
 // domain.Credential, and forwards the call to the gateway dispatcher.
 //
 // Three TS callsites talk to /proxy/v1/*:
-//   - platform/app/src/server/routes/playground.ts
+//   - modules/model-provider/process/src/transport/api-rest/playground.api.ts
 //   - langwatch/src/server/modelProviders/model.factory.ts
-//   - platform/app/src/server/modelProviders/utils.ts
+//   - modules/model-provider/process/src/services/model-provider-execution-handle.service.ts
 //
 // All three send the customer's provider credentials as
 // `x-litellm-<field>` headers. This file owns the header → Credential
@@ -16,7 +16,6 @@ package gatewayproxy
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -80,11 +79,12 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		Extra:      make(map[string]string),
 	}
 
-	//nolint:exhaustive // playground credential header extraction only models the provider shapes that ship credentials inline today; unmapped providers (e.g. ProviderVoyage) fall through with empty Extra.
+	// Only the provider shapes that ship credentials inline today are mapped;
+	// others (e.g. ProviderVoyage) fall through with an empty Extra.
 	switch provider {
 	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
 		domain.ProviderXAI, domain.ProviderGroq, domain.ProviderCerebras,
-		domain.ProviderDeepSeek:
+		domain.ProviderDeepSeek, domain.ProviderDoubleword:
 		cred.APIKey = h.Get(headerAPIKey)
 		if base := h.Get(headerAPIBase); base != "" {
 			cred.Extra["api_base"] = base
@@ -155,6 +155,8 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		if v := h.Get(headerVertexLocation); v != "" {
 			cred.Extra["vertex_location"] = v
 		}
+	default:
+		// No inline credentials to map (see the comment above the switch).
 	}
 
 	// Populate the Azure / Bedrock / Vertex deployment map from the requested
@@ -212,6 +214,8 @@ func providerForPrefix(prefix string) (domain.ProviderID, bool) {
 		return domain.ProviderCerebras, true
 	case "deepseek":
 		return domain.ProviderDeepSeek, true
+	case "doubleword":
+		return domain.ProviderDoubleword, true
 	}
 	return "", false
 }
@@ -224,10 +228,4 @@ func BareModel(model string) string {
 		return model[i+1:]
 	}
 	return model
-}
-
-// LookErrorMessage formats a typed missing-provider error for HTTP
-// callers. Kept as a helper so the handler can wrap consistently.
-func LookErrorMessage(err error) string {
-	return fmt.Sprintf("playground proxy: %s", err.Error())
 }

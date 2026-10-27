@@ -5,42 +5,44 @@
 name: langevals-ci
 
 on:
+  # Pull requests and the merge queue reach this through pr.yml.
+  workflow_call:
   push:
     branches:
       - main
-  pull_request:
-    # ready_for_review is NOT a default pull_request activity type. Without
-    # it, taking a PR out of draft fires no event at all, so the jobs gated
-    # on `heavy` below would never get their first non-draft run.
-    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_target:
     types: [labeled]
-  merge_group:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A pull_request_target label other than `approved-ci` gets its own group.
+  group: langevals-ci-${{ github.event_name }}-${{ (github.event_name == 'pull_request_target' && github.event.label.name != 'approved-ci') && format('label-{0}', github.run_id) || github.event.pull_request.number || github.ref }}
+  # A newer commit supersedes an older run, on main too: the newest verdict
+  # covers the commits before it. Image and release builds keep their own rule.
+  cancel-in-progress: true
 
 jobs:
   changes:
+    # Skips the whole run for a pull_request_target label other than `approved-ci`.
+    # That event exists only to let `approved-ci` run a fork's PR.
+    if: (github.event_name != 'pull_request_target' || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
       # Draft PRs keep the cheap signal and release the runner slots;
       # everything heavy returns on ready_for_review and in the merge queue.
-      heavy: ${{ steps.detect.outputs.heavy }}
+      # A PR labelled `ci:full` runs it all, draft or not.
+      heavy: ${{ steps.detect.outputs.heavy == 'true' || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
+          # The gate reads no working-tree content: the changed paths come
+          # from git trees (.github/actions/detect-changes),
+          # and every file this job needs on disk lives under .github/.
+          # Checking out the rest of the tree is pure runner time.
           sparse-checkout: .github
+          # No token left on disk: every fetch in this job is anonymous.
+          persist-credentials: false
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
@@ -50,6 +52,8 @@ jobs:
           filters: |
             relevant:
               - 'services/langevals/**'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
+              - 'infra/docker/Dockerfile.langevals'
               - '.github/workflows/langevals-ci.yml'
 
   lint:
@@ -70,6 +74,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "services/langevals/uv.lock"
 
       - name: Install dependencies
@@ -98,6 +103,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "services/langevals/uv.lock"
 
       - name: Install dependencies
@@ -140,10 +146,30 @@ jobs:
         # here is what makes them run, and they run on forks too. They guard the
         # dspy thread-affinity crash that broke every evaluation after the first
         # one on a long-lived server, the event-loop block that made the health
-        # probe time out under load, and the worker-count detection that has to
-        # survive a bad value without stopping the boot.
+        # probe time out under load, the worker-count detection that has to
+        # survive a bad value without stopping the boot, and the litellm patch
+        # that decides what actually leaves for the provider — `langevals_core/
+        # tests/` runs on the secret-bearing step by default, which forks skip,
+        # so a contributor could otherwise break the request shape and see CI
+        # stay green.
+        #
+        # The two ragas files are named individually for the same reason. The
+        # step above ignores `evaluators/ragas/` wholesale because the evaluator
+        # tests there are LLM-judged, and that is how two import-time breaks
+        # reached main without CI noticing: the litellm client losing the shape
+        # langchain-openai calls it with, and a notebooks dependency that could
+        # not be imported on this Python taking the whole suite's collection
+        # down. Neither needs a provider. These two files stub every call, so
+        # they pin the client shape and the token accounting that prices each
+        # evaluation, and they fail loudly at import if that surface moves again.
         working-directory: services/langevals
-        run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py tests/deterministic/
+        run: |
+          uv run pytest -x -v \
+            evaluators/langevals/tests/test_llm_answer_match_threading.py \
+            evaluators/ragas/tests/test_model_to_langchain.py \
+            evaluators/ragas/tests/test_token_usage.py \
+            tests/deterministic/ \
+            langevals_core/tests/
 
   docker-build:
     needs: changes
@@ -174,11 +200,11 @@ jobs:
           # evicted each other's layers on every run — and with mode=max
           # against a 10 GB per-repo budget, images this size evict a lot.
           cache-from: type=gha,scope=langevals
-          cache-to: type=gha,mode=max,scope=langevals
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=langevals' || '' }}
 
   langevals-complete:
     needs: [changes, lint, test, docker-build]
-    if: always()
+    if: always() && (github.event_name != 'pull_request_target' || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2

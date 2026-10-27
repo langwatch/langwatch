@@ -31,7 +31,7 @@ func TestEnsureDepsSuppressesLifecycleScriptsForUntrustedCheckouts(t *testing.T)
 		t.Run("when dependencies install, lifecycle scripts are suppressed", func(t *testing.T) {
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			if err := o.ensureDeps(context.Background(), staleDir(t), false); err != nil {
+			if err := o.ensureDeps(context.Background(), staleDir(t), depsInstall{WithLifecycleScripts: false}); err != nil {
 				t.Fatalf("ensureDeps: %v", err)
 			}
 			if len(sup.shells) != 1 {
@@ -47,7 +47,7 @@ func TestEnsureDepsSuppressesLifecycleScriptsForUntrustedCheckouts(t *testing.T)
 		t.Run("when dependencies install, the repo's postinstall still runs", func(t *testing.T) {
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			if err := o.ensureDeps(context.Background(), staleDir(t), true); err != nil {
+			if err := o.ensureDeps(context.Background(), staleDir(t), depsInstall{WithLifecycleScripts: true}); err != nil {
 				t.Fatalf("ensureDeps: %v", err)
 			}
 			if len(sup.shells) != 1 {
@@ -122,26 +122,26 @@ func TestDepsStale(t *testing.T) {
 //
 // @scenario A fresh clone needs one install
 func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
-	// A checkout shaped like the repo: lockfile at the root, none in platform/app/.
-	repo := func(t *testing.T) (root, lwDir string) {
+	// A checkout shaped like the repo: lockfile at the root, none in a member.
+	repo := func(t *testing.T) (root, repoDir string) {
 		t.Helper()
 		root = t.TempDir()
-		lwDir = filepath.Join(root, "langwatch")
-		if err := os.MkdirAll(lwDir, 0o755); err != nil {
+		repoDir = filepath.Join(root, "langwatch")
+		if err := os.MkdirAll(repoDir, 0o755); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(root, "pnpm-lock.yaml"), []byte("x"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		return root, lwDir
+		return root, repoDir
 	}
 
 	t.Run("given a workspace whose lockfile is only at the root", func(t *testing.T) {
 		t.Run("when handed the member directory, the install still runs at the root", func(t *testing.T) {
-			root, lwDir := repo(t)
+			root, repoDir := repo(t)
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			if err := o.ensureDeps(context.Background(), lwDir, true); err != nil {
+			if err := o.ensureDeps(context.Background(), repoDir, depsInstall{WithLifecycleScripts: true}); err != nil {
 				t.Fatalf("ensureDeps: %v", err)
 			}
 			if len(sup.dirs) != 1 {
@@ -156,7 +156,7 @@ func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
 			root, _ := repo(t)
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			if err := o.ensureDeps(context.Background(), root, true); err != nil {
+			if err := o.ensureDeps(context.Background(), root, depsInstall{WithLifecycleScripts: true}); err != nil {
 				t.Fatalf("ensureDeps: %v", err)
 			}
 			if len(sup.dirs) != 1 || sup.dirs[0] != root {
@@ -174,7 +174,7 @@ func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
 			}
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			err := o.ensureDeps(context.Background(), dir, true)
+			err := o.ensureDeps(context.Background(), dir, depsInstall{WithLifecycleScripts: true})
 			if err == nil {
 				t.Fatal("ensureDeps = nil, want an error naming the missing lockfile")
 			}

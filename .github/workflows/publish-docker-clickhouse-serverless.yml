@@ -8,7 +8,7 @@ on:
       tag:
         description: 'Custom image tag (default: "next")'
         required: false
-        default: 'next'
+        default: "next"
 
 # A publish run drains — see publish-docker-app.
 concurrency:

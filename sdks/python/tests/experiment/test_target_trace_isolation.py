@@ -11,9 +11,12 @@ import time
 import pandas as pd
 import pytest
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+import httpx
 
 import langwatch
+from langwatch.http_client import create_client
 from langwatch.experiment.experiment import (
     Experiment,
     _iteration_context,
@@ -111,20 +114,23 @@ class TestTraceIdUniqueness:
             f"Expected 6 unique trace_ids, got {len(set(all_ids))}: {all_ids}"
 
 
+def _capturing_client_factory(bucket):
+    """A create_client stand-in whose transport records every JSON body sent
+    and answers 200."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bucket.append(json.loads(request.content))
+        return httpx.Response(200)
+
+    return lambda **kwargs: create_client(transport=httpx.MockTransport(handler))
+
+
 class TestTraceIdInHttpPayload:
     """Integration tests that verify trace_ids in the actual HTTP payload."""
 
     def test_http_payload_has_unique_trace_ids_per_target(self):
         """Mock HTTP and verify the payload has unique trace_ids."""
         captured_bodies = []
-
-        def mock_post(*args, **kwargs):
-            body = json.loads(kwargs.get("data", "{}"))
-            captured_bodies.append(body)
-            response = MagicMock()
-            response.status_code = 200
-            response.raise_for_status = MagicMock()
-            return response
 
         evaluation = Experiment("test-trace-payload")
         evaluation.initialized = True
@@ -134,7 +140,10 @@ class TestTraceIdInHttpPayload:
             {"question": "Question B"},
         ])
 
-        with patch("httpx.post", side_effect=mock_post):
+        with patch(
+            "langwatch.experiment.experiment.create_client",
+            _capturing_client_factory(captured_bodies),
+        ):
             for index, row in evaluation.loop(df.iterrows(), threads=2):
                 def run(index, row):
                     with evaluation.target("gpt-4"):

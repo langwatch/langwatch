@@ -1,0 +1,27 @@
+diff --git a/dist/oauth2/oauth-provider.d.mts b/dist/oauth2/oauth-provider.d.mts
+index 66ba333..de69d80 100644
+--- a/dist/oauth2/oauth-provider.d.mts
++++ b/dist/oauth2/oauth-provider.d.mts
+@@ -22,6 +22,8 @@ type OAuthIdTokenConfig = {
+   audience: string | string[]; /** Permitted JWS algorithms. Defaults to the token's `alg` header. */
+   algorithms?: string[] | undefined; /** Maximum token age passed to jose (e.g. `"1h"`). */
+   maxTokenAge?: string | undefined;
++  /** Clock skew tolerance passed to jose for `exp`, `nbf` and `iat` (e.g. `120` or `"2m"`). */
++  clockTolerance?: (number | string) | undefined;
+   /**
+    * How the `nonce` claim is compared to the expected nonce.
+    * - `"exact"` (default): strict equality.
+diff --git a/dist/oauth2/verify-id-token.mjs b/dist/oauth2/verify-id-token.mjs
+index 7103418..c6fd938 100644
+--- a/dist/oauth2/verify-id-token.mjs
++++ b/dist/oauth2/verify-id-token.mjs
+@@ -49,7 +49,8 @@ async function verifyProviderIdToken(provider, token, nonce, ctx) {
+ 			issuer: config.issuer,
+ 			audience: config.audience,
+ 			algorithms: config.algorithms ?? (alg ? [alg] : void 0),
+-			maxTokenAge: config.maxTokenAge
++			maxTokenAge: config.maxTokenAge,
++			clockTolerance: config.clockTolerance
+ 		});
+ 		if (nonce && !await nonceMatches(payload.nonce, nonce, config.nonceComparison)) return false;
+ 		if (config.verifyClaims && !config.verifyClaims(payload)) return false;

@@ -48,10 +48,8 @@ Feature: Langy in-product AI assistant — baseline (v1)
     Then the request is rejected with a 403
 
   # ============================================================================
-  # Access and rollout gating
-  # Covered by src/server/app-layer/langy/__tests__/langyAccessGate.unit.test.ts,
-  # src/features/langy/__tests__/ProjectLangyLayout.integration.test.tsx, and
-  # src/features/langy/hooks/__tests__/useShowLangy.integration.test.tsx
+  # Access and rollout gating is covered by the runtime Langy access adapter,
+  # ProjectLangyLayout, and useShowLangy integration suites.
   # ============================================================================
 
   Scenario: Without a rollout, Langy stays closed

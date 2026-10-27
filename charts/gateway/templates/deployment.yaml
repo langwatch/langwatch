@@ -1,3 +1,4 @@
+{{- include "gateway.validateIngressValues" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -42,6 +43,11 @@ spec:
             - name: http
               containerPort: 5563
               protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "gateway.fullname" . }}
@@ -56,6 +62,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.existingSecretName }}
                   key: {{ .Values.secrets.jwtSecretKey }}
+            {{- if .Values.metrics.enabled }}
+            - name: METRICS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.metrics.apiKey.existingSecretName | default .Values.secrets.existingSecretName }}
+                  key: {{ .Values.metrics.apiKey.secretKey }}
+            {{- end }}
+            {{- if .Values.security.extraCACertsConfigMap }}
+            - name: SSL_CERT_DIR
+              value: /etc/langwatch/ca
+            {{- end }}
             {{- if .Values.secrets.jwtSecretPreviousKey }}
             - name: LW_GATEWAY_JWT_SECRET_PREVIOUS
               valueFrom:
@@ -101,10 +118,20 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.security.extraCACertsConfigMap }}
+            - name: extra-ca-certs
+              mountPath: /etc/langwatch/ca
+              readOnly: true
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: {{ .Values.scratchSizeLimit }}
+        {{- if .Values.security.extraCACertsConfigMap }}
+        - name: extra-ca-certs
+          configMap:
+            name: {{ .Values.security.extraCACertsConfigMap }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}
       {{- end }}

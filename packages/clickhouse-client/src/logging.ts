@@ -1,22 +1,7 @@
 /**
- * What to do with the vendor client's own log records.
- *
- * `@clickhouse/client` logs an error for every failed HTTP attempt and cannot
- * know whether the caller then retried and succeeded, so those records carry no
- * verdict. Routed to our error level they made recovered work indistinguishable
- * from real failure and were roughly half of one service's error volume.
- *
- * Two rules come out of that, and they are the whole of this module:
- *
- *  1. Drop the vendor's `error`. A call under the retry wrapper is reported by
- *     the wrapper, which knows the outcome, and an unwrapped call throws, which
- *     surfaces at the request boundary with a stack. The exception is the
- *     signal; the vendor record is an echo with the verdict missing.
- *
- *  2. Never attach the cause under a field named `error`. Loki derives
- *     `detected_level` from the presence of that field, so an `error` key
- *     promotes a record to error regardless of the level chosen here - which is
- *     how successful retries came to be counted as failures.
+ * Two rules for the vendor client's log records: drop its `error` (the retry
+ * wrapper or an unwrapped throw already carries the real verdict); never key
+ * the cause `error` (Loki promotes on that key, once miscounting retries as failures).
  */
 
 export type VendorLogLevel = "trace" | "debug" | "info" | "warn" | "error";
@@ -46,18 +31,14 @@ export interface DecideVendorLogInput {
 }
 
 /**
- * Decide how a vendor record should be emitted, or `null` to drop it.
- *
- * Pure, so the policy is testable without a logger and identical in every
- * process that adopts it.
+ * Decides how a vendor record is emitted, or `null` to drop it. Pure, so
+ * the policy is testable without a logger and identical in every process
+ * that adopts it.
  */
-export function decideVendorLog({
-  level,
-  record,
-}: DecideVendorLogInput): VendorLogDecision | null {
+export function decideVendorLog({ level, record }: DecideVendorLogInput): VendorLogDecision | null {
   if (level === "error") return null;
 
-  const fields: Record<string, unknown> = { ...(record.args ?? {}) };
+  const fields: Record<string, unknown> = { ...record.args };
   // The vendor owns `args`, so it could carry an `error` key of its own and
   // silently defeat the rule this module exists for.
   delete fields.error;
@@ -89,13 +70,43 @@ export interface EmitVendorLogInput {
  * emitted, which is what lets a caller assert the drop without reaching into
  * the sink.
  */
-export function emitVendorLog({
-  sink,
-  level,
-  record,
-}: EmitVendorLogInput): boolean {
+export function emitVendorLog({ sink, level, record }: EmitVendorLogInput): boolean {
   const decision = decideVendorLog({ level, record });
   if (decision === null) return false;
   sink[decision.level](decision.fields, decision.message);
   return true;
+}
+
+/** The vendor's own logger interface, as `@clickhouse/client` calls it. */
+export interface VendorLogger {
+  trace(record: VendorLogRecord): void;
+  debug(record: VendorLogRecord): void;
+  info(record: VendorLogRecord): void;
+  warn(record: VendorLogRecord): void;
+  error(record: VendorLogRecord): void;
+}
+
+/**
+ * The class `@clickhouse/client` is handed as its `log.LoggerClass`, so its
+ * records route through the process's own structured logger instead of raw
+ * console lines. A factory because the driver wants a zero-arg constructor.
+ */
+export function vendorLoggerClassFor(sink: VendorLogSink): new () => VendorLogger {
+  return class ClickHouseVendorLogger implements VendorLogger {
+    trace(record: VendorLogRecord): void {
+      emitVendorLog({ sink, level: "trace", record });
+    }
+    debug(record: VendorLogRecord): void {
+      emitVendorLog({ sink, level: "debug", record });
+    }
+    info(record: VendorLogRecord): void {
+      emitVendorLog({ sink, level: "info", record });
+    }
+    warn(record: VendorLogRecord): void {
+      emitVendorLog({ sink, level: "warn", record });
+    }
+    error(record: VendorLogRecord): void {
+      emitVendorLog({ sink, level: "error", record });
+    }
+  };
 }

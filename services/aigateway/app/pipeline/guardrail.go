@@ -30,6 +30,10 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 				if !call.Bundle.Config.Guardrails.HasAny() {
 					return next(ctx, call)
 				}
+				if reason := guardrailsNotApplicable(call.Request.Type); reason != "" {
+					stampGuardrailsNotApplied(call, reason)
+					return next(ctx, call)
+				}
 
 				if err := call.MaterializeBody(); err != nil {
 					return nil, err
@@ -68,6 +72,10 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 				if !call.Bundle.Config.Guardrails.HasAny() {
 					return next(ctx, call)
 				}
+				if reason := guardrailsNotApplicable(call.Request.Type); reason != "" {
+					stampGuardrailsNotApplied(call, reason)
+					return next(ctx, call)
+				}
 
 				verdict, err := pre(ctx, call.Bundle, call.Request)
 				if blockErr := guardrailOutcome(ctx, guardrailOutcomeInput{
@@ -84,6 +92,12 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 				if err != nil {
 					return nil, err
 				}
+				// Synthesized speech is audio bytes: there is no text in a
+				// chunk for a guardrail to judge, and the request text was
+				// judged above.
+				if call.Request.Type == domain.RequestTypeSpeech {
+					return iter, nil
+				}
 				return &guardrailStreamWrapper{
 					inner:  iter,
 					chunk:  chunk,
@@ -93,6 +107,27 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 			}
 		},
 	}
+}
+
+// guardrailsNotApplicable names the request types a guardrail cannot judge,
+// and why, or "" for every type it can.
+//
+// A realtime session mint carries a session declaration, not a prompt, and
+// the conversation itself never passes through the gateway. Running the
+// key's guardrails against that body would pass a check on content nobody
+// spoke yet and report protection over a socket the gateway cannot see. The
+// caller is told so on the response, because a silently skipped guardrail is
+// the failure that looks exactly like a working one.
+func guardrailsNotApplicable(t domain.RequestType) string {
+	if t == domain.RequestTypeRealtimeSession {
+		return "realtime_session"
+	}
+	return ""
+}
+
+// stampGuardrailsNotApplied records the skip for the response header.
+func stampGuardrailsNotApplied(call *Call, reason string) {
+	call.Meta.Update(func(m *Meta) { m.GuardrailsNotApplied = reason })
 }
 
 type guardrailOutcomeInput struct {
@@ -184,6 +219,10 @@ func (w *guardrailStreamWrapper) Chunk() []byte       { return w.inner.Chunk() }
 func (w *guardrailStreamWrapper) Usage() domain.Usage { return w.inner.Usage() }
 func (w *guardrailStreamWrapper) Err() error          { return w.inner.Err() }
 func (w *guardrailStreamWrapper) Close() error        { return w.inner.Close() }
+
+// Unwrap exposes the wrapped iterator so its optional extensions stay
+// reachable (domain.StreamHeadersOf).
+func (w *guardrailStreamWrapper) Unwrap() domain.StreamIterator { return w.inner }
 
 // RawFraming delegates to the inner iterator so writers can still
 // detect raw-framed (Gemini passthrough) streams through wrapper chains.

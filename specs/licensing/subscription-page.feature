@@ -170,3 +170,102 @@ Feature: Subscription Page Plan Management
       When I view the subscription page
       Then webhook endpoints are not listed among the features I have
       And the rest of the enterprise features are still listed
+
+  # ============================================================================
+  # An organization above its plan's seats is offered the upgrade
+  # ============================================================================
+
+  Rule: An organization using more seats than its plan includes is offered an upgrade
+
+    A plan can shrink under an organization that already filled it: a
+    subscription is cancelled, an override is removed, or a backoffice edit
+    moves the organization back to Free. The members stay, so the organization
+    ends up using more seats than the plan includes. Nothing has to be refused
+    for that to matter, so the upgrade is offered up front instead of waiting
+    for the next invite to fail.
+
+    @unit
+    Scenario: Seat usage above the plan's member limit is reported as exceeded
+      Given my organization is on the Free plan, which includes 2 member seats
+      And my organization uses 3 member seats
+      When the organization's usage is read
+      Then the seat limit is reported as exceeded
+      And the report says 3 seats are used and the plan includes 2
+
+    @unit
+    Scenario: Seat usage above the plan's Lite Member limit is reported as exceeded
+      Given my organization is on the Free plan, which includes no Lite Member seats
+      And my organization uses 2 Lite Member seats
+      When the organization's usage is read
+      Then the seat limit is reported as exceeded
+
+    @unit
+    Scenario: Seat usage within the plan's limits is not reported as exceeded
+      Given my organization uses 2 of the 2 member seats its plan includes
+      When the organization's usage is read
+      Then the seat limit is reported as ok
+
+    @unit
+    Scenario: A plan with no member limit never reports the seat limit as exceeded
+      Given my organization is on a plan with no member limit
+      When the organization's usage is read
+      Then the seat limit is reported as ok
+
+    @unit
+    Scenario: A license plan is left to the license page
+      Given my organization's plan comes from a license
+      And my organization uses more seats than the license covers
+      When the organization's usage is read
+      Then the seat limit is reported as ok
+
+    @integration
+    Scenario: Every page shows the upgrade banner while the seat limit is exceeded
+      Given my organization uses more seats than its plan includes
+      When I open any page in the app
+      Then I see a banner saying how many seats are used and how many the plan includes
+      And the banner links to the subscription page
+
+    @integration
+    Scenario: The upgrade banner is not shown while seats are within the plan
+      Given my organization uses no more seats than its plan includes
+      When I open any page in the app
+      Then I do not see the seat limit banner
+
+    @integration
+    Scenario: The billing page marks an upgrade as required when seats are over the plan
+      Given my organization is on the Free plan, which includes 2 member seats
+      And my organization has 3 members
+      When I view the subscription page
+      Then the seat count reads 3/2
+      And I am told an upgrade is required
+      And I see a note that my organization uses more seats than the plan includes
+      And I am offered the upgrade
+
+    @integration
+    Scenario: The billing page counts Lite Members above the plan as over the limit
+      Given my organization is on the Free plan, which includes no Lite Member seats
+      And my organization has a Lite Member
+      When I view the subscription page
+      Then I am told an upgrade is required
+
+    @integration
+    Scenario: The billing page does not mark an upgrade as required within the plan
+      Given my organization is on the Free plan with 2 members
+      When I view the subscription page
+      Then I am not told an upgrade is required
+      And I do not see the over the seat limit note
+
+    @integration
+    Scenario: Expired invites do not count toward seats on the billing page
+      Given my organization is on the Free plan with 2 members
+      And an invite to my organization has expired
+      When I view the subscription page
+      Then the seat count reads 2/2
+      And I am not told an upgrade is required
+
+    @integration
+    Scenario: Expired invites are not billed when upgrading
+      Given my organization is on the Free plan with 2 members
+      And one invite to my organization is still open and another has expired
+      When I upgrade to the Growth plan
+      Then the checkout is for 3 seats

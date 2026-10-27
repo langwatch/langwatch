@@ -1,9 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
+import type { paths } from "@/internal/generated/openapi/api-client";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { toTimeseriesShape } from "./timeseriesShape";
 
 const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> = {
@@ -27,15 +30,62 @@ const METRIC_ALIASES: Record<string, keyof typeof METRIC_PRESETS> = {
   cost: "total-cost",
   traces: "trace-count",
   "trace-counts": "trace-count",
+  trace_count: "trace-count",
+  "traces.count": "trace-count",
+  "trace.count": "trace-count",
   "pass-rate": "eval-pass-rate",
 };
 
+/** The origin Langy's own turns carry. */
+const LANGY_ORIGIN = "langy";
+
+/** One metric path, as the timeseries endpoint's own schema declares them. */
+type AnalyticsMetric =
+  paths["/api/v1/analytics/timeseries"]["post"]["requestBody"]["content"]["application/json"]["series"][number]["metric"];
+
+// The metric paths the platform accepts, checked here so a mistyped path is
+// refused with the list in hand, before a request is made. `satisfies` pins
+// the list to the generated schema: a metric the platform renames or drops
+// stops compiling here rather than reaching the API as a rejected body.
+const KNOWN_METRICS: readonly string[] = [
+  "metadata.trace_id",
+  "metadata.user_id",
+  "metadata.thread_id",
+  "metadata.span_type",
+  "sentiment.thumbs_up_down",
+  "performance.completion_time",
+  "performance.first_token",
+  "performance.total_cost",
+  "performance.cost_billed",
+  "performance.cost_non_billed",
+  "performance.prompt_tokens",
+  "performance.completion_tokens",
+  "performance.cache_read_tokens",
+  "performance.cache_write_tokens",
+  "performance.reasoning_tokens",
+  "performance.total_processed_tokens",
+  "performance.total_tokens",
+  "performance.tokens_per_second",
+  "events.event_type",
+  "events.event_score",
+  "events.event_details",
+  "evaluations.evaluation_score",
+  "evaluations.evaluation_pass_rate",
+  "evaluations.evaluation_runs",
+  "threads.average_duration_per_thread",
+] satisfies readonly AnalyticsMetric[];
+
+/** The presets and metric paths a `--metric` value can name, for an error. */
+const metricChoices = (): string =>
+  [
+    `Presets: ${Object.keys(METRIC_PRESETS).join(", ")}`,
+    `Metrics: ${KNOWN_METRICS.join(", ")}`,
+  ].join("\n");
+
 /**
- * Returns the timeseries rather than printing it: the output port renders it
- * in whatever format the caller asked for (utils/output.ts). `data` keeps the
- * shape the previous `--format json` branch established — the raw result with
- * the RESOLVED `metric`/`aggregation` attached, so Langy and other consumers
- * can label a result without guessing from the numeric keys.
+ * Returns the timeseries rather than printing it (output port renders
+ * per-format). `data` keeps the prior `--format json` shape -- raw result
+ * plus the RESOLVED `metric`/`aggregation`, so consumers don't guess keys.
  */
 export const queryAnalyticsCommand = async (options: {
   metric?: string;
@@ -44,6 +94,7 @@ export const queryAnalyticsCommand = async (options: {
   endDate?: string;
   groupBy?: string;
   timeScale?: string;
+  shouldIncludeLangy?: boolean;
 }): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -67,15 +118,17 @@ export const queryAnalyticsCommand = async (options: {
     aggregation = options.aggregation ?? "cardinality";
   }
 
+  if (!KNOWN_METRICS.includes(metric)) {
+    console.error(chalk.red(`Error: "${options.metric}" is not a metric preset or a metric path.`));
+    console.error(chalk.gray(metricChoices()));
+    process.exit(1);
+  }
+
   const now = Date.now();
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
 
-  const startDate = options.startDate
-    ? new Date(options.startDate).getTime()
-    : sevenDaysAgo;
-  const endDate = options.endDate
-    ? new Date(options.endDate).getTime()
-    : now;
+  const startDate = options.startDate ? new Date(options.startDate).getTime() : sevenDaysAgo;
+  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
 
   const spinner = createSpinner(`Querying ${metric} (${aggregation})...`).start();
 
@@ -90,8 +143,10 @@ export const queryAnalyticsCommand = async (options: {
         },
       ],
       groupBy: options.groupBy as "metadata.model" | undefined,
-      timeScale: options.timeScale === "full" ? "full" : options.timeScale ? Number(options.timeScale) : undefined,
+      timeScale: parseTimeScale(options.timeScale),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      // Langy's own turns stay out unless asked for, as in the Trace Explorer.
+      ...(options.shouldIncludeLangy ? {} : { excludeOrigins: [LANGY_ORIGIN] }),
     });
 
     spinner.succeed("Analytics query complete");
@@ -105,66 +160,14 @@ export const queryAnalyticsCommand = async (options: {
         ...result,
         metric,
         aggregation,
-        ...(toTimeseriesShape({
+        ...toTimeseriesShape({
           currentPeriod: result.currentPeriod,
           previousPeriod: result.previousPeriod,
           metric,
-        }) ?? {}),
+          aggregation,
+        }),
       },
-      table: () => {
-        console.log();
-        console.log(chalk.bold("Current Period:"));
-
-        if (result.currentPeriod.length === 0) {
-          console.log(chalk.gray("  No data for the current period."));
-        } else {
-          for (const dataPoint of result.currentPeriod) {
-            const entries = Object.entries(dataPoint).filter(
-              ([key]) => key !== "date",
-            );
-            const dateStr = dataPoint.date
-              ? new Date(dataPoint.date as number).toLocaleDateString()
-              : "—";
-
-            if (entries.length === 0) {
-              console.log(`  ${chalk.gray(dateStr)}: ${chalk.gray("no data")}`);
-            } else {
-              const values = entries
-                .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
-                .join(", ");
-              console.log(`  ${chalk.gray(dateStr)}: ${values}`);
-            }
-          }
-        }
-
-        if (result.previousPeriod.length > 0) {
-          console.log();
-          console.log(chalk.bold("Previous Period:"));
-          for (const dataPoint of result.previousPeriod) {
-            const entries = Object.entries(dataPoint).filter(
-              ([key]) => key !== "date",
-            );
-            const dateStr = dataPoint.date
-              ? new Date(dataPoint.date as number).toLocaleDateString()
-              : "—";
-
-            if (entries.length > 0) {
-              const values = entries
-                .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
-                .join(", ");
-              console.log(`  ${chalk.gray(dateStr)}: ${values}`);
-            }
-          }
-        }
-
-        console.log();
-        console.log(chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")));
-        console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch analytics query --metric <preset> -f json")} for raw data`,
-          ),
-        );
-      },
+      table: () => printTimeseries(result),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "query analytics" });
@@ -177,4 +180,62 @@ function formatValue(value: unknown): string {
     return value % 1 === 0 ? value.toLocaleString() : value.toFixed(4);
   }
   return String(value);
+}
+
+function parseTimeScale(timeScale: string | undefined): number | "full" | undefined {
+  if (timeScale === "full") return "full";
+  return timeScale ? Number(timeScale) : void 0;
+}
+
+type Timeseries = Awaited<ReturnType<AnalyticsApiService["timeseries"]>>;
+
+function pointParts(dataPoint: Timeseries["currentPeriod"][number]) {
+  const entries = Object.entries(dataPoint).filter(([key]) => key !== "date");
+  const dateStr = dataPoint.date ? new Date(dataPoint.date as number).toLocaleDateString() : "—";
+  return { entries, dateStr };
+}
+
+function printTimeseries(result: Timeseries): void {
+  console.log();
+  console.log(chalk.bold("Current Period:"));
+
+  if (result.currentPeriod.length === 0) {
+    console.log(chalk.gray("  No data for the current period."));
+  } else {
+    for (const dataPoint of result.currentPeriod) {
+      const { entries, dateStr } = pointParts(dataPoint);
+
+      if (entries.length === 0) {
+        console.log(`  ${chalk.gray(dateStr)}: ${chalk.gray("no data")}`);
+      } else {
+        const values = entries
+          .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
+          .join(", ");
+        console.log(`  ${chalk.gray(dateStr)}: ${values}`);
+      }
+    }
+  }
+
+  if (result.previousPeriod.length > 0) {
+    console.log();
+    console.log(chalk.bold("Previous Period:"));
+    for (const dataPoint of result.previousPeriod) {
+      const { entries, dateStr } = pointParts(dataPoint);
+
+      if (entries.length > 0) {
+        const values = entries
+          .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
+          .join(", ");
+        console.log(`  ${chalk.gray(dateStr)}: ${values}`);
+      }
+    }
+  }
+
+  console.log();
+  console.log(chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")));
+  console.log(
+    chalk.gray(
+      `Use ${chalk.cyan("langwatch analytics query --metric <preset> -f json")} for raw data`,
+    ),
+  );
 }

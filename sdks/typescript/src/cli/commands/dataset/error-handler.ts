@@ -1,26 +1,18 @@
 import chalk from "chalk";
 import type { Ora } from "ora";
+
 import {
   DatasetApiError,
   DatasetNotFoundError,
   DatasetPlanLimitError,
 } from "@/client-sdk/services/datasets/errors";
+
 import { failSpinner } from "../../utils/spinnerError";
 
 /**
- * Centralized error handler for all dataset CLI commands.
- * Every branch funnels through failSpinner, so a machine caller always gets
- * the structured `{ ok: false }` document and a person gets one fail line
- * (plus an optional detail line for plan limits) — never two disconnected
- * lines. Exits with code 1.
- *
- * @param spinner - The ora spinner to fail. The spinner's message is the
- *   only top-level error line rendered — we never emit a separate
- *   `console.error` that would produce two disconnected lines.
- * @param error - The caught error
- * @param context - Human-readable action description (e.g. "create dataset",
- *   "upload records"). Used as a fallback prefix when the error doesn't
- *   already carry one.
+ * Unified error line via failSpinner, never two disconnected lines.
+ * @param spinner Ora spinner (message is the only error line)
+ * @param error Caught error; @param context Action description
  */
 export function handleDatasetCommandError({
   spinner,
@@ -32,25 +24,37 @@ export function handleDatasetCommandError({
   context: string;
 }): never {
   if (error instanceof DatasetNotFoundError) {
-    // The "Not found:" prefix stays inside the message so the failSpinner
-    // headline keeps it: "Failed to <context>: Not found: <detail>".
+    // Keep the type as a handled error. Wrapped in a plain Error it would be
+    // read as `network_error` at status 0, and a wrong slug would tell the
+    // caller to check their network connection.
     failSpinner({
       spinner,
-      error: new Error(`Not found: ${error.message}`),
+      error: {
+        isLangWatchHandledError: true,
+        code: "not_found",
+        message: `Not found: ${error.message}`,
+        httpStatus: 404,
+      },
       action: context,
     });
   } else if (error instanceof DatasetPlanLimitError) {
     failSpinner({
       spinner,
-      error: new Error(`Plan limit reached: ${error.message}`),
+      error: {
+        isLangWatchHandledError: true,
+        code: "plan_limit_reached",
+        message: `Plan limit reached: ${error.message}`,
+        httpStatus: 403,
+        meta: {
+          limitType: error.limitType,
+          ...(error.current !== undefined ? { current: error.current } : {}),
+          ...(error.max !== undefined ? { max: error.max } : {}),
+        },
+      },
       action: context,
     });
     if (error.current !== undefined && error.max !== undefined) {
-      console.error(
-        chalk.gray(
-          `  Current ${error.limitType}: ${error.current} / ${error.max}`,
-        ),
-      );
+      console.error(chalk.gray(`  Current ${error.limitType}: ${error.current} / ${error.max}`));
     }
   } else if (error instanceof DatasetApiError) {
     // DatasetApiError.message is already built with formatApiErrorForOperation

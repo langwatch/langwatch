@@ -4,7 +4,7 @@ description: Debug TypeScript SDK integrations with LangWatch to fix tracing gap
 sidebarTitle: Debugging
 ---
 
-# Debugging and Troubleshooting
+## Troubleshooting Tools
 
 The LangWatch TypeScript SDK has console tracing, a custom logger hook, and error-handling options for troubleshooting an integration.
 
@@ -18,16 +18,16 @@ import { setupObservability } from "langwatch/observability/node";
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
-    processorType: 'simple' // Use 'simple' for immediate export during debugging
+    processorType: "simple", // Use 'simple' for immediate export during debugging
   },
   serviceName: "my-service",
-  
+
   // Debug options for development
   debug: {
     consoleTracing: true, // Log spans to console
     consoleLogging: true, // Log records to console
-    logLevel: 'debug'     // SDK internal logging
-  }
+    logLevel: "debug", // SDK internal logging
+  },
 });
 ```
 
@@ -48,14 +48,14 @@ const customLogger = {
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
 
   debug: {
     logger: customLogger,
-    logLevel: 'debug'
-  }
+    logLevel: "debug",
+  },
 });
 ```
 
@@ -68,14 +68,14 @@ import { setupObservability } from "langwatch/observability/node";
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
 
   // Advanced options for error handling
   advanced: {
     throwOnSetupError: true, // Throw errors instead of returning no-op handles
-  }
+  },
 });
 ```
 
@@ -108,14 +108,14 @@ const handle = setupObservability({
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
-    processorType: 'simple' // Immediate export for debugging
+    processorType: "simple", // Immediate export for debugging
   },
   serviceName: "my-service",
   debug: {
     consoleTracing: true,
     consoleLogging: true,
-    logLevel: 'info' // Raise this to `debug` if you're debugging the LangWatch integration
-  }
+    logLevel: "info", // Raise this to `debug` if you're debugging the LangWatch integration
+  },
 });
 ```
 
@@ -125,13 +125,13 @@ const handle = setupObservability({
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
-    processorType: 'batch' // Efficient batching for production
+    processorType: "batch", // Efficient batching for production
   },
   serviceName: "my-service",
   debug: {
     consoleTracing: false, // Disable console output in production
-    logLevel: 'warn' // Only log warnings and errors
-  }
+    logLevel: "warn", // Only log warnings and errors
+  },
 });
 ```
 
@@ -143,7 +143,7 @@ If you're still experiencing issues:
 2. **Verify Configuration**: Double-check all configuration options
 3. **Test Connectivity**: Ensure your application can reach LangWatch services
 4. **Community Support**: Visit our [Discord community](https://discord.gg/langwatch) for help
-5. **GitHub Issues**: Report bugs and feature requests on [GitHub](https://github.com/langwatch/langwatch/issues) 
+5. **GitHub Issues**: Report bugs and feature requests on [GitHub](https://github.com/langwatch/langwatch/issues)
 
 ## Related Documentation
 
@@ -152,9 +152,11 @@ For more debugging techniques and advanced troubleshooting:
 - **[Integration Guide](/integration/typescript/guide)** - Basic setup and common issues
 - **[API Reference](/integration/typescript/reference)** - Configuration options and error handling
 - **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Debugging manual span management
-- **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific debugging guides
+- **[Framework Integrations](/integration/overview)** - Framework-specific debugging guides
 - **[OpenTelemetry Migration](/integration/typescript/tutorials/opentelemetry-migration)** - Troubleshooting migration issues
 
 <Tip>
-For complex debugging scenarios, combine console tracing with [Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation) techniques for detailed span analysis.
-</Tip> 
+  For complex debugging scenarios, combine console tracing with [Manual
+  Instrumentation](/integration/typescript/tutorials/manual-instrumentation) techniques for detailed
+  span analysis.
+</Tip>

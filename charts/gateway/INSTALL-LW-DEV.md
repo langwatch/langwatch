@@ -117,6 +117,7 @@ helm upgrade --install gateway-smoke ../../charts/gateway \
   --set secrets.existingSecretName=gateway-runtime-secrets \
   --set admin.existingAuthSecretName=gateway-admin-secrets \
   --set admin.addr=127.0.0.1:6060 \
+  --set metrics.enabled=true \
   --wait --timeout 3m
 ```
 
@@ -132,6 +133,7 @@ kubectl -n langwatch logs -l app.kubernetes.io/instance=gateway-smoke --tail=100
 ```
 
 Look for:
+
 - `gateway_effective_config` log line with your config echo (iter 27)
 - `startup_netcheck_ok` or `startup_netcheck_probing` (iter 20) — empty by default, so should just skip to MarkStarted
 - `gateway_listening addr=:5563 version=...` (iter 30)
@@ -166,8 +168,10 @@ curl -sS http://localhost:5563/health | jq .
 curl -si http://localhost:5563/v1/models
 # → HTTP/1.1 401 + X-Request-Id + X-LangWatch-Gateway-Version
 
-# /metrics — Prometheus scrape
-curl -sSf http://localhost:5563/metrics | head -30
+# /metrics — Prometheus scrape, on its own port (needs --set metrics.enabled=true)
+kubectl -n langwatch port-forward deploy/gateway-smoke-langwatch-gateway 9464:9464 &
+curl -sSf http://localhost:9464/metrics \
+  -H "Authorization: Bearer ${METRICS_API_KEY}" | head -30
 
 # Admin listener via port-forward on a second tunnel
 kubectl -n langwatch port-forward deploy/gateway-smoke-langwatch-gateway 6060:6060 &
@@ -219,7 +223,7 @@ kubectl -n langwatch delete pdb gateway-smoke-langwatch-gateway --ignore-not-fou
 
 - **ImagePullBackOff**: EKS node role needs ECR pull permission. The `lw-dev` cluster's node role already has `AmazonEC2ContainerRegistryReadOnly` attached; if a new node group lacks it, `kubectl describe pod` will show the auth error and the fix is to extend the role policy.
 - **CrashLoopBackOff with `LW_GATEWAY_INTERNAL_SECRET is required`**: step 2 secret is missing or the env var key in the Secret doesn't match `secrets.internalSecretKey` (default `LW_GATEWAY_INTERNAL_SECRET`).
-- **401 `invalid_api_key` on every /v1/* request**: INTERNAL_SECRET on the gateway side doesn't match the control plane's. Re-run step 2 and roll both deploys.
+- _*401 `invalid_api_key` on every /v1/* request_*: INTERNAL_SECRET on the gateway side doesn't match the control plane's. Re-run step 2 and roll both deploys.
 - **503 on `/health` with `control_plane: unreachable for Ns`**: the gateway's background probe can't reach the app's `/api/internal/gateway/health` (or the shared INTERNAL_SECRET mismatches, which 401s the probe). Check `kubectl -n langwatch get svc` shows the app Service the ConfigMap's control-plane URL points at, and see the `statusprobe_control_plane_unreachable` log line for the underlying probe failure. `/readyz` stays 200 through this on purpose: pulling pods from the LB on a control-plane blip would kill the warm-cache traffic that still serves fine.
 
 ## Not covered

@@ -1,15 +1,15 @@
 import litellm
 from litellm.cost_calculator import completion_cost
 from litellm.utils import get_max_tokens
-from litellm import Choices, Message
 from litellm.files.main import ModelResponse
 from litellm.utils import trim_messages
 from pydantic import Field
 from typing import List, Optional, Literal, cast
-import os
-import json
 
+from langevals_core.tool_calls import read_tool_call_arguments
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
+    DEFAULT_MAX_TOKENS,
     BaseEvaluator,
     EvaluatorEntry,
     ConversationEntry,
@@ -56,10 +56,6 @@ class QueryResolutionEvaluator(
         self, entry: QueryResolutionEntry
     ) -> SingleEvaluationResult:
         vendor, model = self.settings.model.split("/")
-        if vendor == "azure":
-            os.environ["AZURE_API_KEY"] = self.get_env("AZURE_API_KEY")
-            os.environ["AZURE_API_BASE"] = self.get_env("AZURE_API_BASE")
-            os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
 
         content = entry.conversation or []
         conversation = ""
@@ -78,11 +74,7 @@ class QueryResolutionEvaluator(
         if max_tokens_retrieved is None:
             raise ValueError("Model not mapped yet, cannot retrieve max tokens.")
         llm_max_tokens: int = int(max_tokens_retrieved)
-        max_tokens = (
-            min(self.settings.max_tokens, llm_max_tokens)
-            if self.settings.max_tokens
-            else llm_max_tokens
-        )
+        max_tokens = min(self.settings.max_tokens or DEFAULT_MAX_TOKENS, llm_max_tokens)
         messages = [
             {
                 "role": "system",
@@ -99,6 +91,7 @@ class QueryResolutionEvaluator(
         )
 
         response = litellm.completion(
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             model=litellm_model,
             messages=messages,
             tools=[
@@ -138,9 +131,11 @@ class QueryResolutionEvaluator(
             },
         )
         response = cast(ModelResponse, response)
-        choice = cast(Choices, response.choices[0])
-        arguments = json.loads(
-            cast(Message, choice.message).tool_calls[0].function.arguments
+        arguments = read_tool_call_arguments(
+            response,
+            "query_resolution_evaluator",
+            required=["reasoning", "queries_total", "queries_answered"],
+            model=self.settings.model,
         )
 
         cost = completion_cost(completion_response=response, prompt=prompt)

@@ -1,26 +1,24 @@
+import chalk from "chalk";
 /**
- * The output contract's RESOLUTION half, pinned: flag normalisation (legacy
- * `-f/--format`, bare `--json` → new `-o/--output`, `--json <fields>`, `--jq`,
- * `--agent`), agent-mode detection, and `applyOutputContext` pushing the
- * resolved context into the error/colour machinery.
+ * The output contract's RESOLUTION half: flag normalisation (legacy
+ * `-f/--format`, `--json`, `--jq`, `--agent`), agent-mode detection, and
+ * `applyOutputContext` pushing the resolved context into error/colour.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import chalk from "chalk";
+
+import { getOutputFormat } from "../errorOutput";
 import {
   AGENT_MODE_ENV_VARS,
   applyOutputContext,
   isAgentModeEnv,
   resolveOutputOptions,
 } from "../output";
-import { getOutputFormat } from "../errorOutput";
 
-/** Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must not leak into tests. */
+/** Agent-mode env vars from the host (e.g. CLAUDECODE) must not leak into tests. */
 let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
@@ -91,13 +89,10 @@ describe("resolveOutputOptions flag normalisation", () => {
 });
 
 describe("agent-mode detection", () => {
-  it.each(AGENT_MODE_ENV_VARS.map((name) => [name]))(
-    "activates on the %s env var",
-    (name) => {
-      expect(isAgentModeEnv({ [name]: "1" })).toBe(true);
-      expect(resolveOutputOptions({}, { [name]: "1" }).format).toBe("agents");
-    },
-  );
+  it.each(AGENT_MODE_ENV_VARS.map((name) => [name]))("activates on the %s env var", (name) => {
+    expect(isAgentModeEnv({ [name]: "1" })).toBe(true);
+    expect(resolveOutputOptions({}, { [name]: "1" }).format).toBe("agents");
+  });
 
   it("ignores env values that mean 'off'", () => {
     for (const value of ["", "0", "false"]) {

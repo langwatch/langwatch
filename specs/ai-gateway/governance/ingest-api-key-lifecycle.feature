@@ -7,11 +7,21 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   traces into that one project and nothing else, with no second credential
   type to learn or migrate
 
+  Why a personal key belongs to a CLI session:
+    A person runs one tool from a laptop, a desktop and a few cloud machines
+    under one login. Each machine signs in with `langwatch login`, which mints
+    a CLI login key for that session, and each machine's ingest key is minted
+    under that login key (`parentApiKeyId`). The ingest key then lives and
+    dies with the session: logout, a revoke from the devices tab, a re-login
+    from the same device and session expiry all retire the login key, and
+    every ingest key parented to it goes with it. Nothing else revokes a
+    machine's key on its behalf, so no mint can break another machine.
+
   Why one primitive (replaces the retired UserIngestionBinding):
     There is ONE credential primitive: ApiKey (HMAC-SHA256 + pepper, split
     `{prefix}{lookupId}_{secret}` format). An "ingestion key" is an ApiKey with
-    `keyType = "ingest"` plus a single project-scoped RoleBinding granting the
-    system "Ingest Only" role (permissions = ["traces:create"] only). Ingest
+    `ingestSourceType` set plus a single project-scoped RoleBinding granting
+    the system "Ingest Only" role (permissions = ["traces:create"] only). Ingest
     keys carry an `ik-lw-` prefix (vs full-access `sk-lw-`) purely for
     identifiability; resolution is identical (lookup by lookupId). The retired
     UserIngestionBinding primitive — a separate `ik-lw-` token with its own
@@ -39,10 +49,11 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
 
   @bdd @ingest-api-key @issue
   Scenario: Issuing an ingestion key mints an ApiKey with an ingest-only project role
-    When jane requests an ingestion key for "personal-jane" with sourceType "claude_code"
+    Given jane holds a device session whose login key is K
+    When the CLI requests an ingestion key for "personal-jane" with sourceType "claude_code"
     Then an ApiKey row is created with:
       | column            | value                                          |
-      | keyType           | "ingest"                                       |
+      | parentApiKeyId    | K                                              |
       | hashedSecret      | HMAC-SHA256(secret, pepper)                    |
       | ingestSourceType  | "claude_code"                                  |
       | ingestionTemplateId | NULL (no template for a unified CLI tool)    |
@@ -54,7 +65,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
       | scopeId       | "personal-jane"                |
       | customRole    | "Ingest Only" (traces:create)  |
     And the plaintext token is shown exactly once with the `ik-lw-` prefix
-    And re-requesting the same (project, sourceType) rotates in place, never 409
+    And re-requesting the same (project, sourceType) adds a key, never 409
 
   @bdd @ingest-api-key @issue @structural-impossibility
   Scenario: Personal ingest-key issuance derives the project from auth, not input
@@ -71,8 +82,10 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   # project that owns the code instead of the developer's personal workspace.
   # The named-project mint is create-only: two machines working on the same
   # repository each keep their own live key, and revoking one leaves the other
-  # working. Omitting `project` keeps the personal-project behaviour, which
-  # rotates in place.
+  # working. Omitting `project` mints into the personal workspace on the same
+  # terms, under the session's login key (see the personal-session scenarios
+  # below). A project-pinned key is an org service key: it has no session and
+  # no lifecycle beyond a person's revoke.
 
   @integration @ingest-api-key @issue @project-scoped
   Scenario: The CLI mints an ingestion key for a project named by id
@@ -116,6 +129,330 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     When her second machine mints one for the same project and source type
     Then both tokens authorize trace writes into "checkout-api"
     And neither key is revoked by the other
+
+  # ---------------------------------------------------------------------------
+  # Personal-workspace mint from the CLI: one key per session
+  # ---------------------------------------------------------------------------
+  # The personal mint used to rotate in place, so any one machine's setup
+  # silently revoked the key every other machine was still exporting with.
+  # It is create-only now, and every key it mints is parented to the CLI
+  # login key of the session that asked for it. That parent is what retires
+  # the key later; the mint itself never revokes anything.
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: Two devices each keep a live personal key for the same tool
+    Given jane's laptop already minted a personal ingestion key for "claude_code"
+    When her second device mints one for the same source type
+    Then both tokens authorize trace writes into her personal workspace
+    And neither key is revoked by the other
+
+  @integration @ingest-api-key @issue @personal @session @unimplemented
+  Scenario: A key minted by a CLI session is parented to that session's login key
+    Given jane holds a device session whose login key is K
+    When the CLI mints a personal key for "claude_code"
+    Then the new key's parentApiKeyId is K
+    And its device label is the same normalized label the login key carries
+
+  @integration @ingest-api-key @issue @personal @session @unimplemented
+  Scenario: A mint from a session whose login key is revoked is refused as signed out
+    Given jane holds a device session whose login key was revoked
+    When the CLI mints a personal key for "claude_code"
+    Then the response status is 401
+    And no ingestion key is created
+    # The CLI reads a 401 here as "sign in again", which is the repair.
+
+  @integration @ingest-api-key @issue @personal @session @compatibility @unimplemented
+  Scenario: A session from before login keys existed still mints
+    Given jane holds a device session whose record names no login key
+    When the CLI mints a personal key for "opencode"
+    Then the key is created with no parent
+    And retiring that session's login key leaves it live
+    # Sessions approved before the login key was written are still inside the
+    # 90-day refresh window. Refusing them would tell a person whose CLI works
+    # to sign in again for a reason they cannot see, so they mint the
+    # unparented key they always did. The window closes as they age out.
+
+  @unit @ingest-api-key @issue @personal @session
+  Scenario: A mint that races its session's retirement cleans up the key it wrote
+    Given a login key that is live when the mint checks it
+    When the session is retired while that mint is still writing its key
+    Then the new key is revoked with cause "session"
+    And the mint answers signed out
+
+  # ---------------------------------------------------------------------------
+  # A personal key lives and dies with its CLI session
+  # ---------------------------------------------------------------------------
+  # Four things retire a login key: `langwatch logout`, the revoke on the
+  # devices tab, a re-login from the same device, and the session running out
+  # (the refresh window, or the organization's max session duration). The login
+  # key carries the cause of its own death, and the ingest keys under it carry
+  # the same one, except a person's revoke ("user"), which reaches them as
+  # "session". Keys under another session are never touched.
+
+  @integration @ingest-api-key @session @logout
+  Scenario: Logging out retires the session's ingest keys and leaves another session's live
+    Given jane's laptop and desktop each hold a device session and a "claude_code" key
+    When the laptop calls logout with its tokens
+    Then the laptop's login key is revoked with cause "user"
+    And its ingest key is revoked with cause "session"
+    And the desktop's key still authorizes trace writes
+
+  @integration @ingest-api-key @revoke
+  Scenario: The first revocation's cause is the one recorded
+    Given a live key
+    When a person revokes it and the ingest-key cap retires it in the same moment
+    Then the key is revoked with cause "user"
+    And both callers read that cause back
+    # A "cap" written over a person's "user" is the one that matters: the CLI
+    # re-mints a key the cap retired and leaves a key a person revoked dead.
+    # The later revoke waits on the row lock and re-reads the row as the
+    # first left it, so it records nothing.
+
+  @integration @ingest-api-key @session @revoke
+  Scenario: Revoking a device from the devices tab retires its login key and its ingest keys
+    Given jane's laptop and desktop each hold a device session and a "claude_code" key
+    When jane revokes the laptop session from the devices tab
+    Then the laptop's tokens are gone from Redis
+    And the laptop's login key and ingest key are revoked
+    And the desktop's key still authorizes trace writes
+
+  @integration @ingest-api-key @session @revoke
+  Scenario: Revoking every device retires every session's keys
+    Given jane's laptop and desktop each hold a device session and a "claude_code" key
+    When jane revokes all devices
+    Then both login keys and both ingest keys are revoked
+
+  @unit @ingest-api-key @session
+  Scenario: A re-login from the same device retires the keys of the session it replaces
+    Given a device that signs in again under the same label
+    When the previous login key is replaced
+    Then the ingest keys parented to it are retired and stop authorizing trace writes
+    And the new session starts with none
+
+  @integration @ingest-api-key @session @expiry
+  Scenario: A session past its ceiling has its keys retired with cause expired
+    Given jane's session started longer ago than the organization's max session duration
+    When the CLI refreshes the session
+    Then the refresh is refused
+    And the session's login key and ingest key are revoked with cause "expired"
+
+  @integration @ingest-api-key @session @expiry
+  Scenario: A session whose person left the organization is retired as offboarded
+    Given jane's membership of "acme" ended while her session was still live
+    When the CLI refreshes the session
+    Then the refresh is refused
+    And the session's login key and ingest key are revoked with cause "offboarded"
+    # Not "expired": the session had time left and lost its person instead, and
+    # the CLI reads the cause as a sign-out this machine cannot repair.
+
+  @unit @ingest-api-key @session @expiry
+  Scenario: The reaper retires login keys whose session window ran out
+    Given a CLI login key whose expiry passed and one whose expiry has not
+    When the hourly sweep runs
+    Then only the elapsed key is revoked, with cause "expired"
+    And the ingest keys under it are revoked with it
+
+  @unit @ingest-api-key @session @expiry
+  Scenario: A refresh extends the login key's expiry with the session
+    Given a CLI login key minted with the session
+    When the CLI refreshes the session
+    Then the login key's expiry moves to the new refresh window
+    But never past the organization's max session duration from the session start
+
+  @unit @ingest-api-key @session
+  Scenario: Revoking a login key from the API keys page retires its ingest keys
+    Given a login key with two ingest keys minted under it
+    When the login key is revoked through the ordinary API-key revoke
+    Then both ingest keys are revoked with cause "session"
+    # The cascade belongs to the primitive, not to one caller. The API-keys
+    # page, the REST route and the tRPC mutation reach the same row as a
+    # logout does, and a cascade living in the logout path is one the other
+    # three skip.
+
+  @unit @ingest-api-key @session
+  Scenario: A key whose session is gone does not authenticate
+    Given an ingest key whose login key was revoked, or ran out, or is gone
+    When a request presents that key
+    Then it is refused
+    # The row may still read live: a cascade can fail, and a credential must
+    # not depend on one having run. The parent is the authority, so the token
+    # check asks it.
+
+  @unit @ingest-api-key @session
+  Scenario: A cascade that fails does not fail the logout
+    Given a login key whose ingest keys cannot be revoked
+    When the login key is revoked
+    Then the login key is still revoked and the caller is not told of a failure
+    And the failure is logged
+
+  # The CLI is not the only door to a personal key: the MCP mint an agent
+  # calls reaches the same workspace. It has no session to parent a key to,
+  # so it mints only for sources a published template names and no CLI
+  # wrapper covers, and minting adds a key rather than replacing one.
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: An agent minting a template source through MCP adds a key
+    Given a published template names source type "claude_cowork"
+    And jane already holds a personal ingestion key for "claude_cowork"
+    When an agent mints a personal key for "claude_cowork" through the MCP tool
+    Then both tokens authorize trace writes into her personal workspace
+    And neither key is revoked by the other
+
+  @integration @ingest-api-key @revoke @personal @unimplemented
+  Scenario: An agent revokes one of the caller's keys through MCP
+    Given an agent minted a personal ingestion key through the MCP tool
+    When the agent revokes that key through MCP
+    Then the token no longer authorizes trace writes
+    And the key is gone from the caller's key list
+    And revoking it again is not an error
+
+  @unit @ingest-api-key @issue @personal
+  Scenario: The MCP mint refuses a tool the CLI wraps
+    When an agent mints a personal key for "claude_code" through the MCP tool
+    Then the request is refused with code "ingestion_key_source_not_allowed"
+    And no ingestion key is created
+
+  @unit @ingest-api-key @revoke @personal
+  Scenario: An agent revokes one of the caller's own keys through the MCP tool
+    Given jane holds a personal ingestion key
+    When an agent revokes that key by its api_key_id through the MCP tool
+    Then the key is revoked with cause "user"
+    And the tool answers that the key was revoked
+
+  @unit @ingest-api-key @revoke @personal
+  Scenario: Revoking an already revoked key through the MCP tool is not an error
+    Given jane's personal ingestion key is already revoked
+    When an agent revokes that key through the MCP tool
+    Then the tool answers that the key was revoked
+
+  @unit @ingest-api-key @revoke @personal
+  Scenario: Another person's key answers not found through the MCP tool
+    Given john holds a personal ingestion key
+    When an agent acting for jane revokes john's key through the MCP tool
+    Then the request is refused with code "ingestion_key_not_found"
+    And john's key is not revoked
+
+  # Main audits each door's mint, rotate and revoke, tagging the call surface.
+  # A CLI session's mint writes no row.
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A door's install, rotate and revoke each record main's audit row
+    When a door installs, rotates and revokes one of jane's keys
+    Then the audit log records "ingestionKey.mint", "ingestionKey.rotate" and "ingestionKey.revoke"
+    And each row carries the key id and the door's surface
+    And the mint and rotate rows carry the source type, the rotate row the revoked count
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: The web door's install, rotate and revoke audit rows carry the trpc surface
+    When jane installs, rotates and revokes a key from the web app
+    Then each operation is handed the surface "trpc"
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: The MCP door's mint and revoke audit rows carry the mcp surface
+    When an agent mints and then revokes a key through the MCP tools
+    Then the "ingestionKey.mint" and "ingestionKey.revoke" rows carry the surface "mcp"
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A failed mint audit write does not fail the mint
+    Given the audit log cannot be written
+    When a door installs a key
+    Then the minted token is still answered
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A revoke answers only once its audit row is written
+    Given the audit log cannot be written
+    When a door revokes one of jane's keys
+    Then the key is revoked
+    And the revoke is refused
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: A personal key is minted only for a tool the CLI wraps
+    Given jane holds a device session
+    When the CLI POSTs a personal mint for a source type no wrapped tool stamps
+    Then the mint is refused and no ingestion key is created under that source type
+
+  # A person can retire one of their keys, and a rotation replaces a prior
+  # key with a fresh mint: the person pastes the new token wherever the old
+  # one was.
+
+  @integration @ingest-api-key @revoke @personal
+  Scenario: A person revokes one of their own ingestion keys
+    Given jane holds two personal ingestion keys
+    When she revokes one of them
+    Then that token no longer authorizes trace writes, with cause "user"
+    And the other still does
+    And revoking it again is not an error
+
+  @integration @ingest-api-key @revoke @personal @security
+  Scenario: Revoking another person's ingestion key answers not found
+    Given ben holds a personal ingestion key in "acme"
+    When jane tries to revoke it
+    Then the request is refused with code "ingestion_key_not_found"
+    And ben's key still authorizes trace writes
+
+  @integration @ingest-api-key @rotate @personal
+  Scenario: Rotate says how many keys it revokes and which machines hold them
+    Given jane has two live "claude_cowork" keys, on "MacBook Pro" and on a machine with no label
+    When she opens the install drawer for that source on her personal ingest tile
+    Then the warning names both machines and says two keys will be revoked
+    And a key with no machine label is named "unknown device"
+    And the rotate button says how many keys it revokes
+
+  @unit @ingest-api-key @rotate
+  Scenario: A rotation that cannot kill every prior key mints nothing
+    Given a rotation over several live keys
+    When one of them cannot be revoked
+    Then every other prior key is still attempted
+    And no new key is minted
+    And the error names the keys that survived
+
+  # ---------------------------------------------------------------------------
+  # Revocation records its cause
+  # ---------------------------------------------------------------------------
+  # A device whose key died asks the platform why before it re-mints. The
+  # platform's own revocations name themselves: "session" when a person retired
+  # the login key the ingest key was parented to, "expired" when that session
+  # ran out, "offboarded" when the person's membership ended, "rotation" when a
+  # re-login or a tile rotate replaced it. Everything a person does through the
+  # API-keys page or the REST API is recorded as that person's decision, and
+  # the CLI leaves such a key dead until the person sets the device up again.
+
+  @unit @ingest-api-key
+  Scenario: A revoke from the API keys page records a person as its cause
+    Given jane revokes one of her keys from the API keys page
+    When the row is written
+    Then its revocation cause is "user"
+
+  @unit @ingest-api-key @session
+  Scenario: A re-login names rotation as the cause of the login key it replaces
+    Given a device that signs in again under the same label
+    When the previous login key is revoked
+    Then its revocation cause is "rotation"
+    And the ingest keys under it name "rotation" too
+    # A re-login leaves a live session behind it, so the cause has to say the
+    # keys may be re-minted. "session" would read as a person's decision to an
+    # older CLI and leave the device quiet.
+
+  @integration @ingest-api-key @issue @personal
+  Scenario: The CLI can ask what became of its own key
+    Given jane's device minted a personal key and a person then revoked it
+    When the CLI asks the platform about that key's lookup id
+    Then the answer is revoked, with "user" as the cause
+    And a key retired with its session answers with "session"
+    And a key that is still live answers live
+    And a lookup id that names none of jane's keys answers unknown
+
+  # A person's revoke and a session cascade can land on one key at the same
+  # moment. The cause is what the CLI reads to decide whether it may mint a
+  # replacement, so the first revocation keeps it: a "session" written over
+  # a "user" would let a device mint its way past the decision made on the
+  # API-keys page.
+
+  @integration @ingest-api-key @issue @personal
+  Scenario: The first revocation decides the recorded cause
+    Given a personal key a person revoked
+    When a session cascade, which read the key live, lands after it
+    Then the key still names "user" as the cause
 
   # ---------------------------------------------------------------------------
   # Ingest-only RBAC — the genuinely-write-only guarantee
@@ -214,7 +551,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Given organization "acme" has a team project "shared-app"
     And the caller has aiTools:manage on "acme"
     When an ingestion key is issued for "shared-app" with sourceType "claude_code"
-    Then an ApiKey(keyType="ingest") is created bound to "shared-app" with the Ingest Only role
+    Then an ApiKey with ingestSourceType set is created bound to "shared-app" with the Ingest Only role
     And it authorizes OTLP writes into "shared-app" and nothing else
     # Same primitive, same ingest-only role; not a personal-only concept.
 
@@ -242,3 +579,57 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Then the key's `lastUsedAt` reflects the most recent trace timestamp
     But NO audit rows are emitted per trace
     And only the issue / rotate / revoke state-changes emit audit rows
+
+  # ---------------------------------------------------------------------------
+  # Pull-source key suppression — #7616
+  # ---------------------------------------------------------------------------
+  # Pull-mode and S3-mode sources authenticate outbound (workspace tokens,
+  # client secrets, S3 credentials stored in parserConfig). They never
+  # receive inbound OTLP pushes, so the `lw_is_*` ingest secret is dead
+  # weight: generated, hashed, stored, shown to the admin, never used.
+  #
+  # The `ingestSecretHash` column is non-nullable (String, not String?),
+  # so the suppression stores an empty-string sentinel rather than NULL.
+  # `findByIngestSecret` hashes inbound tokens before matching, so ""
+  # can never collide with a real hash — the sentinel is inert.
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating a pull-mode source does not generate an ingest secret
+    When jane creates an ingestion source with sourceType "copilot_studio_dataverse"
+    Then the IngestionSource row has `ingestSecretHash` = "" (empty sentinel)
+    And the create response carries `ingestSecret` = null
+    And no secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating an S3-mode source does not generate an ingest secret
+    When jane creates an ingestion source with sourceType "openai_compliance"
+    Then the IngestionSource row has `ingestSecretHash` = "" (empty sentinel)
+    And the create response carries `ingestSecret` = null
+    And no secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating an s3_custom source generates a secret for webhook callback
+    When jane creates an ingestion source with sourceType "s3_custom"
+    Then the IngestionSource row has a real `ingestSecretHash` (non-empty)
+    And the create response carries `ingestSecret` with a valid `lw_is_` prefix
+    And the secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating a push-mode source still generates an ingest secret
+    When jane creates an ingestion source with sourceType "claude_code"
+    Then the IngestionSource row has a real `ingestSecretHash` (non-empty)
+    And the create response carries `ingestSecret` with a valid `lw_is_` prefix
+    And the secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @rotation-guard
+  Scenario: Rotating a pull-mode source's secret is refused
+    Given jane has a pull-mode source with sourceType "databricks_genie"
+    When jane requests a secret rotation for that source
+    Then the rotation is refused with a validation error
+    And the source's ingestSecretHash remains "" (empty sentinel)
+
+  @bdd @ingest-api-key @pull-source @rotation-guard
+  Scenario: Rotating a push-mode source's secret still works
+    Given jane has a push-mode source with sourceType "otel_generic"
+    When jane requests a secret rotation for that source
+    Then a new secret is minted and the prior hash enters the grace window

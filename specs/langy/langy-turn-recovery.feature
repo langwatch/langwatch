@@ -34,6 +34,14 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And Langy gives up to an error card once its attempts are exhausted
 
   @unit
+  Scenario: An unreachable agent is retried with a countdown, not an error
+    Given Langy's agent cannot be reached
+    When the turn fails because Langy is unavailable
+    Then the user does not see a red error card
+    And Langy shows a quiet line saying it is unavailable and counting down to the retry
+    And Langy gives up to an error card once its attempts are exhausted
+
+  @unit
   Scenario: A lost session is terminal and is never retried
     Given Langy lost the session backing this conversation
     When the turn fails
@@ -273,6 +281,17 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then the conversation holds exactly one copy of the user's message
     And the retried turn runs against the message already on record
 
+  # The retried turn continues the same agent session, so the plan the failed
+  # turn wrote and the calls it ran are still the context it works in. The
+  # retry used to drop the failed reply from the panel, and the plan card went
+  # with it.
+  @unit
+  Scenario: Trying again keeps the plan the failed turn wrote
+    Given a Langy turn wrote a plan and then failed
+    When the user tries again from the error card
+    Then the failed reply stays on screen with its plan
+    And the retried turn's answer appears below it
+
   # ---------------------------------------------------------------------------
   # The control plane must never fail a turn that already finished
   # ---------------------------------------------------------------------------
@@ -294,6 +313,58 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When the liveness timer fires
     Then it does not touch the newer turn and does not fail the old one
 
+  # The heartbeat is refreshed only by a frame the worker posts to the control
+  # plane, and the key it writes lives ten seconds. A loaded host can swallow
+  # that much worker-to-app traffic without anything being wrong, so a lapsed
+  # heartbeat on its own says nothing about whether the worker is running. What
+  # the turn is still DOING says it. The record kept for reviving a turn ages
+  # out well before a long turn ends, so its absence is routine on a long turn:
+  # a five-minute answer plus one missed heartbeat window must never be
+  # reported to the user as a worker that stopped while the worker is
+  # mid-answer.
+  @unit
+  Scenario: A turn still doing work is not failed because its heartbeat lapsed
+    Given a turn whose heartbeat has lapsed but which is still recording activity
+    And nothing on hand to revive that turn with
+    When the liveness timer fires
+    Then the turn is left running and the check is armed again
+    And the turn is not failed and not re-dispatched
+
+  @unit
+  Scenario: A turn that really stalled with nothing to revive it is failed
+    Given a turn whose heartbeat has lapsed and which has recorded no activity for longer than the stall window
+    And nothing on hand to revive that turn with
+    When the liveness timer fires
+    Then the turn fails as a worker that stopped
+    And no re-dispatch is attempted
+
+  # The record kept for reviving a turn was given its lifetime once, when the
+  # turn was dispatched, and nothing extended it. So a turn that ran longer than
+  # that lifetime lost the record while the worker was still working, and there
+  # was nothing to revive it with for the rest of the answer. The heartbeat is
+  # already the proof that the worker is alive, so it is what extends the
+  # record. It extends the lifetime only, because a heartbeat says the worker is
+  # alive, not that anything about the turn's resume inputs changed.
+  @unit
+  Scenario: A heartbeat keeps the turn's revival record alive
+    Given a turn that has been running for longer than the revival record lives
+    When the worker posts a heartbeat
+    Then the revival record is given its full lifetime again
+    And the record itself is not rewritten
+
+  @unit
+  Scenario: A revival record that already aged out is not recreated
+    Given a turn whose revival record has already expired
+    When the worker posts a heartbeat
+    Then nothing is written back, and the heartbeat still counts as liveness
+
+  @unit
+  Scenario: A heartbeat still counts when the revival record cannot be reached
+    Given the store holding revival records refuses the request
+    When the worker posts a heartbeat
+    Then the turn is still marked as alive
+    And the frame is not rejected
+
   @unit
   Scenario: A late failure never overwrites a completed answer
     Given a turn completed and the conversation is idle
@@ -307,6 +378,34 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When both try to terminate the same turn
     Then only the first terminal is recorded
     And the second is collapsed as a duplicate, like a tool call's terminals
+
+  # The coding agent runs with its own retry off, so the relay is what retries
+  # a burst rate limit: it re-sends the call a bounded number of times inside
+  # the same call, waiting what the provider's Retry-After names, or a short
+  # fixed backoff when it names nothing. Only then does the 429 reach the
+  # agent, and the cut rules below apply to it.
+
+  @unit
+  Scenario: A rate-limited call is re-sent by the relay after the provider's Retry-After
+    Given the model provider answers a relayed call with a burst rate limit and a Retry-After
+    When the relay reads the answer
+    Then it waits the Retry-After, or a short fixed backoff when none is named, and sends the same call again
+    And a call that lands on the re-send answers the agent as if nothing happened
+    And at most two re-sends are made inside one call
+
+  @unit
+  Scenario: A rate limit that outlasts the relay's retries passes through
+    Given the model provider keeps rate-limiting a relayed call through the relay's re-sends
+    When the re-sends are spent
+    Then the 429 reaches the agent with its headers and body unchanged
+    And the captured cause names the rate limit
+
+  @unit
+  Scenario: A hard limit, a long Retry-After or a body too large to hold is not re-sent
+    Given the model provider rejects a relayed call with a rate limit that names a plan limit, asks for a wait past the relay's bound, or the call's body is past the size the relay holds
+    When the relay reads the answer
+    Then it does not wait and does not re-send
+    And the answer passes through at once
 
   # A provider rate limit is retryable by every SDK's book, and for a burst
   # (tokens-per-minute) that is right: back off a little and the call lands.
@@ -361,6 +460,27 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When a later relayed call streams to completion without an error event
     Then the capture is cleared and later calls pass through untouched
 
+  # A gateway can forward an upstream rejection as a 200 whose Content-Type
+  # says event-stream but whose body is ONE bare JSON error object (seen live:
+  # Anthropic rejecting a parameter, and a spent credit balance). Passed on as
+  # a 200, the SDK read a stream that ended without a stop reason and retried
+  # a deterministic refusal five times.
+  @unit
+  Scenario: A bare JSON error body under a stream content type is captured as the cause
+    Given the model provider rejects a relayed call
+    And the gateway forwards the rejection as a 200 stream whose body is one bare JSON error object
+    When the relay answers the agent's SDK
+    Then the SDK receives the same body with the status the error type stands for, 400 for an invalid request
+    And the rejection's reason code is captured as the turn's LLM cause
+    And the provider's own prose stays out of the capture
+
+  @unit
+  Scenario: A bare JSON error that is transient keeps its retries
+    Given the gateway forwards an overloaded or rate-limited provider as a 200 stream of one bare JSON error object
+    When the relay answers the agent's SDK
+    Then the SDK receives the provider's own retryable status for it
+    And a healthy stream is passed through untouched
+
   # The turn stream's terminal error entry shares its `type: "error"`
   # discriminant with the SSE transport's own protocol failure frame. The
   # transport once claimed every such frame for itself, so the one entry that
@@ -381,3 +501,53 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Given the live connection drops before Langy can say what went wrong
     When the turn's failure is already on the conversation's record
     Then the user sees the card naming that recorded failure, not a generic apology
+
+  # A broken stream is not a failed turn. On a flaky link the worker's relay
+  # reconnects and the answer then arrives in bursts; every streamed piece was
+  # one synchronous re-render, so a burst nested past React's update limit,
+  # which threw inside the stream and showed the generic card under an answer
+  # that went on to complete. The card is for turns that failed, nothing else.
+  @integration
+  Scenario: A burst of streamed text does not fail the turn
+    Given Langy is streaming an answer
+    When many pieces of the answer arrive at once, as they do after a connection catches up
+    Then the whole answer shows
+    And no error card appears
+
+  @unit
+  Scenario: An error the turn outlived clears itself
+    Given the stream broke while Langy was answering and an error card is showing
+    When the conversation's record shows that turn completed and the transcript carries its answer
+    Then the error card goes
+    And the recorded answer replaces the cut-off one
+
+  @unit
+  Scenario: A turn that really failed keeps its error card
+    Given the stream broke while Langy was answering and an error card is showing
+    When the conversation's record shows that turn failed
+    Then the error card stays
+
+  @unit
+  Scenario: The previous turn's completion never clears an error about a new message
+    Given the last turn had already completed when a new message failed to send
+    When the record still shows that last turn completed
+    Then the error card about the new message stays
+
+  @unit
+  Scenario: A deployment with no Langy agent says so instead of an unexpected error
+    Given the api runs without a Langy agent and refuses the turn with langy_agent_not_configured
+    When the refusal reaches the panel, with or without its tRPC envelope
+    Then the card reads "Langy isn't set up on this deployment" and says how to enable the agent
+    And it offers no "Try again", since a retry is refused the same way
+
+  @unit
+  Scenario: Refusals that answer the same way every time offer no retry
+    Given a turn refused with langy_not_enabled, langy_skill_not_available or langy_dispatch_rejected
+    Then the card shows that code's registered copy and no "Try again" action
+
+  @unit
+  Scenario: A bare failure code still reads the reasons on the durable record
+    Given a turn failed and its typed failure is on the durable record
+    When the live error carries only the code langy_agent_errored
+    Then the card is chosen from the durable record's reasons
+    But a turn-start refusal with a different code is shown ahead of an older durable failure

@@ -1,9 +1,4 @@
-/**
- * Types for the Evaluations API (Online Evaluations / Guardrails)
- *
- * These types define the structure for running evaluators and guardrails
- * in real-time against LLM inputs/outputs.
- */
+/** Types for the Evaluations API: running evaluators/guardrails in real time against LLM I/O. */
 
 /**
  * Status of an evaluation result

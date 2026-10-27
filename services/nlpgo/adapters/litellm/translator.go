@@ -22,7 +22,7 @@ type InlineCredentials struct {
 	Gemini    map[string]string `json:"gemini,omitempty"`
 	Custom    map[string]string `json:"custom,omitempty"`
 	// Generic holds credentials for plain api-key providers (xai, groq,
-	// cerebras, deepseek) that need no provider-specific fields;
+	// cerebras, deepseek, doubleword) that need no provider-specific fields;
 	// Provider disambiguates which one. Dedicated slots exist only
 	// where the shapes genuinely differ (azure, bedrock, vertex).
 	Generic map[string]string `json:"generic,omitempty"`
@@ -46,7 +46,7 @@ func (ic InlineCredentials) Encode() (string, error) {
 // shape, dispatching by `provider` (parsed from the model id by the caller).
 //
 // Unknown fields in `params` are ignored — the source-of-truth fields are
-// dictated by platform/app/src/server/api/routers/modelProviders.utils.ts:225
+// dictated by modules/model-provider/process/src/adapters/legacy-model-provider.adapter.ts:225
 // (prepareLitellmParams). Adding a new field there means adding it here.
 func FromLiteLLMParams(provider string, params map[string]any) (InlineCredentials, error) {
 	switch provider {
@@ -74,14 +74,14 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 			Bedrock: pickStrings(params,
 				"aws_access_key_id", "aws_secret_access_key",
 				"aws_session_token", "aws_region_name",
-				"aws_bedrock_runtime_endpoint",
+				"aws_bedrock_runtime_endpoint", "api_base",
 			),
 		}, nil
 	case "vertex_ai", "vertex":
 		return InlineCredentials{
 			Provider: "vertex_ai",
 			VertexAI: pickStrings(params,
-				"vertex_credentials", "vertex_project", "vertex_location",
+				"vertex_credentials", "vertex_project", "vertex_location", "api_base",
 			),
 		}, nil
 	case "gemini":
@@ -91,9 +91,9 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 		// credential is an AI Studio key for the Gemini API.
 		return InlineCredentials{
 			Provider: "gemini",
-			Gemini:   pickStrings(params, "api_key", "project_id", "region"),
+			Gemini:   pickStrings(params, "api_key", "project_id", "region", "api_base"),
 		}, nil
-	case "xai", "groq", "cerebras", "deepseek":
+	case "xai", "groq", "cerebras", "deepseek", "doubleword":
 		return InlineCredentials{
 			Provider: provider,
 			Generic:  pickStrings(params, "api_key", "api_base"),

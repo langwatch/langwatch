@@ -4,6 +4,9 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
   So that one image serves assets same-origin for self-host and from a
   commit-prefixed CDN for SaaS, and a rolling deploy never strands a tab on a 404
 
+  # ADR-111 moves the UI build and static server into separate application
+  # workspaces without changing this runtime asset-delivery contract.
+
   # Background: Vite hashes asset filenames per build and, before this change,
   # baked an absolute base ("/") into every chunk URL at build time. During a
   # rolling deploy two builds serve behind one Service, so a tab that fetched the
@@ -52,7 +55,7 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
       And dist/client/index.html references /assets/index-deadbeef.js
       When a client requests /
       Then the response body references https://cdn.langwatch.ai/abc123/assets/index-deadbeef.js
-      And the resolver returns "https://cdn.langwatch.ai/abc123/assets/x.js" for the path "assets/x.js"
+      And the preload and stylesheet links under /assets/ are rewritten the same way
 
     @unit
     Scenario: Same-origin rewriting is a no-op for the entry references
@@ -84,3 +87,26 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
       And style-src includes https://cdn.langwatch.ai
       And font-src includes https://cdn.langwatch.ai
       And connect-src includes https://cdn.langwatch.ai
+
+  Rule: The ECR publish workflow uploads each image's assets to the CDN bucket
+
+    # Workflow YAML has no test harness; first verified on the merge to main.
+    @unimplemented
+    Scenario: A published langwatch-app image has its assets on the CDN before consumers pin it
+      Given FRONTEND_ASSETS_BUCKET names the CDN bucket
+      When publish-docker-ecr builds langwatch-app for the tag "git-abc123"
+      Then dist/client/assets is synced to s3://<bucket>/git-abc123/assets/ with an immutable Cache-Control
+      And sourcemaps are not uploaded
+      And the zero-byte object git-abc123/.complete is written only after the sync finished
+
+    @unimplemented
+    Scenario: A tag whose .complete marker exists is not uploaded again
+      Given s3://<bucket>/git-abc123/.complete exists
+      When publish-docker-ecr runs again for the tag "git-abc123"
+      Then no assets are exported or uploaded
+
+    @unimplemented
+    Scenario: Without a bucket variable the upload is skipped with a notice
+      Given FRONTEND_ASSETS_BUCKET is empty
+      When publish-docker-ecr builds langwatch-app
+      Then the run reports a notice and the image is still published

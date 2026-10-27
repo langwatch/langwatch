@@ -15,3 +15,9 @@ Feature: Python SDK example test input
     Given an example calls a model provider
     When the provider reports exhausted quota
     Then the harness classifies it as an external service issue
+
+  @unit
+  Scenario: Gateway budget limits are classified as external service issues
+    Given an example calls a model through the AI Gateway
+    When the gateway reports that the spending limit is reached
+    Then the harness classifies it as an external service issue

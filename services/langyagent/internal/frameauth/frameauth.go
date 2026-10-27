@@ -51,7 +51,7 @@ type Signed struct {
 	// FrameNonce is 16 random bytes, hex — unique per frame; the relay dedups on it.
 	FrameNonce string `json:"frameNonce"`
 	// Payload is the exact string that is signed and transmitted verbatim; the
-	// relay re-signs THESE bytes (it must not re-serialise before checking).
+	// relay re-signs THESE bytes (it must not re-serialize before checking).
 	Payload string `json:"payload"`
 }
 

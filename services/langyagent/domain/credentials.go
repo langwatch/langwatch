@@ -38,9 +38,9 @@ type Credentials struct {
 	// it was given, and the worst a compromised manager can do with this handle is
 	// destroy its own access.
 	LangwatchAPIKeyID string `json:"langwatchApiKeyId,omitempty"`
-	LLMVirtualKey     string `json:"llmVirtualKey" validate:"required"`
-	GatewayBaseURL    string `json:"gatewayBaseUrl" validate:"required"`
-	LangwatchEndpoint string `json:"langwatchEndpoint" validate:"required"`
+	LLMVirtualKey     string `json:"llmVirtualKey"               validate:"required"`
+	GatewayBaseURL    string `json:"gatewayBaseUrl"              validate:"required"`
+	LangwatchEndpoint string `json:"langwatchEndpoint"           validate:"required"`
 	Model             string `json:"model,omitempty"`
 	GithubToken       string `json:"githubToken,omitempty"`
 	GithubLogin       string `json:"githubLogin,omitempty"`
@@ -70,11 +70,18 @@ type Credentials struct {
 	// turns under a stale one. Empty ⇒ skip (fail-safe: an unset policy mirrors
 	// nothing).
 	MirrorTier string `json:"mirrorTier,omitempty"`
+	// DisabledSkillIds are the skill ids the control plane has flag-gated off
+	// for this project/user, resolved once over the full skill catalog by
+	// langy-turn.service.ts. Folded into the worker signature (see
+	// SignatureOf) so a flag flip recycles the worker rather than reusing one
+	// still hiding (or still offering) the wrong set. Threaded to the
+	// pi adapter, which denies the model access to these skills.
+	DisabledSkillIds []string `json:"disabledSkillIds,omitempty"`
 }
 
 // MirrorTier is the fidelity of the ADR-061 mirror copy, resolved per
 // organization by the control plane and threaded through the credentials
-// envelope. A closed vocabulary; anything unrecognised normalises to skip.
+// envelope. A closed vocabulary; anything unrecognized normalises to skip.
 type MirrorTier string
 
 const (
@@ -88,7 +95,7 @@ const (
 )
 
 // NormalizeMirrorTier maps an envelope value to a known tier. An empty or
-// unrecognised value normalises to skip — fail-safe: a version skew (a manager
+// unrecognized value normalises to skip, fail-safe: a version skew (a manager
 // with a mirror configured but a control plane not yet sending the tier) never
 // leaks a turn LangWatch was not told it could see.
 func NormalizeMirrorTier(v string) MirrorTier {
@@ -151,6 +158,12 @@ type CredentialSignature struct {
 	// worker so the relay re-registers with the new tier, rather than mirroring
 	// a live worker's remaining turns under the policy it booted with.
 	MirrorTier string
+	// DisabledSkillIds is a canonical fingerprint (sorted + newline-joined,
+	// via canonicalStrings) of the flag-gated-off skill ids for this
+	// project/user. Folded in for the same reason as EgressAllowlist: a flag
+	// flip changes what the worker must hide, so it must recycle rather than
+	// keep running under the set it booted with.
+	DisabledSkillIds string
 }
 
 // SignatureOf derives the comparable signature from the parts that must match for
@@ -160,7 +173,7 @@ type CredentialSignature struct {
 // canonicalisation lives in ONE place and the two can never compute subtly
 // different signatures. capabilityKeys carries only capability PRESENCE, never a
 // secret, which is why the probe can supply it from a boolean.
-func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys []string, mirrorTier string) CredentialSignature {
+func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys, disabledSkillIds []string, mirrorTier string) CredentialSignature {
 	return CredentialSignature{
 		ProjectID:       projectID,
 		ActorUserID:     actorUserID,
@@ -171,6 +184,9 @@ func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabili
 		// explicit "skip" produce the SAME signature — they mean the same thing
 		// (no mirror), and must not spuriously recycle a worker between them.
 		MirrorTier: string(NormalizeMirrorTier(mirrorTier)),
+		// A flag flip changes DisabledSkillIds' canonical fingerprint, which
+		// recycles the worker the same way an EgressAllowlist edit does.
+		DisabledSkillIds: canonicalStrings(disabledSkillIds),
 	}
 }
 
@@ -196,7 +212,7 @@ var hostPatternPattern = regexp.MustCompile(`^(\*\.)?([a-z0-9-]+\.)*[a-z0-9-]+$`
 // case-insensitive fingerprint so semantically-equal lists (reordered, mixed
 // case, trailing dots) do not spuriously recycle the worker, while any real
 // membership change does. Entries that are not clean host patterns are DROPPED
-// (defence in depth): the control plane already Zod-validates on write, so this
+// (defense in depth): the control plane already Zod-validates on write, so this
 // only fires on a drifted or hostile envelope — but the manager still refuses to
 // fold a URL, an authority with a port/userinfo, or a path-traversal like
 // "../../etc" into an allow rule. Kept in step with the Go matcher's

@@ -62,13 +62,13 @@ class MonitorsFacade:
 
     def list(self) -> List[Dict[str, Any]]:
         """List all monitors for the project."""
-        response = self._http().get("/api/monitors")
+        response = self._http().get("/api/v1/monitors")
         _raise_for_status(response, operation="list")
         return response.json()
 
     def get(self, monitor_id: str) -> Dict[str, Any]:
         """Get a monitor by ID."""
-        response = self._http().get(f"/api/monitors/{_quote(monitor_id)}")
+        response = self._http().get(f"/api/v1/monitors/{_quote(monitor_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -89,7 +89,7 @@ class MonitorsFacade:
             "sample": sample,
             **kwargs,
         }
-        response = self._http().post("/api/monitors", json=body)
+        response = self._http().post("/api/v1/monitors", json=body)
         _raise_for_status(response, operation="create")
         return response.json()
 
@@ -101,14 +101,14 @@ class MonitorsFacade:
     ) -> Dict[str, Any]:
         """Update a monitor."""
         body = params or {}
-        response = self._http().patch(f"/api/monitors/{_quote(monitor_id)}", json=body)
+        response = self._http().patch(f"/api/v1/monitors/{_quote(monitor_id)}", json=body)
         _raise_for_status(response, operation="update")
         return response.json()
 
     def toggle(self, monitor_id: str, *, enabled: bool) -> Dict[str, Any]:
         """Enable or disable a monitor."""
         response = self._http().post(
-            f"/api/monitors/{_quote(monitor_id)}/toggle",
+            f"/api/v1/monitors/{_quote(monitor_id)}/toggle",
             json={"enabled": enabled},
         )
         _raise_for_status(response, operation="toggle")
@@ -116,6 +116,6 @@ class MonitorsFacade:
 
     def delete(self, monitor_id: str) -> Dict[str, Any]:
         """Delete a monitor."""
-        response = self._http().delete(f"/api/monitors/{_quote(monitor_id)}")
+        response = self._http().delete(f"/api/v1/monitors/{_quote(monitor_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()

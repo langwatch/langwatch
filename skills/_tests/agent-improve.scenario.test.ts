@@ -1,18 +1,18 @@
-import scenario from "@langwatch/scenario";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
-} from "./helpers/claude-code-adapter";
+} from "./helpers/claude-code-adapter.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,9 +26,7 @@ describe("Agent Improvement Skill", () => {
   it.skipIf(isCI)(
     "proposes evidence-backed hypotheses and explains them before building anything",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-agent-improve-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-agent-improve-"));
 
       // A sample agent codebase gives the proposals something concrete to
       // change: system prompt, tool definitions, and an obvious improvement
@@ -67,16 +65,13 @@ describe("Agent Improvement Skill", () => {
           scenario.user("what should I do next to improve my agent?"),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "agent-improve");
           },
           scenario.user(
-            "the first hypothesis makes sense to me, go ahead and set it up as you proposed. Keep it minimal: create the artifact and show it to me, no need to run the app or install anything heavy"
+            "the first hypothesis makes sense to me, go ahead and set it up as you proposed. Keep it minimal: create the artifact and show it to me, no need to run the app or install anything heavy",
           ),
           scenario.agent(),
-          (state) => {
-            toolCallFix(state);
-          },
+          () => {},
           scenario.judge(),
         ],
       });
@@ -85,6 +80,6 @@ describe("Agent Improvement Skill", () => {
     },
     // Two full agent turns: evidence sweep + hypothesis execution. Each turn
     // is a long autonomous run, so this needs more than the single-turn 15m.
-    1_800_000
+    1_800_000,
   );
 });

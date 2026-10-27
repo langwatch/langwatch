@@ -1,0 +1,113 @@
+Feature: Pending counter conservation across job lifecycle
+  As an operator monitoring the ops dashboard
+  I want the total-pending counter to accurately reflect jobs in :jobs ZSETs
+  So that the dashboard shows real queue depth, not phantom drift.
+
+  # Why this exists — incident 2026-05-21
+  #
+  # The total-pending counter drifted to 827K (real pending was ~1,300).
+  # Root cause: COMPLETE_LUA only DECRs the counter when the activeKey
+  # matches the stagedJobId. When the activeKey expires before the worker
+  # calls COMPLETE, the DECR is silently skipped. The INCR at stage time
+  # has no compensating DECR, so the counter only ever goes up.
+  #
+  # Fix: move DECR to DISPATCH (job leaves :jobs ZSET — always succeeds)
+  # and add compensating INCRs in RETRY_RESTAGE and RESTAGE_AND_BLOCK
+  # (job re-enters :jobs ZSET). COMPLETE no longer touches the counter.
+
+  Background:
+    Given the GroupQueue is running with Lua scripts deployed
+
+  @integration @counter @lifecycle
+  Scenario: Counter tracks jobs in :jobs ZSETs through happy path
+    Given a staged job for tenant "proj_acme" (INCR at stage)
+    When DISPATCH removes the job from :jobs
+    Then the counter is decremented (DECR at dispatch)
+    When COMPLETE runs successfully
+    Then the counter is unchanged (no DECR in COMPLETE)
+
+  @integration @counter @active-expiry
+  Scenario: Counter stays accurate when activeKey expires before COMPLETE
+    Given a staged job for tenant "proj_acme" (INCR at stage)
+    When DISPATCH removes the job from :jobs (DECR at dispatch)
+    And the activeKey expires before the worker completes
+    And COMPLETE returns 0 (stale active key)
+    Then the counter is still accurate (DECR already happened at dispatch)
+
+  @integration @counter @retry
+  Scenario: Counter tracks retry restage as a new pending job
+    Given a dispatched job (counter was decremented at dispatch)
+    When RETRY_RESTAGE re-stages the job with a future score
+    Then the counter is incremented (job re-enters :jobs ZSET)
+    When DISPATCH picks up the retried job
+    Then the counter is decremented again
+
+  @integration @counter @block
+  Scenario: Counter tracks restage-and-block as a new pending job
+    Given a dispatched job (counter was decremented at dispatch)
+    When RESTAGE_AND_BLOCK re-stages the job and blocks the group
+    Then the counter is incremented (job re-enters :jobs ZSET)
+
+  @integration @counter @redelivery
+  Scenario: Counter is conserved when the same staged-job id is re-sent
+    Given a staged job whose id derives from the event id (INCR at stage)
+    When at-least-once delivery re-sends the same event and it stages again
+    Then the :jobs ZSET still holds one member for that id
+    And the counter is not incremented a second time
+
+  @integration @counter @invariant
+  Scenario: Counter equals sum of all :jobs ZSET cardinalities
+    Given multiple tenants with staged, dispatched, and retried jobs
+    When the system reaches a quiescent state
+    Then total-pending equals the sum of ZCARD across all group :jobs ZSETs
+
+  @integration @counter @coalescing
+  Scenario: Draining siblings for coalescing decrements pending per job
+    Given a group with several staged jobs (INCR at stage)
+    When the coalescing path drains some of them in one call
+    Then the counter is decremented once per drained job (same as dispatch)
+
+  # The ops reconcile counts jobs by asking this index which groups to look at,
+  # so a staged job that never reached it would be invisible to the count.
+  @integration
+  Scenario: Staging a job records its group as holding pending work
+    Given a queue whose processor has not finished its first job
+    When further jobs are staged for the same group
+    Then the group is recorded as holding pending work
+
+  # An operator's whole-group dead-letter move and its replay change live jobs
+  # too, so they adjust the counter in the same script that moves the jobs. Only
+  # live zset members count: a dead worker's claimed job was taken off at claim,
+  # and a replayed job id the live group already holds keeps its stored score.
+  @integration @counter @dead-letter
+  Scenario: Moving a group to the dead-letter queue takes its live jobs off the counter
+    Given a group holding three staged jobs
+    When an operator moves the group to the dead-letter queue
+    Then the counter is decremented by three
+
+  @integration @counter @dead-letter
+  Scenario: A dead worker's claimed job moves to the dead-letter queue without being subtracted twice
+    Given a group whose worker died holding one claimed job, with two jobs still staged
+    When an operator moves the group to the dead-letter queue
+    Then all three jobs are dead-lettered
+    And the counter is decremented by two
+
+  @integration @counter @dead-letter
+  Scenario: Replaying a dead-lettered group adds only new live jobs to the counter
+    Given a dead-lettered group whose live group already holds one of its job ids
+    When an operator replays the group
+    Then the counter is incremented only for the job that was not already live
+    And the live copy keeps its stored score and value
+
+  @integration @counter @dead-letter
+  Scenario: Repeating a dead-letter move or replay changes the counter only once
+    Given a group an operator has moved to the dead-letter queue
+    When the move is repeated, or the replay is repeated after it
+    Then the repeat leaves the counter unchanged
+
+  @integration @counter @dead-letter
+  Scenario: The counter equals the live jobs through repeated dead-letter moves, replays and a worker death
+    Given a group moved to the dead-letter queue and replayed
+    And its worker dies holding a claimed job
+    When the operator moves and replays it again
+    Then total-pending equals the sum of ZCARD across the live groups after every step

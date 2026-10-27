@@ -9,7 +9,7 @@ Feature: Workflow Management UI
   # `CascadeArchiveDialog.test.tsx` covers a different surface).
   # The behavioral piece (delete mutation success/failure) is covered
   # by the Workflow REST API tests in
-  # `platform/app/src/app/api/workflows/__tests__/`.
+  # `[gone] src/app/api/workflows/__tests__/`.
 
   Background:
     Given I am authenticated as a project member
@@ -84,3 +84,13 @@ Feature: Workflow Management UI
     Then no error toast is shown
     And the description falls back to "autosaved" or stays empty for manual input
     And the commit proceeds normally
+
+  # ============================================================================
+  # Creating a workflow
+  # ============================================================================
+
+  @integration
+  Scenario: The create dialog's submit button says what it creates
+    Given I am on the workflows page
+    When I open the create dialog and choose the blank template
+    Then the submit button reads "Create workflow"

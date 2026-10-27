@@ -1,0 +1,138 @@
+---
+title: "Overview"
+description: "Grant a built-in or custom role to a user, a group or an API key at the organization, a team or a project. Grants replace role bindings."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP
+  402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise
+  license for the same endpoints. To enable it, reach out to
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+A grant is one sentence: **this principal holds this role, here**. A [role](/api-reference/roles/overview) is what you may do; a grant is who holds it, and where. The Grants API succeeds the [Role Bindings API](/api-reference/role-bindings/overview) and reads and writes the same records, so a binding made through either one shows up in both.
+
+For the concepts behind it, including who may grant what, read [Roles & access](/platform/roles-and-access).
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method   | Path                        | Description                                          |
+| -------- | --------------------------- | ---------------------------------------------------- |
+| `GET`    | `/api/v1/grants`            | List grants, one page at a time                      |
+| `POST`   | `/api/v1/grants`            | Grant one role to one principal at one scope         |
+| `GET`    | `/api/v1/grants/{grantId}`  | Read one grant                                       |
+| `PATCH`  | `/api/v1/grants/{grantId}`  | Change the role a grant carries                      |
+| `DELETE` | `/api/v1/grants/{grantId}`  | Revoke a grant                                       |
+
+## The grant
+
+```json
+{
+  "id": "grant_abc123",
+  "principal": { "type": "user", "id": "user_abc123", "name": "Ada Lovelace" },
+  "role": { "id": "member", "name": "Member", "builtIn": true },
+  "scope": { "type": "team", "id": "team_abc123", "name": "Platform" },
+  "status": "active",
+  "expiresAt": null,
+  "createdAt": "2026-09-30T10:00:00.000Z"
+}
+```
+
+| Field       | Values                                                                                                   |
+| ----------- | -------------------------------------------------------------------------------------------------------- |
+| `principal` | `type` is `user`, `group` or `apiKey`                                                                    |
+| `role`      | `id` is `admin`, `member` or `viewer` for a built-in role, or a custom role's id                         |
+| `scope`     | `type` is `organization`, `team` or `project`                                                            |
+| `status`    | `active`, or `expired` once `expiresAt` has passed. An expired grant gives no access                    |
+| `expiresAt` | When the grant stops granting, or `null` when it never does                                              |
+
+## Creating a grant
+
+```bash
+curl -X POST https://app.langwatch.ai/api/v1/grants \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: onboard-group-abc123" \
+  -d '{
+    "principal": { "type": "group", "id": "group_abc123" },
+    "roleId": "member",
+    "scope": { "type": "team", "id": "team_abc123" }
+  }'
+```
+
+The answer is 201 with the grant. `expiresAt` is optional; when given, it must be in the future (422 `grant_expiry_in_past`).
+
+Each create makes its own grant with its own id, even when the same principal already holds the same role at the same scope. To make a create safe to retry, send an `Idempotency-Key` header: a repeat with the same key and the same body answers with the grant the first call made and does not create a second. The same key with a different body is refused with 409 `idempotency_error`.
+
+An organization holds at most 10,000 grants. One more is refused with 409 `grant_limit_reached`, and the limit is in `meta.limit`.
+
+## Changing and revoking
+
+`PATCH` takes only `{ "roleId": "..." }`. The principal and the scope are the grant's identity; to move a grant, revoke it and create another. `DELETE` answers `{ "id": "grant_abc123", "revoked": true }`.
+
+The last live administrator grant on the organization cannot be revoked or lowered: the refusals are 400 `cannot_remove_last_admin` and `cannot_demote_last_admin`.
+
+## Listing
+
+`GET /api/v1/grants` filters on `principalType` with `principalId`, `roleId`, `scopeType`, `scopeId` and `status`. An omitted `status` lists both active and expired grants.
+
+Pages are cursor based. `limit` defaults to 50 and cannot exceed 200. Every page but the last carries `nextCursor`; pass it back as `cursor` for the next page. The last page carries `null`. A cursor the API did not hand out is refused as invalid.
+
+```bash
+curl "https://app.langwatch.ai/api/v1/grants?principalType=user&principalId=user_abc123&limit=100" \
+  -H "Authorization: Bearer sk-lw-..."
+```
+
+## You cannot grant more than you hold
+
+You cannot grant a role carrying a permission you do not hold yourself at that scope. The check applies to every principal, yourself included, and to changing a grant's role as well as creating one. It is the same rule on this API, on the Role Bindings API and in the product.
+
+The caller is checked as itself. A request made with an API key is judged by that key's own permissions, never by those of the person who owns it. An expired grant does not count towards what the caller holds.
+
+The refusal is 403 `grant_exceeds_caller_permissions`, and it names what you lack:
+
+```json
+{
+  "code": "grant_exceeds_caller_permissions",
+  "message": "You cannot grant a role with permissions you do not hold yourself",
+  "meta": { "missingPermissions": ["secrets:manage"] }
+}
+```
+
+## Errors
+
+| Code                               | Status | Meaning                                                                         |
+| ---------------------------------- | ------ | ------------------------------------------------------------------------------- |
+| `grant_not_found`                  | 404    | No such grant in this organization. An id from another organization reads the same way |
+| `grant_principal_not_found`        | 422    | The user, group or API key is not in this organization                          |
+| `grant_role_not_found`             | 422    | The custom role is not in this organization                                     |
+| `grant_scope_not_found`            | 422    | The team or project is not in this organization                                 |
+| `grant_scope_not_allowed`          | 422    | The role carries organization-only permissions, and the scope is a team or project |
+| `grant_scope_personal_workspace`   | 403    | The scope is someone's personal workspace                                       |
+| `grant_expiry_in_past`             | 422    | `expiresAt` is not in the future                                                |
+| `grant_exceeds_caller_permissions` | 403    | The role carries permissions you do not hold at that scope                      |
+| `grant_limit_reached`              | 409    | The organization holds as many grants as it may                                 |
+| `idempotency_error`                | 409    | The `Idempotency-Key` was used before with a different body                     |
+| `cannot_remove_last_admin`         | 400    | The grant is the organization's last administrator                              |
+| `cannot_demote_last_admin`         | 400    | The change would leave the organization without an administrator               |
+
+## CLI
+
+```bash
+langwatch grants list --principal-type user --principal-id user_abc123
+langwatch grants create --principal-type group --principal-id group_abc123 \
+  --role member --scope-type team --scope-id team_abc123 --idempotency-key onboard-group-abc123
+langwatch grants get <grant_id>
+langwatch grants change-role <grant_id> --role viewer
+langwatch grants revoke <grant_id>
+```

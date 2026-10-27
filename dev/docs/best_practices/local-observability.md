@@ -15,7 +15,10 @@ The stack is **not a compose service**. `haven` (thuishaven — the hostname-bas
 local-dev orchestrator) owns its lifecycle. That buys three things a raw
 `docker compose up` did not:
 
-- **It runs on colima, not Docker Desktop.** The VM has an explicit, per-profile
+- **On macOS it runs natively by default; elsewhere it runs on colima.** The
+  native tier (Grafana, Prometheus, Loki, Tempo, Alloy) needs no container
+  runtime, and Pyroscope exists only on the container tier. The rest of this
+  bullet describes the container tier, which uses colima, not Docker Desktop. The VM has an explicit, per-profile
   RAM/CPU/disk ceiling, so a background telemetry stack can never take the whole
   machine. haven starts colima if it is down; a profile it creates is capped, one
   that already exists is never resized out from under you.
@@ -27,8 +30,8 @@ local-dev orchestrator) owns its lifecycle. That buys three things a raw
   **2h**) plus a Prometheus size cap and a Loki ingestion-rate cap. Deriving from
   the image rather than vendoring means an image bump keeps upstream's defaults.
 - **Every worktree wires itself up automatically.** Once the stack is up, each
-  `pnpm dev` (i.e. `haven up`) writes the OTLP endpoint into that stack's
-  `.env.portless` overlay and tags its telemetry `langwatch.worktree=<slug>`. No
+  `pnpm dev` (i.e. `haven up`) hands the OTLP endpoint to every process in that
+  stack and tags its telemetry `langwatch.worktree=<slug>`. No
   `.env` surgery, and one shared collector serves every worktree — filter Grafana
   to `langwatch.worktree="<your-slug>"` to see only your own logs, traces and
   metrics. `make observability-connect` remains for the Grafana token wiring
@@ -37,7 +40,7 @@ local-dev orchestrator) owns its lifecycle. That buys three things a raw
 ## TL;DR
 
 ```bash
-make observability            # start the capped stack on colima (OTLP :4318, Grafana :3000)
+make observability            # start the capped stack (native on macOS, colima elsewhere) (OTLP :4318, Grafana :3000)
                               #   (equivalently: haven restart obs)
 make observability-connect    # mint a Grafana token + configure gcx
 # any pnpm dev stack you start while it is up exports to it automatically,
@@ -55,21 +58,21 @@ stack health and the image actually running.
 Retention and the resource ceilings live in `haven`'s
 `domain.DefaultObservabilityLimits` (a debugging window, not an archive). The
 stack keeps **no volume**, so stopping it reclaims every byte regardless. Override the image or ports with `HAVEN_OBS_IMAGE`,
-`LW_OBS_GRAFANA_PORT`, `LW_OBS_OTLP_HTTP_PORT`; pick the colima profile with
+`LW_OBS_GRAFANA_PORT`, `LW_OBS_OTLP_HTTP_PORT`; pick the colima profile (container tier only) with
 `HAVEN_COLIMA_PROFILE`.
 
 ## What ships where
 
-| Signal   | Backend    | TS app (`platform/app/`)                | Go services (nlpgo, aigateway)                        |
-| -------- | ---------- | --------------------------------------- | ---------------------------------------------------- |
-| Traces   | Tempo      | `OTEL_EXPORTER_OTLP_ENDPOINT`           | dual-export via `OTEL_DEBUG_COLLECTOR_ENDPOINT`      |
-| Logs     | Loki       | `PINO_OTEL_ENABLED=true`                | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
-| Metrics  | Prometheus | `OTEL_METRICS_ENABLED=true` (host/runtime) | Go runtime metrics via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
-| Profiles | Pyroscope  | `PYROSCOPE_SERVER_ADDRESS`              | `PYROSCOPE_SERVER_ADDRESS`                           |
+| Signal   | Backend                         | TS applications (`apps/{ui,api,worker}`)   | Go services (nlpgo, aigateway)                         |
+| -------- | ------------------------------- | ------------------------------------------ | ------------------------------------------------------ |
+| Traces   | Tempo                           | `OTEL_EXPORTER_OTLP_ENDPOINT`              | dual-export via `OTEL_DEBUG_COLLECTOR_ENDPOINT`        |
+| Logs     | Loki                            | `PINO_OTEL_ENABLED=true`                   | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT`   |
+| Metrics  | Prometheus                      | `OTEL_METRICS_ENABLED=true` (host/runtime) | Go runtime metrics via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
+| Profiles | Pyroscope (container tier only) | `PYROSCOPE_SERVER_ADDRESS`                 | `PYROSCOPE_SERVER_ADDRESS`                             |
 
-`make observability-connect` sets all of these in `platform/app/.env` for you
+`make observability-connect` sets all of these in `.env` for you
 (backing it up first). The Go services **dual-export**: their product/customer
-traces still go to the LangWatch app (dogfooding); their *own* operational
+traces still go to the LangWatch app (dogfooding); their _own_ operational
 telemetry additionally goes to the collector. Setting
 `OTEL_DEBUG_COLLECTOR_ENDPOINT` empty (the default everywhere, prod included)
 leaves Go behavior byte-for-byte unchanged.
@@ -77,13 +80,13 @@ leaves Go behavior byte-for-byte unchanged.
 ## Continuous profiling (flame graphs)
 
 Traces say which call was slow and metrics say the process was busy. Neither
-says which *function* burned the CPU, which is why the last step of a
+says which _function_ burned the CPU, which is why the last step of a
 performance investigation used to be a guess or a laptop reproduction that never
 quite matched. Pyroscope closes that gap: every process samples itself on a timer
 and pushes the samples, so a flame graph for any window is a query.
 
-It is on whenever the stack is. haven writes `PYROSCOPE_SERVER_ADDRESS` into
-`.env.portless` while Pyroscope is listening and omits it when it is not —
+It is on whenever the stack is. haven sets `PYROSCOPE_SERVER_ADDRESS` in every
+process it starts while Pyroscope is listening and omits it when it is not —
 absence is the off switch, and it is a real one: with nowhere to push to, no
 profiler starts, and in the TS app the native `@datadog/pprof` binding never even
 enters the boot graph. Override the port with `LW_OBS_PYROSCOPE_PORT`.
@@ -97,8 +100,8 @@ structured metadata makes.
 
 **The two runtimes report different profile types, and this trips people up.**
 
-| Runtime | Profile types pushed                                    | Pick this in Grafana |
-| ------- | ------------------------------------------------------- | -------------------- |
+| Runtime | Profile types pushed                                     | Pick this in Grafana |
+| ------- | -------------------------------------------------------- | -------------------- |
 | Go      | `process_cpu:*`, `memory:*`, `goroutines`                | `process_cpu`        |
 | TS app  | `wall:wall`, `wall:cpu`, `wall:samples`, heap after ~60s | `wall:wall`          |
 
@@ -141,7 +144,7 @@ Go log lines carry standard correlation fields (matching the TS app's
 - `observed.trace_id`, `observed.span_id` — a **customer** trace the service is
   proxying/ingesting, kept distinct from its own. The AI gateway runs its own
   ops trace and stamps the customer's inbound trace as `observed.*`; nlpgo
-  *continues* the customer's Studio trace, so that id is its `trace_id`.
+  _continues_ the customer's Studio trace, so that id is its `trace_id`.
 
 The shared keys + helpers live in `pkg/clog/fields.go`
 (`WithIdentity` / `WithSpanContext` / `WithObserved`).
@@ -154,7 +157,7 @@ vars configures both:
 | Var                 | Local value | Effect                                        |
 | ------------------- | ----------- | --------------------------------------------- |
 | `LOG_CONSOLE_LEVEL` | `warn`      | console (terminal) shows only warnings/errors |
-| `LOG_OTEL_LEVEL`    | `debug`     | info + debug flow to the collector → Loki      |
+| `LOG_OTEL_LEVEL`    | `debug`     | info + debug flow to the collector → Loki     |
 
 `make observability-connect` sets these. So your terminal stays readable while
 the full firehose is queryable in Grafana. On the Go side this is a split-core
@@ -187,7 +190,7 @@ LW_OBS_GRAFANA_PORT=3100 LW_OBS_OTLP_HTTP_PORT=4319 LW_OBS_PYROSCOPE_PORT=4041 m
 
 ## Reading the data as an agent
 
-**When the stack is up, query this instead of grepping `platform/app/server.log`.**
+**When the stack is up, query this instead of grepping a dev-server log.**
 Indexed attribute search (by service, level, trace id, worktree) finds the
 failure far faster than scanning a multi-megabyte log file — and with the stack
 up the console is muted to `warn+` (haven sets `LOG_CONSOLE_LEVEL`), so the
@@ -197,13 +200,13 @@ stack is down.
 Two ways, both wired by `make observability-connect`:
 
 1. **gcx CLI** — Grafana's official CLI. `connect` runs `gcx login local
-   --server http://localhost:3000 --token <token>`. Then:
+--server http://localhost:3000 --token <token>`. Then:
 
    ```bash
    # Logs for one service, most recent first.
    gcx logs query '{service_name="langwatch-app"}' --since 15m
    # Only warnings/errors.
-   gcx logs query '{service_name="langwatch-app"} | level=~"WARN|ERROR"' --since 15m
+   gcx logs query '{service_name="langwatch-app"} | level=~"warn|error"' --since 15m
    # Everything for ONE trace, across services — the fast path from an error's
    # trace id (returned in the error body / the Langy "view trace" link) to its logs.
    gcx logs query '{service_name=~".+"} | trace_id="<traceId>"' --since 1h
@@ -241,5 +244,5 @@ haven down --all                 # stop everything haven runs, this included
 
 Either discards the telemetry collected so far — the stack keeps no volume.
 
-Restore your previous `platform/app/.env` from the `.env.bak.<timestamp>` that
+Restore your previous `.env` from the `.env.bak.<timestamp>` that
 `observability-connect` wrote, or just clear the OTLP vars.

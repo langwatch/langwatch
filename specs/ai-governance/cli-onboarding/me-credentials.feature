@@ -92,6 +92,48 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     Then the resolved API key is the explicit argument
     And the environment value is not used
 
+  # LANGWATCH_ENDPOINT decides which LangWatch a command talks to, and a
+  # folder's .env can set it. A cloned folder could otherwise point every
+  # command at an address of its author's choosing and receive the key of
+  # whoever ran a command there.
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: the device session's key is never sent to another address than the one that issued it
+    Given ~/.langwatch/config.json holds a device session made against one LangWatch address
+    And LANGWATCH_ENDPOINT, in the shell or in the folder's .env, names another address
+    And no API key is given by flag or in LANGWATCH_API_KEY
+    When any API-calling command resolves credentials
+    Then no key of the session is resolved, neither the login key nor the personal project's
+    And the session endpoint is not called
+    And the command ends naming both addresses
+    And it says to run `langwatch login --device` against the other address, or to unset LANGWATCH_ENDPOINT
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: machine callers get a structured login_endpoint_mismatch document
+    Given a device session made against one address and LANGWATCH_ENDPOINT naming another
+    When a command resolves credentials with --format json
+    Then stdout carries one error document of kind "login_endpoint_mismatch"
+    And its meta names the login's address and the address the command targets
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: an API key given for the other address is used as given
+    Given a device session made against one address and LANGWATCH_ENDPOINT naming another
+    And LANGWATCH_API_KEY, or an explicit api key argument, is set
+    When a command resolves credentials
+    Then the resolved API key is the given one, paired with the address LANGWATCH_ENDPOINT names
+    And no key of the session is read
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: two spellings of one address are one address
+    Given a device session made against "https://app.acme.test"
+    When LANGWATCH_ENDPOINT is "https://APP.acme.test/" or "https://app.acme.test:443"
+    Then the session's key is resolved as usual
+
+  @bdd @cli-onboarding @credentials @unit
+  Scenario: localhost and 127.0.0.1 are two addresses
+    Given a device session made against "http://localhost:5560"
+    When LANGWATCH_ENDPOINT is "http://127.0.0.1:5560"
+    Then the command ends naming both addresses
+
   @bdd @cli-onboarding @credentials @unit
   Scenario: the caller's .env still contributes only LANGWATCH_* keys (daemon constraint)
     Given the caller's .env contains LANGWATCH_API_KEY and an unrelated secret like DATABASE_URL
@@ -106,9 +148,18 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   @bdd @cli-onboarding @credentials @integration
   Scenario: device-login exchange delivers the personal project key and the CLI stores it
     Given a device code was approved for a user with a personal workspace
+    And the user currently has permission to manage the personal project
     When the CLI polls POST /api/auth/cli/exchange
     Then the device_session response includes personal_project with id, slug, name and api_key
     And the CLI persists personal_project into ~/.langwatch/config.json
+
+  @bdd @cli-onboarding @credentials @integration
+  Scenario: device-login exchange returns the personal project without its key
+    Given a device code was approved for a user with a personal workspace
+    When the CLI polls POST /api/auth/cli/exchange
+    Then the device_session response is successful
+    And personal_project carries only its id, slug and name
+    And no project API key is returned
 
   @bdd @cli-onboarding @credentials @integration
   Scenario: a session created before this change lazily exchanges once and rewrites the session file
@@ -131,8 +182,15 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     Given a valid device-session bearer token whose personal workspace already exists
     And the user is an active member of the token's organization
     When the CLI calls GET /api/auth/cli/personal-project
-    Then the response carries the personal project's id, slug, name and api_key
+    Then the response carries the personal project's id, slug and name, never a key
     And it is the same project the login exchange delivered
+
+  @bdd @cli-onboarding @credentials @integration
+  Scenario: An old CLI asking for a project key is told to upgrade
+    Given a valid device-session bearer token
+    When a CLI built before project sessions calls POST /api/auth/cli/project-key
+    Then it is answered 410 "gone" with a hint to upgrade the CLI
+    And no key is returned
 
   # ─────────────────────────────────────────────────────────────────────
   # Tenancy boundary: current membership is proven before minting a key
@@ -149,17 +207,27 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     And a follow-up call with the same token is 401
 
   @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: a disabled member's pre-disable token cannot mint or return a personal key
+    Given a device-session token issued while the user was an active member of an organization
+    And an admin then disables that membership to free its seat
+    When the CLI calls GET /api/auth/cli/personal-project with that token
+    Then the response is 403
+    And no personal team, project, or role binding is created
+    And the presented access token is revoked
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: a disabled member's session cannot be renewed
+    Given a device session started while the user was an active member of an organization
+    And an admin then disables that membership to free its seat
+    When the CLI presents the refresh token to POST /api/auth/cli/refresh
+    Then the response is 401 and no new token pair is issued
+    And the presented refresh token is revoked
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
   Scenario: a deactivated user's token cannot mint or return a personal key
     Given a device-session token for a user whose account is deactivated
     When the CLI calls GET /api/auth/cli/personal-project with that token
     Then the response is 403
-    And the presented access token is revoked
-
-  @bdd @cli-onboarding @credentials @tenancy @integration
-  Scenario: POST /api/auth/cli/project-key applies the same membership boundary
-    Given a device-session token whose user is not an active member of the token's org
-    When the CLI calls POST /api/auth/cli/project-key
-    Then the response is 403 and no project key is returned
     And the presented access token is revoked
 
   @bdd @cli-onboarding @credentials @integration

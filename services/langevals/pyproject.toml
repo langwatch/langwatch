@@ -1,24 +1,24 @@
 [project]
 name = "langevals"
-version = "3.0.0"
+version = "3.1.0"
 description = "A platform to evaluate LLM outputs using various evaluators."
-authors = [{name = "Rogerio Chaves", email = "rogerio@langwatch.ai"}]
-license = {text = "MIT"}
+authors = [{ name = "Rogerio Chaves", email = "rogerio@langwatch.ai" }]
+license = { text = "MIT" }
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "pytest>=8.1.2",
-    "fastapi>=0.115.11",
-    "pydantic>=2.4.0",
-    "python-dotenv==1.2.2",
-    "mangum>=0.17.0",
-    "pandas>=2.2.2",
-    "markdown>=3.6",
-    "uvicorn>=0.29.0",
-    "gunicorn>=23.0.0",
-    "httpx>=0.27.0",
-    "nest-asyncio>=1.6.0",
-    "pip-licenses>=5.5.0",
-    "langevals-core",
+  "pytest>=8.1.2",
+  "fastapi>=0.115.11",
+  "pydantic>=2.4.0",
+  "python-dotenv==1.2.2",
+  "mangum>=0.17.0",
+  "pandas>=2.2.2",
+  "markdown>=3.6",
+  "uvicorn>=0.29.0",
+  "gunicorn>=25.1.0",
+  "httpx>=0.27.0",
+  "nest-asyncio>=1.6.0",
+  "pip-licenses>=5.5.0",
+  "langevals-core",
 ]
 
 [project.optional-dependencies]
@@ -30,13 +30,13 @@ langevals = ["langevals-langevals"]
 presidio = ["langevals-presidio"]
 topic_clustering = ["langevals-topic_clustering"]
 all = [
-    "langevals-azure",
-    "langevals-langevals",
-    "langevals-lingua",
-    "langevals-ragas",
-    "langevals-presidio",
-    "langevals-openai",
-    "langevals-topic_clustering",
+  "langevals-azure",
+  "langevals-langevals",
+  "langevals-lingua",
+  "langevals-ragas",
+  "langevals-presidio",
+  "langevals-openai",
+  "langevals-topic_clustering",
 ]
 
 [project.scripts]
@@ -47,14 +47,14 @@ pass_rate_plugin = "langevals.pytest_plugins.pass_rate_plugin"
 
 [dependency-groups]
 dev = [
-    "toml>=0.10.2",
-    "tomli-w>=1.0.0",
-    "grevillea>=0.0.1",
-    "litellm>=1.79.0",
-    "instructor>=1.2.2",
-    "pytest-xdist>=3.5.0",
-    "flaky>=3.8.1",
-    "ipykernel>=6.29.4",
+  "toml>=0.10.2",
+  "tomli-w>=1.0.0",
+  "grevillea>=0.0.1",
+  "litellm>=1.79.0",
+  "instructor>=1.2.2",
+  "pytest-xdist>=3.5.0",
+  "flaky>=3.8.1",
+  "ipykernel>=6.29.4",
 ]
 
 [build-system]
@@ -66,27 +66,109 @@ packages = ["langevals"]
 
 [tool.uv]
 exclude-newer = "7 days"
+# Emergency exceptions to the 7-day age gate (dev/docs/best_practices/
+# dependency-age-gates.md), each scoped by timestamp to the one patched
+# release a CRITICAL advisory needs. Pillow 13.0.0 (uploaded 2026-10-16)
+# closes 28 advisories, three of them critical; certifi 2026.10.19 (uploaded
+# 2026-10-20) closes GHSA-6q48-6c7w-9gw2 (critical). Remove both entries once
+# those uploads are older than 7 days (Pillow from 2026-10-24, certifi from
+# 2026-10-28): a timestamp here then holds the package back, not forward.
+required-version = ">=0.9.25"
+exclude-newer-package = { pillow = "2026-10-17T00:00:00Z", certifi = "2026-10-21T00:00:00Z" }
 override-dependencies = [
-    "langchain>=0.3.30",
-    # security: GHSA-f4xh-w4cj-qxq8 — LangSmith SDK TracingMiddleware arbitrary
-    # server-side file read; patched in 0.8.18.
-    "langsmith>=0.8.18",
-    # Force a patched strawberry-graphql (GHSA-fr49-mhgj-crfc, GHSA-qfwv-87qj-98xq,
-    # GHSA-x97m-qp5c-w9xj). arize-phoenix 14.6.0 pins it to 0.314.3; the patched
-    # 0.316.0 is API-compatible with Phoenix and is the version Phoenix itself moved
-    # to in 16.4.0.
-    "strawberry-graphql>=0.316.0",
-    "pydantic-settings>=2.14.2",  # security: pydantic-settings advisory (#1517)
-    # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
-    "json-repair>=0.60.1",
+  # The langchain family is on the 1.x line, where the advisories affecting it
+  # are fixed. Each floor is the highest first-patched version across the
+  # advisories for that package.
+  "langchain>=1.3.9",
+  "langchain-core>=1.2.22",
+  "langchain-openai>=1.1.14",
+  "langchain-text-splitters>=1.1.2",
+  # langchain-community stays on 0.3.x, which is compatible with core 1.x by
+  # declaration and in practice. It is capped below 0.4 because ragas imports
+  # `langchain_community.chat_models.vertexai` at module level and 0.4.0 moved
+  # the vertexai integrations out, so 0.4.x makes every ragas import fail.
+  # No advisory currently affects this package.
+  "langchain-community>=0.3.31,<0.4",
+  # security: GHSA-f4xh-w4cj-qxq8 — LangSmith SDK TracingMiddleware arbitrary
+  # server-side file read; patched in 0.8.18.
+  "langsmith>=0.8.18",
+  # Force a patched strawberry-graphql. The highest fix across its advisories
+  # is 0.327.2 (a HIGH covering <=0.326.0 and a LOW below 0.327.2).
+  # arize-phoenix pins strawberry exactly, so without this the pin decides
+  # the version.
+  "strawberry-graphql>=0.327.2",
+  "pydantic-settings>=2.14.2", # security: pydantic-settings advisory (#1517)
+  # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
+  "json-repair>=0.60.1",
+  # security: PyJWT advisories covering <=2.14.0, including a CRITICAL; patched in 2.15.0. An override replaces the requirement, so the
+  # crypto extra that mcp asks for has to be restated here.
+  "pyjwt[crypto]>=2.15.0",
+  # security: urllib3 HTTPS-proxy TLS and chunked-read advisories; patched in 2.8.0.
+  "urllib3>=2.8.0",
+  # --- Security floors below carry no API change for this workspace. Each is
+  # the first patched release named by the advisory that produced the alert;
+  # raise a floor rather than removing it, so a transitive downgrade can never
+  # walk back under a fix.
+  #
+  # litellm auth bypass via Host header injection AND via OIDC userinfo cache
+  # key collision (both CRITICAL), plus four further advisories fixed across
+  # 1.83.7 / 1.83.10 / 1.83.14. 1.84.0 is the first release above all of them.
+  "litellm>=1.84.0",
+  # Pillow: heap overflow / DoS across several decoders, then 28 advisories
+  # covering <13.0.0, three of them critical.
+  "pillow>=13.0.0",
+  # nltk unsafe deserialization in the pickle loader path, plus the advisories
+  # closed in 3.10.1 and 3.10.3.
+  "nltk>=3.10.3",
+  # pyasn1 decoder DoS on crafted BER/DER input.
+  "pyasn1>=0.6.4",
+  # aiohttp request smuggling and header-parsing advisories, then no initial
+  # request/header timeout and unbounded memory/CPU use (#2851-#2853).
+  "aiohttp>=3.14.4",
+  # cryptography: bundled OpenSSL advisories.
+  "cryptography>=50.0.0",
+  # h2 HTTP/2 control-frame flood DoS.
+  "h2>=4.4.1",
+  # setuptools path traversal in PackageIndex.
+  "setuptools>=83.0.0",
+  # torch: deserialization advisory in torch.load.
+  "torch>=2.13.0",
+  # tornado: HTTP header and multipart parsing advisories.
+  "tornado>=6.5.9",
+  # httpx2: two advisories fixed in 2.11.0 and one in 2.12.0.
+  "httpx2>=2.12.0",
+  #
+  # NOT fixed here, deliberately:
+  #   ragas, diskcache: no patched release exists upstream yet.
+  #   nltk: GHSA-8mgp-746c-j5xp covers <=3.10.3 and names no fix. 3.10.4
+  #   (uploaded 2026-10-21) sandboxes the model-artifact paths it describes,
+  #   but it is inside the age gate, and langevals reaches nltk only through
+  #   rouge-score's stemmer, not the affected loaders. Raise the floor to
+  #   3.10.4 once it clears the gate on 2026-10-28.
+]
+
+# Security floors that only need to raise a version. Constraints add to the
+# requirements already in the tree; an override would replace them, extras
+# and upper bounds included.
+constraint-dependencies = [
+  "fsspec>=2026.6.0", # fsspec advisory covering <2026.6.0
+  "datasets>=5.0.1", # datasets advisory covering <5.0.1; 4.x also caps fsspec below its fix
+  "mako>=1.4.2", # Mako advisory covering <=1.4.1
+  "multidict>=6.9.1", # multidict advisory covering 6.7.0-6.9.0
+  "langgraph-sdk>=0.4.4", # langgraph-sdk advisory covering <=0.4.3
+  # pydantic-ai: 2.30.0 is the highest floor that resolves. From 2.44.0 its
+  # openai extra needs openai>=3.8.0, whose jiter requirement every
+  # instructor release (a dependency of the notebooks and tutorials) excludes
+  # with `jiter<0.15`. The advisories fixed in 2.44.0, 2.52.0 and 2.53.0 stay
+  # open until instructor lifts that cap. Without this floor in range the
+  # resolver satisfies a higher one by walking arize-phoenix back to 14.x.
+  "pydantic-ai-slim>=2.30.0",
+  "certifi>=2026.10.19", # certifi advisory covering <2026.10.19 (GHSA-6q48-6c7w-9gw2, critical)
+  "mcp>=1.30.0,!=2.0.*,!=2.1.*", # MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2828)
 ]
 
 [tool.uv.workspace]
-members = [
-    "langevals_core",
-    "evaluators/*",
-    "notebooks",
-]
+members = ["langevals_core", "evaluators/*", "notebooks"]
 
 [tool.uv.sources]
 langevals-core = { workspace = true }

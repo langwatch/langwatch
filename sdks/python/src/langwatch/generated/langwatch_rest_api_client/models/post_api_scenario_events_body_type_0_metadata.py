@@ -9,6 +9,9 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.post_api_scenario_events_body_type_0_metadata_agents_item import (
+        PostApiScenarioEventsBodyType0MetadataAgentsItem,
+    )
     from ..models.post_api_scenario_events_body_type_0_metadata_langwatch import (
         PostApiScenarioEventsBodyType0MetadataLangwatch,
     )
@@ -23,11 +26,15 @@ class PostApiScenarioEventsBodyType0Metadata:
     Attributes:
         name (str | Unset):
         description (str | Unset):
+        note (str | Unset):
+        agents (list[PostApiScenarioEventsBodyType0MetadataAgentsItem] | Unset):
         langwatch (PostApiScenarioEventsBodyType0MetadataLangwatch | Unset):
     """
 
     name: str | Unset = UNSET
     description: str | Unset = UNSET
+    note: str | Unset = UNSET
+    agents: list[PostApiScenarioEventsBodyType0MetadataAgentsItem] | Unset = UNSET
     langwatch: PostApiScenarioEventsBodyType0MetadataLangwatch | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -35,6 +42,15 @@ class PostApiScenarioEventsBodyType0Metadata:
         name = self.name
 
         description = self.description
+
+        note = self.note
+
+        agents: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.agents, Unset):
+            agents = []
+            for agents_item_data in self.agents:
+                agents_item = agents_item_data.to_dict()
+                agents.append(agents_item)
 
         langwatch: dict[str, Any] | Unset = UNSET
         if not isinstance(self.langwatch, Unset):
@@ -47,6 +63,10 @@ class PostApiScenarioEventsBodyType0Metadata:
             field_dict["name"] = name
         if description is not UNSET:
             field_dict["description"] = description
+        if note is not UNSET:
+            field_dict["note"] = note
+        if agents is not UNSET:
+            field_dict["agents"] = agents
         if langwatch is not UNSET:
             field_dict["langwatch"] = langwatch
 
@@ -54,6 +74,9 @@ class PostApiScenarioEventsBodyType0Metadata:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_scenario_events_body_type_0_metadata_agents_item import (
+            PostApiScenarioEventsBodyType0MetadataAgentsItem,
+        )
         from ..models.post_api_scenario_events_body_type_0_metadata_langwatch import (
             PostApiScenarioEventsBodyType0MetadataLangwatch,
         )
@@ -62,6 +85,17 @@ class PostApiScenarioEventsBodyType0Metadata:
         name = d.pop("name", UNSET)
 
         description = d.pop("description", UNSET)
+
+        note = d.pop("note", UNSET)
+
+        _agents = d.pop("agents", UNSET)
+        agents: list[PostApiScenarioEventsBodyType0MetadataAgentsItem] | Unset = UNSET
+        if _agents is not UNSET:
+            agents = []
+            for agents_item_data in _agents:
+                agents_item = PostApiScenarioEventsBodyType0MetadataAgentsItem.from_dict(agents_item_data)
+
+                agents.append(agents_item)
 
         _langwatch = d.pop("langwatch", UNSET)
         langwatch: PostApiScenarioEventsBodyType0MetadataLangwatch | Unset
@@ -73,6 +107,8 @@ class PostApiScenarioEventsBodyType0Metadata:
         post_api_scenario_events_body_type_0_metadata = cls(
             name=name,
             description=description,
+            note=note,
+            agents=agents,
             langwatch=langwatch,
         )
 

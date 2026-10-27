@@ -1,171 +1,83 @@
-# Session git context, repo/branch/worktree identity and the session title
+# The working context a coding-agent session declares, and what it charges
 #
 # Implementation:
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization.ts   (admission gate, contribution keys, aliases)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber.ts (declared-agent labeling, title stamp)
-#   platform/app/src/server/app-layer/traces/canonicalisation/extractors/claudeCode.ts                                (title extraction from the response body)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-session.derivation.ts (fold semantics)
-#   platform/app/src/server/clickhouse/migrations/00075_coding_agent_sessions_git_context.sql                          (session columns)
-#   platform/app/src/server/clickhouse/migrations/00077_coding_agent_sessions_git_branches.sql                         (every branch the session drove)
+#   modules/coding-agent/contract/src/telemetry/session-context.ts                      (the declaration's vocabulary and the stamp)
+#   modules/coding-agent/process/src/services/contribute-log-facts.service.ts           (remembers a declaration, stamps row-bearing records)
+#   modules/coding-agent/process/src/services/contribute-span-facts.service.ts          (stamps the spans that carry a model call)
+#   modules/coding-agent/process/src/eventing/coding-agent-session-state.projection.ts  (chargeContextUsage, the bound)
+#   modules/coding-agent/process/src/eventing/coding-agent-session.projection.ts        (the row column, both ways)
+#   packages/clickhouse-migrations/migrations/00099_coding_agent_sessions_usage_by_context.sql
 #
-# Related specs:
-#   specs/coding-agent/session-aggregate.feature                     , the session fold this enriches
-#   specs/coding-agent/pull-request-linkage.feature                  , what the branch identity is for
-#   specs/ai-governance/cli-wrappers/session-context-hook.feature , the hook that emits the event
-#
-# Motivation: coding agents export no repository, branch or working-directory
-# identity over telemetry (verified at the raw OTLP wire). A LangWatch-installed
-# hook emits one small companion log event, `langwatch.session_context`, carrying
-# the session id plus vcs identity attributes. The pipeline admits it through an
-# explicit event-name gate (never by imitating a vendor's instrumentation scope),
-# labels it with the agent the event declares, and folds the git identity onto
-# the session. Claude Code also generates a conversation title; it arrives as a
-# response-body log event today and is folded onto the session as its Title,
-# treated as conversation-derived content for visibility purposes.
-#
-# Nothing here is per-agent: the admission gate is one event-name equality, the
-# label is whatever the event declares (validated against the agent registry),
-# and the fold reads the same attributes whoever sent them. Claude Code, Codex
-# and opencode all emit the companion event today. An agent with no seam of its
-# own (Gemini CLI, Copilot) simply has no git context and no title, and can join
-# later without a schema change.
+# Only the charging rule is written here. The memo's own lifetime and the
+# declaration command live in specs/ai-governance/cli-wrappers/session-context-declare.feature.
 
-Feature: Session git context
+Feature: A session's usage is charged to the context it declared
 
-Rule: Every agent that can emit the event joins on the same terms
+Rule: Tokens are charged to the context declared before them
+
+  # The per-call fact table only sees the agents whose tokens ride log
+  # records. Codex reports its tokens on the turn span and so contributes no
+  # fact row at all, which left its sessions with nothing to split by: a
+  # long-lived Codex session declaring a new branch per pull request was
+  # charged whole to whichever pull request the read looked at. So the span
+  # that carries a model call is stamped the same way a row-bearing log
+  # record is, and the session fold keeps, next to its cumulative totals, what
+  # was spent under each stamped context. The row is the ledger the split
+  # reads; the fact table stays the model breakdown's source.
 
   @unit
-  Scenario: A session context event from Codex folds its git identity
-    Given an admitted session context event declaring the codex agent
+  Scenario: A model-call span after a declaration carries the declared context
+    Given a session that declared a repository and branch
+    When a model-call span is contributed after it
+    Then the contribution carries that repository and branch
+
+  @unit
+  Scenario: A model-call span before any declaration is contributed unstamped
+    Given a session that has not declared a working context
+    When a model-call span is contributed
+    Then the contribution carries no repository and no branch
+
+  @unit
+  Scenario: A span that carries no tokens is not stamped
+    Given a session that declared a repository and branch
+    When a tool span is contributed after it
+    Then the contribution carries no stamped context
+
+  @unit
+  Scenario: A model call's tokens and cost are charged to the context stamped on it
+    Given a session whose model calls are stamped with two different branches
     When the session fold runs
-    Then the session carries the repository, branch and worktree from the event
+    Then the row records each branch's own tokens and cost
+    And the session's cumulative totals are the sum of both
 
   @unit
-  Scenario: A session context event from opencode folds its git identity
-    Given an admitted session context event declaring the opencode agent
+  Scenario: A model call with no stamp is charged to no context
+    Given a session whose model call carries no stamped context
     When the session fold runs
-    Then the session carries the repository, branch and worktree from the event
-
-Rule: The session context event joins the fold honestly
-
-  @unit
-  Scenario: A langwatch session context event passes the log lift without a vendor scope
-    Given a log record named langwatch.session_context under the langwatch hook scope
-    When the coding-agent log facts are lifted
-    Then the record is admitted and its vcs attributes are lifted
-    And no vendor instrumentation scope was required
+    Then the row records no per-context usage for it
+    And the session's cumulative totals still count it
 
   @unit
-  Scenario: A session context contribution is labeled with its declared agent
-    Given an admitted session context event declaring the claude_code agent
-    When the contribution is dispatched
-    Then the contribution carries the claude_code agent label
-
-  @unit
-  Scenario: A declared agent outside the registry contributes nothing
-    Given an admitted session context event declaring an agent LangWatch does not know
-    When the contribution is dispatched
-    Then no contribution reaches the session fold
-
-  @unit
-  Scenario: A session context event with no declared agent contributes nothing
-    Given an admitted session context event that declares no agent
-    When the contribution is dispatched
-    Then no contribution reaches the session fold
-
-Rule: Git identity folds with honest semantics
-
-  @unit
-  Scenario: Repository identity and worktree set once and do not move
-    Given a session whose first context event names a repository and worktree
-    When a later context event names a different repository
-    Then the session keeps the first repository identity and worktree
-
-  @unit
-  Scenario: The branch follows the latest session context event
-    Given a session that started on the default branch
-    When a later context event reports a newly created feature branch
-    Then the session's branch is the feature branch
-
-  @unit
-  Scenario: A session context event contributes no session-events row
-    Given an admitted session context event
-    When the session events fact table is projected
-    Then no row is written for the context event
-
-Rule: A session remembers every branch it drove
-
-  # The branch a session ENDS on is the one it is working in, and that is what
-  # `GitBranch` answers. It is not the only branch the session drove: an agent
-  # that lands one change, moves on and opens a second pull request is one
-  # session behind two of them, and remembering only the last branch drops the
-  # first pull request from everything read off the session. The set is the
-  # session's whole history of branches; the scalar stays the present tense.
-
-  @unit
-  Scenario: Every branch a session reports joins its branch set, first seen first
-    Given a session that reports one branch and later another
+  Scenario: The per-context usage record stops growing at its bound
+    Given a session whose model calls are stamped with more contexts than the record holds
     When the session fold runs
-    Then the branch set names both, in the order they were reported
-    And the session's current branch is the later one
+    Then the record keeps the first contexts it saw and no more
+    And the session's cumulative totals still count every call
 
   @unit
-  Scenario: A branch reported twice joins the set once
-    Given a session that returns to a branch it already reported
-    When the session fold runs
-    Then the branch set names that branch once
-
-  @unit
-  Scenario: The branch set stops growing at its bound
-    Given a session that reports more branches than the set will hold
-    When the session fold runs
-    Then the set holds the first branches it saw and no more
-
-Rule: The session title lifts from the generated conversation title
-
-  @unit
-  Scenario: The title lifts from a generate_session_title response body, capped
-    Given a response body event whose query source is the session title generator
-    When the coding-agent log facts are dispatched
-    Then the session title fact carries the generated title, capped in length
-
-  @unit
-  Scenario: A conversational response body sets no title
-    Given a response body event from the conversational thread
-    When the coding-agent log facts are dispatched
-    Then no session title fact is stamped
-
-  @unit
-  Scenario: An unparseable title body sets no title
-    Given a title-generator response body that does not parse
-    When the coding-agent log facts are dispatched
-    Then no session title fact is stamped
-    And the contribution otherwise proceeds
-
-Rule: The session row stores and reads back the git context
+  Scenario: The per-context usage survives the row and rebuilds identically
+    Given a session that charged usage to two contexts
+    When the session fold writes its row and the state is rebuilt from it
+    Then the rebuilt state carries the same per-context usage
 
   @integration
-  Scenario: A session folds repo, branch, worktree and title into its row and reads back
-    Given a session receiving a context event and a generated title
+  Scenario: The per-context usage round-trips through the session row
+    Given a session that charged usage to two contexts
     When the session fold writes and the row is read back
-    Then the row carries the repository host, owner and name
-    And the row carries the branch, worktree and title
+    Then the row carries each context's tokens and cost
 
   @integration
-  Scenario: A session row from before the git context columns decodes with empty context
-    Given a session row written before the git context columns existed
+  Scenario: A session row from before the per-context usage column decodes with none
+    Given a session row written before the per-context usage column existed
     When the row is read back
-    Then the session decodes with no repository, branch, worktree or title
-    And the rest of the session is intact
-
-  @integration
-  Scenario: The branch set round-trips through the session row
-    Given a session that drove several branches
-    When the session fold writes and the row is read back
-    Then the row carries every branch it drove, in the order they were reported
-
-  @unit
-  Scenario: A session row from before the branch set column falls back to its one branch
-    Given a session row written before the branch set column existed
-    When a reader asks which branches the session drove
-    Then it answers with the branch the session ended on
+    Then the session decodes with no per-context usage

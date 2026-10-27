@@ -366,15 +366,15 @@ unless a reviewed runtime dependency demonstrates it is necessary.
 
 The phases are intentionally ordered so that each stage reduces risk on its own:
 
-| Phase | Application repository | Infrastructure repository | Exit gate |
-|---|---|---|---|
-| 0. Emergency containment | Fail-closed gateway config tests and rebind regression tests | Live flags, corrected gateway/NLP policies, token and Redis removal | Private, metadata, redirect, and rebind probes fail closed in production |
-| 1. Shared contract | Egress envelope, policy evaluator, audit schema, pinned Go dialer | Egress namespace, identities, queues, dashboards | Both TS and Go conformance suites pass |
-| 2. Webhooks | Outbox publisher and dedicated executor | Queue, isolated deployment, no-secret identity, deny policies | General workers cannot reach arbitrary Internet destinations |
-| 3. Providers | Gateway-to-egress transport, connector authorization, retire NLP in-process dial | Dedicated egress network, NAT, PrivateLink connector security groups | Gateway/NLP cannot dial providers directly |
-| 4. Langy | Controller/worker protocol, externalized routing, warm-pool lifecycle | Per-worker gVisor pods, RuntimeClass scheduling, forced proxy policy, multi-node group | Two simultaneous tenants cannot share sandbox resources |
-| 5. Code blocks | Remote sandbox executor, bounded result protocol | Per-invocation Lambda or gVisor runtime | No tenant code executes in the shared NLP pod |
-| 6. Enforcement | Remove legacy direct-dial feature flags and code | Delete transitional broad egress paths and stale secrets | Bypass tests and flow-log assertions remain green |
+| Phase                    | Application repository                                                           | Infrastructure repository                                                              | Exit gate                                                                |
+| ------------------------ | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 0. Emergency containment | Fail-closed gateway config tests and rebind regression tests                     | Live flags, corrected gateway/NLP policies, token and Redis removal                    | Private, metadata, redirect, and rebind probes fail closed in production |
+| 1. Shared contract       | Egress envelope, policy evaluator, audit schema, pinned Go dialer                | Egress namespace, identities, queues, dashboards                                       | Both TS and Go conformance suites pass                                   |
+| 2. Webhooks              | Outbox publisher and dedicated executor                                          | Queue, isolated deployment, no-secret identity, deny policies                          | General workers cannot reach arbitrary Internet destinations             |
+| 3. Providers             | Gateway-to-egress transport, connector authorization, retire NLP in-process dial | Dedicated egress network, NAT, PrivateLink connector security groups                   | Gateway/NLP cannot dial providers directly                               |
+| 4. Langy                 | Controller/worker protocol, externalized routing, warm-pool lifecycle            | Per-worker gVisor pods, RuntimeClass scheduling, forced proxy policy, multi-node group | Two simultaneous tenants cannot share sandbox resources                  |
+| 5. Code blocks           | Remote sandbox executor, bounded result protocol                                 | Per-invocation Lambda or gVisor runtime                                                | No tenant code executes in the shared NLP pod                            |
+| 6. Enforcement           | Remove legacy direct-dial feature flags and code                                 | Delete transitional broad egress paths and stale secrets                               | Bypass tests and flow-log assertions remain green                        |
 
 Every phase ships with a canary, explicit rollback, dashboards, and a
 post-deployment comparison of desired Terraform state to live Kubernetes state.
@@ -679,26 +679,26 @@ isolation boundaries.
 
 ## Dependencies and decisions to resolve before implementation
 
-| Decision | Recommended default | Why it matters | Deadline |
-|---|---|---|---|
-| Egress isolation domain | Separate egress VPC or cluster | It removes a route to core workloads rather than relying on a shared-cluster policy alone | Before Workstream 3 |
-| Egress transport | Streaming internal HTTP/2 or gRPC with mTLS | Provider responses and cancellations must be forwarded safely | Before Workstream 1 |
-| Durable webhook transport | The existing transactional outbox and its process manager | Settled: it already gives durability and dead-lettering, and needs no cloud account, which an internal SQS transport would have imposed on every self-hosted deployment. SQS ships instead as a per-endpoint destination kind a customer points at its own queue | Settled |
-| Sandbox runtime | gVisor pod per Langy conversation and code invocation where Lambda is unsuitable | RuntimeClass isolates a pod, not sibling processes | Before Workstream 4 |
-| Private endpoint model | Tenant-bound connector IDs | Prevents hostname suffixes from becoming authorization | Before Workstream 3 |
-| Hosted compatibility policy | SaaS always fail-closed; self-hosted opts into private egress deliberately | Avoids making SaaS safety depend on a permissive legacy default | Before Workstream 0 |
+| Decision                    | Recommended default                                                              | Why it matters                                                                                                                                                                                                                                                   | Deadline            |
+| --------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Egress isolation domain     | Separate egress VPC or cluster                                                   | It removes a route to core workloads rather than relying on a shared-cluster policy alone                                                                                                                                                                        | Before Workstream 3 |
+| Egress transport            | Streaming internal HTTP/2 or gRPC with mTLS                                      | Provider responses and cancellations must be forwarded safely                                                                                                                                                                                                    | Before Workstream 1 |
+| Durable webhook transport   | The existing transactional outbox and its process manager                        | Settled: it already gives durability and dead-lettering, and needs no cloud account, which an internal SQS transport would have imposed on every self-hosted deployment. SQS ships instead as a per-endpoint destination kind a customer points at its own queue | Settled             |
+| Sandbox runtime             | gVisor pod per Langy conversation and code invocation where Lambda is unsuitable | RuntimeClass isolates a pod, not sibling processes                                                                                                                                                                                                               | Before Workstream 4 |
+| Private endpoint model      | Tenant-bound connector IDs                                                       | Prevents hostname suffixes from becoming authorization                                                                                                                                                                                                           | Before Workstream 3 |
+| Hosted compatibility policy | SaaS always fail-closed; self-hosted opts into private egress deliberately       | Avoids making SaaS safety depend on a permissive legacy default                                                                                                                                                                                                  | Before Workstream 0 |
 
 ## Milestones, ownership, and readiness gates
 
-| Milestone | Primary owner | Supporting owner | Production gate |
-|---|---|---|---|
-| M0: gateway and NLP containment | Platform/SRE | AI gateway | Live negative SSRF probes pass and policies are enforced |
-| M1: egress protocol and audit contract | AI gateway | Platform/Security | Cross-language conformance and signed-envelope tests pass |
-| M2: webhook executor | Application/process manager | Platform | General worker direct Internet probe is denied |
-| M3: provider egress and connectors | AI gateway | Cloud networking | Gateway/NLP direct dial probe is denied |
-| M4: Langy worker pods | Langy | Platform/Security | Cross-pod isolation and direct-egress bypass tests pass |
-| M5: code-block sandbox migration | NLP/workflows | Platform | Shared NLP subprocess execution is absent in hosted deployment |
-| M6: legacy deletion and drift gate | Platform/Security | All owners | No compatibility broad-egress rule or unused secret remains |
+| Milestone                              | Primary owner               | Supporting owner  | Production gate                                                |
+| -------------------------------------- | --------------------------- | ----------------- | -------------------------------------------------------------- |
+| M0: gateway and NLP containment        | Platform/SRE                | AI gateway        | Live negative SSRF probes pass and policies are enforced       |
+| M1: egress protocol and audit contract | AI gateway                  | Platform/Security | Cross-language conformance and signed-envelope tests pass      |
+| M2: webhook executor                   | Application/process manager | Platform          | General worker direct Internet probe is denied                 |
+| M3: provider egress and connectors     | AI gateway                  | Cloud networking  | Gateway/NLP direct dial probe is denied                        |
+| M4: Langy worker pods                  | Langy                       | Platform/Security | Cross-pod isolation and direct-egress bypass tests pass        |
+| M5: code-block sandbox migration       | NLP/workflows               | Platform          | Shared NLP subprocess execution is absent in hosted deployment |
+| M6: legacy deletion and drift gate     | Platform/Security           | All owners        | No compatibility broad-egress rule or unused secret remains    |
 
 ## Alternatives considered
 

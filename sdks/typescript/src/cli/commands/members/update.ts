@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { OrganizationApiService } from "@/client-sdk/services/organization/organization-api.service";
+
 import { parseOrganizationRole } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
@@ -21,8 +23,7 @@ export const updateMemberCommand = async ({
   return runManagement({
     action: "update member",
     pending: `Updating member "${userId}"...`,
-    run: () =>
-      new OrganizationApiService().updateMember({ userId, input: { role } }),
+    run: () => new OrganizationApiService().updateMember({ userId, input: { role } }),
     succeed: (member) => `Member "${userId}" is now ${chalk.cyan(member.role)}`,
     table: (member) => {
       printFacts([

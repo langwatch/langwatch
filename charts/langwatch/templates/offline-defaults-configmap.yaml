@@ -1,0 +1,24 @@
+{{- /*
+  Offline defaults for app, workers and langevals. See
+  langwatch.envFromWithOfflineDefaults in _helpers.tpl: every workload lists
+  this ConfigMap first in envFrom, so extraEnvs and extraEnvFrom override it.
+  Each key is read only by the component that would make the call; the others
+  ignore it.
+
+  - CHECKPOINT_DISABLE: Prisma's version check to checkpoint.prisma.io during
+    the `prisma migrate deploy` the app and workers run at start. The app's
+    prisma.config.ts sets it too, so the check stays off whatever this holds.
+  - VOICE_TUNNEL: the cloudflared quick tunnel the workers would open for
+    voice phone calls. Set "true", or VOICE_PUBLIC_BASE_URL, to run them.
+  - RAGAS_DO_NOT_TRACK: RAGAS usage analytics from langevals.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "langwatch.offlineDefaultsName" . }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+data:
+  CHECKPOINT_DISABLE: "1"
+  VOICE_TUNNEL: "false"
+  RAGAS_DO_NOT_TRACK: "true"

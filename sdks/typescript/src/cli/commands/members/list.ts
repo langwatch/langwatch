@@ -1,15 +1,11 @@
 import chalk from "chalk";
+
 import { OrganizationApiService } from "@/client-sdk/services/organization/organization-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import { parseCount } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import {
-  counted,
-  orDash,
-  printEmpty,
-  runManagement,
-  withParsedFlags,
-} from "../management/_shared";
+import { counted, orDash, printEmpty, runManagement, withParsedFlags } from "../management/_shared";
 
 export interface ListMembersOptions {
   includeDisabled?: boolean;

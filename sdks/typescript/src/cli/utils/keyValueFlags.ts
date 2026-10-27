@@ -1,21 +1,16 @@
 /**
- * Repeatable `key=value` command-line flags.
- *
- * Two families share the same shape on the command line and differ in what a
- * key holds: a spend filter may repeat one key with several values, while a run
- * parameter holds exactly one value per name, read as the type it looks like.
- *
- * Equals rather than a colon, because a value may itself contain a colon and a
- * shell user expects `key=value`.
+ * Repeatable `key=value` command-line flags. A spend filter may repeat one
+ * key with several values; a run parameter holds one value per name. Equals
+ * rather than colon, because a value may itself contain a colon.
  */
 
-import {
-  commandValidationError,
-  reportCommandError,
-} from "./errorOutput";
+import { commandValidationError, reportCommandError } from "./errorOutput";
 
 /** The value types a run parameter may hold once read off the command line. */
 export type RunParameterValue = string | number | boolean;
+
+/** The type a parameter declares, which settles how its flag value is read. */
+export type RunParameterType = "string" | "number" | "boolean";
 
 /** The flag every run command reads its parameter values from. */
 export const PARAM_FLAG = "--param";
@@ -45,12 +40,9 @@ const splitPair = ({
 };
 
 /**
- * `--metadata tier=gold`, repeated, collected into a record where one key may
- * carry several values.
- *
- * A key may not contain a colon: the server splits a pair on its FIRST colon,
- * so a key carrying one would silently address a different key. Refusing beats
- * reporting spend for a filter the caller did not write.
+ * `--metadata tier=gold`, repeated, collected where one key may carry
+ * several values. A key may not contain a colon: the server splits on the
+ * FIRST one, so a key carrying one would silently address a different key.
  */
 export const parseKeyValueFlags = ({
   pairs,
@@ -83,15 +75,25 @@ export const parseKeyValueFlags = ({
 };
 
 /**
- * Read one flag value as the type it looks like: exactly `true` or `false`
- * becomes a boolean, a number that renders back to exactly what was typed
- * becomes a number, and everything else stays text.
- *
- * The round-trip check is what keeps `007`, `1.50` and a twenty-digit account
- * number as text: they are identifiers that merely look numeric, and handing
- * the run a number would change the value it was given.
+ * Reads one flag value as the type it looks like: `true`/`false` becomes
+ * boolean, a round-tripping number becomes a number (keeping `007`/`1.50` as
+ * text), else text. A declared type overrides the guess.
  */
-export const coerceParameterValue = (value: string): RunParameterValue => {
+export const coerceParameterValue = ({
+  value,
+  type,
+}: {
+  value: string;
+  /** The type the target declares for this name, when it declares one. */
+  type?: RunParameterType;
+}): RunParameterValue => {
+  if (type === "string") return value;
+  if (type === "number") return coerceDeclaredNumber(value);
+  if (type === "boolean") {
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return value;
+  }
   if (value === "true") return true;
   if (value === "false") return false;
   const asNumber = Number(value);
@@ -101,15 +103,16 @@ export const coerceParameterValue = (value: string): RunParameterValue => {
 
 /**
  * `--param account_tier=gold`, repeated, collected into the values a run
- * supplies for the names its scenarios declare.
- *
- * A name repeated across flags keeps the last value, so a wrapper script can
- * append an override to a command line it did not write.
+ * supplies for names its scenarios declare. A name repeated keeps the last
+ * value, so a wrapper script can append an override it did not write.
  */
 export const parseRunParameterFlags = ({
   pairs,
+  types,
 }: {
   pairs: string[] | undefined;
+  /** The declared type of each name, when the target declares any. */
+  types?: ReadonlyMap<string, RunParameterType>;
 }): Record<string, RunParameterValue> | undefined => {
   if (pairs === undefined || pairs.length === 0) return undefined;
   // A Map for the same reason as above: assigning `__proto__` on an object
@@ -119,7 +122,14 @@ export const parseRunParameterFlags = ({
   const parsed = new Map<string, RunParameterValue>();
   for (const pair of pairs) {
     const { key, value } = splitPair({ pair, flag: PARAM_FLAG });
-    parsed.set(key, coerceParameterValue(value));
+    parsed.set(key, coerceParameterValue({ value, type: types?.get(key) }));
   }
   return Object.fromEntries(parsed);
 };
+
+function coerceDeclaredNumber(value: string): RunParameterValue {
+  const asNumber = Number(value);
+  if (value.trim() === "") return value;
+  if (!Number.isFinite(asNumber)) return value;
+  return asNumber;
+}

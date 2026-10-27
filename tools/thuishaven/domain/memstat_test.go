@@ -85,14 +85,6 @@ func TestParseSwapUsage(t *testing.T) {
 				}
 			})
 
-			t.Run("and the pair lands in the amber-to-red band, as that machine did", func(t *testing.T) {
-				level := ClassifyPressure(MemStat{
-					TotalBytes: 18 * gib, SwapUsedBytes: used, SwapTotalBytes: total,
-				})
-				if level == Green {
-					t.Fatal("3.2 GB of 4 GB swap should not read as an unloaded machine")
-				}
-			})
 		})
 	})
 

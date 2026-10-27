@@ -2,7 +2,9 @@ package engine
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -179,7 +181,7 @@ func TestRewriteRehomesSystemAttachmentToUser(t *testing.T) {
 	assert.Equal(t, "You are a vision grader. Image:", strings.TrimSpace(systemText),
 		"the system message keeps only the text before the image, not the image link")
 	assert.Equal(t, "user", out[1].Role)
-	firstPartOfType(t, out[1], "image_url") // the image rode into the user message
+	firstPartOfType(t, out[1], "image_url")
 }
 
 // @scenario "An unreachable attachment URL fails the run with a clear message naming the URL"
@@ -219,8 +221,7 @@ func TestRewriteRejectsOversizedAttachment(t *testing.T) {
 		_, _ = w.Write([]byte(big))
 	}))
 	defer srv.Close()
-	f := loopbackFetcher()
-	f.maxBytes = 1024 // smaller than the body
+	f := loopbackFetcher().withMaxBytes(1024) // smaller than the body
 
 	out, ne := f.rewrite(context.Background(), imagePartMessage(srv.URL+"/big.png"))
 	require.Nil(t, out)
@@ -298,21 +299,22 @@ func TestRewriteFetchesPDFIntoFilePart(t *testing.T) {
 	assert.True(t, strings.HasPrefix(fileData, "data:application/pdf;base64,"), "pdf must inline as a data URL, got %q", fileData)
 }
 
-// imageTypedNode builds a signature node declaring the given inputs, used to
-// exercise the image-typed-input resolution that runs before message templating.
-func imageTypedNode(fields ...dsl.Field) *dsl.Node {
+// attachmentTypedNode builds a signature node declaring the given inputs, used
+// to exercise the attachment-input resolution that runs before message
+// templating.
+func attachmentTypedNode(fields ...dsl.Field) *dsl.Node {
 	return &dsl.Node{ID: "sig", Type: dsl.ComponentSignature, Data: dsl.Component{Inputs: fields}}
 }
 
 // @scenario "An image-typed field whose URL is an image is fetched and inlined"
-func TestInlineImageInputsResolvesRemoteImageToDataURL(t *testing.T) {
+func TestInlineAttachmentInputsResolvesRemoteImageToDataURL(t *testing.T) {
 	srv := attachmentServer(t)
 	defer srv.Close()
 	f := loopbackFetcher()
-	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
+	node := attachmentTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
 	inputs := map[string]any{"picture": srv.URL + "/cat.png"}
 
-	out, ne := f.inlineImageInputs(context.Background(), node, inputs)
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, inputs)
 	require.Nil(t, ne)
 	got, _ := out["picture"].(string)
 	assert.True(t, strings.HasPrefix(got, "data:image/png;base64,"),
@@ -322,14 +324,14 @@ func TestInlineImageInputsResolvesRemoteImageToDataURL(t *testing.T) {
 }
 
 // @scenario "An image-typed field whose URL cannot be fetched fails the run with a clear error"
-func TestInlineImageInputsFailsClearlyOnUnreachableImageURL(t *testing.T) {
+func TestInlineAttachmentInputsFailsClearlyOnUnreachableImageURL(t *testing.T) {
 	srv := attachmentServer(t)
 	deadURL := srv.URL + "/cat.png"
 	srv.Close() // nothing is listening now
 	f := loopbackFetcher()
-	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
+	node := attachmentTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
 
-	out, ne := f.inlineImageInputs(context.Background(), node, map[string]any{"picture": deadURL})
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"picture": deadURL})
 	require.Nil(t, out)
 	require.NotNil(t, ne, "an explicit image field with an unfetchable URL must fail the run")
 	assert.Equal(t, "attachment_fetch_error", ne.Type)
@@ -337,24 +339,25 @@ func TestInlineImageInputsFailsClearlyOnUnreachableImageURL(t *testing.T) {
 }
 
 // @scenario "An image-typed field whose URL is not an image fails the run with a clear error"
-func TestInlineImageInputsFailsClearlyWhenNotAnImage(t *testing.T) {
+// @scenario "An image-typed input holding a remote non-image still fails the run"
+func TestInlineAttachmentInputsFailsClearlyWhenNotAnImage(t *testing.T) {
 	srv := attachmentServer(t)
 	defer srv.Close()
 	f := loopbackFetcher()
-	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
+	node := attachmentTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
 
-	out, ne := f.inlineImageInputs(context.Background(), node, map[string]any{"picture": srv.URL + "/page"})
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"picture": srv.URL + "/page"})
 	require.Nil(t, out)
 	require.NotNil(t, ne, "an image field pointing at a web page must fail the run")
 	assert.Equal(t, "attachment_fetch_error", ne.Type)
 	assert.Contains(t, ne.Message, "image", "the error must explain it could not be loaded as an image")
 }
 
-func TestInlineImageInputsLeavesDataURLAndTextInputsUntouched(t *testing.T) {
+func TestInlineAttachmentInputsLeavesDataURLAndTextInputsUntouched(t *testing.T) {
 	f := loopbackFetcher()
 	// picture is image-typed but already an inline data URL (no fetch needed);
 	// link is str-typed and must not be eagerly fetched even though it is a URL.
-	node := imageTypedNode(
+	node := attachmentTypedNode(
 		dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage},
 		dsl.Field{Identifier: "link", Type: dsl.FieldTypeStr},
 	)
@@ -362,7 +365,7 @@ func TestInlineImageInputsLeavesDataURLAndTextInputsUntouched(t *testing.T) {
 		"picture": "data:image/png;base64,AAAA",
 		"link":    "http://127.0.0.1:1/skip.png",
 	}
-	out, ne := f.inlineImageInputs(context.Background(), node, inputs)
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, inputs)
 	require.Nil(t, ne)
 	assert.Equal(t, "data:image/png;base64,AAAA", out["picture"], "an inline data URL must pass through untouched")
 	assert.Equal(t, "http://127.0.0.1:1/skip.png", out["link"], "a str-typed URL must not be eagerly fetched")
@@ -401,28 +404,80 @@ func TestAttachmentErrorStripsUserinfoCredentials(t *testing.T) {
 	assert.Contains(t, ne.Message, "cdn.example.com/private/file.png", "the attachment stays identifiable by host + path")
 }
 
-func TestRedactAttachmentsForTracingStripsInlineBytes(t *testing.T) {
-	bigB64 := strings.Repeat("A", 4096)
+// base64OfDecodedSize returns a base64 string that approxBase64Bytes reads as
+// roughly `decoded` bytes, so the tests below are written in the same units as
+// the budget constants rather than in encoded length.
+func base64OfDecodedSize(decoded int) string {
+	return strings.Repeat("A", decoded*4/3+4)
+}
+
+// @scenario "An attachment small enough to carry reaches the trace as real content"
+// @scenario "Audio and documents follow the same budget as images"
+func TestMessagesForTracingCarriesAttachmentsThatFit(t *testing.T) {
+	smallB64 := base64OfDecodedSize(64 << 10)
 	messages := []app.ChatMessage{{Role: "user", Content: []any{
 		map[string]any{"type": "text", "text": "describe these"},
-		map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64," + bigB64}},
-		map[string]any{"type": "input_audio", "input_audio": map[string]any{"data": bigB64, "format": "mp3"}},
-		map[string]any{"type": "file", "file": map[string]any{"filename": "doc.pdf", "file_data": "data:application/pdf;base64," + bigB64}},
+		map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64," + smallB64}},
+		map[string]any{"type": "input_audio", "input_audio": map[string]any{"data": smallB64, "format": "mp3"}},
+		map[string]any{"type": "file", "file": map[string]any{"filename": "doc.pdf", "file_data": "data:application/pdf;base64," + smallB64}},
 	}}}
 
-	traced := redactAttachmentsForTracing(messages)
+	traced := messagesForTracing(messages)
 	tracedJSON, err := json.Marshal(traced)
 	require.NoError(t, err)
-	assert.NotContains(t, string(tracedJSON), bigB64, "the base64 payload must not survive into the trace copy")
-	assert.Contains(t, string(tracedJSON), "image/png", "the media-type summary is kept for the trace")
-	assert.Contains(t, string(tracedJSON), "bytes]", "a size summary is kept for the trace")
+	assert.Contains(t, string(tracedJSON), smallB64, "an attachment that fits reaches the trace as real content")
+	assert.NotContains(t, string(tracedJSON), "bytes]", "nothing is summarized when everything fits")
 	assert.Contains(t, string(tracedJSON), "describe these", "text content is preserved")
+	assert.Equal(t, 3, strings.Count(string(tracedJSON), smallB64), "image, audio and document are all carried")
+}
+
+// @scenario "An attachment too large to carry keeps a summary naming its type and size"
+func TestMessagesForTracingSummarizesAttachmentsThatDoNotFit(t *testing.T) {
+	hugeB64 := base64OfDecodedSize(maxTracedAttachmentBytes + (1 << 20))
+	messages := []app.ChatMessage{{Role: "user", Content: []any{
+		map[string]any{"type": "text", "text": "describe this"},
+		map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64," + hugeB64}},
+	}}}
+
+	traced := messagesForTracing(messages)
+	tracedJSON, err := json.Marshal(traced)
+	require.NoError(t, err)
+	assert.NotContains(t, string(tracedJSON), hugeB64, "an oversized payload must not reach the trace")
+	assert.Contains(t, string(tracedJSON), "image/png", "the summary names the media type")
+	assert.Contains(t, string(tracedJSON), "bytes]", "the summary names the byte count")
+	assert.Contains(t, string(tracedJSON), "describe this", "text content is preserved")
 
 	// The original messages still carry the full bytes — the model gets the real
-	// attachment, only the traced copy is shrunk.
+	// attachment either way, only the traced copy is bounded.
 	origJSON, err := json.Marshal(messages)
 	require.NoError(t, err)
-	assert.Contains(t, string(origJSON), bigB64, "the original messages must keep the full bytes for the model")
+	assert.Contains(t, string(origJSON), hugeB64, "the original messages must keep the full bytes for the model")
+}
+
+// @scenario "The budget counts every attachment in the message, not each one alone"
+func TestMessagesForTracingSpendsOneBudgetAcrossParts(t *testing.T) {
+	// Each part is under the per-attachment ceiling, so only the shared budget
+	// can stop the second one.
+	half := maxTracedAttachmentBudgetBytes/2 + (64 << 10)
+	require.Less(t, half, maxTracedAttachmentBytes, "each part must fit on its own")
+	first := base64OfDecodedSize(half)
+	second := base64OfDecodedSize(half) + "B"
+
+	messages := []app.ChatMessage{
+		{Role: "user", Content: []any{
+			map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64," + first}},
+		}},
+		{Role: "user", Content: []any{
+			map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/jpeg;base64," + second}},
+		}},
+	}
+
+	traced := messagesForTracing(messages)
+	tracedJSON, err := json.Marshal(traced)
+	require.NoError(t, err)
+	assert.Contains(t, string(tracedJSON), first, "the first attachment is carried while the budget holds")
+	assert.NotContains(t, string(tracedJSON), second, "the budget is spent, so the rest keep their summaries")
+	assert.Contains(t, string(tracedJSON), "image/jpeg", "the summary still names what was left out")
 }
 
 func TestNormalizeMediaType(t *testing.T) {
@@ -440,4 +495,240 @@ func TestTrimTrailingPunct(t *testing.T) {
 	url, trailing = trimTrailingPunct("https://x/cat.png")
 	assert.Equal(t, "https://x/cat.png", url)
 	assert.Empty(t, trailing)
+}
+
+// @scenario "A file-typed input holding a remote URL is fetched and delivered by its content type"
+func TestInlineAttachmentInputsResolvesRemoteFileToDataURL(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+	node := attachmentTypedNode(dsl.Field{Identifier: "report", Type: dsl.FieldTypeFile})
+	inputs := map[string]any{"report": srv.URL + "/doc.pdf"}
+
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, inputs)
+	require.Nil(t, ne)
+	got, _ := out["report"].(string)
+	assert.True(t, strings.HasPrefix(got, "data:application/pdf;name=doc.pdf;base64,"),
+		"the file-typed URL must inline with its name, got %q", got)
+	assert.Equal(t, srv.URL+"/doc.pdf", inputs["report"],
+		"the original inputs map must keep the readable URL, not a base64 blob")
+
+	// The splitter that runs next must turn it into a document the model reads.
+	msgs := splitMessagesWithAttachments(userMessage("Read " + got))
+	file := firstPartOfType(t, msgs[0], "file")
+	data, _ := file["file"].(map[string]any)
+	assert.Equal(t, "doc.pdf", data["filename"], "the file name comes from the URL path")
+}
+
+// @scenario "A file-typed input accepts any content type"
+func TestInlineAttachmentInputsAcceptsAnyContentTypeForFileFields(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+	node := attachmentTypedNode(dsl.Field{Identifier: "report", Type: dsl.FieldTypeFile})
+
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"report": srv.URL + "/page"})
+	require.Nil(t, ne, "the author declared the field a file, so any content type is the file they meant")
+	got, _ := out["report"].(string)
+	assert.True(t, strings.HasPrefix(got, "data:text/html;name=page;base64,"), "got %q", got)
+
+	msgs := splitMessagesWithAttachments(userMessage(got))
+	file := firstPartOfType(t, msgs[0], "file")
+	data, _ := file["file"].(map[string]any)
+	assert.Equal(t, "page", data["filename"])
+}
+
+// @scenario "A large inlined text file keeps a summary in the trace"
+func TestMessagesForTracingSummarizesOversizedTextAttachment(t *testing.T) {
+	big := strings.Repeat("a", maxTracedAttachmentBytes+1)
+	messages := []app.ChatMessage{{Role: "user", Content: []any{
+		map[string]any{"type": "text", "text": "read this"},
+		map[string]any{"type": "text", "text": big},
+	}}}
+
+	traced := messagesForTracing(messages)
+	parts, ok := traced[0].Content.([]any)
+	require.True(t, ok)
+	_, prompt := partType(t, parts[0])
+	assert.Equal(t, "read this", prompt["text"], "ordinary prompt text is never summarized")
+	_, summary := partType(t, parts[1])
+	assert.Equal(t, fmt.Sprintf("[text, %d bytes]", len(big)), summary["text"])
+
+	original, _ := messages[0].Content.([]any)
+	_, kept := partType(t, original[1])
+	assert.Equal(t, big, kept["text"], "the model still receives the whole text")
+}
+
+// @scenario "Many small inlined text files are bounded too"
+func TestMessagesForTracingBoundsManySmallTextAttachments(t *testing.T) {
+	// Each part rides free on its own, so only an aggregate ceiling can stop
+	// the run of them.
+	part := strings.Repeat("a", smallTracedTextBytes)
+	count := (maxTracedFreeTextBytes+maxTracedAttachmentBudgetBytes)/len(part) + 8
+	parts := make([]any, 0, count)
+	for range count {
+		parts = append(parts, map[string]any{"type": "text", "text": part})
+	}
+
+	traced := messagesForTracing([]app.ChatMessage{{Role: "user", Content: parts}})
+	tracedParts, ok := traced[0].Content.([]any)
+	require.True(t, ok)
+
+	summarized := 0
+	for _, p := range tracedParts {
+		_, block := partType(t, p)
+		if text, _ := block["text"].(string); text != part {
+			assert.Equal(t, fmt.Sprintf("[text, %d bytes]", len(part)), text)
+			summarized++
+		}
+	}
+	assert.Positive(t, summarized, "the text past both allowances keeps a summary")
+}
+
+func TestDataURLWithNameSurvivesPunctuationInTheFileName(t *testing.T) {
+	// A semicolon, a comma or a space would end the parameter early and hide
+	// the whole data URL from the splitter.
+	att := &fetchedAttachment{mediaType: "application/pdf", data: []byte("%PDF-1.4")}
+	built := dataURLWithName(att, "q3, final; v2.pdf")
+
+	msgs := splitMessagesWithAttachments(userMessage("Read " + built))
+	file := firstPartOfType(t, msgs[0], "file")
+	data, _ := file["file"].(map[string]any)
+	assert.Equal(t, "q3, final; v2.pdf", data["filename"])
+}
+
+// sizedImageServer serves a PNG-typed body of exactly n bytes. With chunked set
+// it withholds Content-Length, so the cap is enforced on the bytes read rather
+// than on the declared length.
+func sizedImageServer(t *testing.T, n int, chunked bool) *httptest.Server {
+	t.Helper()
+	body := make([]byte, n)
+	copy(body, pngBytes)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		if chunked {
+			w.(http.Flusher).Flush()
+		}
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+const testMiB = 1024 * 1024
+
+// @scenario "An attachment over the default size is fetched when the request raises the limit"
+func TestFetchHonorsARequestLimitAboveTheDefault(t *testing.T) {
+	size := int(app.DefaultMaxAttachmentBytes) + 1
+	for name, chunked := range map[string]bool{"declared length": false, "chunked": true} {
+		t.Run(name, func(t *testing.T) {
+			srv := sizedImageServer(t, size, chunked)
+			shared := loopbackFetcher()
+
+			_, ne := shared.fetch(context.Background(), srv.URL+"/big.png")
+			require.NotNil(t, ne, "one byte past the default must be refused when no limit is named")
+			assert.Contains(t, ne.Message, "larger than the 20 MB attachment limit")
+
+			att, ne := shared.withMaxBytes(21*testMiB).fetch(context.Background(), srv.URL+"/big.png")
+			require.Nil(t, ne)
+			assert.Len(t, att.data, size)
+			assert.Equal(t, app.DefaultMaxAttachmentBytes, shared.maxBytes,
+				"the engine-wide fetcher keeps the default for the runs beside this one")
+		})
+	}
+}
+
+// @scenario "A request that lowers the limit refuses an attachment the default would accept"
+func TestFetchHonorsARequestLimitBelowTheDefault(t *testing.T) {
+	for name, chunked := range map[string]bool{"declared length": false, "chunked": true} {
+		t.Run(name, func(t *testing.T) {
+			srv := sizedImageServer(t, 4096, chunked)
+			shared := loopbackFetcher()
+
+			_, ne := shared.withMaxBytes(1024).fetch(context.Background(), srv.URL+"/a.png")
+			require.NotNil(t, ne)
+			assert.Equal(t, "attachment_fetch_error", ne.Type)
+
+			at, ne := shared.withMaxBytes(4096).fetch(context.Background(), srv.URL+"/a.png")
+			require.Nil(t, ne, "a body exactly at the limit is accepted")
+			assert.Len(t, at.data, 4096)
+		})
+	}
+}
+
+func TestFormatAttachmentLimit(t *testing.T) {
+	assert.Equal(t, "20 MB", formatAttachmentLimit(20*testMiB))
+	assert.Equal(t, "1024 MB", formatAttachmentLimit(1024*testMiB))
+	assert.Equal(t, "1.50 MB", formatAttachmentLimit(testMiB+testMiB/2))
+}
+
+func TestEncodeDataURLMatchesTheStandardEncoding(t *testing.T) {
+	for _, data := range [][]byte{nil, []byte("a"), []byte("ab"), []byte("abc"), pngBytes} {
+		att := &fetchedAttachment{mediaType: "image/png", data: data}
+		assert.Equal(t, "data:image/png;base64,"+base64.StdEncoding.EncodeToString(data), dataURL(att))
+	}
+}
+
+// imageInputWorkflow is a signature node with one image-typed input.
+func imageInputWorkflow(t *testing.T) *dsl.Workflow {
+	t.Helper()
+	llmConfigJSON, err := json.Marshal(map[string]any{"model": "openai/gpt-5-mini"})
+	require.NoError(t, err)
+	return &dsl.Workflow{
+		WorkflowID: "wf_attachment_limit",
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
+				Outputs: []dsl.Field{{Identifier: "picture", Type: dsl.FieldTypeImage}},
+			}},
+			{ID: "answer", Type: dsl.ComponentSignature, Data: dsl.Component{
+				Parameters: []dsl.Field{{Identifier: "llm", Type: dsl.FieldTypeLLM, Value: llmConfigJSON}},
+				Inputs:     []dsl.Field{{Identifier: "picture", Type: dsl.FieldTypeImage}},
+				Outputs:    []dsl.Field{{Identifier: "answer", Type: dsl.FieldTypeStr}},
+			}},
+			{ID: "end", Type: dsl.ComponentEnd, Data: dsl.Component{
+				Inputs: []dsl.Field{{Identifier: "answer", Type: dsl.FieldTypeStr}},
+			}},
+		},
+		Edges: []dsl.Edge{
+			{Source: "entry", SourceHandle: "outputs.picture", Target: "answer", TargetHandle: "inputs.picture"},
+			{Source: "answer", SourceHandle: "outputs.answer", Target: "end", TargetHandle: "inputs.answer"},
+		},
+	}
+}
+
+// @scenario "The too-large error names the limit the run was under"
+// @scenario "A request that names no limit runs under the default limit"
+func TestEngineExecute_AppliesTheRequestAttachmentLimitPerRun(t *testing.T) {
+	srv := sizedImageServer(t, testMiB+1, false)
+	eng := New(Options{
+		LLM:  &fakeLLMClient{resp: &app.LLMResponse{Content: "a cat"}},
+		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}},
+	})
+	run := func(maxAttachmentBytes int64) *ExecuteResult {
+		res, err := eng.Execute(context.Background(), ExecuteRequest{
+			Workflow:           imageInputWorkflow(t),
+			Inputs:             map[string]any{"picture": srv.URL + "/big.png"},
+			MaxAttachmentBytes: maxAttachmentBytes,
+		})
+		require.NoError(t, err)
+		return res
+	}
+
+	limited := run(testMiB)
+	require.Equal(t, "error", limited.Status)
+	require.NotNil(t, limited.Error)
+	assert.Equal(t, "attachment_fetch_error", limited.Error.Type)
+	assert.Contains(t, limited.Error.Message, "is larger than the 1 MB attachment limit")
+
+	// The same engine, with no limit named, serves the default again.
+	unlimited := run(0)
+	assert.Equal(t, "success", unlimited.Status, "engine error: %+v", unlimited.Error)
+	assert.Equal(t, "success", run(-5).Status)
+}
+
+func TestForwardedMaxAttachmentBytes(t *testing.T) {
+	assert.Equal(t, int64(0), forwardedMaxAttachmentBytes(ExecuteRequest{}))
+	assert.Equal(t, int64(0), forwardedMaxAttachmentBytes(ExecuteRequest{MaxAttachmentBytes: -1}))
+	assert.Equal(t, int64(5*testMiB), forwardedMaxAttachmentBytes(ExecuteRequest{MaxAttachmentBytes: 5 * testMiB}))
+	assert.Equal(t, app.MaxAttachmentBytesCeiling, forwardedMaxAttachmentBytes(ExecuteRequest{MaxAttachmentBytes: 1 << 40}))
 }

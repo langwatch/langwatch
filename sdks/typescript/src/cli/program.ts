@@ -1,26 +1,19 @@
 /**
  * The commander command tree.
- *
- * Split out of `index.ts` as a FACTORY rather than a module-level singleton so
- * the daemon can build a fresh tree per request. Commander stores parsed option
- * values on the Command objects themselves, so reusing one tree across requests
- * would leak (say) a `--format json` from one caller into the next caller who
- * did not pass it.
- *
- * Keeping this out of `index.ts` also keeps the CLI entrypoint thin: on the
- * daemon-served path the client never loads commander or any command module at
- * all, which is most of the cold start it is trying to avoid.
- *
- * Every command registration below is unchanged from when it lived in
- * `index.ts` — this was a move, not a rewrite.
  */
 
 import { Command, Option } from "commander";
+
+import { setRequestedProject, setRunsOutsideProject } from "../internal/credentialContext";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
 } from "../internal/generated/redaction/sessionReport";
+import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
+import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
+import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
+import { trustLocalDevCa } from "./utils/localDevCa";
 import {
   applyOutputContext,
   assertFormatIsSupported,
@@ -30,8 +23,28 @@ import {
   rendersOwnResult,
   type RawOutputFlags,
 } from "./utils/output";
+import {
+  applyProjectOption,
+  COMMANDS_ACROSS_PROJECTS,
+  COMMANDS_WITHOUT_PROJECT,
+  commandPath,
+  PROJECT_FLAG_HELP,
+  projectSelectorOf,
+  QUERY_PROJECT_FLAG_HELP,
+} from "./utils/projectOption";
 
 declare const __CLI_VERSION__: string;
+
+/** The `langwatch <tool>` commands that run a coding tool in its own terminal. */
+export const TOOL_WRAPPER_COMMANDS = [
+  "claude",
+  "codex",
+  "copilot",
+  "code",
+  "cursor",
+  "gemini",
+  "opencode",
+] as const;
 
 /**
  * Help for the repeatable `--param key=value` flag the run commands share.
@@ -45,18 +58,189 @@ const WORKFLOW_PARAM_FLAG_HELP = `${PARAM_FLAG_HELP} The workflow receives it as
 
 /**
  * Collect a repeated `--param` into the list the run commands read.
- *
- * One value per occurrence rather than a variadic `<pair...>`: a variadic
- * option keeps eating argv until the next flag, so `--param env=prod my-suite`
- * would swallow the id the command is about to run.
  */
-const collectParam = (pair: string, previous: string[] = []): string[] => [
-  ...previous,
-  pair,
-];
+const collectParam = (pair: string, previous: string[] = []): string[] => [...previous, pair];
+
+/**
+ * Help for the `--note` flag the run commands share. Written here rather than
+ * imported so the command tree keeps its own boot cost; the reading it
+ * describes lives in `cli/utils/runNote.ts`.
+ */
+const NOTE_FLAG_HELP =
+  "Why this run is being started: its hypothesis or commit message. It is kept with the batch and shown beside every run in it. Up to 200 characters.";
+
+/** Help for the `--test-suite` flag on the scenario write commands. */
+const TEST_SUITE_FLAG_HELP = "The test suite to file this scenario in, named by ID or by name.";
+
+/**
+ * Help for the four scope flags of `run-plan run`. They answer one question,
+ * so exactly one of them must be given.
+ */
+const SCOPE_ALL_FLAG_HELP =
+  "Run every active scenario of the project. The set is read again at each run, so a scenario written later runs too.";
+
+const SCOPE_TEST_SUITE_FLAG_HELP =
+  "Run the scenarios filed in this test suite, named by ID or by name. Repeat the flag for more than one.";
+
+const SCOPE_LABEL_FLAG_HELP =
+  "Run the scenarios carrying this label. Repeat the flag for more than one.";
+
+const SCOPE_SCENARIO_FLAG_HELP =
+  "Run this scenario, named by ID. Repeat the flag for more than one.";
+
+/**
+ * Help for the flags a run command shares. `--target` repeats one value per
+ * occurrence for the same reason `--param` does: a variadic option keeps
+ * eating argv until the next flag.
+ */
+const TARGET_FLAG_HELP =
+  "What to run against, written <type>:<referenceId>, for example connected:support-agent. The types are connected, http, code, prompt and workflow. connected:<name> runs the agent in development, or in the one other environment it is online in; connected:<name>@<environment> names the environment, for example connected:support-agent@production, and connected:<id> names the agent by id. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example connected:support-agent?model=gpt-5, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
+
+const RUN_NAME_FLAG_HELP =
+  "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";
+
+const TRIGGER_FILTERS_HELP =
+  'Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {"traces.error":["true"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {"evaluations.passed":{"<monitorId>":["false"]}}; metadata.value keys by metadata key, e.g. {"metadata.value":{"<key>":["true"]}}. A keyed field sent flat is refused';
+
+const REPEAT_FLAG_HELP = "How many times to run each scenario against each target, from 1 to 5.";
+
+const SIMULATOR_MODEL_FLAG_HELP =
+  "The model that plays the user in this run. Left out, the project default is used.";
+
+const JUDGE_MODEL_FLAG_HELP =
+  "The model that judges this run against the criteria. Left out, the project default is used.";
+
+const IDEMPOTENCY_KEY_FLAG_HELP =
+  "Key that makes this run safe to retry. Two requests carrying the same key schedule one run.";
+
+/** Help for the `--field` flag on the test suite write commands. */
+const SUITE_FIELD_FLAG_HELP =
+  "A field the test suite declares, written identifier:type, for example golden_sql:text. The types are text, number and boolean; an identifier is lowercase letters, digits and underscores, starting with a letter. Repeat the flag for more than one. On update, the flags together replace the list the suite holds.";
+
+/** Help for the `--field` flag on the scenario write commands. */
+const SCENARIO_FIELD_FLAG_HELP =
+  "The scenario's value for a field its test suite declares, written identifier=value, for example golden_sql='SELECT 1'. A number field reads a number and a boolean field reads true or false; a field the suite does not declare is refused. Repeat the flag for more than one. On update, the flags together replace the values the scenario holds.";
+
+/**
+ * Help for the `--evaluator` family, shared by the test suite write commands
+ * and `run-plan run`. The gate flags read the evaluator written just before
+ * them, so they are collected in order rather than by commander's last-wins.
+ */
+const EVALUATOR_FLAG_HELP =
+  "A saved evaluator to run after every scenario run, named by ID or by slug. Its input mappings are inferred: input-like inputs read the first user message, output-like ones the last agent message, contexts the retrieved contexts of the trace, and expected-like ones a field of the suite by name. A tool call is never inferred; set it with --evaluators-json. Repeat the flag for more than one.";
+
+const EVALUATOR_REQUIRED_FLAG_HELP =
+  "Make the evaluator written just before it gate the scenario: a failing result fails the scenario. The default for an evaluator that produces a pass or fail verdict.";
+
+const EVALUATOR_NOT_REQUIRED_FLAG_HELP =
+  "Make the evaluator written just before it report only: its result shows beside the verdict and never fails the scenario. The default for a score-only evaluator.";
+
+const EVALUATORS_JSON_FLAG_HELP =
+  "The full evaluator attachment list, as a JSON document or the path of a file holding one: [{ evaluatorId, required, mappings: { <input>: { type: 'source', sourceId: 'conversation'|'scenario'|'trace', path: [...] } | { type: 'value', value } } }]. Conversation paths: first_user_message, last_agent_message, transcript, messages. Scenario paths: situation, criteria, or fields followed by a field identifier. Trace paths: contexts, or tool_calls followed by a tool name and input or output.";
+
+const PLAN_EVALUATOR_FLAG_HELP =
+  "A saved evaluator the plan runs beside the ones its test suites attach, named by ID or by slug. A plan evaluator reads the conversation and the trace, never a scenario field. Repeat the flag for more than one.";
+
+/**
+ * Reads the `--test-suite` / `--no-test-suite` pair.
+ */
+const trackTestSuiteFlags = (
+  command: Command,
+): (() => { testSuite?: string; noTestSuite: boolean }) => {
+  let testSuite: string | undefined;
+  let noTestSuite = false;
+  command.on("option:test-suite", (value: string) => {
+    testSuite = value;
+  });
+  command.on("option:no-test-suite", () => {
+    noTestSuite = true;
+  });
+  return () => {
+    const read = {
+      ...(testSuite !== undefined && { testSuite }),
+      noTestSuite,
+    };
+    testSuite = undefined;
+    noTestSuite = false;
+    return read;
+  };
+};
+
+/**
+ * Records `--evaluator`, `--required` and `--not-required` in the order
+ * written. A boolean flag keeps only its last value in commander, so
+ * pairing a gate flag with its evaluator is read from option events instead.
+ */
+const trackEvaluatorFlags = (
+  command: Command,
+): (() => { reference: string; required?: boolean }[] | undefined) => {
+  let refs: { reference: string; required?: boolean }[] | undefined;
+  const gate = (required: boolean): void => {
+    const last = refs?.[refs.length - 1];
+    if (!last) {
+      console.error(
+        `Error: ${required ? "--required" : "--not-required"} must follow the --evaluator it applies to`,
+      );
+      process.exit(1);
+    }
+    last.required = required;
+  };
+  command.on("option:evaluator", (value: string) => {
+    refs = [...(refs ?? []), { reference: value }];
+  });
+  command.on("option:required", () => gate(true));
+  command.on("option:not-required", () => gate(false));
+  return () => {
+    const read = refs;
+    refs = undefined;
+    return read;
+  };
+};
+
+/**
+ * Records `--ask` and its modifiers in the order written, which commander does
+ * not preserve across different options; a modifier before any `--ask`
+ * describes the positional question. Read in `instant-evals/questionFlags.ts`.
+ */
+const trackQuestionFlags = (command: Command): (() => QuestionDraft[]) => {
+  let drafts: QuestionDraft[] = [];
+  const current = (): QuestionDraft => {
+    const last = drafts[drafts.length - 1];
+    if (last) return last;
+    const opened: QuestionDraft = { criteria: [], categories: [] };
+    drafts.push(opened);
+    return opened;
+  };
+  command.on("option:ask", (value: string) => {
+    drafts.push({ instructions: value, criteria: [], categories: [] });
+  });
+  command.on("option:criteria", (value: string) => {
+    current().criteria.push(value);
+  });
+  command.on("option:category", (value: string) => {
+    current().categories.push(value);
+  });
+  command.on("option:score", (value: string) => {
+    current().score = value;
+  });
+  command.on("option:threshold", (value: string) => {
+    current().threshold = value;
+  });
+  command.on("option:id", (value: string) => {
+    current().id = value;
+  });
+  return () => {
+    const read = drafts;
+    drafts = [];
+    return read;
+  };
+};
 
 // Import commands with proper async handling
-const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
+const addCommand = async (
+  name: string,
+  options: { version?: string; localFile?: string },
+): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
   return addCommandImpl(name, options);
 };
@@ -71,9 +255,12 @@ const initCommand = async (): Promise<void> => {
   return initCommandImpl();
 };
 
-const loginCommand = async (
-  options?: { apiKey?: string; device?: boolean; browser?: string },
-): Promise<void> => {
+const loginCommand = async (options?: {
+  apiKey?: string;
+  device?: boolean;
+  browser?: string;
+  management?: boolean;
+}): Promise<void> => {
   const { loginCommand: loginCommandImpl } = await import("./commands/login.js");
   return loginCommandImpl(options);
 };
@@ -88,24 +275,16 @@ const pullCommand = async (options?: { tag?: string }): Promise<void> => {
   return pullCommandImpl(options);
 };
 
-const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boolean }): Promise<void> => {
+const pushCommand = async (options?: {
+  forceLocal?: boolean;
+  forceRemote?: boolean;
+}): Promise<void> => {
   const { pushCommand: pushCommandImpl } = await import("./commands/push.js");
   return pushCommandImpl(options);
 };
 
 /**
  * The name to title usage, help and commander errors with.
- *
- * The package ships two bin names for the same bundle (see package.json): `lw`
- * (the advertised name) and `langwatch` (the long-standing alias). Whichever
- * one was invoked is the one the caller must be shown.
- *
- * `bin` is the CALLER's `process.argv[1]`, which is only distinct from this
- * process's when the program is built inside the daemon — one daemon serves
- * both bins (`resolveBuildId` stats the same symlink target either way), so its
- * own argv[1] is whichever bin happened to spawn it and is a coin flip for
- * everybody else. Absent, this falls back to the running process's argv, which
- * is correct for every in-process invocation.
  */
 function resolveProgramName(bin: string | undefined): string {
   const invoked = (bin ?? process.argv[1] ?? "").split(/[\\/]/).pop();
@@ -117,7 +296,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   program
     .name(resolveProgramName(bin))
-    .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, suites, and more")
+    .description(
+      "LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, test suites, and more",
+    )
     .version(__CLI_VERSION__, "-v, --version", "Display the current version")
     .enablePositionalOptions()
     .passThroughOptions()
@@ -127,36 +308,121 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .showHelpAfterError()
     .showSuggestionAfterError();
 
-  // Record the output context of the command about to run, so that when it
-  // FAILS it fails in the shape the caller asked for — a structured document
-  // for any machine format, a human block otherwise (see utils/errorOutput.ts)
-  // — and so that agent mode turns colour and spinners off (utils/output.ts).
-  //
-  // Here rather than at the ~100 catch sites: a command that forgot would print
-  // prose at a parser, which is precisely the failure this is meant to end. Set
-  // on every action, including those without any output flag, so a daemon
-  // serving one command after another cannot leak the last caller's format
-  // into the next.
-  //
-  // Every spelling funnels through the one central preprocessor: the new
-  // `-o/--output`, `--json <fields>`, `--jq` and `--agent` (plus agent-mode
-  // env vars), and the legacy `-f/--format json` and bare boolean `--json`
-  // (the ingest/governance/daemon spelling) — all normalised by
-  // resolveOutputOptions. resolveActionOutputOptions additionally keeps a
-  // command's OWN `--json <json>` payload option (dataset records add/update)
-  // from being misread as machine-output intent.
-  //
-  // `assertFormatIsSupported` runs first: a command that has not been migrated
-  // to `emitsResult` cannot honour `-o json`, and answering it with a chalk
-  // table at exit 0 is the one failure a machine caller cannot detect. An
-  // explicit request there is an error; agent mode merely detected from the
-  // environment falls back to the table with a warning (see utils/output.ts).
+  // Record the output context of the command about to run, so that when it FAILS it fails in
+  // the shape the caller asked for — a structured document for any machine format, a human
+  // block otherwise (see utils/errorOutput.ts) — and so that agent mode turns colour and
+  // spinners off (utils/output.ts).
   program.hook("preAction", async (_thisCommand, actionCommand) => {
     const requested = resolveActionOutputOptions(actionCommand);
     const effective = await assertFormatIsSupported(actionCommand, requested);
     await applyOutputContext(effective);
+    // The project the command line pointed this request at, published before
+    // the action runs so `resolveCredentials` reads it without the action
+    // having to accept the value and pass it on.
+    setRequestedProject(projectSelectorOf(actionCommand));
+    const path = commandPath(actionCommand);
+    setRunsOutsideProject(path in COMMANDS_WITHOUT_PROJECT || path in COMMANDS_ACROSS_PROJECTS);
+    const endpointFlag: unknown = actionCommand.opts().endpoint;
+    trustLocalDevCa({
+      endpoint: resolveControlPlaneUrl({
+        flag: typeof endpointFlag === "string" ? endpointFlag : null,
+      }),
+    });
   });
 
+  registerLoginCommands(program);
+  registerConfigCommands(program);
+  registerOpenCommands(program);
+  registerWhoamiCommands(program);
+  registerClaudeCommands(program);
+  registerCodexCommands(program);
+  registerCopilotCommands(program);
+  registerCodeCommands(program);
+  registerInstrumentCommands(program);
+  registerCopilotAppCommands(program);
+  registerCursorCommands(program);
+  registerGeminiCommands(program);
+  registerOpencodeCommands(program);
+  registerCodingAssistantHelp(program);
+  registerReportCommands(program);
+  registerLogoutCommands(program);
+  registerIngestCommands(program);
+  registerGovernanceCommands(program);
+  registerPromptCommands(program);
+  registerStatusCommands(program);
+  registerDoctorCommands(program);
+  registerCommandCatalog(program);
+  registerHelpTreeCommands(program);
+  registerHelpCommands(program);
+  registerSkillsCommands(program);
+  registerDocsCommands(program);
+  registerScenarioDocsCommands(program);
+  registerEvaluatorCommands(program);
+  registerExperimentCommands(program);
+  registerWorkflowCommands(program);
+  registerLangyCommands(program);
+  registerAgentCommands(program);
+  registerDashboardCommands(program);
+  registerBoardCommands(program);
+  registerModelProviderCommands(program);
+  registerModelDefaultCommands(program);
+  registerVirtualKeysCommands(program);
+  registerGatewayBudgetsCommands(program);
+  registerWebhooksCommands(program);
+  registerSpendEventsCommands(program);
+  registerAnnotationCommands(program);
+  registerAnalyticsCommands(program);
+  registerQueryCommands(program);
+  registerInstantEvalCommands(program);
+  registerTraceCommands(program);
+  registerSessionCommands(program);
+  registerScenarioCommands(program);
+  registerRunPlanCommands(program);
+  registerTestSuiteCommands(program);
+  registerGraphCommands(program);
+  registerChartCommands(program);
+  registerDashboardWidgetCommands(program);
+  registerTriggerCommands(program);
+  registerSlackConnectionCommands(program);
+  registerSecretCommands(program);
+  registerMonitorCommands(program);
+  registerSimulationRunCommands(program);
+  registerNavigateCommands(program);
+  registerOnboardingCommands(program);
+  registerUiCommands(program);
+  registerWorkbenchCommands(program);
+  registerDatasetCommands(program);
+  registerProjectsCommands(program);
+  registerApiKeysCommands(program);
+  registerOrganizationCommands(program);
+  registerMembersCommands(program);
+  registerInvitesCommands(program);
+  registerTeamsCommands(program);
+  registerGroupsCommands(program);
+  registerRolesCommands(program);
+  registerRoleBindingsCommands(program);
+  registerGrantsCommands(program);
+  registerScimTokensCommands(program);
+  registerOrganizationsCommands(program);
+  registerDaemonCommands(program);
+
+  // The output contract's global flags (`-o/--output`, `--json <fields>`,
+  // `--jq`, `--agent`), added here — once, centrally — rather than per
+  // command. Registered on the built tree so buildProgram() stays a pure
+  // factory: no module-level state, nothing leaks between daemon requests.
+  registerOutputOptions(program);
+
+  // `--project` on every command that runs inside a project, added the same
+  // way and for the same reason: a family that adopts it one at a time is a
+  // family that forgets it, which is how the whole instant-eval family shipped
+  // with no way to name a project. The two exemption lists live with the
+  // helper (utils/projectOption.ts).
+  applyProjectOption(program);
+
+  return program;
+}
+
+function registerLoginCommands(program: Command): void {
   // Top-level commands
   const loginCmd = program
     .command("login")
@@ -169,11 +435,21 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description(
       "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK).",
     )
-    .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key), writes to .env")
-    .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)")
+    .option(
+      "--api-key <key>",
+      "Set API key non-interactively (CI/agents that already have a project API key), writes to .env",
+    )
+    .option(
+      "--endpoint <url>",
+      "Override the LangWatch control-plane URL for this login (self-hosted instances)",
+    )
     .option(
       "--device",
       "RFC 8628 device-flow login via your company SSO; signs this device in for the coding-assistant wrappers (credentials are issued on first use)",
+    )
+    .option(
+      "--management",
+      "With --device: the login key also gets the management access you hold in the organization (create and manage teams, manage the organization's settings, members and roles). Off by default",
     )
     .option(
       "--project [slug]",
@@ -188,16 +464,28 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
     );
 
-  loginCmd.action(async (options: { apiKey?: string; device?: boolean; project?: boolean | string; browser?: string; endpoint?: string; token?: string }) => {
-    try {
-      await loginCommand(options);
-    } catch (error) {
-      const { reportCommandError } = await import("./utils/errorOutput.js");
-      reportCommandError({ error });
-      process.exit(1);
-    }
-  });
+  loginCmd.action(
+    async (options: {
+      apiKey?: string;
+      device?: boolean;
+      project?: boolean | string;
+      browser?: string;
+      endpoint?: string;
+      token?: string;
+      management?: boolean;
+    }) => {
+      try {
+        await loginCommand(options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+}
 
+function registerConfigCommands(program: Command): void {
   // `langwatch config <get|set|list>` — explicit persistence + introspection
   // for user-global CLI config. Mirrors `gh config` / `doctl auth init` /
   // `stripe config` patterns so users don't hand-edit ~/.langwatch/config.json.
@@ -207,7 +495,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   configCmd
     .command("set <key> <value>")
-    .description("Persist a config value to ~/.langwatch/config.json (e.g. `langwatch config set endpoint https://lw.acme.internal`)")
+    .description(
+      "Persist a config value to ~/.langwatch/config.json (e.g. `langwatch config set endpoint https://lw.acme.internal`)",
+    )
     .action(async (key: string, value: string) => {
       const { configSetCommand } = await import("./commands/config.js");
       await configSetCommand(key, value);
@@ -215,7 +505,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   configCmd
     .command("get <key>")
-    .description("Print the resolved value for a config key (uses the same flag > env > config > default priority as the CLI)")
+    .description(
+      "Print the resolved value for a config key (uses the same flag > env > config > default priority as the CLI)",
+    )
     .action(async (key: string) => {
       const { configGetCommand } = await import("./commands/config.js");
       await configGetCommand(key);
@@ -228,7 +520,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { configListCommand } = await import("./commands/config.js");
       await configListCommand();
     });
+}
 
+function registerOpenCommands(program: Command): void {
   program
     .command("open [path]")
     .description(
@@ -245,30 +539,36 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerWhoamiCommands(program: Command): void {
   // AI Gateway governance — read identity, deep-link, request budget increase.
-  program
-    .command("whoami")
-    .description("Print the identity persisted by `langwatch login --device` (governance plane).")
-    .action(async () => {
+  // Speaks the output port: `-o json|yaml`, `--json <fields>` and `--jq` all
+  // project from the returned `data`. No bespoke boolean `--json` — that spelling
+  // is the port's own projection flag and a boolean would collide with it.
+  emitsResult(
+    program
+      .command("whoami")
+      .description(
+        "Print the identity persisted by `langwatch login --device` (governance plane).",
+      ),
+    async () => {
       try {
         const { whoamiCommand } = await import("./commands/whoami.js");
-        await whoamiCommand();
+        return await whoamiCommand();
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
         process.exit(1);
       }
-    });
+    },
+  );
+}
 
-  // AI Gateway governance — wrapped tool runners.
-  // Each `langwatch <tool>` exec's the underlying binary with the
-  // right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing
-  // at the gateway, after a Screen-8 budget pre-check.
-  //
-  // Marked `hidden:true` so they don't pollute the top-level command list
-  // in `langwatch --help`; rendered together under a "Coding assistants:"
-  // section via addHelpText below. `langwatch <tool> --help` still works.
+function registerClaudeCommands(program: Command): void {
+  // AI Gateway governance — wrapped tool runners. Each `langwatch <tool>` exec's the
+  // underlying binary with the right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected
+  // pointing at the gateway, after a Screen-8 budget pre-check.
   program
     .command("claude", { hidden: true })
     .description("Run `claude` (Claude Code) routed through the LangWatch gateway.")
@@ -285,7 +585,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerCodexCommands(program: Command): void {
   program
     .command("codex", { hidden: true })
     .description("Run `codex` (OpenAI Codex CLI) routed through the LangWatch gateway.")
@@ -302,10 +604,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerCopilotCommands(program: Command): void {
   program
     .command("copilot", { hidden: true })
-    .description("Run `copilot` (GitHub Copilot CLI) with LangWatch telemetry (direct OTLP by default; gateway via --tool-mode=gateway).")
+    .description(
+      "Run `copilot` (GitHub Copilot CLI) with LangWatch telemetry (direct OTLP by default; gateway via --tool-mode=gateway).",
+    )
     .allowUnknownOption(true)
     .allowExcessArguments(true)
     .helpOption(false)
@@ -319,10 +625,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerCodeCommands(program: Command): void {
   program
     .command("code", { hidden: true })
-    .description("Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat (direct OTLP).")
+    .description(
+      "Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat (direct OTLP).",
+    )
     .allowUnknownOption(true)
     .allowExcessArguments(true)
     .helpOption(false)
@@ -336,7 +646,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerInstrumentCommands(program: Command): void {
   program
     .command("instrument", { hidden: true })
     .description(
@@ -376,12 +688,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         }
       },
     );
+}
 
+function registerCopilotAppCommands(program: Command): void {
   const copilotAppCmd = program
     .command("copilot-app", { hidden: true })
-    .description(
-      "Manage LangWatch capture for the standalone GitHub Copilot app (ADR-039).",
-    );
+    .description("Manage LangWatch capture for the standalone GitHub Copilot app (ADR-039).");
 
   copilotAppCmd
     .command("connect")
@@ -399,7 +711,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerCursorCommands(program: Command): void {
   program
     .command("cursor", { hidden: true })
     .description("Run `cursor` routed through the LangWatch gateway.")
@@ -416,7 +730,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerGeminiCommands(program: Command): void {
   program
     .command("gemini", { hidden: true })
     .description("Run `gemini` (Gemini CLI) routed through the LangWatch gateway.")
@@ -433,10 +749,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerOpencodeCommands(program: Command): void {
   program
     .command("opencode", { hidden: true })
-    .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
+    .description(
+      "Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).",
+    )
     .allowUnknownOption(true)
     .allowExcessArguments(true)
     .helpOption(false)
@@ -450,6 +770,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
+
+function registerCodingAssistantHelp(program: Command): void {
+  // A wrapper renders no result of its own, in any format: it hands the
+  // terminal to the tool it runs. Registered as such so the auto-detected
+  // agent mode (a coding agent sets CLAUDECODE in its children) prints no
+  // note about a table under a wrapper started from inside one.
+  for (const tool of TOOL_WRAPPER_COMMANDS) {
+    const wrapper = program.commands.find((command) => command.name() === tool);
+    if (wrapper) rendersOwnResult(wrapper);
+  }
 
   // 'after' (not 'afterAll') so the section only renders on `langwatch --help`,
   // not on every `langwatch <subcommand> --help` invocation.
@@ -479,7 +810,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "",
     ].join("\n"),
   );
+}
 
+function registerReportCommands(program: Command): void {
   emitsResult(
     program
       .command("report")
@@ -572,10 +905,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     },
   );
+}
 
+function registerLogoutCommands(program: Command): void {
   program
     .command("logout")
-    .description("Log out: revoke + clear the device session AND remove the telemetry wiring `langwatch <tool>` installed (claude settings.json, codex config.toml, gemini/opencode/copilot shell functions). Only langwatch-authored blocks are removed; the project API key in .env is left alone. Idempotent.")
+    .description(
+      "Log out: revoke + clear the device session AND remove the telemetry wiring `langwatch <tool>` installed (claude settings.json, codex config.toml, gemini/opencode/copilot shell functions). Only langwatch-authored blocks are removed; the project API key in .env is left alone. Idempotent.",
+    )
     .option("-y, --yes", "skip the confirmation prompt")
     .option("--keep-credentials", "remove the telemetry wiring but stay logged in")
     .action(async (options: { yes?: boolean; keepCredentials?: boolean }) => {
@@ -588,13 +925,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerIngestCommands(program: Command): void {
   // `langwatch ingest *` — read-only debug tools for the IngestionSource
-  // + Activity Monitor surfaces. Mirrors the web admin /settings/governance
+  // + Activity Monitor surfaces. Mirrors the web admin /governance
   // flows for ops folks who live in terminal. Authoring stays browser-only.
   const ingestCmd = program
     .command("ingest")
-    .description("Inspect IngestionSources and tail their recent OCSF-normalised events (read-only governance debug helpers).");
+    .description(
+      "Inspect IngestionSources and tail their recent OCSF-normalised events (read-only governance debug helpers).",
+    );
 
   ingestCmd
     .command("list")
@@ -615,23 +956,29 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   ingestCmd
     .command("tail <sourceId>")
     .description("Stream the most recent events for an IngestionSource. --follow polls every 3s.")
-    .option("--limit <n>", "how many events to fetch on first poll (default 50)", (v) => parseInt(v, 10))
+    .option("--limit <n>", "how many events to fetch on first poll (default 50)", (v) =>
+      parseInt(v, 10),
+    )
     .option("--follow", "keep polling for new events; exit on Ctrl-C")
     .option("--json", "emit machine-readable JSON")
-    .action(async (sourceId: string, options: { limit?: number; follow?: boolean; json?: boolean }) => {
-      try {
-        const { ingestTailCommand } = await import("./commands/ingest/tail.js");
-        await ingestTailCommand(sourceId, options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
+    .action(
+      async (sourceId: string, options: { limit?: number; follow?: boolean; json?: boolean }) => {
+        try {
+          const { ingestTailCommand } = await import("./commands/ingest/tail.js");
+          await ingestTailCommand(sourceId, options);
+        } catch (error) {
+          const { reportCommandError } = await import("./utils/errorOutput.js");
+          reportCommandError({ error });
+          process.exit(1);
+        }
+      },
+    );
 
   ingestCmd
     .command("health <sourceId>")
-    .description("Show events received in the last 24h / 7d / 30d + last-success timestamp for one IngestionSource.")
+    .description(
+      "Show events received in the last 24h / 7d / 30d + last-success timestamp for one IngestionSource.",
+    )
     .option("--json", "emit machine-readable JSON")
     .action(async (sourceId: string, options: { json?: boolean }) => {
       try {
@@ -644,111 +991,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
-  // `langwatch ingest codex` — recover codex conversation content. Codex
-  // itself runs this after every completed turn (via its `notify` setting,
-  // wired up when capture is enabled); the no-flag form backfills sessions
-  // that ran before that.
-  ingestCmd
-    .command("codex")
-    .description(
-      "Recover conversation content (prompt, tool calls, reply) from codex session transcripts onto their traces. Codex exports none of it itself.",
-    )
-    .option("--since <hours>", "how far back to look for sessions (default: 24)")
-    .option("--all", "recover every session on disk, not just recent ones")
-    .option("--json", "emit machine-readable JSON")
-    // Codex passes these; a human never does, so they stay out of the help.
-    .addOption(
-      new Option(
-        "--chain <argv>",
-        "JSON argv of a turn-completion program to run after this one",
-      ).hideHelp(),
-    )
-    .addOption(
-      new Option(
-        "--notify <payload>",
-        "the turn payload codex appends after a completed turn",
-      ).hideHelp(),
-    )
-    .action(
-      async (options: {
-        since?: string;
-        all?: boolean;
-        json?: boolean;
-        chain?: string;
-        notify?: string;
-      }) => {
-        try {
-          const { ingestCodexCommand } = await import(
-            "./commands/ingest/codex.js"
-          );
-          await ingestCodexCommand(options);
-        } catch (error) {
-          // The turn-completion path must never fail a coding session, and it
-          // is the only caller that passes these two flags.
-          if (options.notify !== undefined || options.chain !== undefined) {
-            return;
-          }
-          const { reportCommandError } = await import("./utils/errorOutput.js");
-          reportCommandError({ error });
-          process.exit(1);
-        }
-      },
-    );
+  registerIngestCaptureCommands(ingestCmd);
+}
 
-  // `langwatch ingest install <tool>` — hidden primitive used by CI /
-  // devcontainer / scripted setups. The user surface is
-  // `langwatch <tool>` (the wrapper auto-resolves Path A vs Path B
-  // per cfg.tool_mode + VK presence). Kept registered so existing
-  // scripts continue to work and so reviewers can find the install
-  // helper from the help with `--help --all` if needed.
-  ingestCmd
-    .command("install <tool>", { hidden: true })
-    .description(
-      "Hidden: low-level Path B install primitive. Normal users run `langwatch <tool>` which auto-installs when needed.",
-    )
-    .option(
-      "--env-only",
-      "skip the tool's own config writes; print exports only",
-    )
-    .option("--json", "emit machine-readable JSON")
-    .action(
-      async (
-        tool: string,
-        options: { envOnly?: boolean; json?: boolean },
-      ) => {
-        const { installCommand } = await import(
-          "./commands/ingestion/install.js"
-        );
-        await installCommand(tool, options);
-      },
-    );
-
-  // `langwatch ingest hook <tool>`: what the agent's own hook entries run.
-  // Hidden: nobody types this, the install path writes it into the agent's
-  // settings. It reads its payload on stdin, writes nothing to stdout (a
-  // SessionStart hook's stdout is injected into the user's session context)
-  // and always exits zero, so a hook can never be why a session broke.
-  //
-  // Registered as rendering its own result because it renders NO result, in
-  // any format. Left unregistered, the auto-detected agent mode a hook always
-  // runs under (Claude Code sets CLAUDECODE in its children) would print
-  // "the table below is not machine-readable" to stderr on every session
-  // start and stop, about a table that does not exist.
-  rendersOwnResult(
-    ingestCmd
-      .command("hook <tool>", { hidden: true })
-      .description(
-        "Hidden: reports the session's repository, branch and worktree. Run by the coding agent's own hooks, reading the hook payload on stdin.",
-      ),
-  ).action(async (tool: string) => {
-    try {
-      const { hookCommand } = await import("./commands/ingestion/hook.js");
-      await hookCommand({ tool });
-    } catch {
-      // Same contract as the command itself: never break the session.
-    }
-  });
-
+function registerGovernanceCommands(program: Command): void {
   const governanceCmd = program
     .command("governance")
     .description(
@@ -757,7 +1003,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   governanceCmd
     .command("status")
-    .description("Show how far your organization's governance setup has progressed (sources, tools, telemetry).")
+    .description(
+      "Show how far your organization's governance setup has progressed (sources, tools, telemetry).",
+    )
     .option("--json", "emit machine-readable JSON")
     .action(async (options: { json?: boolean }) => {
       try {
@@ -774,16 +1022,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   const templatesCmd = governanceCmd
     .command("ingestion-templates")
-    .description("CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.");
+    .description(
+      "CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.",
+    );
 
   templatesCmd
     .command("admin-list")
     .description("Admin readonly catalog — includes ottl_rules. Requires aiTools:manage.")
     .option("--json", "emit machine-readable JSON")
     .action(async (options: { json?: boolean }) => {
-      const { adminListCommand } = await import(
-        "./commands/governance/ingestion-templates.js"
-      );
+      const { adminListCommand } = await import("./commands/governance/ingestion-templates.js");
       await adminListCommand(options);
     });
 
@@ -792,9 +1040,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Fetch a single ingestion template by id.")
     .option("--json", "emit machine-readable JSON")
     .action(async (id: string, options: { json?: boolean }) => {
-      const { getCommand } = await import(
-        "./commands/governance/ingestion-templates.js"
-      );
+      const { getCommand } = await import("./commands/governance/ingestion-templates.js");
       await getCommand(id, options);
     });
 
@@ -821,9 +1067,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         ottlRules?: string;
         json?: boolean;
       }) => {
-        const { createCommand } = await import(
-          "./commands/governance/ingestion-templates.js"
-        );
+        const { createCommand } = await import("./commands/governance/ingestion-templates.js");
         await createCommand(options);
       },
     );
@@ -833,43 +1077,37 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Replace ottl_rules on an org-authored template. Platform rows reject.")
     .requiredOption("--ottl-rules <text>", "OTTL rules (newline-separated statements)")
     .option("--json", "emit machine-readable JSON")
-    .action(
-      async (id: string, options: { ottlRules: string; json?: boolean }) => {
-        const { updateOttlRulesCommand } = await import(
-          "./commands/governance/ingestion-templates.js"
-        );
-        await updateOttlRulesCommand(id, options);
-      },
-    );
+    .action(async (id: string, options: { ottlRules: string; json?: boolean }) => {
+      const { updateOttlRulesCommand } =
+        await import("./commands/governance/ingestion-templates.js");
+      await updateOttlRulesCommand(id, options);
+    });
 
   templatesCmd
     .command("archive <id>")
     .description("Soft-archive an org-authored template. Platform rows reject.")
     .option("--json", "emit machine-readable JSON")
     .action(async (id: string, options: { json?: boolean }) => {
-      const { archiveCommand } = await import(
-        "./commands/governance/ingestion-templates.js"
-      );
+      const { archiveCommand } = await import("./commands/governance/ingestion-templates.js");
       await archiveCommand(id, options);
     });
 
   templatesCmd
     .command("clone-from-platform <sourceTemplateId>")
-    .description("Clone a platform-published template into the caller's org for OTTL customisation.")
+    .description(
+      "Clone a platform-published template into the caller's org for OTTL customisation.",
+    )
     .option("--json", "emit machine-readable JSON")
-    .action(
-      async (sourceTemplateId: string, options: { json?: boolean }) => {
-        const { cloneFromPlatformCommand } = await import(
-          "./commands/governance/ingestion-templates.js"
-        );
-        await cloneFromPlatformCommand(sourceTemplateId, options);
-      },
-    );
+    .action(async (sourceTemplateId: string, options: { json?: boolean }) => {
+      const { cloneFromPlatformCommand } =
+        await import("./commands/governance/ingestion-templates.js");
+      await cloneFromPlatformCommand(sourceTemplateId, options);
+    });
+}
 
+function registerPromptCommands(program: Command): void {
   // Add prompt command group
-  const promptCmd = program
-    .command("prompt")
-    .description("Manage prompt dependencies");
+  const promptCmd = program.command("prompt").description("Manage prompt dependencies");
 
   promptCmd
     .command("init")
@@ -936,11 +1174,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     promptCmd
       .command("list")
       .description("List all available prompts on the server")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option("--limit <n>", "Maximum prompts to return (default: all)"),
+    async (options: { limit?: string }) => {
       try {
         const { listCommand: impl } = await import("./commands/list.js");
-        return await impl();
+        return await impl(options);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
@@ -949,47 +1188,20 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  promptCmd
-    .command("sync")
-    .description("Sync prompts - fetch remote and push local")
-    .action(async () => {
-      try {
-        await syncCommand();
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
+  registerPromptSyncCommands(promptCmd);
 
-  promptCmd
-    .command("pull")
-    .description("Pull remote prompts and materialize locally")
-    .option("--tag <name>", "Pull the version pointed to by this tag instead of the configured version")
-    .action(async (options: { tag?: string }) => {
-      try {
-        await pullCommand(options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
-
-  promptCmd
-    .command("push")
-    .description("Push local prompts to the server")
-    .option("--force-local", "Auto-resolve conflicts by keeping local version")
-    .option("--force-remote", "Auto-resolve conflicts by keeping remote version")
-    .action(async (options: { forceLocal?: boolean; forceRemote?: boolean }) => {
-      try {
-        await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
+  emitsResult(
+    promptCmd
+      .command("get <handle>")
+      .description("Show one prompt, with its model and messages")
+      .option("--version <version>", "Read a specific version instead of the latest")
+      .option("--tag <name>", "Read the version this tag points at")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (handle: string, options: { version?: string; tag?: string }) => {
+      const { promptGetCommand: impl } = await import("./commands/prompt/get.js");
+      return impl(handle, options);
+    },
+  );
 
   emitsResult(
     promptCmd
@@ -1005,7 +1217,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     promptCmd
       .command("restore <handle> <versionId>")
-      .description("Restore a prompt to a previous version (creates a new version with that config)")
+      .description(
+        "Restore a prompt to a previous version (creates a new version with that config)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (handle: string, versionId: string) => {
       const { promptRestoreCommand: impl } = await import("./commands/prompt/restore.js");
@@ -1013,94 +1227,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // Add prompt tag subcommand group
-  const tagCmd = promptCmd
-    .command("tag")
-    .description("Manage prompt tags");
+  registerPromptTags(promptCmd);
+}
 
-  emitsResult(
-    tagCmd
-      .command("list")
-      .description("List all tag definitions for the organization")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
-      try {
-        const { tagListCommand: impl } = await import("./commands/tag/list.js");
-        return await impl();
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
-  emitsResult(
-    tagCmd
-      .command("create <name>")
-      .description("Create a custom tag"),
-    async (name: string) => {
-      try {
-        const { tagCreateCommand: impl } = await import("./commands/tag/create.js");
-        return await impl(name);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
-  emitsResult(
-    tagCmd
-      .command("rename <oldName> <newName>")
-      .description("Rename a tag"),
-    async (oldName: string, newName: string) => {
-      try {
-        const { tagRenameCommand: impl } = await import("./commands/tag/rename.js");
-        return await impl(oldName, newName);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
-  emitsResult(
-    tagCmd
-      .command("assign <prompt> <tag>")
-      .description("Assign a tag to a prompt version")
-      .option("--version <number>", "Version number to assign (defaults to latest)"),
-    async (prompt: string, tag: string, options: { version?: string }) => {
-      try {
-        const { tagAssignCommand: impl } = await import("./commands/tag/assign.js");
-        return await impl(prompt, tag, options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
-  emitsResult(
-    tagCmd
-      .command("delete <name>")
-      .description("Delete a tag and remove all its assignments")
-      .option("--force", "Skip confirmation prompt"),
-    async (name: string, options: { force?: boolean }) => {
-      try {
-        const { tagDeleteCommand: impl } = await import("./commands/tag/delete.js");
-        return await impl(name, options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
+function registerStatusCommands(program: Command): void {
   // Status command - project overview
   rendersOwnResult(
     program
@@ -1111,7 +1241,34 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const { statusCommand: impl } = await import("./commands/status.js");
     await impl(command.optsWithGlobals());
   });
+}
 
+function registerDoctorCommands(program: Command): void {
+  // Doctor: the checkup of a self-hosted install, the same rows and the same
+  // usage report the Settings page shows, printed from a terminal.
+  emitsResult(
+    program
+      .command("doctor")
+      .description(
+        "Check whether a self-hosted install is correctly wired, and print what it sends to LangWatch",
+      )
+      .option(
+        "--run",
+        "Also run the checks that open a connection or spend money (reach the LangWatch hosts, storage write, SMTP, model provider, canaries)",
+      )
+      .option(
+        "--scenario-run-plan-id <id>",
+        "The run plan the scenario canary launches, with --run",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { run?: boolean; scenarioRunPlanId?: string }) => {
+      const { doctorCommand: impl } = await import("./commands/doctor.js");
+      return impl(options);
+    },
+  );
+}
+
+function registerCommandCatalog(program: Command): void {
   // Discoverability — the machine-readable catalog + compact help tree agents
   // use to learn the CLI without human docs (gcx `commands` / `help-tree`).
   emitsResult(
@@ -1126,7 +1283,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(options);
     },
   );
+}
 
+function registerHelpTreeCommands(program: Command): void {
   emitsResult(
     program
       .command("help-tree")
@@ -1142,13 +1301,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(command.optsWithGlobals());
     },
   );
+}
 
-  // Help TOPICS (`gh help formatting` style). Registered as a real command:
-  // a command named `help` suppresses commander's implicit one (whose dispatch
-  // is internal and could never reach a topic page), so `langwatch help
-  // agent-mode` lands in this action. A REAL command always wins the lookup —
-  // `help agent` reaches the `agent` group — and topics are never named after
-  // a command (asserted in commands/__tests__); see commands/help.ts.
+function registerHelpCommands(program: Command): void {
+  // Help TOPICS (`gh help formatting` style). Registered as a real command: a command named
+  // `help` suppresses commander's implicit one (whose dispatch is internal and could never
+  // reach a topic page), so `langwatch help agent-mode` lands in this action. A REAL command
+  // always wins the lookup — `help agent` reaches the `agent` group — and topics are never
+  // named after a command (asserted in commands/__tests__); see commands/help.ts.
   program
     .command("help [topic...]")
     .description(
@@ -1158,7 +1318,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { helpCommand: impl } = await import("./commands/help.js");
       impl(program, topic);
     });
+}
 
+function registerSkillsCommands(program: Command): void {
   // `langwatch skills *` — the bundled agent skills (compiled from skills/ at
   // the repo root into the CLI at build time): list/get/install them into
   // ~/.agents/skills, gcx `agent skills` semantics. Named `skills`, not
@@ -1188,7 +1350,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   rendersOwnResult(
     skillsCmd
       .command("get <name>")
-      .description("Print a skill's full body on stdout (raw markdown, for piping into agent context)"),
+      .description(
+        "Print a skill's full body on stdout (raw markdown, for piping into agent context)",
+      ),
   ).action(async (name: string, _options: unknown, command: Command) => {
     try {
       const { skillsGetCommand: impl } = await import("./commands/skills/get.js");
@@ -1203,64 +1367,75 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   rendersOwnResult(
     skillsCmd
       .command("install [names...]")
-      .description("Install skills into <dir>/skills/<slug>/SKILL.md (recipes nest under recipes/<slug>/)")
+      .description(
+        "Install skills into <dir>/skills/<slug>/SKILL.md (recipes nest under recipes/<slug>/)",
+      )
       .option("--all", "Install every skill in the bundle")
       .option("--dir <root>", "Install root (default ~/.agents)")
       .option("--dry-run", "Report what would happen without writing anything")
       .option("--force", "Overwrite files that differ from the bundle")
-      .option("-y, --yes", "Confirm overwriting files the bundle does not manage (required in non-TTY/agent contexts)"),
-  )
-    .action(async (names: string[], _options: unknown, command: Command) => {
-      try {
-        const { skillsInstallCommand: impl } = await import("./commands/skills/install.js");
-        await impl(names, command.optsWithGlobals());
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
+      .option(
+        "-y, --yes",
+        "Confirm overwriting files the bundle does not manage (required in non-TTY/agent contexts)",
+      ),
+  ).action(async (names: string[], _options: unknown, command: Command) => {
+    try {
+      const { skillsInstallCommand: impl } = await import("./commands/skills/install.js");
+      await impl(names, command.optsWithGlobals());
+    } catch (error) {
+      const { reportCommandError } = await import("./utils/errorOutput.js");
+      reportCommandError({ error });
+      process.exit(1);
+    }
+  });
 
   rendersOwnResult(
     skillsCmd
       .command("uninstall [names...]")
-      .description("Remove installed skills (only files the bundle manages; never prompts non-interactively)")
+      .description(
+        "Remove installed skills (only files the bundle manages; never prompts non-interactively)",
+      )
       .option("--all", "Uninstall every skill in the bundle")
       .option("--dir <root>", "Install root (default ~/.agents)")
       .option("--dry-run", "Report what would happen without removing anything")
       .option("-y, --yes", "Skip the confirmation prompt (required in non-TTY/agent contexts)"),
-  )
-    .action(async (names: string[], _options: unknown, command: Command) => {
-      try {
-        const { skillsUninstallCommand: impl } = await import("./commands/skills/uninstall.js");
-        await impl(names, command.optsWithGlobals());
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
+  ).action(async (names: string[], _options: unknown, command: Command) => {
+    try {
+      const { skillsUninstallCommand: impl } = await import("./commands/skills/uninstall.js");
+      await impl(names, command.optsWithGlobals());
+    } catch (error) {
+      const { reportCommandError } = await import("./utils/errorOutput.js");
+      reportCommandError({ error });
+      process.exit(1);
+    }
+  });
 
   rendersOwnResult(
     skillsCmd
       .command("update [names...]")
-      .description("Refresh installed skills whose content differs from the bundle (no names: all installed)")
+      .description(
+        "Refresh installed skills whose content differs from the bundle (no names: all installed)",
+      )
       .option("--dir <root>", "Install root (default ~/.agents)")
       .option("--dry-run", "Report what would happen without writing anything")
       .option("--force", "Overwrite managed files that carry local edits")
-      .option("-y, --yes", "Confirm overwriting files the bundle does not manage (required in non-TTY/agent contexts)"),
-  )
-    .action(async (names: string[], _options: unknown, command: Command) => {
-      try {
-        const { skillsUpdateCommand: impl } = await import("./commands/skills/update.js");
-        await impl(names, command.optsWithGlobals());
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
+      .option(
+        "-y, --yes",
+        "Confirm overwriting files the bundle does not manage (required in non-TTY/agent contexts)",
+      ),
+  ).action(async (names: string[], _options: unknown, command: Command) => {
+    try {
+      const { skillsUpdateCommand: impl } = await import("./commands/skills/update.js");
+      await impl(names, command.optsWithGlobals());
+    } catch (error) {
+      const { reportCommandError } = await import("./utils/errorOutput.js");
+      reportCommandError({ error });
+      process.exit(1);
+    }
+  });
+}
 
+function registerDocsCommands(program: Command): void {
   // Docs commands - fetch markdown documentation for LangWatch and Scenario
   program
     .command("docs [url]")
@@ -1277,7 +1452,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerScenarioDocsCommands(program: Command): void {
   program
     .command("scenario-docs [url]")
     .description(
@@ -1293,11 +1470,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerEvaluatorCommands(program: Command): void {
   // Add evaluator command group
-  const evaluatorCmd = program
-    .command("evaluator")
-    .description("Manage evaluator definitions");
+  const evaluatorCmd = program.command("evaluator").description("Manage evaluator definitions");
 
   emitsResult(
     evaluatorCmd
@@ -1318,13 +1495,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     evaluatorCmd
-      .command("get <idOrSlug>")
-      .description("Get evaluator details by ID or slug")
+      .command("get <idSlugOrName>")
+      .description("Get evaluator details by ID, slug or display name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (idOrSlug: string) => {
+    async (idSlugOrName: string) => {
       try {
         const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
-        return await impl(idOrSlug);
+        return await impl(idSlugOrName);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
@@ -1374,7 +1551,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     evaluatorCmd
       .command("update <idOrSlug>")
-      .description("Update an evaluator name or settings")
+      .description("Update an evaluator by id or slug (find the id with `evaluator get <name>`)")
       .option("--name <name>", "New evaluator name")
       .option("--settings <json>", "Evaluator config settings as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -1393,7 +1570,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     evaluatorCmd
       .command("delete <idOrSlug>")
-      .description("Archive (soft-delete) an evaluator")
+      .description(
+        "Archive (soft-delete) an evaluator by id or slug (find the id with `evaluator get <name>`)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (idOrSlug: string) => {
       try {
@@ -1406,7 +1585,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     },
   );
+}
 
+function registerExperimentCommands(program: Command): void {
   // Add experiment command group — run, monitor, list, and inspect experiments
   const experimentCmd = program
     .command("experiment")
@@ -1442,8 +1623,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("status <experiment>")
       .description("Check the status of an experiment run (defaults to the latest run)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table")
-      .option("--run-id <id>", "Specific run id to check (defaults to the latest run)"),
-    async (experiment: string, options: { runId?: string }) => {
+      .option("--run-id <id>", "Specific run id to check (defaults to the latest run)")
+      .option(
+        "--wait",
+        "Keep reading until the run finishes, or until the limit is up. Answers with the progress either way",
+      )
+      .option(
+        "--timeout <seconds>",
+        "How long --wait waits before answering with the progress so far (default: 60)",
+      ),
+    async (experiment: string, options: { runId?: string; wait?: boolean; timeout?: string }) => {
       const { experimentStatusCommand: impl } = await import("./commands/experiment/status.js");
       return impl(experiment, options);
     },
@@ -1461,7 +1650,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         limit?: string;
       },
     ) => {
-      const { experimentListRunsCommand: impl } = await import("./commands/experiment/list-runs.js");
+      const { experimentListRunsCommand: impl } =
+        await import("./commands/experiment/list-runs.js");
       return impl({ experiment, ...options });
     },
   );
@@ -1476,7 +1666,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
       .option("--evaluator <name>", "Show only this evaluator's column")
       .option("-f, --format <format>", "Output format: table (default) or json", "table")
-      .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20"),
+      .option(
+        "--limit <n>",
+        "Maximum rows to print in the table; the JSON answer always carries every row (default 20)",
+        "20",
+      )
+      .option(
+        "--require-complete",
+        "Exit with status 2 when the run has not ended or its results are still being stored",
+      )
+      .option(
+        "--wait <seconds>",
+        "Keep reading until the run has ended and every result it reported is stored, including a run just reported that is not stored at all yet; exit with status 2 if it is still partial after this many seconds",
+      ),
     async (
       experiment: string,
       options: {
@@ -1484,6 +1686,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         filter?: string;
         evaluator?: string;
         limit?: string;
+        requireComplete?: boolean;
+        wait?: string;
       },
     ) => {
       const { experimentResultsCommand: impl } = await import("./commands/experiment/results.js");
@@ -1491,11 +1695,80 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  emitsResult(
+    experimentCmd
+      .command("create")
+      .description("Create an experiment")
+      .option("--name <name>", "Name for the experiment")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { name?: string }) => {
+      const { experimentCreateCommand: impl } = await import("./commands/experiment/create.js");
+      return impl(options);
+    },
+  );
 
+  emitsResult(
+    experimentCmd
+      .command("get-state <experiment>")
+      .description("Read an experiment's setup, with the version to save it back at")
+      .option("--fields <fields>", "Set to `version` to read the version only, without the setup")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, options: { fields?: string }) => {
+      const { experimentGetStateCommand: impl } =
+        await import("./commands/experiment/get-state.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("set-state <experiment>")
+      .description("Save an experiment's setup from a file, or from stdin with --file -")
+      .option("--file <path>", "File holding the setup as JSON, or - to read stdin")
+      .option(
+        "--expected-version <n>",
+        "Refuse the save if someone else already wrote on top of this version",
+      )
+      .option("--message <text>", "Name this version in the history")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      experiment: string,
+      options: { file?: string; expectedVersion?: string; message?: string },
+    ) => {
+      const { experimentSetStateCommand: impl } =
+        await import("./commands/experiment/set-state.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("versions <experiment>")
+      .description("List the saved versions of an experiment's setup")
+      .option("--limit <n>", "Maximum versions to fetch (default 50, max 100)", "50")
+      .option("--cursor <version>", "The nextCursor of the previous page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, options: { limit?: string; cursor?: string }) => {
+      const { experimentVersionsCommand: impl } = await import("./commands/experiment/versions.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("restore <experiment> <version>")
+      .description("Restore an experiment to one of its saved versions")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, version: string) => {
+      const { experimentRestoreCommand: impl } = await import("./commands/experiment/restore.js");
+      return impl(experiment, version);
+    },
+  );
+}
+
+function registerWorkflowCommands(program: Command): void {
   // Add workflow command group
-  const workflowCmd = program
-    .command("workflow")
-    .description("Manage workflows");
+  const workflowCmd = program.command("workflow").description("Manage workflows");
 
   emitsResult(
     workflowCmd
@@ -1556,20 +1829,66 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerLangyCommands(program: Command): void {
+  // A live, human-only session that never returns a CommandResult or prints
+  // a table. Registered as rendering its own result so agent mode does not
+  // warn about a table nobody printed; the command refuses `-o json` itself.
+  rendersOwnResult(
+    program
+      .command("langy")
+      .description(
+        "Share this folder with the Langy conversation that asked for it. Langy then reads, edits and runs commands here, with your toolchain, and asks you in the terminal, or on the card in LangWatch, before anything that is not read-only",
+      )
+      .option(
+        "--share-control",
+        "Share control of this folder with the Langy session that requested it (what a bare `langwatch langy` does today)",
+      )
+      .option(
+        "-o, --output <format>",
+        "Not available: this command is an interactive session and prints as it goes",
+      ),
+  ).action(async (options: { shareControl?: boolean; output?: string }, command: Command) => {
+    // `--json` and `--jq` are global, so they never reach the command's own
+    // options. They are read here and passed on, or the refusal below would
+    // miss them now that the format gate lets this command through.
+    const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
+    const { langyCommand: impl } = await import("./commands/langy/index.js");
+    return impl({
+      ...options,
+      ...(globals.json !== undefined ? { json: true } : {}),
+      ...(globals.jq !== undefined ? { jq: true } : {}),
+    });
+  });
+}
+
+function registerAgentCommands(program: Command): void {
   // Add agent command group
-  const agentCmd = program
-    .command("agent")
-    .description("Manage agent definitions");
+  const agentCmd = program.command("agent").description("Manage agent definitions");
 
   emitsResult(
     agentCmd
       .command("list")
       .description("List all agents in the project")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option(
+        "--wait-online <agent>",
+        "Read the list again every few seconds until the agent with this name or id reports online, then print it",
+      )
+      .option("--timeout <seconds>", "How long --wait-online waits before failing", "120")
+      .option(
+        "--all",
+        "List every row, including offline rows of a name and environment that a newer row replaced",
+      )
+      // No positional argument here, so a stray word is a name with a space
+      // passed bare after --wait-online: the refusal says to quote it.
+      .configureOutput({
+        outputError: (message, write) => write(withQuotedNameHint(message)),
+      }),
+    async (options: { waitOnline?: string; timeout?: string; all?: boolean }) => {
       const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
-      return impl();
+      return impl(options);
     },
   );
 
@@ -1587,7 +1906,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     agentCmd
       .command("create <name>")
-      .description("Create a new agent")
+      .description(
+        "Create a new agent. A connected agent is not created here: it registers itself from code with connectAgent (langwatch/agent) or connect_agent (Python)",
+      )
       .requiredOption("--type <type>", "Agent type: signature, code, workflow, or http")
       .option("--config <json>", "Agent config as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -1600,43 +1921,89 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     agentCmd
       .command("run <id>")
-      .description("Execute an agent with JSON input (HTTP agents call URL directly, others use workflow engine)")
-      .option("--input <json>", "Input data as JSON string")
+      .description(
+        "Run one turn of an agent. A connected agent runs through the platform relay on a live instance; an HTTP agent is called at its URL; a workflow-linked agent runs on the workflow engine",
+      )
+      .option("--message <text>", "One user message to send (connected agents)")
+      .option(
+        "--input <json>",
+        "The request body as JSON. For a connected agent it carries messages, and may carry threadId, session and params",
+      )
+      .option(
+        "--param <key=value>",
+        "A run parameter value for a connected agent, repeatable",
+        (value: string, previous?: string[]) => [...(previous ?? []), value],
+      )
+      .option("--thread-id <id>", "Continue a conversation on a connected agent")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { input?: string }) => {
+    async (
+      id: string,
+      options: { input?: string; message?: string; param?: string[]; threadId?: string },
+    ) => {
       const { runAgentCommand: impl } = await import("./commands/agents/run.js");
       return impl(id, options);
     },
   );
 
-  // A live, human-only session: it never returns a CommandResult, so it is
-  // registered with a plain action and the format gate honestly refuses
-  // `-o json` instead of accepting a format the command never renders.
-  agentCmd
-    .command("dev")
-    .alias("tunnel")
-    .description("Expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL)")
-    .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
-    .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
-    .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (when omitted: picker, and in an interactive terminal it creates one if the project has none)")
-    .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
-    .option("--no-update-url", "Print the tunnel URL without changing the agent")
-    .option("--no-auth", "Skip the local auth proxy (for servers that already authenticate requests)")
-    .option("--api-key <key>", "API key to use for this run")
-    .action(
-      async (options: {
-        port?: string;
-        url?: string;
-        agent?: string;
-        tunnelUrl?: string;
-        updateUrl?: boolean;
-        auth?: boolean;
-        apiKey?: string;
-      }) => {
-        const { agentDevCommand: impl } = await import("./commands/agents/dev.js");
-        return impl(options);
-      },
-    );
+  emitsResult(
+    agentCmd
+      .command("test <id>")
+      .description(
+        'Test an agent with one scripted scenario run on the platform: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project',
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { testAgentCommand: impl } = await import("./commands/agents/test.js");
+      return impl(id);
+    },
+  );
+
+  // A live, human-only session: never returns a CommandResult, so the format
+  // gate honestly refuses `-o json`. `agent dev` is the same command under
+  // its earlier name, registered as its own hidden command since Commander
+  // cannot hide an alias from help.
+  interface AgentTunnelFlags {
+    port?: string;
+    url?: string;
+    agent?: string;
+    tunnelUrl?: string;
+    updateUrl?: boolean;
+    auth?: boolean;
+    apiKey?: string;
+  }
+  const runAgentTunnel = async (options: AgentTunnelFlags) => {
+    const { agentTunnelCommand: impl } = await import("./commands/agents/tunnel.js");
+    return impl(options);
+  };
+  const withTunnelFlags = (command: Command): Command =>
+    command
+      .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
+      .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
+      .option(
+        "--agent <idOrName>",
+        "Which registered HTTP agent to point at the tunnel (when omitted: picker, and in an interactive terminal it creates one if the project has none)",
+      )
+      .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
+      .option("--no-update-url", "Print the tunnel URL without changing the agent")
+      .option(
+        "--no-auth",
+        "Skip the local auth proxy (for servers that already authenticate requests)",
+      )
+      .option("--api-key <key>", "API key to use for this run");
+
+  withTunnelFlags(
+    agentCmd
+      .command("tunnel")
+      .description(
+        "For HTTP agents: expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL). An agent written in code needs no tunnel: wrap it with connectAgent (langwatch/agent) or connect_agent (Python) and it connects itself",
+      ),
+  ).action(runAgentTunnel);
+
+  withTunnelFlags(
+    agentCmd
+      .command("dev", { hidden: true })
+      .description("The earlier name of `agent tunnel`, kept so existing scripts keep working"),
+  ).action(runAgentTunnel);
 
   emitsResult(
     agentCmd
@@ -1662,11 +2029,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerDashboardCommands(program: Command): void {
   // Add dashboard command group
-  const dashboardCmd = program
-    .command("dashboard")
-    .description("Manage analytics dashboards");
+  const dashboardCmd = program.command("dashboard").description("Manage analytics dashboards");
 
   emitsResult(
     dashboardCmd
@@ -1723,7 +2090,136 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerBoardCommands(program: Command): void {
+  // Dashboards boards over /api/v1/dashboards; the project comes from the API key. The
+  // Analytics Reports dashboards stay on `langwatch dashboard`.
+  const boardCmd = program
+    .command("dashboards")
+    .description("Manage Dashboards boards and the widgets on them");
+  const format = (command: Command) =>
+    command.option("-f, --format <format>", "Output format: table (default) or json", "table");
+
+  emitsResult(
+    format(boardCmd.command("list").description("List the project's boards")),
+    async () => {
+      const { listBoardsCommand: impl } = await import("./commands/boards/boards.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    format(boardCmd.command("get <boardId>").description("Get a board by ID")),
+    async (boardId: string) => {
+      const { getBoardCommand: impl } = await import("./commands/boards/boards.js");
+      return impl(boardId);
+    },
+  );
+
+  emitsResult(
+    format(boardCmd.command("create <name>").description("Create an empty board")),
+    async (name: string) => {
+      const { createBoardCommand: impl } = await import("./commands/boards/boards.js");
+      return impl(name);
+    },
+  );
+
+  emitsResult(
+    format(
+      boardCmd
+        .command("update <boardId>")
+        .description("Rename a board or change its description")
+        .option("--name <name>", "New board name")
+        .option("--description <description>", "New board description")
+        .option("--clear-description", "Remove the board's description"),
+    ),
+    async (
+      boardId: string,
+      options: { name?: string; description?: string; clearDescription?: boolean },
+    ) => {
+      const { updateBoardCommand: impl } = await import("./commands/boards/boards.js");
+      return impl(boardId, options);
+    },
+  );
+
+  emitsResult(
+    format(boardCmd.command("delete <boardId>").description("Delete a board and its widgets")),
+    async (boardId: string) => {
+      const { deleteBoardCommand: impl } = await import("./commands/boards/boards.js");
+      return impl(boardId);
+    },
+  );
+
+  const widgetCmd = boardCmd.command("widgets").description("Manage the widgets on a board");
+
+  emitsResult(
+    format(widgetCmd.command("list <boardId>").description("List the widgets on a board")),
+    async (boardId: string) => {
+      const { listBoardWidgetsCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId);
+    },
+  );
+
+  emitsResult(
+    format(
+      widgetCmd
+        .command("get <boardId> <widgetId>")
+        .description("Get a widget on a board — its React source and named queries"),
+    ),
+    async (boardId: string, widgetId: string) => {
+      const { getBoardWidgetCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId, widgetId);
+    },
+  );
+
+  const definitionOptions = (command: Command) =>
+    command
+      .option("--description <description>", "What the widget shows")
+      .option("--code <code>", "The widget's React source")
+      .option("--code-file <path>", "Read the widget's React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }");
+
+  emitsResult(
+    format(
+      definitionOptions(
+        widgetCmd
+          .command("create <boardId>")
+          .description("Create a widget on a board from a React source file and its queries")
+          .requiredOption("--name <name>", "Widget name"),
+      ),
+    ),
+    async (boardId: string, options: Record<string, string | undefined>) => {
+      const { createBoardWidgetCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId, options);
+    },
+  );
+
+  emitsResult(
+    format(
+      definitionOptions(
+        widgetCmd
+          .command("update <boardId> <widgetId>")
+          .description("Update a widget on a board")
+          .option("--name <name>", "New widget name"),
+      ),
+    ),
+    async (boardId: string, widgetId: string, options: Record<string, string | undefined>) => {
+      const { updateBoardWidgetCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId, widgetId, options);
+    },
+  );
+
+  emitsResult(
+    format(widgetCmd.command("delete <boardId> <widgetId>").description("Delete a widget")),
+    async (boardId: string, widgetId: string) => {
+      const { deleteBoardWidgetCommand: impl } = await import("./commands/boards/widgets.js");
+      return impl(boardId, widgetId);
+    },
+  );
+}
+
+function registerModelProviderCommands(program: Command): void {
   // Add model-provider command group
   const modelProviderCmd = program
     .command("model-provider")
@@ -1735,7 +2231,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("List all configured model providers")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async () => {
-      const { listModelProvidersCommand: impl } = await import("./commands/model-providers/list.js");
+      const { listModelProvidersCommand: impl } =
+        await import("./commands/model-providers/list.js");
       return impl();
     },
   );
@@ -1748,12 +2245,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--api-key <key>", "API key for the provider")
       .option("--default-model <model>", "Default model to use (e.g. gpt-5-mini)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (provider: string, options: { enabled?: boolean; apiKey?: string; defaultModel?: string }) => {
+    async (
+      provider: string,
+      options: { enabled?: boolean; apiKey?: string; defaultModel?: string },
+    ) => {
       const { setModelProviderCommand: impl } = await import("./commands/model-providers/set.js");
       return impl(provider, options);
     },
   );
+}
 
+function registerModelDefaultCommands(program: Command): void {
   // Add model-default command group (cascading default models)
   const modelDefaultCmd = program
     .command("model-default")
@@ -1767,9 +2269,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Show the effective resolution + every config you can read")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async () => {
-      const { listModelDefaultsCommand: impl } = await import(
-        "./commands/model-defaults/list.js"
-      );
+      const { listModelDefaultsCommand: impl } = await import("./commands/model-defaults/list.js");
       return impl();
     },
   );
@@ -1791,9 +2291,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       model: string,
       options: { scope?: "project" | "team" | "organization"; scopeId?: string },
     ) => {
-      const { setModelDefaultCommand: impl } = await import(
-        "./commands/model-defaults/set.js"
-      );
+      const { setModelDefaultCommand: impl } = await import("./commands/model-defaults/set.js");
       return impl(key, model, options);
     },
   );
@@ -1812,13 +2310,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       key: string,
       options: { scope?: "project" | "team" | "organization"; scopeId?: string },
     ) => {
-      const { unsetModelDefaultCommand: impl } = await import(
-        "./commands/model-defaults/unset.js"
-      );
+      const { unsetModelDefaultCommand: impl } = await import("./commands/model-defaults/unset.js");
       return impl(key, options);
     },
   );
+}
 
+/** Help for `--project` on the virtual key commands, where it narrows instead of selecting. */
+const VIRTUAL_KEY_PROJECT_FLAG_HELP =
+  "Project to act in, by id or slug. Without it the command answers for every virtual key your login can see, and a key created with no --scope lands in your personal project";
+
+function registerVirtualKeysCommands(program: Command): void {
   // Add virtual-keys command group (AI Gateway)
   const virtualKeysCmd = program
     .command("virtual-keys")
@@ -1828,7 +2330,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     virtualKeysCmd
       .command("list")
-      .description("List all virtual keys for the current project")
+      .description("List every virtual key your login can see, or one project's with --project")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async () => {
       const { listVirtualKeysCommand: impl } = await import("./commands/virtual-keys/list.js");
@@ -1856,16 +2358,32 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option(
         "--scope <typeAndId>",
         "Scope row in type:id form (repeat the flag for several). Types: org | team | project. Defaults to the calling project when omitted. Example: --scope org:acme --scope team:platform",
-        (value: string, previous: string[] = []) => [...previous, value],
+        (value: string, previous?: string[]) => [...(previous ?? []), value],
       )
-      .option("--trace-project <id>", "Explicit trace destination project for org- or team-scoped keys (needs virtualKeys:manage there)")
+      .option(
+        "--trace-project <id>",
+        "Explicit trace destination project for org- or team-scoped keys (needs virtualKeys:manage there)",
+      )
       .option("--routing-policy <id>", "RoutingPolicy id to pin (pairs with --routing-mode policy)")
       .option("--routing-mode <mode>", "none (default: no silent failover) | fallback_all | policy")
-      .option("--principal-user <userId>", "Mark this VK as personal and attribute spend to the named principal user")
-      .option("--budget-limit <usd>", "Cap the key's own spend (creates a VK-scoped budget atomically with the key)")
+      .option(
+        "--principal-user <userId>",
+        "Mark this VK as personal and attribute spend to the named principal user",
+      )
+      .option(
+        "--budget-limit <usd>",
+        "Cap the key's own spend (creates a VK-scoped budget atomically with the key)",
+      )
       .option("--budget-window <w>", "Budget window for --budget-limit: day | week | month")
       .option("--budget-breach <action>", "block (default) or warn when the key's budget is hit")
-      .option("--providers-allowed <ids>", "Comma-separated ModelProvider ids the key may dispatch to (default: every provider in scope)")
+      .option(
+        "--providers-allowed <ids>",
+        "Comma-separated ModelProvider ids the key may dispatch to (default: every provider in scope)",
+      )
+      .option(
+        "--reveal-once",
+        "Do not print the secret; print a one-time reveal id instead, which shows the secret once through the app to the person the key is for",
+      )
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       name: string;
@@ -1879,6 +2397,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       budgetWindow?: string;
       budgetBreach?: "block" | "warn";
       providersAllowed?: string;
+      revealOnce?: boolean;
     }) => {
       const { createVirtualKeyCommand: impl } = await import("./commands/virtual-keys/create.js");
       return impl(options);
@@ -1908,37 +2427,52 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option(
         "--scope <typeAndId>",
         "Replace the scope set (repeat the flag for several; supplies the full set). Same TYPE:id form as create.",
-        (value: string, previous: string[] = []) => [...previous, value],
+        (value: string, previous?: string[]) => [...(previous ?? []), value],
       )
-      .option("--trace-project <id>", "Re-point the key's trace destination project (needs virtualKeys:manage there)")
-      .option("--clear-trace-project", "Clear the explicit trace destination (falls back to project scope or governance project)")
+      .option(
+        "--trace-project <id>",
+        "Re-point the key's trace destination project (needs virtualKeys:manage there)",
+      )
+      .option(
+        "--clear-trace-project",
+        "Clear the explicit trace destination (falls back to project scope or governance project)",
+      )
       .option("--routing-policy <id>", "Switch to a different RoutingPolicy (pass id)")
-      .option("--clear-routing-policy", "Unpin the routing policy; VK falls back to the org default ordering")
+      .option(
+        "--clear-routing-policy",
+        "Unpin the routing policy; VK falls back to the org default ordering",
+      )
       .option("--routing-mode <mode>", "none | fallback_all | policy")
       .option("--budget-limit <usd>", "Upsert the key's own cap (pairs with --budget-window)")
       .option("--budget-window <w>", "Budget window for --budget-limit: day | week | month")
       .option("--budget-breach <action>", "block or warn when the key's budget is hit")
       .option("--clear-budget", "Archive the key's own budget (spend history is retained)")
-      .option("--config-json <json>", "Inline partial config JSON (model_aliases/cache/fallback/rate_limits/policy_rules). Merges with existing config")
+      .option(
+        "--config-json <json>",
+        "Inline partial config JSON (model_aliases/cache/fallback/rate_limits/policy_rules). Merges with existing config",
+      )
       .option("--config-file <path>", "Read partial config JSON from a file")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (id: string, options: {
-      name?: string;
-      description?: string;
-      clearDescription?: boolean;
-      scope?: string[];
-      traceProject?: string;
-      clearTraceProject?: boolean;
-      routingPolicy?: string;
-      clearRoutingPolicy?: boolean;
-      routingMode?: string;
-      budgetLimit?: string;
-      budgetWindow?: string;
-      budgetBreach?: "block" | "warn";
-      clearBudget?: boolean;
-      configJson?: string;
-      configFile?: string;
-    }) => {
+    async (
+      id: string,
+      options: {
+        name?: string;
+        description?: string;
+        clearDescription?: boolean;
+        scope?: string[];
+        traceProject?: string;
+        clearTraceProject?: boolean;
+        routingPolicy?: string;
+        clearRoutingPolicy?: boolean;
+        routingMode?: string;
+        budgetLimit?: string;
+        budgetWindow?: string;
+        budgetBreach?: "block" | "warn";
+        clearBudget?: boolean;
+        configJson?: string;
+        configFile?: string;
+      },
+    ) => {
       const { updateVirtualKeyCommand: impl } = await import("./commands/virtual-keys/update.js");
       return impl(id, options);
     },
@@ -1958,7 +2492,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     virtualKeysCmd
       .command("disable <id>")
-      .description("Disable a virtual key (reversible; requests get a distinct virtual_key_disabled error)")
+      .description(
+        "Disable a virtual key (reversible; requests get a distinct virtual_key_disabled error)",
+      )
       .option("--reason <text>", "Audit-logged note shown on the key's detail view")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string, options: { reason?: string }) => {
@@ -1989,6 +2525,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  // A virtual key lives in the scopes it names, not in one project, so the flag narrows here.
+  for (const leaf of virtualKeysCmd.commands) {
+    leaf.option("--project <idOrSlug>", VIRTUAL_KEY_PROJECT_FLAG_HELP);
+  }
+}
+
+function registerGatewayBudgetsCommands(program: Command): void {
   // Add gateway-budgets command group (AI Gateway)
   const gatewayBudgetsCmd = program
     .command("gateway-budgets")
@@ -1998,10 +2541,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     gatewayBudgetsCmd
       .command("list")
       .description("List all budgets across scopes")
-      .option("--scope-type <kinds>", "Comma-separated filter: organization,team,project,virtual-key,principal,group (default: all)")
+      .option(
+        "--scope-type <kinds>",
+        "Comma-separated filter: organization,team,project,virtual-key,principal,group (default: all)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (options: { scopeType?: string }) => {
-      const { listGatewayBudgetsCommand: impl } = await import("./commands/gateway-budgets/list.js");
+      const { listGatewayBudgetsCommand: impl } =
+        await import("./commands/gateway-budgets/list.js");
       return impl(options);
     },
   );
@@ -2012,19 +2559,37 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Create a new budget (scope + window + limit)")
       .requiredOption("--name <name>", "Human-readable budget name")
       .option("--description <desc>", "Optional description")
-      .requiredOption("--scope <kind>", "Budget scope: organization|team|project|virtual-key|principal|group")
+      .requiredOption(
+        "--scope <kind>",
+        "Budget scope: organization|team|project|virtual-key|principal|group",
+      )
       .option("--organization <id>", "Organization id (for scope=organization)")
       .option("--team <id>", "Team id (for scope=team)")
       .option("--project <id>", "Project id (for scope=project)")
       .option("--virtual-key <id>", "Virtual key id (for scope=virtual-key)")
       .option("--principal <id>", "Principal user id (for scope=principal)")
-      .option("--group <id>", "Group id (for scope=group; --limit becomes the PER-MEMBER allowance)")
+      .option(
+        "--group <id>",
+        "Group id (for scope=group; --limit becomes the PER-MEMBER allowance)",
+      )
       .requiredOption("--window <w>", "Budget window: minute|hour|day|week|month|total|manual")
-      .requiredOption("--limit <usd>", "Hard cap in USD (e.g. 100 or 49.99). Per member for scope=group")
+      .requiredOption(
+        "--limit <usd>",
+        "Hard cap in USD (e.g. 100 or 49.99). Per member for scope=group",
+      )
       .option("--on-breach <action>", "block (default) or warn", "block")
-      .option("--timezone <tz>", "IANA timezone recorded on the budget for your own reporting. Window boundaries are UTC (e.g. Europe/Amsterdam)")
-      .option("--provider-key <id>", "Pin the budget to one ModelProvider id (default: counts every provider)")
-      .option("--cycle-anchor-at <rfc3339>", "Start the budget's cycle at this instant instead of the calendar (e.g. 2026-01-17T09:00:00Z). Not valid on total or manual windows")
+      .option(
+        "--timezone <tz>",
+        "IANA timezone recorded on the budget for your own reporting. Window boundaries are UTC (e.g. Europe/Amsterdam)",
+      )
+      .option(
+        "--provider-key <id>",
+        "Pin the budget to one ModelProvider id (default: counts every provider)",
+      )
+      .option(
+        "--cycle-anchor-at <rfc3339>",
+        "Start the budget's cycle at this instant instead of the calendar (e.g. 2026-01-17T09:00:00Z). Not valid on total or manual windows",
+      )
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       name: string;
@@ -2043,7 +2608,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       providerKey?: string;
       cycleAnchorAt?: string;
     }) => {
-      const { createGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/create.js");
+      const { createGatewayBudgetCommand: impl } =
+        await import("./commands/gateway-budgets/create.js");
       return impl(options);
     },
   );
@@ -2056,7 +2622,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--reason <text>", "Audit-logged note for the reset")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string, options: { endUser?: string; reason?: string }) => {
-      const { resetGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/reset.js");
+      const { resetGatewayBudgetCommand: impl } =
+        await import("./commands/gateway-budgets/reset.js");
       return impl(id, options);
     },
   );
@@ -2070,19 +2637,26 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--clear-description", "Clear the description")
       .option("--limit <usd>", "New hard-cap in USD")
       .option("--on-breach <action>", "block or warn")
-      .option("--timezone <tz>", "New IANA timezone. Recorded on the budget; window boundaries stay UTC")
+      .option(
+        "--timezone <tz>",
+        "New IANA timezone. Recorded on the budget; window boundaries stay UTC",
+      )
       .option("--clear-timezone", "Clear the timezone override")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (id: string, options: {
-      name?: string;
-      description?: string;
-      clearDescription?: boolean;
-      limit?: string;
-      onBreach?: "block" | "warn";
-      timezone?: string;
-      clearTimezone?: boolean;
-    }) => {
-      const { updateGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/update.js");
+    async (
+      id: string,
+      options: {
+        name?: string;
+        description?: string;
+        clearDescription?: boolean;
+        limit?: string;
+        onBreach?: "block" | "warn";
+        timezone?: string;
+        clearTimezone?: boolean;
+      },
+    ) => {
+      const { updateGatewayBudgetCommand: impl } =
+        await import("./commands/gateway-budgets/update.js");
       return impl(id, options);
     },
   );
@@ -2093,11 +2667,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Archive a budget (stops enforcement; does not delete history)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string) => {
-      const { archiveGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/archive.js");
+      const { archiveGatewayBudgetCommand: impl } =
+        await import("./commands/gateway-budgets/archive.js");
       return impl(id);
     },
   );
+}
 
+function registerWebhooksCommands(program: Command): void {
   // Add webhooks command group (org-anchored webhook platform)
   const webhooksCmd = program
     .command("webhooks")
@@ -2130,10 +2707,22 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("create")
       .description("Create an endpoint; prints the signing secret ONCE")
       .option("--url <url>", "HTTPS receiver URL")
-      .option("--queue-url <url>", "Amazon SQS queue URL to deliver to instead of a receiver URL (standard queues only)")
-      .option("--role-arn <arn>", "IAM role to assume to write to the queue; the printed external id goes in its trust policy")
-      .option("--access-key-id <id>", "Static access key id for the queue, as an alternative to a role. Its secret is read from LANGWATCH_SQS_SECRET_ACCESS_KEY, never from an argument")
-      .requiredOption("--events <types>", "Comma-separated event types (see: langwatch webhooks event-types)")
+      .option(
+        "--queue-url <url>",
+        "Amazon SQS queue URL to deliver to instead of a receiver URL (standard queues only)",
+      )
+      .option(
+        "--role-arn <arn>",
+        "IAM role to assume to write to the queue; the printed external id goes in its trust policy",
+      )
+      .option(
+        "--access-key-id <id>",
+        "Static access key id for the queue, as an alternative to a role. Its secret is read from LANGWATCH_SQS_SECRET_ACCESS_KEY, never from an argument",
+      )
+      .requiredOption(
+        "--events <types>",
+        "Comma-separated event types (see: langwatch webhooks event-types)",
+      )
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       url?: string;
@@ -2152,12 +2741,21 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("update <id>")
       .description("Update an endpoint's address, event subscriptions, or delivery controls")
       .option("--url <url>", "New HTTPS receiver URL")
-      .option("--queue-url <url>", "New Amazon SQS queue URL (an endpoint keeps the destination kind it was created with)")
+      .option(
+        "--queue-url <url>",
+        "New Amazon SQS queue URL (an endpoint keeps the destination kind it was created with)",
+      )
       .option("--role-arn <arn>", "New IAM role to assume to write to the queue")
-      .option("--access-key-id <id>", "New static access key id for the queue. Its secret is read from LANGWATCH_SQS_SECRET_ACCESS_KEY, never from an argument")
+      .option(
+        "--access-key-id <id>",
+        "New static access key id for the queue. Its secret is read from LANGWATCH_SQS_SECRET_ACCESS_KEY, never from an argument",
+      )
       .option("--events <types>", "New comma-separated event types (replaces the set)")
       .option("--max-batch-size <n>", "Envelopes per POST, 1-100")
-      .option("--max-batch-delay <ms>", "Coalescing window in ms before a partial batch ships, 0-60000")
+      .option(
+        "--max-batch-delay <ms>",
+        "Coalescing window in ms before a partial batch ships, 0-60000",
+      )
       .option("--max-in-flight <n>", "Concurrent POSTs to the receiver, 1-8")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (
@@ -2278,12 +2876,20 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--cursor <cursor>", "Page cursor from the previous call")
       .option("--limit <n>", "Events per page (default 50)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: { type?: string; from?: string; to?: string; cursor?: string; limit?: string }) => {
+    async (options: {
+      type?: string;
+      from?: string;
+      to?: string;
+      cursor?: string;
+      limit?: string;
+    }) => {
       const { webhookEventsCommand: impl } = await import("./commands/webhooks/events.js");
       return impl(options);
     },
   );
+}
 
+function registerSpendEventsCommands(program: Command): void {
   // Add spend-events command group (billing reconciliation pull)
   const spendEventsCmd = program
     .command("spend-events")
@@ -2340,7 +2946,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--window <window>", "day|week|month (default month)")
       .option("--virtual-key <id>", "Narrow to one virtual key")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (endUserId: string, options: { window?: "day" | "week" | "month"; virtualKey?: string }) => {
+    async (
+      endUserId: string,
+      options: { window?: "day" | "week" | "month"; virtualKey?: string },
+    ) => {
       const { spendByUserCommand: impl } = await import("./commands/spend-events/by-user.js");
       return impl(endUserId, options);
     },
@@ -2349,11 +2958,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     spendEventsCmd
       .command("summary")
-      .description("Per-key spend rollups, the reconciliation checksum fast path (settled requests counted separately, never in cost sums)")
-      .option("--group-by <keys>", "One or two of virtual_key, end_user, project, model, provider, principal, request_type (comma separated), default virtual_key")
+      .description(
+        "Per-key spend rollups, the reconciliation checksum fast path (settled requests counted separately, never in cost sums)",
+      )
+      .option(
+        "--group-by <keys>",
+        "One or two of virtual_key, end_user, project, model, provider, principal, request_type (comma separated), default virtual_key",
+      )
       .option("--bucket <size>", "Add a time column: none (default), hour or day")
       .option("--timezone <zone>", "Zone the time bucket falls on, default UTC")
-      .option("--allow-unstable", "Group by model, provider or time over a range still receiving outcomes, accepting approximate totals")
+      .option(
+        "--allow-unstable",
+        "Group by model, provider or time over a range still receiving outcomes, accepting approximate totals",
+      )
       .option("--from <instant>", "Range start (ISO or unix ms), default 24h ago")
       .option("--to <instant>", "Range end (ISO or unix ms), default now")
       .option("--project <id>", "Narrow to one project")
@@ -2362,7 +2979,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--provider <id...>", "Narrow to these model providers")
       .option("--end-user <id...>", "Narrow to these end users")
       .option("--metadata <pair...>", "Narrow by your own request metadata, written key=value")
-      .option("--limit <n>", "Rows fetched per page, default 500. The walk always covers the whole window")
+      .option(
+        "--limit <n>",
+        "Rows fetched per page, default 500. The walk always covers the whole window",
+      )
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       groupBy?: string;
@@ -2383,11 +3003,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(options);
     },
   );
+}
 
+function registerAnnotationCommands(program: Command): void {
   // Add annotation command group
-  const annotationCmd = program
-    .command("annotation")
-    .description("Manage trace annotations");
+  const annotationCmd = program.command("annotation").description("Manage trace annotations");
 
   emitsResult(
     annotationCmd
@@ -2416,12 +3036,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     annotationCmd
       .command("create <traceId>")
       .description("Create an annotation for a trace")
-      .option("--comment <comment>", "Annotation comment")
-      .option("--thumbs-up", "Mark as thumbs up")
-      .option("--thumbs-down", "Mark as thumbs down")
+      .option("--comment <comment>", "Annotation comment (required)")
+      .option("--thumbs-up", "Mark as thumbs up (exactly one of --thumbs-up/--thumbs-down)")
+      .option("--thumbs-down", "Mark as thumbs down (exactly one of --thumbs-up/--thumbs-down)")
       .option("--email <email>", "Email of the annotator")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (traceId: string, options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string }) => {
+    async (
+      traceId: string,
+      options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string },
+    ) => {
       const { createAnnotationCommand: impl } = await import("./commands/annotations/create.js");
       return impl(traceId, options);
     },
@@ -2437,39 +3060,358 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerQueryCommands(program: Command): void {
+  // `run` is the DEFAULT subcommand, so `langwatch query "SELECT …"` reaches it
+  // with the statement as its argument while `langwatch query schema` still
+  // resolves to the sibling. Without the default, commander would read the
+  // statement as an unknown subcommand name.
+  const queryCmd = program
+    .command("query")
+    .description("Run LangWatchQL analytics SQL and discover what can be queried");
+
+  emitsResult(
+    queryCmd
+      .command("run [sql]", { isDefault: true })
+      .description("Run one LangWatchQL statement, exactly as written")
+      .option("--sql-file <path>", "Read the statement from a file instead of the argument")
+      .option(
+        "--start <datetime>",
+        "Period start for statements declaring {dashboard_context_period_start:DateTime}",
+      )
+      .option(
+        "--end <datetime>",
+        "Period end for statements declaring {dashboard_context_period_end:DateTime}",
+      )
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--limit <n>", "Rows to keep from the result")
+      .option(
+        "--format <format>",
+        "table (default), json, jsonl (one object per row, JSON columns parsed back) or csv",
+        "table",
+      )
+      .option(
+        "--page-by <mode>",
+        "keyset: walk every page by rebinding the statement's {after_ts} and {after_id} parameters, without rewriting the statement",
+      )
+      .option("--out <file>", "Write the result to a file instead of stdout")
+      .option("--project <idOrSlug>", QUERY_PROJECT_FLAG_HELP),
+    async (sql: string | undefined, options: Record<string, string>) => {
+      const { runQueryCommand: impl } = await import("./commands/query/run.js");
+      return impl(sql, options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("schema")
+      .description("List the analytics views and columns a statement can name")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { queryLwqlSchemaCommand: impl } = await import("./commands/query/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("reference")
+      .description(
+        "Describe both query languages: the analytics SQL, the trace filter, worked examples, and which one answers which question",
+      )
+      .option(
+        "--section <section>",
+        "Print one section only: lwql, trace-filter, examples or decisions",
+      )
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { section?: string; project?: string }) => {
+      const { queryReferenceCommand: impl } = await import("./commands/query/reference.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("examples")
+      .description("Print worked queries in both languages, with their parameters")
+      .option("--tag <tag>", "Only examples carrying this tag or intent")
+      .option("--language <language>", "Only examples in this language: lwql or trace-filter")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { tag?: string; language?: string; project?: string }) => {
+      const { queryExamplesCommand: impl } = await import("./commands/query/examples.js");
+      return impl(options);
+    },
+  );
+}
+
+function registerAnalyticsCommands(program: Command): void {
   // Add analytics command group
-  const analyticsCmd = program
-    .command("analytics")
-    .description("Query analytics and metrics");
+  const analyticsCmd = program.command("analytics").description("Query analytics and metrics");
 
   emitsResult(
     analyticsCmd
       .command("query")
       .description("Query timeseries analytics (costs, latency, token usage, etc.)")
-      .option("-m, --metric <metric>", "Metric to query (preset name or raw metric path, default: trace-count)")
-      .option("-a, --aggregation <aggregation>", "Aggregation type: cardinality, avg, sum, min, max, p95, p99")
+      .option(
+        "-m, --metric <metric>",
+        "Metric to query (preset name or raw metric path, default: trace-count)",
+      )
+      .option(
+        "-a, --aggregation <aggregation>",
+        "Aggregation type: cardinality, avg, sum, min, max, p95, p99",
+      )
       .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
       .option("--end-date <date>", "End date (ISO string, default: now)")
       .option("--group-by <field>", "Group by field (e.g. metadata.model)")
       .option("--time-scale <scale>", "Time scale: 'full' for aggregate, or interval in seconds")
+      .option(
+        "--include-langy",
+        "Count Langy's own turns too (left out by default, as in the Trace Explorer)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: { metric?: string; aggregation?: string; startDate?: string; endDate?: string; groupBy?: string; timeScale?: string }) => {
+    async (options: {
+      metric?: string;
+      aggregation?: string;
+      startDate?: string;
+      endDate?: string;
+      groupBy?: string;
+      timeScale?: string;
+      includeLangy?: boolean;
+    }) => {
       const { queryAnalyticsCommand: impl } = await import("./commands/analytics/query.js");
+      const { includeLangy, ...rest } = options;
+      return impl({ ...rest, shouldIncludeLangy: includeLangy });
+    },
+  );
+}
+
+function registerInstantEvalCommands(program: Command): void {
+  // Instant Evals. One question, asked of every trace, conversation or model
+  // call in a window. The input is a LangWatchQL statement; `--target` writes
+  // one for the caller and the run hands it back so they can edit it.
+  const instantEvalCmd = program
+    .command("instant-eval")
+    .description("Ask one question of every trace, conversation or model call you have");
+
+  const INSTANT_EVAL_ASK_HELP =
+    "The question, in your own words. Repeat it to ask several questions of the same text: one classification answers them all, so three questions cost about what one does";
+  const INSTANT_EVAL_CRITERIA_HELP =
+    "For a yes or no question: what counts as yes, then what counts as no. Write it twice, after the --ask it describes";
+  const INSTANT_EVAL_SCORE_HELP =
+    "Ask for a rating instead of a yes or no, on the whole-numbered scale given as min..max, for example 1..5";
+  const INSTANT_EVAL_CATEGORY_HELP =
+    "Ask which option fits, written name=what it means. Repeat it for each option, after the --ask it describes";
+  const INSTANT_EVAL_THRESHOLD_HELP =
+    "For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself";
+  const INSTANT_EVAL_ID_HELP =
+    "What to call the question before it, which becomes its column and the name its judgements are filed under (default: q1, q2 and so on)";
+  const INSTANT_EVAL_QUESTIONS_FILE_HELP =
+    "Read the questions from a JSON or YAML file, which is how several questions each carry their own criteria, scale or options";
+  const INSTANT_EVAL_TARGET_HELP =
+    "What one judged row is: traces, threads or llm-spans (default: traces)";
+  const INSTANT_EVAL_FILTER_HELP =
+    'Narrow the rows with a trace filter, in the language the trace explorer\'s search bar speaks, for example "service:checkout AND cost:>0.01"';
+  const INSTANT_EVAL_LAST_HELP =
+    "How far back to look, as a number and a unit: 7d, 24h, 30m, 2w (default: 7d)";
+  const INSTANT_EVAL_SQL_HELP =
+    "Run a LangWatchQL statement of your own instead of a target. It must project TraceId and at least one eval function column";
+  const INSTANT_EVAL_LIMIT_HELP =
+    "Rows the run may judge (default: 1000). Ten thousand is allowed on every plan and a hundred thousand on a plan that lifts the cap";
+  // Hidden on `run`, where waiting is the default. `status` still offers it.
+  const INSTANT_EVAL_WAIT_HELP =
+    "Wait for the run to finish, up to 45 minutes or the number of minutes given, and exit non-zero when it failed";
+  const INSTANT_EVAL_START_HELP = "Oldest instant to judge (ISO-8601 or epoch ms)";
+  const INSTANT_EVAL_END_HELP = "Newest instant to judge (ISO-8601 or epoch ms)";
+  const INSTANT_EVAL_PARAM_HELP = "Bind one of your statement's parameters, written key=value";
+
+  const instantEvalRunCmd = instantEvalCmd
+    .command("run [question]")
+    .description("Ask your question of every row it finds, and print the matches when it is done");
+  const readInstantEvalRunQuestions = trackQuestionFlags(instantEvalRunCmd);
+
+  rendersOwnResult(
+    instantEvalRunCmd
+      .option("--ask <question>", INSTANT_EVAL_ASK_HELP, collectParam)
+      .option("--criteria <text>", INSTANT_EVAL_CRITERIA_HELP, collectParam)
+      .option("--score <min..max>", INSTANT_EVAL_SCORE_HELP)
+      .option("--category <name=description>", INSTANT_EVAL_CATEGORY_HELP, collectParam)
+      .option("--threshold <probability>", INSTANT_EVAL_THRESHOLD_HELP)
+      .option("--id <name>", INSTANT_EVAL_ID_HELP)
+      .option("--questions-file <path>", INSTANT_EVAL_QUESTIONS_FILE_HELP)
+      .option("--target <target>", INSTANT_EVAL_TARGET_HELP)
+      .option("--filter <filter>", INSTANT_EVAL_FILTER_HELP)
+      .option("--last <window>", INSTANT_EVAL_LAST_HELP)
+      .option("--start <instant>", INSTANT_EVAL_START_HELP)
+      .option("--end <instant>", INSTANT_EVAL_END_HELP)
+      .option("--sql <statement>", INSTANT_EVAL_SQL_HELP)
+      .option("--sql-file <path>", "Read the statement from a file")
+      .option("--param <pair>", INSTANT_EVAL_PARAM_HELP, collectParam)
+      .option("--limit <n>", INSTANT_EVAL_LIMIT_HELP)
+      .option("--name <name>", "What to call the run. Yours to choose")
+      .option("--estimate", "Price the run and exit without starting it")
+      .option("--detach", "Create the run and return its id instead of waiting for it")
+      .option("--show <n>", "Rows to print when the run finishes (default 20, at most 25)")
+      // A run waits by default now, so --wait asks for what already happens.
+      // Kept and hidden so a line written against the old shape still runs.
+      .addOption(new Option("--wait [minutes]", INSTANT_EVAL_WAIT_HELP).hideHelp())
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (question: string | undefined, _options: unknown, command: Command) => {
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it. The question
+    // flags are dropped here because the tracker read them in the order they
+    // were written, which is what attaches a modifier to its own question.
+    const {
+      ask: _ask,
+      criteria: _criteria,
+      category: _category,
+      score: _score,
+      threshold: _threshold,
+      id: _id,
+      ...rest
+    } = command.optsWithGlobals();
+    const drafts = readInstantEvalRunQuestions();
+    const { runInstantEvalCommand: impl } = await import("./commands/instant-evals/run.js");
+    await impl(question, rest, drafts);
+  });
+
+  const instantEvalEstimateCmd = instantEvalCmd
+    .command("estimate [question]")
+    .description("Price a run without starting it");
+  const readInstantEvalEstimateQuestions = trackQuestionFlags(instantEvalEstimateCmd);
+
+  emitsResult(
+    instantEvalEstimateCmd
+      .option("--ask <question>", INSTANT_EVAL_ASK_HELP, collectParam)
+      .option("--criteria <text>", INSTANT_EVAL_CRITERIA_HELP, collectParam)
+      .option("--score <min..max>", INSTANT_EVAL_SCORE_HELP)
+      .option("--category <name=description>", INSTANT_EVAL_CATEGORY_HELP, collectParam)
+      .option("--threshold <probability>", INSTANT_EVAL_THRESHOLD_HELP)
+      .option("--id <name>", INSTANT_EVAL_ID_HELP)
+      .option("--questions-file <path>", INSTANT_EVAL_QUESTIONS_FILE_HELP)
+      .option("--target <target>", INSTANT_EVAL_TARGET_HELP)
+      .option("--filter <filter>", INSTANT_EVAL_FILTER_HELP)
+      .option("--last <window>", INSTANT_EVAL_LAST_HELP)
+      .option("--start <instant>", INSTANT_EVAL_START_HELP)
+      .option("--end <instant>", INSTANT_EVAL_END_HELP)
+      .option("--sql <statement>", INSTANT_EVAL_SQL_HELP)
+      .option("--sql-file <path>", "Read the statement from a file")
+      .option("--param <pair>", INSTANT_EVAL_PARAM_HELP, collectParam)
+      .option("--limit <n>", INSTANT_EVAL_LIMIT_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (question: string | undefined, _options: unknown, command: Command) => {
+      const {
+        ask: _ask,
+        criteria: _criteria,
+        category: _category,
+        score: _score,
+        threshold: _threshold,
+        id: _id,
+        ...rest
+      } = command.optsWithGlobals();
+      const drafts = readInstantEvalEstimateQuestions();
+      const { estimateInstantEvalCommand: impl } =
+        await import("./commands/instant-evals/estimate.js");
+      return impl(question, rest, drafts);
+    },
+  );
+
+  rendersOwnResult(
+    instantEvalCmd
+      .command("status <id>")
+      .description("Read one run: where it is, what it matched, what it cost")
+      .option("--wait [minutes]", INSTANT_EVAL_WAIT_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (id: string, _options: unknown, command: Command) => {
+    const { statusInstantEvalCommand: impl } = await import("./commands/instant-evals/status.js");
+    await impl(id, command.optsWithGlobals());
+  });
+
+  emitsResult(
+    instantEvalCmd
+      .command("list")
+      .description("List the project's runs, newest first")
+      .option("--limit <n>", "Runs to list, at most one hundred (default: 20)")
+      .option("--before <instant>", "List runs accepted before this instant (ISO-8601)")
+      .option("--before-id <id>", "The id of the last run of the previous page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { limit?: string; before?: string; beforeId?: string }) => {
+      const { listInstantEvalsCommand: impl } = await import("./commands/instant-evals/list.js");
       return impl(options);
     },
   );
 
+  emitsResult(
+    instantEvalCmd
+      .command("results <id>")
+      .description("Read a page of the run's judgements")
+      .option("--question <id>", "Only this question's judgements")
+      .option("--matched", "Only judgements that matched")
+      .option("--unmatched", "Only judgements that did not match")
+      .option("--status <status>", "Only judgements in this state: judged, skipped or failed")
+      .option("--limit <n>", "Judgements per page, at most one thousand (default: 100)")
+      .option("--cursor <cursor>", "The cursor the previous page answered with")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        question?: string;
+        matched?: boolean;
+        unmatched?: boolean;
+        status?: string;
+        limit?: string;
+        cursor?: string;
+      },
+    ) => {
+      const { resultsInstantEvalCommand: impl } =
+        await import("./commands/instant-evals/results.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    instantEvalCmd
+      .command("sample <id>")
+      .description("Read a few rows with the text that was judged beside the verdict")
+      .option("-n, --number <n>", "Rows to read, at most twenty five (default: 5)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { number?: string }) => {
+      const { sampleInstantEvalCommand: impl } = await import("./commands/instant-evals/sample.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    instantEvalCmd
+      .command("cancel <id>")
+      .description("Ask a run to stop before its next page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { cancelInstantEvalCommand: impl } = await import("./commands/instant-evals/cancel.js");
+      return impl(id);
+    },
+  );
+}
+
+function registerTraceCommands(program: Command): void {
   // Add trace command group
-  const traceCmd = program
-    .command("trace")
-    .description("Search and inspect traces");
+  const traceCmd = program.command("trace").description("Search and inspect traces");
 
   rendersOwnResult(
     traceCmd
       .command("search")
       .description("Search traces with optional text query and date range")
-      .option("-q, --query <query>", "Text search query")
+      .option(
+        "-q, --query <query>",
+        "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
+      )
+      .option(
+        "--filter <filter>",
+        'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail". Combined with -q and the other flags. `langwatch trace fields` lists every field',
+      )
       .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
       .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
       .option("--limit <n>", "Max results to return (default: 25)")
@@ -2477,6 +3419,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "--origin <origins>",
         "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
       )
+      .option(
+        "--errors-only",
+        "Only traces that contain an error. The error is on the span, not in the searchable text, so this is the way to find failures",
+      )
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (_options: unknown, command: Command) => {
     const { searchTracesCommand: impl } = await import("./commands/traces/search.js");
@@ -2491,25 +3438,53 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Export traces as CSV, JSONL, or JSON")
     .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
     .option("--end-date <date>", "End date (ISO string, default: now)")
-    .option("-q, --query <query>", "Text search query to filter traces")
+    .option(
+      "-q, --query <query>",
+      "Text search query to filter traces. Plain text only: AND, OR and NOT are matched as words, not as operators",
+    )
     .option(
       "--origin <origins>",
       "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
     )
+    .option(
+      "--errors-only",
+      "Only traces that contain an error. The error is on the span, not in the searchable text, so this is the way to find failures",
+    )
     .option("-f, --format <format>", "Output format: jsonl (default), csv, or json", "jsonl")
     .option("-o, --output <file>", "Write output to file instead of stdout")
-    .option("--limit <n>", "Max traces to export (default: 1000); limits above one server page are fetched by cursor paging")
+    .option(
+      "--limit <n>",
+      "Max traces to export (default: 1000); limits above one server page are fetched by cursor paging",
+    )
     .option("--include-spans", "Include full span data for each trace (slower, larger output)")
-    .action(async (options: { startDate?: string; endDate?: string; query?: string; origin?: string; format?: string; output?: string; limit?: string; includeSpans?: boolean }) => {
-      const { exportTracesCommand: impl } = await import("./commands/traces/export.js");
-      await impl(options);
-    });
+    .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+    .action(
+      async (options: {
+        startDate?: string;
+        endDate?: string;
+        query?: string;
+        origin?: string;
+        format?: string;
+        output?: string;
+        limit?: string;
+        includeSpans?: boolean;
+        project?: string;
+      }) => {
+        const { exportTracesCommand: impl } = await import("./commands/traces/export.js");
+        await impl(options);
+      },
+    );
 
   rendersOwnResult(
     traceCmd
       .command("get <traceId>")
       .description("Get full trace details by ID")
-      .option("-f, --format <format>", "Output format: digest (default, human-readable) or json", "digest"),
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option(
+        "-f, --format <format>",
+        "Output format: digest (default, human-readable) or json",
+        "digest",
+      ),
   ).action(async (traceId: string, _options: unknown, command: Command) => {
     const { getTraceCommand: impl } = await import("./commands/traces/get.js");
     await impl(traceId, command.optsWithGlobals());
@@ -2519,35 +3494,84 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     traceCmd
       .command("transcript <traceId>")
       .description("Print the coding-agent transcript of a trace (what the agent did, in order)")
-      .option("-f, --format <format>", "Output format: table (default, human-readable) or json", "table"),
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option(
+        "-f, --format <format>",
+        "Output format: table (default, human-readable) or json",
+        "table",
+      ),
   ).action(async (traceId: string, _options: unknown, command: Command) => {
     const { transcriptTraceCommand: impl } = await import("./commands/traces/transcript.js");
     await impl(traceId, command.optsWithGlobals());
   });
 
+  emitsResult(
+    traceCmd
+      .command("facets [field]")
+      .description(
+        "Discover what the filter fields actually hold in this project. With no field, every facet and its top values; with a field, that field's values and counts",
+      )
+      .option("--prefix <prefix>", "Only values starting with this. Needs a field")
+      .option("--limit <n>", "Values to return, 1 to 1000 (default: 50). Needs a field")
+      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
+      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (field: string | undefined, options: Record<string, string>) => {
+      const { traceFacetsCommand: impl } = await import("./commands/traces/facets.js");
+      return impl(field, options);
+    },
+  );
+
+  emitsResult(
+    traceCmd
+      .command("fields")
+      .description("List every field a trace filter can name, with its value type and group")
+      .option("--syntax", "Print the filter language's syntax instead of the field list")
+      .option("--examples", "Print worked filter queries instead of the field list")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: Record<string, string>) => {
+      const { traceFieldsCommand: impl } = await import("./commands/traces/fields.js");
+      return impl(options);
+    },
+  );
+}
+
+function registerSessionCommands(program: Command): void {
   // Add session command group
-  const sessionCmd = program
-    .command("session")
-    .description("Inspect coding-agent sessions");
+  const sessionCmd = program.command("session").description("Inspect coding-agent sessions");
 
   rendersOwnResult(
     sessionCmd
       .command("events <sessionId>")
-      .description("List a coding-agent session's events (model calls, compactions, rate limits, tool runs) in time order")
-      .option("--kinds <kinds>", "Comma-separated event kinds to include (e.g. model_call,compaction,rate_limit)")
-      .option("--limit <n>", "Max events to return (default: 500); larger limits are fetched by cursor paging")
-      .option("--from <date>", "Start date (ISO string or epoch ms); with --to, prunes storage partitions for faster reads")
+      .description(
+        "List a coding-agent session's events (model calls, compactions, rate limits, tool runs) in time order",
+      )
+      .option(
+        "--kinds <kinds>",
+        "Comma-separated event kinds to include (e.g. model_call,compaction,rate_limit)",
+      )
+      .option(
+        "--limit <n>",
+        "Max events to return (default: 500); larger limits are fetched by cursor paging",
+      )
+      .option(
+        "--from <date>",
+        "Start date (ISO string or epoch ms); with --to, prunes storage partitions for faster reads",
+      )
       .option("--to <date>", "End date (ISO string or epoch ms)")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (sessionId: string, _options: unknown, command: Command) => {
     const { sessionEventsCommand: impl } = await import("./commands/sessions/events.js");
     await impl(sessionId, command.optsWithGlobals());
   });
+}
 
+function registerScenarioCommands(program: Command): void {
   // Add scenario command group
-  const scenarioCmd = program
-    .command("scenario")
-    .description("Manage scenarios");
+  const scenarioCmd = program.command("scenario").description("Manage scenarios");
 
   emitsResult(
     scenarioCmd
@@ -2562,8 +3586,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     scenarioCmd
-      .command("get <id>")
-      .description("Get scenario details by ID")
+      .command("get <reference>")
+      .description("Get scenario details by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { getScenarioCommand: impl } = await import("./commands/scenarios/get.js");
@@ -2578,148 +3602,360 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .requiredOption("--situation <situation>", "The situation/context for the scenario")
       .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
       .option("--labels <labels>", "Comma-separated list of labels")
+      .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
+      .option("--field <pair>", SCENARIO_FIELD_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { situation: string; criteria?: string; labels?: string }) => {
+    async (
+      name: string,
+      options: {
+        situation: string;
+        criteria?: string;
+        labels?: string;
+        testSuite?: string;
+        field?: string[];
+      },
+    ) => {
       const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
       return impl(name, options);
     },
   );
 
+  const scenarioUpdateCmd = scenarioCmd
+    .command("update <reference>")
+    .description("Update an existing scenario, named by ID or name")
+    .option("--name <name>", "New scenario name")
+    .option("--situation <situation>", "New situation/context")
+    .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
+    .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
+    .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
+    .option("--no-test-suite", "Take the scenario out of its test suite")
+    .option("--field <pair>", SCENARIO_FIELD_FLAG_HELP, collectParam)
+    .option("-f, --format <format>", "Output format: table (default) or json", "table");
+
+  const readScenarioTestSuiteFlags = trackTestSuiteFlags(scenarioUpdateCmd);
+
   emitsResult(
-    scenarioCmd
-      .command("update <id>")
-      .description("Update an existing scenario")
-      .option("--name <name>", "New scenario name")
-      .option("--situation <situation>", "New situation/context")
-      .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
-      .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string }) => {
+    scenarioUpdateCmd,
+    async (
+      id: string,
+      options: {
+        name?: string;
+        situation?: string;
+        criteria?: string;
+        labels?: string;
+        field?: string[];
+      },
+    ) => {
+      const { testSuite, noTestSuite } = readScenarioTestSuiteFlags();
       const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
-      return impl(id, options);
+      return impl(id, {
+        name: options.name,
+        situation: options.situation,
+        criteria: options.criteria,
+        labels: options.labels,
+        testSuite,
+        noTestSuite,
+        field: options.field,
+      });
     },
   );
 
-  scenarioCmd
-    .command("run <id>")
-    .description("Run a scenario against a target (agent or prompt)")
-    .requiredOption("--target <target>", "Target to run against, as <type>:<referenceId> (e.g., http:agent_abc123)")
-    .option("--wait", "Wait for the scenario run to complete")
-    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { target: string; wait?: boolean; format?: string; param?: string[] }) => {
-      const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
-      await impl(id, options);
-    });
+  rendersOwnResult(
+    scenarioCmd
+      .command("run <reference>")
+      .description("Run one scenario, named by ID or name, against one or more targets")
+      .option("--target <target>", TARGET_FLAG_HELP, collectParam)
+      .option("--name <name>", RUN_NAME_FLAG_HELP)
+      .option("--repeat <n>", REPEAT_FLAG_HELP)
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option("--note <text>", NOTE_FLAG_HELP)
+      .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
+      .option(
+        "--wait [minutes]",
+        "Wait for the run to complete, up to 45 minutes or the number of minutes given, and exit non-zero when a run failed",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (id: string, _options: unknown, command: Command) => {
+    const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it.
+    await impl(id, command.optsWithGlobals());
+  });
+
+  // Version history of a scenario. Nested under `scenario` because a version
+  // is a state of one case, never a resource of its own.
+  const scenarioVersionCmd = scenarioCmd
+    .command("version")
+    .description("Read the saved versions of a scenario");
+
+  emitsResult(
+    scenarioVersionCmd
+      .command("list <scenarioId>")
+      .description("List the saved versions of a scenario, newest first")
+      .option("--limit <n>", "Max versions to read (default: 20)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (scenarioId: string, options: { limit?: string }) => {
+      const { listScenarioVersionsCommand: impl } =
+        await import("./commands/scenarios/versions/list.js");
+      return impl(scenarioId, options);
+    },
+  );
+
+  emitsResult(
+    scenarioVersionCmd
+      .command("get <scenarioId> <version>")
+      .description("Read one saved version of a scenario")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (scenarioId: string, version: string) => {
+      const { getScenarioVersionCommand: impl } =
+        await import("./commands/scenarios/versions/get.js");
+      return impl(scenarioId, version);
+    },
+  );
 
   emitsResult(
     scenarioCmd
-      .command("delete <id>")
-      .description("Archive (soft-delete) a scenario")
+      .command("delete <reference>")
+      .description("Archive (soft-delete) a scenario, named by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteScenarioCommand: impl } = await import("./commands/scenarios/delete.js");
       return impl(id);
     },
   );
+}
 
-  // Add suite (run plan) command group
-  const suiteCmd = program
-    .command("suite")
-    .description("Manage suites (run plans) — scenario × target execution plans");
+function registerRunPlanCommands(program: Command): void {
+  // Run plans. A run plan is a named configuration: a scope, targets, a repeat
+  // count and the two models. The name is its identity, so running under a
+  // name already in use joins that plan's history.
+  const runPlanCmd = program
+    .command("run-plan")
+    .description("Run scenarios and read the plans those runs are filed under");
+
+  const runPlanRunCmd = runPlanCmd.command("run").description("Run a configuration under a name");
+  const readRunPlanEvaluatorFlags = trackEvaluatorFlags(runPlanRunCmd);
+
+  rendersOwnResult(
+    runPlanRunCmd
+      .option("--target <target>", TARGET_FLAG_HELP, collectParam)
+      .option("--all", SCOPE_ALL_FLAG_HELP)
+      .option("--test-suite <name-or-id>", SCOPE_TEST_SUITE_FLAG_HELP, collectParam)
+      // `--suite` is the name this flag shipped under. It is kept as an alias so
+      // a saved command line still runs, and it is left out of the help so the
+      // canonical spelling is the one a reader learns.
+      .addOption(
+        new Option("--suite <name-or-id>", SCOPE_TEST_SUITE_FLAG_HELP)
+          .argParser(collectParam)
+          .hideHelp(),
+      )
+      .option("--label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
+      .option("--scenario <id>", SCOPE_SCENARIO_FLAG_HELP, collectParam)
+      .option("--name <name>", RUN_NAME_FLAG_HELP)
+      .option("--repeat <n>", REPEAT_FLAG_HELP)
+      .option("--simulator-model <model>", SIMULATOR_MODEL_FLAG_HELP)
+      .option("--judge-model <model>", JUDGE_MODEL_FLAG_HELP)
+      .option("--evaluator <id-or-slug>", PLAN_EVALUATOR_FLAG_HELP, collectParam)
+      .option("--required", EVALUATOR_REQUIRED_FLAG_HELP)
+      .option("--not-required", EVALUATOR_NOT_REQUIRED_FLAG_HELP)
+      .option("--evaluators-json <file-or-json>", EVALUATORS_JSON_FLAG_HELP)
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option("--note <text>", NOTE_FLAG_HELP)
+      .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
+      .option(
+        "--wait [minutes]",
+        "Wait for the run to complete, up to 45 minutes or the number of minutes given, and exit non-zero when a run failed",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (_options: unknown, command: Command) => {
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it.
+    const {
+      suite,
+      evaluator: _evaluator,
+      required: _required,
+      notRequired: _notRequired,
+      ...rest
+    } = command.optsWithGlobals();
+    const testSuite: string[] = [...(rest.testSuite ?? []), ...(suite ?? [])];
+    const evaluators = readRunPlanEvaluatorFlags();
+    const { runRunPlanCommand: impl } = await import("./commands/run-plans/run.js");
+    await impl({
+      ...rest,
+      ...(testSuite.length > 0 ? { testSuite } : {}),
+      ...(evaluators ? { evaluators } : {}),
+    });
+  });
 
   emitsResult(
-    suiteCmd
+    runPlanCmd
       .command("list")
-      .description("List all suites in the project")
+      .description("List the run plans of the project")
+      .option("--archived", "Include archived run plans")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { archived?: boolean }) => {
+      const { listRunPlansCommand: impl } = await import("./commands/run-plans/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    runPlanCmd
+      .command("get <id>")
+      .description("Read one run plan")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { getRunPlanCommand: impl } = await import("./commands/run-plans/get.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    runPlanCmd
+      .command("archive <id>")
+      .description("Archive a run plan, keeping its run history")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { archiveRunPlanCommand: impl } = await import("./commands/run-plans/archive.js");
+      return impl(id);
+    },
+  );
+}
+
+function registerTestSuiteCommands(program: Command): void {
+  // Test suites. A test suite is a group of scenarios: a name and the
+  // scenarios filed in it. It holds no targets, so a run carries them.
+  // `suite` is the name the group shipped under and stays as an alias.
+  const testSuiteCmd = program
+    .command("test-suite")
+    .alias("suite")
+    .description("Manage test suites, the groups a scenario is filed in");
+
+  emitsResult(
+    testSuiteCmd
+      .command("list")
+      .description("List the test suites of the project")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async () => {
-      const { listSuitesCommand: impl } = await import("./commands/suites/list.js");
+      const { listTestSuitesCommand: impl } = await import("./commands/test-suites/list.js");
       return impl();
     },
   );
 
+  const testSuiteCreateCmd = testSuiteCmd
+    .command("create <name>")
+    .description("Create a test suite, with the fields and evaluators it declares")
+    .option("--field <definition>", SUITE_FIELD_FLAG_HELP, collectParam)
+    .option("--evaluator <id-or-slug>", EVALUATOR_FLAG_HELP, collectParam)
+    .option("--required", EVALUATOR_REQUIRED_FLAG_HELP)
+    .option("--not-required", EVALUATOR_NOT_REQUIRED_FLAG_HELP)
+    .option("--evaluators-json <file-or-json>", EVALUATORS_JSON_FLAG_HELP)
+    .option("-f, --format <format>", "Output format: table (default) or json", "table");
+  const readSuiteCreateEvaluatorFlags = trackEvaluatorFlags(testSuiteCreateCmd);
+
   emitsResult(
-    suiteCmd
-      .command("get <id>")
-      .description("Get suite details by ID")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
-      const { getSuiteCommand: impl } = await import("./commands/suites/get.js");
-      return impl(id);
+    testSuiteCreateCmd,
+    async (name: string, options: { field?: string[]; evaluatorsJson?: string }) => {
+      const evaluators = readSuiteCreateEvaluatorFlags();
+      const { createTestSuiteCommand: impl } = await import("./commands/test-suites/create.js");
+      return impl(name, {
+        field: options.field,
+        evaluators,
+        evaluatorsJson: options.evaluatorsJson,
+      });
+    },
+  );
+
+  const testSuiteUpdateCmd = testSuiteCmd
+    .command("update <suite>")
+    .description("Edit a test suite: its name, its fields or its evaluators")
+    .option("--name <name>", "The new name. The slug is kept.")
+    .option("--field <definition>", SUITE_FIELD_FLAG_HELP, collectParam)
+    .option("--evaluator <id-or-slug>", EVALUATOR_FLAG_HELP, collectParam)
+    .option("--required", EVALUATOR_REQUIRED_FLAG_HELP)
+    .option("--not-required", EVALUATOR_NOT_REQUIRED_FLAG_HELP)
+    .option("--evaluators-json <file-or-json>", EVALUATORS_JSON_FLAG_HELP)
+    .option("-f, --format <format>", "Output format: table (default) or json", "table");
+  const readSuiteUpdateEvaluatorFlags = trackEvaluatorFlags(testSuiteUpdateCmd);
+
+  emitsResult(
+    testSuiteUpdateCmd,
+    async (
+      suite: string,
+      options: { name?: string; field?: string[]; evaluatorsJson?: string },
+    ) => {
+      const evaluators = readSuiteUpdateEvaluatorFlags();
+      const { updateTestSuiteCommand: impl } = await import("./commands/test-suites/update.js");
+      return impl(suite, {
+        name: options.name,
+        field: options.field,
+        evaluators,
+        evaluatorsJson: options.evaluatorsJson,
+      });
     },
   );
 
   emitsResult(
-    suiteCmd
-      .command("create <name>")
-      .description("Create a new suite (run plan)")
-      .requiredOption("--scenarios <ids>", "Comma-separated scenario IDs")
-      .requiredOption("--targets <targets...>", "Targets as <type>:<referenceId> (e.g., http:agent_abc)")
-      .option("--repeat-count <n>", "Number of times to repeat each scenario-target pair", "1")
-      .option("--labels <labels>", "Comma-separated labels")
-      .option("--description <desc>", "Suite description")
+    testSuiteCmd
+      .command("get <suite>")
+      .description("Read one test suite, named by ID or by name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
-      const { createSuiteCommand: impl } = await import("./commands/suites/create.js");
-      return impl(name, options);
+    async (suite: string) => {
+      const { getTestSuiteCommand: impl } = await import("./commands/test-suites/get.js");
+      return impl(suite);
     },
   );
 
   emitsResult(
-    suiteCmd
-      .command("update <id>")
-      .description("Update a suite (run plan)")
-      .option("--name <name>", "New suite name")
-      .option("--scenarios <ids>", "New comma-separated scenario IDs")
-      .option("--targets <targets...>", "New targets as <type>:<referenceId>")
-      .option("--repeat-count <n>", "New repeat count")
-      .option("--labels <labels>", "New comma-separated labels")
-      .option("--description <desc>", "New description")
+    testSuiteCmd
+      .command("rename <suite> <name>")
+      .description("Rename a test suite, keeping its slug")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
-      const { updateSuiteCommand: impl } = await import("./commands/suites/update.js");
-      return impl(id, options);
+    async (suite: string, name: string) => {
+      const { renameTestSuiteCommand: impl } = await import("./commands/test-suites/rename.js");
+      return impl(suite, name);
     },
   );
 
   emitsResult(
-    suiteCmd
-      .command("duplicate <id>")
-      .description("Duplicate a suite")
+    testSuiteCmd
+      .command("archive <suite>")
+      .description("Archive a test suite and every scenario filed in it")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
-      const { duplicateSuiteCommand: impl } = await import("./commands/suites/duplicate.js");
-      return impl(id);
+    async (suite: string) => {
+      const { archiveTestSuiteCommand: impl } = await import("./commands/test-suites/archive.js");
+      return impl(suite);
     },
   );
 
-  suiteCmd
-    .command("run <id>")
-    .description("Execute a suite run — schedules all scenario × target × repeat jobs")
-    .option("--wait", "Wait for the suite run to complete before returning")
-    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[] }) => {
-      const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
-      await impl({ id, options });
-    });
-
-  emitsResult(
-    suiteCmd
-      .command("delete <id>")
-      .description("Archive (soft-delete) a suite")
+  rendersOwnResult(
+    testSuiteCmd
+      .command("run <suite>")
+      .description("Run every scenario filed in a test suite against the given targets")
+      .option("--target <target>", TARGET_FLAG_HELP, collectParam)
+      .option("--name <name>", RUN_NAME_FLAG_HELP)
+      .option("--repeat <n>", REPEAT_FLAG_HELP)
+      .option("--simulator-model <model>", SIMULATOR_MODEL_FLAG_HELP)
+      .option("--judge-model <model>", JUDGE_MODEL_FLAG_HELP)
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option("--note <text>", NOTE_FLAG_HELP)
+      .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
+      .option(
+        "--wait [minutes]",
+        "Wait for the run to complete, up to 45 minutes or the number of minutes given, and exit non-zero when a run failed",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
-      const { deleteSuiteCommand: impl } = await import("./commands/suites/delete.js");
-      return impl(id);
-    },
-  );
+  ).action(async (suite: string, _options: unknown, command: Command) => {
+    const { runTestSuiteCommand: impl } = await import("./commands/test-suites/run.js");
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it.
+    await impl({ reference: suite, options: command.optsWithGlobals() });
+  });
+}
 
+function registerGraphCommands(program: Command): void {
   // Add graph command group
-  const graphCmd = program
-    .command("graph")
-    .description("Manage custom graphs on dashboards");
+  const graphCmd = program.command("graph").description("Manage custom graphs on dashboards");
 
   emitsResult(
     graphCmd
@@ -2754,7 +3990,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--col-span <n>", "Column span (1-2)")
       .option("--row-span <n>", "Row span (1-2)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { dashboardId?: string; graph?: string; filters?: string; colSpan?: string; rowSpan?: string }) => {
+    async (
+      name: string,
+      options: {
+        dashboardId?: string;
+        graph?: string;
+        filters?: string;
+        colSpan?: string;
+        rowSpan?: string;
+      },
+    ) => {
       const { createGraphCommand: impl } = await import("./commands/graphs/create.js");
       return impl(name, options);
     },
@@ -2784,7 +4029,326 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerChartCommands(program: Command): void {
+  // Add chart command group — saved LangWatchQL workbench charts
+  const chartCmd = program
+    .command("chart")
+    .description("Manage saved LangWatchQL charts and place them on dashboards");
+
+  emitsResult(
+    chartCmd
+      .command("schema")
+      .description(
+        "Discover the LangWatchQL analytics datasets and columns to write chart SQL against",
+      )
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { chartSchemaCommand: impl } = await import("./commands/charts/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("list")
+      .description("List the project's saved charts")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listChartsCommand: impl } = await import("./commands/charts/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("get <id>")
+      .description("Get a saved chart by ID — its SQL, parameters, specification and placement")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { getChartCommand: impl } = await import("./commands/charts/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("create")
+      .description(
+        "Save a LangWatchQL chart from a statement, parameters and an optional Vega-Lite specification",
+      )
+      .requiredOption("--name <name>", "Chart name")
+      .option("--sql <sql>", "The LangWatchQL statement")
+      .option("--sql-file <path>", "Read the statement from a file")
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--spec-file <path>", "Vega-Lite specification JSON file")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      name?: string;
+      sql?: string;
+      sqlFile?: string;
+      param?: string[];
+      specFile?: string;
+      project?: string;
+    }) => {
+      const { createChartCommand: impl } = await import("./commands/charts/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("update <id>")
+      .description("Update a saved chart's name or definition")
+      .option("--name <name>", "New chart name")
+      .option("--sql <sql>", "New LangWatchQL statement")
+      .option("--sql-file <path>", "Read the new statement from a file")
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--spec-file <path>", "New Vega-Lite specification JSON file")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        name?: string;
+        sql?: string;
+        sqlFile?: string;
+        param?: string[];
+        specFile?: string;
+        project?: string;
+      },
+    ) => {
+      const { updateChartCommand: impl } = await import("./commands/charts/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("delete <id>")
+      .description("Delete a saved chart")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { deleteChartCommand: impl } = await import("./commands/charts/delete.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("run <id>")
+      .description("Run a saved chart's statement and print the result")
+      .option(
+        "--start <datetime>",
+        "Period start for statements declaring {dashboard_context_period_start:DateTime}",
+      )
+      .option(
+        "--end <datetime>",
+        "Period end for statements declaring {dashboard_context_period_end:DateTime}",
+      )
+      .option(
+        "--granularity <seconds>",
+        "Datapoint step for statements declaring {dashboard_context_granularity_seconds:UInt32}",
+      )
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: { start?: string; end?: string; granularity?: string; project?: string },
+    ) => {
+      const { runChartCommand: impl } = await import("./commands/charts/run.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("place <id>")
+      .description("Place a saved chart on a dashboard")
+      .requiredOption("--dashboard-id <id>", "Dashboard to place the chart on")
+      .option("--grid-column <n>", "Grid column")
+      .option("--grid-row <n>", "Grid row (allocated automatically when omitted)")
+      .option("--col-span <n>", "Column span")
+      .option("--row-span <n>", "Row span")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        dashboardId?: string;
+        gridColumn?: string;
+        gridRow?: string;
+        colSpan?: string;
+        rowSpan?: string;
+        project?: string;
+      },
+    ) => {
+      const { placeChartCommand: impl } = await import("./commands/charts/place.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("unplace <id>")
+      .description("Remove a saved chart from its dashboard")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { unplaceChartCommand: impl } = await import("./commands/charts/unplace.js");
+      return impl(id, options);
+    },
+  );
+}
+
+function registerDashboardWidgetCommands(program: Command): void {
+  // Add dashboard-widget command group — custom-chart-playground widgets
+  const dashboardWidgetCmd = program
+    .command("dashboard-widget")
+    .description("Manage dashboard widgets");
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("schema")
+      .description(
+        "Discover the LangWatchQL analytics datasets and columns to write a widget's queries against",
+      )
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { dashboardWidgetSchemaCommand: impl } =
+        await import("./commands/dashboard-widgets/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("list")
+      .description("List the project's dashboard widgets")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listDashboardWidgetsCommand: impl } =
+        await import("./commands/dashboard-widgets/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("get <id>")
+      .description("Get a dashboard widget by ID — its React source and named queries")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { getDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("create")
+      .description(
+        "Save a dashboard widget from a React source file and its named LangWatchQL queries",
+      )
+      .requiredOption("--name <name>", "Widget name")
+      .option("--code <code>", "The widget's React source")
+      .option("--code-file <path>", "Read the widget's React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      name?: string;
+      code?: string;
+      codeFile?: string;
+      queriesFile?: string;
+      project?: string;
+    }) => {
+      const { createDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("update <id>")
+      .description("Update a dashboard widget's name or definition")
+      .option("--name <name>", "New widget name")
+      .option("--code <code>", "New React source")
+      .option("--code-file <path>", "Read the new React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        name?: string;
+        code?: string;
+        codeFile?: string;
+        queriesFile?: string;
+        project?: string;
+      },
+    ) => {
+      const { updateDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("delete <id>")
+      .description("Delete a dashboard widget")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { deleteDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/delete.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("boards")
+      .description("List the Dashboards boards a widget can be pinned to")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listDashboardWidgetBoardsCommand: impl } =
+        await import("./commands/dashboard-widgets/boards.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("pin <widget>")
+      .description(
+        "Add a dashboard widget to a Dashboards board (widget and board by id or name, from `dashboard-widget boards`)",
+      )
+      .requiredOption("--dashboard <id-or-name>", "Dashboards board to add the widget to")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (widget: string, options: { dashboard?: string; project?: string }) => {
+      const { pinDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/pin.js");
+      return impl(widget, options);
+    },
+  );
+}
+
+function registerTriggerCommands(program: Command): void {
   // Add trigger (automation) command group
   const triggerCmd = program
     .command("trigger")
@@ -2816,13 +4380,60 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     triggerCmd
       .command("create <name>")
       .description("Create a new trigger (automation)")
-      .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE")
-      .option("--filters <json>", "Trigger filter conditions as JSON")
+      .requiredOption(
+        "--action <action>",
+        "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE, SEND_WEBHOOK",
+      )
+      .option("--action-params <json>", "Delivery configuration for the chosen action, as JSON")
+      .option("--filters <json>", TRIGGER_FILTERS_HELP)
+      .option(
+        "--filter-query <query>",
+        "Trace query in the syntax the traces view uses, e.g. status:error. Supersedes --filters",
+      )
+      .option(
+        "--custom-graph-id <id>",
+        "Make this an alert on that graph. Needs --graph-alert and --alert-type",
+      )
+      .option(
+        "--graph-alert <json>",
+        'The rule an alert fires by, as JSON: {"seriesName":"...","operator":"gt|gte|lt|lte|eq","threshold":0.5,"timePeriod":5} (minutes: 1, 5, 15, 30, 60, 1440)',
+      )
+      .option(
+        "--report <json>",
+        'Make this a scheduled report, as JSON: {"source":{"kind":"dashboard","dashboardId":"..."},"schedule":{"cron":"0 9 * * 1","timezone":"UTC"}}. source.kind is dashboard, customGraph or traceQuery',
+      )
       .option("--message <text>", "Custom alert message")
       .option("--alert-type <type>", "Alert severity: CRITICAL, WARNING, INFO")
-      .option("--slack-webhook <url>", "Slack webhook URL (for SEND_SLACK_MESSAGE action)")
+      .option(
+        "--slack-connection <id>",
+        "The Slack connection to post through, for SEND_SLACK_MESSAGE. List them with `langwatch slack-connection list`",
+      )
+      .option(
+        "--slack-channel <id>",
+        "The Slack channel to post in, e.g. C0123. Needed with a bot connection",
+      )
+      .option(
+        "--slack-webhook <url>",
+        "Legacy: a Slack incoming webhook URL, stored as a Slack connection. Prefer --slack-connection",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { action: string; filters?: string; message?: string; alertType?: string; slackWebhook?: string }) => {
+    async (
+      name: string,
+      options: {
+        action: string;
+        actionParams?: string;
+        filters?: string;
+        filterQuery?: string;
+        message?: string;
+        alertType?: string;
+        slackWebhook?: string;
+        slackConnection?: string;
+        slackChannel?: string;
+        customGraphId?: string;
+        graphAlert?: string;
+        report?: string;
+      },
+    ) => {
       const { createTriggerCommand: impl } = await import("./commands/triggers/create.js");
       return impl(name, options);
     },
@@ -2836,10 +4447,93 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--active <boolean>", "Enable or disable the trigger (true/false)")
       .option("--message <text>", "New alert message")
       .option("--alert-type <type>", "New alert severity")
+      .option("--filters <json>", TRIGGER_FILTERS_HELP)
+      .option(
+        "--filter-query <query>",
+        "Trace query in the syntax the traces view uses. An empty value clears it",
+      )
+      .option(
+        "--graph-alert <json>",
+        "The rule an alert fires by, as JSON (only for an automation that is already an alert)",
+      )
+      .option(
+        "--report <json>",
+        "What a report renders and when, as JSON (only for an automation that is already a report)",
+      )
+      .option(
+        "--action-params <json>",
+        "The delivery configuration this trigger should have from now on, as JSON. Replaces the stored one; send [redacted] back for a credential to keep it",
+      )
+      .option(
+        "--slack-connection <id>",
+        "The Slack connection to post through from now on (see `langwatch slack-connection list`). Replaces the delivery configuration, so pass --slack-channel with a bot connection",
+      )
+      .option(
+        "--slack-channel <id>",
+        "The Slack channel to post in, e.g. C0123, for a bot connection",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string }) => {
+    async (
+      id: string,
+      options: {
+        name?: string;
+        active?: string;
+        message?: string;
+        alertType?: string;
+        filters?: string;
+        filterQuery?: string;
+        actionParams?: string;
+        slackConnection?: string;
+        slackChannel?: string;
+        graphAlert?: string;
+        report?: string;
+      },
+    ) => {
       const { updateTriggerCommand: impl } = await import("./commands/triggers/update.js");
       return impl(id, options);
+    },
+  );
+
+  for (const [verb, description, active] of [
+    ["enable", "Resume a paused trigger", true],
+    ["disable", "Pause a trigger", false],
+  ] as const) {
+    emitsResult(
+      triggerCmd
+        .command(`${verb} <id>`)
+        .description(description)
+        .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+      async (id: string) => {
+        const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
+        return impl({ id, active });
+      },
+    );
+  }
+
+  emitsResult(
+    triggerCmd
+      .command("test-fire <id>")
+      .description("Send the trigger's message to the destination it is configured with")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { testFireTriggerCommand: impl } = await import("./commands/triggers/testFire.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    triggerCmd
+      .command("fires <id>")
+      .description("What the trigger has done, newest first")
+      .option("--limit <n>", "How many fires to read")
+      .option(
+        "--cursor <cursor>",
+        "Read the page after this one: the next cursor a previous call printed",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { limit?: string; cursor?: string }) => {
+      const { triggerFiresCommand: impl } = await import("./commands/triggers/fires.js");
+      return impl({ id, options });
     },
   );
 
@@ -2853,7 +4547,29 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerSlackConnectionCommands(program: Command): void {
+  const slackConnectionCmd = program
+    .command("slack-connection")
+    .description(
+      "Slack connections automations post through, listed by name (never their secrets)",
+    );
+
+  emitsResult(
+    slackConnectionCmd
+      .command("list")
+      .description("List the Slack connections this project can deliver through")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listSlackConnectionsCommand: impl } =
+        await import("./commands/slack-connections/list.js");
+      return impl();
+    },
+  );
+}
+
+function registerSecretCommands(program: Command): void {
   // Add secret command group
   const secretCmd = program
     .command("secret")
@@ -2915,7 +4631,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerMonitorCommands(program: Command): void {
   // Add monitor (online evaluation) command group
   const monitorCmd = program
     .command("monitor")
@@ -2934,12 +4652,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     monitorCmd
-      .command("get <id>")
-      .description("Get monitor details by ID")
+      .command("get <idOrSlugOrName>")
+      .description("Get monitor details by id, slug or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
+    async (idOrSlugOrName: string) => {
       const { getMonitorCommand: impl } = await import("./commands/monitors/get.js");
-      return impl(id);
+      return impl(idOrSlugOrName);
     },
   );
 
@@ -2947,14 +4665,34 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     monitorCmd
       .command("create <name>")
       .description("Create a new online evaluation monitor")
-      .requiredOption("--check-type <type>", "Evaluator check type (e.g. ragas/toxicity, custom/my-eval)")
-      .option("--execution-mode <mode>", "Execution mode: ON_MESSAGE (default), AS_GUARDRAIL, MANUALLY", "ON_MESSAGE")
+      .requiredOption(
+        "--check-type <type>",
+        "Evaluator check type (e.g. ragas/toxicity, custom/my-eval)",
+      )
+      .option(
+        "--execution-mode <mode>",
+        "Execution mode: ON_MESSAGE (default), AS_GUARDRAIL, MANUALLY",
+        "ON_MESSAGE",
+      )
       .option("--sample <rate>", "Sampling rate 0.0-1.0 (default: 1.0)")
-      .option("--evaluator-id <id>", "Saved evaluator to run (required; see `langwatch evaluator list`)")
+      .option(
+        "--evaluator-id <id>",
+        "Saved evaluator to run (required; see `langwatch evaluator list`)",
+      )
       .option("--level <level>", "Evaluation level: trace (default) or thread")
       .option("--parameters <json>", "Evaluator settings as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { checkType: string; executionMode?: string; sample?: string; evaluatorId?: string; level?: string; parameters?: string }) => {
+    async (
+      name: string,
+      options: {
+        checkType: string;
+        executionMode?: string;
+        sample?: string;
+        evaluatorId?: string;
+        level?: string;
+        parameters?: string;
+      },
+    ) => {
       const { createMonitorCommand: impl } = await import("./commands/monitors/create.js");
       return impl(name, options);
     },
@@ -2963,14 +4701,23 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     monitorCmd
       .command("update <id>")
-      .description("Update a monitor")
+      .description("Update a monitor by id (find the id with `monitor get <name>`)")
       .option("--name <name>", "New monitor name")
       .option("--enabled <boolean>", "Enable or disable the monitor (true/false)")
       .option("--execution-mode <mode>", "Execution mode: ON_MESSAGE, AS_GUARDRAIL, MANUALLY")
       .option("--sample <rate>", "Sampling rate 0.0-1.0")
       .option("--parameters <json>", "Updated evaluator settings as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; enabled?: string; executionMode?: string; sample?: string; parameters?: string }) => {
+    async (
+      id: string,
+      options: {
+        name?: string;
+        enabled?: string;
+        executionMode?: string;
+        sample?: string;
+        parameters?: string;
+      },
+    ) => {
       const { updateMonitorCommand: impl } = await import("./commands/monitors/update.js");
       return impl(id, options);
     },
@@ -2979,14 +4726,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     monitorCmd
       .command("delete <id>")
-      .description("Delete a monitor")
+      .description("Delete a monitor by id (find the id with `monitor get <name>`)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteMonitorCommand: impl } = await import("./commands/monitors/delete.js");
       return impl(id);
     },
   );
+}
 
+function registerSimulationRunCommands(program: Command): void {
   // Add simulation-run command group
   const simulationRunCmd = program
     .command("simulation-run")
@@ -3002,8 +4751,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--name <substring>", "Filter by run name substring (case-insensitive)")
       .option("--limit <n>", "Max results (default: 20)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: { scenarioSetId?: string; batchRunId?: string; status?: string; name?: string; limit?: string }) => {
-      const { listSimulationRunsCommand: impl } = await import("./commands/simulation-runs/list.js");
+    async (options: {
+      scenarioSetId?: string;
+      batchRunId?: string;
+      status?: string;
+      name?: string;
+      limit?: string;
+    }) => {
+      const { listSimulationRunsCommand: impl } =
+        await import("./commands/simulation-runs/list.js");
       return impl(options);
     },
   );
@@ -3019,16 +4775,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(runId, options);
     },
   );
+}
 
+function registerNavigateCommands(program: Command): void {
   // Ask the platform to open, in the user's browser, a resource this
   // conversation already looked up. Carries only the resource's id — never
   // an address; the platform resolves where it actually lives from the link
   // it remembered surfacing. See specs/langy/langy-agent-driven-navigation.feature.
   const navigateCmd = program
     .command("navigate")
-    .description(
-      "Ask the platform to open a resource this conversation already looked up",
-    );
+    .description("Ask the platform to open a resource this conversation already looked up");
 
   navigateCmd
     .command("open <resourceId>")
@@ -3037,11 +4793,108 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { navigateOpenCommand: impl } = await import("./commands/navigate/open.js");
       await impl(resourceId);
     });
+}
 
+function registerOnboardingCommands(program: Command): void {
+  // The guided onboarding state of the organization this project belongs to.
+  // Agent plumbing like `navigate`: Langy reads it to know which path it is
+  // guiding and marks a path done at the end of a guided setup, so the Home
+  // offer and the campaigns see it finish.
+  // See specs/features/onboarding/guided-onboarding-variant.feature.
+  const onboardingCmd = program
+    .command("onboarding")
+    .description("Read and update the guided onboarding of this organization");
+
+  emitsResult(
+    onboardingCmd
+      .command("state")
+      .description("Show the guided onboarding state: paths picked, current, done, provider, tour")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { onboardingStateCommand: impl } = await import("./commands/onboarding/state.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    onboardingCmd
+      .command("complete-path <path>")
+      .description("Mark a guided onboarding path as done: llmops, coding, gateway or governance")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (path: string) => {
+      const { onboardingCompletePathCommand: impl } =
+        await import("./commands/onboarding/complete-path.js");
+      return impl(path);
+    },
+  );
+}
+
+function registerUiCommands(program: Command): void {
+  // Drive the page the user has open with typed UI actions. Agent plumbing
+  // like `navigate`: only works mid-turn, when the platform can reach the
+  // page over the turn's live stream. See specs/langy/langy-ui-actions.feature.
+  const uiCmd = program
+    .command("ui")
+    .description("Drive the page the user has open with typed actions");
+
+  emitsResult(
+    uiCmd
+      .command("call <kind>")
+      .description("Dispatch one UI action to the open page and print its result")
+      .option("--payload <json>", "The action's payload as JSON (default: {})")
+      .option(
+        "--payload-file <path>",
+        "Read the payload from a file, or from stdin with -. Use this for prompts and any other text a shell would mangle",
+      )
+      .option(
+        "--experiment <slug>",
+        "Experiment for the backend fallback to apply the action to when no page answers",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      kind: string,
+      options: { payload?: string; payloadFile?: string; experiment?: string },
+    ) => {
+      const { uiCallCommand: impl } = await import("./commands/ui/call.js");
+      return impl(kind, options);
+    },
+  );
+
+  emitsResult(
+    uiCmd
+      .command("actions")
+      .description("List the UI actions pages accept, with their schemas")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { uiActionsCommand: impl } = await import("./commands/ui/actions.js");
+      return impl();
+    },
+  );
+}
+
+function registerWorkbenchCommands(program: Command): void {
+  const workbenchCmd = program
+    .command("workbench")
+    .description("Work with the evaluations workbench the user has open");
+
+  emitsResult(
+    workbenchCmd
+      .command("get-state [experiment]")
+      .description(
+        "Read the open workbench as the user sees it, unsaved edits included; with the experiment named it answers from the saved state when no page is open",
+      )
+      .option("--no-include-results", "Leave the results summary out")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string | undefined, options: { includeResults?: boolean }) => {
+      const { workbenchGetStateCommand: impl } = await import("./commands/workbench/get-state.js");
+      return impl(experiment, options);
+    },
+  );
+}
+
+function registerDatasetCommands(program: Command): void {
   // Add dataset command group
-  const datasetCmd = program
-    .command("dataset")
-    .description("Manage datasets");
+  const datasetCmd = program.command("dataset").description("Manage datasets");
 
   emitsResult(
     datasetCmd
@@ -3092,7 +4945,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     datasetCmd
       .command("upload <slug> <file>")
       .description("Upload a file to a dataset (creates if not found)")
-      .option("--if-exists <strategy>", "Strategy when dataset exists: append (default), replace, error"),
+      .option(
+        "--if-exists <strategy>",
+        "Strategy when dataset exists: append (default), replace, error",
+      ),
     async (slug: string, file: string, options: { ifExists?: string }) => {
       const { uploadCommand: uploadDatasetImpl } = await import("./commands/dataset/upload.js");
       return uploadDatasetImpl(slug, file, options);
@@ -3104,7 +4960,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Download dataset records as CSV or JSONL")
     .option("-f, --format <format>", "Output format: csv or jsonl", "csv")
     .action(async (slugOrId: string, options: { format?: string }) => {
-      const { downloadCommand: downloadDatasetImpl } = await import("./commands/dataset/download.js");
+      const { downloadCommand: downloadDatasetImpl } =
+        await import("./commands/dataset/download.js");
       await downloadDatasetImpl(slugOrId, options);
     });
 
@@ -3122,9 +4979,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   );
 
   // Records subcommand group
-  const recordsCmd = datasetCmd
-    .command("records")
-    .description("Manage dataset records");
+  const recordsCmd = datasetCmd.command("records").description("Manage dataset records");
 
   emitsResult(
     recordsCmd
@@ -3175,9 +5030,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return recordsDeleteCommand(slugOrId, recordIds);
     },
   );
-  const projectsCmd = program
-    .command("projects")
-    .description("Manage organization projects");
+}
+
+function registerProjectsCommands(program: Command): void {
+  const projectsCmd = program.command("projects").description("Manage organization projects");
 
   emitsResult(
     projectsCmd
@@ -3237,14 +5093,31 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--framework <fw>", "New framework")
       .option("--pii-redaction-level <level>", "PII redaction: STRICT, ESSENTIAL, or DISABLED")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (id: string, options: {
-      name?: string;
-      language?: string;
-      framework?: string;
-      piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
-    }) => {
+    async (
+      id: string,
+      options: {
+        name?: string;
+        language?: string;
+        framework?: string;
+        piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
+      },
+    ) => {
       const { updateProjectCommand: impl } = await import("./commands/projects/update.js");
       return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    projectsCmd
+      .command("move <project>")
+      .description(
+        "Move a project to another team; gateway keys tracing to it switch to the new team's budgets",
+      )
+      .requiredOption("--team <team>", "Destination team: id, slug or name")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (project: string, options: { team: string }) => {
+      const { moveProjectCommand: impl } = await import("./commands/projects/move.js");
+      return impl({ project, team: options.team });
     },
   );
 
@@ -3258,10 +5131,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
-  const apiKeysCmd = program
-    .command("api-keys")
-    .description("Manage organization API keys");
+function registerApiKeysCommands(program: Command): void {
+  const apiKeysCmd = program.command("api-keys").description("Manage organization API keys");
 
   emitsResult(
     apiKeysCmd
@@ -3282,7 +5155,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--key-type <type>", "Key type: personal or service", "service")
       .option("--description <desc>", "Optional description")
       .option("--expires-at <date>", "Expiration date (ISO 8601)")
-      .option("--project-id <id...>", "Project IDs to scope the key to (service keys only, repeatable)")
+      .option(
+        "--project-id <id...>",
+        "Project IDs to scope the key to (service keys only, repeatable)",
+      )
       .option(
         "--binding <binding...>",
         "What the key may reach, as role:scopeType:scopeId (repeatable), for example ADMIN:PROJECT:project_abc",
@@ -3291,10 +5167,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "--permission <permission...>",
         "Restricted keys only: a permission as resource:action (repeatable)",
       )
-      .option(
-        "--permission-mode <mode>",
-        "How the bindings are read: all, readonly or restricted",
-      )
+      .option("--permission-mode <mode>", "How the bindings are read: all, readonly or restricted")
       .option(
         "--assigned-to-user-id <userId>",
         "Organization admins only: the member the key acts as, and is capped by",
@@ -3341,10 +5214,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "--permission <permission...>",
         "Restricted keys only: a permission as resource:action (repeatable)",
       )
-      .option(
-        "--permission-mode <mode>",
-        "How the bindings are read: all, readonly or restricted",
-      )
+      .option("--permission-mode <mode>", "How the bindings are read: all, readonly or restricted")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (
       id: string,
@@ -3371,14 +5241,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
-  // ── Organization management ────────────────────────────────────────────────
-  // The families that provision an organization: the organization itself, its
-  // members and invites, teams, groups, custom roles, role bindings, SCIM
-  // tokens, and (self-hosted) the organizations on the instance. All of them
-  // take an organization API key and are available on Enterprise plans, except
-  // `organizations`, which provisions the organization an API key would belong
-  // to and so authenticates against the instance instead.
+function registerOrganizationCommands(program: Command): void {
+  // ── Organization management ──────────────────────────────────────────────── The families
+  // that provision an organization: the organization itself, its members and invites, teams,
+  // groups, custom roles, role bindings, SCIM tokens, and (self-hosted) the organizations on
+  // the instance.
 
   const organizationCmd = program
     .command("organization")
@@ -3415,19 +5284,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { updateOrganizationCommand: impl } = await import("./commands/organization/update.js");
       return impl({
         ...(options.name !== undefined ? { name: options.name } : {}),
-        ...(options.supportContact !== undefined
-          ? { supportContact: options.supportContact }
-          : {}),
-        ...(options.presence !== undefined
-          ? { presenceEnabled: options.presence }
-          : {}),
+        ...(options.supportContact !== undefined ? { supportContact: options.supportContact } : {}),
+        ...(options.presence !== undefined ? { presenceEnabled: options.presence } : {}),
         ...(options.traceSharing !== undefined
           ? { traceSharingEnabled: options.traceSharing }
           : {}),
       });
     },
   );
+}
 
+function registerMembersCommands(program: Command): void {
   const membersCmd = program
     .command("members")
     .description("Manage the people in the organization");
@@ -3512,10 +5379,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(userId);
     },
   );
+}
 
-  const invitesCmd = program
-    .command("invites")
-    .description("Invite people into the organization");
+function registerInvitesCommands(program: Command): void {
+  const invitesCmd = program.command("invites").description("Invite people into the organization");
 
   emitsResult(
     invitesCmd
@@ -3537,10 +5404,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "--role <role...>",
         "Organization role for the invited people: one for the batch, or one per email",
       )
-      .option(
-        "--team <team...>",
-        "Team the invited people land on, as teamId:role (repeatable)",
-      )
+      .option("--team <team...>", "Team the invited people land on, as teamId:role (repeatable)")
       .option("--json <json>", "JSON array of invites (inline)")
       .option("--file <path>", "Read the JSON array of invites from a file")
       .option("--stdin", "Read the JSON array of invites from standard input")
@@ -3572,7 +5436,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerTeamsCommands(program: Command): void {
   const teamsCmd = program
     .command("teams")
     .description("Manage the teams that group projects and people");
@@ -3606,8 +5472,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("create")
       .description("Create a team")
       .requiredOption("--name <name>", "Team name")
+      .option(
+        "--copy-members-from <teamId>",
+        "Add every member of this team to the new one, with the role they hold there",
+      )
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (options: { name: string }) => {
+    async (options: { name: string; copyMembersFrom?: string }) => {
       const { createTeamCommand: impl } = await import("./commands/teams/create.js");
       return impl(options);
     },
@@ -3636,9 +5506,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  const teamMembersCmd = teamsCmd
-    .command("members")
-    .description("Manage who belongs to a team");
+  const teamMembersCmd = teamsCmd.command("members").description("Manage who belongs to a team");
 
   emitsResult(
     teamMembersCmd
@@ -3653,13 +5521,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     teamMembersCmd
-      .command("add <teamId> <userId>")
-      .description("Add a member to a team")
-      .option("--role <role>", "Role the member gets on the team: ADMIN, MEMBER or VIEWER")
+      .command("add <teamId> <userIds...>")
+      .description("Add one or more members to a team")
+      .option("--role <role>", "Role every member gets on the team: ADMIN, MEMBER or VIEWER")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (teamId: string, userId: string, options: { role?: string }) => {
-      const { addTeamMemberCommand: impl } = await import("./commands/teams/members.js");
-      return impl({ teamId, userId, options });
+    async (teamId: string, userIds: string[], options: { role?: string }) => {
+      const { addTeamMembersCommand: impl } = await import("./commands/teams/members.js");
+      return impl({ teamId, userIds, options });
     },
   );
 
@@ -3673,7 +5541,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl({ teamId, userId });
     },
   );
+}
 
+function registerGroupsCommands(program: Command): void {
   const groupsCmd = program
     .command("groups")
     .description("Manage access groups and what they grant");
@@ -3742,9 +5612,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  const groupMembersCmd = groupsCmd
-    .command("members")
-    .description("Manage who belongs to a group");
+  const groupMembersCmd = groupsCmd.command("members").description("Manage who belongs to a group");
 
   emitsResult(
     groupMembersCmd
@@ -3827,7 +5695,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl({ groupId, bindingId });
     },
   );
+}
 
+function registerRolesCommands(program: Command): void {
   const rolesCmd = program
     .command("roles")
     .description("Manage custom roles and the permissions they carry");
@@ -3835,11 +5705,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     rolesCmd
       .command("list")
-      .description("List the organization's custom roles")
+      .description("List the organization's roles: the built-in ones first, then custom")
+      .option("--built-in", "Only the built-in roles: admin, member and viewer")
+      .option("--no-built-in", "Only the custom roles")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+    async (options: { builtIn?: boolean }) => {
       const { listRolesCommand: impl } = await import("./commands/roles/list.js");
-      return impl();
+      return impl({ builtIn: options.builtIn });
     },
   );
 
@@ -3882,10 +5754,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "The role's complete permission set as resource:action (repeatable)",
       )
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (
-      id: string,
-      options: { name?: string; description?: string; permission?: string[] },
-    ) => {
+    async (id: string, options: { name?: string; description?: string; permission?: string[] }) => {
       const { updateRoleCommand: impl } = await import("./commands/roles/update.js");
       return impl({ id, options });
     },
@@ -3912,10 +5781,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl();
     },
   );
+}
 
+/** Alex's ruling on the superseded door: a server log plus this stderr line. */
+export const ROLE_BINDINGS_DEPRECATION =
+  "Warning: `langwatch role-bindings` is deprecated and will be removed. Use `langwatch grants` (/api/v1/grants) instead.";
+
+function registerRoleBindingsCommands(program: Command): void {
   const roleBindingsCmd = program
     .command("role-bindings")
-    .description("Grant roles to people, groups and API keys at a scope");
+    .description("Deprecated: use `langwatch grants`. Grant roles at a scope")
+    .hook("preAction", () => {
+      console.error(ROLE_BINDINGS_DEPRECATION);
+    });
 
   emitsResult(
     roleBindingsCmd
@@ -3988,7 +5866,112 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerGrantsCommands(program: Command): void {
+  const grantsCmd = program
+    .command("grants")
+    .description("Grant roles to people, groups and API keys at a scope");
+
+  emitsResult(
+    grantsCmd
+      .command("list")
+      .description("List grants one page at a time, optionally filtered")
+      .option("--principal-type <type>", "Kind of principal: user, group or api-key")
+      .option("--principal-id <id>", "The user, group or API key id")
+      .option("--role <roleId>", "A built-in role (admin, member, viewer) or a custom role id")
+      .option("--scope-type <type>", "Filter by scope: organization, team or project")
+      .option("--scope-id <id>", "Filter by the organization, team or project id")
+      .option("--status <status>", "active or expired; both when omitted")
+      .option("--limit <n>", "Grants per page (default 50, max 200)")
+      .option("--cursor <cursor>", "The next-page cursor a previous page printed")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      principalType?: string;
+      principalId?: string;
+      role?: string;
+      scopeType?: string;
+      scopeId?: string;
+      status?: string;
+      limit?: string;
+      cursor?: string;
+    }) => {
+      const { listGrantsCommand: impl } = await import("./commands/grants/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    grantsCmd
+      .command("get <id>")
+      .description("Get one grant")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { getGrantCommand: impl } = await import("./commands/grants/get.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    grantsCmd
+      .command("create")
+      .description("Grant one role to one principal at one scope, up to what you hold yourself")
+      .requiredOption("--principal-type <type>", "Kind of principal: user, group or api-key")
+      .requiredOption("--principal-id <id>", "The user, group or API key id")
+      .requiredOption(
+        "--role <roleId>",
+        "A built-in role (admin, member, viewer) or a custom role id",
+      )
+      .requiredOption("--scope-type <type>", "Where it applies: organization, team or project")
+      .requiredOption("--scope-id <id>", "The organization, team or project id")
+      .option("--expires-at <iso>", "When the grant stops granting, as an ISO-8601 time")
+      .option(
+        "--idempotency-key <key>",
+        "Retry-safe key: a repeat with the same body makes one grant",
+      )
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: {
+      principalType: string;
+      principalId: string;
+      role: string;
+      scopeType: string;
+      scopeId: string;
+      expiresAt?: string;
+      idempotencyKey?: string;
+    }) => {
+      const { createGrantCommand: impl } = await import("./commands/grants/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    grantsCmd
+      .command("change-role <id>")
+      .description("Change the role a grant carries; principal and scope stay as they are")
+      .requiredOption(
+        "--role <roleId>",
+        "A built-in role (admin, member, viewer) or a custom role id",
+      )
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { role: string }) => {
+      const { changeGrantRoleCommand: impl } = await import("./commands/grants/change-role.js");
+      return impl({ id, role: options.role });
+    },
+  );
+
+  emitsResult(
+    grantsCmd
+      .command("revoke <id>")
+      .description("Revoke a grant")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { revokeGrantCommand: impl } = await import("./commands/grants/revoke.js");
+      return impl(id);
+    },
+  );
+}
+
+function registerScimTokensCommands(program: Command): void {
   const scimTokensCmd = program
     .command("scim-tokens")
     .description("Mint and revoke the bearer tokens an identity provider uses");
@@ -4026,7 +6009,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerOrganizationsCommands(program: Command): void {
   // Self-hosted only, and the one family that authenticates against the
   // INSTANCE rather than an organization: it exists before any organization
   // does. On LangWatch Cloud these paths answer "not found".
@@ -4054,9 +6039,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       adminApiKeyName?: string;
       instanceKey?: string;
     }) => {
-      const { createOrganizationCommand: impl } = await import(
-        "./commands/organizations/create.js"
-      );
+      const { createOrganizationCommand: impl } =
+        await import("./commands/organizations/create.js");
       return impl(options);
     },
   );
@@ -4071,9 +6055,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (options: { instanceKey?: string }) => {
-      const { listOrganizationsCommand: impl } = await import(
-        "./commands/organizations/list.js"
-      );
+      const { listOrganizationsCommand: impl } = await import("./commands/organizations/list.js");
       return impl(options);
     },
   );
@@ -4088,13 +6070,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       )
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string, options: { instanceKey?: string }) => {
-      const { getOrganizationByIdCommand: impl } = await import(
-        "./commands/organizations/get.js"
-      );
+      const { getOrganizationByIdCommand: impl } = await import("./commands/organizations/get.js");
       return impl({ id, options });
     },
   );
+}
 
+function registerDaemonCommands(program: Command): void {
   // `langwatch daemon *` — the warm background process that serves commands
   // over a private Unix socket. Normally invisible: it is auto-spawned on first
   // use and self-exits when idle. These commands are for inspecting it, or for
@@ -4131,12 +6113,280 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { daemonStatusCommand: impl } = await import("./commands/daemon.js");
       await impl(options);
     });
+}
 
-  // The output contract's global flags (`-o/--output`, `--json <fields>`,
-  // `--jq`, `--agent`), added here — once, centrally — rather than per
-  // command. Registered on the built tree so buildProgram() stays a pure
-  // factory: no module-level state, nothing leaks between daemon requests.
-  registerOutputOptions(program);
+function registerPromptTags(promptCmd: Command): void {
+  // Add prompt tag subcommand group
+  const tagCmd = promptCmd.command("tag").description("Manage prompt tags");
 
-  return program;
+  emitsResult(
+    tagCmd
+      .command("list")
+      .description("List all tag definitions for the organization")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      try {
+        const { tagListCommand: impl } = await import("./commands/tag/list.js");
+        return await impl();
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
+  emitsResult(
+    tagCmd.command("create <name>").description("Create a custom tag"),
+    async (name: string) => {
+      try {
+        const { tagCreateCommand: impl } = await import("./commands/tag/create.js");
+        return await impl(name);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
+  emitsResult(
+    tagCmd.command("rename <oldName> <newName>").description("Rename a tag"),
+    async (oldName: string, newName: string) => {
+      try {
+        const { tagRenameCommand: impl } = await import("./commands/tag/rename.js");
+        return await impl(oldName, newName);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
+  emitsResult(
+    tagCmd
+      .command("assign <prompt> <tag>")
+      .description("Assign a tag to a prompt version")
+      .option("--version <number>", "Version number to assign (defaults to latest)"),
+    async (prompt: string, tag: string, options: { version?: string }) => {
+      try {
+        const { tagAssignCommand: impl } = await import("./commands/tag/assign.js");
+        return await impl(prompt, tag, options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
+  emitsResult(
+    tagCmd
+      .command("delete <name>")
+      .description("Delete a tag and remove all its assignments")
+      .option("--force", "Skip confirmation prompt"),
+    async (name: string, options: { force?: boolean }) => {
+      try {
+        const { tagDeleteCommand: impl } = await import("./commands/tag/delete.js");
+        return await impl(name, options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+}
+
+function registerPromptSyncCommands(promptCmd: Command): void {
+  promptCmd
+    .command("sync")
+    .description("Sync prompts - fetch remote and push local")
+    .action(async () => {
+      try {
+        await syncCommand();
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  promptCmd
+    .command("pull")
+    .description("Pull remote prompts and materialize locally")
+    .option(
+      "--tag <name>",
+      "Pull the version pointed to by this tag instead of the configured version",
+    )
+    .action(async (options: { tag?: string }) => {
+      try {
+        await pullCommand(options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  promptCmd
+    .command("push")
+    .description("Push local prompts to the server")
+    .option("--force-local", "Auto-resolve conflicts by keeping local version")
+    .option("--force-remote", "Auto-resolve conflicts by keeping remote version")
+    .action(async (options: { forceLocal?: boolean; forceRemote?: boolean }) => {
+      try {
+        await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+}
+
+function registerIngestCaptureCommands(ingestCmd: Command): void {
+  // `langwatch ingest codex` — recover codex conversation content. Codex
+  // itself runs this after every completed turn (via its `notify` setting,
+  // wired up when capture is enabled); the no-flag form backfills sessions
+  // that ran before that.
+  ingestCmd
+    .command("codex")
+    .description(
+      "Recover conversation content (prompt, tool calls, reply) from codex session transcripts onto their traces. Codex exports none of it itself.",
+    )
+    .option("--since <hours>", "how far back to look for sessions (default: 24)")
+    .option("--all", "recover every session on disk, not just recent ones")
+    .option("--json", "emit machine-readable JSON")
+    // Codex passes these; a human never does, so they stay out of the help.
+    .addOption(
+      new Option(
+        "--chain <argv>",
+        "JSON argv of a turn-completion program to run after this one",
+      ).hideHelp(),
+    )
+    .addOption(
+      new Option(
+        "--notify <payload>",
+        "the turn payload codex appends after a completed turn",
+      ).hideHelp(),
+    )
+    .action(
+      async (options: {
+        since?: string;
+        all?: boolean;
+        json?: boolean;
+        chain?: string;
+        notify?: string;
+      }) => {
+        try {
+          const { ingestCodexCommand } = await import("./commands/ingest/codex.js");
+          await ingestCodexCommand(options);
+        } catch (error) {
+          // The turn-completion path must never fail a coding session, and it
+          // is the only caller that passes these two flags.
+          if (options.notify !== undefined || options.chain !== undefined) {
+            return;
+          }
+          const { reportCommandError } = await import("./utils/errorOutput.js");
+          reportCommandError({ error });
+          process.exit(1);
+        }
+      },
+    );
+
+  // `langwatch ingest install <tool>` — hidden primitive used by CI / devcontainer /
+  // scripted setups. The user surface is `langwatch <tool>` (the wrapper auto-resolves Path
+  // A vs Path B per cfg.tool_mode + VK presence). Kept registered so existing scripts
+  // continue to work and so reviewers can find the install helper from the help with `--help
+  // --all` if needed.
+  ingestCmd
+    .command("install <tool>", { hidden: true })
+    .description(
+      "Hidden: low-level Path B install primitive. Normal users run `langwatch <tool>` which auto-installs when needed.",
+    )
+    .option("--env-only", "skip the tool's own config writes; print exports only")
+    .option("--json", "emit machine-readable JSON")
+    .action(async (tool: string, options: { envOnly?: boolean; json?: boolean }) => {
+      const { installCommand } = await import("./commands/ingestion/install.js");
+      await installCommand(tool, options);
+    });
+
+  // `langwatch ingest hook <tool>`: what the agent's own hook entries and
+  // the Claude Code plugin's launcher run. Hidden: install/plugin write it
+  // in; it always exits zero so a hook can never break a session. Unknown
+  // options/arguments are accepted and ignored, here and on `ingest
+  // guidance` below — the cross-version contract between any plugin and CLI version.
+  rendersOwnResult(
+    ingestCmd
+      .command("hook <tool>", { hidden: true })
+      .description(
+        "Hidden: reports the session's repository, branch and worktree. Run by the coding agent's own hooks, reading the hook payload on stdin.",
+      )
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
+  ).action(async (tool: string) => {
+    try {
+      const { runHookProcess } = await import("./commands/ingestion/hook.js");
+      await runHookProcess({ tool });
+    } catch {
+      // Same contract as the command itself: never break the session.
+      void 0;
+    }
+  });
+
+  // `langwatch ingest context`: the agent declares the repository and branch it is working
+  // on, run from inside the checkout. Visible, because its audience IS the agent reading
+  // `--help`: the always-loaded guidance the CLI installs names this command, and the agent
+  // runs it when it switches repository, branch or worktree mid-session.
+  rendersOwnResult(
+    ingestCmd
+      .command("context")
+      .description(
+        "Declare the repository and branch this coding-agent session is working on. Run it from inside the checkout after you switch repository, branch or worktree.",
+      )
+      .option("--session-id <id>", "declare for this session instead of resolving the live one")
+      .option(
+        "--agent <tool>",
+        "the agent the session belongs to: claude-code, codex, opencode or copilot",
+      ),
+  ).action(async (options: { sessionId?: string; agent?: string }) => {
+    try {
+      const { runContextProcess } = await import("./commands/ingestion/context.js");
+      await runContextProcess(options);
+    } catch {
+      // Never break the session the agent runs this from.
+      void 0;
+    }
+  });
+
+  // `langwatch ingest guidance <tool>` prints declare-your-context guidance
+  // as SessionStart JSON. Hidden: only session-hooks install and the Claude
+  // Code plugin's launcher run it, on every session start. Same contract as
+  // `ingest hook`: unknown args ignored, exit always zero.
+  rendersOwnResult(
+    ingestCmd
+      .command("guidance <tool>", { hidden: true })
+      .description("Hidden: emits the session guidance as a SessionStart hook's additionalContext.")
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
+  ).action(async (tool: string) => {
+    try {
+      const normalizedTool = tool.trim().toLowerCase().replace(/-/g, "_");
+      if (normalizedTool !== "claude_code") return;
+      const { SESSION_CONTEXT_GUIDANCE } = await import("./utils/governance/session-guidance.js");
+      process.stdout.write(
+        `${JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "SessionStart",
+            additionalContext: SESSION_CONTEXT_GUIDANCE,
+          },
+        })}\n`,
+      );
+    } catch {
+      // A hook is never allowed to be why a session broke.
+      void 0;
+    }
+  });
 }

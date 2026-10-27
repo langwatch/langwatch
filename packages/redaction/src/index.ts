@@ -1,4 +1,9 @@
 export {
+  ESSENTIAL_PII_ENTITIES,
+  PRESIDIO_STRICT_ENTITIES,
+  STRICT_ONLY_PII_ENTITIES,
+} from "./piiEntities.ts";
+export {
   findRedactionMarkers,
   formatPiiMarker,
   hasRedactionMarker,
@@ -6,17 +11,19 @@ export {
   REDACTION_MARKER_ENTITIES,
   SECRET_MARKER,
   SECRET_MARKER_ENTITY,
-} from "./markers.js";
+} from "./markers.ts";
 export {
   BUILTIN_SECRET_RULES,
   compileSecretPatterns,
   detectSecretsInText,
   isSensitiveAttributeKey,
+  overBroadSecretPatternProbe,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
   type SecretMatch,
   type SecretsRedactionResult,
-} from "./secrets.js";
+  SHAPE_ONLY_SECRET_RULE_IDS,
+} from "./secrets.ts";
 export {
   collectSensitiveEnvValues,
   REDACTION_AUDIT_URL,
@@ -26,4 +33,4 @@ export {
   type SessionRedactionResult,
   type TruncationResult,
   truncateJsonlToByteBudget,
-} from "./sessionReport.js";
+} from "./sessionReport.ts";

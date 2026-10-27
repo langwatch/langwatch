@@ -3,35 +3,77 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 func TestParseSlotRun(t *testing.T) {
-	t.Run("the label defaults to the command", func(t *testing.T) {
-		label, argv, err := parseSlotRun([]string{"--", "tsgo", "--noEmit"})
-		if err != nil || label != "tsgo" || len(argv) != 2 {
-			t.Fatalf("got label=%q argv=%v err=%v", label, argv, err)
+	t.Run("the label defaults to the command and the class to a check", func(t *testing.T) {
+		args, err := parseSlotRun([]string{"--", "tsgo", "--noEmit"})
+		if err != nil || args.label != "tsgo" || len(args.argv) != 2 || args.class != domain.ClassCheck {
+			t.Fatalf("got %+v err=%v", args, err)
 		}
 	})
 
 	t.Run("an explicit label survives", func(t *testing.T) {
-		label, argv, err := parseSlotRun([]string{"--label", "typecheck (wt)", "--", "tsgo"})
-		if err != nil || label != "typecheck (wt)" || argv[0] != "tsgo" {
-			t.Fatalf("got label=%q argv=%v err=%v", label, argv, err)
+		args, err := parseSlotRun([]string{"--label", "typecheck (wt)", "--", "tsgo"})
+		if err != nil || args.label != "typecheck (wt)" || args.argv[0] != "tsgo" {
+			t.Fatalf("got %+v err=%v", args, err)
 		}
 	})
 
 	t.Run("no command is an error", func(t *testing.T) {
-		if _, _, err := parseSlotRun([]string{"--label", "x", "--"}); err == nil {
+		if _, err := parseSlotRun([]string{"--label", "x", "--"}); err == nil {
 			t.Fatal("expected an error for a missing command")
 		}
 	})
+
+	t.Run("flags are read in any order", func(t *testing.T) {
+		args, err := parseSlotRun([]string{"--timeout", "10m", "--class", "test", "--label", "lint", "--", "golangci-lint"})
+		if err != nil || args.label != "lint" || args.limit != 10*time.Minute || args.class != domain.ClassTest || args.argv[0] != "golangci-lint" {
+			t.Fatalf("got %+v err=%v", args, err)
+		}
+	})
+
+	t.Run("a bad timeout or class is an error", func(t *testing.T) {
+		if _, err := parseSlotRun([]string{"--timeout", "soon", "--", "x"}); err == nil {
+			t.Fatal("expected an error for a bad timeout")
+		}
+		if _, err := parseSlotRun([]string{"--class", "unit", "--", "x"}); err == nil {
+			t.Fatal("expected an error for an unknown class")
+		}
+	})
+}
+
+// @scenario "A stuck check fails instead of waiting forever"
+func TestSlotRunStopsAStuckCommand(t *testing.T) {
+	t.Setenv("CHECK_SLOTS", "1")
+	t.Setenv("CI", "")
+	var progress bytes.Buffer
+	job := &slotJob{sem: semaphore.New(t.TempDir()), label: "stuck", limit: 200 * time.Millisecond, argv: []string{"sleep", "30"}, progress: &progress}
+	started := time.Now()
+	if code := job.run(context.Background()); code != 124 {
+		t.Fatalf("exit code = %d, want 124", code)
+	}
+	if time.Since(started) > 10*time.Second {
+		t.Fatalf("the stuck command was not stopped at its limit (took %s)", time.Since(started))
+	}
+	if !strings.Contains(progress.String(), "stuck ran past 200ms and was stopped") {
+		t.Fatalf("progress = %q, want the stop named", progress.String())
+	}
 }
 
 // @scenario "haven's slot run is transparent to the command"
@@ -96,7 +138,397 @@ func TestSlotRunIsTransparentToTheCommand(t *testing.T) {
 	})
 }
 
+// childEnv runs job with a command that dumps the named variables, and
+// returns their values in order ("unset" for one the child did not get).
+func childEnv(t *testing.T, job *slotJob, names ...string) []string {
+	t.Helper()
+	out := filepath.Join(t.TempDir(), "env.txt")
+	var script []string
+	for _, name := range names {
+		script = append(script, `printf '%s ' "${`+name+`:-unset}"`)
+	}
+	job.argv = []string{"sh", "-c", "{ " + strings.Join(script, "; ") + "; } > " + out}
+	job.progress = &bytes.Buffer{}
+	if code := job.run(context.Background()); code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	env, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("reading the child's env dump: %v", err)
+	}
+	return strings.Fields(string(env))
+}
+
+// @scenario "Memory pressure lowers the memory ceiling to the floor"
+// @scenario "A run's parallelism is the units it holds, on every machine"
+// @scenario "A test run is told its worker count"
+func TestSlotRunUnderPressure(t *testing.T) {
+	sem := semaphore.New(t.TempDir())
+	t.Setenv("CHECK_SLOTS", "2")
+	t.Setenv("CI", "")
+	t.Setenv("GOMEMLIMIT", "")
+	t.Setenv("GOMAXPROCS", "")
+	t.Setenv("VITEST_MAX_WORKERS", "")
+
+	t.Run("a pressured run gets the floor and its units", func(t *testing.T) {
+		got := childEnv(t, &slotJob{sem: sem, label: "pressured", pressure: domain.Red}, "GOMEMLIMIT", "GOMAXPROCS", "VITEST_MAX_WORKERS")
+		if strings.Join(got, " ") != "3GiB 2 unset" {
+			t.Fatalf("child env = %v, want the 3GiB floor, GOMAXPROCS=2 and no worker count", got)
+		}
+	})
+
+	t.Run("a green run is capped to its units too", func(t *testing.T) {
+		got := childEnv(t, &slotJob{sem: sem, label: "green", pressure: domain.Green}, "GOMAXPROCS")
+		if strings.Join(got, " ") != "2" {
+			t.Fatalf("child GOMAXPROCS = %v, want 2 on a green machine", got)
+		}
+	})
+
+	t.Run("a test run gets its worker count", func(t *testing.T) {
+		got := childEnv(t, &slotJob{sem: sem, label: "vitest", class: domain.ClassTest, pressure: domain.Green}, "GOMAXPROCS", "VITEST_MAX_WORKERS")
+		if strings.Join(got, " ") != "2 2" {
+			t.Fatalf("child env = %v, want GOMAXPROCS=2 VITEST_MAX_WORKERS=2", got)
+		}
+	})
+}
+
+// @scenario "An operator's explicit parallelism wins, up to the units held"
+func TestSlotRunKeepsTheOperatorsParallelism(t *testing.T) {
+	t.Setenv("CHECK_SLOTS", "2")
+	t.Setenv("CI", "")
+	t.Setenv("GOMAXPROCS", "7")
+	t.Setenv("VITEST_MAX_WORKERS", "3")
+	job := &slotJob{sem: semaphore.New(t.TempDir()), label: "vitest", class: domain.ClassTest, pressure: domain.Red}
+	got := childEnv(t, job, "GOMAXPROCS", "VITEST_MAX_WORKERS")
+	if strings.Join(got, " ") != "7 3" {
+		t.Fatalf("child env = %v, want the operator's 7 and 3", got)
+	}
+	if job.units != 3 {
+		t.Fatalf("a test run with 3 workers weighs 3 units, got %d", job.units)
+	}
+
+	t.Setenv("CHECK_SLOTS", "1")
+	t.Setenv("VITEST_MAX_WORKERS", "4")
+	small := &slotJob{sem: semaphore.New(t.TempDir()), label: "vitest", class: domain.ClassTest, pressure: domain.Red}
+	if got := childEnv(t, small, "GOMAXPROCS", "VITEST_MAX_WORKERS"); strings.Join(got, " ") != "7 2" {
+		t.Fatalf("child env = %v, want GOMAXPROCS 7 and 4 workers capped at the 2 units held", got)
+	}
+}
+
+// refusingSlots fails the test if a run touches the budget at all.
+type refusingSlots struct{ t *testing.T }
+
+func (r refusingSlots) TryAcquireUnits(string, int, domain.SlotClaim) (func(), bool, error) {
+	r.t.Fatal("a run inside a slot must not take a second one")
+	return nil, false, nil
+}
+
+// @scenario "A run inside a slot takes no second slot"
+func TestSlotRunInsideASlotTakesNoSecondSlot(t *testing.T) {
+	t.Setenv("CHECK_SLOTS", "0") // what slotExec hands every child
+	t.Setenv("CLAUDECODE", "")
+	t.Setenv("CI", "")
+	t.Setenv("GOMAXPROCS", "2")
+	got := childEnv(t, &slotJob{sem: refusingSlots{t}, label: "nested", class: domain.ClassTypecheck}, "GOMAXPROCS")
+	if strings.Join(got, " ") != "2" {
+		t.Fatalf("the nested run keeps its parent's GOMAXPROCS, got %v", got)
+	}
+}
+
+// @scenario "A big run at the head of the queue is not starved by small ones"
+func TestSlotJobLetsTheHeadOfTheQueueGoFirst(t *testing.T) {
+	head := fileregistry.WaiterSnapshot{PID: os.Getpid() + 1, WaiterClaim: fileregistry.WaiterClaim{
+		Command: "vitest run", Caller: domain.SubAgent, QueuedAt: time.Now().Add(-time.Minute),
+	}}
+	job := &slotJob{caller: domain.SubAgent, queuedAt: time.Now(), registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{head}}}
+	if !job.shouldYieldToHigherPriority() {
+		t.Fatal("a typecheck queued after a test run of the same class must let it go first")
+	}
+}
+
+// @scenario "slot explain names who holds the units"
+func TestExplainUnitHoldersNamesClassUnitsAndWorktree(t *testing.T) {
+	sem := semaphore.New(t.TempDir())
+	if out := captureStdout(t, func() { explainUnitHolders(sem) }); strings.TrimSpace(out) != "unit holders: none" {
+		t.Fatalf("expected \"unit holders: none\", got %q", out)
+	}
+	release, ok, err := sem.TryAcquireUnits(checkSlotName, 8, domain.SlotClaim{
+		PID: os.Getpid(), Class: "test", Units: 3, Worktree: "/src/langwatch", Label: "vitest run", StartedAt: time.Now(),
+	})
+	if err != nil || !ok {
+		t.Fatalf("acquire: ok=%v err=%v", ok, err)
+	}
+	defer release()
+	out := captureStdout(t, func() { explainUnitHolders(sem) })
+	want := "unit holder: test, 3 units, worktree langwatch, pid " + strconv.Itoa(os.Getpid())
+	if !strings.Contains(out, want) {
+		t.Fatalf("expected %q, got %q", want, out)
+	}
+}
+
+// @scenario "A run killed from outside is reported as not the queue's doing"
+func TestSlotRunReportsAnOutsideKill(t *testing.T) {
+	sem := semaphore.New(t.TempDir())
+	t.Setenv("CHECK_SLOTS", "1")
+	t.Setenv("CI", "")
+
+	t.Run("a child killed by a signal nobody forwarded is named", func(t *testing.T) {
+		var progress bytes.Buffer
+		job := &slotJob{sem: sem, label: "killed", argv: []string{
+			"sh", "-c", "kill -KILL $$",
+		}, progress: &progress}
+		code := job.run(context.Background())
+		if code != 137 {
+			t.Fatalf("exit code = %d, want 137", code)
+		}
+		// The message goes to the process stderr rather than the job's progress
+		// writer, so capture it around the run.
+		// (job.progress carries only queueing chatter, asserted silent here.)
+		if progress.Len() != 0 {
+			t.Fatalf("queue chatter on a free slot: %q", progress.String())
+		}
+	})
+
+	t.Run("a child that exits on its own says nothing", func(t *testing.T) {
+		stderr := captureStderr(t, func() {
+			job := &slotJob{sem: sem, label: "clean", argv: []string{"sh", "-c", "exit 3"}, progress: &bytes.Buffer{}}
+			if code := job.run(context.Background()); code != 3 {
+				t.Fatalf("exit code = %d, want 3", code)
+			}
+		})
+		if strings.Contains(stderr, "killed from outside") {
+			t.Fatalf("a clean exit must not be reported as a kill: %q", stderr)
+		}
+	})
+
+	t.Run("the kill message names the cause and the wrong fix", func(t *testing.T) {
+		stderr := captureStderr(t, func() {
+			job := &slotJob{sem: sem, label: "killed", argv: []string{"sh", "-c", "kill -KILL $$"}, progress: &bytes.Buffer{}}
+			if code := job.run(context.Background()); code != 137 {
+				t.Fatalf("exit code = %d, want 137", code)
+			}
+		})
+		for _, want := range []string{"killed from outside", "signal 9", "never kills", "Do not set CHECK_SLOTS=0"} {
+			if !strings.Contains(stderr, want) {
+				t.Fatalf("kill report %q is missing %q", stderr, want)
+			}
+		}
+	})
+}
+
+// @scenario "An interrupted run killed from outside is still reported"
+func TestReportOutsideKillReadsTheSignalThatKilled(t *testing.T) {
+	// A real SIGKILL death, so the Wait error carries the wait status the
+	// wrapper reads rather than a synthetic one.
+	killed := exec.Command("sh", "-c", "kill -KILL $$").Run()
+	if killed == nil {
+		t.Fatal("the probe command was supposed to die by SIGKILL")
+	}
+
+	t.Run("a forwarded SIGINT does not excuse a SIGKILL", func(t *testing.T) {
+		out := captureStderr(t, func() {
+			reportOutsideKill(killed, "sh", slotDeath{
+				forwarded: map[syscall.Signal]bool{syscall.SIGINT: true},
+			})
+		})
+		if !strings.Contains(out, "killed from outside") {
+			t.Fatalf("an escalation after an interrupt must still be named, got %q", out)
+		}
+	})
+
+	t.Run("the signal the wrapper forwarded is not reported", func(t *testing.T) {
+		out := captureStderr(t, func() {
+			reportOutsideKill(killed, "sh", slotDeath{
+				forwarded: map[syscall.Signal]bool{syscall.SIGKILL: true},
+			})
+		})
+		if strings.Contains(out, "killed from outside") {
+			t.Fatalf("the wrapper must not blame a kill it sent: %q", out)
+		}
+	})
+
+	t.Run("a run the wrapper canceled is not an outside kill", func(t *testing.T) {
+		out := captureStderr(t, func() {
+			reportOutsideKill(killed, "sh", slotDeath{canceled: true})
+		})
+		if strings.Contains(out, "killed from outside") {
+			t.Fatalf("cancellation is the wrapper's own doing: %q", out)
+		}
+	})
+
+	// exec.CommandContext kills with SIGKILL on cancellation, which no
+	// forwarded-signal record accounts for, so this path needs the real thing.
+	t.Run("a canceled context stays quiet end to end", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		out := captureStderr(t, func() {
+			go func() {
+				time.Sleep(100 * time.Millisecond)
+				cancel()
+			}()
+			slotExec(ctx, []string{"sh", "-c", "sleep 5"}, slotRunEnv{pressure: domain.Green, class: domain.ClassCheck, units: 2})
+		})
+		if strings.Contains(out, "killed from outside") {
+			t.Fatalf("a canceled run must not be reported as an outside kill: %q", out)
+		}
+	})
+}
+
+// captureStderr runs body with os.Stderr swapped for a pipe and returns what
+// was written. slotExec writes the outside-kill report to the real stderr (it
+// belongs to the terminal, not the progress writer), so the test reads it the
+// same way a person would.
+func captureStderr(t *testing.T, body func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	orig := os.Stderr
+	os.Stderr = w
+	defer func() { os.Stderr = orig }()
+	body()
+	_ = w.Close()
+	os.Stderr = orig
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("reading captured stderr: %v", err)
+	}
+	return buf.String()
+}
+
+// captureStdout runs body with os.Stdout swapped for a pipe and returns what
+// was written - `haven machine slot explain` prints its answer there, the same place a
+// person reads it.
+func captureStdout(t *testing.T, body func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	orig := os.Stdout
+	os.Stdout = w
+	defer func() { os.Stdout = orig }()
+	body()
+	_ = w.Close()
+	os.Stdout = orig
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("reading captured stdout: %v", err)
+	}
+	return buf.String()
+}
+
+// @scenario "The unit test worker cap is one machine-wide setting"
+func TestSlotExplainPrintsTheUnitTestWidthAndItsSource(t *testing.T) {
+	t.Run("given HAVEN_TEST_WORKERS is set, the way HAVEN_TYPECHECK_SLOTS is", func(t *testing.T) {
+		t.Setenv("HAVEN_TEST_WORKERS", "6")
+
+		t.Run("when haven machine slot explain runs", func(t *testing.T) {
+			out := captureStdout(t, func() {
+				if err := runSlot(context.Background(), deps{}, invocation{raw: []string{"explain"}}); err != nil {
+					t.Fatal(err)
+				}
+			})
+
+			t.Run("it prints the width and names the setting as its source", func(t *testing.T) {
+				if !strings.Contains(out, "unit_test_full_width=6 source=HAVEN_TEST_WORKERS") {
+					t.Fatalf("expected the configured width and its source, got %q", out)
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_TEST_WORKERS is unset", func(t *testing.T) {
+		t.Setenv("HAVEN_TEST_WORKERS", "")
+
+		t.Run("when haven machine slot explain runs", func(t *testing.T) {
+			out := captureStdout(t, func() {
+				if err := runSlot(context.Background(), deps{}, invocation{raw: []string{"explain"}}); err != nil {
+					t.Fatal(err)
+				}
+			})
+
+			t.Run("it derives the width from the machine instead", func(t *testing.T) {
+				if !strings.Contains(out, "unit_test_full_width=") || !strings.Contains(out, "source=machine") {
+					t.Fatalf("expected a machine-derived width, got %q", out)
+				}
+			})
+		})
+	})
+}
+
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
+func TestExplainWaitersPrintsClassAgeAndEffectivePriority(t *testing.T) {
+	store := fileregistry.New(t.TempDir())
+
+	t.Run("with nobody queued it says so", func(t *testing.T) {
+		out := captureStdout(t, func() { explainWaiters(store) })
+		if strings.TrimSpace(out) != "waiters: none" {
+			t.Fatalf("expected \"waiters: none\", got %q", out)
+		}
+	})
+
+	release, err := store.ClaimWaiter(os.Getpid(), checkSlotName, fileregistry.WaiterClaim{
+		Command: "pnpm test:unit", Caller: domain.SubAgent, QueuedAt: time.Now().Add(-2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	defer release()
+
+	out := captureStdout(t, func() { explainWaiters(store) })
+	for _, want := range []string{"waiter:", "sub-agent", "priority "} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected the waiter line to mention %q, got %q", want, out)
+		}
+	}
+}
+
+// @scenario "An explicit HAVEN_PRIORITY=high in the caller's environment lets an agent state that this run matters"
+func TestResolvePriorityStateHonorsTheOverrideOncePerWindow(t *testing.T) {
+	store := fileregistry.New(t.TempDir())
+	t.Setenv("HAVEN_PRIORITY", "high")
+	t.Setenv("HAVEN_AGENT_ID", "agent_9")
+
+	agentID, caller, honored := resolvePriorityState(store)
+	if agentID != "agent_9" || caller != domain.SubAgent || !honored {
+		t.Fatalf("first claim: agentID=%q caller=%v honored=%v, want agent_9/SubAgent/true", agentID, caller, honored)
+	}
+
+	history := store.RunHistory()
+	if len(history) != 1 || !history[0].PriorityOverride || history[0].AgentID != "agent_9" {
+		t.Fatalf("the honored claim must be written to run-history.jsonl, got %+v", history)
+	}
+
+	t.Run("a second claim inside the window is refused", func(t *testing.T) {
+		_, _, honored := resolvePriorityState(store)
+		if honored {
+			t.Fatal("a claim from the same agent id within the window must not be honored twice")
+		}
+		if got := len(store.RunHistory()); got != 1 {
+			t.Fatalf("a refused claim must not write a second entry, history has %d", got)
+		}
+	})
+}
+
+// @scenario "An explicit HAVEN_PRIORITY=high in the caller's environment lets an agent state that this run matters"
+func TestResolvePriorityStateWithoutTheEnvVarNeverClaims(t *testing.T) {
+	store := fileregistry.New(t.TempDir())
+	t.Setenv("HAVEN_PRIORITY", "")
+	t.Setenv("HAVEN_AGENT_ID", "")
+
+	if _, _, honored := resolvePriorityState(store); honored {
+		t.Fatal("with no HAVEN_PRIORITY=high, nothing is ever honored")
+	}
+	if got := len(store.RunHistory()); got != 0 {
+		t.Fatalf("no claim must ever be written when none was requested, got %d entries", got)
+	}
+}
+
 // @scenario "A run queued inside haven says so"
+// @scenario "A run past the limit waits and names what it is waiting for"
+// @scenario "A run that waited says how long it waited"
 func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	sem := semaphore.New(t.TempDir())
 	t.Setenv("CHECK_SLOTS", "1")
@@ -130,7 +562,342 @@ func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	if !strings.Contains(report, "queued") || !strings.Contains(report, "CHECK_SLOTS") {
 		t.Fatalf("a queued run must say so and name the knob, got %q", report)
 	}
+	if !strings.Contains(report, "already active") || !strings.Contains(report, "limit 1") {
+		t.Fatalf("a queued run must name what holds the slot and the limit, got %q", report)
+	}
 	if !strings.Contains(report, "slot free after") {
 		t.Fatalf("a run that waited must report it, got %q", report)
+	}
+}
+
+// @scenario "A long wait repeats itself so it never looks hung"
+func TestSlotHeartbeatRepeatsPositionAndNamesHolders(t *testing.T) {
+	home := t.TempDir()
+	sem := semaphore.New(home)
+	store := fileregistry.New(home)
+	t.Setenv("CHECK_SLOTS", "1")
+	t.Setenv("CI", "")
+
+	release, _, ok, err := sem.TryAcquire(checkSlotName, 1)
+	if err != nil || !ok {
+		t.Fatalf("could not pre-hold the only slot: ok=%v err=%v", ok, err)
+	}
+	releaseHolder, err := store.ClaimHolder(os.Getpid(), checkSlotName, fileregistry.HolderClaim{
+		Label:     "@langwatch/web typecheck",
+		StartedAt: time.Now().Add(-5 * time.Second),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer releaseHolder()
+
+	var progress bytes.Buffer
+	done := make(chan int, 1)
+	go func() {
+		job := &slotJob{sem: sem, registry: store, label: "queued-run", argv: []string{"true"}, progress: &progress, heartbeat: 150 * time.Millisecond}
+		done <- job.run(context.Background())
+	}()
+
+	time.Sleep(800 * time.Millisecond)
+	release()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the queued run never started after the slot freed")
+	}
+
+	report := progress.String()
+	if !strings.Contains(report, "still queued at position 1 after") {
+		t.Fatalf("the heartbeat must repeat the position and the wait, got %q", report)
+	}
+	if !regexp.MustCompile(`Active: @langwatch/web typecheck for \d+s`).MatchString(report) {
+		t.Fatalf("the heartbeat must name the holder and how long it has held, got %q", report)
+	}
+}
+
+// fakeWaiterRegistry is a waiterRegistry test double: ClaimWaiter is a no-op
+// (nothing here asserts on the registration itself) and WaiterSnapshots
+// always answers with a fixed, caller-supplied list of other waiters - what
+// lets shouldYieldToHigherPriority be tested as the pure decision it is,
+// without racing two goroutines that share this test's own pid (a real
+// `haven machine slot run` is always a separate OS process, so the production code
+// keys a claim by pid; two slotJobs in one test process would collide on
+// that same key, which is a test artifact this fake sidesteps entirely).
+type fakeWaiterRegistry struct{ snapshots []fileregistry.WaiterSnapshot }
+
+func (f *fakeWaiterRegistry) ClaimWaiter(int, string, fileregistry.WaiterClaim) (func(), error) {
+	return func() {}, nil
+}
+
+func (f *fakeWaiterRegistry) WaiterSnapshots(string) []fileregistry.WaiterSnapshot {
+	return f.snapshots
+}
+
+func (f *fakeWaiterRegistry) ClaimHolder(int, string, fileregistry.HolderClaim) (func(), error) {
+	return func() {}, nil
+}
+
+func (f *fakeWaiterRegistry) HolderSnapshots(string) []fileregistry.HolderSnapshot { return nil }
+
+// @scenario "Priority classes rank a person above a main session above a sub-agent"
+func TestSlotJobYieldsToAHigherPriorityWaiter(t *testing.T) {
+	job := &slotJob{
+		caller:   domain.SubAgent,
+		queuedAt: time.Now(),
+		registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{
+			{PID: os.Getpid() + 1, WaiterClaim: fileregistry.WaiterClaim{Caller: domain.Interactive, QueuedAt: time.Now()}},
+		}},
+	}
+	if !job.shouldYieldToHigherPriority() {
+		t.Fatal("a sub-agent queued at the same moment as a person must yield to them")
+	}
+}
+
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
+func TestSlotJobDoesNotYieldToALowerPriorityWaiter(t *testing.T) {
+	job := &slotJob{
+		caller:   domain.Interactive,
+		queuedAt: time.Now(),
+		registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{
+			{PID: os.Getpid() + 1, WaiterClaim: fileregistry.WaiterClaim{Caller: domain.SubAgent, QueuedAt: time.Now()}},
+		}},
+	}
+	if job.shouldYieldToHigherPriority() {
+		t.Fatal("a person must not yield to a sub-agent queued at the same moment")
+	}
+}
+
+// @scenario "Priority scheduling is additive: with no registry wired, nothing yields"
+func TestSlotJobNeverYieldsWithNoRegistryWired(t *testing.T) {
+	job := &slotJob{caller: domain.SubAgent, queuedAt: time.Now()}
+	if job.shouldYieldToHigherPriority() {
+		t.Fatal("with no registry wired, every existing call site must behave exactly as before")
+	}
+}
+
+// @scenario "haven machine slot explain shows each holder and waiter with class, age and effective priority"
+func TestSlotJobExcludesItsOwnRegistrationFromOthers(t *testing.T) {
+	job := &slotJob{
+		caller:   domain.Interactive,
+		queuedAt: time.Now(),
+		registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{
+			// Same pid as this test process - i.e. this job's own claim.
+			{PID: os.Getpid(), WaiterClaim: fileregistry.WaiterClaim{Caller: domain.SubAgent, QueuedAt: time.Now()}},
+		}},
+	}
+	if job.shouldYieldToHigherPriority() {
+		t.Fatal("a job must not compare itself against its own registration")
+	}
+}
+
+// @scenario "An explicit HAVEN_PRIORITY=high in the caller's environment lets an agent state that this run matters"
+func TestSlotJobHonoredOverrideRaisesEffectivePriority(t *testing.T) {
+	other := fileregistry.WaiterSnapshot{PID: os.Getpid() + 1, WaiterClaim: fileregistry.WaiterClaim{Caller: domain.MainSession, QueuedAt: time.Now()}}
+
+	t.Run("without the override the sub-agent yields to a waiting main session", func(t *testing.T) {
+		job := &slotJob{caller: domain.SubAgent, queuedAt: time.Now(), registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{other}}}
+		if !job.shouldYieldToHigherPriority() {
+			t.Fatal("a sub-agent must yield to a main session queued at the same moment")
+		}
+	})
+
+	t.Run("an honored override closes the gap", func(t *testing.T) {
+		job := &slotJob{caller: domain.SubAgent, queuedAt: time.Now(), overrideHonored: true, registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{other}}}
+		if job.shouldYieldToHigherPriority() {
+			t.Fatal("an honored HAVEN_PRIORITY=high claim must close a one-class-step gap")
+		}
+	})
+}
+
+// @scenario "A borrowed held-marker does not turn the queue off"
+// @scenario "An agent's own shell is not a queue wrapper"
+func TestHeldByQueueAncestor(t *testing.T) {
+	// The chain walk on its own: the test binary's parent really is above us.
+	// The full check refuses it all the same, because that parent runs "go
+	// test", not the queue. An agent's CHECK_QUEUE_HELD=$$ has exactly this
+	// shape, and this is what stops it.
+	if !isLiveAncestor(os.Getppid()) {
+		t.Fatal("the test binary's own parent must count as a live ancestor")
+	}
+	if heldByQueueAncestor(strconv.Itoa(os.Getppid())) {
+		t.Fatal("an ancestor that is not a queue wrapper must not verify")
+	}
+
+	for _, raw := range []string{"", "1", "0", "-4", "bananas"} {
+		if heldByQueueAncestor(raw) {
+			t.Fatalf("%q must not verify as a held marker", raw)
+		}
+	}
+
+	// A live process that is not above us: an agent copying a wrapper's pid
+	// into its own environment is exactly this shape.
+	bystander := exec.Command("sleep", "30")
+	if err := bystander.Start(); err != nil {
+		t.Fatalf("starting the bystander: %v", err)
+	}
+	defer func() {
+		_ = bystander.Process.Kill()
+		_ = bystander.Wait()
+	}()
+	if heldByQueueAncestor(strconv.Itoa(bystander.Process.Pid)) {
+		t.Fatal("a live process that is not an ancestor must not verify")
+	}
+}
+
+// @scenario "An agent's own shell is not a queue wrapper"
+func TestIsQueueCommand(t *testing.T) {
+	accepted := []string{
+		"node /repo/dev/scripts/check-queue.mjs pnpm typecheck",
+		"haven machine slot run --label typecheck -- pnpm typecheck",
+		"/Users/someone/go/bin/haven machine typecheck",
+		"/var/folders/T/go-build/b001/haven.test -test.run TestX",
+	}
+	for _, command := range accepted {
+		if !isQueueCommand(command) {
+			t.Fatalf("%q must read as a queue wrapper", command)
+		}
+	}
+
+	refused := []string{
+		"",
+		"   ",
+		"-zsh",
+		"/bin/bash -l",
+		"node /repo/dev/scripts/__tests__/check-queue.unit.test.ts",
+		"/opt/homebrew/bin/havenclone slot run",
+	}
+	for _, command := range refused {
+		if isQueueCommand(command) {
+			t.Fatalf("%q must not read as a queue wrapper", command)
+		}
+	}
+}
+
+// @scenario "A signal delivered to the whole process group still counts as forwarded"
+func TestSignalRelayRecordsAQueuedSignal(t *testing.T) {
+	child := exec.Command("sleep", "10")
+	if err := child.Start(); err != nil {
+		t.Fatalf("starting the stand-in child: %v", err)
+	}
+	defer func() {
+		_ = child.Process.Kill()
+		_ = child.Wait()
+	}()
+
+	// A Ctrl-C at a terminal reaches the wrapper and the child together, so the
+	// wrapper's own copy of the signal can still be queued at the moment the
+	// child is already gone and the relay closes.
+	signals := make(chan os.Signal, 4)
+	relay := newSignalRelay(signals)
+	signals <- syscall.SIGINT
+	go relay.pump(child.Process)
+
+	if forwarded := relay.close(); !forwarded[syscall.SIGINT] {
+		t.Fatal("a signal queued when the child died must still count as forwarded, or the wrapper reports the operator's own interrupt as a kill from outside")
+	}
+}
+
+// @scenario "An interrupt that arrives as the command starts is forwarded"
+func TestSignalRelayForwardsASignalThatArrivedBeforeTheChild(t *testing.T) {
+	child := exec.Command("sleep", "10")
+	if err := child.Start(); err != nil {
+		t.Fatalf("starting the stand-in child: %v", err)
+	}
+
+	// The wrapper listens before it starts the command, so an interrupt in
+	// between is already waiting when forwarding begins. Dropping it there
+	// would leave the operator's Ctrl-C unanswered and the command running.
+	signals := make(chan os.Signal, 4)
+	relay := newSignalRelay(signals)
+	signals <- syscall.SIGTERM
+	relay.forwardTo(child.Process)
+
+	err := child.Wait()
+	relay.close()
+
+	exit := &exec.ExitError{}
+	if !errors.As(err, &exit) {
+		t.Fatalf("the child must end by the forwarded signal, got %v", err)
+	}
+	status, ok := exit.Sys().(syscall.WaitStatus)
+	if !ok || !status.Signaled() || status.Signal() != syscall.SIGTERM {
+		t.Fatalf("the child must be ended by SIGTERM, got %v", exit)
+	}
+}
+
+// @scenario "A slot reads the published memory pressure instead of measuring it"
+// @scenario "A slot measures the pressure when no fresh level is published"
+func TestSlotPressureReadsThePublishedLevel(t *testing.T) {
+	now := time.Now()
+	cases := []struct {
+		name      string
+		rec       domain.PressureRecord
+		ok        bool
+		want      domain.Pressure
+		wantFresh bool
+	}{
+		{"a fresh record is believed without probing", domain.PressureRecord{Version: domain.PressureRecordVersion, Level: "red", WrittenAt: now.Add(-5 * time.Second)}, true, domain.Red, true},
+		{"a missing record is measured", domain.PressureRecord{}, false, domain.Green, false},
+		{"an unknown version is measured", domain.PressureRecord{Version: 99, Level: "red", WrittenAt: now}, true, domain.Green, false},
+		{"a stale record is measured", domain.PressureRecord{Version: domain.PressureRecordVersion, Level: "red", WrittenAt: now.Add(-domain.PressureStaleAfter - time.Second)}, true, domain.Green, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, fresh := freshPublishedPressure(tc.rec, tc.ok)
+			if got != tc.want || fresh != tc.wantFresh {
+				t.Fatalf("got %s fresh=%v, want %s fresh=%v", got, fresh, tc.want, tc.wantFresh)
+			}
+		})
+	}
+
+	t.Run("slot run reads the record the daemon wrote", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("LANGWATCH_PORTLESS_HOME", home)
+		t.Setenv("CHECK_PRESSURE", "")
+		t.Setenv("CI", "")
+		rec := domain.PressureRecord{Version: domain.PressureRecordVersion, Level: "amber", WrittenAt: time.Now()}
+		if err := fileregistry.New(home).WritePressure(rec); err != nil {
+			t.Fatalf("writing the record: %v", err)
+		}
+		if got := resolveSlotPressure(); got != domain.Amber {
+			t.Fatalf("resolveSlotPressure() = %s, want the published amber", got)
+		}
+	})
+}
+
+// @scenario "An agent's run on macOS runs in the utility band"
+func TestAgentQoSArgvClampsOnlyAnAgentOnMacOS(t *testing.T) {
+	argv := []string{"sh", "-c", "true"}
+	env := func(pairs ...string) func(string) string {
+		m := map[string]string{}
+		for i := 0; i+1 < len(pairs); i += 2 {
+			m[pairs[i]] = pairs[i+1]
+		}
+		return func(k string) string { return m[k] }
+	}
+	utility := []string{"/usr/sbin/taskpolicy", "-c", "utility", "sh", "-c", "true"}
+	cases := []struct {
+		name   string
+		goos   string
+		getenv func(string) string
+		argv   []string
+		want   []string
+	}{
+		{"claude agent on darwin", "darwin", env("CLAUDECODE", "1"), argv, utility},
+		{"sub-agent id on darwin", "darwin", env("HAVEN_AGENT_ID", "a1"), argv, utility},
+		{"explicit utility", "darwin", env("CLAUDECODE", "1", "HAVEN_AGENT_QOS", "utility"), argv, utility},
+		{"opted out", "darwin", env("CLAUDECODE", "1", "HAVEN_AGENT_QOS", "off"), argv, argv},
+		{"a person's shell", "darwin", env(), argv, argv},
+		{"linux agent", "linux", env("CLAUDECODE", "1"), argv, argv},
+		{"command not found stays bare", "darwin", env("CLAUDECODE", "1"), []string{"no-such-binary-haven-qos"}, []string{"no-such-binary-haven-qos"}},
+	}
+	for _, c := range cases {
+		got := agentQoSArgv(c.goos, c.getenv, c.argv)
+		if strings.Join(got, " ") != strings.Join(c.want, " ") {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+		if slices.Contains(got, "-b") {
+			t.Errorf("%s: the background band is never used: %q", c.name, got)
+		}
 	}
 }

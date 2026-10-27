@@ -1,20 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { createTracingProxy } from "../../create-tracing-proxy";
-import { getLangWatchTracer } from "../../../../observability-sdk";
-import { createIntegrationObservability } from "../../../../observability-sdk/setup/node/__tests__/createIntegrationObservability";
-import type { setupObservability } from "../../../../observability-sdk/setup/node";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-/**
- * Integration tests for createTracingProxy with real OpenTelemetry setup.
- *
- * These tests verify:
- * - Real OpenTelemetry SDK initialization
- * - Actual span creation and data flow through proxy
- * - Integration between proxy and tracer components
- * - Data format consistency in exported spans
- */
+import { getLangWatchTracer } from "../../../../observability-sdk";
+import type { setupObservability } from "../../../../observability-sdk/setup/node";
+import { createIntegrationObservability } from "../../../../observability-sdk/setup/node/__tests__/createIntegrationObservability";
+import { createTracingProxy } from "../../create-tracing-proxy";
+
+/** Integration tests for createTracingProxy with real OpenTelemetry setup. */
 
 describe("createTracingProxy Integration Tests", () => {
   let spanExporter: InMemorySpanExporter;
@@ -40,7 +33,7 @@ describe("createTracingProxy Integration Tests", () => {
       spanProcessors: [spanProcessor],
       attributes: {
         "test.suite": "tracing-proxy-integration",
-        "test.environment": "vitest"
+        "test.environment": "vitest",
       },
     });
 
@@ -54,15 +47,15 @@ describe("createTracingProxy Integration Tests", () => {
     trace.disable();
   });
 
-  describe("basic functionality", () => {
+  describe("when using basic functionality", () => {
     it("creates a proxy that traces public methods", async () => {
       class TestClass {
         publicMethod() {
-          return 'public result';
+          return "public result";
         }
 
         private _privateMethod() {
-          return 'private result';
+          return "private result";
         }
       }
 
@@ -71,7 +64,7 @@ describe("createTracingProxy Integration Tests", () => {
 
       const result = proxy.publicMethod();
 
-      expect(result).toBe('public result');
+      expect(result).toBe("public result");
 
       // Flush and verify exported spans
       await spanProcessor.forceFlush();
@@ -93,11 +86,11 @@ describe("createTracingProxy Integration Tests", () => {
     it("does not trace private methods", async () => {
       class TestClass {
         publicMethod() {
-          return 'public result';
+          return "public result";
         }
 
         private _privateMethod() {
-          return 'private result';
+          return "private result";
         }
       }
 
@@ -105,7 +98,7 @@ describe("createTracingProxy Integration Tests", () => {
       const proxy = createTracingProxy(target, tracer);
 
       // Private methods should not be traced but should still be callable
-      expect(typeof (proxy as any)._privateMethod).toBe('function');
+      expect(typeof (proxy as any)._privateMethod).toBe("function");
 
       // Call a public method to ensure tracing works
       proxy.publicMethod();
@@ -121,7 +114,11 @@ describe("createTracingProxy Integration Tests", () => {
     it("does not trace built-in methods", async () => {
       class TestClass {
         publicMethod() {
-          return 'public result';
+          return "public result";
+        }
+
+        toString() {
+          return "TestClass";
         }
       }
 
@@ -129,7 +126,6 @@ describe("createTracingProxy Integration Tests", () => {
       const proxy = createTracingProxy(target, tracer);
 
       // These should not trigger tracing
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       proxy.toString();
       proxy.valueOf();
 
@@ -142,17 +138,17 @@ describe("createTracingProxy Integration Tests", () => {
 
     it("handles non-function properties", async () => {
       class TestClass {
-        public property = 'test value';
+        public property = "test value";
 
         publicMethod() {
-          return 'public result';
+          return "public result";
         }
       }
 
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      expect(proxy.property).toBe('test value');
+      expect(proxy.property).toBe("test value");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -162,11 +158,11 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("decorator functionality", () => {
+  describe("when using decorator functionality", () => {
     it("uses decorator methods when available", async () => {
       class TestClass {
         publicMethod() {
-          return 'original result';
+          return "original result";
         }
       }
 
@@ -174,7 +170,7 @@ describe("createTracingProxy Integration Tests", () => {
         constructor(private target: TestClass) {}
 
         publicMethod() {
-          return 'decorated result';
+          return "decorated result";
         }
       }
 
@@ -183,7 +179,7 @@ describe("createTracingProxy Integration Tests", () => {
 
       const result = proxy.publicMethod();
 
-      expect(result).toBe('decorated result');
+      expect(result).toBe("decorated result");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -203,7 +199,7 @@ describe("createTracingProxy Integration Tests", () => {
     it("falls back to original method when decorator method is not available", async () => {
       class TestClass {
         publicMethod() {
-          return 'original result';
+          return "original result";
         }
       }
 
@@ -217,7 +213,7 @@ describe("createTracingProxy Integration Tests", () => {
 
       const result = proxy.publicMethod();
 
-      expect(result).toBe('original result');
+      expect(result).toBe("original result");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -235,14 +231,14 @@ describe("createTracingProxy Integration Tests", () => {
     it("handles decorator methods that are not functions", async () => {
       class TestClass {
         publicMethod() {
-          return 'original result';
+          return "original result";
         }
       }
 
       class TestDecorator {
         constructor(private target: TestClass) {}
 
-        publicMethod = 'not a function';
+        publicMethod = "not a function";
       }
 
       const target = new TestClass();
@@ -250,7 +246,7 @@ describe("createTracingProxy Integration Tests", () => {
 
       const result = proxy.publicMethod();
 
-      expect(result).toBe('original result');
+      expect(result).toBe("original result");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -266,7 +262,7 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("method arguments and return values", () => {
+  describe("when passing method arguments and return values", () => {
     it("passes arguments correctly to traced methods", async () => {
       class TestClass {
         publicMethod(arg1: string, arg2: number) {
@@ -277,9 +273,9 @@ describe("createTracingProxy Integration Tests", () => {
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      const result = proxy.publicMethod('test', 42);
+      const result = proxy.publicMethod("test", 42);
 
-      expect(result).toBe('test-42');
+      expect(result).toBe("test-42");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -297,7 +293,7 @@ describe("createTracingProxy Integration Tests", () => {
     it("handles async methods", async () => {
       class TestClass {
         async publicMethod() {
-          return 'async result';
+          return "async result";
         }
       }
 
@@ -306,7 +302,7 @@ describe("createTracingProxy Integration Tests", () => {
 
       const result = await proxy.publicMethod();
 
-      expect(result).toBe('async result');
+      expect(result).toBe("async result");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -324,14 +320,14 @@ describe("createTracingProxy Integration Tests", () => {
     it("handles methods that throw errors", async () => {
       class TestClass {
         publicMethod() {
-          throw new Error('test error');
+          throw new Error("test error");
         }
       }
 
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      expect(() => proxy.publicMethod()).toThrow('test error');
+      expect(() => proxy.publicMethod()).toThrow("test error");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -350,14 +346,14 @@ describe("createTracingProxy Integration Tests", () => {
     it("handles async methods that throw errors", async () => {
       class TestClass {
         async publicMethod() {
-          throw new Error('async error');
+          throw new Error("async error");
         }
       }
 
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      await expect(proxy.publicMethod()).rejects.toThrow('async error');
+      await expect(proxy.publicMethod()).rejects.toThrow("async error");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -374,11 +370,11 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("decorator span access", () => {
+  describe("when the decorator accesses the span", () => {
     it("calls decorator method with correct context", async () => {
       class TestClass {
         publicMethod() {
-          return 'original result';
+          return "original result";
         }
       }
 
@@ -388,7 +384,7 @@ describe("createTracingProxy Integration Tests", () => {
 
         publicMethod() {
           decoratorCalled = true;
-          return 'decorated result';
+          return "decorated result";
         }
       }
 
@@ -397,7 +393,7 @@ describe("createTracingProxy Integration Tests", () => {
 
       const result = proxy.publicMethod();
 
-      expect(result).toBe('decorated result');
+      expect(result).toBe("decorated result");
       expect(decoratorCalled).toBe(true);
 
       await spanProcessor.forceFlush();
@@ -414,14 +410,14 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("span lifecycle", () => {
+  describe("when checking span lifecycle", () => {
     it("handles multiple method calls", async () => {
       class TestClass {
         method1() {
-          return 'result1';
+          return "result1";
         }
         method2() {
-          return 'result2';
+          return "result2";
         }
       }
 
@@ -436,8 +432,8 @@ describe("createTracingProxy Integration Tests", () => {
 
       expect(exportedSpans).toHaveLength(2);
 
-      const method1Span = exportedSpans.find(s => s.name === "TestClass.method1");
-      const method2Span = exportedSpans.find(s => s.name === "TestClass.method2");
+      const method1Span = exportedSpans.find((s) => s.name === "TestClass.method1");
+      const method2Span = exportedSpans.find((s) => s.name === "TestClass.method2");
 
       expect(method1Span).toBeDefined();
       expect(method2Span).toBeDefined();
@@ -446,23 +442,23 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("method filtering", () => {
+  describe("when filtering methods", () => {
     it("does not trace getters", async () => {
+      const getterValue = "getter value";
       class TestClass {
-        // eslint-disable-next-line @typescript-eslint/class-literal-property-style
         get getterProperty() {
-          return 'getter value';
+          return getterValue;
         }
 
         publicMethod() {
-          return 'public result';
+          return "public result";
         }
       }
 
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      expect(proxy.getterProperty).toBe('getter value');
+      expect(proxy.getterProperty).toBe("getter value");
 
       // Call a public method to ensure tracing works
       proxy.publicMethod();
@@ -477,7 +473,7 @@ describe("createTracingProxy Integration Tests", () => {
 
     it("does not trace setters", async () => {
       class TestClass {
-        private _value = '';
+        private _value = "";
 
         set setterProperty(value: string) {
           this._value = value;
@@ -488,15 +484,15 @@ describe("createTracingProxy Integration Tests", () => {
         }
 
         publicMethod() {
-          return 'public result';
+          return "public result";
         }
       }
 
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      proxy.setterProperty = 'test value';
-      expect(proxy.getterProperty).toBe('test value');
+      proxy.setterProperty = "test value";
+      expect(proxy.getterProperty).toBe("test value");
 
       // Call a public method to ensure tracing works
       proxy.publicMethod();
@@ -510,7 +506,7 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("handles target with no methods", async () => {
       class EmptyClass {}
 
@@ -529,7 +525,7 @@ describe("createTracingProxy Integration Tests", () => {
     it("handles target with only private methods", async () => {
       class PrivateOnlyClass {
         private _privateMethod() {
-          return 'private';
+          return "private";
         }
       }
 
@@ -548,14 +544,14 @@ describe("createTracingProxy Integration Tests", () => {
     it("handles target with only built-in methods", async () => {
       class BuiltInOnlyClass {
         toString() {
-          return 'built-in';
+          return "built-in";
         }
       }
 
       const target = new BuiltInOnlyClass();
       const proxy = createTracingProxy(target, tracer);
 
-      expect(proxy.toString()).toBe('built-in');
+      expect(proxy.toString()).toBe("built-in");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -565,15 +561,15 @@ describe("createTracingProxy Integration Tests", () => {
     });
 
     it("handles symbol properties", async () => {
-      const symbol = Symbol('test');
+      const symbol = Symbol("test");
 
       class SymbolClass {
         [symbol]() {
-          return 'symbol method';
+          return "symbol method";
         }
 
         publicMethod() {
-          return 'public result';
+          return "public result";
         }
       }
 
@@ -581,7 +577,7 @@ describe("createTracingProxy Integration Tests", () => {
       const proxy = createTracingProxy(target, tracer);
 
       // Symbol methods should not be traced
-      expect(proxy[symbol]()).toBe('symbol method');
+      expect(proxy[symbol]()).toBe("symbol method");
 
       // Public methods should still be traced
       proxy.publicMethod();
@@ -596,32 +592,34 @@ describe("createTracingProxy Integration Tests", () => {
 
     it("handles methods with special characters in names", async () => {
       class TestClass {
-        'method-with-dash'() {
-          return 'dash result';
+        "method-with-dash"() {
+          return "dash result";
         }
-        'method_with_underscore'() {
-          return 'underscore result';
+        method_with_underscore() {
+          return "underscore result";
         }
-        'methodWithCamelCase'() {
-          return 'camel result';
+        methodWithCamelCase() {
+          return "camel result";
         }
       }
 
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      expect(proxy['method-with-dash']()).toBe('dash result');
-      expect(proxy.method_with_underscore()).toBe('underscore result');
-      expect(proxy.methodWithCamelCase()).toBe('camel result');
+      expect(proxy["method-with-dash"]()).toBe("dash result");
+      expect(proxy.method_with_underscore()).toBe("underscore result");
+      expect(proxy.methodWithCamelCase()).toBe("camel result");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
 
       expect(exportedSpans).toHaveLength(3);
 
-      const dashSpan = exportedSpans.find(s => s.name === "TestClass.method-with-dash");
-      const underscoreSpan = exportedSpans.find(s => s.name === "TestClass.method_with_underscore");
-      const camelSpan = exportedSpans.find(s => s.name === "TestClass.methodWithCamelCase");
+      const dashSpan = exportedSpans.find((s) => s.name === "TestClass.method-with-dash");
+      const underscoreSpan = exportedSpans.find(
+        (s) => s.name === "TestClass.method_with_underscore",
+      );
+      const camelSpan = exportedSpans.find((s) => s.name === "TestClass.methodWithCamelCase");
 
       expect(dashSpan).toBeDefined();
       expect(underscoreSpan).toBeDefined();
@@ -671,7 +669,7 @@ describe("createTracingProxy Integration Tests", () => {
     it("handles methods with complex return values", async () => {
       class TestClass {
         publicMethod() {
-          return { complex: 'object', nested: { value: 42 } };
+          return { complex: "object", nested: { value: 42 } };
         }
       }
 
@@ -679,7 +677,7 @@ describe("createTracingProxy Integration Tests", () => {
       const proxy = createTracingProxy(target, tracer);
 
       const result = proxy.publicMethod();
-      expect(result).toEqual({ complex: 'object', nested: { value: 42 } });
+      expect(result).toEqual({ complex: "object", nested: { value: 42 } });
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -690,7 +688,7 @@ describe("createTracingProxy Integration Tests", () => {
 
     it("handles methods with this context", async () => {
       class TestClass {
-        private value = 'test';
+        private value = "test";
 
         publicMethod() {
           return this.value;
@@ -701,7 +699,7 @@ describe("createTracingProxy Integration Tests", () => {
       const proxy = createTracingProxy(target, tracer);
 
       const result = proxy.publicMethod();
-      expect(result).toBe('test');
+      expect(result).toBe("test");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -737,8 +735,8 @@ describe("createTracingProxy Integration Tests", () => {
       // getCounter is also a public method, so it gets traced too
       expect(exportedSpans).toHaveLength(3);
 
-      const methodSpans = exportedSpans.filter(s => s.name === "TestClass.publicMethod");
-      const counterSpans = exportedSpans.filter(s => s.name === "TestClass.getCounter");
+      const methodSpans = exportedSpans.filter((s) => s.name === "TestClass.publicMethod");
+      const counterSpans = exportedSpans.filter((s) => s.name === "TestClass.getCounter");
 
       expect(methodSpans).toHaveLength(2);
       expect(counterSpans).toHaveLength(1);
@@ -746,7 +744,7 @@ describe("createTracingProxy Integration Tests", () => {
 
     it("handles methods with default parameters", async () => {
       class TestClass {
-        publicMethod(param1 = 'default', param2 = 42) {
+        publicMethod(param1 = "default", param2 = 42) {
           return `${param1}-${param2}`;
         }
       }
@@ -754,15 +752,15 @@ describe("createTracingProxy Integration Tests", () => {
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      expect(proxy.publicMethod()).toBe('default-42');
-      expect(proxy.publicMethod('custom')).toBe('custom-42');
-      expect(proxy.publicMethod('custom', 100)).toBe('custom-100');
+      expect(proxy.publicMethod()).toBe("default-42");
+      expect(proxy.publicMethod("custom")).toBe("custom-42");
+      expect(proxy.publicMethod("custom", 100)).toBe("custom-100");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
 
       expect(exportedSpans).toHaveLength(3);
-      exportedSpans.forEach(span => {
+      exportedSpans.forEach((span) => {
         expect(span.name).toBe("TestClass.publicMethod");
         expect(span.status.code).toBe(SpanStatusCode.OK);
       });
@@ -771,22 +769,22 @@ describe("createTracingProxy Integration Tests", () => {
     it("handles methods with rest parameters", async () => {
       class TestClass {
         publicMethod(...args: any[]) {
-          return args.join('-');
+          return args.join("-");
         }
       }
 
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      expect(proxy.publicMethod()).toBe('');
-      expect(proxy.publicMethod('a')).toBe('a');
-      expect(proxy.publicMethod('a', 'b', 'c')).toBe('a-b-c');
+      expect(proxy.publicMethod()).toBe("");
+      expect(proxy.publicMethod("a")).toBe("a");
+      expect(proxy.publicMethod("a", "b", "c")).toBe("a-b-c");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
 
       expect(exportedSpans).toHaveLength(3);
-      exportedSpans.forEach(span => {
+      exportedSpans.forEach((span) => {
         expect(span.name).toBe("TestClass.publicMethod");
         expect(span.status.code).toBe(SpanStatusCode.OK);
       });
@@ -802,8 +800,8 @@ describe("createTracingProxy Integration Tests", () => {
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      const result = proxy.publicMethod({ name: 'John', age: 30 });
-      expect(result).toBe('John-30');
+      const result = proxy.publicMethod({ name: "John", age: 30 });
+      expect(result).toBe("John-30");
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -814,12 +812,12 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("performance and concurrency", () => {
+  describe("when checking performance and concurrency", () => {
     it("handles concurrent method calls efficiently", async () => {
       class TestClass {
         async publicMethod(index: number) {
           // Simulate some async work
-          await new Promise(resolve => setTimeout(resolve, Math.random() * 10));
+          await new Promise((resolve) => setTimeout(resolve, Math.random() * 10));
           return `result-${index}`;
         }
       }
@@ -827,13 +825,11 @@ describe("createTracingProxy Integration Tests", () => {
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      const concurrentOperations = Array.from({ length: 5 }, (_, i) =>
-        proxy.publicMethod(i)
-      );
+      const concurrentOperations = Array.from({ length: 5 }, (_, i) => proxy.publicMethod(i));
 
       const results = await Promise.all(concurrentOperations);
 
-      expect(results).toEqual(['result-0', 'result-1', 'result-2', 'result-3', 'result-4']);
+      expect(results).toEqual(["result-0", "result-1", "result-2", "result-3", "result-4"]);
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();
@@ -841,7 +837,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(exportedSpans).toHaveLength(5);
 
       // Verify all spans have unique IDs and proper attributes
-      const spanIds = new Set(exportedSpans.map(s => s.spanContext().spanId));
+      const spanIds = new Set(exportedSpans.map((s) => s.spanContext().spanId));
       expect(spanIds.size).toBe(5); // All unique
 
       exportedSpans.forEach((span) => {

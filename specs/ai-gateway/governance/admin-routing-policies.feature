@@ -116,7 +116,7 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   @bdd @ui @routing-policy @admin-page
   Scenario: Admin RoutingPolicies page lists all policies grouped by scope
     Given org "acme" has 3 RoutingPolicies across ORG / TEAM / PROJECT scopes
-    When carol navigates to "/settings/routing-policies"
+    When carol navigates to "/gateway/routing-policies"
     Then she sees a list grouped by scope: "Organization defaults", "Team defaults", "Project defaults"
     And each group can be expanded to show its policies with name, model tier count, and provider count
     And a "Set as default" button is present for non-default policies in each group
@@ -248,7 +248,13 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   # The editor
   # ---------------------------------------------------------------------------
 
-  Rule: The routing policy editor opens from its own address
+  Rule: The routing policy editor opens from one address, whoever opened it
+
+    The editor is reached from two places that have nothing else in common: a
+    row on the policies table, and a virtual key's detail page saying which
+    policy that key routes through. Both have to land on the same editor
+    showing the same policy, and the link has to survive being pasted to a
+    colleague who is on neither page.
 
     @integration
     Scenario: Editing a policy from the list opens the editor for that policy
@@ -256,6 +262,18 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
       When carol picks Edit from the policy's actions
       Then the routing policy editor opens for that policy
       And the address carries the policy, so the same link reopens it
+
+    @integration
+    Scenario: An editor opened from a pasted link closes back to the page under it
+      Given carol opened the routing policy editor from a link, with no page handing it a close action
+      When she closes the editor
+      Then the address loses every drawer parameter and keeps the rest of its query
+
+    @integration
+    Scenario: A guardrail editor opened from a pasted link closes back to the page under it
+      Given carol opened the guardrail editor from a link, with no page handing it a close action
+      When she closes the editor
+      Then the address loses every drawer parameter and keeps the rest of its query
 
     @integration
     Scenario: A tier name cannot be set twice

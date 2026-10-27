@@ -118,8 +118,7 @@ func SplitRecords(rows Records, trainSize, testSize float64, seed int64) (*Split
 //   - an int index — direct lookup
 //   - one of the Studio mode keywords "first" / "last" / "random" / "all"
 //     (mirrors Python's get_dataset_entry_selection in
-//     langwatch_nlp/studio/utils.py — Studio's TS DSL pins this set in
-//     optimization_studio/types/dsl.ts)
+//     langwatch_nlp/studio/utils.py — the Workflow contract pins this set)
 //   - any other string — delegated to byString (column-name lookup, which
 //     is workflow-specific so the engine wires the callback per call)
 //

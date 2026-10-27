@@ -1,0 +1,439 @@
+import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import {
+  ModelProviderInvalidError,
+  ModelProviderNotFoundError,
+  type ModelProvider,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
+import { projectSchema, type ProjectApi } from "@langwatch/project-contract";
+import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contract";
+import {
+  type LiteLLMParams,
+  ScenarioNotFoundError,
+  scenarioSchema,
+} from "@langwatch/scenario-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
+import {
+  workflowDslSchema,
+  workflowSchema,
+  workflowVersionSchema,
+  WorkflowNotFoundError,
+  type WorkflowApi,
+} from "@langwatch/workflow-contract";
+import { vi } from "vitest";
+
+import { type ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import {
+  ScenarioExecutionPrefetcherService,
+  type ScenarioExecutionPrefetchConfig,
+} from "../../features/prefetch/services/scenario-execution-prefetcher.service.ts";
+import type { VoiceTargetReader } from "../../features/prefetch/services/scenario-target-prefetch.service.ts";
+import type { ScenarioService } from "../../services/scenario.service.ts";
+
+export interface ScenarioFetcher {
+  getById(input: { projectId: string; id: string }): Promise<{
+    id: string;
+    name: string;
+    situation: string;
+    criteria: string[];
+    labels: string[];
+    simulatorModel?: string | null;
+    judgeModel?: string | null;
+    parameters?: unknown;
+    maxTurns?: number | null;
+    minTurns?: number | null;
+    callerVoice?: unknown;
+  } | null>;
+}
+
+export interface PromptFetcher {
+  findByIdOrHandle(input: {
+    projectId: string;
+    idOrHandle: string;
+  }): Promise<Record<string, unknown> | null>;
+}
+
+export interface AgentFetcher {
+  findById(input: { projectId: string; id: string }): Promise<Agent | null>;
+}
+
+export interface WorkflowVersionFetcher {
+  getLatestDsl(input: {
+    projectId: string;
+    workflowId: string;
+  }): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
+}
+
+export interface ProjectFetcher {
+  findUnique(projectId: string): Promise<{ apiKey: string | null } | null>;
+}
+
+export interface ModelResolver {
+  resolve: (featureKey: string, projectId: string) => Promise<string>;
+}
+
+export interface ProjectSecretsFetcher {
+  getSecrets: (projectId: string) => Promise<Record<string, string>>;
+}
+
+export type ModelParamsResult =
+  | { success: true; params: LiteLLMParams }
+  | {
+      success: false;
+      reason:
+        | "invalid_model_format"
+        | "provider_not_found"
+        | "provider_not_enabled"
+        | "missing_params"
+        | "preparation_error";
+      message: string;
+    };
+
+export interface ModelParamsProvider {
+  prepare: (projectId: string, model: string) => Promise<ModelParamsResult>;
+}
+
+export interface TraceWaitBudgetResolver {
+  resolveTraceWaitTimeoutMs: (input: { projectId: string }) => Promise<number>;
+}
+
+export interface ScenarioPrefetchFixture {
+  scenarioFetcher: ScenarioFetcher;
+  promptFetcher: PromptFetcher;
+  agentFetcher: AgentFetcher;
+  workflowVersionFetcher: WorkflowVersionFetcher;
+  projectFetcher: ProjectFetcher;
+  modelParamsProvider: ModelParamsProvider;
+  modelResolver: ModelResolver;
+  projectSecretsFetcher: ProjectSecretsFetcher;
+  traceWaitBudgetResolver: TraceWaitBudgetResolver;
+  disabledProviders?: ReadonlySet<string>;
+  /**
+   * A real model-provider service in place of the in-memory stand-in. A
+   * case whose subject IS the model-provider boundary (the codex execution
+   * backstop) needs the real service, or it proves the stand-in instead.
+   */
+  modelProviders?: ModelProviderApi;
+  voiceTargets?: VoiceTargetReader;
+  /** The project's organization; absent, it is "organization_1". */
+  organizationId?: string;
+  /** The run-key mint; unconfigured, every key is "run-key". */
+  apiKeys?: Partial<Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">>;
+  /** Whether workflow reports per-project engines; absent, it does not. */
+  perProjectEngines?: boolean;
+}
+
+class TestScenarioSecretCipher implements ScenarioSecretCipher {
+  encrypt(plaintext: string): string {
+    return `test:v1:${Buffer.from(plaintext, "utf8").toString("base64url")}`;
+  }
+
+  decrypt(ciphertext: string): string {
+    if (!ciphertext.startsWith("test:v1:")) {
+      throw new Error("Scenario run secret could not be decrypted");
+    }
+    return Buffer.from(ciphertext.slice("test:v1:".length), "base64url").toString("utf8");
+  }
+}
+
+const cipher = new TestScenarioSecretCipher();
+
+export function encryptTestRunSecrets(values: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(values).map(([name, value]) => [name, cipher.encrypt(value)]),
+  );
+}
+
+function fakeService<T extends object>(methods: Partial<T>): T {
+  return Object.assign(Object.create(null), methods) as T;
+}
+
+function scenarioService(deps: ScenarioPrefetchFixture): ScenarioService {
+  return fakeService<ScenarioService>({
+    getById: async (input: { projectId: string; id: string }) => {
+      const value = await deps.scenarioFetcher.getById(input);
+      if (!value) throw new ScenarioNotFoundError(input.id);
+      const now = new Date(0);
+      return scenarioSchema.parse({
+        projectId: input.projectId,
+        parameters: null,
+        simulatorModel: null,
+        judgeModel: null,
+        maxTurns: null,
+        minTurns: null,
+        testSuiteId: null,
+        version: 1,
+        lastUpdatedById: null,
+        archivedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        ...value,
+      });
+    },
+  });
+}
+
+function promptService(deps: ScenarioPrefetchFixture): PromptApi {
+  return fakeService<PromptApi>({
+    findByIdOrHandle: async (input: { projectId: string; idOrHandle: string }) => {
+      const value = await deps.promptFetcher.findByIdOrHandle(input);
+      if (!value) return null;
+      const now = new Date(0);
+      return versionedPromptSchema.parse({
+        id: input.idOrHandle,
+        name: "Test prompt",
+        handle: null,
+        scope: "PROJECT",
+        version: 1,
+        versionId: `${input.idOrHandle}_version`,
+        versionCreatedAt: now,
+        prompt: "",
+        projectId: input.projectId,
+        organizationId: "organization_1",
+        messages: [],
+        authorId: null,
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+        updatedAt: now,
+        createdAt: now,
+        tags: [],
+        parameters: {},
+        ...value,
+      });
+    },
+  });
+}
+
+function agentService(deps: ScenarioPrefetchFixture): AgentApi {
+  return createApiFixture<AgentApi>({
+    getById: async (input) => {
+      const value = await deps.agentFetcher.findById(input);
+      if (!value) throw new AgentNotFoundError(input.id);
+      return {
+        ...value,
+        inputFields: [],
+        outputFields: [],
+        fieldsResolved: true,
+        environment: value.environment ?? null,
+        ownerUserId: value.ownerUserId ?? null,
+        hostLabel: value.hostLabel ?? null,
+        lastSeenAt: value.lastSeenAt ?? null,
+        parameters: [],
+        owner: null,
+        status: "offline",
+        instances: [],
+        selectable: true,
+        notSelectableReason: null,
+        platformUrl: "https://app.example.com/agents/test",
+      };
+    },
+  });
+}
+
+function workflowService(deps: ScenarioPrefetchFixture): WorkflowApi {
+  return fakeService<WorkflowApi>({
+    hasPerProjectEngines: () => deps.perProjectEngines ?? false,
+    getById: async (input) => {
+      const value = await deps.workflowVersionFetcher.getLatestDsl({
+        projectId: input.projectId,
+        workflowId: input.id,
+      });
+      if (!value) throw new WorkflowNotFoundError(input.id);
+      const now = new Date(0);
+      const workflow = workflowSchema.parse({
+        id: value.workflowId,
+        projectId: input.projectId,
+        name: "Test workflow",
+        icon: null,
+        description: null,
+        latestVersionId: `${value.workflowId}_version`,
+        currentVersionId: `${value.workflowId}_version`,
+        publishedId: null,
+        publishedById: null,
+        copiedFromWorkflowId: null,
+        isEvaluator: false,
+        isComponent: false,
+        archivedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const dsl = workflowDslSchema.parse({
+        version: "1.0",
+        name: "Test workflow",
+        nodes: [],
+        edges: [],
+        ...value.dsl,
+      });
+      const latestVersion = workflowVersionSchema.parse({
+        id: `${value.workflowId}_version`,
+        workflowId: value.workflowId,
+        projectId: input.projectId,
+        version: "1.0",
+        autoSaved: false,
+        commitMessage: "test",
+        authorId: null,
+        parentId: null,
+        dsl,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { ...workflow, latestVersion };
+    },
+  });
+}
+
+function projectService(deps: ScenarioPrefetchFixture): ProjectApi {
+  return createApiFixture<ProjectApi>({
+    findOrganizationId: async () => deps.organizationId ?? "organization_1",
+    findById: async (projectId) => {
+      const value = await deps.projectFetcher.findUnique(projectId);
+      if (!value) return null;
+      const now = new Date(0);
+      return projectSchema.parse({
+        id: projectId,
+        name: "Test project",
+        slug: "test-project",
+        apiKey: value.apiKey ?? "",
+        lwqlKey: "lwql",
+        teamId: "team_1",
+        language: "typescript",
+        framework: "other",
+        kind: "application",
+        firstMessage: false,
+        integrated: false,
+        createdAt: now,
+        updatedAt: now,
+        userLinkTemplate: null,
+        traceSharingEnabled: false,
+        presenceEnabled: false,
+        s3Endpoint: null,
+        s3AccessKeyId: null,
+        s3SecretAccessKey: null,
+        s3Bucket: null,
+        archivedAt: null,
+        isPersonal: false,
+        ownerUserId: null,
+        personalFeatures: null,
+        departmentId: null,
+        langyEgressAllowlist: null,
+        lastCodingAgentSessionAt: null,
+        lastCodingAgentPullRequestAt: null,
+      });
+    },
+  });
+}
+
+function disabledProvider(provider: string): ModelProvider {
+  const now = new Date(0);
+  return {
+    id: `${provider}_provider`,
+    organizationId: "organization_1",
+    provider,
+    name: provider,
+    enabled: false,
+    routingHandle: null,
+    scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+    customKeys: null,
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function modelProviderService(deps: ScenarioPrefetchFixture): ModelProviderApi {
+  if (deps.modelProviders) return deps.modelProviders;
+  return fakeService<ModelProviderApi>({
+    findResolvedDefault: async (input) => ({
+      model: await deps.modelResolver.resolve(input.featureKey, input.projectId),
+      source: "feature_override",
+      scope: "project",
+    }),
+    findProviderForProject: async (input) =>
+      deps.disabledProviders?.has(input.provider) ? disabledProvider(input.provider) : null,
+    prepareExecution: async (input) => {
+      const result = await deps.modelParamsProvider.prepare(input.projectId, input.model);
+      if (result.success) return result.params;
+      if (result.reason === "provider_not_found") {
+        throw new ModelProviderNotFoundError();
+      }
+      if (result.reason === "invalid_model_format") {
+        throw new ModelProviderInvalidError(result.message);
+      }
+      if (result.reason === "missing_params") return { model: input.model };
+      throw new Error(result.message);
+    },
+    getExecutionProviders: async () => ({}),
+  });
+}
+
+export function createTestScenarioExecutionPrefetcherService(
+  deps: ScenarioPrefetchFixture,
+  config: ScenarioExecutionPrefetchConfig = {
+    langwatchEndpoint: "http://app:5560",
+    nlpServiceUrl: "http://langwatch_nlp:5561",
+    legacyDefaultModel: "openai/gpt-5-mini",
+  },
+): ScenarioExecutionPrefetcherService {
+  return ScenarioExecutionPrefetcherService.create({
+    runSecretSeal: {
+      sealRunSecret: ({ plain }) => cipher.encrypt(plain),
+      openRunSecret: ({ sealed }) => cipher.decrypt(sealed),
+    },
+    config,
+    scenarios: scenarioService(deps),
+    prompts: promptService(deps),
+    agents: agentService(deps),
+    workflows: workflowService(deps),
+    projects: projectService(deps),
+    modelProviders: modelProviderService(deps),
+    secrets: fakeService<SecretApi>({
+      getValuesByName: async ({ projectId, names }: { projectId: string; names: string[] }) =>
+        Object.fromEntries(
+          Object.entries(await deps.projectSecretsFetcher.getSecrets(projectId)).filter(([name]) =>
+            names.includes(name),
+          ),
+        ),
+      list: async ({ projectId }: { projectId: string }) =>
+        Object.keys(await deps.projectSecretsFetcher.getSecrets(projectId)).map((name) => ({
+          id: name,
+          projectId,
+          name,
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+          createdBy: { name: null },
+          updatedBy: { name: null },
+        })),
+    }),
+    traces: createApiFixture<TraceApi>({
+      resolveIngestWaitTimeout: (input) =>
+        deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),
+    }),
+    apiKeys: createApiFixture<ApiKeyApi>({
+      mintRunKey: vi.fn().mockResolvedValue("run-key"),
+      ...deps.apiKeys,
+    }),
+    voiceTargets: deps.voiceTargets ?? {
+      getVoiceTarget: async ({ agentId }) => ({
+        type: "voice",
+        agentId,
+        voiceTarget: {
+          transport: "elevenlabs_convai",
+          agentId: "test-agent",
+          credential: null,
+        },
+        callerEnv: {},
+        maxCallSeconds: 300,
+      }),
+    },
+  });
+}

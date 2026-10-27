@@ -1,5 +1,11 @@
+import { stripVTControlCharacters } from "node:util";
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ExperimentsApiServiceError } from "@/client-sdk/services/experiments/experiments-api.service";
+
+import {
+  ExperimentsApiServiceError,
+  ExperimentsApiService,
+} from "@/client-sdk/services/experiments/experiments-api.service";
 import type * as EvaluationsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
 const oraMocks = vi.hoisted(() => ({
@@ -15,7 +21,11 @@ vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (impo
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -28,7 +38,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { experimentResultsCommand } from "../results";
 
 class ProcessExitError extends Error {
@@ -60,20 +69,22 @@ const sampleResults = {
   ],
   evaluations: [
     { evaluator: "quality", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", index: 2, status: "processed", score: 0.2, passed: false, details: "low score" },
+    {
+      evaluator: "quality",
+      index: 2,
+      status: "processed",
+      score: 0.2,
+      passed: false,
+      details: "low score",
+    },
     { evaluator: "safety", index: 0, status: "processed", score: 1.0, passed: true },
   ],
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
 
 /**
- * A run with a Comparison evaluator.
- *
- * The shape is the point: dataset entries are per (row, target), and the
- * comparison's verdict is per row only — recorded against its own id, which
- * is not one of the targets. Anything keyed that way has no dataset entry to
- * hang off, which is exactly how 60 real verdicts went missing on a live run
- * while the run summary still advertised the comparison.
+ * Comparison evaluator verdicts are keyed to row only, not (row, target).
+ * They have no dataset entry to attach to. Test ensures they don't vanish.
  */
 const comparisonResults = {
   experimentId: "exp_2",
@@ -88,11 +99,41 @@ const comparisonResults = {
     { index: 1, targetId: "target_b", entry: { input: "q2" } },
   ],
   evaluations: [
-    { evaluator: "quality", targetId: "target_a", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", targetId: "target_b", index: 0, status: "processed", score: 0.4, passed: true },
+    {
+      evaluator: "quality",
+      targetId: "target_a",
+      index: 0,
+      status: "processed",
+      score: 0.9,
+      passed: true,
+    },
+    {
+      evaluator: "quality",
+      targetId: "target_b",
+      index: 0,
+      status: "processed",
+      score: 0.4,
+      passed: true,
+    },
     // Keyed to the comparison, not to a target — no dataset row matches this.
-    { evaluator: "target_comparison", targetId: "target_comparison", index: 0, status: "processed", score: 1, label: "target_a", details: "A was clearer." },
-    { evaluator: "target_comparison", targetId: "target_comparison", index: 1, status: "processed", score: 1, label: "target_b", details: "B was more accurate." },
+    {
+      evaluator: "target_comparison",
+      targetId: "target_comparison",
+      index: 0,
+      status: "processed",
+      score: 1,
+      label: "target_a",
+      details: "A was clearer.",
+    },
+    {
+      evaluator: "target_comparison",
+      targetId: "target_comparison",
+      index: 1,
+      status: "processed",
+      score: 1,
+      label: "target_b",
+      details: "B was more accurate.",
+    },
   ],
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
@@ -109,12 +150,14 @@ describe("experimentResultsCommand()", () => {
     mockListRuns = vi.fn().mockResolvedValue({
       runs: [{ runId: "run_1" }, { runId: "older_run" }],
     });
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: vi.fn(),
-      getRunStatus: vi.fn(),
-      getRunResults: mockGetRunResults,
-      listRuns: mockListRuns,
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: vi.fn(),
+        getRunResults: mockGetRunResults,
+        listRuns: mockListRuns,
+      } as unknown as ExperimentsApiService;
+    });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -161,9 +204,9 @@ describe("experimentResultsCommand()", () => {
       /** @scenario "User requests an experiment with no runs" */
       it("exits with code 1", async () => {
         mockListRuns.mockResolvedValue({ runs: [] });
-        await expect(
-          experimentResultsCommand({ experimentSlug: "doc-qa" }),
-        ).rejects.toMatchObject({ code: 1 });
+        await expect(experimentResultsCommand({ experimentSlug: "doc-qa" })).rejects.toMatchObject({
+          code: 1,
+        });
         expect(mockGetRunResults).not.toHaveBeenCalled();
       });
     });
@@ -181,15 +224,54 @@ describe("experimentResultsCommand()", () => {
           evaluations: unknown[];
           meta: Record<string, unknown>;
         };
-        expect(payload.dataset).toHaveLength(1);
+        // `--limit 1` shortens the printed table. Both failing rows are still
+        // in the answer, and `meta` says so, so a caller doing arithmetic on
+        // the payload divides by the real number of rows.
+        expect(payload.dataset).toHaveLength(2);
         expect(payload.dataset[0]!.entry.input).toBe("broken row");
-        expect(payload.evaluations).toHaveLength(0);
         expect(payload.meta).toMatchObject({
           totalMatching: 2,
-          truncated: true,
-          limit: 1,
+          returned: 2,
+          tableLimit: 1,
+          tableTruncated: true,
           filter: "failed",
         });
+      });
+    });
+
+    describe("when the row limit is smaller than the run", () => {
+      /** @scenario "The row limit shortens the table and never the answer" */
+      it("keeps every row in the answer while the table shows the limit", async () => {
+        const big = {
+          ...sampleResults,
+          dataset: Array.from({ length: 50 }, (_, i) => ({
+            index: i,
+            entry: { input: `row ${i}` },
+          })),
+          evaluations: [],
+        };
+        mockGetRunResults.mockResolvedValue(big);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { limit: "5" },
+        });
+        const payload = result?.data as {
+          dataset: unknown[];
+          meta: Record<string, unknown>;
+        };
+
+        expect(payload.dataset).toHaveLength(50);
+        expect(payload.meta).toMatchObject({
+          totalMatching: 50,
+          returned: 50,
+          tableLimit: 5,
+          tableTruncated: true,
+        });
+
+        result?.table();
+        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        expect(printed).toContain("Showing 5 of 50");
       });
     });
 
@@ -205,11 +287,9 @@ describe("experimentResultsCommand()", () => {
         // Strip ANSI colour codes: whether chalk colours here depends on the
         // environment (vitest propagates FORCE_COLOR from a colour terminal),
         // and `\b1\b` never matches when the digit sits inside an escape code.
-        const printed = logSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .join("\n")
-          // eslint-disable-next-line no-control-regex
-          .replace(/\[[0-9;]*m/g, "");
+        const printed = stripVTControlCharacters(
+          logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n"),
+        );
         expect(printed).toMatch(/\b1\b/);
         expect(printed).toMatch(/\b2\b/);
         expect(printed).not.toContain("hello world");
@@ -227,9 +307,10 @@ describe("experimentResultsCommand()", () => {
         result?.table();
         const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("quality");
-        const headerLine = logSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .find((line: string) => line.includes("Target")) ?? "";
+        const headerLine =
+          logSpy.mock.calls
+            .map((c: unknown[]) => String(c[0]))
+            .find((line: string) => line.includes("Target")) ?? "";
         expect(headerLine).not.toContain("safety");
       });
     });
@@ -325,46 +406,67 @@ describe("experimentResultsCommand()", () => {
 
   describe("given a run with a Comparison evaluator", () => {
     describe("when the results are returned", () => {
-      /** @scenario "A comparison verdict reaches the CLI even though it belongs to no single target" */
-      it("keeps the verdicts that belong to no single target", async () => {
-        mockGetRunResults.mockResolvedValue(comparisonResults);
+      let result: Awaited<ReturnType<typeof experimentResultsCommand>>;
 
-        const result = await experimentResultsCommand({
+      beforeEach(async () => {
+        mockGetRunResults.mockResolvedValue(comparisonResults);
+        result = await experimentResultsCommand({
           experimentSlug: "doc-qa",
         });
+      });
 
+      /** @scenario "A comparison verdict reaches the CLI even though it belongs to no single target" */
+      it("keeps the verdicts that belong to no single target", () => {
         const evaluations = (result as any).data.evaluations;
-        const verdicts = evaluations.filter(
-          (e: any) => e.evaluator === "target_comparison",
-        );
+        const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
         expect(verdicts).toHaveLength(2);
-        expect(verdicts.map((v: any) => v.label)).toEqual([
-          "target_a",
-          "target_b",
-        ]);
+        expect(verdicts.map((v: any) => v.label)).toEqual(["target_a", "target_b"]);
         // The judge's reasoning is the reason to reach for this at all.
         expect(verdicts[0].details).toBe("A was clearer.");
       });
 
-      it("still reports every target-scoped evaluation", async () => {
+      it("still reports every target-scoped evaluation", () => {
         // The comparison must be additive — a fix that surfaced verdicts by
         // displacing the per-target scores would trade one gap for another.
-        mockGetRunResults.mockResolvedValue(comparisonResults);
-
-        const result = await experimentResultsCommand({
-          experimentSlug: "doc-qa",
-        });
-
         const evaluations = (result as any).data.evaluations;
-        expect(
-          evaluations.filter((e: any) => e.evaluator === "quality"),
-        ).toHaveLength(2);
+        expect(evaluations.filter((e: any) => e.evaluator === "quality")).toHaveLength(2);
       });
     });
 
-    describe("when --limit drops some rows", () => {
+    describe("when --filter failed drops some rows", () => {
       /** @scenario "Comparison verdicts follow the rows that survive filtering" */
-      it("reports verdicts only for the rows still shown", async () => {
+      it("reports verdicts only for the rows that failed", async () => {
+        // Row 1 fails, row 0 passes, so only row 1 survives the filter and
+        // only its verdict should be described.
+        mockGetRunResults.mockResolvedValue({
+          ...comparisonResults,
+          evaluations: [
+            ...comparisonResults.evaluations,
+            {
+              evaluator: "quality",
+              targetId: "target_a",
+              index: 1,
+              status: "processed",
+              score: 0.1,
+              passed: false,
+            },
+          ],
+        });
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { filter: "failed" },
+        });
+
+        const evaluations = (result as any).data.evaluations;
+        const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
+        expect(verdicts.map((v: any) => v.index)).toEqual([1]);
+      });
+    });
+
+    describe("when the row limit is smaller than the run", () => {
+      /** @scenario "The row limit shortens the table and never the answer" */
+      it("keeps every verdict, because the limit only shortens the table", async () => {
         mockGetRunResults.mockResolvedValue(comparisonResults);
 
         const result = await experimentResultsCommand({
@@ -372,13 +474,11 @@ describe("experimentResultsCommand()", () => {
           options: { limit: "2" },
         });
 
-        // limit=2 keeps the two row-0 entries, so only row 0's verdict.
         const evaluations = (result as any).data.evaluations;
-        const verdicts = evaluations.filter(
-          (e: any) => e.evaluator === "target_comparison",
-        );
-        expect(verdicts).toHaveLength(1);
-        expect(verdicts[0].index).toBe(0);
+        const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
+        // Both judged rows are in the answer, not only the two rows the table
+        // would have printed.
+        expect(verdicts.map((v: any) => v.index).toSorted()).toEqual([0, 1]);
       });
     });
 
@@ -393,9 +493,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        expect(
-          evaluations.some((e: any) => e.evaluator === "target_comparison"),
-        ).toBe(false);
+        expect(evaluations.some((e: any) => e.evaluator === "target_comparison")).toBe(false);
       });
     });
   });
@@ -412,9 +510,202 @@ describe("experimentResultsCommand()", () => {
             options: { runId: "missing" },
           }),
         ).rejects.toMatchObject({ code: 1 });
-        expect(oraMocks.fail).toHaveBeenCalledWith(
-          expect.stringContaining("Run not found"),
+        expect(oraMocks.fail).toHaveBeenCalledWith(expect.stringContaining("Run not found"));
+      });
+    });
+  });
+
+  describe("given a run whose results are still being stored", () => {
+    const partial = {
+      ...sampleResults,
+      timestamps: { createdAt: 0, updatedAt: 0, finishedAt: 5 },
+      completeness: {
+        complete: false,
+        dataset: { received: 3, expected: 40 },
+        evaluations: { received: 3, expected: 480 },
+      },
+    };
+    const whole = {
+      ...partial,
+      completeness: {
+        complete: true,
+        dataset: { received: 40, expected: 40 },
+        evaluations: { received: 480, expected: 480 },
+      },
+    };
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    const stderr = () =>
+      errorSpy.mock.calls
+        .map((call: unknown[]) => stripVTControlCharacters(String(call[0])))
+        .join("\n");
+
+    beforeEach(() => {
+      process.exitCode = undefined;
+      errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
+    });
+
+    afterEach(() => {
+      process.exitCode = undefined;
+    });
+
+    describe("when the answer is read as JSON", () => {
+      /** @scenario "A JSON answer that is not whole says so" */
+      it("carries the counts, marks the answer partial and warns on stderr", async () => {
+        mockGetRunResults.mockResolvedValue(partial);
+
+        const result = await experimentResultsCommand({ experimentSlug: "doc-qa" });
+
+        const payload = result?.data as {
+          completeness: unknown;
+          meta: Record<string, unknown>;
+        };
+        expect(payload.completeness).toEqual(partial.completeness);
+        expect(payload.meta.complete).toBe(false);
+        expect(stderr()).toContain("Partial results: 3 of 40 rows and 3 of 480 evaluations");
+        expect(process.exitCode).toBeUndefined();
+      });
+    });
+
+    describe("when complete results are required", () => {
+      /** @scenario "Requiring complete results fails on a partial answer" */
+      it("sets exit status 2 and names what is missing", async () => {
+        mockGetRunResults.mockResolvedValue(partial);
+
+        await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { requireComplete: true },
+        });
+
+        expect(process.exitCode).toBe(2);
+        expect(stderr()).toContain("3 of 480 evaluations");
+      });
+    });
+
+    describe("when the caller waits and the run becomes whole", () => {
+      /** @scenario "Waiting returns the whole run once it is stored" */
+      it("reads again until complete and exits clean", async () => {
+        mockGetRunResults
+          .mockResolvedValueOnce(partial)
+          .mockResolvedValueOnce(partial)
+          .mockResolvedValue(whole);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { wait: "60", pollMs: 1 },
+        });
+
+        expect(mockGetRunResults).toHaveBeenCalledTimes(3);
+        expect(result).toMatchObject({ data: { meta: { complete: true } } });
+        expect(stderr()).not.toContain("Partial results");
+        expect(process.exitCode).toBeUndefined();
+      });
+    });
+
+    describe("when the caller waits for a run the platform does not hold yet", () => {
+      const notFound = () =>
+        new ExperimentsApiServiceError("Run not found: run_1", "get run results", {
+          name: "LangWatchHandledError",
+          code: "run_not_found",
+          httpStatus: 404,
+        });
+
+      /** @scenario "Waiting holds on while the run is not stored yet" */
+      it("reads again instead of failing, and answers once the run is whole", async () => {
+        mockGetRunResults
+          .mockRejectedValueOnce(notFound())
+          .mockRejectedValueOnce(notFound())
+          .mockResolvedValueOnce(partial)
+          .mockResolvedValue(whole);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { wait: "60", pollMs: 1 },
+        });
+
+        expect(mockGetRunResults).toHaveBeenCalledTimes(4);
+        expect(result).toMatchObject({ data: { meta: { complete: true } } });
+        expect(process.exitCode).toBeUndefined();
+      });
+
+      /** @scenario "Waiting reports a run that never appears" */
+      it("fails with the missing run once the wait is over", async () => {
+        mockGetRunResults.mockRejectedValue(notFound());
+
+        await expect(
+          experimentResultsCommand({
+            experimentSlug: "doc-qa",
+            options: { wait: "0.02", pollMs: 5 },
+          }),
+        ).rejects.toThrow("process.exit(1)");
+        expect(mockGetRunResults.mock.calls.length).toBeGreaterThan(1);
+      });
+
+      it("fails at once on any other error", async () => {
+        mockGetRunResults.mockRejectedValue(
+          new ExperimentsApiServiceError("Forbidden", "get run results", {
+            response: { status: 403 },
+          }),
         );
+
+        await expect(
+          experimentResultsCommand({
+            experimentSlug: "doc-qa",
+            options: { wait: "60", pollMs: 1 },
+          }),
+        ).rejects.toThrow("process.exit(1)");
+        expect(mockGetRunResults).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the caller waits and the run stays partial", () => {
+      /** @scenario "Waiting gives up when the run stays partial" */
+      it("sets exit status 2 once the wait is over", async () => {
+        mockGetRunResults.mockResolvedValue(partial);
+
+        await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { wait: "0.02", pollMs: 5 },
+        });
+
+        expect(process.exitCode).toBe(2);
+        expect(stderr()).toContain("Partial results");
+      });
+    });
+
+    describe("when every reported result is stored", () => {
+      /** @scenario "A whole answer raises no warning" */
+      it("prints no partial warning and exits clean", async () => {
+        mockGetRunResults.mockResolvedValue(whole);
+
+        await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { requireComplete: true },
+        });
+
+        expect(stderr()).not.toContain("Partial results");
+        expect(process.exitCode).toBeUndefined();
+      });
+    });
+
+    describe("when the server predates the completeness count", () => {
+      it("derives a partial answer from a run with no finish marker", async () => {
+        mockGetRunResults.mockResolvedValue({
+          ...sampleResults,
+          timestamps: { createdAt: 0, updatedAt: Date.now() },
+        });
+
+        const result = await experimentResultsCommand({ experimentSlug: "doc-qa" });
+
+        expect(result).toMatchObject({
+          data: {
+            completeness: {
+              complete: false,
+              dataset: { received: 3, expected: null },
+              evaluations: { received: 3, expected: null },
+            },
+          },
+        });
+        expect(stderr()).toContain("Partial results: 3 rows and 3 evaluations");
       });
     });
   });
@@ -436,10 +727,30 @@ const comparisonFailedResults = {
     { index: 0, targetId: "target_b", entry: { input: "q1" } },
   ],
   evaluations: [
-    { evaluator: "quality", targetId: "target_a", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", targetId: "target_b", index: 0, status: "processed", score: 0.8, passed: true },
+    {
+      evaluator: "quality",
+      targetId: "target_a",
+      index: 0,
+      status: "processed",
+      score: 0.9,
+      passed: true,
+    },
+    {
+      evaluator: "quality",
+      targetId: "target_b",
+      index: 0,
+      status: "processed",
+      score: 0.8,
+      passed: true,
+    },
     // Row-independent, and the only thing that went wrong.
-    { evaluator: "target_comparison", targetId: "target_comparison", index: 0, status: "error", details: "judge timed out" },
+    {
+      evaluator: "target_comparison",
+      targetId: "target_comparison",
+      index: 0,
+      status: "error",
+      details: "judge timed out",
+    },
   ],
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
@@ -476,9 +787,7 @@ describe("experimentResultsCommand() — failures the row join cannot see", () =
       })) as { data: { dataset: unknown[]; evaluations: { evaluator: string }[] } };
 
       expect(result.data.dataset.length).toBeGreaterThan(0);
-      expect(
-        result.data.evaluations.some((e) => e.evaluator === "target_comparison"),
-      ).toBe(true);
+      expect(result.data.evaluations.some((e) => e.evaluator === "target_comparison")).toBe(true);
     });
   });
 
@@ -487,9 +796,7 @@ describe("experimentResultsCommand() — failures the row join cannot see", () =
       mockGetRunResults2.mockResolvedValue({
         ...comparisonFailedResults,
         evaluations: comparisonFailedResults.evaluations.map((e) =>
-          e.status === "error"
-            ? { ...e, status: "processed", score: 1, label: "target_a" }
-            : e,
+          e.status === "error" ? { ...e, status: "processed", score: 1, label: "target_a" } : e,
         ),
       });
 

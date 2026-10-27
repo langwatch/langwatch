@@ -1,0 +1,53 @@
+/**
+ * What a connected agent's reply is allowed to weigh. Server-side rather than contract: the
+ * measurement is `Buffer.byteLength`, and the caps are only ever enforced on the way in.
+ */
+
+/** The size of a JSON value on the wire, in bytes. */
+function jsonByteLength(value: unknown): number {
+  return Buffer.byteLength(JSON.stringify(value ?? null), "utf8");
+}
+
+/**
+ * The cap a result breaks, or nothing when it fits.
+ */
+export function detectResultCapViolation({
+  output,
+  session,
+  state,
+  caps,
+}: {
+  output: unknown;
+  session: unknown;
+  state?: unknown;
+  caps: { resultBytes: number; sessionBytes: number; stateBytes: number };
+}): {
+  what: "result" | "session" | "state";
+  sizeBytes: number;
+  limitBytes: number;
+} | null {
+  const sessionBytes = session === undefined ? 0 : jsonByteLength(session);
+  if (session !== undefined && sessionBytes > caps.sessionBytes) {
+    return {
+      what: "session",
+      sizeBytes: sessionBytes,
+      limitBytes: caps.sessionBytes,
+    };
+  }
+
+  const stateBytes = state === undefined ? 0 : jsonByteLength(state);
+  if (state !== undefined && stateBytes > caps.stateBytes) {
+    return { what: "state", sizeBytes: stateBytes, limitBytes: caps.stateBytes };
+  }
+
+  const resultBytes = jsonByteLength(output) + sessionBytes + stateBytes;
+  if (resultBytes > caps.resultBytes) {
+    return {
+      what: "result",
+      sizeBytes: resultBytes,
+      limitBytes: caps.resultBytes,
+    };
+  }
+
+  return null;
+}

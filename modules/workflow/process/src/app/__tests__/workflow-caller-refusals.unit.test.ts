@@ -1,0 +1,76 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
+
+import { HttpWorkflowChannels } from "../../channels/http/http.workflow.channels.ts";
+import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
+import { WorkflowModule } from "../workflow.app.ts";
+
+/** The app over the memory registry; a test passes the peer whose calls it watches. */
+async function appWith({
+  authz = createApiFixture<AuthzApi>({}, "AuthzApi"),
+}: { authz?: AuthzApi } = {}): Promise<WorkflowModule> {
+  const config = {
+    nlpServiceUrl: void 0,
+    stagingThresholdBytes: void 0,
+    stagingTtlSeconds: 600,
+    relayTurnCeilingMs: void 0,
+    publicBaseUrl: void 0,
+    nlpCodeBlockTimeoutSeconds: void 0,
+  };
+  const secrets = new ScopedSecrets(async (_handle, build) => build(undefined));
+  return WorkflowModule.create({
+    dependencies: {
+      modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
+      agents: createApiFixture<AgentApi>({}, "AgentApi"),
+      authz,
+      apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
+      datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
+      secrets: createApiFixture<SecretApi>({}, "SecretApi"),
+    },
+    config,
+    resources: { own: () => void 0, ownService: () => void 0 },
+    secrets,
+    channels: await HttpWorkflowChannels.create({ config, secrets }),
+    repositories: MemoryWorkflowRepositories.create(),
+  });
+}
+
+describe("WorkflowModule caller refusals", () => {
+  describe("given a Studio event posted to the editor's door", () => {
+    const isAlive = JSON.stringify({
+      projectId: "project_1",
+      event: { type: "is_alive", payload: {} },
+    });
+    const authzAnswering = (granted: boolean) =>
+      createApiFixture<AuthzApi>({ hasPermission: async () => granted }, "AuthzApi");
+    const drain = async (events: AsyncIterable<StudioServerEvent>) => {
+      const seen: StudioServerEvent[] = [];
+      for await (const event of events) seen.push(event);
+      return seen;
+    };
+
+    it("refuses a body that is not a Studio event as a validation error", async () => {
+      await expect(
+        (await appWith()).streamStudioEvent({ body: "not json", userId: "user_1" }),
+      ).rejects.toMatchObject({ code: "validation_error", httpStatus: 400 });
+    });
+
+    it("answers a run the engine cannot start with one last error frame, then ends", async () => {
+      const app = await appWith({ authz: authzAnswering(true) });
+
+      const events = await app.streamStudioEvent({ body: isAlive, userId: "user_1" });
+
+      expect(await drain(events)).toEqual([
+        { type: "error", payload: { message: expect.stringContaining("NLP engine") } },
+      ]);
+    });
+  });
+});

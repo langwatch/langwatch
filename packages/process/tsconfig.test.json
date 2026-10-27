@@ -1,0 +1,29 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2023", "dom"],
+    "types": ["node"],
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
+    "composite": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/**/__tests__/**/*.ts",
+    "src/**/__mocks__/**/*.ts",
+    "src/**/tests/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.*.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.*.ts",
+    "tests/**/*.ts"
+  ],
+
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../test-harness/tsconfig.build.json"
+    }
+  ]
+}

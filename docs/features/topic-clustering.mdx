@@ -1,0 +1,34 @@
+---
+title: Topic clustering
+description: Group your traces into topics and subtopics automatically, choose the model it uses, and run it on demand from Settings.
+---
+
+Topic clustering reads the inputs of your traces and groups them into topics, each split into subtopics, so you can see what your users ask about without reading traces one by one. Each clustered trace carries its topic and subtopic, and you can filter on them in the Trace Explorer and in [automations](/features/automations) (`topics.topics` and `topics.subtopics`).
+
+## Set it up
+
+Topic clustering calls a model on your behalf, so it needs one:
+
+1. Add a [model provider](/platform/model-providers) for your project.
+2. In **Settings → Model Providers → Default Models**, choose the model and the embeddings model for topic clustering.
+
+Until both are set, runs are skipped with "no topic clustering model is set up".
+
+## When it runs
+
+Once a project receives traces, topic clustering is scheduled to run on its own, about once a day. A run does one of two things:
+
+- **Rebuild all topics** from your recent traces. A rebuild needs at least 10 traces with an input, and is not repeated for a few days after the last one (two to seven, depending on how many traces are already clustered), so the topics stay stable.
+- **Sort new traces into your existing topics**, once enough traces are clustered. This keeps the topics you have and assigns each new trace to one of them.
+
+A scheduled run with too few new traces, or too soon after the last rebuild, is recorded as skipped, with the reason.
+
+## The Topic Clustering settings page
+
+**Settings → Topic Clustering** (project admins only) shows:
+
+- **Schedule**: the outcome of the last run (completed, skipped, failed, running or interrupted), when it ran, and for a completed run how many traces it organised into how many topics and subtopics. A failed run caused by your model provider, such as rejected credentials or an exhausted quota, says what to fix.
+- **Manual topic clustering**: **Run topic clustering** starts a run now instead of waiting for the next scheduled one. It can take several minutes. If a run is already in progress, the page says so rather than starting a second one.
+- **Run history**: the recent runs and their outcomes.
+
+There is no public REST, CLI or MCP endpoint to start a run or change the schedule. The topics themselves can be read with [LangWatchQL](/api-reference/query/overview) (`topics` view) and used as trace filters.

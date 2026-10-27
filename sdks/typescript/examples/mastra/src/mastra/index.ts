@@ -3,6 +3,7 @@ import { LibSQLStore } from "@mastra/libsql";
 import { PinoLogger } from "@mastra/loggers";
 import { Observability } from "@mastra/observability";
 import { OtelExporter } from "@mastra/otel-exporter";
+
 import { weatherAgent } from "./agents/weather-agent";
 import {
   completenessScorer,

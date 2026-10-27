@@ -16,6 +16,28 @@ import (
 type ctxKey struct{}
 type spanCtxKey struct{}
 type clientSessionIDKey struct{}
+type mirrorWithheldKey struct{}
+
+// HeaderLangyMirror is set by the Langy relay, never the worker, on a model
+// call whose turn mirrors nothing (ADR-061 amendment 2026-10-12). The gateway
+// tiers the mirror by virtual key, and a chat turn and a read-only run share
+// one Langy key, so only the relay knows the turn's own tier. The header can
+// only withhold a mirror copy, never ask for one.
+const HeaderLangyMirror = "X-LangWatch-Langy-Mirror"
+
+// LangyMirrorWithheld is the one HeaderLangyMirror value the gateway honors.
+const LangyMirrorWithheld = "skip"
+
+// WithMirrorWithheld marks the call as one whose turn mirrors nothing.
+func WithMirrorWithheld(ctx context.Context) context.Context {
+	return context.WithValue(ctx, mirrorWithheldKey{}, true)
+}
+
+// MirrorWithheld reports whether the call's turn mirrors nothing.
+func MirrorWithheld(ctx context.Context) bool {
+	withheld, _ := ctx.Value(mirrorWithheldKey{}).(bool)
+	return withheld
+}
 
 // WithTraceParent stashes the customer's raw traceparent header value on the
 // context. The middleware should call this after extracting (and stripping) the
@@ -161,4 +183,28 @@ func activeSpanFrom(ctx context.Context) trace.Span {
 		return v
 	}
 	return nil
+}
+
+// CustomerTraceID is the trace the customer sees this request in, or empty
+// when no customer span is open.
+//
+// It reads the bridge's own span rather than the ambient OpenTelemetry one.
+// The two are not the same trace: the ambient span belongs to the gateway's
+// internal instrumentation, while this one is what reaches the customer's
+// project and what the traces explorer shows them. Anything that has to point
+// back at a request from outside the request, such as a voice session settled
+// minutes later, has to name this one.
+//
+// An all-zeros id is never returned. It would look like a join key and match
+// every other unrecorded request.
+func CustomerTraceID(ctx context.Context) string {
+	span := activeSpanFrom(ctx)
+	if span == nil {
+		return ""
+	}
+	sc := span.SpanContext()
+	if !sc.HasTraceID() {
+		return ""
+	}
+	return sc.TraceID().String()
 }

@@ -301,6 +301,13 @@ Feature: Model default config cascade
     Then the save fails with a handled "model_default_scope_forbidden" error carrying a 403
     And no ModelDefaultConfig row is created
 
+  @unit
+  Scenario: Saving with a key that names no user is refused with a handled error
+    Given a caller whose API key carries a project but no user
+    When they save a config attached to any scope
+    Then the save fails with a handled "model_default_user_key_required" error carrying a 403
+    And the message names the two ways forward, and does not say the caller is unauthenticated
+
   @integration
   Scenario: Migration collapses pre-invariant duplicate configs per scope
     Given two configs attached to the same (ORGANIZATION, org-acme) scope
@@ -382,3 +389,27 @@ Feature: Model default config cascade
     # screen readers reach it the same way as any model id. Storing the
     # sentinel as a delete is what keeps the absence-equals-inherit
     # contract from leaking into the UI layer.
+
+  @unit
+  Scenario: A default-models write queued behind another in the organization is not aborted
+    Given a default-models write waits on the organization's advisory lock
+    When the write opens its transaction
+    Then the transaction timeout outlasts the lock queue
+    And the pool wait is budgeted separately
+    # Prisma's 5s timeout turned a write that only had to wait its turn into
+    # an unknown 500 (main budgeted timeout 20s, maxWait 10s).
+
+  @unit
+  Scenario: A project-bound access token cannot write model defaults outside its project
+    Given an organization admin's access token bound to one project, which has no key row
+    When it saves a default-model config naming the organization scope
+    Then the write is refused with model_default_scope_forbidden
+    And the application is never reached
+
+  @unit
+  Scenario: A project-bound access token cannot update or delete a model default outside its project
+    Given an organization admin's access token bound to one project
+    And a default-model config scoped to the organization
+    When it updates that config by id, empties its scopes, or deletes it by id
+    Then the write is refused with model_default_scope_forbidden
+    And the application is never reached

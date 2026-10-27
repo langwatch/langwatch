@@ -1,6 +1,10 @@
 package authresolver
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
+)
 
 // BenchmarkHashKey is the hot-path cache lookup hash. Fires on every
 // inbound request BEFORE we can serve from L1.
@@ -8,6 +12,6 @@ func BenchmarkHashKey(b *testing.B) {
 	raw := "vk-lw-01HZX0123456789ABCDEFGHIJ"
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = hashKey(raw)
+		_ = hashKey(domain.PresentedKey{Token: raw})
 	}
 }

@@ -37,7 +37,7 @@ LANGWATCH_API_KEY="your_langwatch_api_key"
 LANGWATCH_ENDPOINT="https://app.langwatch.ai"
 
 # Use curl to send the POST request, e.g.:
-curl -X POST "$LANGWATCH_ENDPOINT/api/collector" \
+curl -X POST "$LANGWATCH_ENDPOINT/api/v1/collector" \
      -H "X-Auth-Token: $LANGWATCH_API_KEY" \
      -H "Content-Type: application/json" \
      -d @- <<EOF

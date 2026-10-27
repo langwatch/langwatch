@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { PromptsApiService } from "../prompts-api.service";
-import { PromptsFacade } from "../prompts.facade";
-import { PromptsApiError } from "../errors";
+import { describe, it, expect, beforeEach, type Mock, vi } from "vitest";
 import { mock, type MockProxy } from "vitest-mock-extended";
-import { vi } from "vitest";
+
 import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
+
+import { PromptsApiError } from "../errors";
 import type { LocalPromptsService } from "../local-prompts.service";
+import { PromptsApiService } from "../prompts-api.service";
+import { PromptsFacade } from "../prompts.facade";
 
 describe("Tag CRUD", () => {
   describe("PromptsApiService", () => {
@@ -33,11 +34,15 @@ describe("Tag CRUD", () => {
 
     describe("listTags()", () => {
       describe("when listing tags succeeds", () => {
-        /** @scenario List tags calls GET /api/prompts/tags */
-        it("calls GET /api/prompts/tags", async () => {
+        /** @scenario List tags calls GET /api/v1/prompts/tags */
+        it("calls GET /api/v1/prompts/tags", async () => {
           mockGet.mockResolvedValue({
             data: [
-              { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
+              {
+                id: "ptag_prod",
+                name: "production",
+                createdAt: "2026-01-01T00:00:00.000Z",
+              },
               { id: "ptag_stg", name: "staging", createdAt: "2026-01-01T00:00:00.000Z" },
               { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
             ],
@@ -46,13 +51,17 @@ describe("Tag CRUD", () => {
 
           await service.listTags();
 
-          expect(mockGet).toHaveBeenCalledWith("/api/prompts/tags");
+          expect(mockGet).toHaveBeenCalledWith("/api/v1/prompts/tags");
         });
 
         /** @scenario List tags returns built-in and custom tags */
         it("returns the list of tags", async () => {
           const expectedTags = [
-            { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
+            {
+              id: "ptag_prod",
+              name: "production",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
             { id: "ptag_stg", name: "staging", createdAt: "2026-01-01T00:00:00.000Z" },
             { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
           ];
@@ -79,22 +88,30 @@ describe("Tag CRUD", () => {
     describe("createTag()", () => {
       describe("when creating a tag succeeds", () => {
         /** @scenario Create custom tag via SDK */
-        it("calls POST /api/prompts/tags with the tag name", async () => {
+        it("calls POST /api/v1/prompts/tags with the tag name", async () => {
           mockPost.mockResolvedValue({
-            data: { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
+            data: {
+              id: "ptag_abc",
+              name: "canary",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
             error: undefined,
           });
 
           await service.createTag({ name: "canary" });
 
           expect(mockPost).toHaveBeenCalledWith(
-            "/api/prompts/tags",
+            "/api/v1/prompts/tags",
             expect.objectContaining({ body: { name: "canary" } }),
           );
         });
 
         it("returns the created tag", async () => {
-          const expectedTag = { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" };
+          const expectedTag = {
+            id: "ptag_abc",
+            name: "canary",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          };
           mockPost.mockResolvedValue({ data: expectedTag, error: undefined });
 
           const result = await service.createTag({ name: "canary" });
@@ -118,13 +135,13 @@ describe("Tag CRUD", () => {
     describe("deleteTag()", () => {
       describe("when deleting a tag succeeds", () => {
         /** @scenario Delete custom tag via SDK */
-        it("calls DELETE /api/prompts/tags/:tag", async () => {
+        it("calls DELETE /api/v1/prompts/tags/:tag", async () => {
           mockDelete.mockResolvedValue({ data: undefined, error: undefined });
 
           await service.deleteTag("my-tag");
 
           expect(mockDelete).toHaveBeenCalledWith(
-            "/api/prompts/tags/{tag}",
+            "/api/v1/prompts/tags/{tag}",
             expect.objectContaining({ params: { path: { tag: "my-tag" } } }),
           );
         });
@@ -143,13 +160,19 @@ describe("Tag CRUD", () => {
     });
   });
 
-  describe("PromptsFacade.tags", () => {
+  describe("when calling PromptsFacade.tags", () => {
     let promptsApiService: MockProxy<PromptsApiService>;
     let facade: PromptsFacade;
     let localPromptsService: MockProxy<LocalPromptsService>;
+    let listTags: Mock;
+    let createTag: Mock;
+    let deleteTag: Mock;
 
     beforeEach(() => {
-      promptsApiService = mock<PromptsApiService>();
+      listTags = vi.fn();
+      createTag = vi.fn();
+      deleteTag = vi.fn();
+      promptsApiService = mock<PromptsApiService>({ listTags, createTag, deleteTag });
       localPromptsService = mock<LocalPromptsService>();
       facade = new PromptsFacade({
         promptsApiService,
@@ -164,42 +187,43 @@ describe("Tag CRUD", () => {
         const expectedTags = [
           { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
         ];
-        promptsApiService.listTags.mockResolvedValue(expectedTags);
+        listTags.mockResolvedValue(expectedTags);
 
         const result = await facade.tags.list();
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(promptsApiService.listTags).toHaveBeenCalled();
+        expect(listTags).toHaveBeenCalled();
         expect(result).toEqual(expectedTags);
       });
     });
 
     describe("tags.create()", () => {
       it("delegates to PromptsApiService.createTag with name", async () => {
-        const expectedTag = { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" };
-        promptsApiService.createTag.mockResolvedValue(expectedTag);
+        const expectedTag = {
+          id: "ptag_abc",
+          name: "canary",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        };
+        createTag.mockResolvedValue(expectedTag);
 
         const result = await facade.tags.create({ name: "canary" });
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(promptsApiService.createTag).toHaveBeenCalledWith({ name: "canary" });
+        expect(createTag).toHaveBeenCalledWith({ name: "canary" });
         expect(result).toEqual(expectedTag);
       });
     });
 
     describe("tags.delete()", () => {
       it("delegates to PromptsApiService.deleteTag with tag name", async () => {
-        promptsApiService.deleteTag.mockResolvedValue(undefined);
+        deleteTag.mockResolvedValue(undefined);
 
         await facade.tags.delete("my-tag");
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(promptsApiService.deleteTag).toHaveBeenCalledWith("my-tag");
+        expect(deleteTag).toHaveBeenCalledWith("my-tag");
       });
     });
   });
 
-  describe("tag type is widened to string", () => {
+  describe("when the tag type is widened to string", () => {
     it("passes an arbitrary string tag through to the API service", async () => {
       // Verifies that GetPromptOptions.tag accepts any string, not just "production"|"staging"
       // Verify the get method is called with the custom tag

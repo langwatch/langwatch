@@ -23,8 +23,8 @@ Feature: Pre-compiled Scenario Child Process
     dropped silently.
   - In development, tsx is used for fast iteration; in production, the
     pre-compiled bundle is required — packaged deployments carry no tsx
-  - Bundle output lives at dist/server/scenario-child-process.cjs relative to
-    the langwatch package root
+  - The child is its own app, @langwatch/scenario-child; its bundle lives at
+    dist/server/scenario-child-process.cjs relative to that package root
   - The build step is integrated into the existing build pipeline
 
   Background:
@@ -54,6 +54,22 @@ Feature: Pre-compiled Scenario Child Process
     When the child process build step runs
     Then the bundle requires "@opentelemetry/api" from node_modules
     And no copy of the OpenTelemetry API is inlined into the bundle
+
+  @regression
+  Scenario: An inlined dependency binds only exports the external OTEL packages still have
+    Inlining the SDK while keeping OpenTelemetry external means the SDK's OTEL
+    bindings are resolved against whatever version the application depends on,
+    not the one the SDK was published against. When those disagree about an
+    export, the child dies at module scope and every simulation fails before it
+    starts.
+
+    A missing export is invisible to a check for unresolved modules, and the
+    exit code is the same whether the child crashed on load or read its input
+    and rejected it. Only a result on stdout distinguishes the two.
+
+    When the child process build step runs
+    And a child process is started with input that is not valid job data
+    Then the child reports that it could not parse the job data
 
   @regression
   Scenario: Configuring log output does not stop a simulation starting

@@ -1,99 +1,24 @@
 # Drawers
 
-Drawers are URL-routed. Opening a drawer pushes a `drawer.open=<name>`
-query param onto the page URL; closing pops it. The shell that renders
-the drawer (`<CurrentDrawer />`, mounted once near the app root) keys
-off that param and resolves the component via `drawerRegistry`.
+Render `<Drawer title onClose footer={{ ... }}>`; the shape draws header, body and footer
+([ADR-002](../../../packages/design-system/adrs/002-overlay-and-card-shapes.md)). The raw parts
+and the trace drawer keep their own material.
 
-Always render through the shared `Drawer.Root` wrapper
-(`components/ui/drawer.tsx`), never raw Chakra. Drawers anchor to the right
-(`end`) as usual even while the Langy panel is open: the panel notices the
-open drawer and re-seats ITSELF as a floating companion card beside the
-drawer (same height, same radius, a strip of space between the two), then
-returns to its dock when the drawer closes. Nothing to do per drawer; the
-panel owns that dance. Spec: specs/langy/langy-panel-layout.feature.
+## Partly translucent header and footer
 
-This is the only pattern. Don't reach for `useState`-driven open/close
-on a new drawer — the URL form gives you:
+Ruled 2026-10-11: the body stays opaque and scrolls; the header band (header plus toolbar) and the
+footer are the card material (`bg.card` at half strength, 12px blur) laid over it, so content passes
+beneath. It is **on** by default (approved by Alex after the light and dark screenshots, 2026-10-11);
+`DRAWER_GLASS_DEFAULT` in `overlays/drawer-chrome.rules.ts` turns it off. Stories `Overlays/Drawer` Solid and Glass, light and dark,
+show the pair.
 
-- a stable deep-link (paste the URL, the drawer is open with the same target),
-- back/forward history (browser back closes the drawer),
-- shareable state for support / repro recordings,
-- no prop drilling for the open flag.
+| Concern     | Behaviour                                                                                                                                                                               |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Layout      | Header band and footer are absolute over the body, which is the one scrollport; its padding and scroll-padding follow their measured heights (`--lw-drawer-top`, `--lw-drawer-bottom`). |
+| Edge        | A 1px edge plus a faint glint shows only where content waits past it: header once scrolled, footer until the end. Off when the content fits.                                            |
+| Tokens      | `bg.drawer.chrome`, `border.drawer.edge`, `border.drawer.glint` in `config.ts`; callers never pick alpha, blur or colour.                                                               |
+| Fallbacks   | `data-reduced-graphics` and `prefers-reduced-transparency` are opaque with no blur; reduced motion drops the edge fade; forced colours draw a static system edge.                       |
+| Not covered | `bodyScroll="content"` hosts keep flex siblings and static separators until their pane gets a measured scroll port.                                                                     |
 
-## Adding a new drawer
-
-1. Add the component under `src/components/.../<MyDrawer>.tsx`. It
-   should render `Drawer.Root` with `open={true}` (the registry only
-   mounts it when active), and call `closeDrawer()` from
-   `useDrawer()` on the close trigger.
-
-2. Define the props as a single `interface Props` — the props you
-   accept become serializable URL parameters by default. Use scalar
-   types (strings, numbers, booleans) and an optional `editingId` /
-   `targetId` style identifier instead of passing full row objects.
-   Fetch the row through a tRPC query inside the drawer.
-
-   ```ts
-   interface Props {
-     editingId?: string;
-   }
-   export function MyDrawer({ editingId }: Props) {
-     const { closeDrawer } = useDrawer();
-     const dataQuery = api.x.getOne.useQuery(
-       { id: editingId ?? "" },
-       { enabled: !!editingId },
-     );
-     // ...
-   }
-   ```
-
-3. Register in `src/components/drawerRegistry.ts`:
-
-   ```ts
-   export const drawers = {
-     // ...
-     myDrawer: MyDrawer,
-   } satisfies Record<string, React.FC<any>>;
-   ```
-
-   The registry inference picks up the props automatically, so
-   `openDrawer("myDrawer", { editingId: "abc" })` is fully type-safe
-   at the call site.
-
-4. Open from any component via `useDrawer().openDrawer("myDrawer",
-   { editingId })`. The hook handles URL serialization, push vs
-   replace, and the navigation stack for back-button behavior.
-
-## Non-serializable props (rare)
-
-If a drawer genuinely needs an in-memory payload that can't be
-reconstructed from a URL parameter (e.g. a complex callback the
-caller wants to run on save), useDrawer's `complexProps` slot keeps
-it in memory and threads it to the next mount. Prefer fetching the
-data inside the drawer over this escape hatch — the URL form must
-always carry enough state to reconstitute the drawer from a paste.
-
-## Testing
-
-Drawers are mounted by `<CurrentDrawer />` outside the section that
-opens them, so component tests of the opener can assert by mocking
-`useDrawer`:
-
-```ts
-const mockOpenDrawer = vi.fn();
-vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ openDrawer: mockOpenDrawer, /* ... */ }),
-}));
-
-it("opens the drawer with the row id", () => {
-  // ...
-  expect(mockOpenDrawer).toHaveBeenCalledWith("myDrawer", {
-    editingId: "row-1",
-  });
-});
-```
-
-Full end-to-end tests (router + `CurrentDrawer` + the drawer itself)
-go in `*.integration.test.tsx` with a Next.js router mock that lets
-`useDrawer` write to the URL.
+Code: `overlays/use-drawer-chrome.ts` (measuring, edge state), `drawer-chrome.rules.ts` (pure edge
+rule), `overlays/drawer-chrome.tsx` (bands), `system/drawer.recipe.ts` (material).

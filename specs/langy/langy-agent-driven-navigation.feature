@@ -164,6 +164,87 @@ Feature: Langy opens the resource it surfaced in the browser
       Then the browser navigates to that link
       And asking to open the batch the lookup named navigates to the same link
 
+    # The shared folder runs the same CLI as the sandbox, through its own
+    # shell tool. A langwatch call is the CLI's whichever shell ran it: it is
+    # re-typed, its link remembered and its navigate intercepted the same way.
+    @unit
+    Scenario: A navigate run in the shared folder opens the resource just the same
+      Given Langy runs its commands in the folder I shared from my machine
+      When the agent looks a resource up there and then asks to open it
+      Then the browser navigates to the platform's link for that resource
+      And the navigate call draws no card of its own
+
+  Rule: An id the conversation never surfaced still resolves through the platform
+
+    # The link store is an optimization, not the source of truth. The model
+    # often chains its lookup and the open into ONE compound command, and
+    # compound stdout never seeds the store (stdout provenance), so the
+    # platform's own verified lookup must resolve the id, for every resource
+    # surface Langy opens, not only scenario runs.
+
+    @unit
+    Scenario: A chained lookup-and-open compound resolves through the platform fallback
+      Given Langy found the resource and opened it in one step
+      And the conversation never showed the user a link for it
+      When Langy asks to open a resource in this project
+      Then the user is taken to that resource, resolved with the project's own access
+
+    @unit
+    Scenario: The platform fallback resolves every resource surface Langy opens
+      When Langy asks to open a prompt, dataset, workflow, experiment, monitor, evaluator or agent the project can see
+      Then the user is taken to that resource
+      And they land on the same page the product's own links open
+
+    # The governance pages sit beside the project pages, not inside one. The
+    # sources page name used to be built under the project slug like the
+    # project pages, and that address only matches the project catch-all: a
+    # 404 wearing the project's own sidebar, which is where the governance
+    # onboarding left the user.
+    @unit
+    Scenario: An organization page opens at the top level, outside the project
+      When Langy asks to open the governance sources page
+      Then the user is taken to the inventory's sources tab at the top level, with no project slug in the address
+      And a project page name still opens under the project slug
+
+    # The link a scenario create prints is remembered only when the command's
+    # stdout is trusted, and the provenance check refuses a command whose
+    # quoted text carries parentheses. A scenario whose situation reads
+    # "(WELCOME10)" is then reachable only through the fallback.
+    @unit
+    Scenario: A scenario opens in its editor through the platform fallback
+      When Langy asks to open a scenario the project can see, and the conversation remembered no link for it
+      Then the user is taken to that scenario's editor, resolved with the project's own access
+
+    # A prompt used to open as a drawer stacked over the playground's own "no
+    # prompts open" empty state, so the page behind the form was blank and the
+    # one surface built for reading a prompt and running it was the surface the
+    # drawer covered.
+    @unit
+    Scenario: A prompt opens in the playground, ready to run
+      When Langy asks to open a prompt
+      Then the playground opens that prompt as a tab
+      And the reader can edit and run it where they landed
+
+    @unit
+    Scenario: An id the project cannot resolve drops silently
+      When a navigate instruction names an id that does not resolve in this project
+      Then no navigation happens
+      And the turn continues unaffected
+
+    # "Take me to my prompts" names a page, not a resource: there is no id to
+    # look up, so the platform resolves a closed set of page names to its own
+    # project-scoped addresses. A name outside that set is not a destination.
+
+    @unit
+    Scenario: A page name navigates to the project's own page
+      When the navigate instruction names a page such as "prompts"
+      Then the browser navigates to that page under the project's own address
+
+    @unit
+    Scenario: A name outside the page set is not a destination
+      When the navigate instruction names a word that is neither a page nor a resolvable id
+      Then no navigation happens
+
   Rule: Navigation is a live-edge instruction, fired at most once
 
     @integration

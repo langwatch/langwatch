@@ -13,22 +13,25 @@ BDD feature files describing user-facing behavior.
 A feature file should be a **complete specification** of the work:
 
 ### Feature Complete
+
 - All acceptance criteria from the issue are captured as scenarios
 - All user-visible behaviors are described
 - No gaps - if it's not in the feature file, it's not in scope
 
 ### Non-Overlapping Test Coverage
+
 Each test level has a distinct purpose (see `dev/docs/TESTING_PHILOSOPHY.md`):
 
-| Tag | Purpose | What It Tests |
-|-----|---------|---------------|
-| `@e2e` | Happy paths via real examples | Full system, no mocks |
-| `@integration` | Edge cases, error handling | Module boundaries, external services mocked |
-| `@unit` | Pure logic, branches | Single function/class, collaborators mocked |
+| Tag            | Purpose                       | What It Tests                               |
+| -------------- | ----------------------------- | ------------------------------------------- |
+| `@e2e`         | Happy paths via real examples | Full system, no mocks                       |
+| `@integration` | Edge cases, error handling    | Module boundaries, external services mocked |
+| `@unit`        | Pure logic, branches          | Single function/class, collaborators mocked |
 
 **Avoid overlap**: If an E2E test covers the happy path, don't duplicate it in integration. Integration tests edge cases. Unit tests logic branches.
 
 ### Scenario Design
+
 - One invariant per scenario
 - Scenarios should be independent
 - Focus on behavior, not implementation
@@ -41,6 +44,16 @@ Each test level has a distinct purpose (see `dev/docs/TESTING_PHILOSOPHY.md`):
 - Complete coverage plan with appropriate test levels
 
 See `dev/docs/TESTING_PHILOSOPHY.md` for detailed testing workflow and decision tree.
+
+## From issue to feature file
+
+Issues are written as Scrum stories: `As a <role>, I want <capability>, so that <benefit>` with Given/When/Then acceptance criteria and a separate Definition of Done.
+
+When an issue is picked up, the story becomes the `Feature:` narrative (the As/I want/So that lines) and each acceptance criterion becomes one `Scenario:` in the feature file.
+
+Tests bind scenarios via `/** @scenario` JSDoc annotation directly above the matching `it()` call. The binding enforces that every tagged scenario has at least one bound test.
+
+See the "Binding Scenarios to Tests" section below.
 
 ## Binding Scenarios to Tests
 
@@ -59,10 +72,10 @@ code). The `it()` description stays in whatever form the BDD describe/it tree
 requires — the annotation is what the parity checker reads.
 
 Annotations live in the normal test files (`*.unit.test.ts`, `*.integration.test.tsx`).
-One `it` block may carry multiple `@scenario` annotations if it covers several scenarios;
+One `it()` block may carry multiple `@scenario` annotations if it covers several scenarios;
 one scenario may be bound by multiple tests.
 
-The `platform/app/scripts/check-feature-parity.ts` script parses every feature file
+The `packages/architecture-enforcer/src/check-feature-parity.ts` script parses every feature file
 and fails CI if any tagged (`@unit` / `@integration` / `@e2e` / `@regression`) scenario
 has no binding. Enforcement is on by default and fails closed — a new feature file
 needs no registration anywhere. The script carries two ratcheted deny-lists instead:
@@ -78,5 +91,5 @@ scenarios, or the spec is decorative.
 Run locally:
 
 ```bash
-cd platform/app && pnpm check:feature-parity
+pnpm --filter @langwatch/architecture-enforcer check:feature-parity
 ```

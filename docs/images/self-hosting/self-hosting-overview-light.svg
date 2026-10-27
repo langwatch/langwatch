@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 790" width="1280" height="790" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Self-hosted LangWatch: every component runs in your environment">
+<title>Self-hosted LangWatch: every component runs in your environment</title>
+<defs><marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/></marker><marker id="head-out" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#e17100"/></marker><marker id="head-start" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/></marker><marker id="head-out-start" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#e17100"/></marker></defs>
+<rect width="1280" height="790" fill="#ffffff"/>
+<text x="24" y="42" font-size="22" font-weight="700" fill="#1d293d" text-anchor="start">Self-hosted LangWatch: every component runs in your environment</text>
+<rect x="16" y="62" width="1248" height="552" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="32" y="86" font-size="14.5" font-weight="600" fill="#52637a" text-anchor="start">Your cloud account or data centre</text>
+<rect x="296" y="96" width="716" height="500" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="312" y="120" font-size="14.5" font-weight="600" fill="#52637a" text-anchor="start">Your Kubernetes cluster, installed with the LangWatch Helm chart</text>
+<rect x="36" y="124" width="172" height="88" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="122" y="154.75" font-size="15" font-weight="650" fill="#1d293d" text-anchor="middle">Coding tools,</text>
+<text x="122" y="173.75" font-size="15" font-weight="650" fill="#1d293d" text-anchor="middle">LLM clients</text>
+<text x="122" y="194.25" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">optional</text>
+<rect x="36" y="244" width="172" height="88" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="122" y="275" font-size="15" font-weight="650" fill="#1d293d" text-anchor="middle">Your agents</text>
+<text x="122" y="295.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">any framework,</text>
+<text x="122" y="314" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">OpenTelemetry</text>
+<rect x="36" y="364" width="172" height="88" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="122" y="395" font-size="15" font-weight="650" fill="#1d293d" text-anchor="middle">Your team</text>
+<text x="122" y="415.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">browser,</text>
+<text x="122" y="434" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">your single sign-on</text>
+<rect x="316" y="134" width="236" height="76" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="434" y="168.75" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">AI Gateway (optional)</text>
+<text x="434" y="189.25" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">virtual keys, budgets, routing</text>
+<rect x="316" y="240" width="676" height="176" rx="14" fill="#ffffff" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="332" y="264" font-size="14.5" font-weight="600" fill="#9a4a00" text-anchor="start">LangWatch services</text>
+<rect x="332" y="278" width="122" height="122" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="393" y="327" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">App</text>
+<text x="393" y="347" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">UI, API,</text>
+<text x="393" y="365" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">trace ingestion</text>
+<rect x="462" y="278" width="122" height="122" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="523" y="327" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">Workers</text>
+<text x="523" y="347" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">pipeline,</text>
+<text x="523" y="365" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">PII redaction</text>
+<rect x="592" y="278" width="122" height="122" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="653" y="327" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">LangEvals</text>
+<text x="653" y="347" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">evaluators,</text>
+<text x="653" y="365" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">guardrails</text>
+<rect x="722" y="278" width="122" height="122" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="783" y="327" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">NLP</text>
+<text x="783" y="347" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">workflows,</text>
+<text x="783" y="365" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">playground</text>
+<rect x="852" y="278" width="122" height="122" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="913" y="326" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">Langy</text>
+<text x="913" y="346" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">(optional)</text>
+<text x="913" y="366" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">assistant</text>
+<rect x="316" y="452" width="676" height="128" rx="14" fill="#ffffff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="332" y="476" font-size="14.5" font-weight="600" fill="#1e4b8f" text-anchor="start">Data stores: in the cluster, or managed services in your account</text>
+<rect x="332" y="490" width="155" height="74" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="409.5" y="524" font-size="15.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">PostgreSQL</text>
+<text x="409.5" y="543.5" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">users, settings</text>
+<rect x="495" y="490" width="155" height="74" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="572.5" y="524" font-size="15.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">ClickHouse</text>
+<text x="572.5" y="543.5" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">traces, evaluations</text>
+<rect x="658" y="490" width="155" height="74" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="735.5" y="524" font-size="15.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">Redis</text>
+<text x="735.5" y="543.5" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">queue, cache</text>
+<rect x="821" y="490" width="155" height="74" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="898.5" y="524" font-size="15.5" font-weight="650" fill="#1e4b8f" text-anchor="middle">Object storage</text>
+<text x="898.5" y="543.5" font-size="12.5" font-weight="400" fill="#52637a" text-anchor="middle">older data, backups</text>
+<rect x="1042" y="134" width="204" height="282" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="1144" y="206.25" font-size="16" font-weight="650" fill="#1d293d" text-anchor="middle">Model providers</text>
+<text x="1144" y="226.25" font-size="16" font-weight="650" fill="#1d293d" text-anchor="middle">you configure</text>
+<text x="1144" y="246.75" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">OpenAI, Anthropic,</text>
+<text x="1144" y="265.25" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">Azure OpenAI, Bedrock,</text>
+<text x="1144" y="283.75" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">Vertex AI, your own</text>
+<text x="1144" y="302.25" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">endpoints</text>
+<text x="1144" y="320.75" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle"></text>
+<text x="1144" y="339.25" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">called with your keys,</text>
+<text x="1144" y="357.75" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">under your contracts</text>
+<path d="M208 168 L314 168" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<rect x="213.825" y="141.5" width="76.35000000000001" height="21" rx="4" fill="#ffffff"/>
+<text x="252" y="156.68" font-size="13" font-weight="500" fill="#52637a" text-anchor="middle">LLM calls</text>
+<path d="M208 300 L330 300" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<rect x="224.55" y="273.5" width="54.900000000000006" height="21" rx="4" fill="#ffffff"/>
+<text x="252" y="288.68" font-size="13" font-weight="500" fill="#52637a" text-anchor="middle">traces</text>
+<path d="M208 388 L330 388" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<rect x="228.125" y="361.5" width="47.75" height="21" rx="4" fill="#ffffff"/>
+<text x="252" y="376.68" font-size="13" font-weight="500" fill="#52637a" text-anchor="middle">HTTPS</text>
+<path d="M552 172 L1040 172" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<rect x="661.3" y="161.5" width="269.40000000000003" height="21" rx="4" fill="#ffffff"/>
+<text x="796" y="176.68" font-size="13" font-weight="500" fill="#52637a" text-anchor="middle">model calls, with your provider keys</text>
+<path d="M992 310 L1040 310" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<path d="M654 416 L654 450" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<rect x="663.95" y="423.5" width="112.10000000000001" height="21" rx="4" fill="#f1f5f9"/>
+<text x="720" y="438.68" font-size="13" font-weight="500" fill="#52637a" text-anchor="middle">read and write</text>
+<path d="M992 372 L1017 372 Q1027 372 1027 382 L1027 668" fill="none" stroke="#e17100" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#head-out)"/>
+<rect x="989.8" y="623.5" width="74.4" height="21" rx="4" fill="#ffffff"/>
+<text x="1027" y="638.68" font-size="13" font-weight="600" fill="#e17100" text-anchor="middle">optional</text>
+<rect x="900" y="670" width="346" height="100" rx="10" fill="#fff7ed" stroke="#e17100" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="1073" y="708" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">LangWatch cloud</text>
+<text x="1073" y="728" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">nothing is required to reach it:</text>
+<text x="1073" y="746" font-size="13" font-weight="400" fill="#52637a" text-anchor="middle">an offline license key works without it</text>
+<text x="24" y="652" font-size="15" font-weight="700" fill="#1d293d" text-anchor="start">The only connections to LangWatch (dashed, all optional)</text>
+<text x="24" y="680" font-size="14" font-weight="700" fill="#e17100" text-anchor="start">1</text>
+<text x="44" y="680" font-size="14" font-weight="400" fill="#52637a" text-anchor="start">Daily usage report: counts and the version. No trace content. One setting turns it off.</text>
+<text x="24" y="704" font-size="14" font-weight="700" fill="#e17100" text-anchor="start">2</text>
+<text x="44" y="704" font-size="14" font-weight="400" fill="#52637a" text-anchor="start">License sync: once a day, only for a license that includes hosted services.</text>
+<text x="24" y="728" font-size="14" font-weight="700" fill="#e17100" text-anchor="start">3</text>
+<text x="44" y="728" font-size="14" font-weight="400" fill="#52637a" text-anchor="start">Instant Evals and managed models: hosted services that carry content. Off unless the</text>
+<text x="44" y="752" font-size="14" font-weight="400" fill="#52637a" text-anchor="start">license includes them, and an admin can switch them off. One setting stops every call.</text>
+</svg>

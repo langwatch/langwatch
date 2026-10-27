@@ -31,6 +31,20 @@ Feature: Gateway errors are logged with fault attribution
     When the gateway forwards the rejection to the client
     Then an info log records the failure with customer fault, status and message
 
+  # The forwarded response holds the provider's own sentence, and the log line
+  # held only our summary of it ("codex backend HTTP 400"). A production outage
+  # on codex models took a live probe of the backend to name, because the one
+  # place an operator looks never carried the reply that said "Unsupported
+  # parameter: prompt_cache_retention".
+  @unit
+  Scenario: A forwarded provider rejection names the provider's own reason
+    Given the upstream provider rejects the request with a reason in its body
+    When the gateway forwards the rejection to the client
+    Then the operator reads that reason next to the status
+    And a rejection worded in any of the ways providers word it reads the same
+    And a body that states no reason is described, never quoted, so nothing the customer sent can reach the log
+    And a reason our own message already states is not repeated
+
   @unit
   Scenario: A gateway-classified error is logged by its error code
     Given the gateway rejects or fails a request with one of its own error codes
@@ -101,3 +115,13 @@ Feature: Gateway errors are logged with fault attribution
     When the error response is written
     Then the response and the log are unaffected
     And nothing panics for want of a recorder
+
+  # A caller that disconnects cancels the request's context, and the error
+  # that surfaces is context.Canceled. That is the caller going away, not a
+  # failure of ours, and it must not read as an unknown platform fault.
+  @unit
+  Scenario: A request the client abandoned is logged at info, not as a platform fault
+    Given a request whose caller disconnected, so it failed with a canceled context
+    When the error response is written
+    Then it is answered and logged as an abandoned request, not as an unhandled error
+    And neither the failure line nor the request completion line is at error level

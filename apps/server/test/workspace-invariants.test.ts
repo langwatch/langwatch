@@ -1,0 +1,382 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+// ADR-076 invariants. Cheap to state, expensive to lose.
+
+const repoRoot = join(__dirname, "..", "..", "..");
+
+function readJson(relPath: string): Record<string, unknown> {
+  return JSON.parse(readFileSync(join(repoRoot, relPath), "utf8"));
+}
+
+function gitLsFiles(pattern: string): string[] {
+  return execFileSync("git", ["ls-files", pattern], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter(Boolean);
+}
+
+/**
+ * The `packages:` list from pnpm-workspace.yaml, via a line scan rather
+ * than a YAML parser — not worth a devDependency for one test, and an
+ * empty result fails loudly on the assertions below.
+ */
+function workspaceMembers(): string[] {
+  const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
+  const start = lines.findIndex((l) => l.trimEnd() === "packages:");
+  if (start === -1) return [];
+
+  const members: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    const entry = /^\s+-\s+"?([^"#]+?)"?\s*$/.exec(line);
+    if (entry?.[1]) {
+      members.push(entry[1]);
+      continue;
+    }
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
+    break; // the next top-level key ends the list
+  }
+  return members;
+}
+
+/** The keys of the root `overrides:` block, same line-scan approach. */
+function rootOverrideKeys(): string[] {
+  const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
+  const start = lines.findIndex((l) => l.trimEnd() === "overrides:");
+  if (start === -1) return [];
+
+  const keys: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
+    if (!/^\s/.test(line)) break; // next top-level key
+    const m = /^\s+"?([^"]+?)"?:/.exec(line);
+    if (m?.[1]) keys.push(m[1]);
+  }
+  return keys;
+}
+
+/** Every package.json the repo tracks, excluding installed dependencies. */
+function trackedManifests(): string[] {
+  return execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "*package.json"],
+    { cwd: repoRoot, encoding: "utf8" },
+  )
+    .split("\n")
+    .filter(Boolean)
+    .filter((p) => !p.includes("node_modules") && existsSync(join(repoRoot, p)));
+}
+
+/** Directory of a manifest, "" for the root one. */
+function manifestDir(manifest: string): string {
+  return manifest.replace(/\/?package\.json$/, "");
+}
+
+/** Whether dir is a workspace member per the `packages:` globs. */
+function isWorkspaceMember(dir: string): boolean {
+  if (dir === "") return false;
+  const directoryParts = dir.split("/");
+  return workspaceMembers().some((glob) => {
+    const globParts = glob.split("/");
+    return (
+      globParts.length === directoryParts.length &&
+      globParts.every((part, index) => part === "*" || part === directoryParts[index])
+    );
+  });
+}
+
+const installRulesSchema = z.object({
+  pnpm: z.record(z.string(), z.unknown()).optional(),
+  resolutions: z.record(z.string(), z.unknown()).optional(),
+});
+
+const dependenciesSchema = z.object({
+  dependencies: z.record(z.string(), z.string()).optional(),
+  devDependencies: z.record(z.string(), z.string()).optional(),
+});
+
+/** Install rules a member carries that pnpm honours only in the root manifest. */
+function memberInstallRules(): string[] {
+  return trackedManifests()
+    .filter((manifest) => manifest !== "package.json")
+    .flatMap((manifest) => {
+      const pkg = installRulesSchema.parse(readJson(manifest));
+      const rules = Object.keys(pkg.pnpm ?? {}).map((key) => `${manifest}: pnpm.${key}`);
+      return pkg.resolutions === undefined ? rules : [...rules, `${manifest}: resolutions`];
+    });
+}
+
+/** Every workspace member's dependency on a package that lives in this repo, bar the SDK. */
+function memberInternalDependencies(): { manifest: string; name: string; spec: string }[] {
+  const internalNames = new Set(
+    trackedManifests()
+      .map((m) => readJson(m).name)
+      .filter((n): n is string => typeof n === "string"),
+  );
+  return trackedManifests()
+    .filter((manifest) => isWorkspaceMember(manifestDir(manifest)))
+    .flatMap((manifest) => {
+      const pkg = dependenciesSchema.parse(readJson(manifest));
+      return Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })
+        .filter(([name]) => internalNames.has(name) && name !== "langwatch")
+        .map(([name, spec]) => ({ manifest, name, spec }));
+    });
+}
+
+describe("the repo is a single pnpm workspace", () => {
+  describe("when the lockfiles are counted", () => {
+    /** @scenario The repo holds one lockfile */
+    it("finds exactly one, at the repo root", () => {
+      expect(gitLsFiles("*pnpm-lock.yaml")).toEqual(["pnpm-lock.yaml"]);
+    });
+  });
+
+  describe("when the workspace definition is read", () => {
+    /** @scenario Projects that used to opt out of the workspace no longer do */
+    it("lists every JavaScript project the repo used to install separately", () => {
+      const members = workspaceMembers();
+
+      for (const project of [
+        "apps/*",
+        "sdks/typescript",
+        "mcp/typescript",
+        "skills",
+        "dev/tests/agentic-e2e",
+      ]) {
+        expect(members).toContain(project);
+      }
+    });
+
+    /** @scenario The repo holds one lockfile */
+    it("keeps the workspace definition at the repo root and nowhere else", () => {
+      expect(gitLsFiles("*pnpm-workspace.yaml")).toEqual(["pnpm-workspace.yaml"]);
+    });
+  });
+
+  describe("when the package names are compared", () => {
+    /** @scenario The application and the SDK no longer share a package name */
+    it("gives each process the image and the app archive install the name they filter by, and the SDK its own", () => {
+      const deployables = ["apps/backend", "apps/tasks"].map((dir) =>
+        String(readJson(`${dir}/package.json`).name),
+      );
+      const sdk = readJson("sdks/typescript/package.json").name;
+      const prune = readFileSync(join(repoRoot, "infra/docker/prune-runtime-tree.sh"), "utf8");
+
+      // pnpm exits 0 on a filter that matches nothing, so a rename the production install misses
+      // ships a tree without that process's dependencies, which fails only at boot.
+      for (const name of deployables) expect(prune).toContain(`--filter-prod "${name}..."`);
+      expect(sdk).toBe("langwatch");
+      expect(deployables).not.toContain(sdk);
+    });
+
+    /** @scenario The application links the SDK working copy */
+    it("links the SDK working copy rather than a published release", () => {
+      // The invariant is asserted where the specifier lives: every
+      // `langwatch` dependency names the working copy, so an SDK edit
+      // reaches the applications and the production image without a
+      // publish. `linkWorkspacePackages` stays false otherwise.
+      const specifiers = execFileSync(
+        "git",
+        ["grep", "-h", "--", '"langwatch": "', "--", "packages", "apps"],
+        { cwd: repoRoot, encoding: "utf8" },
+      )
+        .split("\n")
+        .filter((line) => line.trim().startsWith('"langwatch":'));
+
+      expect(specifiers.length).toBeGreaterThan(0);
+      for (const line of specifiers) {
+        expect(line).toMatch(/"langwatch":\s*"workspace:/);
+      }
+    });
+
+    /** @scenario The SDK carries its own copy of a pinned dependency */
+    it("bundles zod into the SDK instead of importing it from the consumer", () => {
+      const bundle = join(repoRoot, "sdks/typescript/dist/index.mjs");
+      if (!existsSync(bundle)) return; // dist is a build artefact, not tracked
+
+      // The link above is only survivable because of this. Left external, a
+      // consumer-selected incompatible Zod runtime could replace the SDK's
+      // tested runtime and fail at first import, taking down the app rather
+      // than only the SDK path.
+      const source = readFileSync(bundle, "utf8");
+      const externalZodImports = source.match(/from\s*["']zod(?:\/[^"']*)?["']/g);
+
+      expect(externalZodImports ?? []).toEqual([]);
+    });
+  });
+
+  describe("when a member carries install configuration of its own", () => {
+    /** @scenario No project keeps a dependency rule that no longer applies */
+    it("finds no member holding dependency rules pnpm would ignore", () => {
+      // pnpm honours these only in the workspace ROOT manifest: the whole
+      // `pnpm` block (overrides, packageExtensions, onlyBuiltDependencies,
+      // patchedDependencies, ...) and yarn-style `resolutions`. One left in
+      // a member looks like an active pin and does nothing — which is
+      // exactly how the six old roots drifted apart.
+      expect(memberInstallRules()).toEqual([]);
+    });
+
+    /** @scenario No project keeps a dependency rule that no longer applies */
+    it("finds no .npmrc outside the repo root", () => {
+      // An .npmrc is read from the install root, which is the repo root
+      // now. A member one is dead config that still READS as active —
+      // skills/.npmrc held a release-age exemption for @langwatch/scenario
+      // that silently stopped applying the day the roots merged.
+      expect(gitLsFiles("*.npmrc")).toEqual([".npmrc"]);
+    });
+  });
+
+  describe("when the root overrides are read", () => {
+    /** @scenario A pin that suits one project is not forced onto the others */
+    it("carries no unconditional pin for the packages the projects disagree on", () => {
+      // Three projects legitimately sit on different zod majors (app 3.x,
+      // SDK 4.0, MCP server 4.3) via their own direct dependency — an
+      // unconditional root pin (no `@range` selector) would drag them onto
+      // one version, so a future merge adding one back must fail here.
+      const disputed = ["zod", "@opentelemetry/api-logs", "@opentelemetry/sdk-logs"];
+      const unconditional = rootOverrideKeys().filter((k) => !k.replace(/^@/, "").includes("@"));
+
+      // Guards the guard: the parser returning nothing would pass
+      // vacuously. The alignment block genuinely holds unconditional keys.
+      expect(unconditional.length).toBeGreaterThan(3);
+
+      for (const name of disputed) {
+        expect(unconditional, `root overrides pin ${name} for every project`).not.toContain(name);
+      }
+    });
+  });
+
+  describe("when a member depends on an internal package", () => {
+    /** @scenario A shared internal package is reachable from every project */
+    it("resolves every internal dependency to the working copy", () => {
+      // Generalised over every member and internal name: any dependency on
+      // a package that lives in this repo must take the working copy. The
+      // one exception is `langwatch` (the published SDK), consumed from
+      // the registry on purpose (see "keeps the app on the published SDK").
+      const internalDependencies = memberInternalDependencies();
+      const internalDepsSeen = internalDependencies.length;
+      const offenders = internalDependencies
+        .filter(({ spec }) => !spec.startsWith("workspace:"))
+        .map(({ manifest, name, spec }) => `${manifest}: ${name} -> ${spec}`);
+
+      // Guards the guard: zero internal dependencies found would mean the
+      // scan is broken, not that the repo is clean.
+      expect(internalDepsSeen).toBeGreaterThan(5);
+      expect(offenders).toEqual([]);
+    });
+  });
+
+  describe("when the published package manifest is read", () => {
+    /** @scenario "The self-host command remains compatible" */
+    it("keeps publishing ownership in apps/server", () => {
+      const root = readJson("package.json") as {
+        name?: string;
+        private?: boolean;
+        bin?: Record<string, string>;
+        files?: string[];
+      };
+      const server = readJson("apps/server/package.json") as {
+        name?: string;
+        private?: boolean;
+        bin?: Record<string, string>;
+      };
+
+      expect(root.name).toBe("@langwatch/workspace");
+      expect(root.private).toBe(true);
+      expect(root.bin).toBeUndefined();
+      expect(root.files).toBeUndefined();
+      expect(server.name).toBe("@langwatch/server");
+      expect(server.private).not.toBe(true);
+      expect(server.bin).toEqual({ "langwatch-server": "dist/cli.cjs" });
+    });
+  });
+
+  describe("when the applications are started from a fresh clone", () => {
+    const ensureBuilt = "pnpm run ensure:built";
+
+    /** @scenario A fresh clone starts the applications without a manual build step */
+    it("hooks the bundle build onto every application's dev script", () => {
+      for (const app of ["apps/ui", "apps/api", "apps/worker"]) {
+        const scripts = readJson(`${app}/package.json`).scripts as Record<string, string>;
+        expect(scripts.dev).toBeDefined();
+        expect(scripts.predev).toBe("pnpm -w run ensure:built");
+      }
+    });
+
+    /** @scenario A fresh clone starts the applications without a manual build step */
+    it("leaves only generation in the repository's file-generation step", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+
+      // The two bundles are the only workspace packages consumed as `dist`;
+      // everything else exports its own `src`. Building them inside the
+      // generator chain made a build a thing you had to know to run.
+      expect(scripts["start:prepare:files"]).not.toMatch(/--filter\s+langwatch\s+build/);
+      expect(scripts["start:prepare:files"]).not.toMatch(/mcp-server\s+build/);
+      expect(scripts["ensure:built"]).toMatch(
+        /nx run-many -t build -p langwatch,@langwatch\/mcp-server,@langwatch\/ksuid,@langwatch\/mail/,
+      );
+    });
+
+    /** @scenario A fresh worktree prepares its databases without a manual bundle build */
+    it("builds every dist bundle before the root database preparation, which production does not run", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+      expect(scripts["start:prepare:db"]).toMatch(new RegExp(`^${ensureBuilt} && `));
+      const apiScripts = readJson("apps/api/package.json").scripts as Record<string, string>;
+      expect(apiScripts["start:prepare:db"]).not.toContain("ensure:built");
+    });
+
+    /** @scenario A fresh worktree prepares its databases without a manual bundle build */
+    it("builds the bundles before every root entry to the migration tasks, never in the tasks app", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+      for (const name of ["task", "prisma:migrate", "clickhouse:migrate"]) {
+        expect(scripts[name]).toMatch(new RegExp(`^${ensureBuilt} && `));
+      }
+      const tasksScripts = readJson("apps/tasks/package.json").scripts as Record<string, string>;
+      expect(JSON.stringify(tasksScripts)).not.toContain("ensure:built");
+    });
+
+    /** @scenario "The root migrate scripts are aliases of the upgrade command" */
+    it("makes the root migrate scripts aliases of the upgrade command whose tasks no workflow runs", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+      for (const name of ["prisma:migrate", "clickhouse:migrate"]) {
+        expect(scripts[name]).toMatch(new RegExp(`^${ensureBuilt} && .*task upgrade$`));
+        expect(scripts[name]).not.toMatch(/prisma-migrate|clickhouse-migrate/);
+      }
+      const workflows = join(repoRoot, ".github/workflows");
+      for (const file of readdirSync(workflows)) {
+        const source = readFileSync(join(workflows, file), "utf8");
+        expect(source, file).not.toMatch(/task\s+(prisma|clickhouse)-migrate/);
+      }
+    });
+
+    /** @scenario A stale SDK build is rebuilt before the browser application starts */
+    it("decides by comparing the bundle against the source it was built from", () => {
+      const nx = z
+        .object({
+          targetDefaults: z.object({
+            build: z.array(
+              z.object({
+                filter: z.object({ projects: z.array(z.string()).optional() }).optional(),
+                outputs: z.array(z.string()).optional(),
+              }),
+            ),
+          }),
+        })
+        .parse(readJson("nx.json"));
+
+      // Nx's cache compares the build's inputs against the outputs it last produced.
+      const sdk = nx.targetDefaults.build.find((entry) =>
+        entry.filter?.projects?.includes("langwatch"),
+      );
+      expect(sdk?.outputs).toContain("{projectRoot}/dist");
+    });
+  });
+});

@@ -1,0 +1,61 @@
+/**
+ * Secrets more than one owner holds: one handle each, claimed by instance, so a
+ * double claim passes only for this very handle (ARCHITECTURE.md §6, layer 3).
+ */
+import { Secret } from "./secret.ts";
+
+/** The browser-session key: auth builds sessions from it, automation signs unsubscribe links. */
+export const sessionSecret = Secret.load("NEXTAUTH_SECRET", { optional: true });
+
+/** The stored-credential key: stores seal with it, scim peppers directory token digests with it. */
+export const credentialsSecret = Secret.load("CREDENTIALS_SECRET", { optional: true });
+
+/**
+ * The value CREDENTIALS_SECRET held before a rotation. It only reads: stores open old values
+ * with it, api-key, scim and slack match old hashes with it, and nothing is written under it.
+ */
+export const credentialsSecretPrevious = Secret.load("CREDENTIALS_SECRET_PREVIOUS", {
+  optional: true,
+});
+
+/** Signs calls to the gateway's internal surface: gateway checks, governance's OTTL signs. */
+export const gatewayInternalSecret = Secret.load("LW_GATEWAY_INTERNAL_SECRET", { optional: true });
+
+/** The hash pepper: gateway peppers virtual keys with it, governance its ingestion secrets. */
+export const virtualKeyPepper = Secret.load("LW_VIRTUAL_KEY_PEPPER", { optional: true });
+
+/** The engine hop's shared credential: the process and every module calling the engine. */
+export const nlpInternalSecret = Secret.load("LANGWATCH_NLP_INTERNAL_SECRET", { optional: true });
+
+/**
+ * The telemetry exporter's collector headers: the process's exporter sends with
+ * them, rum falls back to them while `OTEL_EXPORTER_OTLP_*` is deprecated for it.
+ */
+export const telemetryExporterHeaders = Secret.load("OTEL_EXPORTER_OTLP_HEADERS", {
+  optional: true,
+});
+
+/**
+ * The platform's own OpenAI key: model-provider dispatches on it, evaluation
+ * reads it, sample-agents' demo bot spends it.
+ */
+export const openAiApiKey = Secret.load("OPENAI_API_KEY", { optional: true });
+
+/**
+ * LangWatch's own sign-ups Slack webhook, never a customer's: organization,
+ * auth and identity announce there; billing falls back to it.
+ */
+export const internalSlackSignupsWebhook = Secret.load("SLACK_CHANNEL_SIGNUPS", { optional: true });
+
+/** Each sign-in provider's client secret: auth mounts them, sso reports whether one mounted. */
+export const signInProviderSecrets = {
+  googleClientSecret: Secret.load("GOOGLE_CLIENT_SECRET", { optional: true }),
+  githubClientSecret: Secret.load("GITHUB_CLIENT_SECRET", { optional: true }),
+  gitlabClientSecret: Secret.load("GITLAB_CLIENT_SECRET", { optional: true }),
+  azureAdClientSecret: Secret.load("AZURE_AD_CLIENT_SECRET", { optional: true }),
+  auth0ClientSecret: Secret.load("AUTH0_CLIENT_SECRET", { optional: true }),
+  oktaClientSecret: Secret.load("OKTA_CLIENT_SECRET", { optional: true }),
+  cognitoClientSecret: Secret.load("COGNITO_CLIENT_SECRET", { optional: true }),
+  oneLoginClientSecret: Secret.load("ONELOGIN_CLIENT_SECRET", { optional: true }),
+  oidcClientSecret: Secret.load("OIDC_CLIENT_SECRET", { optional: true }),
+} as const;

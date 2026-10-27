@@ -1,7 +1,9 @@
 import { defineConfig } from "vitest/config";
 
+// Unit lane. The live-service lanes are vitest.integration.config.js and
+// vitest.scenario.config.js; `pnpm test` never reaches either.
 export default defineConfig({
   test: {
-    testTimeout: 60 * 60 * 1000, // 1 hour
+    include: ["src/**/*.unit.test.ts"],
   },
 });

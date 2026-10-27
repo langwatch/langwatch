@@ -61,8 +61,9 @@ order. `--kinds model_call,compaction` narrows it.
 `langwatch ingest hook <tool>` is the command a coding agent runs at the start
 and end of a session. It reports the repository, branch and worktree the session
 is working in, so the agent's traces can be joined to the code they touched.
-This plugin ships that hook, so an installed plugin needs nothing on PATH for
-the capture to happen.
+This plugin's hooks run that command from the installed `langwatch` CLI, so the
+capture needs the CLI installed and signed in, and a hook fix arrives with the
+next CLI release.
 
 Nothing here sends the user's code anywhere. The hook reports repository
 identity, not file contents.

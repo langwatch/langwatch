@@ -22,22 +22,220 @@ import (
 // are modeled; everything else in a workflow is deliberately ignored.
 type Step struct {
 	Name string            `yaml:"name"`
+	If   string            `yaml:"if"`
 	Uses string            `yaml:"uses"`
 	With map[string]any    `yaml:"with"`
 	Env  map[string]string `yaml:"env"`
+
+	// UsesComment is the trailing `# <version>` comment on the `uses:` line.
+	// yaml keeps it on the node but drops it from Uses, and the pin guard needs
+	// it to assert every SHA pin documents the version it points at. Empty when
+	// the line carries no comment. Populated by UnmarshalYAML from the decoded
+	// node, so — unlike a raw text scan — it is immune to a quoted value and to
+	// `uses:` text that appears inside a run: script rather than as a real step.
+	UsesComment string `yaml:"-"`
+
+	// Line and EndLine are the 1-based source lines the step's mapping starts
+	// and ends on, so a guard can attribute raw-text findings to the step that
+	// holds them. EndLine is the last line any of the step's nodes starts on,
+	// which undercounts a trailing multi-line block scalar; a guard reading it
+	// to permit lines therefore errs towards reporting, never towards hiding.
+	Line    int `yaml:"-"`
+	EndLine int `yaml:"-"`
 }
 
-// Job is one entry under `jobs:`.
+// UnmarshalYAML decodes the modeled step fields, then separately recovers the
+// trailing comment on the `uses:` line so the pin guard can read it.
+func (s *Step) UnmarshalYAML(node *yaml.Node) error {
+	type plainStep Step
+	var plain plainStep
+	if err := node.Decode(&plain); err != nil {
+		return err
+	}
+	*s = Step(plain)
+	s.UsesComment = usesLineComment(node)
+	s.Line = node.Line
+	s.EndLine = lastLine(node)
+
+	return nil
+}
+
+// lastLine returns the greatest start line of node and its descendants.
+func lastLine(node *yaml.Node) int {
+	last := node.Line
+	for _, child := range node.Content {
+		if line := lastLine(child); line > last {
+			last = line
+		}
+	}
+
+	return last
+}
+
+// GrantsWrite reports whether the block grants write on scope, counting the
+// write-all shorthand.
+func (p Permissions) GrantsWrite(scope string) bool {
+	return p.Shorthand == "write-all" || p.Scopes[scope] == "write"
+}
+
+// Declared reports whether a permissions block was written at all.
+func (p Permissions) Declared() bool {
+	return p.Scopes != nil || p.Shorthand != ""
+}
+
+// EffectivePermissions returns the job's own permissions block when it
+// declares one, else the workflow-level block: GitHub replaces, never merges,
+// the workflow block with a job-level one.
+func (w *Workflow) EffectivePermissions(jobName string) Permissions {
+	if job, ok := w.Jobs[jobName]; ok && job.Permissions.Declared() {
+		return job.Permissions
+	}
+
+	return w.Permissions
+}
+
+// usesLineComment returns the trailing comment on the mapping's `uses:` entry,
+// with the leading `#` and surrounding space stripped, or "" when there is
+// none. yaml attaches a same-line trailing comment to the value node; some
+// shapes leave it on the key, so both are checked.
+func usesLineComment(mapping *yaml.Node) string {
+	if mapping.Kind != yaml.MappingNode {
+		return ""
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		key, value := mapping.Content[i], mapping.Content[i+1]
+		if key.Value != "uses" {
+			continue
+		}
+		for _, raw := range []string{value.LineComment, key.LineComment} {
+			if comment := strings.TrimSpace(strings.TrimPrefix(raw, "#")); comment != "" {
+				return comment
+			}
+		}
+	}
+
+	return ""
+}
+
+// Job is one entry under `jobs:`. If is the job-level `if:` condition, read as
+// literal text rather than evaluated — a guard's job is to notice a gate
+// clause disappearing, not to re-implement GitHub's expression language.
+// Permissions is the job's own `permissions:` block, which GitHub uses to
+// replace (not merge with) the workflow-level block when present.
 type Job struct {
-	Name  string `yaml:"name"`
-	Steps []Step `yaml:"steps"`
+	Name        string      `yaml:"name"`
+	If          string      `yaml:"if"`
+	Permissions Permissions `yaml:"permissions"`
+	Steps       []Step      `yaml:"steps"`
+}
+
+// PullRequest is the `on.pull_request` trigger and the event types that fire
+// it.
+type PullRequest struct {
+	Types []string `yaml:"types"`
+}
+
+// On models the workflow `on:` triggers the guards read. Only pull_request is
+// modeled, because that is the trigger whose event types a guard asserts.
+type On struct {
+	PullRequest PullRequest `yaml:"pull_request"`
+}
+
+// UnmarshalYAML decodes the mapping form of `on:` and tolerates GitHub's
+// shorthand forms — `on: [push]` (a sequence) and `on: push` (a scalar) — by
+// yielding no trigger data instead of an error. LoadAll parses every workflow
+// in the repo, so a single file written in shorthand must not fail the guards
+// that only read some other workflow.
+func (o *On) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return nil
+	}
+	type plainOn On
+	var plain plainOn
+	if err := node.Decode(&plain); err != nil {
+		return err
+	}
+	*o = On(plain)
+
+	return nil
+}
+
+// Concurrency models the workflow-level `concurrency:` block: the group runs
+// share, and whether a superseded run is canceled.
+type Concurrency struct {
+	Group            string `yaml:"group"`
+	CancelInProgress any    `yaml:"cancel-in-progress"`
+}
+
+// UnmarshalYAML decodes the mapping form of `concurrency:` and tolerates the
+// scalar shorthand — `concurrency: some-group` — by yielding no data instead
+// of an error, so a workflow written that way does not fail a LoadAll that
+// only needs some other file.
+func (c *Concurrency) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return nil
+	}
+	type plainConcurrency Concurrency
+	var plain plainConcurrency
+	if err := node.Decode(&plain); err != nil {
+		return err
+	}
+	*c = Concurrency(plain)
+
+	return nil
+}
+
+// CancelsInProgress reports whether cancel-in-progress is set to true,
+// accepting YAML's unquoted form and the quoted string form. Anything absent,
+// false, or not recognizably true — a typo like `ture` included — reads as
+// false, which is exactly what the guard needs to know: a superseded run is
+// left alive.
+func (c Concurrency) CancelsInProgress() bool {
+	switch typed := c.CancelInProgress.(type) {
+	case bool:
+		return typed
+	case string:
+		return strings.EqualFold(typed, "true")
+	}
+
+	return false
+}
+
+// Permissions models a `permissions:` block at either workflow or job level.
+// GitHub accepts either a per-scope mapping (`contents: write`) or a shorthand
+// string (`read-all` / `write-all`); modeling only the mapping form turned
+// the shorthand into a decode error that failed LoadAll for every guard —
+// the same failure mode On and Concurrency were fixed for. Scopes holds the
+// mapping form, keyed by scope with its grant. Shorthand holds the string
+// form. Both are zero when the workflow declares no permissions block.
+type Permissions struct {
+	Scopes    map[string]string
+	Shorthand string
+}
+
+// UnmarshalYAML decodes the mapping form of `permissions:` into Scopes and
+// the scalar shorthand form into Shorthand, tolerating either so a workflow
+// written with the shorthand does not fail a LoadAll that only needs some
+// other file.
+func (p *Permissions) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.MappingNode:
+		return node.Decode(&p.Scopes)
+	case yaml.ScalarNode:
+		return node.Decode(&p.Shorthand)
+	default:
+		return nil
+	}
 }
 
 // Workflow is a single .yml file under .github/workflows.
 type Workflow struct {
 	// Path is repo-relative, so guard output is copy-pasteable.
-	Path string
-	Jobs map[string]Job `yaml:"jobs"`
+	Path        string
+	On          On             `yaml:"on"`
+	Permissions Permissions    `yaml:"permissions"`
+	Concurrency Concurrency    `yaml:"concurrency"`
+	Jobs        map[string]Job `yaml:"jobs"`
 }
 
 // WorkflowDir is where GitHub requires workflows to live.

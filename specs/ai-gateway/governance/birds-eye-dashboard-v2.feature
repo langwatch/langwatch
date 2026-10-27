@@ -24,8 +24,8 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     7. Honest empty / zero / no-baseline states.
 
   This is a v2 over the same `/governance` page (canonical Overview;
-  `/settings/governance` is registered as a back-compat alias per
-  `platform/app/src/routes.tsx` comment) — the v1
+  the legacy `/settings/governance` address redirects there per
+  specs/navigation/gateway-url-move.feature); the v1
   shape continues to ship as a regression invariant for orgs that
   haven't seeded multi-team data yet.
 
@@ -35,10 +35,10 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     - specs/ai-gateway/governance/persona-home-content.feature (page wrap)
 
   Implementation lives under:
-    - platform/app/src/pages/settings/governance.tsx                   (page)
-    - platform/app/src/server/governance/activity-monitor/             (service)
-    - platform/app/src/components/governance/charts/                   (Recharts wrappers — Phase B)
-    - platform/app/src/utils/colorFromName.ts                          (Phase C util)
+    - apps/ui governance route                                         (page)
+    - enterprise/modules/governance/process/src/ (activity-monitor)             (service)
+    - enterprise/modules/governance/browser/src/                 (chart wrappers — Phase B)
+    - modules/trace/browser/src/model/rotating-colors.ts         (Phase C util)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"
@@ -59,7 +59,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     Then the lastActivity cell renders "just now"
     And no row anywhere on the page renders a string starting with "-"
       followed by digits + "s ago" / "m ago" / "h ago" / "d ago"
-    And the seed scripts under platform/app/scripts/ also clamp seeded
+    And the governance seed harness also clamps seeded
       OccurredAt to "now - 1s" minimum so re-seeding cannot reintroduce
       the bug
 
@@ -157,7 +157,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     And below the table there is a "View all teams →" link
     And the link points to a route that lists every team with full
       sort + filter + pagination affordances (route lives at
-      "/settings/governance/teams" or similar — see Axis 4)
+      "/governance/teams" or similar, see Axis 4)
 
   @bdd @ui @birds-eye-v2 @top-n
   Scenario: SpendByUser section is explicitly framed as "Top 10 by spend"
@@ -254,9 +254,9 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     When the user clicks the row for team "engineering"
     Then the user is routed to a page scoped to that team — either:
       | option                         | route                                           |
-      | A — dedicated team detail page | /settings/governance/teams/<teamId>            |
+      | A — dedicated team detail page | /governance/teams/<teamId>            |
       | B — filtered traces view       | /traces?filter[teamId]=<teamId>                |
-      | C — filtered activity-monitor  | /settings/activity-monitor?filter[teamId]=...  |
+      | C — filtered activity-monitor  | /governance?filter[teamId]=...  |
     And whichever option ships, the destination page renders that team's
       spend totals + recent activity + per-user breakdown for that team
     And the destination is consistent with the View-all link
@@ -299,7 +299,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     Then all three surfaces show that team in the SAME color
     And the color is derived deterministically from the team name
       (same algorithm ProjectAvatar uses today via
-       platform/app/src/utils/rotatingColors.ts → getColorForString)
+       modules/trace/browser/src/model/rotating-colors.ts → getColorForString)
     And a different team named "marketing" renders in a different
       color (palette spread is a function of the name, not row order)
     And renaming a team changes its color (acceptable trade-off — the
@@ -308,7 +308,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
   @bdd @ui @birds-eye-v2 @color
   Scenario: Color util is hoisted to a shared module
     Given Phase C ships
-    Then a shared util exists at platform/app/src/utils/colorFromName.ts
+    Then a shared colour-from-name util exists in one place
       (or equivalent shared path) exporting at minimum:
         | export                  | shape                                |
         | colorFromName(name)     | (name: string) => string (CSS color) |

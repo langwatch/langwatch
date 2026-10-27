@@ -1,57 +1,104 @@
 ---
 title: Operations Console
-description: "Monitor, manage, and debug your LangWatch event-sourcing pipeline from one interface"
+description: "Run your LangWatch installation: inspect queues, recover processing and support identity or directory issues."
 ---
 
 The **Ops Console** (`/ops`) is a platform-wide operations interface built for teams running LangWatch on their own infrastructure. It gives operators real-time visibility into the event-sourcing pipeline, queue health, processing throughput, error clusters, and the tools to act on problems without touching the database or restarting pods.
 
 <Frame>
-<img src="/images/ops/dashboard.png" alt="Ops Dashboard overview" />
+  <img src="/images/ops/dashboard.png" alt="Ops Dashboard overview" />
 </Frame>
 
 ## When to Use Ops
 
-| Scenario | Where to go |
-|---|---|
-| Traces aren't appearing in the UI | [Dashboard](/self-hosting/ops/dashboard): check Staged/s and Failed/s rates |
-| Processing is stuck | [Queue Management](/self-hosting/ops/queue-management): inspect blocked groups and error clusters |
-| A deployment broke a projection | [Projection Replay](/self-hosting/ops/projection-replay): replay affected projections from a known-good date |
-| Need to debug a specific trace or aggregate | [Deja View](/self-hosting/ops/dejaview): time-travel through the event stream |
-| Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry): build and send synthetic traces |
-| Failed jobs need reprocessing | [Queue Management](/self-hosting/ops/queue-management): redrive from the DLQ |
+| Scenario                                       | Where to go                                                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Traces aren't appearing in the UI              | [Dashboard](/self-hosting/ops/dashboard): check Staged/s and Failed/s rates                                  |
+| Processing is stuck                            | [Queue Management](/self-hosting/ops/queue-management): inspect blocked groups and error clusters            |
+| A deployment broke a projection                | [Projection Replay](/self-hosting/ops/projection-replay): replay affected projections from a known-good date |
+| Need to debug a specific trace or aggregate    | [Deja View](/self-hosting/ops/dejaview): time-travel through the event stream                                |
+| Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry): build and send synthetic traces                                    |
+| SSO setup or directory sync needs investigation | The identity and directory Backoffice pages below                                                            |
+| An upgrade is running, behind or failed       | `/ops/upgrades`: the installation's state, each release's steps and every run ([Upgrade Guide](/self-hosting/upgrade#while-it-runs-and-after)) |
+| An upgrade is waiting on an organization migration | `/ops/upgrades?tab=tenants`: Ops > Upgrades > Tenant migrations, to inspect its result and report         |
+| Failed jobs need reprocessing                  | [Queue Management](/self-hosting/ops/queue-management): redrive from the DLQ                                 |
 
 ## Feature Overview
 
 <CardGroup cols={2}>
   <Card title="Dashboard" icon="gauge" href="/self-hosting/ops/dashboard">
-    Real-time throughput, latency, error rates, and pipeline health at a glance. Powered by Server-Sent Events with automatic polling fallback.
+    Real-time throughput, latency, error rates, and pipeline health at a glance. Powered by
+    Server-Sent Events with automatic polling fallback.
   </Card>
   <Card title="Queue Management" icon="layer-group" href="/self-hosting/ops/queue-management">
-    Error groups, blocked queues, dead letter queue redriving, draining, and pipeline pause/unpause controls.
+    Error groups, blocked queues, dead letter queue redriving, draining, and pipeline pause/unpause
+    controls.
   </Card>
   <Card title="Projection Replay" icon="rotate" href="/self-hosting/ops/projection-replay">
-    Rebuild projection state by replaying events from ClickHouse. Supports bulk replay across tenants, single-aggregate debugging, and dry runs.
+    Rebuild projection state by replaying events from ClickHouse. Supports bulk replay across
+    tenants, single-aggregate debugging, and dry runs.
   </Card>
   <Card title="Deja View" icon="clock-rotate-left" href="/self-hosting/ops/dejaview">
-    Time-travel debugger for event-sourced aggregates. Inspect the full event history and compute any projection's state at any point in time.
+    Time-travel debugger for event-sourced aggregates. Inspect the full event history and compute
+    any projection's state at any point in time.
   </Card>
   <Card title="The Foundry" icon="hammer" href="/self-hosting/ops/foundry">
-    Interactive trace playground for building, visualizing, and sending synthetic traces to any project. Useful for testing ingestion pipelines and reproducing issues.
+    Interactive trace playground for building, visualizing, and sending synthetic traces to any
+    project. Useful for testing ingestion pipelines and reproducing issues.
   </Card>
 </CardGroup>
 
-## Access Control
+## Who can use Ops
 
-The Ops Console uses two dedicated permissions, separate from project-level RBAC:
+Ops access comes from the deployment's `ADMIN_EMAILS` allow-list. Set it to a
+comma-separated list of trusted operator email addresses:
 
-| Permission | Grants |
-|---|---|
-| `ops:view` | Read-only access to all dashboards, metrics, and search |
-| `ops:manage` | Write access, unblock groups, drain queues, pause pipelines, start replays, redrive DLQ |
+```bash
+ADMIN_EMAILS=operator@yourcompany.com,backup-operator@yourcompany.com
+```
 
-These are platform-wide permissions, not scoped to a specific project. Users without `ops:view` are redirected away from `/ops` routes.
+These operators have platform-wide access. Being an organization Admin, or
+creating a custom role with `ops:view` or `ops:manage`, does not grant Ops
+access. The console uses those permission names to distinguish reads and
+changes, but the current allow-list grants the operator both.
 
-See [Access Control (RBAC)](/platform/rbac) for details on assigning permissions.
+The Backoffice pages also check the platform-admin allow-list. Use
+[organization roles](/platform/rbac) for customer access to teams, projects and
+organization settings.
+
+## Identity and directory support
+
+Organization administrators manage their own provider in **Settings >
+Authentication**, and people and assignments in **Settings > Directory**.
+Use the Backoffice pages when an installation operator needs to investigate
+across organizations.
+
+| Page in your installation | Use it for |
+| --- | --- |
+| `/ops/backoffice/identity-lookup` | Find an account, inspect its identity state and sign it out everywhere when required. |
+| `/ops/backoffice/sso-connections` | Inspect connection state and domain evidence, investigate setup, or pause and resume a connection. |
+| `/ops/backoffice/directory-sync` | Inspect SCIM sync failures, provisioning attempts and external user mappings. Retry a retired apply after fixing its cause. |
+| `/ops/upgrades` | Follow an upgrade: the installation's state, each release's steps and every run with its phases and error. |
+| `/ops/upgrades?tab=tenants` | Ops > Upgrades > Tenant migrations: inspect migration progress and reports, or run a targeted migration for an organization. |
+
+Pausing SSO stops new sign-ins through the connection. It leaves existing
+sessions and SCIM provisioning in place. Removing a connection also stops
+SCIM requests immediately and later revokes that connection's tokens. It does
+not remove members or end their sessions. To offboard a person, use Directory
+or the identity provider's SCIM deactivation before removing the connection.
+See [SSO removal](/platform/sso#disable-or-remove-a-connection).
+
+For a migration, read the per-organization result. **Held** means the work ran
+but its parity checks found differences. **Parked** means the attempt failed
+and will be retried. **Finalized** means the organization completed that
+migration. A run that is waiting for an earlier migration has not changed the
+organization yet. Do not treat starting a migration as proof it finished.
+
+Identity and access migrations run automatically after each upgrade; see
+[Automatic identity and access migration](/self-hosting/upgrade#automatic-identity-and-access-migration).
+Check every required migration, including users as well as organizations.
+Credential repair is recurring and does not finalize; the one-time backfills
+must finalize.
 
 ## Architecture Context
 

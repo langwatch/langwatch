@@ -111,13 +111,14 @@ const anthropicModelsAPIVersion = "2023-06-01"
 // prefixes IDs with "models/"; Groq nests its OpenAI surface under
 // /openai; the rest serve a stock /v1/models.
 var hostedModelCatalogs = map[domain.ProviderID]catalogProbe{
-	domain.ProviderOpenAI:    {modelsURL: "https://api.openai.com/v1/models"},
-	domain.ProviderAnthropic: {modelsURL: "https://api.anthropic.com/v1/models?limit=1000", headers: map[string]string{"anthropic-version": anthropicModelsAPIVersion}},
-	domain.ProviderGemini:    {modelsURL: "https://generativelanguage.googleapis.com/v1beta/openai/models", stripIDPrefix: "models/"},
-	domain.ProviderGroq:      {modelsURL: "https://api.groq.com/openai/v1/models"},
-	domain.ProviderXAI:       {modelsURL: "https://api.x.ai/v1/models"},
-	domain.ProviderCerebras:  {modelsURL: "https://api.cerebras.ai/v1/models"},
-	domain.ProviderDeepSeek:  {modelsURL: deepseekBaseURL + "/v1/models"},
+	domain.ProviderOpenAI:     {modelsURL: "https://api.openai.com/v1/models"},
+	domain.ProviderAnthropic:  {modelsURL: "https://api.anthropic.com/v1/models?limit=1000", headers: map[string]string{"anthropic-version": anthropicModelsAPIVersion}},
+	domain.ProviderGemini:     {modelsURL: "https://generativelanguage.googleapis.com/v1beta/openai/models", stripIDPrefix: "models/"},
+	domain.ProviderGroq:       {modelsURL: "https://api.groq.com/openai/v1/models"},
+	domain.ProviderXAI:        {modelsURL: "https://api.x.ai/v1/models"},
+	domain.ProviderCerebras:   {modelsURL: "https://api.cerebras.ai/v1/models"},
+	domain.ProviderDeepSeek:   {modelsURL: deepseekBaseURL + "/v1/models"},
+	domain.ProviderDoubleword: {modelsURL: doublewordBaseURL + "/v1/models"},
 }
 
 // newModelsDiscoveryClient builds the HTTP client discovery probes use.
@@ -136,13 +137,7 @@ var hostedModelCatalogs = map[domain.ProviderID]catalogProbe{
 //     the host itself, so a name that answers with a public address then
 //     a private one (DNS rebinding) would otherwise slip past it.
 func newModelsDiscoveryClient(policy customerEndpointPolicy) *http.Client {
-	dialer := &net.Dialer{
-		Timeout:   modelsDiscoveryTimeout,
-		KeepAlive: 30 * time.Second,
-		ControlContext: func(_ context.Context, _, address string, _ syscall.RawConn) error {
-			return policy.allowsDialAddress(address)
-		},
-	}
+	dialer := policyDialer(policy, modelsDiscoveryTimeout)
 	return &http.Client{
 		Timeout:   modelsDiscoveryTimeout,
 		Transport: &http.Transport{DialContext: dialer.DialContext},
@@ -152,12 +147,39 @@ func newModelsDiscoveryClient(policy customerEndpointPolicy) *http.Client {
 	}
 }
 
-// allowsDialAddress applies the endpoint policy to a resolved
-// "host:port" the dialer is about to connect to. Host allowlisting is
-// intentionally not consulted here: the allowlist names hosts, and by
-// this point the name is gone. The pre-flight check is where an
-// allowlisted host earns its exemption.
-func (p customerEndpointPolicy) allowsDialAddress(address string) error {
+// policyDialer builds a dialer that re-checks every resolved address against
+// the endpoint policy immediately before connecting. Shared by the direct
+// HTTP lanes that carry a customer credential to a customer-configured host:
+// catalog discovery and the realtime session mint.
+func policyDialer(policy customerEndpointPolicy, timeout time.Duration) endpointPolicyDialer {
+	return endpointPolicyDialer{dialer: &net.Dialer{
+		Timeout:   timeout,
+		KeepAlive: 30 * time.Second,
+		ControlContext: func(ctx context.Context, _, address string, _ syscall.RawConn) error {
+			dialHost, _ := ctx.Value(dialHostKey{}).(string)
+			return policy.allowsDialAddress(address, dialHost)
+		},
+	}}
+}
+
+// dialHostKey carries the host a dial was asked for (before resolution) to
+// the pre-connect check, so an allowlisted name keeps its exemption there.
+type dialHostKey struct{}
+
+type endpointPolicyDialer struct{ dialer *net.Dialer }
+
+func (d endpointPolicyDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	if host, _, err := net.SplitHostPort(address); err == nil {
+		ctx = context.WithValue(ctx, dialHostKey{}, normalizeEndpointHost(host))
+	}
+	return d.dialer.DialContext(ctx, network, address)
+}
+
+// allowsDialAddress applies the endpoint policy to a resolved "host:port"
+// the dialer is about to connect to. Only an exact ALLOWED_PROXY_HOSTS entry
+// (the dialed IP itself, or the host it was resolved from) is exempt; cloud
+// metadata and link-local stay refused by endpointAddressError either way.
+func (p customerEndpointPolicy) allowsDialAddress(address, dialHost string) error {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return fmt.Errorf("customer endpoint address is not host:port")
@@ -166,10 +188,9 @@ func (p customerEndpointPolicy) allowsDialAddress(address string) error {
 	if ip == nil {
 		return fmt.Errorf("customer endpoint did not resolve to an IP address")
 	}
-	// Same classifier the pre-flight check runs, so a dial cannot reach an
-	// address the URL check would have refused. Not allowlisted: the
-	// allowlist names hosts, and by this point the name is gone.
-	return endpointAddressError(ip, p.blockLocal, false)
+	_, ipAllowlisted := p.allowedHosts[normalizeEndpointHost(ip.String())]
+	_, hostAllowlisted := p.allowedHosts[dialHost]
+	return endpointAddressError(ip, p.blockLocal, ipAllowlisted || (dialHost != "" && hostAllowlisted))
 }
 
 // discoveredCatalog is one round's answer: the models plus the gaps
@@ -306,13 +327,16 @@ func (c *modelsDiscoveryCache) evictLocked(now time.Time) {
 // serving a catalog fetched with the old one; it is hashed with the rest
 // into an opaque key that is only ever compared, never logged. The
 // deployment map is included because its keys are listed as models, so an
-// edit must not serve the previous map's catalog for a full TTL.
+// edit must not serve the previous map's catalog for a full TTL. The routing
+// handle is included for the same reason: it rides on every model this
+// credential contributes, so a rename must not keep serving the old spelling.
 func modelsDiscoveryCacheKey(creds []domain.Credential) string {
 	sum := sha256.New()
 	for _, cred := range creds {
 		for _, field := range []string{
 			cred.ID,
 			string(cred.ProviderID),
+			cred.Handle,
 			credBaseURL(cred),
 			cred.APIKey,
 		} {
@@ -474,14 +498,19 @@ func (r *BifrostRouter) discoverModels(ctx context.Context, creds []domain.Crede
 	wg.Wait()
 
 	var out discoveredCatalog
+	// Deduped per instance, not per model id. Two credentials of one family
+	// serve the same ids, and collapsing them on the id alone dropped the
+	// second instance's catalog entirely, which is exactly the instance a
+	// routing handle exists to address.
 	seen := make(map[string]bool)
 	for i, ids := range perCred {
 		for _, id := range ids {
-			if id == "" || seen[id] {
+			key := creds[i].Handle + "\x1f" + id
+			if id == "" || seen[key] {
 				continue
 			}
-			seen[id] = true
-			out.models = append(out.models, domain.Model{ID: id, Name: id, ProviderID: creds[i].ProviderID})
+			seen[key] = true
+			out.models = append(out.models, domain.Model{ID: id, Name: id, ProviderID: creds[i].ProviderID, Handle: creds[i].Handle})
 		}
 	}
 	seenGaps := make(map[domain.ModelDiscoveryGap]bool)

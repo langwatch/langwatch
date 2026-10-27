@@ -16,8 +16,21 @@ on:
       - "services/**"
       - "dev/docs/adr/**"
       - "dev/docs/best_practices/**"
-      - "platform/app/.env.example"
+      - ".env.example"
       - "docs/self-hosting/**"
+      - "infra/**"
+      - "**/Dockerfile*"
+      - "apps/*/src/config.ts"
+      - "packages/config/**"
+      - "packages/secrets/**"
+      - "packages/prisma-client/prisma/migrations/**"
+      - "packages/clickhouse-migrations/migrations/**"
+      - "modules/*/process/src/migrations/**"
+      - "enterprise/modules/*/process/src/migrations/**"
+      - "modules/*/contract/src/**/*.config.ts"
+      - "enterprise/modules/*/contract/src/**/*.config.ts"
+      - "modules/*/adrs/**"
+      - "enterprise/modules/*/adrs/**"
 
 # Triggered on `edited`, and it reads the PR description, so an in-flight run
 # is grading a body the author has already rewritten. 18 of the last 100 runs
@@ -39,14 +52,49 @@ jobs:
     #
     # Same-repo only: a fork can name its branch anything, and the branch name
     # alone would let it opt out of the gate. release-please only ever opens
-    # PRs from inside the upstream repo, matching the guard in
-    # release-please-chart-lock-sync.yml.
+    # PRs from inside the upstream repo.
     if: |
       !(github.event.pull_request.head.repo.full_name == github.repository &&
         startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      # The `services/**`/`charts/**` trigger paths match every dependency bump
+      # in services/langevals, services/aigateway, services/nlpgo, and every
+      # chart's Chart.lock too. Which of those get an exemption, and why, is
+      # decided by guard-deployment-impact.ts — a plain function with a test,
+      # rather than a `case` statement buried in YAML that nothing can run.
+      #
+      # PR_AUTHOR is the pull request's author, NOT `github.actor`. This
+      # workflow triggers on `edited`, so `github.actor` is whoever last touched
+      # the pull request: a maintainer tidying a dependabot PR's description
+      # would flip the actor away from the bot and silently withdraw the
+      # exemption the PR qualified for when it opened.
+      - name: Determine whether this PR only touches dependency manifests
+        id: manifest-only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          # JSON, not newline-delimited names. A path may legally contain a
+          # newline, and splitting on lines would turn one such path into two
+          # records that classify independently — so the file list never
+          # crosses a line-delimited boundary at all.
+          gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --slurp \
+            > "${RUNNER_TEMP}/changed-files.json"
+          echo "Author: $PR_AUTHOR"
+          node --experimental-strip-types .github/scripts/guard-deployment-impact.ts \
+            "${RUNNER_TEMP}/changed-files.json" | tee -a "$GITHUB_OUTPUT"
+
       - name: Verify deployment-impact section in PR description
+        if: steps.manifest-only.outputs.requires_writeup == 'true'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
@@ -59,7 +107,7 @@ jobs:
           # Heading presence — strict H2 (`## `). Loosen to `##+` if H3 turns
           # out to be common in template usage.
           if ! printf '%s\n' "$PR_BODY" | grep -qiE '^##[[:space:]]+(deployment[[:space:]]+impact|operator[[:space:]]*/?[[:space:]]*deployment[[:space:]]+impact)' ; then
-            echo "::error::No '## Deployment Impact' heading found in PR description. This PR touches deployment surface (charts/services/ADRs/best-practices docs/env.example/self-hosting) — add the section as a top-level H2 (`## Deployment Impact`)."
+            echo "::error::No '## Deployment Impact' heading found in PR description. This PR touches deployment surface (charts/services/migrations/module config/ADRs/best-practices docs/env.example/self-hosting) — add the section as a top-level H2 (## Deployment Impact)."
             exit 1
           fi
 

@@ -1,0 +1,58 @@
+{
+  "extends": ["./tsconfig.json", "../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/process-stores": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["**/__tests__/**", "**/tests/**", "**/*.test.*"],
+  "references": [
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../limiter/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../group-queue/tsconfig.build.json"
+    },
+    {
+      "path": "../eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../clickhouse-client/tsconfig.build.json"
+    }
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/module",
+        "@langwatch/test-harness",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
+}

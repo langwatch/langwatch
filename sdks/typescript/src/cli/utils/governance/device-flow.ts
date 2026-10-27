@@ -1,15 +1,13 @@
-/**
- * RFC 8628 device-code OAuth client for the `langwatch login --device`
- * flow. Targets the control plane's `/api/auth/cli/*` endpoints —
- * the same wire surface a custom CLI client would hit (documented in
- * `docs/ai-gateway/governance/admin-setup.mdx#cli-device-flow-rest-api`).
- *
- * Pure stdlib `fetch`, no axios — matches the rest of the typescript
- * CLI's HTTP style.
- */
-
 import * as os from "node:os";
+/**
+ * RFC 8628 device-code OAuth client for `langwatch login --device`, hitting the control plane's
+ * `/api/auth/cli/*` endpoints (documented in
+ * `docs/ai-gateway/governance/admin-setup.mdx#cli-device-flow-rest-api`).
+ */
 import { setTimeout as wait } from "node:timers/promises";
+
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
+
 import { normalizeEndpoint } from "../../../internal/endpoint";
 
 export interface DeviceCode {
@@ -46,30 +44,35 @@ export interface ExchangeProject {
 }
 
 /**
- * The caller's personal workspace project, shipped on device-session
- * exchanges so data commands can authenticate with its API key without
- * any env var. Older servers omit it; the CLI then lazily exchanges via
- * `GET /api/auth/cli/personal-project` on first use.
+ * The personal workspace a device session names. Only servers before project sessions
+ * also sent its key; the login key (`cli_api_key`) authenticates instead.
  */
 export interface ExchangePersonalProject {
   id: string;
   slug: string;
   name: string;
-  api_key: string;
+  api_key?: string;
 }
 
 /**
- * The CLI device-code flow can mint two distinct credential types:
- *   - "device_session" — the user-scoped OAuth-style access+refresh
- *     token pair used by `langwatch claude/codex/...` wrappers.
- *   - "project_api_key" — the project-scoped SDK key
- *     (`Project.apiKey`) returned verbatim, used by SDK consumers
- *     and `langwatch sync/eval/prompt/...` commands.
- *
- * Caller selects via `startDeviceCode({ credentialType })`. Server
- * stamps the choice on the device-code record + flips the response
- * shape on /exchange. Same browser approval ceremony for both — only
- * the persist target differs (`~/.langwatch/config.json` vs `.env`).
+ * What the minted `cli_api_key` reaches. `organization` covers every project
+ * of the organization and carries an empty `project_ids`; `projects` names the
+ * exact ids the user picked on the authorize screen.
+ */
+export interface ExchangeCliApiKeyScope {
+  kind: "organization" | "projects";
+  project_ids: string[];
+  /**
+   * The permission slugs the key was minted with. Absent on servers that
+   * predate the field; `whoami` then reports only the reach.
+   */
+  permissions?: string[];
+}
+
+/**
+ * "device_session": user-scoped OAuth token pair, for the `claude`/`codex`
+ * wrappers. "project_api_key": the project-scoped SDK key verbatim. Same
+ * approval ceremony for both; only the persist target differs.
  */
 export type CredentialType = "device_session" | "project_api_key";
 
@@ -82,6 +85,13 @@ export interface ExchangeDeviceSessionResult {
   organization: ExchangeOrganization;
   default_personal_vk?: ExchangePersonalVK;
   personal_project?: ExchangePersonalProject;
+  /**
+   * The user-scoped API key minted for this login, reaching every project the
+   * user selected while approving. Absent on servers that predate the feature,
+   * and the CLI then authenticates with the personal project's own key.
+   */
+  cli_api_key?: string;
+  cli_api_key_scope?: ExchangeCliApiKeyScope;
   endpoint?: string;
 }
 
@@ -94,29 +104,45 @@ export interface ExchangeApiKeyResult {
   endpoint?: string;
 }
 
+/** A project login: the person's session capped at one project. It carries no key. */
+export interface ExchangeProjectSessionResult {
+  kind: "project_session";
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  project: ExchangeProject;
+  user: ExchangeUser;
+  organization: ExchangeOrganization;
+  endpoint?: string;
+}
+
 export type ExchangeResult =
   | ExchangeDeviceSessionResult
-  | ExchangeApiKeyResult;
+  | ExchangeApiKeyResult
+  | ExchangeProjectSessionResult;
 
 /**
- * Back-compat alias for the device-session shape. Pre-`f9fcc3927` server
- * builds returned the unkinded shape verbatim; the runtime normaliser
- * below maps that to `{ kind: 'device_session', ... }` so callers can
- * always assume the discriminated form.
+ * Back-compat: pre-`f9fcc3927` servers returned this shape unkinded; the
+ * runtime normaliser below maps it to `{ kind: 'device_session', ... }` so
+ * callers can always assume the discriminated form.
  */
-export type LegacyExchangeResult = Omit<
-  ExchangeDeviceSessionResult,
-  "kind"
-> & { kind?: "device_session" };
+export type LegacyExchangeResult = Omit<ExchangeDeviceSessionResult, "kind"> & {
+  kind?: "device_session";
+};
 
 export interface RefreshResult {
   access_token: string;
   refresh_token: string;
   expires_in: number;
+  /** The project the pair is capped at, where it is capped at one. */
+  project?: ExchangeProject;
 }
 
 export class DeviceFlowError extends Error {
-  constructor(public readonly kind: "pending" | "denied" | "expired" | "slow_down" | "unauthorized" | "other", message: string) {
+  constructor(
+    public readonly kind: "pending" | "denied" | "expired" | "slow_down" | "unauthorized" | "other",
+    message: string,
+  ) {
     super(message);
     this.name = "DeviceFlowError";
   }
@@ -131,32 +157,27 @@ export interface DeviceFlowOptions {
 
 /**
  * `POST /api/auth/cli/device-code` — mint a device-code + user-code pair.
- *
- * Optional `credentialType` selects what `/exchange` will return on
- * approval: a user-scoped device session (default) or a project-scoped
- * API key. Older servers ignore the field and stay on the device-session
- * shape — back-compat is the server's responsibility.
+ * Optional `credentialType` selects what `/exchange` returns: a user-scoped
+ * device session (default) or a project-scoped API key.
  */
 export async function startDeviceCode(
   opts: DeviceFlowOptions,
-  init: { credentialType?: CredentialType } = {},
+  init: { credentialType?: CredentialType; management?: boolean } = {},
 ): Promise<DeviceCode> {
   const body: Record<string, unknown> = {};
   if (init.credentialType) body.credential_type = init.credentialType;
+  // Sent only when asked, so a login without --management reads exactly as
+  // it did before the flag existed.
+  if (init.management) body.management = true;
   const dc = await postJSON<DeviceCode>(opts, "/api/auth/cli/device-code", body);
   if (!dc.interval || dc.interval <= 0) dc.interval = 5;
   return dc;
 }
 
 /**
- * Device fingerprint stamped onto the CLI session at /exchange time.
- * The control plane persists it on the access + refresh token records
- * so /me/devices can render "Mac (rchaves.local)" instead of
- * "Unknown device" — multi-device users need this to revoke
- * individual sessions without nuking every device they're logged in
- * on (Ariana QA finding). See
- * `platform/app/src/server/routes/auth-cli.ts#clientInfoSchema` for the
- * server contract.
+ * Fingerprint stamped on the CLI session so /me/devices can render "Mac
+ * (rchaves.local)" and one device can be revoked without logging out every
+ * device. Contract: `auth-cli-device-flow.api.ts#clientInfoSchema`.
  */
 function collectClientInfo(): {
   hostname: string;
@@ -169,21 +190,22 @@ function collectClientInfo(): {
     hostname = os.hostname();
   } catch {
     // os.hostname() can throw on locked-down sandboxes; carry empty.
+    void 0;
   }
   try {
     uname = os.userInfo().username;
   } catch {
     // os.userInfo() throws when the uid has no /etc/passwd entry
     // (some Docker images, CI sandboxes); carry empty.
+    void 0;
   }
   return { hostname, uname, platform: process.platform };
 }
 
 /**
- * `POST /api/auth/cli/exchange` — single poll. Returns the access+refresh
- * token bundle on success (200), or throws DeviceFlowError with a
- * categorised `kind` so the caller can decide whether to keep polling
- * (`pending`, `slow_down`) or stop (`denied`, `expired`).
+ * `POST /api/auth/cli/exchange` — single poll. Returns the token bundle on
+ * success (200), or throws `DeviceFlowError` with a `kind` so the caller
+ * can decide whether to keep polling or stop.
  */
 export async function exchange(
   opts: DeviceFlowOptions,
@@ -195,13 +217,11 @@ export async function exchange(
   });
   switch (res.status) {
     case 200: {
-      const body = (await res.json()) as
-        | ExchangeResult
-        | LegacyExchangeResult;
+      const body = (await res.json()) as ExchangeResult | LegacyExchangeResult;
       // Pre-f9fcc3927 servers returned the device-session shape without
       // a `kind` field. Normalise so callers can always discriminate.
       if (!("kind" in body) || !body.kind) {
-        return { kind: "device_session", ...(body) };
+        return { kind: "device_session", ...body };
       }
       return body as ExchangeResult;
     }
@@ -215,15 +235,110 @@ export async function exchange(
       throw new DeviceFlowError("slow_down", "polling too fast");
     default: {
       const body = await res.text().catch(() => "");
+      // Approved, but the key's grants have not landed yet: the next poll takes it.
+      if (res.status === 503 && body.includes("authz_grant_not_confirmed")) {
+        throw new DeviceFlowError("pending", "access is still being set up");
+      }
       throw new DeviceFlowError("other", `unexpected status ${res.status}: ${body.slice(0, 256)}`);
     }
   }
 }
 
 /**
- * Poll `exchange` at the cadence the server requested until the user
- * approves, denies, or the device-code expires. Honours RFC 8628 §3.5
- * by doubling the polling interval on `slow_down` responses.
+ * `GET /api/auth/cli/device-approval` — emits one frame when the browser
+ * approves/denies (no credential, just "poll now"); never resolves otherwise,
+ * so an old server or dropped connection leaves the poll timer in charge.
+ */
+function watchDeviceApproval({
+  opts,
+  deviceCode,
+}: {
+  opts: DeviceFlowOptions;
+  deviceCode: string;
+}): { settled: Promise<void>; close: () => void } {
+  const controller = new AbortController();
+  const settled = new Promise<void>((resolve) => {
+    readApprovalStream({ opts, deviceCode, signal: controller.signal })
+      .then((sawFrame) => {
+        if (sawFrame) resolve();
+      })
+      .catch(() => {
+        // Never settles: polling stays in charge.
+      });
+  });
+  return { settled, close: () => controller.abort() };
+}
+
+/** Whether the approval stream delivered a frame before it ended. */
+async function readApprovalStream({
+  opts,
+  deviceCode,
+  signal,
+}: {
+  opts: DeviceFlowOptions;
+  deviceCode: string;
+  /** Aborts the read once the login is over, so the socket is not left open. */
+  signal: AbortSignal;
+}): Promise<boolean> {
+  const base = normalizeEndpoint(opts.baseUrl);
+  const f = opts.fetchImpl ?? fetch;
+  const res = await f(
+    `${base}/api/auth/cli/device-approval?device_code=${encodeURIComponent(deviceCode)}`,
+    {
+      headers: { Accept: "text/event-stream", Origin: base },
+      signal,
+    },
+  );
+  if (!res.ok || !res.body) return false;
+
+  const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+  const decoder = new TextDecoder();
+  let buffered = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return false;
+      buffered += decoder.decode(value, { stream: true });
+      // Any data frame means "the code settled, poll now". The payload does
+      // not decide anything: /exchange is what says approved or denied.
+      if (/^data:.*\S/m.test(buffered)) return true;
+    }
+  } finally {
+    void reader.cancel().catch(() => {
+      // The stream is already going away.
+    });
+  }
+}
+
+/** Sleep, cut short by the approval signal when one is still worth racing. */
+async function waitForNextPoll({
+  ms,
+  approval,
+}: {
+  ms: number;
+  approval: Promise<void> | null;
+}): Promise<void> {
+  if (!approval) {
+    await wait(ms);
+    return;
+  }
+  const timer = new AbortController();
+  try {
+    await Promise.race([
+      wait(ms, undefined, { signal: timer.signal }).catch(() => {
+        // Aborted because the approval landed first.
+      }),
+      approval,
+    ]);
+  } finally {
+    timer.abort();
+  }
+}
+
+/**
+ * Poll `exchange` until approved, denied, or expired — honouring RFC 8628
+ * §3.5 by doubling the interval on `slow_down`. The approval stream also
+ * cuts a wait short the moment the browser settles the code.
  */
 export async function pollUntilDone(
   opts: DeviceFlowOptions,
@@ -233,22 +348,37 @@ export async function pollUntilDone(
   const ceiling = 60_000;
   const deadline = Date.now() + dc.expires_in * 1000;
 
-  for (;;) {
-    if (Date.now() > deadline) {
-      throw new DeviceFlowError("expired", "authorization request expired");
-    }
-    await wait(interval);
-    try {
-      return await exchange(opts, dc.device_code);
-    } catch (err) {
-      if (!(err instanceof DeviceFlowError)) throw err;
-      if (err.kind === "pending") continue;
-      if (err.kind === "slow_down") {
-        interval = Math.min(interval * 2, ceiling);
-        continue;
+  const watch = watchDeviceApproval({ opts, deviceCode: dc.device_code });
+  const approval = watch.settled;
+  // A signal fires once, tracked in two flags: `signalled` (frame arrived) and
+  // `spent` (already let one poll through for it) — a frame during an in-flight
+  // exchange still shortens the next wait, and `spent` stops the loop racing
+  // an already-resolved promise into a hot poll.
+  const signal = { signalled: false, spent: false };
+  void approval.then(() => {
+    signal.signalled = true;
+  });
+
+  try {
+    let firstPoll = true;
+    for (;;) {
+      if (Date.now() > deadline) {
+        throw new DeviceFlowError("expired", "authorization request expired");
       }
-      throw err;
+      if (firstPoll) {
+        firstPoll = false;
+      } else {
+        await waitForDevicePoll(interval, approval, signal);
+      }
+
+      try {
+        return await exchange(opts, dc.device_code);
+      } catch (err) {
+        interval = nextPollInterval(err, interval, ceiling);
+      }
     }
+  } finally {
+    watch.close();
   }
 }
 
@@ -261,7 +391,9 @@ export async function refresh(
   opts: DeviceFlowOptions,
   refreshToken: string,
 ): Promise<RefreshResult> {
-  const res = await rawPost(opts, "/api/auth/cli/refresh", { refresh_token: refreshToken });
+  const res = await rawPost(opts, "/api/auth/cli/refresh", {
+    refresh_token: refreshToken,
+  });
   if (res.status === 401) {
     throw new DeviceFlowError("unauthorized", "session revoked — re-authenticate");
   }
@@ -273,11 +405,143 @@ export async function refresh(
 }
 
 /**
- * `POST /api/auth/cli/logout` — server-side revoke a refresh token
- * AND its paired access token (per `e7a042c69`: a stolen access
- * token used to survive logout for up to 1h until expiry; sending
- * both closes the gap). Idempotent — 200 on already-revoked or
- * unknown tokens.
+ * `POST /api/auth/cli/refresh` naming a project: forks a child pair locked to it and leaves the
+ * parent pair valid. 403 means the person cannot reach that project; 401 a dead parent session.
+ */
+export async function forkProjectSession(
+  opts: DeviceFlowOptions,
+  { refreshToken, projectSlug }: { refreshToken: string; projectSlug: string },
+): Promise<RefreshResult> {
+  const res = await rawPost(opts, "/api/auth/cli/refresh", {
+    refresh_token: refreshToken,
+    project_slug: projectSlug,
+  });
+  if (res.status === 401) {
+    throw new DeviceFlowError("unauthorized", "session revoked — re-authenticate");
+  }
+  if (res.status === 403) {
+    throw new DeviceFlowError("denied", `no access to project "${projectSlug}"`);
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new DeviceFlowError("other", `refresh failed (${res.status}): ${body.slice(0, 256)}`);
+  }
+  // An older server ignores the project and rotates the parent: no `project` comes back.
+  return (await res.json()) as RefreshResult;
+}
+
+/**
+ * The ingestion key a project session mints for this machine's app: personal, that project only.
+ */
+export async function createIngestionKey(
+  opts: DeviceFlowOptions,
+  { accessToken, project }: { accessToken: string; project: ExchangeProject },
+): Promise<string> {
+  return mintProjectSessionKey(opts, {
+    accessToken,
+    path: "/api/v1/api-keys/ingestion",
+    body: {
+      name: `${collectClientInfo().hostname || "this machine"} / ${project.slug}`,
+      keyType: "personal",
+      permissionMode: "restricted",
+      permissions: ["traces:create"],
+      bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: project.id }],
+    },
+    refused: `cannot send traces to project "${project.slug}"`,
+    failed: "ingestion key failed",
+  });
+}
+
+/**
+ * The full-access key a project session mints for this machine: personal, every permission in that
+ * one project, capped at what the person holds there. Refused (403) to a person without
+ * project:manage, and missing (404) on a server older than the route: both read as "denied".
+ */
+export async function createFullAccessApiKey(
+  opts: DeviceFlowOptions,
+  { accessToken, project }: { accessToken: string; project: ExchangeProject },
+): Promise<string> {
+  return mintProjectSessionKey(opts, {
+    accessToken,
+    path: "/api/v1/api-keys/full-access",
+    body: {
+      name: `${collectClientInfo().hostname || "this machine"} / ${project.slug}`,
+      keyType: "personal",
+      permissionMode: "all",
+      bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: project.id }],
+    },
+    refused: `cannot get a full-access key for "${project.slug}"`,
+    failed: "full-access key failed",
+    missingIsRefusal: true,
+  });
+}
+
+/** Which key a project login wrote to .env. */
+export type ProjectLoginKeyKind = "full-access" | "ingestion";
+
+/**
+ * The key `langwatch login --project` writes: the full-access key, or the ingestion key when the
+ * person cannot get the full one (no project:manage there, or a server without the route).
+ */
+export async function createProjectLoginKey(
+  opts: DeviceFlowOptions,
+  session: { accessToken: string; project: ExchangeProject },
+): Promise<{ token: string; kind: ProjectLoginKeyKind }> {
+  try {
+    return { token: await createFullAccessApiKey(opts, session), kind: "full-access" };
+  } catch (error) {
+    if (!(error instanceof DeviceFlowError) || error.kind !== "denied") throw error;
+    return { token: await createIngestionKey(opts, session), kind: "ingestion" };
+  }
+}
+
+async function mintProjectSessionKey(
+  opts: DeviceFlowOptions,
+  {
+    accessToken,
+    path,
+    body,
+    refused,
+    failed,
+    missingIsRefusal = false,
+  }: {
+    accessToken: string;
+    path: string;
+    body: Record<string, unknown>;
+    refused: string;
+    failed: string;
+    missingIsRefusal?: boolean;
+  },
+): Promise<string> {
+  const res = await (opts.fetchImpl ?? fetch)(`${normalizeEndpoint(opts.baseUrl)}${path}`, {
+    method: "POST",
+    headers: {
+      ...buildSdkIdentityHeaders({ surface: "cli" }),
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) {
+    throw new DeviceFlowError("unauthorized", "session revoked — re-authenticate");
+  }
+  if (res.status === 403 || (missingIsRefusal && res.status === 404)) {
+    throw new DeviceFlowError("denied", refused);
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new DeviceFlowError("other", `${failed} (${res.status}): ${text.slice(0, 256)}`);
+  }
+  const minted = (await res.json()) as { token?: string };
+  if (!minted.token) throw new DeviceFlowError("other", `${failed}: the answer carried no token`);
+  return minted.token;
+}
+
+/**
+ * `POST /api/auth/cli/logout` — revokes the refresh token AND its paired
+ * access token (per `e7a042c69`: a stolen access token used to survive
+ * logout for up to 1h; sending both closes the gap). Idempotent.
  */
 export async function logout(
   opts: DeviceFlowOptions,
@@ -308,6 +572,7 @@ function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<
   return f(url, {
     method: "POST",
     headers: {
+      ...buildSdkIdentityHeaders({ surface: "cli" }),
       "Content-Type": "application/json",
       Accept: "application/json",
       // Origin enforcement on the server requires this for non-browser
@@ -317,4 +582,25 @@ function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<
     },
     body: JSON.stringify(body ?? {}),
   });
+}
+
+function nextPollInterval(error: unknown, interval: number, ceiling: number): number {
+  if (!(error instanceof DeviceFlowError)) throw error;
+  if (error.kind === "pending") return interval;
+  if (error.kind === "slow_down") return Math.min(interval * 2, ceiling);
+  throw error;
+}
+
+async function waitForDevicePoll(
+  interval: number,
+  approval: Promise<void>,
+  signal: { signalled: boolean; spent: boolean },
+): Promise<void> {
+  // An approval arriving during an exchange skips exactly one wait.
+  if (signal.signalled && !signal.spent) {
+    signal.spent = true;
+    return;
+  }
+  await waitForNextPoll({ ms: interval, approval: signal.spent ? null : approval });
+  if (signal.signalled) signal.spent = true;
 }

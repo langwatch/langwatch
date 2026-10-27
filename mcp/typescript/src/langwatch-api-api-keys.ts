@@ -1,4 +1,4 @@
-import { makeRequest } from "./langwatch-api.js";
+import { makeRequest } from "./langwatch-api.ts";
 
 export interface RoleBinding {
   id: string;
@@ -28,7 +28,7 @@ export interface ApiKeyCreateResponse {
 }
 
 export async function listApiKeys(): Promise<{ data: ApiKeySummary[] }> {
-  return makeRequest("GET", "/api/api-keys") as Promise<{ data: ApiKeySummary[] }>;
+  return makeRequest("GET", "/api/v1/api-keys") as Promise<{ data: ApiKeySummary[] }>;
 }
 
 export async function createApiKey(data: {
@@ -36,19 +36,18 @@ export async function createApiKey(data: {
   name: string;
   description?: string;
   expiresAt?: string;
-  bindings?: Array<{
+  bindings?: {
     role: "ADMIN" | "MEMBER" | "VIEWER";
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }>;
+  }[];
   projectIds?: string[];
 }): Promise<ApiKeyCreateResponse> {
-  return makeRequest("POST", "/api/api-keys", data) as Promise<ApiKeyCreateResponse>;
+  return makeRequest("POST", "/api/v1/api-keys", data) as Promise<ApiKeyCreateResponse>;
 }
 
 export async function revokeApiKey(id: string): Promise<{ success: boolean }> {
-  return makeRequest(
-    "DELETE",
-    `/api/api-keys/${encodeURIComponent(id)}`,
-  ) as Promise<{ success: boolean }>;
+  return makeRequest("DELETE", `/api/v1/api-keys/${encodeURIComponent(id)}`) as Promise<{
+    success: boolean;
+  }>;
 }

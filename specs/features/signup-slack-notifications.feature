@@ -8,7 +8,7 @@ Feature: Internal Slack notifications for new signups
     Given a user signs up with name "Jane Doe" and email "jane@example.com"
     And the new organization is named "Acme Corp"
 
-  # All 5 scenarios are bound to existing tests in platform/app/ee/billing/__tests__/notification.service.unit.test.ts.
+  # Bound in modules/organization/process/src/services/__tests__ (the announcement service and the onboarding ceremony).
 
   Scenario: Slack notification sent after onboarding creates the organization
     When the onboarding flow completes successfully
@@ -46,3 +46,8 @@ Feature: Internal Slack notifications for new signups
     When the onboarding flow completes successfully
     Then the organization is created successfully
     And the failure is captured for observability
+
+  Scenario: The signup notice carries the message and none of the client's options
+    Given the signup Slack webhook is configured
+    When the notice is posted
+    Then the body the webhook receives has no "timeout" field

@@ -10,22 +10,21 @@ from ...models.post_api_model_defaults_response_400 import PostApiModelDefaultsR
 from ...models.post_api_model_defaults_response_401 import PostApiModelDefaultsResponse401
 from ...models.post_api_model_defaults_response_422 import PostApiModelDefaultsResponse422
 from ...models.post_api_model_defaults_response_500 import PostApiModelDefaultsResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiModelDefaultsBody | Unset = UNSET,
+    body: PostApiModelDefaultsBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/model-defaults",
+        "url": "/api/v1/model-defaults",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -96,8 +95,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiModelDefaultsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiModelDefaultsBody,
 ) -> Response[
     PostApiModelDefaultsResponse200
     | PostApiModelDefaultsResponse400
@@ -106,10 +105,11 @@ def sync_detailed(
     | PostApiModelDefaultsResponse500
 ]:
     """Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST,
-    LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
+    LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher
+    scope.
 
     Args:
-        body (PostApiModelDefaultsBody | Unset):
+        body (PostApiModelDefaultsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -132,8 +132,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiModelDefaultsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiModelDefaultsBody,
 ) -> (
     PostApiModelDefaultsResponse200
     | PostApiModelDefaultsResponse400
@@ -143,10 +143,11 @@ def sync(
     | None
 ):
     """Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST,
-    LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
+    LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher
+    scope.
 
     Args:
-        body (PostApiModelDefaultsBody | Unset):
+        body (PostApiModelDefaultsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -164,8 +165,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiModelDefaultsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiModelDefaultsBody,
 ) -> Response[
     PostApiModelDefaultsResponse200
     | PostApiModelDefaultsResponse400
@@ -174,10 +175,11 @@ async def asyncio_detailed(
     | PostApiModelDefaultsResponse500
 ]:
     """Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST,
-    LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
+    LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher
+    scope.
 
     Args:
-        body (PostApiModelDefaultsBody | Unset):
+        body (PostApiModelDefaultsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -198,8 +200,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiModelDefaultsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiModelDefaultsBody,
 ) -> (
     PostApiModelDefaultsResponse200
     | PostApiModelDefaultsResponse400
@@ -209,10 +211,11 @@ async def asyncio(
     | None
 ):
     """Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST,
-    LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
+    LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher
+    scope.
 
     Args:
-        body (PostApiModelDefaultsBody | Unset):
+        body (PostApiModelDefaultsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

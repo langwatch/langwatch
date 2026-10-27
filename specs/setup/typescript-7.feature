@@ -13,36 +13,99 @@ Feature: TypeScript 7 is the compiler
   ADR: dev/docs/adr/099-typescript-7-is-the-compiler.md
 
   @unit
+  Scenario: An application checks its sources and its tests in one configuration
+    Given API, worker, and UI each keep a solution tsconfig.json and one check configuration, tsconfig.app.json
+    When the check configuration checks an application
+    Then its diagnostics include test directories and colocated test files
+    And the solution tsconfig.json compiles no file of its own
+    And the application's own typecheck script builds the solution, which references only that configuration
+
+  @unit
+  Scenario: A package's adopted dependencies are checked before its own source
+    Given a package's TypeScript project references its adopted workspace dependencies
+    When the package is typechecked
+    Then its dependencies are built and their declarations refreshed first
+    And the package resolves their public entries to declarations rather than implementation source
+    And invalid arguments against a dependency still produce type errors
+    But a failed dependency build stops the package's own check
+
+  @unit
   Scenario: The compiler API is only reached through its unstable export
     Given a file that needs a TypeScript AST
     When it imports the compiler
     Then it takes the AST types and predicates from the unstable export
     And no file value-imports the root `typescript` module
+    But a package held on 6 may, because there the root export is the compiler
 
   @unit
   Scenario: Every workspace package builds against one compiler major
     Given the workspace installs from a single root
     Then every package declares TypeScript 7
-    But the two packages that publish bundled declarations stay on 6
-    # tsup's `dts: true` bundles through the old programmatic compiler API,
-    # which 7 does not expose. Held deliberately, not by omission.
+    But the packages that drive the old programmatic compiler API stay on 6
+    # Two of them publish bundled declarations through tsup's `dts: true`; the
+    # third is the architecture linter, a synchronous CLI over the whole tree
+    # that uses a program, a printer and a scanner 7 does not expose. Held
+    # deliberately, not by omission — and held as a library only: they
+    # typecheck with 7, as the next scenario requires.
+
+  @unit
+  Scenario: A package held on 6 still typechecks with 7
+    Given a package that declares TypeScript 6 for its build or its runtime
+    When its typecheck script runs
+    Then the workspace's TypeScript 7 compiler checks it, not the package's own
+    # Its references reach build projects the root solution builds too; two
+    # compilers over one build info each mark the other's output stale.
+
+  # ADR-181: the workspace `tsc` launcher runs tsrs, the Rust port of the compiler.
+  @unit
+  Scenario: The workspace compiler is the Rust port, with the Go binary one switch away
+    Given the workspace's `tsc` command
+    When it reports its version
+    Then it names tsrs
+    But with LANGWATCH_TSC set to "tsgo" it is the Go binary TypeScript 7 ships
+    And on a platform tsrs supports, a missing tsrs binary stops the run instead of falling back
 
   @unit
   Scenario: The superseded preview compiler is gone
     Given TypeScript 7 is released
-    Then no package declares `@typescript/native-preview`
+    Then no workspace package declares `@typescript/native-preview`; the root keeps it as the language server tsrs falls back to (round 41)
 
-  @unit
+  # Gap: main's tsAst helper (parseSourceText) was deleted in 0affb6cbab; no helper parses source text that has no file.
+  @unit @unimplemented
   Scenario: Source text with no file behind it still parses
     Given a snippet that exists only as a string
     When a scan asks for its parsed form
     Then it gets back a syntax tree of that text
     And the scan walks it without the snippet ever reaching disk
 
-  @unit
+  # Gap: main's tsAst helper (parseSourceText) was deleted in 0affb6cbab; no helper parses source text that has no file.
+  @unit @unimplemented
   Scenario: A name reused with new text parses the new text
     Given a snippet was parsed under some file name
     When different text is parsed under that same name
     Then the second parse reflects the second text
     # The session caches source files by path, so a scan pinning a rule across
     # several snippets would otherwise judge every one of them by the first.
+
+  @unit
+  Scenario: Every package tsconfig extends the shared root base
+    Given the workspace declares one root tsconfig with the compiler options every package shares
+    When a package's own tsconfig.json is read
+    Then its "extends" field points at the shared root base
+    And the package layers only its own paths and overrides on top
+
+  @unit
+  Scenario: Every package sets incremental with its own build info file
+    Given a package tsconfig extends the shared root base
+    When the package is typechecked
+    Then its tsconfig declares "incremental": true
+    And its "tsBuildInfoFile" is scoped to that package under node_modules/.cache/tsbuildinfo
+    # A shared or missing path lets packages clobber each other's cache, or
+    # forces every typecheck to start cold.
+
+  @unit
+  Scenario: Checking one package does not invalidate another's cache
+    Given two packages each declare their own tsBuildInfoFile
+    When one package is typechecked
+    Then the other package's cached build info file is untouched
+    And that other package's next typecheck starts warm, not cold

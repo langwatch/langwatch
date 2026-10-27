@@ -1,0 +1,263 @@
+/**
+ * `langwatch ingest context`: the agent declares its repository and branch
+ * from inside the checkout, fixing a standing agent whose hooks only ever
+ * report its launch directory. Never exits non-zero or throws.
+ */
+
+import {
+  defaultClaudeSessionRegistryDir,
+  readClaudeSessionName,
+} from "@/cli/utils/governance/claude-session-registry";
+import type { AncestorProbe } from "@/cli/utils/governance/codex-ancestor-session";
+import { defaultCodexSessionsRoot } from "@/cli/utils/governance/codex-rollout-otlp";
+import {
+  codexSessionIndexPath,
+  readCodexThreadNames,
+} from "@/cli/utils/governance/codex-session-index";
+import { loadConfig } from "@/cli/utils/governance/config";
+import {
+  defaultStateDir,
+  readFingerprint,
+  stateFilePath,
+  writeFingerprint,
+} from "@/cli/utils/governance/hook-state";
+import {
+  buildSessionContextLogPayload,
+  normalizeSessionName,
+  parseTraceparent,
+  sessionContextFingerprint,
+  sessionTitleFromPrompt,
+} from "@/cli/utils/governance/session-context";
+import { sessionContextAgentFor } from "@/cli/utils/governance/session-context-agents";
+import { writeSpooledDeclaration } from "@/cli/utils/governance/session-context-spool";
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { type ResolvedSession, resolveSession } from "./context-session.ts";
+import { endProcessWhenDone } from "./end-process.ts";
+import { type GitRunner, readSessionContext, runGitCommand } from "./git-context.ts";
+import { type CliTelemetryConfig, postSessionContext, resolveTarget } from "./hook.ts";
+
+export interface ContextCommandOptions {
+  /** Declare for this session instead of resolving the live one. */
+  sessionId?: string;
+  /** The agent the session belongs to. Required with `sessionId`. */
+  agent?: string;
+  env?: NodeJS.ProcessEnv;
+  /** The checkout being declared. Defaults to where the agent ran this. */
+  cwd?: string;
+  runGit?: GitRunner;
+  fetchImpl?: typeof fetch;
+  now?: () => number;
+  stateDir?: string;
+  claudeRegistryDir?: string;
+  codexSessionsRoot?: string;
+  /** The process the ancestor walk starts from. Defaults to the parent. */
+  ancestorStartPid?: number;
+  /** The process-tree readings. Defaults to the real `ps` and `lsof`. */
+  ancestorProbe?: AncestorProbe;
+  readCliConfig?: () => CliTelemetryConfig;
+  /** One line to whoever ran the command. Defaults to stdout. */
+  writeLine?: (line: string) => void;
+}
+
+/**
+ * The declaration as the process the agent's shell runs: it ends itself after
+ * its one line, so a post given up at its deadline cannot hold the shell.
+ */
+export async function runContextProcess({
+  exit,
+  ...options
+}: ContextCommandOptions & { exit?: (code: number) => void } = {}): Promise<void> {
+  await endProcessWhenDone({ work: () => contextCommand(options), exit });
+}
+
+/**
+ * Declare the working context of the running coding-agent session.
+ * One line of output, exit zero, whatever happens.
+ */
+export async function contextCommand({
+  sessionId,
+  agent,
+  env = process.env,
+  cwd = process.cwd(),
+  runGit = runGitCommand,
+  fetchImpl = langwatchFetch,
+  now = Date.now,
+  stateDir = defaultStateDir(),
+  claudeRegistryDir,
+  codexSessionsRoot = defaultCodexSessionsRoot(),
+  ancestorStartPid = process.ppid,
+  ancestorProbe,
+  readCliConfig = loadConfig,
+  writeLine = (line) => process.stdout.write(`${line}\n`),
+}: ContextCommandOptions = {}): Promise<void> {
+  try {
+    await declare({
+      sessionId,
+      agent,
+      env,
+      cwd,
+      runGit,
+      fetchImpl,
+      now,
+      stateDir,
+      claudeRegistryDir,
+      codexSessionsRoot,
+      ancestorStartPid,
+      ancestorProbe,
+      readCliConfig,
+      writeLine,
+    });
+  } catch (error) {
+    writeLine(`Could not declare the context: ${(error as Error).message}`);
+  }
+}
+
+async function declare({
+  sessionId,
+  agent,
+  env,
+  cwd,
+  runGit,
+  fetchImpl,
+  now,
+  stateDir,
+  claudeRegistryDir,
+  codexSessionsRoot,
+  ancestorStartPid,
+  ancestorProbe,
+  readCliConfig,
+  writeLine,
+}: Required<
+  Omit<ContextCommandOptions, "sessionId" | "agent" | "claudeRegistryDir" | "ancestorProbe">
+> &
+  Pick<
+    ContextCommandOptions,
+    "sessionId" | "agent" | "claudeRegistryDir" | "ancestorProbe"
+  >): Promise<void> {
+  const session = await resolveSession({
+    sessionId,
+    agent,
+    env,
+    now,
+    codexSessionsRoot,
+    ancestorStartPid,
+    ancestorProbe,
+    writeLine,
+  });
+  if (!session) return;
+
+  const context = readSessionContext({ directory: cwd, runGit });
+  if (!context) {
+    writeLine(
+      `No git repository with an origin remote at ${cwd}. Run this from inside the checkout you are working on.`,
+    );
+    return;
+  }
+
+  // The same key the agent's own hook posts with, read off the same table, so
+  // a declaration and the hook land in the same project.
+  const target = resolveTarget({
+    env,
+    sourceType: sessionContextAgentFor(session.agent)?.keySourceType(env) ?? session.agent,
+    readCliConfig,
+  });
+  if (!target) {
+    writeLine(
+      "LangWatch telemetry is not configured on this machine, so there is nowhere to declare to.",
+    );
+    return;
+  }
+
+  // The titles ride exactly as each agent's own seam sends them, so this
+  // declaration and that seam fingerprint identically and post once between
+  // them. Claude names its sessions in a live registry; codex names its in
+  // the rollout's first typed prompt and its session index.
+  const title = session.codexMeta?.firstUserMessage
+    ? sessionTitleFromPrompt(session.codexMeta.firstUserMessage)
+    : null;
+  let name: string | null = null;
+  if (session.agent === "claude_code") {
+    name = normalizeSessionName(
+      readClaudeSessionName({
+        sessionId: session.sessionId,
+        registryDir: claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
+      }),
+    );
+  } else if (session.agent === "codex") {
+    name = normalizeSessionName(
+      (await readCodexThreadNames(codexSessionIndexPath(codexSessionsRoot))).get(session.sessionId),
+    );
+  }
+
+  const fingerprint = sessionContextFingerprint(context, { title, name });
+  const stateFile = stateFilePath({
+    stateDir,
+    agent: session.agent,
+    sessionId: session.sessionId,
+  });
+  const declared = describeContext({ context, session });
+  if (readFingerprint(stateFile) === fingerprint) {
+    writeLine(`Context already declared: ${declared}`);
+    return;
+  }
+
+  const payload = buildSessionContextLogPayload({
+    sessionId: session.sessionId,
+    agent: session.agent,
+    context,
+    timeUnixNano: `${now()}000000`,
+    scopeVersion: LANGWATCH_SDK_VERSION,
+    trace: parseTraceparent(env.TRACEPARENT),
+    title,
+    name,
+  });
+
+  const posted = await postSessionContext({ target, env, payload, fetchImpl });
+  if (!posted.ok) {
+    // Under codex's default sandbox this shell has no network, so retrying
+    // from here would fail exactly the same way every time. The declaration
+    // is queued instead, for the session report to deliver: that runs from
+    // the agent's own process, outside the sandbox. The fingerprint stays
+    // unwritten, so nothing yet claims this context landed.
+    try {
+      writeSpooledDeclaration({
+        stateDir,
+        agent: session.agent,
+        sessionId: session.sessionId,
+        fingerprint,
+        payload,
+        now,
+      });
+      writeLine(`Queued ${declared}; it will be sent when this session next reports.`);
+    } catch (error) {
+      writeLine(
+        `LangWatch did not accept the declaration and it could not be queued: ${(error as Error).message}`,
+      );
+    }
+    return;
+  }
+
+  try {
+    writeFingerprint({ stateFile, fingerprint, now });
+  } catch {
+    // A fingerprint we cannot record costs one duplicate record next time.
+    void 0;
+  }
+  writeLine(`Declared ${declared}`);
+}
+
+function describeContext({
+  context,
+  session,
+}: {
+  context: NonNullable<ReturnType<typeof readSessionContext>>;
+  session: ResolvedSession;
+}): string {
+  const repo = context.repository
+    ? `${context.repository.host}/${context.repository.owner}/${context.repository.name}`
+    : "(no repository)";
+  const branch = context.branch ? `@${context.branch}` : "";
+  return `${repo}${branch} for ${session.agent} session ${session.sessionId}`;
+}

@@ -1,0 +1,86 @@
+# How long each workspace package's suites take in the package-suites job, in
+# seconds, so `.github/scripts/run-package-suites.ts` can split them over the
+# shards by weight instead of by count. One package per line: `<package>  <seconds>`.
+#
+# Every shard reads this file from the checkout and computes the split alone, so
+# the file must never come from a cache or a previous run: two shards holding
+# different weights would run a package twice or not at all.
+#
+# A package not listed here costs 5 seconds (DEFAULT_WEIGHT_SECONDS), which is
+# what the ~160 small contract and process packages measured on average. Only
+# packages of 20 seconds or more are listed, so the file stays short.
+#
+# Measured as the median of package-suites runs 39365033127, 39361384457,
+# 39357729994 and 39357260279 on main (all eight shards green in each).
+# To refresh: open a green main run's package-suites job summaries, paste the
+# "Measured seconds" blocks of all eight shards here, and sort by seconds.
+
+@langwatch/trace-browser  595
+@langwatch/analytics-process  368
+@langwatch/design-system  295
+@langwatch/scenario-browser  274
+@langwatch/enterprise-governance-browser  246
+@langwatch/trace-process  235
+@langwatch/langy-browser  226
+@langwatch/analytics-browser  219
+@langwatch/enterprise-governance-process  209
+@langwatch/experiment-browser  177
+@langwatch/prompt-browser  174
+@langwatch/scenario-process  170
+@langwatch/ops-browser  162
+@langwatch/test-harness  162
+@langwatch/gateway-process  147
+@langwatch/enterprise-billing-process  141
+@langwatch/group-queue  138
+@langwatch/organization-browser  134
+@langwatch/ops-process  128
+@langwatch/navigation-browser  122
+@langwatch/gateway-browser  116
+@langwatch/automation-browser  112
+@langwatch/model-provider-browser  105
+@langwatch/process  105
+@langwatch/auth-browser  98
+@langwatch/identity-process  95
+@langwatch/workflow-browser  95
+@langwatch/tasks  93
+@langwatch/user-browser  89
+@langwatch/evaluator-browser  87
+@langwatch/auth-process  84
+@langwatch/experiment-process  76
+@langwatch/agent-browser  75
+@langwatch/enterprise-sso-browser  71
+@langwatch/langy-process  69
+@langwatch/evaluation-process  67
+@langwatch/dataset-browser  60
+@langwatch/project-browser  59
+@langwatch/onboarding-browser  58
+@langwatch/eventing  52
+@langwatch/automation-process  51
+@langwatch/workflow-process  51
+@langwatch/architecture-enforcer  50
+@langwatch/agent-process  48
+@langwatch/webhook-process  48
+@langwatch/annotation-browser  45
+@langwatch/browser-host  45
+@langwatch/suite-process  45
+@langwatch/api-key-browser  44
+@langwatch/model-provider-process  41
+@langwatch/enterprise-scim-process  40
+@langwatch/organization-process  38
+@langwatch/dashboard-process  35
+@langwatch/scenario-child  34
+@langwatch/metric-process  32
+@langwatch/browser  30
+@langwatch/coding-agent-process  29
+@langwatch/sims  28
+@langwatch/api  27
+@langwatch/enterprise-licensing-browser  25
+@langwatch/api-key-process  23
+@langwatch/enterprise-scim-browser  23
+@langwatch/prompt-process  23
+@langwatch/enterprise-billing-browser  22
+@langwatch/process-stores  22
+@langwatch/stored-object-process  22
+@langwatch/authz-process  21
+@langwatch/topic-process  21
+@langwatch/coding-agent-browser  20

@@ -1,3 +1,5 @@
+> Archive note: dated run, kept as history. Its sign-in provider and compose setup no longer exist; current setup is in `../HOW_TO.md` and `haven-browser`.
+
 # Browser Test Run — Scenario Archiving
 
 **Date:** 2026-02-05
@@ -7,10 +9,10 @@
 
 ## Scenarios Tested
 
-| # | Scenario | Result | Notes |
-|---|----------|--------|-------|
-| 1 | Archive a single scenario via row action menu | PASS | Row menu shows "Archive", confirmation modal shows scenario name + undo message. Scenario removed from list after confirm. |
-| 2 | Batch archive multiple selected scenarios | PASS | Select all checks both rows, batch bar shows "2 selected". Confirmation modal shows "Archive 2 scenarios?" listing both. Both removed after confirm. |
+| #   | Scenario                                      | Result | Notes                                                                                                                                                |
+| --- | --------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Archive a single scenario via row action menu | PASS   | Row menu shows "Archive", confirmation modal shows scenario name + undo message. Scenario removed from list after confirm.                           |
+| 2   | Batch archive multiple selected scenarios     | PASS   | Select all checks both rows, batch bar shows "2 selected". Confirmation modal shows "Archive 2 scenarios?" listing both. Both removed after confirm. |
 
 ## Setup Notes
 

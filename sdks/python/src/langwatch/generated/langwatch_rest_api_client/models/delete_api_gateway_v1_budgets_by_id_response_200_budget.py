@@ -4,10 +4,12 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.delete_api_gateway_v1_budgets_by_id_response_200_budget_on_breach import (
     DeleteApiGatewayV1BudgetsByIdResponse200BudgetOnBreach,
+)
+from ..models.delete_api_gateway_v1_budgets_by_id_response_200_budget_scope_reach import (
+    DeleteApiGatewayV1BudgetsByIdResponse200BudgetScopeReach,
 )
 from ..models.delete_api_gateway_v1_budgets_by_id_response_200_budget_scope_type import (
     DeleteApiGatewayV1BudgetsByIdResponse200BudgetScopeType,
@@ -40,28 +42,23 @@ class DeleteApiGatewayV1BudgetsByIdResponse200Budget:
         on_breach (DeleteApiGatewayV1BudgetsByIdResponse200BudgetOnBreach):
         limit_usd (str): Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never
             exponent notation. Use limit_nano_usd for arithmetic.
-        limit_nano_usd (int | None): Canonical integer amount, nano-USD. Null past the safe integer range, where
-            limit_usd still reads.
-        spent_usd (None | str): Display value, null when spend_available is false. Decimal string, up to 9 fractional
-            digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic.
-        spent_nano_usd (int | None): Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the
-            same integer as spent_usd, so the pair always agrees.
+        limit_nano_usd (int | None):
+        spent_usd (None | str):
+        spent_nano_usd (int | None):
         timezone (None | str):
         provider_key (None | str):
         external_id (None | str):
         metadata (DeleteApiGatewayV1BudgetsByIdResponse200BudgetMetadata):
-        current_period_started_at (str): Start of the period `spent_usd` covers, computed at read time. For an anchored
-            budget this is its own cycle's start, not the calendar period's.
-        resets_at (str): When the current period gives way to the next. Far-future for total and manual windows, which
-            do not roll on their own.
-        cycle_anchor_at (None | str): The instant this budget's cycle is phased to, or null when the window is calendar
-            aligned.
+        current_period_started_at (str):
+        resets_at (str):
+        cycle_anchor_at (None | str):
         last_reset_at (None | str):
         archived_at (None | str):
         created_at (str):
         member_count (int | Unset):
         end_users_seen (int | Unset):
         end_users_over (int | Unset):
+        scope_reach (DeleteApiGatewayV1BudgetsByIdResponse200BudgetScopeReach | Unset):
     """
 
     id: str
@@ -89,7 +86,7 @@ class DeleteApiGatewayV1BudgetsByIdResponse200Budget:
     member_count: int | Unset = UNSET
     end_users_seen: int | Unset = UNSET
     end_users_over: int | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    scope_reach: DeleteApiGatewayV1BudgetsByIdResponse200BudgetScopeReach | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -152,8 +149,12 @@ class DeleteApiGatewayV1BudgetsByIdResponse200Budget:
 
         end_users_over = self.end_users_over
 
+        scope_reach: str | Unset = UNSET
+        if not isinstance(self.scope_reach, Unset):
+            scope_reach = self.scope_reach.value
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -186,6 +187,8 @@ class DeleteApiGatewayV1BudgetsByIdResponse200Budget:
             field_dict["end_users_seen"] = end_users_seen
         if end_users_over is not UNSET:
             field_dict["end_users_over"] = end_users_over
+        if scope_reach is not UNSET:
+            field_dict["scope_reach"] = scope_reach
 
         return field_dict
 
@@ -296,6 +299,13 @@ class DeleteApiGatewayV1BudgetsByIdResponse200Budget:
 
         end_users_over = d.pop("end_users_over", UNSET)
 
+        _scope_reach = d.pop("scope_reach", UNSET)
+        scope_reach: DeleteApiGatewayV1BudgetsByIdResponse200BudgetScopeReach | Unset
+        if isinstance(_scope_reach, Unset):
+            scope_reach = UNSET
+        else:
+            scope_reach = DeleteApiGatewayV1BudgetsByIdResponse200BudgetScopeReach(_scope_reach)
+
         delete_api_gateway_v1_budgets_by_id_response_200_budget = cls(
             id=id,
             organization_id=organization_id,
@@ -322,23 +332,7 @@ class DeleteApiGatewayV1BudgetsByIdResponse200Budget:
             member_count=member_count,
             end_users_seen=end_users_seen,
             end_users_over=end_users_over,
+            scope_reach=scope_reach,
         )
 
-        delete_api_gateway_v1_budgets_by_id_response_200_budget.additional_properties = d
         return delete_api_gateway_v1_budgets_by_id_response_200_budget
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

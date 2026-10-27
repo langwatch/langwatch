@@ -13,7 +13,7 @@ ordinary multi-agent work:
 - a whole-tree `typecheck:tests` run peaking at **10.0 GiB RSS**;
 - a second whole-tree run at 2.5–7.4 GiB running **concurrently** — allowed,
   because the check-queue's slot policy (ADR-090 era, `dev/scripts/check-queue.mjs`)
-  bounds *concurrency* (2 slots on this machine), not *memory*, and its sizing
+  bounds _concurrency_ (2 slots on this machine), not _memory_, and its sizing
   formula assumes ~3–4 GiB per run;
 - long-lived `tsgo --lsp` instances of ~2.5 GiB each, one per worktree the
   tslsp daemon has ever served, parented to PID 1 and **exempt from every
@@ -107,6 +107,32 @@ Every kill is logged with the reason, class, RSS and age, and counted in the
 kill metric by reason — so "did the Prisma 7 upgrade make types cheaper" is
 answered from the recorded per-class footprint history rather than a hunch.
 
+## Amendment (2026-08-25): the compiler answers to two names
+
+TypeScript 7 shipped as the `typescript` package and **renamed the native
+binary from `tsgo` to `tsc`** (`lib/getExePath.js` picks the name from the
+package it was published in; `lib/tsc.js` then `execve()`s it, so the live
+process image IS the compiler and its argv[0] ends in `/tsc`). The governor
+selected on `binaryBase(command) == "tsgo"`, so on a machine that had moved to
+typescript@7 it selected **nothing**: no per-run ceiling, no combined budget,
+no runaway reclamation, and the compiler did not even reach the dev-tooling
+dashboards, because it matched no watched class either.
+
+The selection rule is now name-neutral — `domain.IsTypeScriptCompilerCommand`
+accepts `tsc` and `tsgo`, still matched on the binary's base name and never on
+the args — and both land in the **same** watched class, so one compiler is one
+budget however it was installed. Nothing above changes: the knobs keep their
+`HAVEN_TSGO_*` names, the class attribute and the reap Kind stay spelled
+`tsgo`, and a machine still running the preview package (or a local build of
+the TypeScript repo, which still produces `tsgo`) behaves exactly as before.
+Splitting the two names into two classes was rejected for the same reason:
+each half of a machine's compilers would then be weighed against the whole
+budget, and the recorded history would be cut in two.
+
+`haven gate` gained the compiler by binary name rather than by substring —
+`tsc` is a substring of `tsconfig.json`, and a gate that queues `cat` is its
+own outage. See ADR-099 for the compiler move itself.
+
 ## Consequences
 
 - No spawn path can take the machine down: unshimmed binaries, editors and
@@ -131,5 +157,6 @@ answered from the recorded per-class footprint history rather than a hunch.
 
 - ADR-090 — machine-wide resource governance (pressure, demotion, no kills for stacks)
 - ADR-091 — haven gate (agent-session admission)
+- ADR-099 — TypeScript 7 is the compiler (the rename this governor was amended for)
 - `specs/setup/haven-tsgo-governor.feature` — the behavioural contract
 - `specs/setup/check-slots.feature` — the whole-tree check queue this backstops

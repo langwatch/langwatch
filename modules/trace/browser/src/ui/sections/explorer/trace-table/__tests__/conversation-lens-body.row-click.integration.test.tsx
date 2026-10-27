@@ -1,0 +1,197 @@
+// Click: row opens most recent trace in drawer; chevron expands turns
+// inline.
+// @vitest-environment jsdom
+// @see specs/traces-v2/sessions-lens.feature
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
+import "@testing-library/jest-dom/vitest";
+
+import type { ConversationGroup } from "../../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import { setTraceTableScrollElement } from "../../../../../behavior/explorer/trace-table/scroll-context.ts";
+import { mapSessionGroupToConversationGroup } from "../../../../../behavior/explorer/utils/map-session-groups-payload.ts";
+import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
+import { type LensConfig } from "../../../../../behavior/view.slice.ts";
+import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
+import { ConversationLensBody } from "../conversation-lens-body.tsx";
+
+const { openDrawerMock } = vi.hoisted(() => ({ openDrawerMock: vi.fn() }));
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDrawer: () => ({ openDrawer: openDrawerMock }),
+}));
+
+/** The project the page is on: a plain project, or an aggregate. */
+const page = vi.hoisted(() => ({ projectId: "project-plain" }));
+
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: page.projectId } }),
+}));
+
+// The expanded row's turns come from their own conversation-scoped query;
+// nothing here needs them to land, only whether the row asked to expand.
+vi.mock("../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
+  useConversationTurns: () => ({ data: undefined }),
+}));
+
+const LAST_ACTIVITY_MS = 1_700_003_600_000;
+
+function conversationRow(overrides: Partial<SessionGroupPayloadItem> = {}): ConversationGroup {
+  return mapSessionGroupToConversationGroup({
+    conversationId: "conv-1",
+    projectId: "project-plain",
+    traceCount: 4,
+    totalCost: 1.5,
+    totalTokens: 90_000,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    contextSizeTokens: 40_000,
+    totalDurationMs: 12_000,
+    startedAtMs: LAST_ACTIVITY_MS - 600_000,
+    lastActivityMs: LAST_ACTIVITY_MS,
+    models: ["claude-sonnet-4"],
+    primaryModel: "claude-sonnet-4",
+    serviceName: "coding-agent-cli",
+    errorCount: 0,
+    warningCount: 0,
+    totalSpans: 900,
+    lastTraceId: "trace-latest",
+    input: "make the tests pass",
+    output: "all green",
+    codingAgent: null,
+    ...overrides,
+  });
+}
+
+const lens: LensConfig = {
+  id: "conversations",
+  name: "Conversations",
+  isBuiltIn: true,
+  columns: ["conversation", "turns"],
+  addons: ["conversation-turns"],
+  grouping: "by-conversation",
+  sort: { columnId: "lastTurn", direction: "desc" },
+  filterText: "",
+};
+
+function renderBody(groups: ConversationGroup[]) {
+  return renderWithDesignSystem(<ConversationLensBody groups={groups} lens={lens} />);
+}
+
+/** The main row of the first conversation, the surface a reader clicks. */
+function firstRow(): HTMLElement {
+  const row = document.querySelector("tbody tr");
+  if (!row) throw new Error("no conversation row rendered");
+  return row as HTMLElement;
+}
+
+const expandToggle = () => screen.getByRole("button", { name: /Expand turns|Collapse turns/ });
+
+beforeEach(() => {
+  openDrawerMock.mockClear();
+  setWindowAddress({ url: "/my-project/traces" });
+  page.projectId = "project-plain";
+  // The open row outlives a remount now that it lives in the Explorer store.
+  useExplorerStore.getState().setExpandedRows([]);
+  // The virtualizer windows rows to the scroll element's height, and jsdom
+  // measures every element as zero, which windows the table down to no rows
+  // at all and leaves every assertion below passing vacuously. Publishing a
+  // scroll element that reports a real height is what puts rows on screen.
+  const scrollElement = document.createElement("div");
+  Object.defineProperty(scrollElement, "offsetHeight", { value: 800 });
+  Object.defineProperty(scrollElement, "offsetWidth", { value: 1200 });
+  document.body.appendChild(scrollElement);
+  setTraceTableScrollElement(scrollElement);
+});
+
+afterEach(() => {
+  cleanup();
+  setTraceTableScrollElement(null);
+});
+
+describe("given the conversations lens is showing grouped rows", () => {
+  describe("when the reader clicks a conversation row", () => {
+    /** @scenario Clicking a conversation opens its latest trace in the drawer */
+    it("opens the drawer on the conversation's most recent trace, without expanding the row", async () => {
+      const user = userEvent.setup();
+      renderBody([conversationRow()]);
+
+      await user.click(firstRow());
+
+      expect(openDrawerMock).toHaveBeenCalledWith("traceV2Details", {
+        traceId: "trace-latest",
+        t: String(LAST_ACTIVITY_MS),
+      });
+      expect(expandToggle()).toHaveAccessibleName("Expand turns");
+    });
+  });
+
+  describe("when the reader clicks a session row on an aggregate project", () => {
+    it("opens the drawer on the member the session belongs to, and names it in the link", async () => {
+      page.projectId = "project-aggregate";
+      const user = userEvent.setup();
+      renderBody([conversationRow({ projectId: "project-member" })]);
+
+      await user.click(firstRow());
+
+      expect(openDrawerMock).toHaveBeenCalledWith("traceV2Details", {
+        traceId: "trace-latest",
+        t: String(LAST_ACTIVITY_MS),
+        tenantId: "project-member",
+      });
+    });
+  });
+
+  describe("when the reader clicks the row's expand chevron", () => {
+    /** @scenario The chevron alone expands a conversation inline */
+    it("expands the conversation and leaves the drawer closed", async () => {
+      const user = userEvent.setup();
+      renderBody([conversationRow()]);
+
+      await user.click(expandToggle());
+
+      expect(expandToggle()).toHaveAccessibleName("Collapse turns");
+      expect(openDrawerMock).not.toHaveBeenCalled();
+      expect(getTraceDrawer().isOpen).toBe(false);
+    });
+  });
+
+  describe("when the table unmounts with a conversation open", () => {
+    /** @scenario "Open rows leave the component and survive a remount" */
+    it("shows the same conversation open when it mounts again", async () => {
+      const user = userEvent.setup();
+      const first = renderBody([conversationRow()]);
+      await user.click(expandToggle());
+      first.unmount();
+
+      renderBody([conversationRow()]);
+
+      expect(expandToggle()).toHaveAccessibleName("Collapse turns");
+      expect(Array.from(useExplorerStore.getState().expandedRows)).toEqual(["conv-1"]);
+    });
+  });
+
+  describe("when the read named no trace for a conversation", () => {
+    // Only client-grouped rows (onboarding sample preview) and skeletons get
+    // here; expanding keeps the row useful rather than making it dead surface.
+    it("expands on click instead of opening an absent trace", async () => {
+      const user = userEvent.setup();
+      renderBody([conversationRow({ lastTraceId: null })]);
+
+      await user.click(firstRow());
+
+      expect(openDrawerMock).not.toHaveBeenCalled();
+      expect(expandToggle()).toHaveAccessibleName("Collapse turns");
+    });
+  });
+});

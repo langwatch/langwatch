@@ -1,16 +1,5 @@
 /**
- * `langwatch ingest install codex` wires the turn harvest, not just telemetry.
- *
- * Codex exports tokens, model and timing and no conversation, so activating
- * capture without asking codex to run the harvest after a turn leaves a
- * scripted setup with traces nobody can read. Running this command explicitly
- * IS the consent, so nothing here asks a question: that is what makes it the
- * path a CI job or a setup script can take.
- *
- * The mint is the only thing faked. The config is a real file behind
- * LANGWATCH_CLI_CONFIG and the codex config.toml the command merges into is a
- * real file in a temp directory.
- *
+ * Install turn harvest for Codex; only mint is faked, config is real.
  * Feature: specs/coding-agent/codex-content-capture.feature
  */
 
@@ -27,9 +16,7 @@ const { mintIngestionKeyMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/cli/utils/governance/cli-api", async () => {
-  const actual = await vi.importActual<typeof CliApiModule>(
-    "@/cli/utils/governance/cli-api",
-  );
+  const actual = await vi.importActual<typeof CliApiModule>("@/cli/utils/governance/cli-api");
   return { ...actual, mintIngestionKey: mintIngestionKeyMock };
 });
 
@@ -60,12 +47,9 @@ const origConfig = process.env.LANGWATCH_CLI_CONFIG;
 const stdout = (): string =>
   stdoutSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("");
 
-const readConfigToml = (): string =>
-  fs.readFileSync(codexConfigPath, "utf8");
+const readConfigToml = (): string => fs.readFileSync(codexConfigPath, "utf8");
 
-const runCodexInstall = async (
-  overrides: Record<string, unknown> = {},
-): Promise<void> => {
+const runCodexInstall = async (overrides: Record<string, unknown> = {}): Promise<void> => {
   const { installCommand } = await import("../install.js");
   await installCommand("codex", {
     codexConfigPath,
@@ -122,9 +106,7 @@ describe("the codex ingestion install", () => {
       it("reports what it did to the codex configuration", async () => {
         await runCodexInstall();
 
-        expect(stdout()).toContain(
-          "Codex will record each turn's conversation as it completes",
-        );
+        expect(stdout()).toContain("Codex will record each turn's conversation as it completes");
       });
 
       it("carries the harvest action in the json report", async () => {
@@ -143,9 +125,7 @@ describe("the codex ingestion install", () => {
         await runCodexInstall();
 
         const toml = readConfigToml();
-        expect((toml.match(/langwatch codex notify begin/g) ?? []).length).toBe(
-          1,
-        );
+        expect((toml.match(/langwatch codex notify begin/g) ?? []).length).toBe(1);
       });
     });
 
@@ -164,10 +144,7 @@ describe("the codex ingestion install", () => {
         fs.mkdirSync(path.dirname(codexConfigPath), { recursive: true });
         // Two top-level assignments: moving one aside still leaves the other,
         // and a duplicate key stops codex from starting at all.
-        fs.writeFileSync(
-          codexConfigPath,
-          'notify = ["/one"]\nnotify = ["/two"]\n',
-        );
+        fs.writeFileSync(codexConfigPath, 'notify = ["/one"]\nnotify = ["/two"]\n');
 
         await runCodexInstall();
 
@@ -178,10 +155,7 @@ describe("the codex ingestion install", () => {
 
       it("carries the blocked action in the json report", async () => {
         fs.mkdirSync(path.dirname(codexConfigPath), { recursive: true });
-        fs.writeFileSync(
-          codexConfigPath,
-          'notify = ["/one"]\nnotify = ["/two"]\n',
-        );
+        fs.writeFileSync(codexConfigPath, 'notify = ["/one"]\nnotify = ["/two"]\n');
 
         await runCodexInstall({ json: true });
 

@@ -35,6 +35,82 @@ func TestClassifyCommandGatesOnlyWhatIsHeavy(t *testing.T) {
 			}
 		})
 	})
+
+	// TypeScript 7 renamed the compiler binary to `tsc`, so the route around
+	// the package scripts is spelled differently now and costs exactly as
+	// much as it did.
+	t.Run("given the compiler invoked directly under either name", func(t *testing.T) {
+		t.Run("each is heavy", func(t *testing.T) {
+			for _, cmd := range []string{
+				"./node_modules/.bin/tsc --noEmit --project ./tsconfig.tsgo.json",
+				"pnpm exec tsc --noEmit -p tsconfig.json",
+				"pnpm exec tsgo --noEmit -p tsconfig.tsgo.json",
+				"cd apps/api && tsc -p tsconfig.test.json",
+			} {
+				if _, heavy := ClassifyCommand(cmd); !heavy {
+					t.Fatalf("%q should be gated", cmd)
+				}
+			}
+		})
+
+		// "tsc" is three letters and a substring of "tsconfig.json", so it is
+		// matched as the binary a word invokes rather than as text anywhere in
+		// the line. Reading a project file as a compiler run is the over-match
+		// that has a developer wondering why `cat` was queued.
+		t.Run("but naming the config file is not running the compiler", func(t *testing.T) {
+			for _, cmd := range []string{
+				"cat apps/api/tsconfig.json",
+				"grep -n strict apps/api/tsconfig.json",
+				"git diff tsconfig.json",
+				"/x/bin/mytsc --noEmit",
+				"node dev/scripts/check-queue.mjs ./node_modules/.bin/tsc.real --noEmit -p tsconfig.json",
+			} {
+				if _, heavy := ClassifyCommand(cmd); heavy {
+					t.Fatalf("%q must not be gated", cmd)
+				}
+			}
+		})
+	})
+}
+
+// @scenario "A command that only mentions a heavy tool is not gated"
+func TestClassifyCommandGatesOnInvocationNotSubstring(t *testing.T) {
+	t.Run("given a command that only reads, searches or prints text naming a heavy tool", func(t *testing.T) {
+		// The 2026-09-10 incident: a status read piped through head and awk, and
+		// a grep for the classifier's own source, were both queued behind the
+		// machine-wide slot for tens of minutes because they mentioned "vitest",
+		// "tsc" and "golangci" as plain text, never as a program they ran.
+		for _, cmd := range []string{
+			`HAVEN_AGENT=1 haven machine slot explain 2>&1 | head -20; echo ---; ps -eo rss,comm | awk '$2 ~ /node|tsgo|tsc|golangci|vitest/ {n[$2]++} END {for (k in n) print k, n[k]}'`,
+			`grep -rn 'func.*[Cc]lassif\|"vitest"\|"tsc"\|"golangci' --include='*.go' domain app | grep -v _test`,
+			"grep -rn vitest.config .",
+			"cat vitest.config.ts",
+			"echo typecheck",
+		} {
+			t.Run(cmd, func(t *testing.T) {
+				if _, heavy := ClassifyCommand(cmd); heavy {
+					t.Fatalf("mentioning a heavy tool must not gate: %q", cmd)
+				}
+			})
+		}
+	})
+
+	t.Run("given a command that genuinely invokes a heavy tool, however it is wrapped", func(t *testing.T) {
+		for _, cmd := range []string{
+			"pnpm typecheck:one apps/api",
+			"cd tools && pnpm --filter @langwatch/ui test:unit src/x.test.ts",
+			"HAVEN_AGENT=1 pnpm exec vitest run src/x.test.ts",
+			"./node_modules/.bin/tsc --noEmit -p tsconfig.json",
+			"golangci-lint run ./tools/...",
+			"make typecheck",
+		} {
+			t.Run(cmd, func(t *testing.T) {
+				if _, heavy := ClassifyCommand(cmd); !heavy {
+					t.Fatalf("an actual invocation must still gate: %q", cmd)
+				}
+			})
+		}
+	})
 }
 
 // @scenario "An integration run is never narrowed"
@@ -74,6 +150,22 @@ func TestClassifyCommandSeparatesIntegrationFromUnit(t *testing.T) {
 }
 
 // @scenario "A caller's own worker count is respected but still admitted"
+// One compiler is one population: a `tsc` run has to file its duration where
+// its `tsgo` predecessor filed, or the estimate that decides whether a run is
+// narrowed has no prior observation and treats it as long.
+func TestDurationKeyBucketsBothCompilerNamesTogether(t *testing.T) {
+	t.Run("given the compiler invoked under each of its names", func(t *testing.T) {
+		tsc := DurationKey("./node_modules/.bin/tsc --noEmit -p tsconfig.json")
+		tsgo := DurationKey("./node_modules/.bin/tsgo --noEmit -p tsconfig.json")
+
+		t.Run("both land in one bucket", func(t *testing.T) {
+			if tsc != TypeScriptCompilerClass || tsgo != TypeScriptCompilerClass {
+				t.Fatalf("tsc = %q, tsgo = %q, want both %q", tsc, tsgo, TypeScriptCompilerClass)
+			}
+		})
+	})
+}
+
 func TestCallerSetWorkersIsDetected(t *testing.T) {
 	t.Run("given a command that already chose its width", func(t *testing.T) {
 		t.Run("the gate notices, and will not override it", func(t *testing.T) {
@@ -93,67 +185,6 @@ func TestCallerSetWorkersIsDetected(t *testing.T) {
 		t.Run("the gate is free to narrow it", func(t *testing.T) {
 			if CallerSetWorkers("pnpm test:unit run src/x") {
 				t.Fatal("expected no caller-chosen width")
-			}
-		})
-	})
-}
-
-// @scenario "A heavy command is passed to haven as one escaped argument"
-// @scenario "A command containing shell operators is gated as a whole"
-// @scenario "The rewrap names haven by absolute path"
-// @scenario "A command already under haven's heavy class is not rewrapped again"
-func TestWrapCommandKeepsTheWholeShellLineInsideTheSlot(t *testing.T) {
-	const havenPath = "/opt/homebrew/bin/haven"
-
-	t.Run("given a command joined to another by a shell operator", func(t *testing.T) {
-		wrapped := WrapCommand(havenPath, "pnpm test:unit && echo done", WrapOptions{})
-
-		t.Run("the whole line is passed as one quoted argument", func(t *testing.T) {
-			if !strings.Contains(wrapped, `--sh 'pnpm test:unit && echo done'`) {
-				t.Fatalf("the operator must stay inside the quotes, got %q", wrapped)
-			}
-		})
-
-		t.Run("so no part of it is parsed at the outer level", func(t *testing.T) {
-			// The line has to end at the closing quote. Anything the wrapper let
-			// past it would be parsed by the outer shell and run outside the slot.
-			if !strings.HasSuffix(wrapped, "'") {
-				t.Fatalf("part of the line escaped the slot: %q", wrapped)
-			}
-			if words := ShellWords(wrapped); words[len(words)-1] != "pnpm test:unit && echo done" {
-				t.Fatalf("the operator must arrive as one argument, got %q", words)
-			}
-		})
-
-		t.Run("and haven is named by absolute path, because PATH is optional", func(t *testing.T) {
-			if !strings.HasPrefix(wrapped, ShellQuote(havenPath)) {
-				t.Fatalf("expected an absolute path, got %q", wrapped)
-			}
-		})
-	})
-
-	t.Run("given a command carrying a single quote", func(t *testing.T) {
-		wrapped := WrapCommand(havenPath, `echo 'it works'`, WrapOptions{})
-
-		t.Run("the quote is escaped rather than closing the argument early", func(t *testing.T) {
-			if strings.Count(wrapped, "--sh") != 1 {
-				t.Fatalf("expected one wrapped argument, got %q", wrapped)
-			}
-			if !strings.Contains(wrapped, `'"'"'`) {
-				t.Fatalf("expected the embedded quote escaped, got %q", wrapped)
-			}
-		})
-	})
-
-	t.Run("given a command already under haven's heavy class", func(t *testing.T) {
-		wrapped := WrapCommand(havenPath, "pnpm test:unit", WrapOptions{})
-
-		t.Run("it is recognised as wrapped, so it is not wrapped again", func(t *testing.T) {
-			if !AlreadyWrapped(wrapped) {
-				t.Fatal("a nested wrap makes the outer hold the slot the inner waits for")
-			}
-			if AlreadyWrapped("pnpm test:unit") {
-				t.Fatal("an unwrapped command must not look wrapped")
 			}
 		})
 	})
@@ -192,52 +223,6 @@ func TestShellWordsReadsBackWhatShellQuoteWrote(t *testing.T) {
 				if words[i] != w {
 					t.Fatalf("word %d: expected %q, got %q", i, w, words[i])
 				}
-			}
-		})
-	})
-}
-
-// @scenario "The rewrap carries the decision it was given"
-func TestWrapCommandCarriesTheDecision(t *testing.T) {
-	t.Run("given a sub-agent's narrowed run", func(t *testing.T) {
-		wrapped := WrapCommand("/opt/haven", "pnpm test:unit",
-			WrapOptions{AgentID: "agent_123", Workers: 2})
-
-		t.Run("the agent id travels with it, because it picks the wait ceiling", func(t *testing.T) {
-			if !strings.Contains(wrapped, "--agent-id 'agent_123'") {
-				t.Fatalf("without the id the run re-resolves as a main session: %q", wrapped)
-			}
-		})
-
-		t.Run("and so does the width it was admitted at", func(t *testing.T) {
-			if !strings.Contains(wrapped, "--workers 2") {
-				t.Fatalf("a narrowing nobody applies is not a narrowing: %q", wrapped)
-			}
-		})
-
-		t.Run("and it is still recognised as wrapped", func(t *testing.T) {
-			if !AlreadyWrapped(wrapped) {
-				t.Fatalf("the flags must not break the idempotence check: %q", wrapped)
-			}
-		})
-	})
-
-	t.Run("given a run that was neither narrowed nor named", func(t *testing.T) {
-		wrapped := WrapCommand("/opt/haven", "pnpm test:unit", WrapOptions{})
-
-		t.Run("neither flag is emitted at all", func(t *testing.T) {
-			if strings.Contains(wrapped, "--workers") || strings.Contains(wrapped, "--agent-id") {
-				t.Fatalf("an absent decision must not become a stated one: %q", wrapped)
-			}
-		})
-	})
-
-	t.Run("given haven installed under a path with a space", func(t *testing.T) {
-		wrapped := WrapCommand("/Users/x/My Tools/haven", "pnpm test:unit", WrapOptions{})
-
-		t.Run("the path survives as one argument", func(t *testing.T) {
-			if !strings.HasPrefix(wrapped, `'/Users/x/My Tools/haven' `) {
-				t.Fatalf("the path split into two words: %q", wrapped)
 			}
 		})
 	})
@@ -329,21 +314,80 @@ func TestRefusalReasonTellsTheCallerNotToSleep(t *testing.T) {
 	})
 }
 
-// @scenario "A backgrounded run explains itself in the same breath"
-func TestBackgroundDescriptionSaysItIsNotAResult(t *testing.T) {
-	t.Run("given a command the gate backgrounded", func(t *testing.T) {
-		got := BackgroundDescription(3)
+// @scenario "The gate leaves compile and test runs to their launchers"
+// @scenario "The gate leaves oxlint runs to their launcher"
+// @scenario "Lint and builds keep the gate until they have launchers"
+func TestLauncherOwnedCoversOnlyLauncherRuns(t *testing.T) {
+	owned := []string{
+		"tsc --noEmit --ignoreConfig f.ts",
+		"pnpm exec tsc -b",
+		"npx vitest run src/x",
+		"vitest run",
+		"pnpm typecheck",
+		"pnpm --filter @langwatch/time typecheck",
+		"pnpm --filter @langwatch/time test src/x.unit.test.ts",
+		"VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/time test",
+		"pnpm test:unit run src/x",
+		"cd modules/x && pnpm typecheck",
+		"oxlint --quiet src",
+		"pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc f.ts",
+		"./node_modules/.bin/oxlint -c .oxlintrc.native.jsonc .",
+		"pnpm lint:fix",
+		"pnpm exec tsc -b && pnpm exec oxlint src",
+	}
+	for _, command := range owned {
+		if !LauncherOwned(command) {
+			t.Errorf("LauncherOwned(%q) = false, want true: the launcher takes its slot", command)
+		}
+	}
+	gated := []string{
+		"pnpm lint",
+		"pnpm --filter @langwatch/architecture-enforcer lint",
+		"pnpm exec oxlint src && pnpm exec oxfmt --check src",
+		"pnpm exec oxfmt --write f.ts",
+		"eslint .",
+		"next build",
+		"golangci-lint run",
+		"go build ./...",
+		"docker build .",
+		"pnpm typecheck && pnpm lint",
+		"git status",
+		"pnpm typecheck:src",
+		"pnpm test:affected",
+		"nx run-many -t typecheck -p @langwatch/time",
+	}
+	for _, command := range gated {
+		if LauncherOwned(command) {
+			t.Errorf("LauncherOwned(%q) = true, want false", command)
+		}
+	}
+	for _, command := range []string{"pnpm typecheck:src", "pnpm test:affected", "nx run-many -t test -p @langwatch/time"} {
+		if _, heavy := ClassifyCommand(command); heavy {
+			t.Errorf("ClassifyCommand(%q) is heavy; an Nx entry point is not the gate's to hold", command)
+		}
+	}
+}
 
-		t.Run("it says haven queued it and that it is running in the background", func(t *testing.T) {
-			if !strings.Contains(got, "queued") || !strings.Contains(got, "background") {
-				t.Fatalf("expected both, got %q", got)
-			}
-		})
-
-		t.Run("and that the result is not this return, so an immediate return is not read as success", func(t *testing.T) {
-			if !strings.Contains(got, "not now") {
-				t.Fatalf("expected the result to be disclaimed, got %q", got)
-			}
-		})
-	})
+// @scenario "Haven steps aside for programs rush's gate owns"
+// @scenario "Haven keeps its gate for programs rush's gate does not own"
+func TestRushOwnedNeedsEveryHeavySegmentOwned(t *testing.T) {
+	owns := func(program string) bool { return program == "tsc" || program == "vitest" || program == "oxlint" }
+	for _, command := range []string{
+		"tsc --noEmit --ignoreConfig f.ts", "pnpm typecheck", "pnpm --filter x test", "npx vitest run",
+		"pnpm exec oxlint src", "pnpm lint:fix", "pnpm exec tsc -b && vitest run",
+	} {
+		if !RushOwned(command, owns) {
+			t.Errorf("RushOwned(%q) = false, want true", command)
+		}
+	}
+	for _, command := range []string{
+		"pnpm lint", "oxfmt --write f.ts", "tsc -b && oxfmt --check f.ts", "eslint .", "go build ./...", "ls -la",
+	} {
+		if RushOwned(command, owns) {
+			t.Errorf("RushOwned(%q) = true, want false", command)
+		}
+	}
+	if RushOwned("tsc -b", func(string) bool { return false }) {
+		t.Error("RushOwned with rush's gate off = true, want false")
+	}
 }

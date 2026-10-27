@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   getCurrentContext,
   getJobContextMetadata,
@@ -6,8 +7,8 @@ import {
   type RequestContext,
   runWithContext,
   updateCurrentContext,
-} from "../context/core";
-import { getLogContext } from "../context/logging";
+} from "../context/core.ts";
+import { getLogContext } from "../context/logging.ts";
 
 vi.mock("@opentelemetry/api", () => ({
   context: {
@@ -24,7 +25,7 @@ describe("context/core", () => {
     vi.clearAllMocks();
   });
 
-  describe("getCurrentContext", () => {
+  describe("getCurrentContext()", () => {
     describe("when no context is set", () => {
       it("returns undefined", () => {
         expect(getCurrentContext()).toBeUndefined();
@@ -46,7 +47,7 @@ describe("context/core", () => {
     });
   });
 
-  describe("runWithContext", () => {
+  describe("runWithContext()", () => {
     describe("when running async operations", () => {
       it("propagates context through async boundaries", async () => {
         const testCtx: RequestContext = { projectId: "async-project" };
@@ -75,7 +76,7 @@ describe("context/core", () => {
     });
   });
 
-  describe("updateCurrentContext", () => {
+  describe("updateCurrentContext()", () => {
     describe("when context is active", () => {
       it("updates mutable context fields", () => {
         runWithContext({}, () => {
@@ -95,14 +96,12 @@ describe("context/core", () => {
 
     describe("when no context is set", () => {
       it("does not throw", () => {
-        expect(() =>
-          updateCurrentContext({ organizationId: "no-context" }),
-        ).not.toThrow();
+        expect(() => updateCurrentContext({ organizationId: "no-context" })).not.toThrow();
       });
     });
   });
 
-  describe("getOtelSpanContext", () => {
+  describe("getOtelSpanContext()", () => {
     describe("when no active span exists", () => {
       it("returns undefined", () => {
         expect(getOtelSpanContext()).toBeUndefined();
@@ -130,9 +129,7 @@ describe("context/core", () => {
 
     describe("when the span context is invalid", () => {
       it("returns undefined", async () => {
-        const { trace, isSpanContextValid } = await import(
-          "@opentelemetry/api"
-        );
+        const { trace, isSpanContextValid } = await import("@opentelemetry/api");
         vi.mocked(trace.getSpan).mockReturnValueOnce({
           spanContext: () => ({
             traceId: "00000000000000000000000000000000",
@@ -148,7 +145,7 @@ describe("context/core", () => {
     });
   });
 
-  describe("getJobContextMetadata", () => {
+  describe("getJobContextMetadata()", () => {
     it("captures business context for queue propagation", () => {
       runWithContext(
         {

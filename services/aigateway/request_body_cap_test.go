@@ -68,11 +68,11 @@ func bodyCapRepoRoot(t *testing.T) string {
 	dir, err := os.Getwd()
 	require.NoError(t, err)
 	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "go.work")); err == nil {
 			return dir
 		}
 		parent := filepath.Dir(dir)
-		require.NotEqual(t, dir, parent, "walked past the filesystem root without finding go.mod")
+		require.NotEqual(t, dir, parent, "walked past the filesystem root without finding go.work")
 		dir = parent
 	}
 }

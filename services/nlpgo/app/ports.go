@@ -135,6 +135,9 @@ type Usage struct {
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
 	ReasoningTokens  int `json:"reasoning_tokens,omitempty"`
+	// Cache counts are a subset of PromptTokens on the gateway's reply.
+	CacheReadInputTokens     int `json:"cache_read_input_tokens,omitempty"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
 }
 
 // CodeRunner executes a single code-block invocation in an isolated
@@ -175,13 +178,6 @@ type CodeError struct {
 	Type      string
 	Message   string
 	Traceback string
-}
-
-// SecretsResolver resolves a secret reference like {{ secrets.NAME }} at
-// HTTP-block invocation time. Owned by Sarah; backed by a cached fetch
-// from the control plane.
-type SecretsResolver interface {
-	Resolve(ctx context.Context, projectID, name string) (string, error)
 }
 
 // IsCloseable is a helper for adapters that need to close on shutdown.

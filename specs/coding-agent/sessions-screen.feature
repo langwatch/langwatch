@@ -1,17 +1,16 @@
 # The Sessions screen, every coding-agent session I ran and what it cost me
 #
 # Implementation:
-#   platform/app/src/server/app-layer/coding-agent/coding-agent-sessions-list.service.ts (the list read and the pull-request join)
-#   platform/app/src/server/app-layer/coding-agent/coding-agent-session.service.ts       (the session read it is built on)
-#   platform/app/src/server/api/routers/codingAgents.ts                                  (codingAgents.sessionsList)
-#   platform/app/src/server/api/routers/codingAgents.gates.ts                            (the title and cost gates)
-#   platform/app/src/server/traces/protections.ts                                        (the one content-visibility rule both surfaces read)
-#   The page and its table live under platform/app/src/pages/me/ and
-#   platform/app/src/components/me/.
+#   modules/coding-agent/process/src/services/coding-agent.service.ts (the canonical read service)
+#   modules/coding-agent/contract/src/coding-agent.ts                        (codingAgents.sessionsList)
+#   modules/coding-agent/process/src/transport/api-trpc/coding-agent.gates.ts                  (the title and cost gates)
+#   modules/trace/process/src/services/trace-viewer-protections.rules.ts (the shared content-visibility rule)
+#   The page and its table live under [gone] src/pages/me/ and
+#   [gone] src/components/me/.
 #
 # Related specs:
 #   specs/coding-agent/context-economics.feature    , what the context columns count
-#   specs/coding-agent/session-git-context.feature  , where the branch set comes from
+#   modules/coding-agent/specs/session-git-context.feature, where the branch set comes from
 #   specs/coding-agent/pull-request-linkage.feature , how a branch finds its pull requests
 #   specs/coding-agent/terminal-view.feature        , the replay a row opens
 #   specs/coding-agent/personal-usage.feature       , the totals card above the table
@@ -74,6 +73,38 @@ Rule: The page lists my sessions with their context economics
     When the user opens their Sessions page
     Then the page says no sessions have been recorded yet
 
+Rule: A session row exists once the session says something
+
+  A coding agent that starts and then dies before its first prompt still
+  emits lifecycle telemetry: session start, auth errors, config reads. A
+  fleet of agents resuming at boot with expired credentials produced twelve
+  such rows in one morning, every one untitled with a dash in every column.
+  A row that can never say what the session did or even what it was asked
+  is noise, so it is not created; the session's records stay stored and the
+  row appears the moment a real signal arrives.
+
+  @unit
+  Scenario: Lifecycle-only telemetry creates no session row
+    Given a session that emitted only lifecycle and error events
+    And it never carried a prompt, a model call, a title or a repository
+    When its telemetry is folded
+    Then no session row is stored
+
+  @unit
+  Scenario: The first real signal creates the row
+    Given a session whose lifecycle telemetry created no row
+    When its first user prompt arrives
+    Then the session row is stored
+    And it is named by that prompt
+
+  @unit
+  Scenario: A session announced with a name is a row from the start
+    Given a session its harness already named
+    When the session-context record arrives before any prompt
+    Then the session row is stored under that name
+    # An agent that wedges before its first prompt still shows up,
+    # attributable by name, rather than vanishing entirely.
+
 Rule: A session is named by its generated title, else by its first prompt
 
   Most agents rarely generate a title, so a title-only session list reads as
@@ -118,6 +149,52 @@ Rule: A session is named by its generated title, else by its first prompt
     When the user reads its row
     Then the row names it as an untitled session
 
+Rule: The session's own name outranks every derived title
+
+  Every harness names its sessions and can rename them: claude with --name
+  and /rename, codex with its thread names. The capture MIRRORS that name
+  on the session-context record, the fold writes the newest name onto the
+  one Title column in place, and neither the generated conversation title
+  nor the first typed prompt may clobber it. A fleet whose sessions all
+  open with the same scripted greeting reads as its agents' names, because
+  the launcher names each session through the harness's own flag.
+
+  @unit
+  Scenario: The session's own name outranks the generated title
+    Given a session whose context record carries its name
+    When the agent later generates its own title
+    Then the row keeps the name
+
+  @unit
+  Scenario: The session's own name outranks the prompt-derived name
+    Given a session whose context record carries its name
+    When a prompt event arrives carrying a name candidate
+    Then the row keeps the name
+
+  @unit
+  Scenario: A renamed session renames its row
+    Given a session named by its harness
+    When a later context record carries a different name
+    Then the row wears the newest name
+
+  @unit
+  Scenario: A blank name does not rename the session
+    Given a session named by its harness
+    When a later context record carries a whitespace name
+    Then the row keeps the name it already had
+
+  @unit
+  Scenario: The session's own name is the title the list shows
+    Given a stored session row named by its harness
+    When the sessions list is read
+    Then the row's title is that name
+
+  @unit
+  Scenario: A row from before the source column still takes a generated title
+    Given a session row stored before the title source column existed
+    When the agent generates a new title
+    Then the row wears the generated title
+
 Rule: A session lists every pull request it drove
 
   @unit
@@ -150,6 +227,23 @@ Rule: A session lists every pull request it drove
     Given a session whose branch has no pull request
     When the user reads its row
     Then the pull request cell reads as absent
+
+  @integration
+  Scenario: A pull request number opens what the change cost, not GitHub
+    Given a session row that lists a pull request
+    When the user chooses the pull request number
+    Then the pull request's detail opens over the table
+    And the replay of the session does not open
+    # The reader is on this screen to read spend, so the number leads to the
+    # same detail the pull requests screen opens, which is where every
+    # session that worked on that change is added up. GitHub is one click
+    # further, in that detail's own header.
+
+  @integration
+  Scenario: A pull request number is drawn as something to choose
+    Given a session row that lists a pull request
+    When the user reads the row
+    Then the number is underlined
 
 Rule: The table narrows, sorts and pages
 
@@ -230,3 +324,39 @@ Rule: A session can be replayed from wherever it is listed
     When the user chooses it
     Then they are told the session stored none of its turns
     And no replay opens
+
+Rule: A helper thread the agent ran for itself is not a session
+
+  Codex generates a thread title, and a recap, on a hidden thread of its own
+  with its own thread id, through the same telemetry exporter as the session
+  it serves. Every one of those turns used to list as an untitled session
+  beside the real one, with a withheld prompt as its only content. The fold
+  marks such a session auxiliary; the row is kept and priced on its own
+  trace, and the list never shows it.
+
+  @integration
+  Scenario: An auxiliary session is not listed
+    Given a codex session and the auxiliary helper session its title came from
+    When the sessions list is read
+    Then the helper session is not in the list
+    And the codex session is
+
+  @integration
+  Scenario: A second session started seconds later is listed on its own
+    Given two codex sessions the user started seconds apart, neither auxiliary
+    When the sessions list is read
+    Then both sessions are listed
+
+  @integration
+  Scenario: A run of helper threads does not shorten the list
+    Given more auxiliary helper sessions than a page holds, all started after
+      the user's own sessions
+    When a page of the sessions list is read
+    Then the page holds as many user sessions as it asked for
+
+  @integration
+  Scenario: A session marked auxiliary after it was first stored drops out of the list
+    Given a session whose first stored version was not yet marked auxiliary
+    When a later version marks it auxiliary
+    And the sessions list is read
+    Then the session is not in the list

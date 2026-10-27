@@ -7,6 +7,7 @@ class PostApiScenarioEventsBodyType1Status(str, Enum):
     FAILED = "FAILED"
     IN_PROGRESS = "IN_PROGRESS"
     PENDING = "PENDING"
+    PENDING_EVALUATION = "PENDING_EVALUATION"
     QUEUED = "QUEUED"
     RUNNING = "RUNNING"
     STALLED = "STALLED"

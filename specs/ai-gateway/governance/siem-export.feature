@@ -64,6 +64,46 @@ Feature: SIEM export — OCSF read projection over the unified governance store
     And the caller cannot read events outside their org (tenancy invariant)
     And the underlying CH partition pruning makes large time-window exports cheap
 
+  @integration
+  Scenario: An actor the trace names by an opaque id is exported as a user id, never as an email
+    Given a trace whose email attribute carries an opaque identifier that is
+      not an address
+    And the trace carries no user id attribute
+    When its governance event is derived and later exported
+    Then the exported row carries that identifier as the actor's user id
+    And the actor's email field is empty
+    # The trace attribute is named "user.email" but nothing checks that what
+    # sits in it is an address. The pulled-source path already places the
+    # string by what it is; the trace path copied the attribute straight into
+    # the email column. A SIEM reads that column as an address, so an
+    # identifier there is a claim the row cannot back. Only the email
+    # attribute is placed by what it is. A trace that carries both a user
+    # id and an address keeps both, as it does today.
+
+  @unit
+  Scenario: An opaque email attribute beside a user id attribute is dropped, not exported as an email
+    Given a trace whose email attribute carries an opaque identifier that is
+      not an address
+    And the trace also carries a user id attribute that is not blank
+    When its governance event is derived
+    Then the actor's user id is the user id attribute
+    And the actor's email field is empty
+    And the opaque identifier is not written to either actor field
+    # The user id column is already taken by the attribute that means it.
+    # Keeping the opaque string in the email column would be the bug the
+    # scenario above fixes, wearing a different hat. Dropping it is a
+    # deliberate loss: the row no longer records that the trace named a
+    # second identifier. Stated here so a later change cannot reverse it
+    # by accident.
+    #
+    # "Not blank" is load-bearing: a user id attribute that is present but
+    # empty does not take the column, so the opaque string lands in the user
+    # id field instead, as the scenario above describes. And the email
+    # attribute reaches this derivation only as a resource attribute; the
+    # same key on a span is not carried into the trace's attributes at all,
+    # so this shape is not produced by the onboarding payloads the product
+    # hands out.
+
   Scenario: Cursor pagination returns deterministic ordering
     Given the org has many governance events
     When a caller paginates through api.governance.exportOcsf via next_cursor

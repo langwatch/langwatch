@@ -97,6 +97,9 @@ func Spend(emit SpendEmitter) Interceptor {
 		Name: "spend",
 		Sync: func(next DispatchFunc) DispatchFunc {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
+				if !admissible(call) {
+					return next(ctx, call)
+				}
 				start := time.Now()
 				admission := admissionFor(ctx, call, start)
 				emit.AdmitSpend(admission)
@@ -105,12 +108,18 @@ func Spend(emit SpendEmitter) Interceptor {
 					emit.FailSpend(outcomeFor(outcomeInput{call: call, start: start, err: classifySpendError(err), admission: admission}))
 					return nil, err
 				}
+				if deferredOutcome(call.Request.Type) {
+					return resp, nil
+				}
 				emit.ConfirmSpend(outcomeFor(outcomeInput{call: call, start: start, usage: resp.Usage, admission: admission}))
 				return resp, nil
 			}
 		},
 		Stream: func(next StreamFunc) StreamFunc {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
+				if !admissible(call) {
+					return next(ctx, call)
+				}
 				start := time.Now()
 				admission := admissionFor(ctx, call, start)
 				emit.AdmitSpend(admission)
@@ -131,9 +140,45 @@ func Spend(emit SpendEmitter) Interceptor {
 	}
 }
 
-// traceIDFrom returns the active trace id, or empty when no span is
-// recording: an all-zeros id must never masquerade as a join key.
+// admissible reports whether a request can open a spend record at all. One
+// that names no model cannot: the control plane refuses an admission without
+// one, and the model resolver answers the caller with its own customer error
+// before anything could be spent, so there is nothing to bill and nothing to
+// record.
+func admissible(call *Call) bool {
+	return call.Request != nil && call.Request.Model != ""
+}
+
+// deferredOutcome reports the request types whose spend record this dispatch
+// must NOT close.
+//
+// Every other type measures its own usage and confirms the moment the
+// provider answers. A realtime session mint answers in milliseconds and the
+// call it opened has not started, so confirming here would close the record
+// at zero dollars and leave the settlement sweeper nothing to settle. The
+// record stays admitted until the vendor reports the call, or until the
+// grace expires and it settles as cost-unknown.
+//
+// Only the success path defers. A mint the gateway refused or that the
+// vendor rejected still emits a failure, because a session that never opened
+// has no later report coming and an invisible record is a lost one.
+func deferredOutcome(t domain.RequestType) bool {
+	return t == domain.RequestTypeRealtimeSession
+}
+
+// traceIDFrom returns the trace this spend record joins to, or empty when
+// there is none: an all-zeros id must never masquerade as a join key.
+//
+// The customer-facing trace comes first. That is the trace the request lands
+// in for the project, so it is the one that matches the trace surface; the
+// ambient span belongs to the gateway's internal instrumentation and names a
+// different trace whenever the caller sent no traceparent of its own. The
+// ambient span is still the fallback, so a request outside the bridge keeps
+// the join it had.
 func traceIDFrom(ctx context.Context) string {
+	if id := customertracebridge.CustomerTraceID(ctx); id != "" {
+		return id
+	}
 	sc := trace.SpanFromContext(ctx).SpanContext()
 	if !sc.HasTraceID() {
 		return ""
@@ -170,16 +215,20 @@ func ResolveEndUser(ctx context.Context, call *Call) string {
 	switch call.Request.Type {
 	case domain.RequestTypeChat, domain.RequestTypeMessages,
 		domain.RequestTypeEmbeddings, domain.RequestTypeResponses,
-		domain.RequestTypeSpeech:
+		domain.RequestTypeSpeech, domain.RequestTypeImageGeneration,
+		domain.RequestTypeImageEdit:
 		if err := call.MaterializeBody(); err != nil {
 			return ""
 		}
 		return customertracebridge.EndUserIDFromBody(call.Request.Body)
-	case domain.RequestTypePassthrough, domain.RequestTypeTranscription:
-		// Passthrough carries a provider-native body shape, and
-		// transcription is multipart form, not JSON: neither exposes the
-		// OpenAI `user` field this reads, so header-only attribution
-		// (resolved above) is all these types get.
+	case domain.RequestTypePassthrough, domain.RequestTypeTranscription,
+		domain.RequestTypeRealtimeSession:
+		// Passthrough carries a provider-native body shape, transcription is
+		// multipart form, not JSON, and a session mint declares a socket
+		// rather than a completion: none exposes the OpenAI `user` field
+		// this reads, so header-only attribution (resolved above) is all
+		// these types get. The image edit route is also multipart and still
+		// reads the field above, because its synthesized body states it.
 		return ""
 	}
 	return ""
@@ -272,6 +321,10 @@ func (w *spendStreamWrapper) Next(ctx context.Context) bool {
 func (w *spendStreamWrapper) Chunk() []byte       { return w.inner.Chunk() }
 func (w *spendStreamWrapper) Usage() domain.Usage { return w.inner.Usage() }
 func (w *spendStreamWrapper) Err() error          { return w.inner.Err() }
+
+// Unwrap exposes the wrapped iterator so its optional extensions stay
+// reachable (domain.StreamHeadersOf).
+func (w *spendStreamWrapper) Unwrap() domain.StreamIterator { return w.inner }
 
 func (w *spendStreamWrapper) RawFraming() bool {
 	if rf, ok := w.inner.(domain.RawFramer); ok {

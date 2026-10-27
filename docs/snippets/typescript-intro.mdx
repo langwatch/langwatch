@@ -24,10 +24,10 @@ import Prerequisites from "/snippets/prerequests-ts.mdx";
 
 ## Basic Concepts
 
-- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces).
-- A [Trace](/concepts#traces) contains multiple [Spans](/concepts#spans), which are the steps inside your pipeline.
+- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces-one-task-end-to-end).
+- A [Trace](/concepts#traces-one-task-end-to-end) contains multiple [Spans](/concepts#spans-the-building-blocks), which are the steps inside your pipeline.
   - A span can be an LLM call, a database query for a RAG retrieval, or a simple function transformation.
-  - Different types of [Spans](/concepts#spans) capture different parameters.
-  - [Spans](/concepts#spans) can be nested to capture the pipeline structure.
-- [Traces](/concepts#traces) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads) in their metadata, making the individual messages become part of a conversation.
-  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.
+  - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
+  - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
+- [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.

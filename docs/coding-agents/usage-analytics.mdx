@@ -1,0 +1,47 @@
+---
+title: Coding Agent Usage Analytics and Cost
+sidebarTitle: Usage
+description: Spend, tokens and activity for your coding agents, on your personal page, over the command line, and over the API.
+keywords:
+  - claude code analytics
+  - coding agent usage analytics
+  - ai usage tracking
+  - llm cost tracking
+  - ai cost management
+  - usage api
+---
+
+Usage rolls up everything your sessions spent. Read your own numbers at [/me](https://app.langwatch.ai/me), a project's numbers on the project page, and an organization's numbers on the governance dashboard.
+
+## Your usage at /me
+
+The personal page opens on this month: what you spent, how many requests you made, and the model you used most, with spend over time and a breakdown by tool underneath.
+
+The **coding-agent usage** card summarizes the last 30 days across your assistants: cost, tokens, active time, and how many sessions you ran. Sessions that reported only metrics still count, so the card is complete even for tools set up with usage-only telemetry.
+
+## Query it from the command line
+
+The CLI reads the same analytics your pages read:
+
+```bash
+langwatch analytics query -m total-cost --group-by metadata.model   # spend per model
+langwatch trace search --period 7d                                   # recent traces
+langwatch trace export -f jsonl                                      # bulk export for your own analysis
+```
+
+You do not have to type these yourself: [give your agent the prompt](/coding-agents/explore-your-usage-with-your-own-agent) and ask your questions in plain language.
+
+## Query it over the API
+
+`GET /api/me/usage` returns your personal rollup: a summary, daily buckets, and a per-model breakdown. The two coding-agent endpoints return the structured data behind the sessions and pull request views:
+
+- `GET /api/coding-agent/sessions/{sessionId}/events` for per-call rows: model calls, compactions, rate limits, tool runs.
+- `GET /api/coding-agent/pull-request-usage` for the per-pull-request rollup.
+
+See the [coding agents API reference](/api-reference/coding-agents/overview).
+
+## For admins
+
+The governance dashboard at `/governance` shows the organization: spend over the last 30 days with a group-by toggle (team, department, user, source), top teams and users, and per-department attribution that includes personal AI use. See [Governance dashboard](/ai-governance/governance-dashboard).
+
+**Also check:** [Sessions](/coding-agents/sessions) for the per-session detail behind these rollups, and [Compare provider costs](/coding-agents/compare-provider-costs) to price your real usage mix against other providers.

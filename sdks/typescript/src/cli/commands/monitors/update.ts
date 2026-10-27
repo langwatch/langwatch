@@ -1,14 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
-import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { commandValidationError } from "../../utils/errorOutput.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { failMonitorResponse } from "./findMonitor";
 /**
  * Returns the updated monitor rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -21,13 +23,12 @@ export const updateMonitorCommand = async (
     executionMode?: string;
     sample?: string;
     parameters?: string;
-  }
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Updating monitor "${id}"...`).start();
 
@@ -39,29 +40,24 @@ export const updateMonitorCommand = async (
   try {
     const body: Record<string, unknown> = {};
     if (options.name) body.name = options.name;
-    if (options.enabled !== undefined)
-      body.enabled = options.enabled === "true";
+    if (options.enabled !== undefined) body.enabled = options.enabled === "true";
     if (options.executionMode) body.executionMode = options.executionMode;
     if (options.sample) body.sample = parseFloat(options.sample);
     if (options.parameters) {
-      body.parameters = JSON.parse(options.parameters) as Record<
-        string,
-        unknown
-      >;
+      body.parameters = JSON.parse(options.parameters) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/monitors/${id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+        ...buildRequestHeaders({ apiKey }),
       },
       body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update monitor" });
+      await failMonitorResponse({ spinner, response, action: "update monitor", reference: id });
       process.exit(1);
     }
 
@@ -96,7 +92,7 @@ export const updateMonitorCommand = async (
       console.log(`  ${chalk.gray("ID:")}      ${chalk.green(monitor.id)}`);
       console.log(`  ${chalk.gray("Name:")}    ${chalk.cyan(monitor.name)}`);
       console.log(
-        `  ${chalk.gray("Enabled:")} ${monitor.enabled ? chalk.green("yes") : chalk.gray("no")}`
+        `  ${chalk.gray("Enabled:")} ${monitor.enabled ? chalk.green("yes") : chalk.gray("no")}`,
       );
       console.log();
     },

@@ -151,6 +151,70 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     Then the gateway drops the sampling options the codex backend refuses
     And the assist gets its title back instead of a failed request
 
+  # The codex backend keeps its own allowlist and answers 400 "Unsupported
+  # parameter" on anything outside it, before a token is generated. So the
+  # gateway keeps the body to what that backend accepts, rather than removing
+  # refused fields one at a time: a removal list costs one production outage
+  # per field, and it took two to learn it. Langy's worker sends both
+  # prompt_cache_retention and its own default max output tokens, so removing
+  # the first only uncovered the second, with the same dead card for the user.
+  #
+  # The codex lane follows the parameter policy the translated chat lanes
+  # follow (adapters/providers/param_policy.go): the gateway authors the
+  # outgoing body, so every field the caller sends gets an explicit
+  # disposition. A tuning option the backend refuses is dropped and the drop
+  # is signaled; an option whose silent absence would change what the caller
+  # observably gets is refused by name before a provider round trip is paid.
+  @unit
+  Scenario: A codex request carries only what its backend accepts
+    Given a caller sends a Responses body with options the codex backend refuses
+    When the gateway forwards the call to the codex backend
+    Then the backend accepts the call and the user gets their answer
+    And what the user asked for is unchanged: the question, the tools and the reasoning all arrive
+    And an option we have not named is left out, so a caller adding one cannot fail their own call
+
+  # The codex response is provider-shaped SSE streamed through untouched, so
+  # the drop is not injected into the response body the way the chat lanes
+  # inject params_dropped; the header and the gateway span carry it.
+  @unit
+  Scenario: A tuning option the codex backend refuses is dropped with a signal
+    Given a caller sends a Responses body with an output cap and a temperature
+    When the gateway forwards the call to the codex backend
+    Then the call proceeds without those options
+    And the X-LangWatch-Params-Dropped response header names them
+    And the gateway span records the drop
+
+  # These four are functional, not tuning: the gateway pins store false, so a
+  # previous_response_id chain cannot continue; background promises an id to
+  # poll; top_logprobs promises data in the answer; max_tool_calls is a cap
+  # the model would exceed. Dropping any of them returns an answer that is
+  # not what was asked for, so the gateway refuses before dialing.
+  @unit
+  Scenario: An option a codex answer would silently betray is refused by name
+    Given a caller sends a Responses body with previous_response_id
+    When the gateway builds the codex request
+    Then the gateway responds 400 unsupported_parameter naming the field
+    And no provider round trip is paid for an answer that could not be what was asked
+
+  @unit
+  Scenario: Strict mode refuses codex tuning options instead of dropping them
+    Given a caller sends a Responses body with a temperature and drop_tuning_params false
+    When the gateway builds the codex request
+    Then the gateway responds 400 unsupported_parameter
+    And the message names the option and how to proceed
+
+  # The backend's allowlist is theirs and can move. The table's claim about
+  # each field is checked against the real backend by an on-demand probe
+  # (codex_live_conformance_test.go, gated on a real ChatGPT sign-in): every
+  # mapped field must be accepted and every dropped or refused field must be
+  # rejected upstream. Run it before changing the codex lane; it is the check
+  # that would have caught both production outages before they shipped.
+  @live
+  Scenario: The codex disposition table agrees with the live backend
+    When each field the table names is probed against the real codex backend
+    Then every mapped field is accepted
+    And every dropped or refused field is rejected upstream
+
   Scenario: Langy resolves its own feature key without breaking older setups
     Given Langy resolves its model through the langy.chat feature key
     When a project configured Langy before that key existed
@@ -186,3 +250,74 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     When a scenario run is prefetched for a workflow, code, or HTTP target
     Then the prefetch succeeds
     Because those target types never resolve the FAST-role coding default for the agent under test
+
+  # Topic clustering is a FAST-role feature, but it names its topics inside
+  # the evaluation service, which calls the provider itself. Codex is only
+  # reachable through the AI gateway, so clustering is the one fast assist
+  # Codex cannot serve. The skip happens when the model is resolved, so a
+  # project that already set Codex as its Fast default needs no data change.
+  @unit
+  Scenario: Topic clustering never runs on a Codex coding default
+    Given a project whose FAST role default is a codex model
+    When topic clustering resolves its model
+    Then it does not get the codex model
+    And it uses a model set for topic clustering at a wider scope, if there is one
+    And with nothing else set, it fails as "this model can't be used here", not as an unknown error
+
+  @unit
+  Scenario: A refused Codex clustering model logs as a customer setup issue
+    Given topic clustering is refused because its model is a codex model
+    When the clustering run handles the refusal
+    Then it is classified as the customer's to fix
+    And it logs at warning level, not as an error that pages anyone
+
+  @unit
+  Scenario: A clustering run refused for its Codex model is recorded as failed
+    Given topic clustering is refused because its model is a codex model
+    When the clustering run handles the refusal
+    Then the run is recorded as failed on its first attempt, without retries
+    And the run status carries a code the topic clustering settings page explains
+
+  @unit
+  Scenario: Saving model defaults still works over a stored Codex clustering model
+    Given a saved default-models config holds a codex model for topic clustering from before Codex was kept off it
+    When the whole config is saved again with another model changed
+    Then the save succeeds
+    And the codex model is dropped from topic clustering, which falls back to the cascade
+
+  @unit
+  Scenario: Saving a config whose only model is a stored Codex clustering model is refused, not deleted
+    Given a saved default-models config whose only model is a codex model for topic clustering
+    When the config is saved again without clearing it
+    Then the save is refused as a validation error asking for another model
+    And the config and its scopes are kept
+
+  @unit
+  Scenario: A config left with only retired keys is removed on save, not refused
+    Given a saved default-models config whose only model sits under a feature key that no longer exists
+    When the config is saved again
+    Then the config is removed, as any config with nothing left in it is
+    And no Codex restriction error is raised
+
+  @unit
+  Scenario: Newly picking a Codex model for topic clustering is still refused
+    Given a saved default-models config with no topic clustering model
+    When a codex model is picked for topic clustering and the config is saved
+    Then the save is refused as a validation error naming the restriction
+
+  # ── Where Codex is reached ─────────────────────────────────────────────────
+
+  Rule: Codex is reached at a configured base, the real vendor unless the deployment names another
+
+    @unit
+    Scenario: A Codex base that is unset or blank reaches OpenAI
+      Given CODEX_OAUTH_ISSUER and the gateway's CODEX_API_BASE are unset or exported blank
+      When a device sign-in, a token refresh or a codex model call is made
+      Then it goes to auth.openai.com and chatgpt.com/backend-api/codex
+
+    @unit
+    Scenario: Codex is reached at the bases the deployment configures
+      Given CODEX_OAUTH_ISSUER and the gateway's CODEX_API_BASE name URLs
+      When a device sign-in, a token refresh or a codex model call is made
+      Then it goes to those bases, the verification page included
+      And a value that is not a URL is refused at boot

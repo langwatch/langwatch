@@ -1,7 +1,9 @@
-import {
-  type AnyValue,
-  type Logger,
-} from "@opentelemetry/api-logs";
+import { context } from "@opentelemetry/api";
+import { type AnyValue, type Logger } from "@opentelemetry/api-logs";
+
+import { shouldCaptureOutput } from "../config";
+import * as intSemconv from "../semconv";
+import { type SemConvLogRecordAttributes } from "../semconv";
 import {
   type EmitOptions,
   type LangWatchLogger,
@@ -12,22 +14,19 @@ import {
   type LangWatchSpanGenAIToolMessageEventBody,
   type LangWatchSpanGenAIUserMessageEventBody,
 } from "./types";
-import { shouldCaptureOutput } from "../config";
-import * as intSemconv from "../semconv";
-import { type SemConvLogRecordAttributes } from "../semconv";
-import { context } from "@opentelemetry/api";
 
-/**
- * Internal implementation of {@link LangWatchLogger}.
- *
- * @remarks
- * This class wraps an OpenTelemetry logger and adds LangWatch-specific functionality for
- * structured logging and event emission.
- * Not intended for direct use; use {@link getLangWatchLogger} or
- * {@link createLangWatchLogger} instead.
- */
+/** Internal implementation of {@link LangWatchLogger}. Wraps OpenTelemetry
+ * logger with LangWatch functionality. Use {@link getLangWatchLogger} instead. */
 export class LangWatchLoggerInternal implements LangWatchLogger {
   constructor(private logger: Logger) {}
+
+  // Delegates to the wrapped OTel logger rather than always returning `true`:
+  // the underlying logger is what actually knows whether a processor is
+  // registered, so this is what keeps `enabled()` truthful for a caller that
+  // wraps a no-op provider (e.g. `getLangWatchLogger` before setup runs).
+  enabled(options?: Parameters<Logger["enabled"]>[0]): boolean {
+    return this.logger.enabled(options);
+  }
 
   emit(logRecord: LangWatchLogRecord, options?: EmitOptions): void {
     // Handle output capture configuration
@@ -51,7 +50,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   ): void {
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
-      { ...body, role: body.role ?? "system" } satisfies LangWatchSpanGenAISystemMessageEventBody,
+      {
+        ...body,
+        role: body.role ?? "system",
+      } satisfies LangWatchSpanGenAISystemMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
@@ -66,7 +68,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   ) {
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE,
-      { ...body, role: body.role ?? "user" } satisfies LangWatchSpanGenAIUserMessageEventBody,
+      {
+        ...body,
+        role: body.role ?? "user",
+      } satisfies LangWatchSpanGenAIUserMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
@@ -81,7 +86,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   ) {
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
-      { ...body, role: body.role ?? "assistant" } satisfies LangWatchSpanGenAIAssistantMessageEventBody,
+      {
+        ...body,
+        role: body.role ?? "assistant",
+      } satisfies LangWatchSpanGenAIAssistantMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,

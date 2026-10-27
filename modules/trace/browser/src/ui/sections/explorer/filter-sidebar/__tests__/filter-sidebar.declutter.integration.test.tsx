@@ -1,0 +1,189 @@
+// Declutter: finder button removed, "More…" opens Configure popover via
+// shared facetManagerOpen state.
+// @vitest-environment jsdom
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+
+const mockSetFacetManagerOpen = vi.fn();
+
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-declutter-test" },
+    organization: { id: "org-1" },
+  }),
+}));
+
+vi.mock("../../../../../behavior/explorer/use-project-has-traces.ts", () => ({
+  useProjectHasTraces: () => ({ hasAnyTraces: true }),
+}));
+
+vi.mock("../../../../../features/facet/behavior/use-trace-facets.ts", () => ({
+  useTraceFacets: () => ({
+    data: [{ kind: "categorical", key: "status", label: "Status", topValues: [] }],
+    isLoading: false,
+  }),
+}));
+
+// The counts read: mocked out here so these render tests keep proving what the
+// discovery alone puts on the rail.
+vi.mock("../../../../../features/facet/behavior/use-filtered-trace-facets.ts", () => ({
+  useFilteredTraceFacets: () => ({
+    data: undefined,
+    isPlaceholderData: false,
+    isFetching: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("../../../../../features/explorer/behavior/density.store.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDensityStore: (selector: (state: Record<string, unknown>) => unknown) =>
+    selector({ density: "comfortable" }),
+}));
+vi.mock(
+  "../../../../../features/facet/behavior/facet-visibility.store.ts",
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    useFacetVisibilityStore: (selector: (state: Record<string, unknown>) => unknown) =>
+      selector({
+        showFacet: vi.fn(),
+        hideFacet: vi.fn(),
+        resetAll: vi.fn(),
+        hydrateFromStorage: vi.fn(),
+      }),
+    selectVisibilityFor: () => ({ hidden: [], shown: [] }),
+  }),
+);
+vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule0>();
+  return {
+    ...actual,
+    useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
+      selector({
+        toggleSidebar: vi.fn(),
+        facetManagerOpen: false,
+        setFacetManagerOpen: mockSetFacetManagerOpen,
+        sidebarCollapsed: false,
+        sidebarWidth: null,
+      }),
+  };
+});
+vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule1>();
+  return {
+    ...actual,
+    useFilterStore: (selector: (s: unknown) => unknown) =>
+      selector({
+        ast: { type: "group", combinator: "and", filters: [] },
+        queryText: "",
+        clearAll: vi.fn(),
+      }),
+    useViewStore: (selector: (s: unknown) => unknown) =>
+      selector({
+        activeLensId: "all-traces",
+        isDraft: () => false,
+        revertLens: vi.fn(),
+        allLenses: [{ id: "all-traces", name: "All" }],
+      }),
+  };
+});
+
+vi.mock("../../../../../features/facet/behavior/facet-lens.store.ts", () => ({
+  useFacetLensStore: (selector: (s: unknown) => unknown) =>
+    selector({
+      lens: { sectionOrder: [], groupOrder: [] },
+      setSectionOrder: vi.fn(),
+      setGroupOrder: vi.fn(),
+      setAllSectionsOpen: vi.fn(),
+    }),
+  applyLensOrder: (keys: string[]) => keys,
+}));
+
+vi.mock("@langwatch/trace-contract", async (importOriginal) => {
+  const contract = await importOriginal<typeof traceContractModule>();
+
+  return {
+    ...contract,
+    analyzeOrGroups: () => ({ groups: [], fieldToGroupIds: new Map() }),
+    buildFacetStateLookup: () => new Map(),
+    getFacetValues: () => ({
+      include: new Set<string>(),
+      exclude: new Set<string>(),
+    }),
+  };
+});
+
+vi.mock("../explorer-total.tsx", () => ({
+  ExplorerTotal: () => null,
+}));
+
+vi.mock("../section-renderer.tsx", () => ({
+  SectionRenderer: () => <div data-testid="section-renderer" />,
+}));
+
+vi.mock("../../../../elements/explorer/filter-sidebar/sortable-section.tsx", () => ({
+  SortableSection: ({ children }: { children: (p: unknown) => React.ReactNode }) => (
+    <div>{children({})}</div>
+  ),
+}));
+
+vi.mock("../../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton.tsx", () => ({
+  FilterSidebarSkeleton: () => <div data-testid="filter-sidebar-skeleton" />,
+}));
+
+vi.mock("@dnd-kit/core", () => ({
+  DndContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DragOverlay: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  closestCenter: vi.fn(),
+  PointerSensor: vi.fn(),
+  KeyboardSensor: vi.fn(),
+  useSensor: vi.fn(() => ({})),
+  useSensors: vi.fn(() => []),
+}));
+
+vi.mock("@dnd-kit/sortable", () => ({
+  SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  sortableKeyboardCoordinates: vi.fn(),
+  arrayMove: (arr: unknown[]) => arr,
+  verticalListSortingStrategy: vi.fn(),
+}));
+
+import type * as traceContractModule from "@langwatch/trace-contract";
+import type React from "react";
+
+import type * as actualModule1 from "../../../../../behavior/explorer.store.ts";
+import type * as actualModule0 from "../../../../../behavior/ui.store.ts";
+import { FilterSidebar } from "../filter-sidebar.tsx";
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+function renderSidebar() {
+  return renderWithDesignSystem(<FilterSidebar />);
+}
+
+describe("<FilterSidebar /> declutter", () => {
+  describe("given the sidebar is open", () => {
+    it("no longer renders the Find a facet button", () => {
+      renderSidebar();
+      expect(screen.queryByRole("button", { name: /find a facet/i })).not.toBeInTheDocument();
+    });
+
+    it("renders a More… button below the facet list", () => {
+      renderSidebar();
+      expect(screen.getByRole("button", { name: /more/i })).toBeInTheDocument();
+    });
+  });
+
+  describe("when the user clicks More…", () => {
+    it("opens the Configure facet manager", () => {
+      renderSidebar();
+      fireEvent.click(screen.getByRole("button", { name: /more/i }));
+      expect(mockSetFacetManagerOpen).toHaveBeenCalledWith(true);
+    });
+  });
+});

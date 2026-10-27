@@ -37,6 +37,24 @@ type Extractor interface {
 	NewStreamAccumulator() StreamAccumulator
 }
 
+// ResponseErrorReporter is an optional Extractor extension for providers whose
+// endpoints can answer 2xx with an error body. After ExtractNonStreaming the base
+// asks it about the same buffered bytes; a non-nil error marks the span Error
+// with the error's message instead of Ok. The response the caller reads is never
+// altered. Extractors that do not implement it keep the Ok outcome.
+type ResponseErrorReporter interface {
+	ResponseError(raw []byte) error
+}
+
+// BodyError is an error a provider reported inside a 2xx response body. When a
+// ResponseErrorReporter returns one, Type (if set) is recorded as error.type.
+type BodyError struct {
+	Message string
+	Type    string
+}
+
+func (e *BodyError) Error() string { return e.Message }
+
 // StreamAccumulator reconstructs a streamed response from its SSE `data:` lines.
 // One accumulator is used per streamed response: the base feeds it every data
 // payload in order and then calls Finish exactly once.

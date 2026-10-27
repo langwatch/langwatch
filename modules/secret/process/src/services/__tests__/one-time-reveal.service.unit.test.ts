@@ -1,0 +1,133 @@
+/**
+ * The one-time reveal, over the memory twin of the store a deployment runs
+ * on. Spec: modules/secret/specs/one-time-reveal.feature.
+ */
+import { ONE_TIME_REVEAL_TTL_MS } from "@langwatch/secret-contract";
+import { describe, expect, it } from "vitest";
+
+import { MemoryOneTimeRevealRepository } from "../../repositories/memory/memory.one-time-reveal.repository.ts";
+import { OneTimeRevealService } from "../one-time-reveal.service.ts";
+
+const STASH = {
+  organizationId: "org_acme",
+  kind: "virtual_key" as const,
+  keyId: "vk_1",
+  preview: "sk-…4f2a",
+  secret: "sk-live-9f2c",
+  recipientUserId: "user_jane",
+};
+const RECIPIENT = { id: STASH.recipientUserId };
+
+function fixture() {
+  let nowMs = 1_700_000_000_000;
+  const store = MemoryOneTimeRevealRepository.create({ nowMs: () => nowMs });
+
+  return {
+    store,
+    pass: (ms: number) => {
+      nowMs += ms;
+    },
+    service: OneTimeRevealService.create({ store }),
+  };
+}
+
+/** The code of a handled failure, or the error itself when it is not one. */
+async function codeOf(run: () => Promise<unknown>): Promise<unknown> {
+  try {
+    await run();
+  } catch (error) {
+    return (error as { code?: unknown }).code ?? error;
+  }
+
+  return null;
+}
+
+describe("the one-time reveal", () => {
+  /** @scenario "The first read returns the secret and the second refuses" */
+  /** @scenario "The reveal survives without Redis" */
+  it("serves the secret once and refuses every read after it", async () => {
+    const { service } = fixture();
+
+    const { revealId } = await service.stash(STASH);
+
+    await expect(
+      service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
+    ).resolves.toEqual({
+      kind: "virtual_key",
+      keyId: "vk_1",
+      preview: "sk-…4f2a",
+      secret: STASH.secret,
+    });
+
+    expect(
+      await codeOf(() =>
+        service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
+      ),
+    ).toBe("secret_already_revealed");
+  });
+
+  /** @scenario "A reveal id that never existed or has expired is refused" */
+  it("refuses an id nobody ever stashed", async () => {
+    const { service } = fixture();
+
+    expect(
+      await codeOf(() =>
+        service.reveal(
+          { organizationId: STASH.organizationId, revealId: "rvl_invented" },
+          RECIPIENT,
+        ),
+      ),
+    ).toBe("secret_reveal_expired");
+  });
+
+  /** @scenario "A reveal belongs to the organization that stashed it" */
+  /** @scenario "A reveal belongs to the organization that minted it" */
+  it("does not serve one organization's reveal to another", async () => {
+    const { service } = fixture();
+
+    const { revealId } = await service.stash(STASH);
+
+    expect(
+      await codeOf(() => service.reveal({ organizationId: "org_other", revealId }, RECIPIENT)),
+    ).toBe("secret_reveal_expired");
+    // And the near miss consumed nothing: the owner's read still works.
+    await expect(
+      service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
+    ).resolves.toMatchObject({ secret: STASH.secret });
+  });
+
+  /** @scenario "A reveal is served only to the person it was stashed for" */
+  it("refuses another member of the organization, consuming nothing", async () => {
+    const { service } = fixture();
+
+    const { revealId } = await service.stash(STASH);
+
+    expect(
+      await codeOf(() =>
+        service.reveal({ organizationId: STASH.organizationId, revealId }, { id: "user_mallory" }),
+      ),
+    ).toBe("secret_reveal_expired");
+    await expect(
+      service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
+    ).resolves.toMatchObject({ secret: STASH.secret });
+    expect(
+      await codeOf(() =>
+        service.reveal({ organizationId: STASH.organizationId, revealId }, { id: "user_mallory" }),
+      ),
+    ).toBe("secret_reveal_expired");
+  });
+
+  /** @scenario "A reveal left unread past its window is gone" */
+  it("forgets a reveal nobody read inside its window", async () => {
+    const { service, pass } = fixture();
+
+    const { revealId } = await service.stash(STASH);
+    pass(ONE_TIME_REVEAL_TTL_MS + 1);
+
+    expect(
+      await codeOf(() =>
+        service.reveal({ organizationId: STASH.organizationId, revealId }, RECIPIENT),
+      ),
+    ).toBe("secret_reveal_expired");
+  });
+});

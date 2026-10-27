@@ -1,22 +1,7 @@
 /**
- * The attribute vocabulary the CLI puts on its live OTEL log records, and the
- * contract the control plane reads them back with.
- *
- * Langy reaches LangWatch by running this CLI in a shell, so a command's
- * mid-flight state is invisible to the panel until the process exits. These
- * attributes are that missing channel: each log record is one beat of a
- * command's life cycle, and the control plane bridges them onto the turn's
- * ephemeral status / progress / metric signals that `StreamingStatusLine` and
- * `StreamingStatCard` already render.
- *
- * The names mirror the CLI's own grammar — `langwatch <resource> <verb>` — so a
- * record identifies itself the same way the tool call that produced it does
- * (see specs/langy/langy-cli-tool-envelope.feature).
- *
- * This vocabulary is a published contract. Add to it freely; renaming or
- * repurposing a key breaks the reader on the other side.
- *
- * Spec: specs/telemetry/langy-live-events.feature
+ * The attribute vocabulary on the CLI's live OTEL log records -- Langy's
+ * only channel into mid-flight state. Add freely; renaming a key breaks the reader.
+ * Spec: sdks/typescript/specs/telemetry/langy-live-events.feature
  */
 
 /** Attribute keys carried on every live CLI event. */
@@ -41,10 +26,9 @@ export const LANGWATCH_EVENT_ATTRIBUTES = {
   /** The failure message on an `error` record. Never carries a credential. */
   error: "langwatch.error",
   /**
-   * The platform's own name for a failure — the `HandledError.kind` it raised,
-   * e.g. `dataset_not_found`. This is the attribute that lets the panel react to
-   * a failure instead of merely printing it: a `not_found` can offer to list what
-   * does exist, where a sentence can only be read.
+   * The platform's own name for a failure -- the `HandledError.kind` raised,
+   * e.g. `dataset_not_found`. Lets the panel react instead of merely
+   * printing it: a `not_found` can offer to list what does exist.
    */
   errorKind: "langwatch.error.kind",
   /** The HTTP status the platform answered with. */
@@ -73,8 +57,7 @@ export const LANGWATCH_EVENTS = {
   error: "error",
 } as const;
 
-export type LangWatchEvent =
-  (typeof LANGWATCH_EVENTS)[keyof typeof LANGWATCH_EVENTS];
+export type LangWatchEvent = (typeof LANGWATCH_EVENTS)[keyof typeof LANGWATCH_EVENTS];
 
 /**
  * Switches the OTLP transport on. Unset (or any value other than a truthy one)

@@ -48,35 +48,41 @@ Feature: Service orchestration after pre-deps are installed
     And their "LW_GATEWAY_INTERNAL_SECRET" values differ
 
   # =========================================================================
-  # Service startup order + health
+  # Service startup and health (the start order is 09-prebuilt-app.feature, "Starting")
   # =========================================================================
 
-  Scenario: Services start in dependency order and report healthy
+  @unit
+  Scenario: The backend runs the api and the worker as one process
+    When the CLI starts "langwatch"
+    Then it spawns apps/backend once, the api and the worker in one Node process, and no "workers" process
+    And the api listens on the internal backend port and the worker's health door on its own port slot
+    And "langwatch" is reported healthy once "/api/health" answers on the internal backend port
+    And when "/api/health" never answers, the backend is stopped and `runtime.startAll` fails
+
+  @unit
+  Scenario: The backend leaves migrations to the worker's upgrade
+    When the CLI starts "langwatch"
+    Then the backend's environment does not set SKIP_LWQL_PROVISION
+
+  @unit
+  Scenario: nlpgo and the ai-gateway run as one Go process when the binary has combined mode
+    Given the installed monobinary offers `service combined`
+    When the CLI starts the Go services
+    Then it spawns one "go" process running "combined nlpgo aigateway"
+    And nlpgo and the ai-gateway each listen on their own port, both pointed back at the app
+    And the Go services are reported healthy once both "/healthz" doors answer
+
+  @unit
+  Scenario: An older monobinary still gets nlpgo and the ai-gateway as two processes
+    Given the installed monobinary predates combined mode
+    When the CLI starts the Go services
+    Then nlpgo and the ai-gateway start as two processes, as before
+
+  @unit
+  Scenario: The ai-gateway sees the same environment as the other app-tier services
+    Given the user's shell carries "OPENAI_API_KEY"
     When the CLI calls `runtime.startAll(ctx)`
-    Then "postgres", "redis", "clickhouse" start concurrently in phase 1
-    And "pg_isready -p 6560" returns 0 within 10 seconds
-    And "redis-cli -p 6561 ping" returns "PONG" within 5 seconds
-    And "curl http://localhost:6562/ping" returns "Ok." within 30 seconds
-    And in phase 2, Prisma migrations run against postgres and ClickHouse goose runs against clickhouse
-    And in phase 3, "langwatch_nlp", "langevals", "ai-gateway", "langwatch" start concurrently
-    And "curl http://localhost:5561/health" returns 200 within 30 seconds
-    And "curl http://localhost:5562/health" returns 200 within 30 seconds
-    And "curl http://localhost:5563/healthz" returns 200 within 10 seconds
-    And "curl http://localhost:5560/api/health" returns 200 within 60 seconds
-    And `runtime.startAll` returns one ServiceHandle per service
-
-  Scenario: Migrations run automatically on first start
-    Given postgres has no "langwatch_db" schema yet
-    And clickhouse has no "langwatch" database yet
-    When phase 2 of `runtime.startAll(ctx)` runs
-    Then Prisma migrations run and the "Project" table exists in postgres
-    And ClickHouse goose runs and the "Trace" table exists in clickhouse
-
-  Scenario: Re-running with healthy data does not re-migrate
-    Given postgres + clickhouse already have current migration state
-    When `runtime.startAll(ctx)` runs phase 2
-    Then Prisma reports "Already in sync"
-    And ClickHouse goose reports "no migrations to run"
+    Then "ai-gateway" receives the same environment as "langwatch"
 
   # =========================================================================
   # Logs + event stream
@@ -86,8 +92,8 @@ Feature: Service orchestration after pre-deps are installed
     When services run for 30 seconds
     Then "~/.langwatch/logs/postgres.log" is being written to
     And "~/.langwatch/logs/langwatch.log" is being written to
-    And `runtime.events(ctx)` emits "log" events with "service" ∈ {postgres, redis, clickhouse, langwatch_nlp, langevals, ai-gateway, langwatch}
-    And the CLI renders each log line to TTY with a stable prefix+color (langwatch=green, nlp=cyan, langevals=magenta, gateway=yellow, postgres=blue, redis=red, clickhouse=dim)
+    And `runtime.events(ctx)` emits "log" events with "service" ∈ {postgres, redis, clickhouse, go, langevals, langwatch}
+    And the CLI renders each log line to TTY with a stable prefix+color (langwatch=green, go=cyan, langevals=magenta, gateway=yellow, the stores dim)
 
   Scenario: A service that crashes after being healthy is restarted with backoff
     Given all services are running
@@ -155,8 +161,8 @@ Feature: Service orchestration after pre-deps are installed
     And the predep installer resolves "port-base=5570" (services tier 5570..5577, infra tier 6570..6573)
     When `runtime.startAll(ctx)` runs
     Then "BASE_HOST" in the running app's env is "http://localhost:5570"
-    And the langwatch app binds 5570
-    And langwatch_nlp binds 5571, langevals 5572, ai-gateway 5573
+    And the CLI's door binds 5570 and the backend binds its internal port 5576
+    And nlpgo binds 5571, langevals 5572, ai-gateway 5573
     And postgres binds 6570, redis 6571, clickhouse-http 6572, clickhouse-native 6573
     And the browser auto-open targets "http://localhost:5570"
 
@@ -196,7 +202,7 @@ Feature: Service orchestration after pre-deps are installed
   Scenario: --no-open suppresses the browser
     When the user runs `npx @langwatch/server --no-open`
     Then no browser is launched
-    And the CLI prints "Open http://localhost:5560 in your browser to get started."
+    And once the backend is healthy the CLI prints "langwatch is running at http://localhost:5560"
 
   Scenario: CI env auto-suppresses the browser
     Given the env var "CI=true" is set
@@ -204,29 +210,20 @@ Feature: Service orchestration after pre-deps are installed
     Then no browser is launched
 
   # =========================================================================
-  # uv environments for langwatch_nlp + langevals (runtime.installServices)
+  # LangEvals' uv environment (prepared while the rest of the stack starts)
   # =========================================================================
 
-  Scenario: Both uv envs install in parallel on first run
-    Given "~/.langwatch/venvs/langwatch_nlp" does not exist
-    And "~/.langwatch/venvs/langevals" does not exist
-    When the CLI calls `runtime.installServices(ctx)`
-    Then "uv sync" is invoked for both projects concurrently
-    And both venvs exist within 90 seconds (warm pip cache acceptable)
-    And `runtime.events(ctx)` emits a "starting" + "healthy" pair for "uv:langwatch_nlp" and "uv:langevals"
+  @unit
+  Scenario: LangEvals' environment is reused while nothing it depends on changed
+    Given LangEvals' environment was built for the current lockfile and evaluator toggles
+    When the CLI starts again
+    Then "uv sync" is not run again
 
-  Scenario: uv envs are cached across runs
-    Given both venvs already exist with current lockfile hash recorded in install-manifest.json
-    When the CLI calls `runtime.installServices(ctx)`
-    Then "uv sync" is NOT re-run
-    And the call completes in under 1 second
-
-  Scenario: Lockfile change forces a re-sync of only the affected venv
-    Given "langwatch_nlp/uv.lock" hash changed since last run
-    And "services/langevals/uv.lock" hash is unchanged
-    When the CLI calls `runtime.installServices(ctx)`
-    Then "uv sync" runs ONLY for "langwatch_nlp"
-    And "langevals" is skipped
+  @unit
+  Scenario: A changed evaluator toggle rebuilds LangEvals' environment
+    Given LangEvals' environment was built without the PII detection evaluator
+    When the user turns that evaluator on and starts again
+    Then "uv sync" runs again with the PII detection extra
 
   # =========================================================================
   # Re-entrancy guard

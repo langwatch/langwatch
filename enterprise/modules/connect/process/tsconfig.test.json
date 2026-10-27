@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+  },
+  "include": [
+    "src/**/__tests__/**/*.ts",
+    "src/**/__mocks__/**/*.ts",
+    "src/**/tests/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.*.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.*.ts",
+    "src/**/*.stories.ts",
+    "src/**/*.stories.*.ts",
+    "src/**/*.bench.ts",
+    "src/**/*.bench.*.ts",
+    "src/**/__bench__/**/*.ts",
+    "src/**/testing.ts"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/test-harness/tsconfig.build.json"
+    }
+  ]
+}

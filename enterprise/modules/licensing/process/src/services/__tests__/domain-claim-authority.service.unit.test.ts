@@ -1,0 +1,57 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { DomainClaimAuthorityService } from "../domain-claim-authority.service.ts";
+
+function authorityOver({ isSaas, organizations }: { isSaas: boolean; organizations: number }) {
+  const findAllOldestFirst = vi.fn(async () =>
+    Array.from({ length: organizations }, (_, i) => ({
+      organizationId: `org_${i}`,
+      license: null,
+    })),
+  );
+  const service = DomainClaimAuthorityService.create({
+    isSaas,
+    licenses: {
+      isPlatformSsoLicensed: async () => true,
+      findPlatformLicenseDigests: async () => ["sha256:licence"],
+    },
+    organizations: { findAllOldestFirst },
+  });
+
+  return { service, findAllOldestFirst };
+}
+
+describe("who the installation's licence speaks for when a domain is claimed", () => {
+  describe("when the self-hosted installation holds one organization", () => {
+    it("authorizes claims, speaks for its administrator and names the licence's hash", async () => {
+      await expect(
+        authorityOver({ isSaas: false, organizations: 1 }).service.getDomainClaimAuthority(),
+      ).resolves.toEqual({
+        authorizesDomainClaims: true,
+        hostsSingleOrganization: true,
+        licenseDigests: ["sha256:licence"],
+      });
+    });
+  });
+
+  describe("when the self-hosted installation holds several organizations", () => {
+    it("does not report a single organization", async () => {
+      await expect(
+        authorityOver({ isSaas: false, organizations: 2 }).service.getDomainClaimAuthority(),
+      ).resolves.toMatchObject({ hostsSingleOrganization: false });
+    });
+  });
+
+  describe("when the deployment is the hosted service", () => {
+    it("authorizes nothing and never counts organizations", async () => {
+      const { service, findAllOldestFirst } = authorityOver({ isSaas: true, organizations: 1 });
+
+      await expect(service.getDomainClaimAuthority()).resolves.toEqual({
+        authorizesDomainClaims: false,
+        hostsSingleOrganization: false,
+        licenseDigests: [],
+      });
+      expect(findAllOldestFirst).not.toHaveBeenCalled();
+    });
+  });
+});

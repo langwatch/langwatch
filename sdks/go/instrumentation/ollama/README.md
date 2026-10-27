@@ -19,7 +19,7 @@ extensions.
 The Ollama client takes its `*http.Client` at construction
 (`api.NewClient(base, httpClient)`, and `api.ClientFromEnvironment()` uses
 `http.DefaultClient`), so this package traces at that HTTP layer via the shared
-[`otelhttp`](../otelhttp) base: it passes request and response bodies *through* to
+[`otelhttp`](../otelhttp) base: it passes request and response bodies _through_ to
 the caller byte-for-byte while capturing a bounded copy off the critical path for
 attribute extraction. Tracing adds negligible latency and memory.
 
@@ -49,24 +49,24 @@ each non-streaming response to the matching extractor by sniffing its body
 fields. A generic fallback extractor is tried last, so unknown `/api/*` endpoints
 still produce a useful span instead of nothing.
 
-| Extractor    | Request discriminator                        | Response fields                          | Streaming reconstruction |
-| ------------ | -------------------------------------------- | ---------------------------------------- | ------------------------ |
-| `chat`       | `messages[]` (or an `/api/chat` path)        | `message{}`, `done_reason`, token counts | accumulate `message.content`; capture `tool_calls`; final-line `done_reason` + counts |
-| `generate`   | top-level `prompt` (or an `/api/generate` path) | `response`, `done_reason`, token counts | accumulate `response` text; final-line `done_reason` + counts |
-| `embeddings` | `input` / an `/api/embed`(`/api/embeddings`) path | `embeddings[][]` / `embedding[]`, `prompt_eval_count` | n/a (never streams) |
-| `generic`    | anything (terminal fallback)                 | anything                                 | best-effort `response` / `message.content` probing |
+| Extractor    | Request discriminator                             | Response fields                                       | Streaming reconstruction                                                              |
+| ------------ | ------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `chat`       | `messages[]` (or an `/api/chat` path)             | `message{}`, `done_reason`, token counts              | accumulate `message.content`; capture `tool_calls`; final-line `done_reason` + counts |
+| `generate`   | top-level `prompt` (or an `/api/generate` path)   | `response`, `done_reason`, token counts               | accumulate `response` text; final-line `done_reason` + counts                         |
+| `embeddings` | `input` / an `/api/embed`(`/api/embeddings`) path | `embeddings[][]` / `embedding[]`, `prompt_eval_count` | n/a (never streams)                                                                   |
+| `generic`    | anything (terminal fallback)                      | anything                                              | best-effort `response` / `message.content` probing                                    |
 
 ## Supported operations
 
-| API                       | Endpoint           | Support             |
-| ------------------------- | ------------------ | ------------------- |
-| Chat                      | `/api/chat`        | Full (Input/Output) |
-| Chat (streaming)          | `/api/chat`        | Full (Input/Output) |
-| Generate (text completion)| `/api/generate`    | Full (Input/Output) |
-| Generate (streaming)      | `/api/generate`    | Full (Input/Output) |
-| Embeddings                | `/api/embed`       | Full (Input/usage)  |
-| Embeddings (legacy)       | `/api/embeddings`  | Full (Input)        |
-| Other endpoints           | —                  | Generic fallback    |
+| API                        | Endpoint          | Support             |
+| -------------------------- | ----------------- | ------------------- |
+| Chat                       | `/api/chat`       | Full (Input/Output) |
+| Chat (streaming)           | `/api/chat`       | Full (Input/Output) |
+| Generate (text completion) | `/api/generate`   | Full (Input/Output) |
+| Generate (streaming)       | `/api/generate`   | Full (Input/Output) |
+| Embeddings                 | `/api/embed`      | Full (Input/usage)  |
+| Embeddings (legacy)        | `/api/embeddings` | Full (Input)        |
+| Other endpoints            | —                 | Generic fallback    |
 
 Ollama reports `prompt_eval_count` (input tokens) and `eval_count` (output
 tokens) on the response (the final line, when streaming); the total is derived as
@@ -178,9 +178,9 @@ To chain a custom base transport, use `NewTransportWithBase(base, opts...)`.
 
 | Option                   | Description                                                                                                                                                  |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `WithTracerProvider(tp)` | Tracer provider to use. Defaults to the global provider.                                                                                                       |
+| `WithTracerProvider(tp)` | Tracer provider to use. Defaults to the global provider.                                                                                                     |
 | `WithDataCapture(mode)`  | Gates input/output **content** capture at the source. Defaults to `langwatch.DataCaptureAll`. Span structure, models, usage and metrics are always recorded. |
-| `WithGenAIProvider(kv)`  | Sets `gen_ai.provider.name`. Defaults to `ollama`.                                                                                                             |
+| `WithGenAIProvider(kv)`  | Sets `gen_ai.provider.name`. Defaults to `ollama`.                                                                                                           |
 
 `WithDataCapture` composes with the exporter-level
 `langwatch.WithDataCapture(...)`: the transport gates content at the source and

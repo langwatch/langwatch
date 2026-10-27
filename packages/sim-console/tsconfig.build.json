@@ -1,0 +1,20 @@
+{
+  "extends": ["./tsconfig.json", "../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": [],
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"],
+
+  "references": [
+    {
+      "path": "../design-system-internal/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
+}

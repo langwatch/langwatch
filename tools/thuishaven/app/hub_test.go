@@ -17,18 +17,38 @@ import (
 // --- fakes -------------------------------------------------------------------
 
 type fakeStore struct {
-	stacks     []domain.Stack
-	removed    []string
-	slugCache  map[string]string
-	dbActivity map[string]time.Time
-	selection  map[string]domain.Selection
-	touched    []string
+	waiterClaims []domain.SlotClaim
+	stacks       []domain.Stack
+	removed      []string
+	slugCache    map[string]string
+	dbActivity   map[string]time.Time
+	selection    map[string]domain.Selection
+	touched      []string
 
 	pressure           domain.PressureRecord
 	hasWrittenPressure bool
 	heavyRuns          int
 	observed           map[string]time.Duration
 	reapEvents         []domain.ReapEvent
+	heavyRunSnapshots  []HeavyRunSnapshot
+	runHistory         []domain.RunRecord
+	appendHistoryErr   error
+	prereqSkips        map[string]bool
+	containerPosture   string
+	machineSettings    domain.MachineSettings
+	focus              string
+}
+
+func (f *fakeStore) ReadFocus() string { return f.focus }
+func (f *fakeStore) WriteFocus(slug string) error {
+	f.focus = slug
+	return nil
+}
+
+func (f *fakeStore) ReadMachineSettings() domain.MachineSettings { return f.machineSettings }
+func (f *fakeStore) WriteMachineSettings(s domain.MachineSettings) error {
+	f.machineSettings = s
+	return nil
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -48,11 +68,7 @@ func (f *fakeStore) ReadSlugCache(dir string) (string, bool) {
 	s, ok := f.slugCache[dir]
 	return s, ok
 }
-func (f *fakeStore) WriteSlugCache(string, string) error     { return nil }
-func (f *fakeStore) WriteOverlay(string, domain.Stack) error { return nil }
-func (f *fakeStore) WriteHMRGate(string, int64) error        { return nil }
-func (f *fakeStore) ReadHMRGate(string) (int64, bool)        { return 0, false }
-func (f *fakeStore) ClearHMRGate(string)                     {}
+func (f *fakeStore) WriteSlugCache(string, string) error { return nil }
 func (f *fakeStore) TouchDBActivity(slug string) error {
 	f.touched = append(f.touched, slug)
 	if f.dbActivity == nil {
@@ -83,6 +99,16 @@ func (f *fakeStore) WriteSelection(worktreeDir string, sel domain.Selection) err
 	f.selection[worktreeDir] = sel
 	return nil
 }
+func (f *fakeStore) ReadPrereqSkips() map[string]bool { return f.prereqSkips }
+func (f *fakeStore) ReadContainerPosture() string     { return f.containerPosture }
+func (f *fakeStore) WriteContainerPosture(p string) error {
+	f.containerPosture = p
+	return nil
+}
+func (f *fakeStore) WritePrereqSkips(skips map[string]bool) error {
+	f.prereqSkips = skips
+	return nil
+}
 func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error) { return true, nil }
 func (f *fakeStore) Daemon() (DaemonInfo, bool)           { return DaemonInfo{}, false }
 func (f *fakeStore) ClearDaemon()                         {}
@@ -90,6 +116,7 @@ func (f *fakeStore) WritePressure(rec domain.PressureRecord) error {
 	f.pressure, f.hasWrittenPressure = rec, true
 	return nil
 }
+func (f *fakeStore) WaiterClaims(string) []domain.SlotClaim { return f.waiterClaims }
 func (f *fakeStore) ReadPressure() (domain.PressureRecord, bool) {
 	return f.pressure, f.hasWrittenPressure
 }
@@ -116,25 +143,29 @@ func (f *fakeStore) AppendReapEvent(ev domain.ReapEvent) error {
 }
 func (f *fakeStore) ReapEvents() []domain.ReapEvent { return f.reapEvents }
 
-// fakeClaudeSettings records what `haven setup` asked to install.
-type fakeClaudeSettings struct {
-	root    string
-	command string
+func (f *fakeStore) HeavyRunSnapshots() []HeavyRunSnapshot { return f.heavyRunSnapshots }
+func (f *fakeStore) AppendRunHistory(rec domain.RunRecord) error {
+	if f.appendHistoryErr != nil {
+		return f.appendHistoryErr
+	}
+	f.runHistory = append(f.runHistory, rec)
+	return nil
 }
-
-func (f *fakeClaudeSettings) EnsureHook(repoRoot, command string) (bool, error) {
-	f.root, f.command = repoRoot, command
-	return true, nil
-}
+func (f *fakeStore) RunHistory() []domain.RunRecord { return f.runHistory }
 
 type fakeSystem struct {
 	alive           map[int]bool
+	starts          map[int]string
 	terminated      []int
+	reloaded        []int
+	replanned       []int
+	nextPort        int // FreePorts counts up from it; 0 hands out zeros
 	groupTerminated []int
 	groupKilled     []int
 	pidsByPort      map[int][]int
 	now             time.Time
 	memStat         domain.MemStat
+	loadAverage     float64
 	demoted         []int
 	restored        []int
 	orphans         []int
@@ -143,14 +174,35 @@ type fakeSystem struct {
 	// matches every process on the machine and group-kills the result.
 	orphanMarker string
 	procSamples  []ProcessSample
+	cwds         map[int]string
 	killed       []int
 	totalMemory  uint64
 	portsInUse   map[int]bool
+	// spawned records what SpawnDetached was asked to run and where. A test that
+	// only asserted "no error" would pass while starting a process in whatever
+	// directory the request named.
+	spawned []spawnCall
 }
 
-func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
-func (f *fakeSystem) PortInUse(port int) bool        { return f.portsInUse[port] }
-func (f *fakeSystem) ProcessAlive(pid int) bool      { return f.alive[pid] }
+// spawnCall is one detached spawn: the argv, and the directory it ran in.
+type spawnCall struct {
+	Argv []string
+	Dir  string
+}
+
+func (f *fakeSystem) FreePorts(n int) ([]int, error) {
+	ports := make([]int, n)
+	for i := range ports {
+		if f.nextPort != 0 {
+			f.nextPort++
+			ports[i] = f.nextPort
+		}
+	}
+	return ports, nil
+}
+func (f *fakeSystem) PortInUse(port int) bool     { return f.portsInUse[port] }
+func (f *fakeSystem) ProcessAlive(pid int) bool   { return f.alive[pid] }
+func (f *fakeSystem) ProcessStart(pid int) string { return f.starts[pid] }
 func (f *fakeSystem) Terminate(pid int) {
 	f.terminated = append(f.terminated, pid)
 	// A terminated launcher dies with its process group; reflect that so the
@@ -159,6 +211,8 @@ func (f *fakeSystem) Terminate(pid int) {
 		f.alive[pid] = false
 	}
 }
+func (f *fakeSystem) Reload(pid int)         { f.reloaded = append(f.reloaded, pid) }
+func (f *fakeSystem) Replan(pid int)         { f.replanned = append(f.replanned, pid) }
 func (f *fakeSystem) TerminateGroup(pid int) { f.groupTerminated = append(f.groupTerminated, pid) }
 func (f *fakeSystem) KillGroup(pid int) {
 	f.groupKilled = append(f.groupKilled, pid)
@@ -166,39 +220,93 @@ func (f *fakeSystem) KillGroup(pid int) {
 		f.alive[pid] = false
 	}
 }
-func (f *fakeSystem) PIDsOnPort(port int) []int                    { return f.pidsByPort[port] }
-func (f *fakeSystem) SpawnDetached([]string, string, string) error { return nil }
-func (f *fakeSystem) Now() time.Time                               { return f.now }
-func (f *fakeSystem) Getpid() int                                  { return 1 }
-func (f *fakeSystem) TotalMemory() uint64                          { return f.totalMemory }
-func (f *fakeSystem) GroupRSS(int) uint64                          { return 0 }
-func (f *fakeSystem) MemStat() domain.MemStat                      { return f.memStat }
-func (f *fakeSystem) DemoteGroup(pid int)                          { f.demoted = append(f.demoted, pid) }
-func (f *fakeSystem) RestoreGroup(pid int)                         { f.restored = append(f.restored, pid) }
+func (f *fakeSystem) PIDsOnPort(port int) []int { return f.pidsByPort[port] }
+func (f *fakeSystem) SpawnDetached(argv []string, dir, _ string) error {
+	f.spawned = append(f.spawned, spawnCall{Argv: argv, Dir: dir})
+	return nil
+}
+func (f *fakeSystem) Now() time.Time          { return f.now }
+func (f *fakeSystem) Getpid() int             { return 1 }
+func (f *fakeSystem) TotalMemory() uint64     { return f.totalMemory }
+func (f *fakeSystem) GroupRSS(int) uint64     { return 0 }
+func (f *fakeSystem) MemStat() domain.MemStat { return f.memStat }
+func (f *fakeSystem) LoadAverage() float64    { return f.loadAverage }
+func (f *fakeSystem) DemoteGroup(pid int)     { f.demoted = append(f.demoted, pid) }
+func (f *fakeSystem) RestoreGroup(pid int)    { f.restored = append(f.restored, pid) }
 func (f *fakeSystem) OrphanedWorkers(marker string) []int {
 	f.orphanMarker = marker
 	return f.orphans
 }
 func (f *fakeSystem) ProcessSamples() []ProcessSample { return f.procSamples }
 func (f *fakeSystem) Kill(pid int)                    { f.killed = append(f.killed, pid) }
+func (f *fakeSystem) ProcessCwds(pids []int) map[int]string {
+	out := map[int]string{}
+	for _, pid := range pids {
+		if dir, ok := f.cwds[pid]; ok {
+			out[pid] = dir
+		}
+	}
+	return out
+}
 
-type fakeProxy struct{ removed []string }
+// fakeProxy is safe for concurrent calls: provision and teardown route in parallel.
+type fakeProxy struct {
+	mu      sync.Mutex
+	removed []string
+}
 
 func (f *fakeProxy) Register(string, string, int) error { return nil }
-func (f *fakeProxy) Remove(service, slug string)        { f.removed = append(f.removed, service+"."+slug) }
-func (f *fakeProxy) Running() bool                      { return true }
-func (f *fakeProxy) Installed() bool                    { return true }
-func (f *fakeProxy) EnsureReady() error                 { return nil }
-func (f *fakeProxy) Endpoint() (string, int)            { return "https", 443 }
-func (f *fakeProxy) CACertPath() string                 { return "" }
-func (f *fakeProxy) Shutdown() error                    { return nil }
-func (f *fakeProxy) Install() error                     { return nil }
+func (f *fakeProxy) Remove(service, slug string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.removed = append(f.removed, service+"."+slug)
+}
+func (f *fakeProxy) Running() bool           { return true }
+func (f *fakeProxy) Installed() bool         { return true }
+func (f *fakeProxy) EnsureReady() error      { return nil }
+func (f *fakeProxy) Endpoint() (string, int) { return "https", 443 }
+func (f *fakeProxy) CACertPath() string      { return "" }
+func (f *fakeProxy) Shutdown() error         { return nil }
+func (f *fakeProxy) Install() error          { return nil }
+func (f *fakeProxy) Version() string         { return domain.PortlessVersion }
 
 type fakeDBServer struct {
 	databases []string
 	mu        sync.Mutex // guards dropped: the bulk delete drops concurrently
 	dropped   []string
 	dropErr   error // when set, DropDatabase records the attempt then fails
+	// access and weights record EnsureStackAccess and SetStackWeight; accessErr
+	// and weightErr fail them.
+	access    map[string]string
+	weights   map[string]int
+	accessErr error
+	weightErr error
+}
+
+func (f *fakeDBServer) EnsureStackAccess(_ context.Context, db, password string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.accessErr != nil {
+		return f.accessErr
+	}
+	if f.access == nil {
+		f.access = map[string]string{}
+	}
+	f.access[db] = password
+	return nil
+}
+
+func (f *fakeDBServer) SetStackWeight(_ context.Context, db string, weight int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.weightErr != nil {
+		return f.weightErr
+	}
+	if f.weights == nil {
+		f.weights = map[string]int{}
+	}
+	f.weights[db] = weight
+	return nil
 }
 
 func (f *fakeDBServer) Ensure(context.Context) (int, error)               { return 1, nil }
@@ -225,6 +333,8 @@ type fakeHygiene struct {
 	dirtyDirs    map[string]bool
 	lastActivity map[string]time.Time
 	goneDirs     map[string]bool
+	mergedDirs   map[string]bool
+	lastTouched  map[string]time.Time
 	// mu guards the two removal logs: DestroyWorktrees removes concurrently.
 	mu               sync.Mutex
 	removed          []string
@@ -272,7 +382,19 @@ func (f *fakeHygiene) LastActivity(dir string) (time.Time, bool) {
 	t, ok := f.lastActivity[dir]
 	return t, ok
 }
-func (f *fakeHygiene) UpstreamGone(dir, _ string) bool { return f.goneDirs[dir] }
+func (f *fakeHygiene) UpstreamGone(dir, _ string) bool   { return f.goneDirs[dir] }
+func (f *fakeHygiene) MergedIntoMain(dir, _ string) bool { return f.mergedDirs[dir] }
+
+// LastTouched is the directory's own mtime. The fake keeps a separate map so a
+// test can make a worktree's HEAD look ancient while the directory is fresh —
+// the exact shape a scratch worktree at an old ref has, and the one the temporary rule must survive.
+func (f *fakeHygiene) LastTouched(dir string) (time.Time, bool) {
+	if f.lastTouched == nil {
+		return f.LastActivity(dir)
+	}
+	t, ok := f.lastTouched[dir]
+	return t, ok
+}
 
 func hubOrchestrator(store *fakeStore, sys *fakeSystem, proxy *fakeProxy, ch, pg *fakeDBServer, hyg *fakeHygiene) *Orchestrator {
 	return &Orchestrator{

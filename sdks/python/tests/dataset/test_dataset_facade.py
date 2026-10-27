@@ -194,9 +194,7 @@ class TestDatasetsFacade:
             with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
                 tmp_path = f.name
             try:
-                facade._api.get_dataset = MagicMock(
-                    return_value={"id": "ds_1", "name": "my-dataset", "slug": "my-dataset", "data": []}
-                )
+                facade._api.dataset_exists = MagicMock(return_value=True)
                 # First call returns records, second call returns empty (all deleted)
                 facade._api.list_records = MagicMock(
                     side_effect=[
@@ -219,14 +217,10 @@ class TestDatasetsFacade:
 
         def test_replace_creates_when_not_found(self, facade):
             """replace mode creates dataset when it does not exist"""
-            from langwatch.dataset.errors import DatasetNotFoundError
-
             with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
                 tmp_path = f.name
             try:
-                facade._api.get_dataset = MagicMock(
-                    side_effect=DatasetNotFoundError("Not found")
-                )
+                facade._api.dataset_exists = MagicMock(return_value=False)
                 facade._api.create_from_file = MagicMock(
                     return_value={
                         "dataset": {
@@ -252,9 +246,7 @@ class TestDatasetsFacade:
             with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
                 tmp_path = f.name
             try:
-                facade._api.get_dataset = MagicMock(
-                    return_value={"id": "ds_1", "name": "my-dataset", "slug": "my-dataset", "data": []}
-                )
+                facade._api.dataset_exists = MagicMock(return_value=True)
                 with pytest.raises(DatasetApiError, match="Dataset already exists"):
                     facade.upload("my-dataset", file_path=tmp_path, if_exists="error")
             finally:
@@ -262,14 +254,10 @@ class TestDatasetsFacade:
 
         def test_error_creates_when_not_found(self, facade):
             """error mode creates dataset when it does not exist"""
-            from langwatch.dataset.errors import DatasetNotFoundError
-
             with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
                 tmp_path = f.name
             try:
-                facade._api.get_dataset = MagicMock(
-                    side_effect=DatasetNotFoundError("Not found")
-                )
+                facade._api.dataset_exists = MagicMock(return_value=False)
                 facade._api.create_from_file = MagicMock(
                     return_value={
                         "dataset": {

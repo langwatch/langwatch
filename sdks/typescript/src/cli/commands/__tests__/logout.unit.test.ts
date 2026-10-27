@@ -1,8 +1,7 @@
 /**
  * `langwatch logout` orchestration: scan → (confirm) → remove telemetry
- * wiring, and revoke the session unless --keep-credentials. Exercised
- * against a real temp HOME + isolated config path with --yes so no prompt
- * blocks and --keep-credentials so no network revoke is attempted.
+ * wiring, revoke unless --keep-credentials. Exercised with --yes (no
+ * prompt) and --keep-credentials (no network revoke).
  */
 
 import * as fs from "node:fs";
@@ -18,12 +17,14 @@ import {
   rcPath,
   toolMarkers,
 } from "@/cli/utils/governance/shell-rc";
+
 import { logoutCommand } from "../logout";
 
 let tmpHome: string;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origCodexHome = process.env.CODEX_HOME;
+const origCopilotHome = process.env.COPILOT_HOME;
 const origCliConfig = process.env.LANGWATCH_CLI_CONFIG;
 
 const seedClaudeAndGemini = (): void => {
@@ -47,6 +48,7 @@ beforeEach(() => {
   process.env.HOME = tmpHome;
   process.env.USERPROFILE = tmpHome;
   delete process.env.CODEX_HOME;
+  delete process.env.COPILOT_HOME;
   process.env.LANGWATCH_CLI_CONFIG = path.join(tmpHome, "config.json");
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -57,6 +59,8 @@ afterEach(() => {
   process.env.USERPROFILE = origUserprofile;
   if (origCodexHome === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = origCodexHome;
+  if (origCopilotHome === undefined) delete process.env.COPILOT_HOME;
+  else process.env.COPILOT_HOME = origCopilotHome;
   if (origCliConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
   else process.env.LANGWATCH_CLI_CONFIG = origCliConfig;
   vi.restoreAllMocks();

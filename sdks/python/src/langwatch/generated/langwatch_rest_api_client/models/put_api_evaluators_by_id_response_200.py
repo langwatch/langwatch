@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..types import UNSET, Unset
 
@@ -31,8 +32,8 @@ class PutApiEvaluatorsByIdResponse200:
         config (None | PutApiEvaluatorsByIdResponse200ConfigType0):
         workflow_id (None | str):
         copied_from_evaluator_id (None | str):
-        created_at (str):
-        updated_at (str):
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
         fields (list[PutApiEvaluatorsByIdResponse200FieldsItem]):
         output_fields (list[PutApiEvaluatorsByIdResponse200OutputFieldsItem]):
         platform_url (str):
@@ -48,14 +49,13 @@ class PutApiEvaluatorsByIdResponse200:
     config: None | PutApiEvaluatorsByIdResponse200ConfigType0
     workflow_id: None | str
     copied_from_evaluator_id: None | str
-    created_at: str
-    updated_at: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
     fields: list[PutApiEvaluatorsByIdResponse200FieldsItem]
     output_fields: list[PutApiEvaluatorsByIdResponse200OutputFieldsItem]
     platform_url: str
     workflow_name: str | Unset = UNSET
     workflow_icon: str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.put_api_evaluators_by_id_response_200_config_type_0 import (
@@ -85,9 +85,9 @@ class PutApiEvaluatorsByIdResponse200:
         copied_from_evaluator_id: None | str
         copied_from_evaluator_id = self.copied_from_evaluator_id
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
-        updated_at = self.updated_at
+        updated_at = self.updated_at.isoformat()
 
         fields = []
         for fields_item_data in self.fields:
@@ -106,7 +106,7 @@ class PutApiEvaluatorsByIdResponse200:
         workflow_icon = self.workflow_icon
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -186,9 +186,9 @@ class PutApiEvaluatorsByIdResponse200:
 
         copied_from_evaluator_id = _parse_copied_from_evaluator_id(d.pop("copiedFromEvaluatorId"))
 
-        created_at = d.pop("createdAt")
+        created_at = isoparse(d.pop("createdAt"))
 
-        updated_at = d.pop("updatedAt")
+        updated_at = isoparse(d.pop("updatedAt"))
 
         fields = []
         _fields = d.pop("fields")
@@ -228,21 +228,4 @@ class PutApiEvaluatorsByIdResponse200:
             workflow_icon=workflow_icon,
         )
 
-        put_api_evaluators_by_id_response_200.additional_properties = d
         return put_api_evaluators_by_id_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -1,0 +1,172 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Landing page (/): per-org product memory resolves before server. Moved from platform/app.
+ */
+
+import { render, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const replaceMock = vi.fn();
+let mockResolveHome: {
+  data?: { destination: string; isOverride: boolean } & Record<string, unknown>;
+  isError: boolean;
+} = { isError: false };
+let mockTestArrival: { data?: { testing: boolean }; isLoading: boolean } = {
+  data: { testing: false },
+  isLoading: false,
+};
+
+vi.mock("../../../../behavior/use-reachable-products.ts", () => ({
+  useReachableProducts: () => ({
+    reachableProducts: ["me", "llm-ops", "gateway", "governance"],
+    isLoading: false,
+  }),
+}));
+
+vi.mock("../../../../behavior/navigation-api.ts", () => ({
+  navigationApi: {
+    governance: {
+      resolveHome: { useQuery: () => mockResolveHome },
+    },
+    identity: {
+      myTestArrival: { useQuery: () => mockTestArrival },
+    },
+  },
+}));
+
+import { writeLastVisitedProduct } from "../../../../model/product-memory.ts";
+import { WithStubNavigationHost } from "../../../../testing.tsx";
+import LandingScreen from "../landing.screen.tsx";
+
+const ORGANIZATION = { id: "org_1", name: "Acme", teams: [] };
+const PROJECT = { id: "project_1", name: "Demo", slug: "demo", isPersonal: false };
+
+function renderLanding({ orgless = false }: { orgless?: boolean } = {}) {
+  return render(
+    <WithStubNavigationHost
+      readings={{
+        organization: orgless ? undefined : ORGANIZATION,
+        organizations: orgless ? [] : [ORGANIZATION],
+        project: orgless ? undefined : PROJECT,
+        isLoading: false,
+      }}
+      actions={{ replace: replaceMock }}
+    >
+      <LandingScreen />
+    </WithStubNavigationHost>,
+  );
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  replaceMock.mockClear();
+  mockTestArrival = { data: { testing: false }, isLoading: false };
+  mockResolveHome = {
+    data: {
+      destination: "/demo",
+      isOverride: false,
+      intentPinned: false,
+      governanceUiEnabled: true,
+    },
+    isError: false,
+  };
+});
+
+describe("the root landing", () => {
+  describe("when the device remembers a product", () => {
+    /** @scenario The root address opens the remembered product */
+    it("opens the remembered product ahead of the server resolver", async () => {
+      writeLastVisitedProduct({ organizationId: "org_1", productId: "gateway" });
+      renderLanding();
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/gateway/virtual-keys");
+      });
+    });
+
+    it("still honours an explicit pin over the memory", async () => {
+      writeLastVisitedProduct({ organizationId: "org_1", productId: "gateway" });
+      mockResolveHome = {
+        data: {
+          destination: "/governance",
+          isOverride: true,
+          intentPinned: false,
+          governanceUiEnabled: true,
+        },
+        isError: false,
+      };
+      renderLanding();
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/governance");
+      });
+    });
+  });
+
+  describe("when the landing page re-renders while the navigation is in flight", () => {
+    /** @scenario The landing redirect navigates once per destination */
+    it("navigates once per destination", async () => {
+      const { rerender } = renderLanding();
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/demo");
+      });
+
+      // Every mocked hook above returns a fresh object per call, the way
+      // the real hooks behave while a lazy route is loading. A re-render
+      // must not restart the same navigation.
+      rerender(
+        <WithStubNavigationHost
+          readings={{
+            organization: ORGANIZATION,
+            organizations: [ORGANIZATION],
+            project: PROJECT,
+            isLoading: false,
+          }}
+          actions={{ replace: replaceMock }}
+        >
+          <LandingScreen />
+        </WithStubNavigationHost>,
+      );
+
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a test sign-in leaves somebody with no organization", () => {
+    // With no organization the home query is disabled, so it never answers.
+    beforeEach(() => {
+      mockResolveHome = { isError: false };
+    });
+
+    /** @scenario A test sign-in that returns to the setup screen is sent to what happened */
+    it("sends them to the test sign-in result, not to onboarding", async () => {
+      mockTestArrival = { data: { testing: true }, isLoading: false };
+      renderLanding({ orgless: true });
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/auth/sso-test-complete");
+      });
+      expect(replaceMock).not.toHaveBeenCalledWith("/onboarding/welcome");
+    });
+
+    /** @scenario A test sign-in that returns to the setup screen is sent to what happened */
+    it("sends them nowhere while the server has not answered", async () => {
+      mockTestArrival = { data: undefined, isLoading: true };
+      renderLanding({ orgless: true });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A test sign-in that returns to the setup screen is sent to what happened */
+    it("still sends somebody who is not a test arrival to onboarding", async () => {
+      renderLanding({ orgless: true });
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/onboarding/welcome");
+      });
+    });
+  });
+});

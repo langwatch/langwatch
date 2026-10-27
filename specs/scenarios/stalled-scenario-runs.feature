@@ -33,6 +33,35 @@ Feature: Detect and display stalled scenario runs
     When the stall watchdog wake fires
     Then the run finishes with status ERROR and reason "stalled"
 
+  # The first deploy of the watchdog caught up a backlog of runs dead since
+  # spring and finished each one "today". Trace metrics then looked for the
+  # run's traces around today, missed every one, and logged a failure per
+  # trace for two days. A finish records when the outcome became true.
+  @unit
+  Scenario: A run caught up long after it stalled is finished at its stall time
+    Given a scenario run went quiet months ago and no RUN_FINISHED event exists
+    When the stall watchdog wake fires today
+    Then the run finishes with status ERROR and reason "stalled"
+    And the finished event is dated when the stall threshold passed, not today
+
+  @unit
+  Scenario: A finish that names no outcome time is dated when it is written
+    Given a finish intent queued before finishes carried their outcome time
+    When the finish executor writes the terminal event
+    Then the finished event is dated when it is written
+
+  # A run reported from outside opens with RUN_STARTED: only the platform
+  # emits QUEUED. The watchdog must decide the stall from the activity the
+  # process really saw, not from the identity only the queued path stamps,
+  # or a CI machine that dies mid-run leaves the run in progress forever.
+  @unit
+  Scenario: An externally reported run quiet past the threshold is finished as stalled
+    Given a run reported by an SDK from outside the platform, so no queued event exists
+    And the reporting process died before it sent a finished event
+    When the stall watchdog wake fires after the threshold of silence
+    Then the run finishes with status ERROR and reason "stalled"
+    And a run still sending activity keeps its wake armed instead
+
   # The watchdog only puts the reason on its finish command; the command is
   # what must carry it onto the recorded event, or the run shows an error
   # with no explanation.
@@ -42,6 +71,9 @@ Feature: Detect and display stalled scenario runs
     And no judge results accompany the finish command
     When the finish command emits the terminal event
     Then the event carries failure results encoding that reason
+
+  # The upgrade step backstopping the watchdog for historical runs:
+  # modules/scenario/specs/close-stalled-runs-step.feature.
 
   # ============================================================================
   # End-to-End - User Workflow

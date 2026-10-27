@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..models.patch_api_gateway_v1_virtual_keys_by_id_response_200_virtual_key_purpose import (
     PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyPurpose,
@@ -15,7 +16,6 @@ from ..models.patch_api_gateway_v1_virtual_keys_by_id_response_200_virtual_key_r
 from ..models.patch_api_gateway_v1_virtual_keys_by_id_response_200_virtual_key_status import (
     PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyStatus,
 )
-from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.patch_api_gateway_v1_virtual_keys_by_id_response_200_virtual_key_metadata import (
@@ -41,18 +41,23 @@ class PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKey:
         purpose (PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyPurpose):
         display_prefix (str):
         principal_user_id (None | str):
-        trace_project_id (None | str):
+        trace_project_id (None | str): The project this key's traces and costs land in. Not a scope: it grants no access
+            to the key. Null only on a key created before this was stored.
+        trace_project_archived (bool): True when the project in trace_project_id has been deleted. The key goes on
+            sending its traces there.
         external_id (None | str):
         metadata (PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyMetadata):
         scopes (list[PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyScopesItem]):
         routing_policy_id (None | str):
         routing_mode (PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyRoutingMode):
+        config (Any):
         revision (str):
-        created_at (str):
-        updated_at (str):
-        last_used_at (None | str):
-        revoked_at (None | str):
-        config (Any | Unset):
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
+        last_used_at (datetime.datetime | None):
+        revoked_at (datetime.datetime | None):
+        expires_at (datetime.datetime | None): When the key stops serving, or null for a key that never expires. status
+            stays active past the date on purpose.
     """
 
     id: str
@@ -64,18 +69,19 @@ class PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKey:
     display_prefix: str
     principal_user_id: None | str
     trace_project_id: None | str
+    trace_project_archived: bool
     external_id: None | str
     metadata: PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyMetadata
     scopes: list[PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyScopesItem]
     routing_policy_id: None | str
     routing_mode: PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyRoutingMode
+    config: Any
     revision: str
-    created_at: str
-    updated_at: str
-    last_used_at: None | str
-    revoked_at: None | str
-    config: Any | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    last_used_at: datetime.datetime | None
+    revoked_at: datetime.datetime | None
+    expires_at: datetime.datetime | None
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -99,6 +105,8 @@ class PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKey:
         trace_project_id: None | str
         trace_project_id = self.trace_project_id
 
+        trace_project_archived = self.trace_project_archived
+
         external_id: None | str
         external_id = self.external_id
 
@@ -114,22 +122,34 @@ class PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKey:
 
         routing_mode = self.routing_mode.value
 
-        revision = self.revision
-
-        created_at = self.created_at
-
-        updated_at = self.updated_at
-
-        last_used_at: None | str
-        last_used_at = self.last_used_at
-
-        revoked_at: None | str
-        revoked_at = self.revoked_at
-
         config = self.config
 
+        revision = self.revision
+
+        created_at = self.created_at.isoformat()
+
+        updated_at = self.updated_at.isoformat()
+
+        last_used_at: None | str
+        if isinstance(self.last_used_at, datetime.datetime):
+            last_used_at = self.last_used_at.isoformat()
+        else:
+            last_used_at = self.last_used_at
+
+        revoked_at: None | str
+        if isinstance(self.revoked_at, datetime.datetime):
+            revoked_at = self.revoked_at.isoformat()
+        else:
+            revoked_at = self.revoked_at
+
+        expires_at: None | str
+        if isinstance(self.expires_at, datetime.datetime):
+            expires_at = self.expires_at.isoformat()
+        else:
+            expires_at = self.expires_at
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -141,20 +161,21 @@ class PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKey:
                 "display_prefix": display_prefix,
                 "principal_user_id": principal_user_id,
                 "trace_project_id": trace_project_id,
+                "trace_project_archived": trace_project_archived,
                 "external_id": external_id,
                 "metadata": metadata,
                 "scopes": scopes,
                 "routing_policy_id": routing_policy_id,
                 "routing_mode": routing_mode,
+                "config": config,
                 "revision": revision,
                 "created_at": created_at,
                 "updated_at": updated_at,
                 "last_used_at": last_used_at,
                 "revoked_at": revoked_at,
+                "expires_at": expires_at,
             }
         )
-        if config is not UNSET:
-            field_dict["config"] = config
 
         return field_dict
 
@@ -201,6 +222,8 @@ class PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKey:
 
         trace_project_id = _parse_trace_project_id(d.pop("trace_project_id"))
 
+        trace_project_archived = d.pop("trace_project_archived")
+
         def _parse_external_id(data: object) -> None | str:
             if data is None:
                 return data
@@ -226,27 +249,58 @@ class PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKey:
 
         routing_mode = PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKeyRoutingMode(d.pop("routing_mode"))
 
+        config = d.pop("config")
+
         revision = d.pop("revision")
 
-        created_at = d.pop("created_at")
+        created_at = isoparse(d.pop("created_at"))
 
-        updated_at = d.pop("updated_at")
+        updated_at = isoparse(d.pop("updated_at"))
 
-        def _parse_last_used_at(data: object) -> None | str:
+        def _parse_last_used_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
-            return cast(None | str, data)
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                last_used_at_type_0 = isoparse(data)
+
+                return last_used_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
 
         last_used_at = _parse_last_used_at(d.pop("last_used_at"))
 
-        def _parse_revoked_at(data: object) -> None | str:
+        def _parse_revoked_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
-            return cast(None | str, data)
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                revoked_at_type_0 = isoparse(data)
+
+                return revoked_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
 
         revoked_at = _parse_revoked_at(d.pop("revoked_at"))
 
-        config = d.pop("config", UNSET)
+        def _parse_expires_at(data: object) -> datetime.datetime | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                expires_at_type_0 = isoparse(data)
+
+                return expires_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
+
+        expires_at = _parse_expires_at(d.pop("expires_at"))
 
         patch_api_gateway_v1_virtual_keys_by_id_response_200_virtual_key = cls(
             id=id,
@@ -258,34 +312,19 @@ class PatchApiGatewayV1VirtualKeysByIdResponse200VirtualKey:
             display_prefix=display_prefix,
             principal_user_id=principal_user_id,
             trace_project_id=trace_project_id,
+            trace_project_archived=trace_project_archived,
             external_id=external_id,
             metadata=metadata,
             scopes=scopes,
             routing_policy_id=routing_policy_id,
             routing_mode=routing_mode,
+            config=config,
             revision=revision,
             created_at=created_at,
             updated_at=updated_at,
             last_used_at=last_used_at,
             revoked_at=revoked_at,
-            config=config,
+            expires_at=expires_at,
         )
 
-        patch_api_gateway_v1_virtual_keys_by_id_response_200_virtual_key.additional_properties = d
         return patch_api_gateway_v1_virtual_keys_by_id_response_200_virtual_key
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

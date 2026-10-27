@@ -11,7 +11,14 @@
 #   - uses: ./.github/actions/setup-pnpm-node
 #     with:
 #       # optional: what to install. Omit to skip installing entirely.
-#       install: "@langwatch/web..."
+#       install: "@langwatch/platform-api..."
+#       # optional: npm registry for a publish job. Writes the .npmrc that
+#       # `pnpm publish` authenticates through. Omit everywhere else.
+#       registry-url: "https://registry.npmjs.org"
+#       # optional: save the pnpm store at the end of the install. Set it on ONE
+#       # job per workflow that installs every project (`install: all`); see the
+#       # store steps below.
+#       save-store: "true"
 name: setup-pnpm-node
 description: Set up pnpm + Node 24 with pnpm-store caching.
 inputs:
@@ -31,9 +38,26 @@ inputs:
   install:
     description: >
       What to install. Omit to skip the install step. `all` installs every
-      workspace project. Anything else is passed straight to `pnpm --filter`,
-      so a trailing `...` selects a project together with its workspace
-      dependencies (e.g. `@langwatch/web...`).
+      workspace project. Anything else is split on whitespace and each word
+      becomes one `pnpm --filter`, so a trailing `...` selects a project
+      together with its workspace dependencies (e.g. `@langwatch/platform-api...`,
+      or `@langwatch/platform-api... @langwatch/langyworker...` for two roots).
+    required: false
+    default: ""
+  save-store:
+    description: >
+      Save the pnpm store after the install, on a push to main, when no store
+      was restored for this lockfile. Only a job that installs every project
+      may set it: the key is shared, the first save wins, and a store saved
+      from a filtered install is partial for every full install that reuses it.
+    required: false
+    default: "false"
+  registry-url:
+    description: >
+      npm registry to authenticate against, for publish jobs only. Passed
+      through to actions/setup-node, which writes a project .npmrc pointing at
+      it with an auth token read from NODE_AUTH_TOKEN. Empty (the default)
+      leaves .npmrc untouched.
     required: false
     default: ""
 
@@ -44,20 +68,45 @@ runs:
       if: inputs.install-dir != ''
       shell: bash
       run: |
-        echo "::error::setup-pnpm-node no longer takes 'install-dir'. The repo is a single pnpm workspace (ADR-076), so installs run from the root and are narrowed with a filter. Replace 'install-dir: <dir>' with 'install: \"<package-name>...\"' — e.g. install-dir: langwatch becomes install: \"@langwatch/web...\"."
+        echo "::error::setup-pnpm-node no longer takes 'install-dir'. The repo is a single pnpm workspace (ADR-076), so installs run from the root and are narrowed with a filter. Replace 'install-dir: <dir>' with 'install: \"<package-name>...\"' — e.g. install-dir: langwatch becomes install: \"langwatch...\"."
         exit 1
 
     - name: Setup pnpm
       uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
       with:
-        version: 10.24.0
+        version: 12.6.0
 
     - name: Setup Node
       uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
       with:
-        node-version: 24
-        cache: "pnpm"
-        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+        node-version: "24.22.1"
+        package-manager-cache: false
+        registry-url: ${{ inputs.registry-url }}
+
+    # setup-node's own `cache: pnpm` keyed the store on the lockfile alone and
+    # saved it from whichever job finished first, filtered installs included, so
+    # a 915-package store from a small job was reused by every 2143-package
+    # install. Here only a full install saves, under a key of its own.
+    - name: Find the pnpm store
+      id: store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the pnpm store
+      id: restore-store
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(inputs.cache-dependency-path) }}
+
+    # The dev scripts (generate:modules, ensure:built, and the
+    # apps' predev/pretest hooks) are Go: dev/scripts/devscripts.sh runs them.
+    - name: Setup Go
+      if: inputs.install != ''
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.work
+        cache-dependency-path: "*/go.sum"
 
     # node-gyp is no longer bundled on PATH under Node-24 + npm-11, so any
     # native-module install lifecycle script (e.g. node-pty's prebuild fallback
@@ -98,5 +147,28 @@ runs:
         if [ "$INSTALL" = "all" ]; then
           CI=true pnpm install --frozen-lockfile
         else
-          CI=true pnpm install --frozen-lockfile --filter "$INSTALL"
+          # read -ra splits on whitespace WITHOUT pathname expansion. An
+          # unquoted `for target in $INSTALL` would glob, and a filter carrying
+          # a `*` would become however many paths happen to match in the
+          # checkout, which is not what the caller asked to install.
+          # read stops at the first newline, and a YAML block scalar (`install: >`
+          # or `install: |`) is the natural way to write several targets, so
+          # fold newlines into spaces first or every target after the first is
+          # dropped without a word of warning.
+          read -ra targets <<< "${INSTALL//[$'\n\r']/ }"
+          filters=()
+          for target in "${targets[@]}"; do
+            filters+=(--filter "$target")
+          done
+          CI=true pnpm install --frozen-lockfile "${filters[@]}"
         fi
+
+    - name: Save the pnpm store
+      if: >-
+        inputs.install == 'all' && inputs.save-store == 'true'
+        && github.ref == 'refs/heads/main'
+        && steps.restore-store.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(inputs.cache-dependency-path) }}

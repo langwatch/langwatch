@@ -81,26 +81,45 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given the permission registry
     When I list the available categories
     Then the categories include:
-      | category    | access levels |
-      | Traces      | read, write   |
-      | Cost        | read          |
-      | Scenarios   | read, write   |
-      | Annotations | read, write   |
-      | Analytics   | read, write   |
-      | Evaluations | read, write   |
-      | Datasets    | read, write   |
-      | Triggers    | read, write   |
-      | Workflows   | read, write   |
-      | Prompts     | read, write   |
-      | Secrets     | read, write   |
-      | Audit Log   | read          |
-      | Team        | read, write   |
-      | Project     | read, write   |
+      | category               | access levels |
+      | Traces                 | read, write   |
+      | Cost                   | read          |
+      | Scenarios              | read, write   |
+      | Annotations            | read, write   |
+      | Analytics              | read, write   |
+      | Evaluations            | read, write   |
+      | Langy                  | read, write   |
+      | Datasets               | read, write   |
+      | Triggers               | read, write   |
+      | Workflows              | read, write   |
+      | Experiments            | read, write   |
+      | Prompts                | read, write   |
+      | Playground             | read, write   |
+      | Secrets                | read, write   |
+      | Audit Log              | read          |
+      | Team                   | read, write   |
+      | Project                | read, write   |
+      | Organization           | read, write   |
+      | Gateway                | read, write   |
+      | Governance             | read, write   |
+      | Feature Flags          | write         |
 
-  # Deferred: Gateway permissions (virtualKeys, gatewayBudgets, gatewayProviders,
-  # gatewayGuardrails, gatewayCacheRules, gatewayUsage) inherit from the scope's
-  # built-in role. Fine-grained gateway control will be added when the gateway UI
-  # supports per-key configuration.
+  @unit
+  Scenario: Project write carries creation and deletion, because manage implies them
+    Given a category "Project" with "write" selected
+    When I compute the backend permissions
+    Then the result includes "project:create" and "project:delete"
+    And a check for "project:create" is answered by "project:manage", so a
+      category that offered project settings alone would describe a
+      separation the request path does not make
+
+  @unit
+  Scenario: Every registry permission belongs to a category
+    Given the permission registry
+    When I list the permissions every category names
+    Then every registry permission appears in exactly one category
+    And the only permissions left out are the platform tier ("ops:view",
+      "ops:manage"), which can never ride on an API key
 
   @unit
   Scenario: "read" access maps to view permission
@@ -113,21 +132,20 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given the permission registry
     When I compute "write" permissions for each category
     Then the exact backend permissions are:
-      | category    | permissions                                                    |
-      | Traces      | traces:view, traces:create, traces:update, traces:share        |
-      | Cost        | cost:view                                                      |
-      | Scenarios   | scenarios:view, scenarios:manage                               |
-      | Annotations | annotations:view, annotations:manage                           |
-      | Analytics   | analytics:view, analytics:manage                               |
-      | Evaluations | evaluations:view, evaluations:manage                           |
-      | Datasets    | datasets:view, datasets:manage                                 |
-      | Triggers    | triggers:view, triggers:manage                                 |
-      | Workflows   | workflows:view, workflows:manage                               |
-      | Prompts     | prompts:view, prompts:manage                                   |
-      | Secrets     | secrets:view, secrets:manage                                   |
-      | Audit Log   | auditLog:view                                                  |
-      | Team        | team:view, team:manage                                         |
-      | Project     | project:view, project:create, project:update, project:delete, project:manage |
+      | category               | permissions                                                              |
+      | Traces                 | traces:view, traces:create, traces:update, traces:share                  |
+      | Cost                   | cost:view                                                                |
+      | Scenarios              | scenarios:view, scenarios:create, scenarios:update, scenarios:delete, scenarios:manage |
+      | Audit Log              | auditLog:view                                                            |
+      | Team                   | team:view, team:manage                                                   |
+      | Project                | project:view, project:create, project:update, project:delete, project:manage |
+
+  @unit
+  Scenario: Older stored keys keep reading as write via the manage hierarchy
+    Given a stored key whose permissions are "datasets:view" and
+      "datasets:manage", written before the expanded write lists
+    When the drawer maps those permissions back to category selections
+    Then the Datasets category reads as "write"
 
   @unit
   Scenario: Selecting no categories produces an empty permission set
@@ -171,6 +189,13 @@ Feature: API Key Scope and Fine-Grained Permissions
     Then the key gets MEMBER-level access, not ADMIN
     And the key cannot perform admin-only operations
 
+  @unit
+  Scenario: An API key's ceiling cannot be dropped by its caller
+    Given a personal API key has project access
+    When its stored owner loses that access
+    Then the key loses that access on its next permission check
+    And the owner is read from storage by the key's id, never supplied by the caller
+
   @integration @unimplemented
   Scenario: Changing scope recalculates ceiling and resets out-of-bounds selections
     Given my role is Admin on "Project Alpha" and Viewer on "Team Beta"
@@ -179,10 +204,10 @@ Feature: API Key Scope and Fine-Grained Permissions
     Then Traces resets to "None" because Write exceeds my Viewer ceiling on Team Beta
 
   @integration @unimplemented
-  Scenario: Service key bypasses creator ceiling
+  Scenario: A service key is offered every permission its creator's organization role holds
     Given I am an organization admin
     When I create a service key with "Restricted" permissions
-    Then all resource menus offer None, Read, and Write regardless of my personal role
+    Then each resource menu offers the levels my organization role holds, and no more
 
   # ── Create flow ─────────────────────────────────────────────
 
@@ -256,9 +281,10 @@ Feature: API Key Scope and Fine-Grained Permissions
 
   @unit
   Scenario: permissionsSummary counts granted categories for restricted keys
-    Given a key with 3 permission categories granted
+    Given a key with 3 of the registry's permission categories granted
     When I compute the permissions summary
-    Then the result is "3 of 14 permissions"
+    Then the result reads "3 of N permissions", where N is the number of
+      categories the registry offers
 
   @unit
   Scenario: scopeLabel formats project scope correctly
@@ -308,16 +334,12 @@ Feature: API Key Scope and Fine-Grained Permissions
   # ── Backend validation ──────────────────────────────────────
 
   @unit
-  Scenario: A key minted from legacy membership works at request time
-    Given my access comes from team membership predating the permissions rebuild
-    And a key has been minted mirroring that access
-    When the key is used for something that access covers
-    Then the request is permitted
-    # Minting and using a key are two separate ceiling checks. Teaching only
-    # the first one about legacy membership moved the failure rather than
-    # fixing it: the key was issued and then every request made with it was
-    # refused, so an agent turn began, streamed, and then had every tool call
-    # denied — worse than being told up front.
+  Scenario: A key cannot regain access from legacy membership
+    Given a key still holds a grant but its owner has no live grant
+    And old membership rows may still contain a role
+    When the key is used
+    Then the request is refused
+    And neither old role rows nor migration status decide access
 
   @unit
   Scenario: Service rejects permissions above creator ceiling
@@ -354,6 +376,13 @@ Feature: API Key Scope and Fine-Grained Permissions
     And the bindings are recreated with the CustomRole id
 
   @unit
+  Scenario: Editing a key without changing its scopes keeps them
+    Given an API key already bound to a project
+    When I save an edit that resubmits the same scope unchanged
+    Then the key keeps that binding
+    And the key still works afterwards
+
+  @unit
   Scenario: Restricted key with camelCase permissions saves without error
     When I create a restricted key with permissions including "auditLog:view"
     Then the CustomRole is created successfully
@@ -364,3 +393,45 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given every permission category at its maximum access level
     When I compute the backend permissions for each category
     Then every permission string matches the CustomRole schema regex
+
+  # ── Cost visibility on the REST read doors ──────────────────
+
+  # A key's grants decide what its reads may see, and cost is one of them. The
+  # governed-SQL door and the trace doors both used to answer "yes" to
+  # cost:view for every key alike, on the reasoning that project keys predate
+  # RBAC — true of a legacy project key, and false of every key minted since.
+
+  @unit
+  Scenario: A key without the cost grant reads the query surface with costs redacted
+    Given a key that may run governed queries but does not carry "cost:view"
+    When the query surface resolves what that key may see
+    Then costs are hidden from it
+
+  @unit
+  Scenario: A key carrying the cost grant reads the query surface with costs
+    Given a key that carries "cost:view" for its project
+    When the query surface resolves what that key may see
+    Then costs are visible to it
+
+  @unit
+  Scenario: A key without the cost grant reads traces with costs redacted
+    Given a key that may view traces but does not carry "cost:view"
+    When the trace read resolves what that key may see
+    Then costs are hidden from it
+
+  @unit
+  Scenario: A legacy project key still reads costs without a grant lookup
+    Given a legacy project key, which predates fine-grained permissions
+    When either read door resolves what that key may see
+    Then costs are visible to it
+    And no per-key permission is looked up
+
+  # A misconfigured client retries its refused request many times a second.
+  # Each retry is the same customer fault, so the API door logs one warning
+  # per key per window, like trace ingestion does.
+  @unit
+  Scenario: Repeated ceiling refusals for one key log one warning per window
+    Given an API key whose permissions do not include the route's permission
+    When it is refused three times inside one sampling window
+    Then one warning is logged and no error
+    And the next refusal after the window carries the two refusals held back

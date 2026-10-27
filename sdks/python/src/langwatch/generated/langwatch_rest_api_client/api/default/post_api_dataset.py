@@ -5,22 +5,22 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_dataset_body import PostApiDatasetBody
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...models.post_api_dataset_response_201 import PostApiDatasetResponse201
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiDatasetBody | Unset = UNSET,
+    body: PostApiDatasetBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/dataset",
+        "url": "/api/v1/dataset",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -28,14 +28,23 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> PostApiDatasetResponse201 | None:
+    if response.status_code == 201:
+        response_201 = PostApiDatasetResponse201.from_dict(response.json())
+
+        return response_201
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[PostApiDatasetResponse201]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -49,20 +58,20 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiDatasetBody | Unset = UNSET,
-) -> Response[Any]:
+    client: AuthenticatedClient,
+    body: PostApiDatasetBody,
+) -> Response[PostApiDatasetResponse201]:
     """Create a new dataset
 
     Args:
-        body (PostApiDatasetBody | Unset):
+        body (PostApiDatasetBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Response[PostApiDatasetResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -76,22 +85,46 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-async def asyncio_detailed(
+def sync(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiDatasetBody | Unset = UNSET,
-) -> Response[Any]:
+    client: AuthenticatedClient,
+    body: PostApiDatasetBody,
+) -> PostApiDatasetResponse201 | None:
     """Create a new dataset
 
     Args:
-        body (PostApiDatasetBody | Unset):
+        body (PostApiDatasetBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        PostApiDatasetResponse201
+    """
+
+    return sync_detailed(
+        client=client,
+        body=body,
+    ).parsed
+
+
+async def asyncio_detailed(
+    *,
+    client: AuthenticatedClient,
+    body: PostApiDatasetBody,
+) -> Response[PostApiDatasetResponse201]:
+    """Create a new dataset
+
+    Args:
+        body (PostApiDatasetBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[PostApiDatasetResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -101,3 +134,29 @@ async def asyncio_detailed(
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    *,
+    client: AuthenticatedClient,
+    body: PostApiDatasetBody,
+) -> PostApiDatasetResponse201 | None:
+    """Create a new dataset
+
+    Args:
+        body (PostApiDatasetBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        PostApiDatasetResponse201
+    """
+
+    return (
+        await asyncio_detailed(
+            client=client,
+            body=body,
+        )
+    ).parsed

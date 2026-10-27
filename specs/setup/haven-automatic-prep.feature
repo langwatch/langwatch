@@ -21,7 +21,14 @@ Feature: haven automatic preparation
   Scenario: A missing database is created, migrated, and seeded
     Given this worktree has no databases yet
     When the developer runs "haven up"
-    Then its databases exist, are migrated, and are seeded before the app starts
+    Then its databases exist, the worker migrates them, and the seed runs once the api reports ready
+
+  @unit
+  Scenario: The keeper seeds once the api reports ready
+    Given an up whose worker is running the upgrade
+    When the api reports ready
+    Then the keeper runs the seed once
+    And a keeper stopped before then seeds nothing
 
   @integration @unimplemented
   Scenario: A stopped database server is started, not reported
@@ -65,3 +72,17 @@ Feature: haven automatic preparation
     Given langy is running
     When the developer runs "haven restart langy --rebuild"
     Then the image is rebuilt regardless of input hashing and langy restarts on it
+
+  # The pepper both API-key hashes are written under is optional in
+  # development (packages/secrets/keys.json marks both spellings `optional`),
+  # and the seed treated its absence as fatal — so `haven up` reported a failed
+  # seed on any checkout that had never set one. It cannot be minted either: it
+  # keys stored hashes and the envelope around seeded provider credentials, so
+  # a per-run value would write rows no application could verify.
+  Scenario: A seed with no API-key pepper still seeds the local identity
+    Given a checkout that has configured no credentials pepper
+    When the developer runs "haven up"
+    Then the organization, team, project and admin login are seeded
+    And one warning names the keys that were absent
+    And only the access-token rows are skipped
+    And up carries on

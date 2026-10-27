@@ -310,6 +310,20 @@ func TestPlayNamesAreDisjointFromSharedData(t *testing.T) {
 	}
 }
 
+// The sandbox Redis is Valkey, and its readiness probe uses the client the
+// Valkey image ships rather than one it might not carry.
+func TestPlayRedisRunsValkey(t *testing.T) {
+	rd := playRedisShell(77, 56379)
+	for _, want := range []string{" valkey/valkey:9.1\n", "valkey-cli ping"} {
+		if !strings.Contains(rd, want) {
+			t.Errorf("play redis shell missing %q:\n%s", want, rd)
+		}
+	}
+	if strings.Contains(rd, "redis:7") || strings.Contains(rd, "redis-cli") {
+		t.Errorf("play redis shell still names the Redis image or client:\n%s", rd)
+	}
+}
+
 func TestPlayInfraShellsUseOwnPortsAndVolumes(t *testing.T) {
 	pg := playPostgresShell(77, 55432, "lw_play_77")
 	ch := playClickHouseShell(77, 58123, "lw_play_77")
@@ -384,7 +398,7 @@ func TestPlayTeardownRunsEveryStepInOrderBestEffort(t *testing.T) {
 			}), nil)
 
 			if slices.Contains(ran, "remove record") {
-				t.Error("the record must be kept after a failed teardown so `haven clean` can finish it")
+				t.Error("the record must be kept after a failed teardown so `haven machine clean` can finish it")
 			}
 			// Best-effort still holds for everything else.
 			if !slices.Contains(ran, "remove checkout") {

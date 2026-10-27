@@ -1,0 +1,792 @@
+/**
+ * The scope rules, carried over from the application's `useOrganizationTeamProject` and
+ * asserted the same way its own tests assert them.
+ */
+
+import {
+  UI_RESERVED_PROJECT_SLUGS,
+  type UiScopeOrganization,
+  type UiScopeTeam,
+} from "@langwatch/organization-contract";
+import { describe, expect, it } from "vitest";
+
+import {
+  organizationRoleOf,
+  projectSlugAddressedBy,
+  resolveUiScope,
+  selectAmbientTeam,
+  uiOrgQueryParamWrites,
+  uiScopeSelectionWrites,
+  userCanOpenTeam,
+} from "../ui-scope-resolution";
+import {
+  JANE,
+  NOTHING_REMEMBERED,
+  organizationWith,
+  PERSONAL_TEAM,
+  SHARED_TEAM,
+} from "./ui-scope-graph";
+
+const ORGANIZATION_SCOPED_PAGE = { isPersonalScopeRoute: false } as const;
+const PERSONAL_SCOPED_PAGE = { isPersonalScopeRoute: true } as const;
+
+function resolve({
+  route = ORGANIZATION_SCOPED_PAGE,
+  organizations,
+  userId = JANE,
+  selection = NOTHING_REMEMBERED,
+  demoProjectSlug,
+}: {
+  route?: { projectParam?: string; teamParam?: string; isPersonalScopeRoute: boolean };
+  organizations: readonly UiScopeOrganization[] | undefined;
+  userId?: string | undefined;
+  selection?: { organizationId: string; teamId: string; projectSlug: string };
+  demoProjectSlug?: string;
+}) {
+  return resolveUiScope({ route, organizations, userId, selection, demoProjectSlug });
+}
+
+describe("given an organization whose personal workspace is listed first", () => {
+  const organizations = organizationWith({ teams: [PERSONAL_TEAM, SHARED_TEAM] });
+
+  describe("when an organization-scoped page resolves with nothing selected yet", () => {
+    /** @scenario "The personal workspace sorts first but does not win" */
+    it("resolves the shared team even though the personal one is listed first", () => {
+      expect(resolve({ organizations }).team?.id).toBe("team-shared");
+    });
+
+    /** @scenario "Organization-scoped credentials are filed against the organization's project" */
+    it("resolves the organization's project, which is what settings writes against", () => {
+      expect(resolve({ organizations }).project?.id).toBe("proj-app");
+    });
+  });
+
+  describe("when the shared team holds no project yet", () => {
+    const withEmptyShared = organizationWith({
+      teams: [PERSONAL_TEAM, { ...SHARED_TEAM, projects: [] }],
+    });
+
+    /** @scenario "A shared team without a project still outranks a personal one" */
+    it("still resolves the shared team rather than the personal one that has a project", () => {
+      expect(resolve({ organizations: withEmptyShared }).team?.id).toBe("team-shared");
+    });
+
+    /** @scenario "A shared team without a project still outranks a personal one" */
+    it("leaves the page without a project, so it can say a project comes first", () => {
+      expect(resolve({ organizations: withEmptyShared }).project).toBeUndefined();
+    });
+  });
+
+  describe("when the personal project is named in the address bar", () => {
+    const addressed = {
+      ...ORGANIZATION_SCOPED_PAGE,
+      projectParam: "personal-jane-abc123",
+    };
+
+    /** @scenario "Opening the personal project by its own address" */
+    it("resolves the personal project", () => {
+      expect(resolve({ route: addressed, organizations }).project?.id).toBe("proj-personal");
+    });
+
+    /** @scenario "Opening the personal project by its own address" */
+    it("resolves the personal team, which the personal chrome keys off", () => {
+      expect(resolve({ route: addressed, organizations }).team?.id).toBe("team-personal");
+    });
+  });
+
+  describe("when the personal project is only the remembered selection", () => {
+    const remembered = {
+      organizationId: "org-acme",
+      teamId: "team-personal",
+      projectSlug: "personal-jane-abc123",
+    };
+
+    /** @scenario "Leaving the personal project releases it" */
+    it("resolves the organization's project instead", () => {
+      expect(resolve({ organizations, selection: remembered }).project?.id).toBe("proj-app");
+    });
+
+    /** @scenario "Leaving the personal project releases it" */
+    it("resolves the shared team instead", () => {
+      expect(resolve({ organizations, selection: remembered }).team?.id).toBe("team-shared");
+    });
+
+    /** @scenario "The remembered selection heals after one organization-scoped page" */
+    it("asks for the shared selection to be written over the stale personal one", () => {
+      const resolved = resolve({ organizations, selection: remembered });
+
+      expect(
+        uiScopeSelectionWrites({
+          resolved,
+          selection: remembered,
+        }),
+      ).toEqual([
+        { key: "teamId", value: "team-shared" },
+        { key: "projectSlug", value: "acme-app" },
+      ]);
+    });
+  });
+
+  describe("when a ?team= slug matches no team the reader can see", () => {
+    const staleTeamLink = { ...ORGANIZATION_SCOPED_PAGE, teamParam: "team-that-no-longer-exists" };
+    const rememberedPersonal = {
+      organizationId: "org-acme",
+      teamId: "team-personal",
+      projectSlug: "personal-jane-abc123",
+    };
+
+    /** @scenario "A team slug that matches nothing does not address the personal workspace" */
+    it("resolves the shared team rather than the remembered personal one", () => {
+      const resolved = resolve({
+        route: staleTeamLink,
+        organizations,
+        selection: rememberedPersonal,
+      });
+
+      expect(resolved.team?.id).toBe("team-shared");
+      expect(resolved.project?.id).toBe("proj-app");
+    });
+
+    /** @scenario "A team slug that matches nothing does not address the personal workspace" */
+    it("still resolves the personal workspace when the slug does match it", () => {
+      const resolved = resolve({
+        route: { ...ORGANIZATION_SCOPED_PAGE, teamParam: "personal-jane" },
+        organizations,
+        selection: rememberedPersonal,
+      });
+
+      expect(resolved.team?.id).toBe("team-personal");
+      expect(resolved.project?.id).toBe("proj-personal");
+    });
+  });
+
+  describe("when a shared project is named in the address bar", () => {
+    it("resolves that project and its team", () => {
+      const resolved = resolve({
+        route: { ...ORGANIZATION_SCOPED_PAGE, projectParam: "acme-app" },
+        organizations,
+      });
+
+      expect(resolved.project?.id).toBe("proj-app");
+      expect(resolved.team?.id).toBe("team-shared");
+    });
+  });
+});
+
+describe("given an organization whose only team is the personal one", () => {
+  const organizations = organizationWith({ teams: [PERSONAL_TEAM] });
+
+  /** @scenario "The personal workspace is the only one there is" */
+  it("resolves the personal workspace rather than leaving the app contextless", () => {
+    const resolved = resolve({ organizations });
+
+    expect(resolved.team?.id).toBe("team-personal");
+    expect(resolved.project?.id).toBe("proj-personal");
+  });
+
+  /** @scenario "A remembered personal team is not held against the only organization" */
+  it("keeps resolving it when it is also the remembered selection", () => {
+    const resolved = resolve({
+      organizations,
+      selection: {
+        organizationId: "org-acme",
+        teamId: "team-personal",
+        projectSlug: "personal-jane-abc123",
+      },
+    });
+
+    expect(resolved.team?.id).toBe("team-personal");
+    expect(resolved.project?.id).toBe("proj-personal");
+  });
+});
+
+describe("given the personal-workspace pages", () => {
+  const organizations = organizationWith({ teams: [PERSONAL_TEAM, SHARED_TEAM] });
+
+  describe("when nothing is selected yet", () => {
+    /** @scenario "Visiting the personal-workspace page resolves the personal team" */
+    it("resolves the personal team instead of the shared one", () => {
+      expect(resolve({ route: PERSONAL_SCOPED_PAGE, organizations }).team?.id).toBe(
+        "team-personal",
+      );
+    });
+
+    /** @scenario "Visiting the personal-workspace page resolves the personal team" */
+    it("resolves the personal project instead of the organization's", () => {
+      expect(resolve({ route: PERSONAL_SCOPED_PAGE, organizations }).project?.id).toBe(
+        "proj-personal",
+      );
+    });
+
+    /** @scenario "The personal workspace is not what the next organization-scoped page is about" */
+    it("leaves the shared team for the next organization-scoped page", () => {
+      const personal = resolve({ route: PERSONAL_SCOPED_PAGE, organizations });
+      const writes = uiScopeSelectionWrites({ resolved: personal, selection: NOTHING_REMEMBERED });
+
+      // The visit remembers the organization and nothing of the private
+      // workspace, so the next organization-scoped page resolves afresh.
+      expect(writes).toEqual([{ key: "organizationId", value: "org-acme" }]);
+
+      const next = resolve({
+        organizations,
+        selection: { organizationId: "org-acme", teamId: "", projectSlug: "" },
+      });
+
+      expect(next.team?.id).toBe("team-shared");
+      expect(next.project?.id).toBe("proj-app");
+    });
+  });
+
+  describe("when the shared team holds no project", () => {
+    /** @scenario "A shared team without a project does not leak into the personal-workspace page" */
+    it("still resolves the personal team and project, not an empty shared one", () => {
+      const resolved = resolve({
+        route: PERSONAL_SCOPED_PAGE,
+        organizations: organizationWith({
+          teams: [PERSONAL_TEAM, { ...SHARED_TEAM, projects: [] }],
+        }),
+      });
+
+      expect(resolved.team?.id).toBe("team-personal");
+      expect(resolved.project?.id).toBe("proj-personal");
+    });
+  });
+
+  describe("when a shared team is remembered from an earlier organization-scoped visit", () => {
+    /** @scenario "A team remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page" */
+    it("still resolves the personal team, not the remembered shared one", () => {
+      const resolved = resolve({
+        route: PERSONAL_SCOPED_PAGE,
+        organizations,
+        selection: { organizationId: "", teamId: "team-shared", projectSlug: "" },
+      });
+
+      expect(resolved.team?.id).toBe("team-personal");
+      expect(resolved.project?.id).toBe("proj-personal");
+    });
+
+    /** @scenario "A project remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page" */
+    it("resolves the personal project, not the remembered shared project", () => {
+      const resolved = resolve({
+        route: PERSONAL_SCOPED_PAGE,
+        organizations,
+        selection: {
+          organizationId: "org-acme",
+          teamId: "team-shared",
+          projectSlug: "acme-app",
+        },
+      });
+
+      expect(resolved.team?.id).toBe("team-personal");
+      expect(resolved.project?.id).toBe("proj-personal");
+    });
+
+    /** @scenario "Organization-scoped work goes on in the project jane left, after a visit to the personal-workspace page" */
+    it("leaves the remembered organization work untouched, so the next page opens it again", () => {
+      const remembered = {
+        organizationId: "org-acme",
+        teamId: "team-shared",
+        projectSlug: "acme-app",
+      };
+      const personal = resolve({
+        route: PERSONAL_SCOPED_PAGE,
+        organizations,
+        selection: remembered,
+      });
+
+      expect(
+        uiScopeSelectionWrites({
+          resolved: personal,
+          selection: remembered,
+        }),
+      ).toEqual([]);
+      expect(resolve({ organizations, selection: remembered }).project?.slug).toBe("acme-app");
+    });
+  });
+
+  describe("when the reader has no personal workspace of their own", () => {
+    /** @scenario "A member with no personal workspace of their own falls back to the ambient team" */
+    it("falls back to the ambient team rather than resolving nothing", () => {
+      const resolved = resolve({
+        route: PERSONAL_SCOPED_PAGE,
+        organizations: organizationWith({ teams: [SHARED_TEAM] }),
+      });
+
+      expect(resolved.team?.id).toBe("team-shared");
+    });
+  });
+});
+
+describe("given a member of one team in an organization that has several", () => {
+  const MEMBER = "user-member";
+  /** The team the member is NOT on. Listed first, so ordering alone elects it. */
+  const OTHER_TEAM: UiScopeTeam = {
+    id: "team-platform",
+    slug: "acme-platform",
+    isPersonal: false,
+    ownerUserId: null,
+    members: [],
+    projects: [{ id: "proj-platform", slug: "platform-app", name: "Platform App" }],
+  };
+  /** The owning team, where the member holds a real membership row. */
+  const OWNING_TEAM: UiScopeTeam = {
+    id: "team-data",
+    slug: "acme-data",
+    isPersonal: false,
+    ownerUserId: null,
+    members: [{ userId: MEMBER }],
+    projects: [{ id: "proj-data", slug: "data-app", name: "Data App" }],
+  };
+  const organizations = organizationWith({
+    teams: [OTHER_TEAM, OWNING_TEAM],
+    organizationRole: "MEMBER",
+  });
+
+  /**
+   * The predicate the page body gates on, restated here rather than imported.
+   */
+  function chromeWouldRefuse({
+    team,
+    organizationRole,
+  }: {
+    team: UiScopeTeam | undefined;
+    organizationRole: string | undefined;
+  }): boolean {
+    if (organizationRole === "ADMIN") return false;
+    return !(team?.members?.some((member) => member.userId === MEMBER) ?? false);
+  }
+
+  describe("when they open a settings page with nothing selected yet", () => {
+    /** @scenario "A member resolves the team they are on, not the first one listed" */
+    it("resolves the team the member is on, not the one that sorts first", () => {
+      const resolved = resolve({ organizations, userId: MEMBER });
+
+      expect(resolved.team?.id).toBe("team-data");
+      expect(
+        chromeWouldRefuse({
+          team: resolved.team,
+          organizationRole: resolved.organizationRole,
+        }),
+      ).toBe(false);
+    });
+
+    /** @scenario "The ambient project belongs to the team the member is on" */
+    it("resolves that team's project, which is what settings writes against", () => {
+      expect(resolve({ organizations, userId: MEMBER }).project?.slug).toBe("data-app");
+    });
+  });
+
+  describe("when a remembered selection names a team they are not on", () => {
+    const remembered = {
+      organizationId: "",
+      teamId: "team-platform",
+      projectSlug: "platform-app",
+    };
+
+    /** @scenario "A remembered team the member is not on does not win" */
+    it("ignores the remembered team and resolves the one they hold", () => {
+      const resolved = resolve({ organizations, userId: MEMBER, selection: remembered });
+
+      expect(resolved.team?.id).toBe("team-data");
+      expect(resolved.project?.slug).toBe("data-app");
+    });
+
+    /** @scenario "The remembered selection heals to the team the member is on" */
+    it("asks for the resolved selection to be written, so the stale one heals", () => {
+      const resolved = resolve({ organizations, userId: MEMBER, selection: remembered });
+
+      expect(
+        uiScopeSelectionWrites({
+          resolved,
+          selection: remembered,
+        }),
+      ).toEqual([
+        { key: "organizationId", value: "org-acme" },
+        { key: "teamId", value: "team-data" },
+        { key: "projectSlug", value: "data-app" },
+      ]);
+    });
+  });
+
+  describe("when an organization admin opens a page after working in another team's project", () => {
+    const asAdmin = organizationWith({
+      teams: [OTHER_TEAM, OWNING_TEAM],
+      organizationRole: "ADMIN",
+    });
+
+    /** @scenario "The admin's picked project survives a page that names no project" */
+    it("keeps the project they picked, and its team", () => {
+      const resolved = resolve({
+        organizations: asAdmin,
+        userId: MEMBER,
+        selection: {
+          organizationId: "",
+          teamId: "team-platform",
+          projectSlug: "platform-app",
+        },
+      });
+
+      expect(resolved.project?.slug).toBe("platform-app");
+      expect(resolved.team?.id).toBe("team-platform");
+      expect(resolved.organizationRole).toBe("ADMIN");
+    });
+
+    /** @scenario "The admin's remembered team survives" */
+    it("keeps the remembered team when only the team is remembered", () => {
+      const resolved = resolve({
+        organizations: asAdmin,
+        userId: MEMBER,
+        selection: { organizationId: "", teamId: "team-platform", projectSlug: "" },
+      });
+
+      expect(resolved.team?.id).toBe("team-platform");
+    });
+  });
+
+  describe("when the reader belongs to no team in the organization", () => {
+    /** @scenario "A genuine non-member is still refused" */
+    it("still resolves a context, and the chrome still refuses them", () => {
+      const resolved = resolve({
+        organizations: organizationWith({
+          teams: [OTHER_TEAM, { ...OWNING_TEAM, members: [] }],
+          organizationRole: "MEMBER",
+        }),
+        userId: MEMBER,
+      });
+
+      // A resolved context is what lets the chrome render the refusal at all;
+      // leaving it undefined would hang the page on a loading screen.
+      expect(resolved.team).toBeDefined();
+      expect(
+        chromeWouldRefuse({
+          team: resolved.team,
+          organizationRole: resolved.organizationRole,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when a project named in the address bar belongs to another team", () => {
+    /** @scenario "A project named in the URL still resolves its own team" */
+    it("resolves the addressed team, refusal and all", () => {
+      const resolved = resolve({
+        route: { ...ORGANIZATION_SCOPED_PAGE, projectParam: "platform-app" },
+        organizations,
+        userId: MEMBER,
+      });
+
+      expect(resolved.team?.id).toBe("team-platform");
+      expect(
+        chromeWouldRefuse({
+          team: resolved.team,
+          organizationRole: resolved.organizationRole,
+        }),
+      ).toBe(true);
+    });
+  });
+});
+
+describe("given the reserved top-level addresses that also bind the project segment", () => {
+  const organizations = organizationWith({ teams: [SHARED_TEAM] });
+  const remembered = { organizationId: "org-acme", teamId: "team-shared", projectSlug: "acme-app" };
+
+  it("refuses every reserved slug as a project address", () => {
+    for (const reserved of UI_RESERVED_PROJECT_SLUGS) {
+      expect(projectSlugAddressedBy(reserved)).toBeUndefined();
+    }
+    expect(projectSlugAddressedBy("acme-app")).toBe("acme-app");
+  });
+
+  it("resolves the remembered project rather than looking for one named 'messages'", () => {
+    const resolved = resolve({
+      route: { ...ORGANIZATION_SCOPED_PAGE, projectParam: "messages" },
+      organizations,
+      selection: remembered,
+    });
+
+    expect(resolved.project?.slug).toBe("acme-app");
+  });
+});
+
+describe("given the deployment's demo project", () => {
+  const DEMO_TEAM: UiScopeTeam = {
+    id: "team-demo",
+    slug: "demo-team",
+    isPersonal: false,
+    ownerUserId: null,
+    members: [],
+    projects: [{ id: "proj-demo", slug: "demo-project-slug", name: "Demo" }],
+  };
+  const organizations: readonly UiScopeOrganization[] = [
+    ...organizationWith({ teams: [SHARED_TEAM] }),
+    { id: "org-demo", slug: "demo", members: [], teams: [DEMO_TEAM] },
+  ];
+  const demoRoute = { ...ORGANIZATION_SCOPED_PAGE, projectParam: "demo-project-slug" };
+
+  it("resolves the organization that holds the demo project, not the reader's own", () => {
+    const resolved = resolve({
+      route: demoRoute,
+      organizations,
+      demoProjectSlug: "demo-project-slug",
+    });
+
+    expect(resolved.isDemo).toBe(true);
+    expect(resolved.organization?.id).toBe("org-demo");
+    expect(resolved.project?.id).toBe("proj-demo");
+  });
+
+  it("answers to the slug the address bar used", () => {
+    const renamed: readonly UiScopeOrganization[] = [
+      { id: "org-demo", slug: "demo", members: [], teams: [DEMO_TEAM] },
+    ];
+    const resolved = resolveUiScope({
+      route: { ...ORGANIZATION_SCOPED_PAGE, projectParam: "demo" },
+      organizations: renamed,
+      userId: JANE,
+      selection: NOTHING_REMEMBERED,
+      demoProjectSlug: "demo",
+    });
+
+    // No project carries the slug "demo", so the team's first one answers for
+    // it — under the address the reader typed.
+    expect(resolved.project?.id).toBe("proj-demo");
+    expect(resolved.project?.slug).toBe("demo");
+  });
+
+  it("remembers nothing, because a visitor's demo is not the reader's own work", () => {
+    const resolved = resolve({
+      route: demoRoute,
+      organizations,
+      demoProjectSlug: "demo-project-slug",
+    });
+
+    expect(
+      uiScopeSelectionWrites({
+        resolved,
+        selection: NOTHING_REMEMBERED,
+      }),
+    ).toEqual([]);
+  });
+
+  it("is not a demo when the address names any other project", () => {
+    const resolved = resolve({
+      route: { ...ORGANIZATION_SCOPED_PAGE, projectParam: "acme-app" },
+      organizations,
+      demoProjectSlug: "demo-project-slug",
+    });
+
+    expect(resolved.isDemo).toBe(false);
+    expect(resolved.project?.id).toBe("proj-app");
+  });
+});
+
+describe("given the organization graph has not answered yet", () => {
+  it("resolves no scope at all rather than a guess", () => {
+    const resolved = resolve({
+      organizations: void 0,
+      selection: { organizationId: "org-acme", teamId: "team-shared", projectSlug: "acme-app" },
+    });
+
+    expect(resolved.organization).toBeUndefined();
+    expect(resolved.team).toBeUndefined();
+    expect(resolved.project).toBeUndefined();
+  });
+});
+
+describe("given the selection write-back", () => {
+  const organizations = organizationWith({ teams: [PERSONAL_TEAM, SHARED_TEAM] });
+
+  it("writes nothing when the stored selection already says what resolved", () => {
+    const remembered = {
+      organizationId: "org-acme",
+      teamId: "team-shared",
+      projectSlug: "acme-app",
+    };
+
+    expect(
+      uiScopeSelectionWrites({
+        resolved: resolve({ organizations, selection: remembered }),
+        selection: remembered,
+      }),
+    ).toEqual([]);
+  });
+
+  it("never remembers a personal team or project as the place work was happening", () => {
+    const resolved = resolve({
+      route: { ...ORGANIZATION_SCOPED_PAGE, projectParam: "personal-jane-abc123" },
+      organizations,
+    });
+
+    // The organization is still recorded: the private context resolves from
+    // its own address every time, so neither the team nor the project needs
+    // to be.
+    expect(
+      uiScopeSelectionWrites({
+        resolved,
+        selection: NOTHING_REMEMBERED,
+      }),
+    ).toEqual([{ key: "organizationId", value: "org-acme" }]);
+  });
+});
+
+describe("given my current organization has no project and another of mine has one", () => {
+  const EMPTY_TEAM: UiScopeTeam = {
+    id: "team-empty",
+    slug: "empty-team",
+    isPersonal: false,
+    ownerUserId: null,
+    members: [{ userId: JANE }],
+    projects: [],
+  };
+  const organizations: readonly UiScopeOrganization[] = [
+    { id: "org-empty", slug: "empty-org", members: [{ role: "ADMIN" }], teams: [EMPTY_TEAM] },
+    { id: "org-other", slug: "other-org", members: [{ role: "ADMIN" }], teams: [SHARED_TEAM] },
+  ];
+  const remembered = { organizationId: "org-empty", teamId: "", projectSlug: "" };
+
+  describe("when the app resolves my context", () => {
+    /**
+     * The application used to teleport a member out of an empty organization
+     * and into another organization's project. The organization switch and
+     * the landing resolver own cross-organization destinations now, so the
+     * resolution answers the ambient organization and no project at all.
+     *
+     * @scenario A member kept in an empty organization stays put
+     */
+    it("keeps the empty organization and resolves no project of another one", () => {
+      const resolved = resolve({ organizations, selection: remembered });
+
+      expect(resolved.organization?.id).toBe("org-empty");
+      expect(resolved.project).toBeUndefined();
+    });
+
+    it("remembers nothing of the other organization either", () => {
+      const resolved = resolve({ organizations, selection: remembered });
+
+      expect(uiScopeSelectionWrites({ resolved, selection: remembered })).toEqual([
+        { key: "teamId", value: "team-empty" },
+      ]);
+    });
+  });
+});
+
+describe("given the two predicates the resolution is built out of", () => {
+  describe("when a team is tested against a reader", () => {
+    it("opens every team of the organization to its admin", () => {
+      expect(
+        userCanOpenTeam({ team: { members: [] }, userId: "someone", organizationRole: "ADMIN" }),
+      ).toBe(true);
+    });
+
+    it("refuses a member a team they hold no row in", () => {
+      expect(
+        userCanOpenTeam({ team: { members: [] }, userId: "someone", organizationRole: "MEMBER" }),
+      ).toBe(false);
+    });
+
+    it("holds a reader whose session has not resolved to no test at all", () => {
+      expect(
+        userCanOpenTeam({ team: { members: [] }, userId: void 0, organizationRole: void 0 }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when the ambient team is picked", () => {
+    it("prefers a shared team with a project over one without", () => {
+      const teams = [
+        { id: "empty", isPersonal: false, projects: [], members: [{ userId: JANE }] },
+        { id: "full", isPersonal: false, projects: [{}], members: [{ userId: JANE }] },
+      ];
+
+      expect(selectAmbientTeam({ teams, userId: JANE })?.id).toBe("full");
+    });
+
+    it("prefers a shared team without a project over a personal one with", () => {
+      const teams = [
+        { id: "personal", isPersonal: true, projects: [{}], members: [{ userId: JANE }] },
+        { id: "empty", isPersonal: false, projects: [], members: [{ userId: JANE }] },
+      ];
+
+      expect(selectAmbientTeam({ teams, userId: JANE })?.id).toBe("empty");
+    });
+
+    it("falls back to every team when the reader is on none of them", () => {
+      const teams = [{ id: "other", isPersonal: false, projects: [{}], members: [] }];
+
+      expect(selectAmbientTeam({ teams, userId: JANE })?.id).toBe("other");
+    });
+  });
+
+  describe("when the reader's own organization role is read", () => {
+    it("takes the caller's row, which is the only one the graph carries", () => {
+      expect(organizationRoleOf({ members: [{ role: "EXTERNAL" }] })).toBe("EXTERNAL");
+      expect(organizationRoleOf({ members: [] })).toBeUndefined();
+      expect(organizationRoleOf(void 0)).toBeUndefined();
+    });
+  });
+});
+
+describe("given the one-shot `?org=` switch", () => {
+  const ORGANIZATIONS = [
+    { id: "org-alpha", slug: "alpha" },
+    { id: "org-beta", slug: "beta" },
+  ];
+  const ON_ALPHA = { organizationId: "org-alpha", teamId: "team-shared", projectSlug: "acme-app" };
+
+  describe("when the slug names an organization the reader belongs to", () => {
+    it("selects it and clears the previous organization's team and project", () => {
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "beta",
+          organizations: ORGANIZATIONS,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([
+        { key: "organizationId", value: "org-beta" },
+        { key: "teamId", value: "" },
+        { key: "projectSlug", value: "" },
+      ]);
+    });
+
+    it("writes nothing when it is the organization already selected", () => {
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "alpha",
+          organizations: ORGANIZATIONS,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the slug names no organization of theirs", () => {
+    it("writes nothing", () => {
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "not-a-member",
+          organizations: ORGANIZATIONS,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the graph has not arrived, or the address names no organization", () => {
+    it("writes nothing either way", () => {
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "beta",
+          organizations: void 0,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([]);
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "",
+          organizations: ORGANIZATIONS,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([]);
+    });
+  });
+});

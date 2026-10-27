@@ -88,6 +88,9 @@ func TestIsReasoningModel(t *testing.T) {
 	yes := []string{
 		"openai/o1-mini", "openai/o3", "openai/o4-preview",
 		"openai/gpt-5-mini", "gpt-5", "o1",
+		// Every generation after gpt-5 keeps the fixed temperature: the
+		// catalog's latest-mini resolves to these, and OpenAI refuses 0.2.
+		"openai/gpt-5.6-terra", "openai/gpt-6-luna", "gpt-7", "openai/gpt-10-mini",
 	}
 	// Pin Python parity: matching is anchored on the model BASENAME
 	// (anything after the last `/`, or the full string if no `/`),
@@ -97,11 +100,13 @@ func TestIsReasoningModel(t *testing.T) {
 	// non-reasoning models.
 	no := []string{
 		"openai/gpt-4o", "anthropic/claude-3-5-sonnet", "gemini/gemini-2.0-flash",
-		"openai/gpt-3.5-turbo",
+		"openai/gpt-3.5-turbo", "openai/gpt-4.1-mini",
 		// CodeRabbit-flagged false-positives that the basename-anchor fixes:
 		"openai/co3-thing",     // `co3` would substring-match o3 in the full id
 		"vertex_ai/pro1-model", // `pro1` would substring-match o1 in the full id
 		"custom/super-gpt-5x",  // gpt-5 anywhere but the start would substring-match
+		"openai/gpt-6x",        // a generation must end at the id's end, a `.` or a `-`
+		"openai/o1x-model",
 	}
 	for _, m := range yes {
 		if !IsReasoningModel(m) {
@@ -330,7 +335,7 @@ func TestFromLiteLLMParams_OpenAI(t *testing.T) {
 }
 
 func TestFromLiteLLMParams_GenericAPIKeyProviders(t *testing.T) {
-	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek"} {
+	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek", "doubleword"} {
 		t.Run(provider, func(t *testing.T) {
 			ic, err := FromLiteLLMParams(provider, map[string]any{
 				"api_key": "gen-key",
@@ -508,5 +513,21 @@ func TestInlineCredentials_RequiresProvider(t *testing.T) {
 	ic := InlineCredentials{Provider: ""}
 	if _, err := ic.Encode(); err == nil {
 		t.Errorf("expected error when provider is empty")
+	}
+}
+
+// @scenario "A Gemini or Vertex provider with a base URL reaches that host instead of Google's"
+func TestFromLiteLLMParams_GeminiVertexAndBedrockCarryTheBaseURL(t *testing.T) {
+	gemini, err := FromLiteLLMParams("gemini", map[string]any{"api_key": "k", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || gemini.Gemini["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("gemini api_base lost: %v %v", gemini.Gemini, err)
+	}
+	vertex, err := FromLiteLLMParams("vertex_ai", map[string]any{"vertex_project": "p", "vertex_location": "l", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || vertex.VertexAI["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("vertex api_base lost: %v %v", vertex.VertexAI, err)
+	}
+	bedrock, err := FromLiteLLMParams("bedrock", map[string]any{"aws_region_name": "us-east-1", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || bedrock.Bedrock["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("bedrock api_base lost: %v %v", bedrock.Bedrock, err)
 	}
 }

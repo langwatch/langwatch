@@ -32,11 +32,11 @@ Feature: Anomaly detection — evaluate AnomalyRules + dispatch alerts (event-so
   Pairs with: anomaly-rules.feature (configuration entity)
               docs/ai-gateway/governance/architecture.md
               (Activity-monitor event sourcing section)
-  Backend: platform/app/src/server/event-sourcing/pipelines/activity-monitor-processing/
+  Backend: enterprise/modules/governance/process/src/projections/
 
   Background:
     Given the org admin has authored at least one active AnomalyRule
-      (via api.anomalyRules.create from the /settings/governance/anomaly-rules UI)
+      (via api.anomalyRules.create from the /governance/anomaly-rules UI)
     And the IngestionSource for that rule's scope has been emitting
       events for the past 30 days
 

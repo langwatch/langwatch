@@ -6,54 +6,54 @@
 
 ## Context
 
-LangWatch has dozens of settings, model-provider, team, role, and dialog forms. Until this point, the codebase has had a *de-facto* convention for how Save buttons interact with form validation — observable by reading the existing forms (`ChangePasswordDialog`, `RoleFormDialog`, `LLMModelCostDrawer`, `TeamForm`, `useProviderFormSubmit`, etc.) — but no written record of *why*. As a result:
+LangWatch has dozens of settings, model-provider, team, role, and dialog forms. Until this point, the codebase has had a _de-facto_ convention for how Save buttons interact with form validation — observable by reading the existing forms (`ChangePasswordDialog`, `RoleFormDialog`, `LLMModelCostDrawer`, `TeamForm`, `useProviderFormSubmit`, etc.) — but no written record of _why_. As a result:
 
 - New forms occasionally diverge (e.g. someone adds `disabled={!isValid}` to a Save button because it "feels" safer).
 - Reviewers have no doc to point at when nudging back toward the convention.
 - Bugs like #3785 — where a Save silently no-ops because the form's underlying state doesn't match what's displayed — are easy to introduce because the boundary between "what can be saved" and "what should be saved" is not articulated.
 
-The trigger for writing this down: while fixing #3785 (provider-default mismatch silently persisting cross-provider values), the question came up — should we *disable* the Save button when the model selection is invalid for this provider, or let the user click and surface a validation error? That question turned out to have an implicit, never-documented answer in the codebase.
+The trigger for writing this down: while fixing #3785 (provider-default mismatch silently persisting cross-provider values), the question came up — should we _disable_ the Save button when the model selection is invalid for this provider, or let the user click and surface a validation error? That question turned out to have an implicit, never-documented answer in the codebase.
 
 ## Decision
 
-**Save buttons are clickable whenever the user has finished entering data. Validation runs on submit. Errors surface inline (field-level) or via toast (cross-field / backend). Save is disabled *only* while the request is in flight.**
+**Save buttons are clickable whenever the user has finished entering data. Validation runs on submit. Errors surface inline (field-level) or via toast (cross-field / backend). Save is disabled _only_ while the request is in flight.**
 
 In code form:
 
 ```tsx
 <Button
   type="submit"
-  disabled={mutation.isPending}     // ✅ in-flight only
+  disabled={mutation.isPending} // ✅ in-flight only
   // disabled={!form.formState.isValid}   // ❌ never
 >
   Save
 </Button>
 ```
 
-Validation responsibility is split. *(Amended 2026-07-22 — see below: server
+Validation responsibility is split. _(Amended 2026-07-22 — see below: server
 errors go through `showErrorToast`, never `toaster.create`, and a rejection that
-names fields lands on those fields via `applyHandledErrorToForm`.)*
+names fields lands on those fields via `applyHandledErrorToForm`.)_
 
-| Layer | Where | Tool | Surface |
-|---|---|---|---|
-| Field-level (sync schema rules) | `react-hook-form` + `zodResolver` | Schema | `<Field.ErrorText>` inline |
-| Cross-field (one input depends on another) | Submit handler | Manual | `toaster.create({type:"error"})` with copy **you** wrote + `return` before mutation |
-| Server-side field rejection (a `validation_error` naming fields) | Mutation `onError` | `applyHandledErrorToForm` | The offending fields, marked in place, plus `<FormServerError>` for form-level complaints |
-| Server-side, everything else (auth, conflicts, business rules) | Mutation `onError` | `showErrorToast` | Toast, with copy from the code-keyed presentation registry |
+| Layer                                                            | Where                             | Tool                      | Surface                                                                                   |
+| ---------------------------------------------------------------- | --------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------- |
+| Field-level (sync schema rules)                                  | `react-hook-form` + `zodResolver` | Schema                    | `<Field.ErrorText>` inline                                                                |
+| Cross-field (one input depends on another)                       | Submit handler                    | Manual                    | `toaster.create({type:"error"})` with copy **you** wrote + `return` before mutation       |
+| Server-side field rejection (a `validation_error` naming fields) | Mutation `onError`                | `applyHandledErrorToForm` | The offending fields, marked in place, plus `<FormServerError>` for form-level complaints |
+| Server-side, everything else (auth, conflicts, business rules)   | Mutation `onError`                | `showErrorToast`          | Toast, with copy from the code-keyed presentation registry                                |
 
 A submit handler that detects an invalid cross-field state **must `return` before any mutation fires** and **must surface why** through a toast or inline error. Silent no-ops are forbidden — they are the failure mode that produced #3785.
 
-**Inputs are a separate category from action buttons.** A disabled *input* (a select with no options to pick, a date field outside its allowed range) is fine and often clearer than an enabled-but-empty one. The "no `disabled={!isValid}`" rule applies to **submit/action buttons**, where the user is choosing whether to commit. An input whose underlying domain is empty isn't hiding a constraint — there's nothing to choose. Pair the disabled input with a hint that explains *why* and *what to do* (see #3785: empty `chatOptions` → disabled `ProviderModelSelector` + "Add one in the Custom Models section above").
+**Inputs are a separate category from action buttons.** A disabled _input_ (a select with no options to pick, a date field outside its allowed range) is fine and often clearer than an enabled-but-empty one. The "no `disabled={!isValid}`" rule applies to **submit/action buttons**, where the user is choosing whether to commit. An input whose underlying domain is empty isn't hiding a constraint — there's nothing to choose. Pair the disabled input with a hint that explains _why_ and _what to do_ (see #3785: empty `chatOptions` → disabled `ProviderModelSelector` + "Add one in the Custom Models section above").
 
 ## Rationale
 
 ### Why not `disabled={!isValid}`
 
-1. **A disabled button is silent.** It tells the user "you can't proceed" without saying *why*. Users hunt for the broken field, fail, and bounce.
+1. **A disabled button is silent.** It tells the user "you can't proceed" without saying _why_. Users hunt for the broken field, fail, and bounce.
 
 2. **`isValid` can lie.** React-hook-form's `formState.isValid` reflects the most recent validation pass, which may not have run on every field. If validation is async (uniqueness, server-side), the button would either need to always-disable while pending (jittery) or risk being out-of-date.
 
-3. **Some users click Save *to* discover what's wrong.** Especially in long forms — they want the system to point to the broken field. A pre-disabled button removes that affordance.
+3. **Some users click Save _to_ discover what's wrong.** Especially in long forms — they want the system to point to the broken field. A pre-disabled button removes that affordance.
 
 4. **Consistency with existing forms.** Every shipped LangWatch form follows this pattern (sample: `ChangePasswordDialog.tsx:149`, `RoleFormDialog.tsx`, `TeamForm.tsx`, `LLMModelCostDrawer.tsx`). Diverging adds cognitive load without benefit.
 
@@ -61,19 +61,19 @@ A submit handler that detects an invalid cross-field state **must `return` befor
 
 - Errors that fire on every keystroke are noisy; users haven't finished thinking yet.
 - Errors that fire only on blur miss cross-field problems (one field's validity depends on another).
-- Submit-time validation is the moment the user has *committed* — the right moment to confront them with what's wrong.
+- Submit-time validation is the moment the user has _committed_ — the right moment to confront them with what's wrong.
 
 ### Why toasts for cross-field errors
 
 - Inline errors live at one field. Cross-field errors don't have a single home.
 - A toast pulled to the corner of the screen with a clear "Cannot save: X" title is unambiguous.
-- For especially impactful errors (e.g. #3785's "you'd persist a contradiction"), the toast can describe the *consequence*, not just the state.
+- For especially impactful errors (e.g. #3785's "you'd persist a contradiction"), the toast can describe the _consequence_, not just the state.
 
 ## Consequences
 
 - New forms that ship with `disabled={!isValid}` should be rejected in review with a link to this ADR.
 - The existing `useProviderFormSubmit` hook is the canonical example for the cross-field validation pattern (gates `updateProjectDefaultModels` mutation on provider-prefix match before firing — see #3785).
-- The design guideline (`dev/docs/design/guidelines.md` §6) summarises the rule with code patterns; this ADR captures the *why* and the alternatives considered.
+- The design guideline (`dev/docs/design/guidelines.md` §6) summarises the rule with code patterns; this ADR captures the _why_ and the alternatives considered.
 - We accept the risk that a user clicks Save on an obviously-broken form and only discovers the error after the click. In practice the click is cheap; the cost of a confusing disabled button is higher.
 
 ## Amendment 2026-07-22: server rejections go back on the form, not into a toast
@@ -105,7 +105,7 @@ Second, **a rejection that names fields belongs on those fields.** A toast makes
 the user hunt for what to change and is gone by the time they find it — the same
 "silent no-op" family of failure this ADR was written against. `applyHandledErrorToForm`
 maps a `validation_error`'s `meta.fieldErrors` onto the fields the form owns and
-focuses the first; it returns `true` only when it can display the *whole*
+focuses the first; it returns `true` only when it can display the _whole_
 rejection, so the caller still toasts whatever it couldn't show:
 
 ```tsx

@@ -1,0 +1,17 @@
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
+
+export abstract class AutomationPersistActionRepository {
+  abstract addToAnnotationQueue(input: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+  }): Promise<void>;
+
+  abstract addToDataset(input: {
+    datasetId: string;
+    projectId: string;
+    triggerId: string;
+    datasetRecords: DatasetRecordEntry[];
+  }): Promise<void>;
+}

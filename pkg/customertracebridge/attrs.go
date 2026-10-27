@@ -40,6 +40,14 @@ const (
 	AttrGenAIUsageInputAudioTokens  = "gen_ai.usage.input_audio_tokens"
 	AttrGenAIUsageOutputAudioTokens = "gen_ai.usage.output_audio_tokens"
 
+	// Image token counts and the number of images returned, on the same
+	// exclusive convention as the audio buckets above: an output image token
+	// on the gpt-image family costs four times a text one, and some vendors
+	// price the call per image instead of per token.
+	AttrGenAIUsageInputImageTokens  = "gen_ai.usage.input_image_tokens"
+	AttrGenAIUsageOutputImageTokens = "gen_ai.usage.output_image_tokens"
+	AttrGenAIUsageImageCount        = "gen_ai.usage.image_count"
+
 	// AttrLabels carries the VK's tags; the trace pipeline ingests this
 	// exact key into metadata.labels (otel.traces.ts), which the Trace
 	// Explorer filters as "Label".

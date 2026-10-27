@@ -8,10 +8,15 @@ Feature: Idempotency-Key on the control-plane creates
   # request", and the receipt is what lets the second one answer with the
   # first one's response.
   #
-  # Bound scenarios run in
-  # platform/app/src/app/api/gateway-platform/__tests__/ and
-  # platform/app/src/app/api/webhooks/__tests__/ against the real Hono apps and
-  # real Postgres.
+  # The receipt protocol itself — the claim, its heartbeat, its takeover window
+  # and the encrypted stored response — is
+  # packages/api/src/rest/idempotency-ledger.ts, bound in
+  # packages/api/src/rest/__tests__/idempotency-ledger.unit.test.ts. The API
+  # process composes exactly one of it (apps/api/src/app/
+  # api-idempotency.composition.ts) and hands the runner to every family that
+  # accepts the header, which is what stops two takeover clocks racing over one
+  # table. The REST scenarios are bound in
+  # apps/api/src/app/__tests__/api-gateway-idempotency.integration.test.ts.
 
   As a backend that provisions gateway resources programmatically
   I want a create I can retry without checking first whether it landed
@@ -135,7 +140,7 @@ Feature: Idempotency-Key on the control-plane creates
   @integration @rest
   Scenario: An unusable idempotency key is refused before anything is created
     When I send `POST /api/gateway/v1/budgets` with Idempotency-Key "short"
-    Then the response status is 400 and the code is `validation_error`
+    Then the response status is 422 and the code is `validation_error`
     And `meta.target` is "header"
     And no budget was created
     # Refused rather than ignored: a caller who sent a key believes its retry
@@ -158,6 +163,26 @@ Feature: Idempotency-Key on the control-plane creates
     # caller can never complete the create it was trying to make. Missed beats
     # rather than elapsed time, so the key recovers in seconds when the holder
     # really is gone and never while it is merely slow.
+
+  @integration
+  Scenario: Two retries taking over one silent claim resolve to one winner
+    Given a receipt whose claim stopped reporting itself alive
+    When two retries take the claim over at the same moment
+    Then one of them holds the claim
+    And the other is sent back to re-read the receipt
+    # The database decides, not the process: the write that waited on the
+    # row lock re-checks the claim it was taking over against the row as the
+    # winner left it, and finds a different claim there.
+
+  @integration
+  Scenario: A takeover that waited on the original's response is refused
+    Given a receipt whose claim stopped reporting itself alive
+    And a retry is taking the claim over
+    When the original stores its response first
+    Then the retry is sent back to re-read the receipt
+    And the receipt holds the original's response under the original's claim
+    # The retry then replays that response, rather than running the create a
+    # second time under a key that already has an answer.
 
   @integration @rest
   Scenario: A replaced request cannot overwrite the receipt that replaced it

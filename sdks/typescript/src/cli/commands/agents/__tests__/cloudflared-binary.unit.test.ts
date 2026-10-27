@@ -3,26 +3,23 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   CLOUDFLARED_PINS,
   CLOUDFLARED_RELEASE,
   ensureCloudflaredBinary,
   type PinnedAsset,
-} from "../dev/cloudflared-binary";
+} from "../tunnel/cloudflared-binary";
 
-const sha256 = (bytes: Buffer) =>
-  crypto.createHash("sha256").update(bytes).digest("hex");
+const sha256 = (bytes: Buffer) => crypto.createHash("sha256").update(bytes).digest("hex");
 
 const PINNED_BINARY = Buffer.from("#!/bin/sh\necho pinned cloudflared\n");
 const OLD_BINARY = Buffer.from("#!/bin/sh\necho an earlier release\n");
 
 /** A release tarball shaped like Cloudflare's: one `cloudflared` member. */
-function makeReleaseArchive(
-  dir: string,
-  binary: Buffer,
-  extraMember?: string,
-): Buffer {
+function makeReleaseArchive(dir: string, binary: Buffer, extraMember?: string): Buffer {
   const staging = fs.mkdtempSync(path.join(dir, "staging-"));
   fs.writeFileSync(path.join(staging, "cloudflared"), binary);
   const members = ["cloudflared"];
@@ -131,7 +128,7 @@ describe("ensureCloudflaredBinary", () => {
         ensureCloudflaredBinary({
           binPath,
           platformKey: "darwin-arm64",
-            pins,
+          pins,
           fetchAsset: async () => tampered,
         }),
       ).rejects.toThrow(/does not match the pinned/);
@@ -150,7 +147,7 @@ describe("ensureCloudflaredBinary", () => {
         ensureCloudflaredBinary({
           binPath,
           platformKey: "darwin-arm64",
-            pins: wrongBinaryPins,
+          pins: wrongBinaryPins,
           fetchAsset: async () => archive,
         }),
       ).rejects.toThrow(/does not match the pinned/);
@@ -165,7 +162,7 @@ describe("ensureCloudflaredBinary", () => {
         ensureCloudflaredBinary({
           binPath,
           platformKey: "linux-x64",
-            pins,
+          pins,
           fetchAsset: async () => OLD_BINARY,
         }),
       ).rejects.toThrow(/--tunnel-url/);
@@ -182,7 +179,7 @@ describe("ensureCloudflaredBinary", () => {
         ensureCloudflaredBinary({
           binPath,
           platformKey: "freebsd-x64",
-            pins,
+          pins,
           fetchAsset,
         }),
       ).rejects.toThrow(/No pinned cloudflared release for freebsd-x64/);

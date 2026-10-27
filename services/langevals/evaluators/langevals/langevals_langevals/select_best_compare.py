@@ -20,11 +20,11 @@ BDD spec:     specs/experiments/comparison.feature
 """
 
 import json
-import os
 import random
 import re
 from typing import Literal, Optional, cast
 
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluationResult,
@@ -258,11 +258,6 @@ class SelectBestCompareEvaluator(
     is_guardrail = False
 
     def evaluate(self, entry: SelectBestCompareEntry) -> SingleEvaluationResult:
-        os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
-        if self.env:
-            for key, env in self.env.items():
-                os.environ[key] = env
-
         candidates = [c for c in entry.candidates if c.output]
         if len(candidates) < 2:
             return EvaluationResultSkipped(
@@ -579,6 +574,7 @@ class SelectBestCompareEvaluator(
         # customer-facing prose and the schema already asks for brevity.
         response = completion(
             model=self.settings.model,
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             temperature=effective_temperature,
             drop_params=True,
             messages=[

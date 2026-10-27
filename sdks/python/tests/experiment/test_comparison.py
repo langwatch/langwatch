@@ -131,8 +131,8 @@ def judge(monkeypatch) -> _Judge:
         def get_span_context(self) -> _FakeSpanContext:
             return _FakeSpanContext()
 
-    monkeypatch.setattr(langwatch.evaluation.httpx, "Client", _FakeClient)
-    monkeypatch.setattr(langwatch.evaluation.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(langwatch.evaluation, "create_client", _FakeClient)
+    monkeypatch.setattr(langwatch.evaluation, "create_async_client", _FakeAsyncClient)
     monkeypatch.setattr(
         langwatch.evaluation, "get_endpoint", lambda: "https://app.langwatch.test"
     )
@@ -720,7 +720,7 @@ class TestGivenBothSdksImplementComparison:
         experiment.compare(0)
 
         assert judge.last["url"] == (
-            "https://app.langwatch.test/api/evaluations/"
+            "https://app.langwatch.test/api/v1/evaluations/"
             "langevals/select_best_compare/evaluate"
         )
         assert judge.body()["name"] == "comparison"

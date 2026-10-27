@@ -9,7 +9,7 @@ Feature: Local-dev override of the platform retention default
   # .feature). That default is fixed in production, but a local stack can lower
   # it through the LANGWATCH_DEFAULT_RETENTION_DAYS environment variable so an
   # unseeded worktree keeps a week of data instead of seven. haven pins it to 7
-  # for every dev stack (LANGWATCH_DEFAULT_RETENTION_DAYS in .env.portless).
+  # for every dev stack, injected into each process it starts.
   #
   # This is strictly a local-dev affordance. Lowering the default in production
   # would silently expire customer data, so the control plane FAILS LOUD at

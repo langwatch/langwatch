@@ -1,21 +1,47 @@
-import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import {
-  listNativeSkills,
-  listPublishedSkills,
-  renderSkill,
-} from "../_compiler/native.js";
-import {
-  FEATURE_SKILLS,
-  NATIVE_ONLY_SKILLS,
-} from "../_lib/feature-skills.js";
+
+import { describe, expect, it } from "vitest";
+
+import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.ts";
+import { FEATURE_SKILLS, NATIVE_ONLY_SKILLS } from "../_lib/feature-skills.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsRoot = path.resolve(__dirname, "..");
 const skills = listNativeSkills(skillsRoot);
 const publishedSkills = listPublishedSkills(skillsRoot);
+
+/** | user intent | `skill` | primary commands | — Langy's AGENTS.md rows that name a skill. */
+function routingRows(): { skill: string; commands: string }[] {
+  return fs
+    .readFileSync(
+      path.resolve(skillsRoot, "..", "services", "langyagent", "internal", "assets", "AGENTS.md"),
+      "utf8",
+    )
+    .split("\n")
+    .filter((row) => row.startsWith("|"))
+    .map((row) => row.split("|").map((cell) => cell.trim()))
+    .flatMap((cells) => {
+      const skill = cells[2]?.match(/^`([a-z0-9-]+)`$/)?.[1];
+      return skill ? [{ skill, commands: cells[3] ?? "" }] : [];
+    });
+}
+
+function expectSameSkillFile({
+  slug,
+  embedRoot,
+  nativeDir,
+}: {
+  slug: string;
+  embedRoot: string;
+  nativeDir: string;
+}) {
+  const embedded = fs.readFileSync(path.join(embedRoot, slug, "SKILL.md"), "utf8");
+  expect(embedded, `${slug}: Go embed copy is stale`).toBe(
+    fs.readFileSync(path.join(nativeDir, slug, "SKILL.md"), "utf8"),
+  );
+}
 
 // Backs specs/langy/langy-native-skills.feature. Langy loads every published
 // skill plus explicitly native-only skills, all from canonical root sources.
@@ -30,10 +56,16 @@ describe("native skill generation", () => {
     it("includes every recipe on disk — what we publish, Langy has", () => {
       const recipeDirs = fs
         .readdirSync(path.join(skillsRoot, "recipes"), { withFileTypes: true })
-        .filter((e) => e.isDirectory() && fs.existsSync(path.join(skillsRoot, "recipes", e.name, "SKILL.mdx")))
+        .filter(
+          (e) =>
+            e.isDirectory() && fs.existsSync(path.join(skillsRoot, "recipes", e.name, "SKILL.mdx")),
+        )
         .map((e) => e.name)
-        .sort();
-      const recipeSlugs = skills.filter((s) => s.isRecipe).map((s) => s.slug).sort();
+        .toSorted();
+      const recipeSlugs = skills
+        .filter((s) => s.isRecipe)
+        .map((s) => s.slug)
+        .toSorted();
       expect(recipeSlugs).toEqual(recipeDirs);
       expect(recipeSlugs.length, "expected recipes to be included").toBeGreaterThan(0);
     });
@@ -62,14 +94,20 @@ describe("native skill generation", () => {
         const m = renderSkill(skill).match(/^---\n([\s\S]*?)\n---\n/);
         expect(m, `${skill.slug}: no frontmatter block`).not.toBeNull();
         expect(m![1], `${skill.slug}: frontmatter missing name`).toMatch(/^name:\s*\S/m);
-        expect(m![1], `${skill.slug}: frontmatter missing description`).toMatch(/^description:\s*\S/m);
+        expect(m![1], `${skill.slug}: frontmatter missing description`).toMatch(
+          /^description:\s*\S/m,
+        );
       }
     });
 
     it("inlines shared partials — no leftover MDX import or unrendered component", () => {
       for (const skill of skills) {
-        const noCode = renderSkill(skill).replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
-        expect(noCode, `${skill.slug}: leftover import`).not.toMatch(/^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m);
+        const noCode = renderSkill(skill)
+          .replace(/```[\s\S]*?```/g, "")
+          .replace(/`[^`\n]*`/g, "");
+        expect(noCode, `${skill.slug}: leftover import`).not.toMatch(
+          /^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m,
+        );
         expect(noCode, `${skill.slug}: unrendered component`).not.toMatch(/^<[A-Z]\w*\s*\/>\s*$/m);
         expect(noCode, `${skill.slug}: leftover _shared ref`).not.toContain("_shared/");
       }
@@ -94,29 +132,112 @@ describe("native skill generation", () => {
         .readdirSync(nativeDir, { withFileTypes: true })
         .filter((e) => e.isDirectory())
         .map((e) => e.name)
-        .sort();
-      expect(committed).toEqual(skills.map((s) => s.slug).sort());
+        .toSorted();
+      expect(committed).toEqual(skills.map((s) => s.slug).toSorted());
     });
 
     it("matches the sources — regenerate with `bash skills/_compiled/generate.sh`", () => {
       for (const skill of skills) {
         const committed = fs.readFileSync(path.join(nativeDir, skill.slug, "SKILL.md"), "utf8");
-        expect(committed, `${skill.slug}: committed native output is stale`).toBe(renderSkill(skill));
+        expect(committed, `${skill.slug}: committed native output is stale`).toBe(
+          renderSkill(skill),
+        );
       }
     });
 
-    it("keeps the Go embed copy of github synchronized with its root source", () => {
-      const embedded = fs.readFileSync(
-        path.resolve(
-          skillsRoot,
-          "..",
-          "services/langyagent/internal/assets/skills/github/SKILL.md",
-        ),
-        "utf8",
+    // The Docker build overlays _compiled/native/ over the Go embed tree, so
+    // production always ships the compiled set — but a local (host-tier)
+    // manager builds from the committed copy, and that copy silently drifted
+    // for weeks until Langy ran skills older than the docs. generate.sh now
+    // mirrors the whole tree; this pins every file, not just github.
+    it("keeps the whole Go embed skill tree synchronized with the compiled set — regenerate with `bash skills/_compiled/generate.sh`", () => {
+      const embedRoot = path.resolve(
+        skillsRoot,
+        "..",
+        "services/langyagent/internal/assets/skills",
       );
-      expect(embedded).toBe(
-        fs.readFileSync(path.join(nativeDir, "github/SKILL.md"), "utf8"),
-      );
+      const embeddedDirs = fs
+        .readdirSync(embedRoot, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+        .toSorted();
+      expect(embeddedDirs).toEqual(skills.map((s) => s.slug).toSorted());
+      for (const slug of embeddedDirs) expectSameSkillFile({ slug, embedRoot, nativeDir });
+    });
+  });
+
+  // A skill body reaches the customer as literal tool output, so anything
+  // describing the machine WE run on is a leak (e.g. a worker-side host
+  // where only the question's answer should appear). Naming a variable the
+  // CUSTOMER sets (`LANGWATCH_ENDPOINT`, `LANGWATCH_API_KEY`) is expected —
+  // the operating contract enforces what the agent SAYS; this only pins the text.
+  describe("given a skill body a customer can end up reading", () => {
+    // A home directory or a machine-local root. No skill has a reason to name
+    // one: the agent's own workspace path means nothing to the reader.
+    const HOST_PATH =
+      /(\/Users\/[a-z0-9._-]+|\/home\/[a-z0-9._-]+|\/root\/|\/private\/tmp\/|\/var\/folders\/)/i;
+
+    // An address only the worker can reach: a loopback host or its container
+    // alias. A placeholder like `https://lw.acme.internal` is NOT one — that
+    // teaches the self-hosted endpoint shape safely. A bare `localhost:3000`
+    // counts too, but the bare form skips anything with a scheme already, so
+    // a customer's own `ws://` placeholder still passes.
+    const LOOPBACK_HOST = String.raw`localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal`;
+    const WORKER_SIDE_ADDRESS = new RegExp(
+      `(https?://(${LOOPBACK_HOST})|(?<!://)\\b(${LOOPBACK_HOST}):\\d{2,5}\\b)`,
+      "i",
+    );
+
+    /** @scenario "A skill never hands the customer a path from the machine it runs on" */
+    it("names no path from the machine the agent runs on", () => {
+      for (const skill of skills) {
+        const body = renderSkill(skill);
+        const found = body.match(HOST_PATH);
+        expect(found?.[0], `${skill.slug}: names a host path`).toBeUndefined();
+      }
+    });
+
+    /** @scenario "A skill never hands the customer an address only the worker can reach" */
+    it("names no worker-side address", () => {
+      for (const skill of skills) {
+        const found = renderSkill(skill).match(WORKER_SIDE_ADDRESS);
+        expect(
+          found?.[0],
+          `${skill.slug}: names an address the reader cannot reach`,
+        ).toBeUndefined();
+      }
+    });
+
+    // The regression this pins is the over-correction, not the leak: the first
+    // fix for the leak stripped the variable names out of the setup guidance
+    // too, and an agent told only that "the CLI resolves it" has nothing to go
+    // and check.
+    /** @scenario "The setup guidance still names the variables the agent has to find" */
+    it("keeps the endpoint and key variable names in the setup guidance", () => {
+      const setup = skills.find((skill) => skill.slug === "setup-lw");
+      expect(setup, "setup-lw is not in the shipped set").toBeDefined();
+      const body = renderSkill(setup!);
+      expect(body).toContain("LANGWATCH_API_KEY");
+      expect(body).toContain("LANGWATCH_ENDPOINT");
+    });
+  });
+
+  // The rule is prose, and prose gets reworded. This gate is what keeps a
+  // rewording from dropping it out of the compiled copies Langy reads.
+  // Backs specs/langy/langy-scenario-grounding.feature.
+  describe("given the skills that reproduce a failing trace as a scenario", () => {
+    /** @scenario "A reproduced scenario invents its identifiers and seeds the lookup" */
+    it("tell the agent to invent the identifiers, name them in the situation and seed the lookup", () => {
+      for (const slug of ["agent-improve", "scenarios"]) {
+        const body = renderSkill(skills.find((s) => s.slug === slug)!);
+        expect(body, `${slug}: redaction rule`).toContain("[REDACTED]");
+        expect(body, `${slug}: redaction rule`).toContain("invent a stand-in");
+        expect(body, `${slug}: naming rule`).toContain("stops being reproducible");
+        expect(body, `${slug}: lookup rule`).toContain("fixtures or test data");
+        expect(body, `${slug}: the trace's own identifiers are not copied`).not.toContain(
+          "verbatim into the situation",
+        );
+      }
     });
   });
 
@@ -125,30 +246,15 @@ describe("native skill generation", () => {
   // The image's skill set is the root-compiled native set Docker overlays into
   // the Go embed directory.
   describe("given Langy's AGENTS.md routing table", () => {
-    const readAgentsMd = () =>
-      fs.readFileSync(
-        path.resolve(skillsRoot, "..", "services", "langyagent", "internal", "assets", "AGENTS.md"),
-        "utf8",
-      );
-
-    /** | user intent | `skill` | primary commands | — rows that name a skill. */
-    const routingRows = (): { skill: string; commands: string }[] =>
-      readAgentsMd()
-        .split("\n")
-        .filter((row) => row.startsWith("|"))
-        .map((row) => row.split("|").map((cell) => cell.trim()))
-        .flatMap((cells) => {
-          const skill = cells[2]?.match(/^`([a-z0-9-]+)`$/)?.[1];
-          return skill ? [{ skill, commands: cells[3] ?? "" }] : [];
-        });
-
     it("routes only to skills that exist in the shipped image", () => {
       const routed = new Set(routingRows().map((row) => row.skill));
       expect(routed.size, "no skill rows found — did the routing table move?").toBeGreaterThan(0);
 
       const shipped = new Set(skills.map((s) => s.slug));
       for (const name of routed) {
-        expect(shipped.has(name), `AGENTS.md routes to a skill that does not ship: ${name}`).toBe(true);
+        expect(shipped.has(name), `AGENTS.md routes to a skill that does not ship: ${name}`).toBe(
+          true,
+        );
       }
     });
 
@@ -166,25 +272,21 @@ describe("native skill generation", () => {
       it("points choosing a type at the type catalog", () => {
         const rows = evaluationRows();
         expect(
-          rows.map((row) => row.skill).sort(),
+          rows.map((row) => row.skill).toSorted(),
           "the evaluation routing rows moved — this check is scanning nothing",
-        ).toEqual([...EVALUATION_SKILLS].sort());
+        ).toEqual([...EVALUATION_SKILLS].toSorted());
 
-        for (const row of rows) {
-          expect(
-            row.commands,
-            `${row.skill} does not name the evaluator type catalog`,
-          ).toContain("langwatch evaluator types");
-        }
+        const withoutCatalog = rows
+          .filter((row) => !row.commands.includes("langwatch evaluator types"))
+          .map((row) => row.skill);
+        expect(withoutCatalog, "rows that do not name the evaluator type catalog").toEqual([]);
       });
 
       it("never names listing the project's saved evaluators as a step", () => {
-        for (const row of evaluationRows()) {
-          expect(
-            row.commands,
-            `${row.skill} sends the model to the evaluator library`,
-          ).not.toContain("langwatch evaluator list");
-        }
+        const toLibrary = evaluationRows()
+          .filter((row) => row.commands.includes("langwatch evaluator list"))
+          .map((row) => row.skill);
+        expect(toLibrary, "rows that send the model to the evaluator library").toEqual([]);
       });
     });
   });

@@ -135,6 +135,26 @@ Feature: Organization members and invites REST API
     Then the request is refused with code duplicate_invite and status 409
     And the organization still has one invite for that address
 
+  @unit
+  # The management API validates STRICTLY: a provisioning caller that names the
+  # wrong team is told so, rather than being handed a 201 with an empty invite
+  # list while nobody is invited.
+  Scenario: Creating invites naming a team outside the organization is refused
+    Given a team that is not in the organization
+    When I invite two people and one of them is assigned to that team
+    Then the request is refused with code team_not_in_organization and status 422
+    And neither invite is created
+
+  @unit
+  # The invite form validates LENIENTLY, and keeps doing so: an admin filling in
+  # a batch by hand does not lose the whole batch to one assignment the server
+  # will not grant.
+  Scenario: The invite form drops a team assignment it cannot grant
+    Given a team that is not in the organization
+    When the invite form invites someone assigned to that team
+    Then the response reports no invite created
+    And the organization has no pending invite for that address
+
   @integration
   Scenario: Invites beyond the seat limit are refused
     Given the plan has one seat left
@@ -150,9 +170,25 @@ Feature: Organization members and invites REST API
     And no invite is created
 
   @integration
-  Scenario: Revoking a pending invite deletes it
+  # Revocation is a state, not a delete (D11 — see
+  # specs/identity/resilient-invitations.feature): the row stays so an admin
+  # can still see what they revoked, and the code on it stops opening
+  # anything.
+  Scenario: Revoking a pending invite marks it REVOKED
     Given the organization has a pending invite
     When I revoke that invite
     Then the response status is 200
-    And it no longer appears in the invite list
+    And it still appears in the invite list with status REVOKED
     And revoking it again is refused with code invite_not_found and status 404
+
+  @integration
+  Scenario: A revocation landing during an acceptance stands
+    Given the organization has a pending invite
+    And the invitee is accepting it
+    When an admin revokes it in the same moment
+    Then the acceptance is refused as no longer open
+    And the invite reads REVOKED with no membership written
+    # Either write can be the one that waits on the row lock, so both re-read
+    # the row as the other left it. The reverse ordering is the same rule: a
+    # revoke that waited on an acceptance finds an ACCEPTED row and is
+    # refused as not found, rather than marking a member's invite REVOKED.

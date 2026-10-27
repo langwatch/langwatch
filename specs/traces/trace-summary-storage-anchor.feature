@@ -71,6 +71,49 @@ Feature: Trace summaries are filed under a real time, and their span reads stay 
       Then its start is the time its first signal was accepted
       And it is not presented as having started in 1970
 
+    @unit
+    Scenario: The trace list shows the same fallback time, not the epoch
+      Given a trace whose only signal is a log record
+      When the trace list renders its row
+      Then the row's time is the time its first signal was accepted
+      # The list once rendered the span baseline raw, so a span-less trace
+      # read "20684d ago" in the list and in the drawer header while the
+      # single-trace read reported the honest time.
+
+  Rule: A trace summary exists once the trace says something
+
+    Log-only traces are a supported shape, but a log record proves only that
+    a process was alive, not that anything happened worth a row. Twelve
+    agents dying at login produced twelve span-less summaries with no input,
+    no output, no cost and no duration. A summary is stored once the trace
+    carries something a reader can see; a content-free record batch stores
+    nothing, and the records themselves stay stored and reachable.
+
+    @unit
+    Scenario: A content-free log batch persists no summary
+      Given a trace whose log records carry no input, output, cost, tokens or model
+      When its records are folded
+      Then no trace summary is stored
+
+    @unit
+    Scenario: A log record carrying content persists the summary
+      Given a trace whose log record carries a user prompt as its input
+      When the record is folded
+      Then the trace summary is stored
+      And it reports that input
+
+    @unit
+    Scenario: A log record whose only contribution is a cost persists the summary
+      Given a trace whose log record carries a cost and no input or output
+      When the record is folded
+      Then the trace summary is stored
+
+    @unit
+    Scenario: A span persists the summary regardless of content
+      Given a trace whose first signal is a span
+      When the span is folded
+      Then the trace summary is stored
+
   Rule: Reading a page of traces' spans is always bounded in time
 
     @unit

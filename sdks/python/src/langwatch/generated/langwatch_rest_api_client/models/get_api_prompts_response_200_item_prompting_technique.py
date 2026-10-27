@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.get_api_prompts_response_200_item_prompting_technique_type import (
     GetApiPromptsResponse200ItemPromptingTechniqueType,
@@ -30,7 +29,6 @@ class GetApiPromptsResponse200ItemPromptingTechnique:
 
     type_: GetApiPromptsResponse200ItemPromptingTechniqueType
     demonstrations: GetApiPromptsResponse200ItemPromptingTechniqueDemonstrations | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         type_ = self.type_.value
@@ -40,7 +38,7 @@ class GetApiPromptsResponse200ItemPromptingTechnique:
             demonstrations = self.demonstrations.to_dict()
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "type": type_,
@@ -72,21 +70,4 @@ class GetApiPromptsResponse200ItemPromptingTechnique:
             demonstrations=demonstrations,
         )
 
-        get_api_prompts_response_200_item_prompting_technique.additional_properties = d
         return get_api_prompts_response_200_item_prompting_technique
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

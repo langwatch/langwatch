@@ -1,52 +1,37 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env node
 /**
- * Native skill generator.
- *
- * Emits opencode-discoverable SKILL.md files for the langyagent image from the
- * canonical skills/<name>/SKILL.mdx sources. Public entries are the same files
- * skills/_publish/sync.ts publishes; Langy-only entries remain native.
- *
- * The SET is whatever listNativeSkills() reports: everything public plus the
- * Langy-only skills whose canonical sources also live under root skills/. The
- * publisher continues to use listPublishedSkills(), so internal capabilities
- * do not leak into the public directory. Recipes are flattened to top-level
- * dirs because opencode discovers skills one level deep
- * ($HOME/.config/opencode/skills/<name>/SKILL.md).
- *
- * The CONTENT is the canonical skill, verbatim: inlineMdx preserves frontmatter
- * (name + description → opencode discovery) and inlines shared partials. We do
- * NOT rewrite bodies. In-product nuances (the worker already has credentials +
- * the CLI) live as a single global override in AGENTS.md.
- *
- * Output is COMMITTED (unlike the gitignored skills/_compiled/*.txt prompts):
- * Dockerfile.langyagent COPYs skills/_compiled/native/ into the manager's
- * go:embed dir at image build, so the checked-in tree is exactly what ships.
- * Regenerate via skills/_compiled/generate.sh after any SKILL.mdx change.
- *
- * Usage:  tsx skills/_compiler/native.ts [--out <dir>]
+ * Native skill generator: emits opencode-discoverable SKILL.md files,
+ * verbatim, for the langyagent image (in-product nuances live in AGENTS.md).
+ * Recipes flatten one level deep — see skills/_compiled/README.md for the pipeline.
  */
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { inlineMdx } from "../_lib/mdx-inline.js";
+
 import {
   listNativeSkills,
   listPublishedSkills,
   type PublishedSkill,
-} from "../_lib/feature-skills.js";
+} from "../_lib/feature-skills.ts";
+import { inlineMdx } from "../_lib/mdx-inline.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const skillsRoot = path.resolve(__dirname, "..");
 const DEFAULT_OUT = path.join(skillsRoot, "_compiled", "native");
 
-// Render one canonical skill into opencode SKILL.md text — frontmatter + body,
-// using the same renderer as the public publisher.
+/**
+ * Setup partials the in-product agent must not be given: it already has
+ * credentials, endpoint and CLI on PATH, so these are instructions to ignore
+ * something, priced at every token spent reading them regardless.
+ */
+const LANGY_EXCLUDED_PARTIALS = ["cli-setup", "projects-and-api-keys"];
+
 export function renderSkill(skill: PublishedSkill): string {
   if (!fs.existsSync(skill.src)) {
     throw new Error(`Skill source not found: ${skill.src}`);
   }
-  return inlineMdx(skill.src);
+  return inlineMdx(skill.src, { excludeShared: LANGY_EXCLUDED_PARTIALS });
 }
 
 function main() {

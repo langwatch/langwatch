@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -99,8 +101,8 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 // shapes the Studio client emits:
 //
 //  1. Discriminated event (preferred — matches the Python
-//     StudioClientEvent union sent by platform/app/src/server/workflows/
-//     runWorkflow.ts):
+//     StudioClientEvent union declared by
+//     modules/workflow/contract/src/studio-events.ts):
 //     {"type":"execute_flow"|"execute_component"|"execute_evaluation",
 //     "payload":{trace_id, workflow, inputs?, origin?, ...}}
 //
@@ -163,7 +165,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		UntilNodeID string `json:"until_node_id,omitempty"`
 		ProjectID   string `json:"project_id,omitempty"`
 		// RunID is present only on execute_evaluation envelopes
-		// (platform/app/src/optimization_studio/hooks/useEvaluationExecution.ts).
+		// (modules/workflow/browser/src/ui/sections/optimization_studio/use-evaluation-execution.ts).
 		// Plumbed through to the engine so evaluation_state_change events
 		// carry the run_id Studio's reducer keys evaluations on.
 		RunID string `json:"run_id,omitempty"`
@@ -179,6 +181,11 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		// parent workflow already owns the trace. Mirrors
 		// langwatch_nlp/studio/types/events.py:57 + execute_flow.py:53.
 		DoNotTrace bool `json:"do_not_trace,omitempty"`
+		// MaxAttachmentBytes is the per-file attachment limit the
+		// application resolved for the organization that owns the run.
+		// Absent or zero falls back to the
+		// X-LangWatch-Max-Attachment-Bytes header, then to the default.
+		MaxAttachmentBytes int64 `json:"max_attachment_bytes,omitempty"`
 	}
 	if err := json.Unmarshal(innerBytes, &inner); err != nil {
 		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
@@ -201,6 +208,10 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 	if threadID == "" {
 		threadID = r.Header.Get("X-LangWatch-Thread-Id")
 	}
+	maxAttachmentBytes := inner.MaxAttachmentBytes
+	if maxAttachmentBytes <= 0 {
+		maxAttachmentBytes = headerMaxAttachmentBytes(r)
+	}
 	// Combine envelope-level do_not_trace with the workflow's
 	// enable_tracing setting (default true). Either being false
 	// suppresses the studio span. Mirrors execute_flow.py:53 logic
@@ -211,23 +222,40 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 	}
 
 	return &app.WorkflowRequest{
-		WorkflowJSON:      inner.Workflow,
-		Inputs:            normalizeInputs(inner.Inputs),
-		Origin:            origin,
-		TraceID:           inner.TraceID,
-		ProjectID:         inner.ProjectID,
-		ThreadID:          threadID,
-		NodeID:            inner.NodeID,
-		UntilNodeID:       inner.UntilNodeID,
-		APIKey:            peekWorkflowAPIKey(inner.Workflow),
-		WorkflowName:      peekWorkflowName(inner.Workflow),
-		Type:              peek.Type,
-		RunID:             inner.RunID,
-		WorkflowVersionID: inner.WorkflowVersionID,
-		EvaluateOn:        inner.EvaluateOn,
-		DatasetEntry:      inner.DatasetEntry,
-		DoNotTrace:        doNotTrace,
+		WorkflowJSON:       inner.Workflow,
+		Inputs:             normalizeInputs(inner.Inputs),
+		Origin:             origin,
+		TraceID:            inner.TraceID,
+		ProjectID:          inner.ProjectID,
+		ThreadID:           threadID,
+		NodeID:             inner.NodeID,
+		UntilNodeID:        inner.UntilNodeID,
+		APIKey:             peekWorkflowAPIKey(inner.Workflow),
+		WorkflowName:       peekWorkflowName(inner.Workflow),
+		Type:               peek.Type,
+		RunID:              inner.RunID,
+		WorkflowVersionID:  inner.WorkflowVersionID,
+		EvaluateOn:         inner.EvaluateOn,
+		DatasetEntry:       inner.DatasetEntry,
+		DoNotTrace:         doNotTrace,
+		MaxAttachmentBytes: maxAttachmentBytes,
 	}, nil
+}
+
+// headerMaxAttachmentBytes reads the per-file attachment limit off the
+// X-LangWatch-Max-Attachment-Bytes header, a decimal integer of bytes. A
+// missing, malformed or non-positive value is zero, which the engine reads as
+// "no limit named" and serves at the default.
+func headerMaxAttachmentBytes(r *http.Request) int64 {
+	v := strings.TrimSpace(r.Header.Get(app.MaxAttachmentBytesHeader))
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return n
 }
 
 // peekWorkflowName extracts the user-visible workflow name from raw
@@ -371,12 +399,145 @@ func normalizeInputs(v any) map[string]any {
 	return nil
 }
 
+// decodeStudioStreamRequest reads the /go/studio/execute body, answers a
+// bare Studio control event in place, and decodes the workflow request.
+// Returns nil once the response has been written and the caller must stop.
+func decodeStudioStreamRequest(w http.ResponseWriter, r *http.Request) *app.WorkflowRequest {
+	body, err := readStudioRequestBody(r, stagedPayloadClient)
+	if err != nil {
+		writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"reason": "read_body",
+		}, err))
+		return nil
+	}
+	// Studio fires `is_alive` (every ~7s) and `stop_execution` (on
+	// user-initiated stop) as bare control events with no workflow
+	// body. Pre-fix these went to the legacy `/studio/execute` path
+	// and broke Studio UX whenever the Python sidecar wasn't running
+	// (the post-100% target topology) — see PR #3483 dogfood
+	// finding. Short-circuit before workflow decode and answer with
+	// the same SSE frames the Python sidecar emits today: an
+	// `is_alive_response` (the heartbeat pong Studio's
+	// usePostEvent.tsx switches on) followed by `done`. For
+	// `stop_execution` we emit `done` only — there's no in-process
+	// execution to cancel since each request is independent; the
+	// real cancel happens on the next /go/studio/execute via
+	// client-context disconnection.
+	if peeked := peekStudioControlEventType(body); peeked != "" {
+		emitStudioControlEvent(w, peeked)
+		return nil
+	}
+
+	req, herrErr := decodeStudioClientEvent(r, body)
+	if herrErr != nil {
+		writeHandlerError(r.Context(), w, *herrErr)
+		return nil
+	}
+	return req
+}
+
+// studioStreamContext folds the decoded request's identity, origin and
+// inbound causality into the request context the stream runs under.
+func studioStreamContext(r *http.Request, req *app.WorkflowRequest) context.Context {
+	ctx := enrichRequestLogContext(r.Context(), req)
+	if req.Origin != "" {
+		ctx = withOrigin(ctx, req.Origin)
+	}
+	return applyInboundCausality(ctx, r)
+}
+
+// sseStream is the write side of one Server-Sent Events response: the
+// writer paired with the flusher that puts each frame on the wire
+// immediately. Bundled so the stream loop passes one value instead of
+// threading both through every frame-writing helper.
+type sseStream struct {
+	w       http.ResponseWriter
+	flusher http.Flusher
+}
+
+// write puts one event frame on the wire and flushes it.
+func (s sseStream) write(eventType string, payload map[string]any) {
+	writeSSE(s.w, s.flusher, eventType, payload)
+}
+
+// beginSSEResponse commits the SSE response headers and returns the stream
+// the event loop writes through. The second result is false once a
+// structured error has been written instead and the caller must stop.
+func beginSSEResponse(ctx context.Context, w http.ResponseWriter) (sseStream, bool) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		// Without flushing the events would buffer indefinitely;
+		// surface a structured error rather than silently
+		// underperforming. The flusher check has to happen BEFORE
+		// any Set/WriteHeader call — once 200 OK is on the wire,
+		// herr.WriteHTTP can no longer set a non-2xx status and
+		// the client sees mixed signals.
+		writeHandlerError(ctx, w, herr.New(ctx, domain.ErrInternal, herr.M{
+			"reason": "no_flusher",
+		}, errors.New("response writer does not support flushing")))
+		return sseStream{}, false
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	return sseStream{w: w, flusher: flusher}, true
+}
+
+// drain copies engine events onto the SSE wire until the
+// engine closes the channel or goes silent for `idle`.
+//
+// `idle` is a silence budget, not a wall clock: every event restarts it, so
+// a long run that keeps reporting progress is never cut off. Idle detection
+// lives here rather than in engine.ExecuteStream because only the handler
+// observes whether a frame reached the client (see app/engine/stream.go).
+//
+// The timer is reset without draining its channel, which is safe from Go
+// 1.23 on: a stopped or reset timer never delivers a stale tick.
+func (s sseStream) drain(ctx context.Context, events <-chan app.WorkflowStreamEvent, idle time.Duration) {
+	timer := time.NewTimer(idle)
+	defer timer.Stop()
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				return
+			}
+			s.write(ev.Type, ev.Payload)
+			timer.Reset(idle)
+		case <-timer.C:
+			s.writeIdleTimeout(ctx, idle)
+			return
+		}
+	}
+}
+
+// writeIdleTimeout ends a silent stream with the terminal `error`
+// frame Studio's parser reads, naming domain.ErrIdleTimeout so the client
+// can tell a stalled run from a completed one.
+//
+// The frame carries the code rather than a 504 because the SSE headers are
+// committed before the first event is drained: once 200 OK is on the wire
+// the status registered for ErrIdleTimeout (router.go) can no longer be
+// sent. Returning ends the handler, which cancels the stream context and
+// tears the engine goroutines down.
+func (s sseStream) writeIdleTimeout(ctx context.Context, idle time.Duration) {
+	message := fmt.Sprintf("%s: no stream event for %s", domain.ErrIdleTimeout, idle)
+	clog.Get(ctx).Error("studio_stream_idle_timeout",
+		zap.String("fault", "platform"),
+		zap.String("code", domain.ErrIdleTimeout.String()),
+		zap.Duration("idle", idle))
+	s.write("error", map[string]any{"message": message})
+}
+
 // executeStreamHandler is the entry point for /go/studio/execute.
 // Returns Server-Sent Events: one `execution_state_change` per node
 // transition (running → success/error), `is_alive_response` heartbeats every
-// NLP_STREAM_HEARTBEAT_SECONDS, and a final `done` (or `error`) frame
-// when the run completes. Closes when the client disconnects.
-func executeStreamHandler(application *app.App) http.HandlerFunc {
+// NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS, and a final `done` (or `error`)
+// frame when the run completes. Closes when the client disconnects, or when
+// the engine emits nothing for NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS.
+func executeStreamHandler(application *app.App, configuredHeartbeat, configuredIdle time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		executor := application.Executor()
 		if executor == nil {
@@ -385,63 +546,18 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			}, errors.New("workflow executor missing from app")))
 			return
 		}
-		body, err := readStudioRequestBody(r, stagedPayloadClient)
-		if err != nil {
-			writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
-				"reason": "read_body",
-			}, err))
+		req := decodeStudioStreamRequest(w, r)
+		if req == nil {
 			return
 		}
-		// Studio fires `is_alive` (every ~7s) and `stop_execution` (on
-		// user-initiated stop) as bare control events with no workflow
-		// body. Pre-fix these went to the legacy `/studio/execute` path
-		// and broke Studio UX whenever the Python sidecar wasn't running
-		// (the post-100% target topology) — see PR #3483 dogfood
-		// finding. Short-circuit before workflow decode and answer with
-		// the same SSE frames the Python sidecar emits today: an
-		// `is_alive_response` (the heartbeat pong Studio's
-		// usePostEvent.tsx switches on) followed by `done`. For
-		// `stop_execution` we emit `done` only — there's no in-process
-		// execution to cancel since each request is independent; the
-		// real cancel happens on the next /go/studio/execute via
-		// client-context disconnection.
-		if peeked := peekStudioControlEventType(body); peeked != "" {
-			emitStudioControlEvent(w, peeked)
-			return
-		}
-
-		req, herrErr := decodeStudioClientEvent(r, body)
-		if herrErr != nil {
-			writeHandlerError(r.Context(), w, *herrErr)
-			return
-		}
-		ctx := enrichRequestLogContext(r.Context(), req)
-		if req.Origin != "" {
-			ctx = withOrigin(ctx, req.Origin)
-		}
-		ctx = applyInboundCausality(ctx, r)
-		ctx, span := startStudioSpan(ctx, req, req.APIKey)
+		ctx, span := startStudioSpan(studioStreamContext(r, req), req, req.APIKey)
 		defer span.End()
 		clog.Get(ctx).Info("execute_flow_received", zap.Bool("stream", true))
 
-		flusher, ok := w.(http.Flusher)
+		out, ok := beginSSEResponse(ctx, w)
 		if !ok {
-			// Without flushing the events would buffer indefinitely;
-			// surface a structured error rather than silently
-			// underperforming. The flusher check has to happen BEFORE
-			// any Set/WriteHeader call — once 200 OK is on the wire,
-			// herr.WriteHTTP can no longer set a non-2xx status and
-			// the client sees mixed signals.
-			writeHandlerError(ctx, w, herr.New(ctx, domain.ErrInternal, herr.M{
-				"reason": "no_flusher",
-			}, errors.New("response writer does not support flushing")))
 			return
 		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		w.Header().Set("X-Accel-Buffering", "no")
-		w.WriteHeader(http.StatusOK)
 
 		streamCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -453,20 +569,18 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 		}()
 
 		events, err := executor.ExecuteStream(streamCtx, *req, app.WorkflowStreamOptions{
-			Heartbeat: streamHeartbeat(r),
+			Heartbeat: streamHeartbeat(r, configuredHeartbeat),
 		})
 		if err != nil {
 			// The SSE error frame reaches the client; this line is the
 			// server-side trail for it (the engine stream failed to start).
 			clog.Get(ctx).Error("studio_stream_failed",
 				zap.String("fault", "platform"), zap.String("message", err.Error()))
-			writeSSE(w, flusher, "error", map[string]any{"message": err.Error()})
+			out.write("error", map[string]any{"message": err.Error()})
 			return
 		}
 
-		for ev := range events {
-			writeSSE(w, flusher, ev.Type, ev.Payload)
-		}
+		out.drain(ctx, events, streamIdleTimeout(configuredIdle))
 	}
 }
 
@@ -475,8 +589,9 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 //	data: {"type":"<type>","payload":{...}}\n\n
 //
 // matching the Python /studio/execute SSE contract that Studio's TS
-// parser expects (platform/app/src/app/api/workflows/post_event/post-event.ts
-// reads only `data:` lines and JSON.parses the rest). An optional
+// parser expects (modules/workflow/process/src/adapters/
+// workflow-studio-stream.adapter.ts reads only `data:` lines and JSON.parses
+// the rest). An optional
 // `event:` line is intentionally omitted — the TS parser ignores it
 // today and emitting it confused early SSE rounds-tripping. The
 // `payload` key is omitted entirely when the event has no payload
@@ -496,17 +611,32 @@ func writeSSE(w http.ResponseWriter, flusher http.Flusher, eventType string, pay
 	flusher.Flush()
 }
 
-// streamHeartbeat returns the heartbeat interval, defaulting to 15s
-// when the request didn't override it via header. Tests use a tiny
-// interval to verify ticking.
-func streamHeartbeat(r *http.Request) time.Duration {
+// DefaultStreamHeartbeat is the is_alive_response cadence applied when
+// neither the request header nor the operator config names one. Matches
+// specs/nlp-go/_shared/contract.md §6; clients detect a dead stream by
+// missed heartbeats, so changing it is a contract change.
+const DefaultStreamHeartbeat = 15 * time.Second
+
+// streamHeartbeat returns the heartbeat interval for one stream. The
+// per-request header wins (tests use a tiny interval to verify
+// ticking), then the operator's configured cadence, then the default.
+//
+// A non-positive `configured` falls through to DefaultStreamHeartbeat
+// rather than reaching the engine: engine.ExecuteStream only starts the
+// heartbeat goroutine when the interval is positive, so passing zero
+// through would silently disable heartbeats entirely and let idle
+// proxies tear healthy streams down.
+func streamHeartbeat(r *http.Request, configured time.Duration) time.Duration {
 	if v := r.Header.Get("X-LangWatch-NLPGO-Heartbeat-MS"); v != "" {
 		var ms int
 		if _, err := fmt.Sscanf(v, "%d", &ms); err == nil && ms > 0 {
 			return time.Duration(ms) * time.Millisecond
 		}
 	}
-	return 15 * time.Second
+	if configured > 0 {
+		return configured
+	}
+	return DefaultStreamHeartbeat
 }
 
 // PlaygroundProxy is the dispatcher surface the playground-proxy
@@ -563,4 +693,26 @@ func versionHandler(version string) http.HandlerFunc {
 			"version": version,
 		})
 	}
+}
+
+// DefaultStreamIdleTimeout closes an SSE stream that has emitted nothing
+// for this long when the operator names no budget. Matches
+// httpblock.DefaultTimeout: the stream must outlive the slowest single
+// agent HTTP call, or a customer running a long agent backend loses the
+// inbound stream mid-call.
+//
+// Counterpart: NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS in
+// platform/app/src/server/nlpgo/timeouts.ts, which bounds every code-block
+// ceiling the platform will accept. Change both together.
+const DefaultStreamIdleTimeout = 720 * time.Second
+
+// streamIdleTimeout returns the silence budget for one stream. A
+// non-positive `configured` falls through to DefaultStreamIdleTimeout
+// rather than traveling on: zero would arm a timer that fires before the
+// first engine event and cut every healthy stream off immediately.
+func streamIdleTimeout(configured time.Duration) time.Duration {
+	if configured > 0 {
+		return configured
+	}
+	return DefaultStreamIdleTimeout
 }

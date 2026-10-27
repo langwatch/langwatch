@@ -13,26 +13,26 @@ app:
     skipEnvValidation: true
   resources:
     requests: { cpu: 50m, memory: 256Mi }
-    limits:   { cpu: 250m, memory: 512Mi }
+    limits: { cpu: 250m, memory: 512Mi }
 
 workers:
   replicaCount: 1
   resources:
     requests: { cpu: 50m, memory: 256Mi }
-    limits:   { cpu: 250m, memory: 512Mi }
+    limits: { cpu: 250m, memory: 512Mi }
 
 langwatch_nlp:
   replicaCount: 1
   resources:
     requests: { cpu: 50m, memory: 256Mi }
-    limits:   { cpu: 250m, memory: 512Mi }
+    limits: { cpu: 250m, memory: 512Mi }
 
 langevals:
   replicaCount: 1
   # 256Mi/512Mi is below what the service needs just to import its evaluators.
   resources:
     requests: { cpu: 50m, memory: 768Mi }
-    limits:   { cpu: 250m, memory: 4Gi }
+    limits: { cpu: 250m, memory: 4Gi }
 
 clickhouse:
   chartManaged: true
@@ -45,25 +45,25 @@ clickhouse:
 postgresql:
   chartManaged: true
   auth:
-    password: ""  # autogen handles it
+    password: "" # autogen handles it
     database: "langwatch"
   primary:
     persistence:
       size: 1Gi
     resources:
       requests: { cpu: 50m, memory: 128Mi }
-      limits:   { cpu: 250m, memory: 256Mi }
+      limits: { cpu: 250m, memory: 256Mi }
 
 redis:
   chartManaged: true
   auth:
-    password: ""  # autogen handles it
+    password: "" # autogen handles it
   master:
     persistence:
       size: 1Gi
     resources:
       requests: { cpu: 25m, memory: 32Mi }
-      limits:   { cpu: 100m, memory: 128Mi }
+      limits: { cpu: 100m, memory: 128Mi }
 
 prometheus:
   chartManaged: true
@@ -73,7 +73,7 @@ prometheus:
       size: 1Gi
     resources:
       requests: { cpu: 25m, memory: 64Mi }
-      limits:   { cpu: 100m, memory: 256Mi }
+      limits: { cpu: 100m, memory: 256Mi }
 
 cronjobs:
   enabled: false

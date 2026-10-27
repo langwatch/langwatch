@@ -1,11 +1,11 @@
 /**
- * Rows where a target produced nothing: who still becomes a candidate, when
- * the row is skipped, and when naming an empty target is an error.
- *
+ * Rows where a target produced nothing: who still becomes a candidate,
+ * when the row is skipped, and when naming an empty target is an error.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
 import { describe, it, expect } from "vitest";
+
 import { ComparisonError } from "../errors";
 import {
   type ComparisonHarness,
@@ -34,9 +34,10 @@ describe("Experiment.compare", () => {
           outputs: TWO_OUTPUTS,
         });
 
-        expect(
-          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)
-        ).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
+        expect(harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)).toEqual([
+          "gpt-5-mini",
+          "claude-sonnet-5",
+        ]);
         expect(verdict?.candidates).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
       });
     });

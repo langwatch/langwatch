@@ -1,14 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { commandValidationError } from "../../utils/errorOutput.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 /**
  * Returns the created graph rather than printing it: the output port renders it
  * in whatever format the caller asked for (utils/output.ts).
@@ -36,11 +38,11 @@ export const createGraphCommand = async (
       graphDef = JSON.parse(options.graph) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/graphs`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/graphs`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+        ...buildRequestHeaders({ apiKey }),
       },
       body: JSON.stringify({
         name,
@@ -53,12 +55,15 @@ export const createGraphCommand = async (
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "create graph" });
+      await failSpinnerFromResponse({ spinner, response, action: "create graph" });
       process.exit(1);
     }
 
-    const graph = await response.json() as { id: string; name: string; dashboardId: string | null };
+    const graph = (await response.json()) as {
+      id: string;
+      name: string;
+      dashboardId: string | null;
+    };
     spinner.succeed(`Graph "${graph.name}" created (${graph.id})`);
 
     return {

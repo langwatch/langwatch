@@ -1,0 +1,573 @@
+import type { ResolvedRetention } from "@langwatch/data-retention-contract";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { describe, expect, it } from "vitest";
+
+import {
+  DECLARED_ID_INDEXES,
+  EXPERIMENT_RUNS_BY_EXPERIMENT,
+} from "../../__tests__/support/declared-id-indexes.fixture.ts";
+import {
+  createDataRetentionTestProjectScopes,
+  retentionTestGraph,
+  retentionTestScopeRow,
+} from "../../app/__tests__/data-retention.fixture.ts";
+import { ClickHouseStorageMeterRepository } from "../../repositories/clickhouse/clickhouse.storage-meter.repository.ts";
+import {
+  type CachedRetentionLookup,
+  DataRetentionCacheRepository,
+} from "../../repositories/data-retention-cache.repository.ts";
+import { DataRetentionProjectScopeRepository } from "../../repositories/data-retention-project-scope.repository.ts";
+import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/memory/memory.data-retention-project-scope.repository.ts";
+import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
+import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
+import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
+import { RedisStorageMeterCacheRepository } from "../../repositories/redis/redis.storage-meter-cache.repository.ts";
+import { STORAGE_METER_CACHE_TTL_MS } from "../../repositories/storage-meter-cache.repository.ts";
+import { DataRetentionService } from "../data-retention.service.ts";
+import { StorageMeterService } from "../storage-meter.service.ts";
+
+/** These cases never meter: a read reaching ClickHouse is the test failing. */
+function refusingClickHouse() {
+  return clickHouseQueryClientDouble({
+    query: async () => {
+      throw new Error("storage metering is not part of this case");
+    },
+  });
+}
+
+const DEFAULT_DAYS = 49;
+const PROJECT = retentionTestGraph.projectId;
+const ORGANIZATION = retentionTestGraph.organizationId ?? "organization-1";
+
+/** Records what a write invalidated, which is what the cascade has to reach. */
+class RecordingCache extends DataRetentionCacheRepository {
+  readonly values = new Map<string, ResolvedRetention>();
+  readonly deleted: string[] = [];
+
+  async get(key: string): Promise<CachedRetentionLookup> {
+    const value = this.values.get(key);
+    return value === undefined ? { kind: "miss" } : { kind: "hit", value };
+  }
+
+  async set(key: string, value: ResolvedRetention): Promise<void> {
+    this.values.set(key, value);
+  }
+
+  async delete(key: string): Promise<void> {
+    this.deleted.push(key);
+    this.values.delete(key);
+  }
+}
+
+/** The memory placements, recording which read each lookup took. */
+class CountingProjectScopes extends DataRetentionProjectScopeRepository {
+  readonly reads: string[] = [];
+
+  constructor(private readonly inner: DataRetentionProjectScopeRepository) {
+    super();
+  }
+
+  findProjectPlacement(input: { projectId: string }) {
+    this.reads.push("findProjectPlacement");
+    return this.inner.findProjectPlacement(input);
+  }
+
+  findProjectPlacements(input: { projectIds: readonly string[] }) {
+    this.reads.push("findProjectPlacements");
+    return this.inner.findProjectPlacements(input);
+  }
+
+  findTeamOrganizationId(input: { teamId: string }) {
+    return this.inner.findTeamOrganizationId(input);
+  }
+
+  findProjectIds(input: { organizationId: string; teamId?: string }) {
+    return this.inner.findProjectIds(input);
+  }
+}
+
+function createService(
+  input: Readonly<{
+    policies?: MemoryDataRetentionRepository;
+    cache?: DataRetentionCacheRepository;
+    projectScopes?: DataRetentionProjectScopeRepository;
+    retroactive?: MemoryRetroactiveRetentionRepository;
+  }> = {},
+) {
+  return DataRetentionService.create({
+    policies: input.policies ?? MemoryDataRetentionRepository.create(),
+    pins: MemoryPinnedTraceRepository.create(),
+    projectScopes: input.projectScopes ?? createDataRetentionTestProjectScopes(),
+    defaultRetentionDays: DEFAULT_DAYS,
+    retroactive: input.retroactive ?? MemoryRetroactiveRetentionRepository.create(),
+    cache: input.cache ?? new RecordingCache(),
+    storageMeter: StorageMeterService.create({
+      meter: ClickHouseStorageMeterRepository.create({ clickhouse: refusingClickHouse() }),
+      cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
+    }),
+  });
+}
+
+describe("DataRetentionService", () => {
+  describe("given a rewrite was asked for", () => {
+    /**
+     * The store is never absent: a deployment with no ClickHouse refuses at
+     * boot naming this module. So a rewrite asked for reports as in progress
+     * until killed, rather than "nothing is running" for lack of a store.
+     */
+    it("reports it as in progress until it is killed", async () => {
+      const service = createService();
+
+      await expect(
+        service.triggerRetroactiveUpdate({
+          projectId: PROJECT,
+          category: "traces",
+          newRetentionDays: DEFAULT_DAYS,
+        }),
+      ).resolves.toMatchObject({ tables: expect.any(Array) });
+
+      const progress = await service.getRetroactiveMutationProgress({ projectId: PROJECT });
+      expect(progress.length).toBeGreaterThan(0);
+      expect(progress.every((mutation) => mutation.category === "traces")).toBe(true);
+
+      for (const mutation of progress) {
+        await service.killRetroactiveMutation({
+          projectId: PROJECT,
+          mutationId: mutation.mutationId,
+        });
+      }
+
+      await expect(service.getRetroactiveMutationProgress({ projectId: PROJECT })).resolves.toEqual(
+        [],
+      );
+    });
+  });
+
+  describe("when a rule is set above the project", () => {
+    /** @scenario "Resolve retention through the scope cascade" */
+    it("resolves policy through the project/team/organization cascade", async () => {
+      const policies = MemoryDataRetentionRepository.create();
+      await policies.upsertForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
+        category: "traces",
+        retentionDays: 63,
+      });
+
+      const service = createService({ policies });
+
+      await expect(
+        service.getRetentionDays({ projectId: PROJECT, category: "traces" }),
+      ).resolves.toBe(63);
+    });
+  });
+
+  describe("when the value is not a whole number of weeks", () => {
+    /** @scenario "Reject invalid retention values" */
+    it("rejects unaligned retention values at the service boundary", async () => {
+      const service = createService();
+
+      await expect(
+        service.setForScope({
+          organizationId: ORGANIZATION,
+          scope: { scopeType: "PROJECT", scopeId: PROJECT },
+          category: "traces",
+          retentionDays: 42,
+        }),
+      ).rejects.toThrow(/only available as a fixed plan option/);
+    });
+  });
+
+  describe("given a project with no row in project's table", () => {
+    /** @scenario "A retention lookup for a project with no row gets the platform default, never cached" */
+    it("answers the platform default, caches nothing, and resolves its rules once its row exists", async () => {
+      const cache = new RecordingCache();
+      const projectScopes = MemoryDataRetentionProjectScopeRepository.create();
+      const policies = MemoryDataRetentionRepository.create();
+      await policies.upsertForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
+        category: "traces",
+        retentionDays: 63,
+      });
+      const service = createService({ cache, projectScopes, policies });
+
+      await expect(service.getResolvedForProject({ projectId: PROJECT })).resolves.toEqual({
+        traces: DEFAULT_DAYS,
+        scenarios: DEFAULT_DAYS,
+        experiments: DEFAULT_DAYS,
+      });
+      expect(cache.values.size).toBe(0);
+
+      const created = createService({
+        cache,
+        policies,
+        projectScopes: MemoryDataRetentionProjectScopeRepository.create({
+          projects: [retentionTestScopeRow(PROJECT)],
+        }),
+      });
+      await expect(
+        created.getRetentionDays({ projectId: PROJECT, category: "traces" }),
+      ).resolves.toBe(63);
+    });
+
+    /** @scenario "Default a missing removal preview" */
+    it("previews the platform default for a project it does not know", async () => {
+      const service = createService();
+
+      await expect(
+        service.previewScopeRemoval({
+          organizationId: ORGANIZATION,
+          scope: { scopeType: "PROJECT", scopeId: "missing" },
+        }),
+      ).resolves.toEqual({
+        traces: DEFAULT_DAYS,
+        scenarios: DEFAULT_DAYS,
+        experiments: DEFAULT_DAYS,
+      });
+    });
+  });
+
+  describe("when a rule is written at a scope that no longer exists", () => {
+    /** @scenario "A retention rule aimed at a scope that no longer exists is refused by name" */
+    it("refuses by name rather than writing an unanchored rule", async () => {
+      const service = createService();
+
+      await expect(
+        service.setForScope({
+          organizationId: ORGANIZATION,
+          scope: { scopeType: "PROJECT", scopeId: "missing" },
+          category: "traces",
+          retentionDays: 49,
+        }),
+      ).rejects.toMatchObject({
+        code: "data_retention_scope_target_not_found",
+        httpStatus: 404,
+        isHandled: true,
+      });
+    });
+  });
+
+  describe("when a scope names a team", () => {
+    /** @scenario "Resolve scope ownership through canonical services" */
+    it("places the team in an organization from the team's own row", async () => {
+      const service = createService();
+      const team = { scopeType: "TEAM", scopeId: retentionTestGraph.teamId } as const;
+      const unknown = { scopeType: "TEAM", scopeId: "team-without-row" } as const;
+
+      await expect(
+        service.assertScopeInOrganization({ organizationId: ORGANIZATION, scope: team }),
+      ).resolves.toBeUndefined();
+      await expect(
+        service.assertScopeInOrganization({ organizationId: "organization-other", scope: team }),
+      ).rejects.toMatchObject({ code: "data_retention_scope_target_not_found" });
+      await expect(
+        service.previewScopeRemoval({
+          organizationId: ORGANIZATION,
+          scope: unknown,
+        }),
+      ).resolves.toEqual({
+        traces: DEFAULT_DAYS,
+        scenarios: DEFAULT_DAYS,
+        experiments: DEFAULT_DAYS,
+      });
+    });
+  });
+
+  describe("when a write names a project with no row", () => {
+    /** @scenario "Reject a missing write target" */
+    it("refuses it as a missing scope target", async () => {
+      await expect(
+        createService().setForScope({
+          organizationId: ORGANIZATION,
+          scope: { scopeType: "PROJECT", scopeId: "project-without-row" },
+          category: "traces",
+          retentionDays: 63,
+        }),
+      ).rejects.toMatchObject({ code: "data_retention_scope_target_not_found" });
+    });
+  });
+
+  describe("when a rule is written at the organization", () => {
+    it("invalidates every affected project's resolved policy after writes", async () => {
+      const cache = new RecordingCache();
+      const service = createService({
+        cache,
+        projectScopes: createDataRetentionTestProjectScopes(retentionTestGraph, ["project-2"]),
+      });
+
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
+        category: "traces",
+        retentionDays: 63,
+      });
+      await service.removeForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
+        category: "traces",
+      });
+
+      expect(cache.deleted).toEqual([PROJECT, "project-2", PROJECT, "project-2"]);
+    });
+  });
+
+  describe("given the organization holds its hidden governance project", () => {
+    /** @scenario "An organization or team retention rule reaches the governance project" */
+    it("invalidates the governance project for organization and team rules", async () => {
+      const cache = new RecordingCache();
+      // The governance project has a Project row like any other, so the placement reader holds it.
+      const projectScopes = createDataRetentionTestProjectScopes(retentionTestGraph, [
+        "project-governance",
+      ]);
+      const service = createService({ cache, projectScopes });
+
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
+        category: "traces",
+        retentionDays: 63,
+      });
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "TEAM", scopeId: retentionTestGraph.teamId },
+        category: "traces",
+        retentionDays: 63,
+      });
+
+      expect(cache.deleted).toEqual([PROJECT, "project-governance", PROJECT, "project-governance"]);
+    });
+  });
+});
+
+describe("given placement read from project's and organization's rows", () => {
+  const TEAM = retentionTestGraph.teamId;
+
+  async function rulesOn(
+    rules: readonly { scopeType: "ORGANIZATION" | "TEAM"; scopeId: string; days: number }[],
+  ) {
+    const policies = MemoryDataRetentionRepository.create();
+    for (const rule of rules) {
+      await policies.upsertForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: rule.scopeType, scopeId: rule.scopeId },
+        category: "traces",
+        retentionDays: rule.days,
+      });
+    }
+    return policies;
+  }
+
+  describe("when a project that existed before the deploy is first resolved", () => {
+    /** @scenario "An existing project resolves retention on the first request after deploy" */
+    it("resolves through the project, its team and organisation with nothing replayed", async () => {
+      const policies = await rulesOn([{ scopeType: "TEAM", scopeId: TEAM, days: 70 }]);
+      const service = createService({
+        policies,
+        projectScopes: MemoryDataRetentionProjectScopeRepository.create({
+          projects: [retentionTestScopeRow(PROJECT)],
+        }),
+      });
+
+      await expect(service.getResolvedForProject({ projectId: PROJECT })).resolves.toMatchObject({
+        traces: 70,
+      });
+    });
+  });
+
+  describe("when the project's row names the team it was moved to", () => {
+    /** @scenario "A moved project resolves under the team its row names now" */
+    it("applies the rule on the new team", async () => {
+      const moved = { ...retentionTestGraph, teamId: "team-moved-to" };
+      const policies = await rulesOn([
+        { scopeType: "TEAM", scopeId: TEAM, days: 70 },
+        { scopeType: "TEAM", scopeId: moved.teamId, days: 91 },
+      ]);
+      const projectScopes = MemoryDataRetentionProjectScopeRepository.create({
+        projects: [retentionTestScopeRow(PROJECT), retentionTestScopeRow(PROJECT, moved)],
+      });
+
+      await expect(
+        createService({ policies, projectScopes }).getResolvedForProject({ projectId: PROJECT }),
+      ).resolves.toMatchObject({ traces: 91 });
+    });
+  });
+
+  describe("when a team holds no project yet", () => {
+    /** @scenario "A team is placed in its organisation by its own row" */
+    it("places the team by its own row and refuses it in another organisation", async () => {
+      const empty = { scopeType: "TEAM", scopeId: "team-empty" } as const;
+      const service = createService({
+        projectScopes: MemoryDataRetentionProjectScopeRepository.create({
+          teams: [{ teamId: empty.scopeId, organizationId: ORGANIZATION }],
+        }),
+      });
+
+      await expect(
+        service.assertScopeInOrganization({ organizationId: ORGANIZATION, scope: empty }),
+      ).resolves.toBeUndefined();
+      await expect(
+        service.assertScopeInOrganization({ organizationId: "organization-other", scope: empty }),
+      ).rejects.toMatchObject({ code: "data_retention_scope_target_not_found" });
+    });
+  });
+});
+
+describe("given an aggregate project", () => {
+  const aggregate = { ...retentionTestScopeRow(PROJECT), kind: "aggregate" };
+  const service = () =>
+    createService({
+      projectScopes: MemoryDataRetentionProjectScopeRepository.create({ projects: [aggregate] }),
+    });
+
+  describe("when a trace is pinned under it", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+    it("refuses with aggregate_project_is_read_only", async () => {
+      await expect(service().pin({ projectId: PROJECT, traceId: "trace-1" })).rejects.toMatchObject(
+        {
+          code: "aggregate_project_is_read_only",
+        },
+      );
+    });
+  });
+
+  describe("when a trace is unpinned under it", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+    it("refuses with aggregate_project_is_read_only", async () => {
+      await expect(
+        service().unpin({ projectId: PROJECT, traceId: "trace-1" }),
+      ).rejects.toMatchObject({
+        code: "aggregate_project_is_read_only",
+      });
+    });
+  });
+
+  describe("when a trace is pinned under an application project", () => {
+    /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+    it("pins it", async () => {
+      const application = createService({
+        projectScopes: MemoryDataRetentionProjectScopeRepository.create({
+          projects: [retentionTestScopeRow(PROJECT)],
+        }),
+      });
+
+      await expect(
+        application.pin({ projectId: PROJECT, traceId: "trace-1" }),
+      ).resolves.toMatchObject({ traceId: "trace-1" });
+    });
+  });
+});
+
+describe("given a ClickHouse target whose id indexes were filled", () => {
+  async function serviceOverIndexes() {
+    const policies = MemoryDataRetentionRepository.create();
+    await policies.upsertForScope({
+      organizationId: ORGANIZATION,
+      scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
+      category: "traces",
+      retentionDays: 63,
+    });
+    const retroactive = MemoryRetroactiveRetentionRepository.create();
+    retroactive.idIndexDeclarations = DECLARED_ID_INDEXES;
+    retroactive.idIndexTenants = new Map([
+      ["stored_spans_id_index", [PROJECT, "project-gone"]],
+      ["event_log_id_index", [PROJECT]],
+    ]);
+    return { service: createService({ policies, retroactive }), retroactive };
+  }
+
+  describe("when its indexes are raised to each tenant's current retention", () => {
+    it("raises the held indexes to the resolved retention and leaves a gone project as it is", async () => {
+      const { service, retroactive } = await serviceOverIndexes();
+
+      const result = await service.raiseIdIndexRetention({
+        organizationId: "org-private",
+        indexes: [
+          "stored_spans_id_index",
+          "event_log_id_index",
+          "trace_summaries_id_index",
+          "gateway_spend_id_index",
+        ],
+      });
+
+      expect(result.tables).toEqual(["stored_spans_id_index", "event_log_id_index"]);
+      expect(retroactive.idIndexRetention.get(`stored_spans_id_index/${PROJECT}/traces`)).toBe(63);
+      expect(retroactive.idIndexRetention.get(`event_log_id_index/${PROJECT}/scenarios`)).toBe(
+        DEFAULT_DAYS,
+      );
+      expect(
+        [...retroactive.idIndexRetention.keys()].some((key) => key.includes("project-gone")),
+      ).toBe(false);
+    });
+
+    it("raises nothing on a target that holds none of the named indexes yet", async () => {
+      const { service, retroactive } = await serviceOverIndexes();
+
+      await expect(
+        service.raiseIdIndexRetention({ indexes: ["experiment_runs_id_index"] }),
+      ).resolves.toEqual({ tables: [] });
+      expect(retroactive.idIndexRetention.size).toBe(0);
+    });
+
+    /** @scenario "a retention raise is one statement per index, never lowering a row" */
+    it("resolves every tenant in one batched read and leaves the marker row's tenant out", async () => {
+      const policies = MemoryDataRetentionRepository.create();
+      await policies.upsertForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "PROJECT", scopeId: "project-2" },
+        category: "traces",
+        retentionDays: 364,
+      });
+      const retroactive = MemoryRetroactiveRetentionRepository.create();
+      retroactive.idIndexDeclarations = DECLARED_ID_INDEXES;
+      retroactive.idIndexTenants = new Map([["stored_spans_id_index", ["", PROJECT, "project-2"]]]);
+      const projectScopes = new CountingProjectScopes(
+        createDataRetentionTestProjectScopes(retentionTestGraph, ["project-2"]),
+      );
+      const service = createService({ policies, retroactive, projectScopes });
+
+      await service.raiseIdIndexRetention({ indexes: ["stored_spans_id_index"] });
+
+      expect(projectScopes.reads).toEqual(["findProjectPlacements"]);
+      expect(retroactive.idIndexRetention.get(`stored_spans_id_index/${PROJECT}/traces`)).toBe(
+        DEFAULT_DAYS,
+      );
+      expect(retroactive.idIndexRetention.get("stored_spans_id_index/project-2/traces")).toBe(364);
+      expect(
+        [...retroactive.idIndexRetention.keys()].some((key) =>
+          key.startsWith("stored_spans_id_index//"),
+        ),
+      ).toBe(false);
+    });
+
+    it("raises a source's second index, on another key, beside its first", async () => {
+      const retroactive = MemoryRetroactiveRetentionRepository.create();
+      retroactive.idIndexDeclarations = [...DECLARED_ID_INDEXES, EXPERIMENT_RUNS_BY_EXPERIMENT];
+      retroactive.idIndexTenants = new Map([
+        ["experiment_runs_id_index", [PROJECT]],
+        ["experiment_runs_by_experiment_id_index", [PROJECT]],
+      ]);
+      const service = createService({ retroactive });
+
+      const result = await service.raiseIdIndexRetention({
+        indexes: ["experiment_runs_id_index", "experiment_runs_by_experiment_id_index"],
+      });
+
+      expect(result.tables).toEqual([
+        "experiment_runs_id_index",
+        "experiment_runs_by_experiment_id_index",
+      ]);
+      expect(
+        retroactive.idIndexRetention.get(
+          `experiment_runs_by_experiment_id_index/${PROJECT}/experiments`,
+        ),
+      ).toBe(DEFAULT_DAYS);
+    });
+
+    it("refuses an empty list of indexes", async () => {
+      const { service } = await serviceOverIndexes();
+
+      await expect(service.raiseIdIndexRetention({ indexes: [] })).rejects.toThrow(/indexes/);
+    });
+  });
+});

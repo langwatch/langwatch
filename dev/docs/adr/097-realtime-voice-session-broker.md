@@ -4,6 +4,8 @@
 
 **Status:** Accepted (2026-08-14)
 
+> **Implemented.** The broker shipped on 2026-08-21 in `langwatch/langwatch#7066`. The amendment below records where the build differs from the design here, and which gates and prerequisites are now closed.
+
 ## Context
 
 Realtime voice traffic does not pass through the LangWatch AI Gateway. Customers running voice agents connect straight to OpenAI, ElevenLabs or Google, so that spend carries no virtual key, no budget, and no trace. Our own voice test harness does the same: the simulator, judge, speech-to-text and text-to-speech legs route through `gateway.langwatch.ai` because they are OpenAI-shaped, while the ElevenLabs conversation itself bills a separate account.
@@ -117,18 +119,160 @@ We will not build the media relay until all four hold.
 
 **Risks worth naming.** ADR-053 Track C forbids the direct dial that even the broker's mint call performs, though that call is short, bounded and shaped exactly like the envelope Track C describes, unlike a socket. Vendor usage reporting is the single point of truth for brokered billing, so a vendor webhook outage becomes a billing gap rather than a service outage, and it must fail visibly under the existing rule that losses are never silent. ElevenLabs publishes regional residency endpoints, so brokering must preserve the region the customer selected.
 
+## Amendment (2026-08-21): the broker as built
+
+The broker shipped in `langwatch/langwatch#7066`. Both mints, the client usage report and the vendor post-call webhook are live, and voice spend lands on a virtual key. This section records where the build differs from the design above. Everything not named here holds as written.
+
+### The ElevenLabs post-call webhook is served by the gateway
+
+The webhook is `POST /v1/convai/webhook/{model_provider_id}` on the gateway. That is the URL a customer registers in their own ElevenLabs workspace. The control plane keeps its own route mounted and unchanged, as the target the gateway relays to.
+
+A webhook must be reachable from the vendor's network, so whatever serves it has to be public. The gateway is public by design. The LangWatch app is the admin UI, and self-hosted installs commonly keep it behind a VPN or an access proxy, so serving the webhook there would force a public hole in the admin surface. The route sits under the `/v1` prefix the gateway chart already publishes, so a self-hosted install that already exposes the gateway gets voice billing with no ingress change. Voice then needs one public component.
+
+The gateway verifies nothing and reads nothing. It relays the raw request bytes and the `ElevenLabs-Signature` header exactly as received, because the vendor signs those bytes and any re-encoding would fail every delivery. The control plane holds the per-tenant secret and remains the only verifier. Its status is relayed unchanged, so a 404 for a provider id with no webhook configured keeps provider ids unprobeable.
+
+A relay that cannot reach the control plane answers 502. Acknowledging a delivery the gateway never passed on would tell the vendor the report landed, and the count of consecutive failures is the only signal that the relay is broken. The reconciler below reads the same numbers back from the vendor, so the refusal loses no billing data.
+
+### The route decides the vendor
+
+Each mint route states its own providers through the surface descriptor added in `langwatch/langwatch#7049`, and the credential chain is trimmed to those providers before the model is resolved. `Surface` moved off `PassthroughRequest` onto `Request` so a mint can carry it alongside the raw-forward routes. There is no fallback walk, and the model string never selects the vendor. A session credential is bound to one vendor account, so a second credential would sign for an agent that does not exist there and the caller would get a URL that only fails once the socket opens.
+
+### Gate 3 and all three prerequisites are closed
+
+Prerequisite 1 is done. `langwatch/langwatch#6934` closed on 2026-08-16, so character-priced and second-priced audio calls debit.
+
+Prerequisite 2 is done. The spend quantity vocabulary carries `input_chars` and `audio_ms` beside the token classes, so a voice session can state the duration it was charged for.
+
+Prerequisite 3 and **gate 3** are done. Per-key concurrency limits shipped as `realtime.maxOpenSessions` on the virtual key. The open count and the session insert run in one Postgres transaction behind an advisory lock keyed on the project and the key, so two mints racing on the same key cannot both read a count of zero. Past the limit the mint answers 429 `realtime_session_limit`, and the refusal is written as a failed spend row so a blocked call stays visible. The limit is read inside that transaction rather than carried on the gateway config bundle, so an edit applies to the next mint instead of waiting on the config cache.
+
+Gates 1, 2 and 4 are unchanged, so the media relay stays unbuilt.
+
+### An OpenAI ephemeral secret authenticates a server-side socket
+
+Measured against the live API on 2026-08-16. An `ek_` client secret opens a server-side websocket both as an `Authorization: Bearer` header and as the GA `openai-insecure-api-key.<secret>` subprotocol, and both reach `session.created`. Only the deprecated `openai-beta.realtime-v1` subprotocol is refused, and the vendor's error names the beta API rather than the credential. This was the open question the OpenAI arm of the decision rested on.
+
+The negative consequence recorded above, that OpenAI usage under a broker depends on the vendor's usage API or the SDK, is narrower as built. The client posts what its own socket reported in `response.done` to `POST /v1/realtime/sessions/{id}/usage`, and that closes the session's spend record.
+
+That figure is taken as reported. The report is bound to the session's own project and virtual key and a second report on a closed session is a no-op, so it cannot be replayed or written by another key, but nothing checks it against the vendor. An OpenAI session bills what its client says it used, and a session that reports nothing settles as cost unknown at the grace. The socket does not pass through the gateway, so there is no second reading to compare against until OpenAI exposes one.
+
+### The webhook signature is checked against the vendor's published verifier, and never against a live delivery
+
+The ElevenLabs workspace key available for this work lacks the `webhooks_write` scope, so no webhook could be registered and no vendor-signed delivery was ever received. The implementation was read against the verifier ElevenLabs ships in `@elevenlabs/elevenlabs-js@2.64.0` and matches it on every point that decides accept or reject: `t=<unix>,v0=<hex>`, HMAC-SHA256 over the timestamp, a literal dot, then the raw body, in lowercase hex. Our tolerance is two-sided over 30 minutes where the vendor's bounds only the past.
+
+Read that as verified against the vendor's code. It is weaker evidence than a live delivery and stronger than the documentation.
+
+### The reconciler makes the webhook optional
+
+A control-plane worker polls sessions still open two minutes after their mint, at most 25 per tick on a 60-second tick, and reads each conversation back from the vendor by the id recorded at the mint.
+
+The ElevenLabs post-call webhook is one slot per workspace, and a customer may already be using it for something else. Without the poller, giving up that slot would be a precondition for billing voice at all. With it, the webhook is an optimization: a fully private install with no inbound path still bills every call, because the poller is outbound only.
+
+A session with no recorded conversation id is left alone. It settles as cost unknown when its grace expires, which is visible, rather than being charged whatever conversation happened to be nearby.
+
+### A settled session emits a span
+
+Budgets and the ledger read `gateway_spend`. The Usage page and the trace explorer read `trace_summaries`. A brokered call runs client to vendor, so the only span the gateway can emit is the mint, and a mint happens before the call has cost anything. The first dogfood run billed a call correctly and showed $0.00 on the Usage page.
+
+The settlement now writes a `realtime.session.settled` span into the trace the mint opened, from `closeAndConfirmRealtimeSession` in the control plane. That is the one funnel the webhook, the reconciler and the client usage report all pass through, so both vendors converge on it.
+
+Emission is gated on the conditional close. The session row moves to CLOSED only while it is still open, and the span is written only by the update that won that move. A resent webhook, a retried client report, and a late confirmation superseding a settled record all find the row closed and add nothing. The span id is derived from the session id, so a write that got past the gate would land on the same span rather than a second one. A settlement with an unknown cost writes no span, so a call never appears at zero.
+
+### Properties of the broker the design did not state
+
+**The mint admits and does not confirm.** The spend interceptor confirms on any successful dispatch for every other request type. For a mint that would close the record at zero dollars before the call started, and leave the settlement sweeper nothing to settle, so `realtime_session` defers its outcome. A refused or errored mint still emits a failure, because a session that never opened has no later report coming.
+
+**The session booking fails closed**, against the budget fail-open doctrine. A budget precheck that cannot reach the control plane lets one bounded request through and reconciles afterwards. A voice session is neither bounded nor self-reporting, so an unbooked session is spend no ledger will ever see and a cap slot the next mint cannot count against. The mint already depends on the control plane to resolve the virtual key, so refusing costs no availability the caller had.
+
+**Guardrails do not run on a mint**, and the response says so on `X-LangWatch-Guardrails-Not-Applied: realtime_session`. The body is a session declaration rather than a prompt, and the conversation never reaches the gateway.
+
+**A post-call report is matched exactly or not at all.** The conversation id recorded at the mint, then the session id a conversation echoed back, then the one session open for that credential in the window. Two candidates is a miss, and an unmatched call settles visibly as cost unknown, because charging a call to the wrong session is a wrong bill that reads as a right one.
+
+**Regional residency is preserved.** A customer on an ElevenLabs residency endpoint sets `ELEVENLABS_BASE_URL` on the provider, and both the mint and the reconciler go there. The value is restricted to HTTPS on `elevenlabs.io` on write and again on read, because both paths send the customer's `xi-api-key` to that host.
+
+## Amendment (2026-10-04): metering the client cannot skip, and the brokers that carry it
+
+A consumer voice product puts one virtual key per end user behind a 5 USD monthly budget, under a 50 USD project budget. That is the named requirement gate 4 asked for. It exposed three holes in the broker as built: one report closed a session, so budgets saw nothing during a call; a session that never reported settled as cost unknown, which a per-user budget reads as zero; and nothing could end a call. This amendment closes them and records how far the relay gates moved.
+
+### A usage report is its own spend record
+
+The ledger key `(TenantId, BudgetId, GatewayRequestId)` cannot gain a tick dimension, and the debit process writes one debit per budget per request id. A second confirmation on the session's id updates the spend fold and never reaches a budget.
+
+So the tick goes into the id. Each usage report is confirmed as a spend record of its own, `<session id>.<report key>`, with request type `realtime_response`. The report key is the vendor's `response.id`, a transcription `item_id`, or a duration checkpoint. The confirmation carries its own attribution, so it needs no admission. Redelivery collapses on the aggregate id, which makes a report idempotent per response with no extra machinery, and every budget on the key's chain is debited once per report while the call runs. No ClickHouse table changes.
+
+The session's own record, admitted at the mint, carries money only for a legacy single report, the remainder of a reported total, or an estimate. Reports are also stored in Postgres (`GatewayRealtimeSessionReport`, unique per session and key) so the settlement span can state the session's summed usage exactly once.
+
+The usage answer returns the rated cost and a budget verdict. A brokered client learns from that answer that its budget is spent; a gateway-held session acts on it.
+
+### A session that never reports is charged an estimate
+
+A session the client meters, with no report by the end of the open window, settles at an estimate instead of cost unknown. The assumed duration is the minted credential's lifetime when the vendor states one, else a default per kind, clamped to between one minute and one hour.
+
+| Kind                                                 | Estimate                                                                                           |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `realtime` (OpenAI Realtime)                         | 10 input audio tokens per second of the duration, 20 output audio tokens per second for half of it |
+| `live` (OpenAI Live)                                 | the duration, at the per-second rate                                                               |
+| `tts_socket` (ElevenLabs speech sockets)             | 15 characters per second                                                                           |
+| `stt_socket`, `stt_batch` (ElevenLabs transcription) | the duration, as audio seconds                                                                     |
+
+The token rates are OpenAI's published ones: one token per 100 ms of user audio, one per 50 ms of assistant audio. The estimate is a deterrent with a stated basis, and a client that closes its session, even at zero, never meets it. Hosted-agent sessions keep the reconciler, and rows written before this change keep their old behaviour.
+
+A session with reports that was never closed settles at what was recorded.
+
+### Where the gateway meters without the client
+
+Two vendor features make that possible without relaying media.
+
+**OpenAI Live** (`gpt-live-1`) has no client credential at all: a server posts the client's SDP offer to `POST /v1/live/sessions` and returns the answer. The gateway is that server. It then attaches its own socket to the session (`/v1/live/sessions/{id}/attach`), which reports cumulative seconds and delegated backend token usage, and accepts `session.close`.
+
+**OpenAI Realtime over WebRTC** has the same shape through `POST /v1/realtime/calls`: the call id comes back in the `Location` header, a server socket attaches with `?call_id=`, every `response.done` arrives on it, and `POST /v1/realtime/calls/{id}/hangup` ends the call.
+
+In both, media runs client to vendor and the gateway adds one REST hop at call setup. The gateway reports usage as it arrives, ends the call when a budget on the key's chain is exhausted or the key is revoked, and ends it when its own socket cannot be re-attached, because a call the gateway cannot see must not keep running. A session whose gateway pod died is closed by the reconciler at what was recorded.
+
+The mint (`POST /v1/realtime/client_secrets`) stays, for clients that want the vendor's own WebSocket with no gateway involvement after setup. It is client-metered, and the documentation says so.
+
+### ElevenLabs single-use tokens
+
+`POST /v1/single-use-token/{token_type}` mints a 15 minute, single-use token so a phone opens the speech or transcription socket directly. It is booked like the ConvAI mint and metered by client report: characters for speech, audio seconds for transcription. The vendor's sockets report no usage and the history API cannot attribute a generation to one end user when many share a provider key, so vendor read-back is not built. An unreported session takes the estimate above.
+
+### The relay gates
+
+Gate 4 is met by the requirement above. Gate 3 was already closed.
+
+Gate 2, draining, is closed for gateway-held server sockets: the gateway tracks them, stops booking new sessions on SIGTERM, supervises until the calls end or the drain budget runs out, then ends what is left and reports it.
+
+It is closed for hijacked client sockets too. `http.Server.Shutdown` does not see a hijacked connection, so a relayed socket is tracked by the same supervisor, in the same slot count, as a brokered call. On SIGTERM an upgrade answers 503 with `Retry-After`. Open sockets keep relaying until the drain budget runs out, then each client is closed with code 1012 (service restart), which is the reconnect signal, and the final report is sent before the process exits. A voice session has no state the next pod could resume, so the client dials again and starts a new session.
+
+Gate 1 is decided for the server sockets by this dated amendment: gateway pods may dial the OpenAI Realtime and Live hosts directly for an event socket, through the same endpoint policy the mint calls use. The socket carries events and no media, is bounded by the session's own lifetime, and the destination is the provider host the credential names. ADR-053 Track C still governs tenant-selected destinations.
+
+Gate 1 is decided for the relay by the same amendment (2026-10-04): gateway pods may dial the vendor socket of a relayed session directly, on the OpenAI and ElevenLabs hosts the credential names, through that endpoint policy and with no redirects. These sockets carry media. The destination is still never tenant-selected beyond the provider base URL the mint calls already honour, so ADR-053 Track C is unchanged.
+
+### The relay, and where it sits in the decision
+
+The decision stands: media runs client to vendor by default. The mints and the WebRTC brokers are the first choice, because they add no hop to the audio.
+
+The relay exists for one case the brokers cannot serve. A vendor's WebSocket transport authenticates the socket with the real API key, and OpenAI Live has no client credential at all, so a client on that transport can only reach the vendor through a party that holds the key. The gateway is that party: the client upgrades with its virtual key on the vendor's own path, and the gateway dials the vendor with the provider key and passes frames both ways. The ElevenLabs sockets are relayed on the same core, for clients that should hold no vendor credential and report no usage.
+
+A relayed socket is a supervised session with `metering = gateway`. It is booked before the vendor is dialed and released if the dial fails, it reports through the same keyed queue, and it ends on an exhausted budget or a revoked key: the client gets a `budget_exceeded` error frame and close 1008, or close 1008 with reason `key_revoked`.
+
+Client frames are never parsed or re-encoded, with three stated exceptions: the `session.start` frame of a Live socket, which carries the model; key fields in the first frame of an ElevenLabs socket, which are stripped; and the `text` and `audio_base_64` fields of ElevenLabs client frames, which are counted because those sockets state no usage. Vendor frames are passed on unchanged and read only for usage events. Audio and transcripts are not logged or stored, so ADR-017's payload capture does not apply to a relayed socket.
+
+The hop costs about 11 microseconds per frame at the median and 20 at the 95th percentile on loopback (`services/aigateway/BENCHMARKS.md`), against a target of 5 ms. What a client pays is the network distance to the gateway, which is why the relay is not the default.
+
+Input transcription on a relayed Realtime socket is rated under the session model: the transcription model is declared in a `session.update` frame, which the relay does not parse.
+
 ## References
 
 - Related Nexus pages (internal wiki): `gateway-spend-command-pipeline-adr`, `skai-gateway-replacement-adr`, `bench-gateway-kong`, `feature-ai-gateway`, `feature-gateway-virtual-keys`, `feature-voice-agent-testing`, `pain-voice-agent-testing-cost`
 - Repo ADRs: [053-tenant-aware-egress-and-workload-isolation.md](./053-tenant-aware-egress-and-workload-isolation.md) (Proposed), [017-gateway-trace-payload-capture.md](./017-gateway-trace-payload-capture.md) (Accepted, and not the regime running in code), [016-scoped-model-providers.md](./016-scoped-model-providers.md), [021-multi-scope-targeting-and-tenancy.md](./021-multi-scope-targeting-and-tenancy.md), [018-governance-unified-observability-substrate.md](./018-governance-unified-observability-substrate.md)
 - Scenario ADRs, in the `langwatch/scenario` repository: [docs/adr/002-voice-provider-state.md](https://github.com/langwatch/scenario/blob/main/docs/adr/002-voice-provider-state.md) (Proposed), [docs/adr/003-voice-internal-design.md](https://github.com/langwatch/scenario/blob/main/docs/adr/003-voice-internal-design.md) (Accepted)
 - Shipped audio support: `langwatch/langwatch#6168`, [specs/ai-gateway/audio-endpoints.feature](../../../specs/ai-gateway/audio-endpoints.feature), [docs/ai-gateway/api/audio.mdx](../../../docs/ai-gateway/api/audio.mdx)
+- The broker as built: `langwatch/langwatch#7066`, [specs/ai-gateway/realtime-sessions.feature](../../../specs/ai-gateway/realtime-sessions.feature), [docs/ai-gateway/api/realtime.mdx](../../../docs/ai-gateway/api/realtime.mdx), and `langwatch/scenario#935` for the two voice adapters that mint through it
 - Vendor documentation: OpenAI Realtime websocket and costs guides, ElevenLabs Conversational AI websocket and authentication references, Google Gemini Live API and session management, Deepgram Voice Agent reference, Azure Voice Live how-to
 - Competitor realtime support: Cloudflare AI Gateway realtime websockets, LiteLLM `/v1/realtime`, Portkey realtime API, Helicone realtime integration, Kong voice AI observability cookbook
 
 ### Doc changes this decision requires when it lands
 
-- `docs/ai-gateway/api/audio.mdx`, the "Not yet supported" block, currently tells customers to connect directly to the provider.
+- `docs/ai-gateway/api/audio.mdx`, the "Not yet supported" block, currently tells customers to connect directly to the provider. Done on 2026-08-21: the block now points at `docs/ai-gateway/api/realtime.mdx`.
 - `bench-gateway-kong`, whose LangWatch route-type column predates `#6168`.
 
 ### Resolutions (2026-08-14)

@@ -12,11 +12,11 @@ Parent epic:  https://github.com/langwatch/langwatch/issues/5099
 BDD spec:     specs/experiments/pairwise-compare-mvp.feature
 """
 
-import json
-import os
 from typing import Literal, Optional, cast
 
 import litellm
+from langevals_core.tool_calls import read_tool_call_arguments
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluationResult,
@@ -26,7 +26,6 @@ from langevals_core.base_evaluator import (
     Money,
     SingleEvaluationResult,
 )
-from litellm import Choices, Message
 from litellm.cost_calculator import completion_cost
 from litellm.files.main import ModelResponse
 from pydantic import Field
@@ -161,11 +160,6 @@ class PairwiseCompareEvaluator(
     is_guardrail = False
 
     def evaluate(self, entry: PairwiseCompareEntry) -> SingleEvaluationResult:
-        os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
-        if self.env:
-            for key, env in self.env.items():
-                os.environ[key] = env
-
         if not entry.candidate_a_output or not entry.candidate_b_output:
             return EvaluationResultSkipped(
                 details="Missing candidate output(s)"
@@ -286,6 +280,7 @@ class PairwiseCompareEvaluator(
 
         response = litellm.completion(
             model=self.settings.model,
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             messages=[
                 {
                     "role": "system",
@@ -334,9 +329,11 @@ class PairwiseCompareEvaluator(
         )
 
         response = cast(ModelResponse, response)
-        choice = cast(Choices, response.choices[0])
-        arguments = json.loads(
-            cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
+        arguments = read_tool_call_arguments(
+            response,
+            "pairwise_verdict",
+            required=["reasoning", "winner"],
+            model=self.settings.model,
         )
 
         displayed = arguments["winner"]

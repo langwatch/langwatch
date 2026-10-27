@@ -18,7 +18,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/model-defaults/{id}".format(
+        "url": "/api/v1/model-defaults/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }
@@ -36,6 +36,10 @@ def _parse_response(
     | DeleteApiModelDefaultsByIdResponse500
     | None
 ):
+    if response.status_code == 200:
+        response_200 = response.json()
+        return response_200
+
     if response.status_code == 204:
         response_204 = cast(Any, None)
         return response_204
@@ -89,7 +93,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     Any
     | DeleteApiModelDefaultsByIdResponse400
@@ -124,7 +128,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     Any
     | DeleteApiModelDefaultsByIdResponse400
@@ -155,7 +159,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     Any
     | DeleteApiModelDefaultsByIdResponse400
@@ -188,7 +192,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     Any
     | DeleteApiModelDefaultsByIdResponse400

@@ -3,15 +3,17 @@
 # Implementation:
 #   sdks/typescript/src/cli/commands/ingestion/hook.ts                 (the hook command, shared by every agent)
 #   sdks/typescript/src/cli/commands/ingestion/hook-input.ts           (the payload the agent writes to its stdin)
+#   sdks/typescript/src/cli/commands/ingestion/end-process.ts          (ends the hook process inside its time budget)
 #   sdks/typescript/src/cli/commands/ingestion/git-context.ts          (what git says about the session's directory)
-#   sdks/typescript/src/cli/commands/ingestion/hook-state.ts           (the per-session fingerprint store)
+#   sdks/typescript/src/cli/utils/governance/hook-state.ts             (the per-session fingerprint store)
 #   sdks/typescript/src/cli/commands/ingestion/install.ts              (each tool's seam wired at install)
-#   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts  (the Claude Code and Codex hook files)
+#   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts  (the Claude Code, Codex and Copilot hook files)
+#   sdks/typescript/src/cli/utils/governance/shell-rc.ts               (the wrapper's persist offer, which writes the Copilot hook file)
 #   sdks/typescript/src/cli/utils/governance/opencode-plugin.ts        (the opencode plugin file)
 #   sdks/typescript/src/cli/utils/governance/telemetry-targets.ts      (logout removal)
 #
 # Related specs:
-#   specs/coding-agent/session-git-context.feature , what the pipeline does with the event
+#   modules/coding-agent/specs/session-git-context.feature, what the pipeline does with the event
 #   specs/ai-governance/cli-wrappers/shell-rc-persistence.feature , the persist flow that also installs the hooks
 #   specs/ai-governance/cli-wrappers/claude-plugin-install.feature , the Claude Code plugin that carries this hook
 #
@@ -38,9 +40,12 @@
 #
 # One command serves all three: the git work, the fingerprint, the payload and
 # the endpoint resolution are tool-agnostic and only the seam differs. It must
-# never write to stdout (a Claude Code SessionStart hook's stdout is injected
-# into the user's session context) and must never fail the session (always exit
-# zero).
+# never fail the session (always exit zero), and it writes to stdout for one
+# reason only: the Claude Code notice after a key heals (see "A revoked ingest
+# key heals itself"), a single JSON line carrying `systemMessage` and nothing
+# the model reads. Every other path stays silent, a failed heal and the
+# non-Claude tools included, because a Claude Code SessionStart hook's stdout
+# is read as its answer to the session.
 
 Feature: Coding agent session context hook
 
@@ -158,16 +163,85 @@ Rule: The hook reports the git identity of the session
     Then a new record is posted with the new branch
 
   @unit
+  Scenario: A native worktree switch changes the reported checkout
+    Given a Claude Code session launched in one checkout
+    When a Stop invocation's payload cwd names a different worktree of the repository
+    Then the record reports the worktree the payload names, not the launch directory
+
+  @unit
+  Scenario: A payload with no cwd falls back to the launch directory
+    Given a Claude Code invocation whose payload carries only the session id
+    When the hook runs with CLAUDE_PROJECT_DIR set
+    Then the record reports the git identity of that directory
+
+  @unit
   Scenario: Two agents reporting the same session id keep separate fingerprints
     Given a session id already reported for one agent
     When another agent reports the same session id
     Then the second agent posts rather than reading the first one's fingerprint
 
+  @unit
+  Scenario: An isolated CLI config keeps its own session fingerprints
+    Given LANGWATCH_CLI_CONFIG names a config outside the home directory
+    When the hook records a session's fingerprint
+    Then the fingerprint is kept beside that config, not under the home directory
+
+Rule: The session's own name travels with its context
+
+  Claude names every session: --name at launch, /rename mid-session, or its
+  own derived default. The hook MIRRORS that name rather than inventing one.
+  At session start the hook payload carries it (session_title); no hook
+  fires on a mid-session /rename, so the hook reads claude's live session
+  registry instead, and the Stop hook runs after every turn, which is what
+  makes a rename reach the platform within one turn.
+
+  @unit
+  Scenario: The session's name rides the context record
+    Given a hook payload whose session_title names the session
+    And a hook invocation inside a git worktree
+    When the hook runs
+    Then the record carries the name alongside the git identity
+
+  @unit
+  Scenario: A mid-session rename reaches the next hook through the registry
+    Given a hook payload with no session_title
+    And claude's live session registry names the session
+    When the hook runs
+    Then the record carries the newest name the registry holds
+
+  @unit
+  Scenario: A named session posts even outside a git repository
+    Given a hook payload whose session_title names the session
+    And a hook invocation in a directory that is not a git repository
+    When the hook runs
+    Then one record is posted carrying the session id and the name
+    And it carries no repository attributes
+
+  @unit
+  Scenario: A renamed session re-posts its context
+    Given a session whose context was already posted with one name
+    When the hook runs again with a different name
+    Then a new record is posted carrying the new name
+
+  @unit
+  Scenario: A blank name is no name
+    Given a hook payload whose session_title is whitespace
+    And a hook invocation in a directory that is not a git repository
+    When the hook runs
+    Then nothing is posted and the exit code is zero
+
+  @unit
+  Scenario: Only claude's seam reads claude's registry
+    Given claude's live session registry names the session
+    When the hook runs for the codex seam
+    Then the record carries no session name
+
 Rule: The hook never disturbs the session
 
   @unit
-  Scenario: Outside a git repository the hook sends nothing and exits zero
+  Scenario: Outside a git repository with nothing to declare the hook sends nothing and exits zero
     Given a hook invocation in a directory that is not a git repository
+    And nothing names the session
     When the hook runs
     Then nothing is posted and the exit code is zero
 
@@ -200,10 +274,304 @@ Rule: The hook never disturbs the session
     Then nothing is posted and the exit code is zero
 
   @unit
-  Scenario: The hook never writes to stdout even when the post fails
+  Scenario: The hook writes nothing to stdout when the post fails
     Given a hook invocation whose telemetry endpoint is unreachable
     When the hook runs
     Then stdout stays empty and the exit code is zero
+
+  # A post given up at its own deadline still leaves the connection attempt
+  # open until the system abandons it, about ten seconds on, and that alone
+  # kept the process past the ten seconds every agent allows a hook.
+  @unit
+  Scenario: The hook process ends once its work is done, with a connection still open
+    Given a hook whose post was given up with its connection attempt still open
+    When the hook's work is done
+    Then the process ends itself with exit code zero and nothing on stdout
+
+  @unit
+  Scenario: The hook process ends inside the agent's hook timeout whatever it waits on
+    Given a hook still waiting on the collector when its time budget runs out
+    When the budget ends
+    Then the process ends with exit code zero and nothing on stdout
+    And the budget leaves room for the process to start inside the agent's ten seconds
+
+  @unit
+  Scenario: The hook process ends with exit code zero when its work fails
+    Given a hook whose work fails before it posts anything
+    When the failure reaches the process
+    Then the process ends itself with exit code zero
+
+Rule: A tool pinned to a project reports with the pinned key
+
+  # `langwatch instrument <tool> --key` and `--project` pin the tool to one
+  # ingest key, stored per tool rather than per agent, and while that pin
+  # stands the personal path is neither consulted nor rewritten. So a pinned
+  # tool has no personal key to fall back on, and a hook that read only the
+  # personal path sent nothing at all: the session's traces arrived and the
+  # repository, branch and worktree never did, which is what leaves those
+  # sessions unjoined to their pull requests. A pin is an explicit choice of
+  # where this tool's data goes, so it wins over the personal key, and the
+  # endpoint the pin carries wins with it: a machine instrumented against
+  # another instance declares to that instance. This is the normal shape for a
+  # background agent, which traces to a fixed project on a machine that may
+  # never have logged in.
+
+  @unit
+  Scenario: A pinned tool posts its session context with the pinned key
+    Given a hook invocation whose environment carries no OTLP variables
+    And a CLI whose tool is pinned to a project key
+    When the hook runs
+    Then the record is posted to the control plane
+    And it is authorized with the pinned key
+
+  @unit
+  Scenario: The endpoint the pin carries wins over the control plane
+    Given a tool pinned to a key with an endpoint of its own
+    When the hook runs
+    Then the record is posted to the pinned endpoint
+
+  @unit
+  Scenario: A tool with both a pin and a personal key uses the pin
+    Given a CLI holding a personal ingest key for this agent
+    And the same tool pinned to a project key
+    When the hook runs
+    Then it is authorized with the pinned key
+
+  @unit
+  Scenario: A pin for another tool leaves this one on its personal key
+    Given a CLI holding a personal ingest key for this agent
+    And a different tool pinned to a project key
+    When the hook runs
+    Then it is authorized with the personal ingest key
+
+  @unit
+  Scenario: A pin to a loopback endpoint over http still reports
+    Given a tool pinned to a key with a loopback endpoint over plain http
+    When the hook runs
+    Then the record is posted to that loopback endpoint
+
+  @unit
+  Scenario: A pin on a CLI that names no control plane sends nothing
+    Given a tool pinned to a project key with no endpoint of its own
+    And a CLI that names no control plane
+    When the hook runs
+    Then nothing is posted and the exit code is zero
+
+Rule: A revoked ingest key heals itself
+
+  # A personal ingest key can die under a running agent: revoked on the
+  # API-keys page, or retired with the session that minted it after a
+  # re-login on this device. The agent's own exporter answers that 401 with silence, and so did the
+  # hook, so a machine could export into a void for weeks. The hook is the one
+  # process that learns the key is dead on every session, so it repairs it:
+  # re-mint through the CLI's own resolver, rewrite the wiring, retry the
+  # record, and tell the user to restart the agent, which still holds the old
+  # key in its environment. The notice is the only thing the hook ever writes
+  # to stdout.
+
+  @unit
+  Scenario: A rejected personal key is re-minted, rewired and retried
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    When the hook runs
+    Then a new key is minted and the tool's wiring is rewritten
+    And the record is posted again with the new key
+    And the user is told to restart the agent
+
+  @unit
+  Scenario: A rejected key with no login to mint with stays silent
+    Given a CLI that is not signed in
+    And a collector that answers 401
+    When the hook runs
+    Then nothing is re-minted, stdout stays empty and the exit code is zero
+
+  @unit
+  Scenario: A second rejection inside the throttle window does not re-mint
+    Given a hook that healed a rejected key minutes ago
+    When the collector answers 401 again
+    Then no new key is minted
+
+  # The window exists to stop a device asking the platform for a key every
+  # session. Only an attempt is worth throttling: a decline is read off the
+  # device's own config before any network call, costs nothing to repeat, and
+  # spending the window on one would silence the next 401 this device can fix.
+
+  @unit
+  Scenario: A decline does not spend the heal throttle
+    Given a 401 the hook declines to heal, because the device sent no key
+    When a repairable 401 arrives inside the same window
+    Then that one is still healed
+
+  @unit
+  Scenario: A failed heal spends the throttle
+    Given a heal that reached the platform and came back with no wired tool
+    When the next session starts inside the window
+    Then no second mint is attempted
+
+  # The window is claimed before the mint rather than recorded after it. Two
+  # sessions opened at the same second read the same 401, and a device that
+  # asked the platform twice for one dead key would spend two of the slots
+  # the per-tool cap gives it.
+
+  @unit
+  Scenario: Two sessions rejected at the same moment mint one key
+    Given two hooks that start together, both exporting with the rejected key
+    When they run at the same time
+    Then only one of them reaches the healer
+
+  # A claim left by a run that died mid-heal is replaced by a delete and a
+  # create, and two hooks reading it stale could interleave those into two
+  # winners. The right to replace it is claimed exclusively first, so the
+  # hooks that lose it stand down rather than deleting the winner's claim.
+
+  @unit
+  Scenario: Two sessions taking over the same stale claim mint one key
+    Given a heal claim left behind by a run that died mid-heal
+    And two hooks that start together, both exporting with the rejected key
+    When they run at the same time
+    Then only one of them reaches the healer
+
+  @unit
+  Scenario: A hook that loses the takeover leaves the winner's claim alone
+    Given a heal claim left behind by a run that died mid-heal
+    And another hook already holding the right to replace it
+    When the hook runs
+    Then it does not reach the healer
+    And the claim being replaced is left in place
+
+  @unit
+  Scenario: A tool pinned to a project is not re-minted on the personal path
+    Given a tool pinned to a project key
+    And a collector that answers 401
+    When the hook runs
+    Then no personal key is minted
+
+  # A pinned key that dies is a decision for whoever pinned it: minting a
+  # personal one in its place would move the session's telemetry to another
+  # project without telling anyone. So the hook stops at the report.
+
+  @unit
+  Scenario: A rejected pinned key is reported rather than healed
+    Given a tool pinned to a project key
+    And a collector that answers 401
+    When the hook runs
+    Then the healer is never reached
+    And the user is told the pinned key was rejected
+
+  @unit
+  Scenario: A pasted credential is never replaced
+    Given a hook exporting with a key that is not the cached personal key
+    And a collector that answers 401
+    When the hook runs
+    Then no personal key is minted
+
+  @unit
+  Scenario: A key the platform still lists as live is not re-minted
+    Given a signed-in CLI whose cached key the platform still lists as live
+    And a collector that answers 401
+    When the hook runs
+    Then no new key is minted
+
+  @unit
+  Scenario: A 401 the device sent no key with is not this key's failure
+    Given a hook whose telemetry target carries no authorization header
+    And a collector that answers 401
+    When the hook runs
+    Then no personal key is minted
+    And stdout stays empty and the exit code is zero
+
+  # A revoke from the API-keys page is a decision about the device that held
+  # the key. The platform records why each key died, and the hook asks before
+  # it re-mints: a key the cap retired or a rotation replaced is the platform's
+  # own doing and is re-minted; a key a person revoked stays dead, and the
+  # person is told to set the machine up again.
+
+  @unit
+  Scenario: A key a person revoked is not re-minted
+    Given a signed-in CLI whose cached key the platform says a person revoked
+    And a collector that answers 401
+    When the hook runs
+    Then no new key is minted
+    And the user is told to run langwatch instrument again
+
+  # Asking is part of the repair, so an answer that never arrives stops it.
+  # Minting on a platform that did not respond would replace a key a person
+  # may have revoked on purpose, on the strength of nothing.
+
+  @unit
+  Scenario: A status call that does not answer ends the heal
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a platform whose key status call does not answer inside its deadline
+    When the hook runs
+    Then no new key is minted
+    And the window is spent, so the next session asks again later
+
+  # A key revoked before the platform recorded causes reads as revoked with
+  # no cause. It may have been a person, so it is treated as one: withheld.
+
+  @unit
+  Scenario: A key revoked before the cause was recorded is not re-minted
+    Given a signed-in CLI whose cached key the platform says was revoked with no recorded cause
+    And a collector that answers 401
+    When the hook runs
+    Then no new key is minted
+
+  # A key retired with its session is the platform's own doing: this device
+  # signed in again and the old session's keys went with it, or another
+  # session that shared this key was logged out. The device holds a live
+  # session, so it mints a replacement under it.
+
+  @unit
+  Scenario: A key retired with its session is re-minted under the device's current session
+    Given a platform that says the cached key was retired with its session
+    When the hook runs
+    Then a new key is minted and wired
+
+  @unit
+  Scenario: A key whose session expired is re-minted when the device signed in again
+    Given a platform that says the cached key expired with its session
+    And the device holds a live session
+    When the hook runs
+    Then a new key is minted and wired
+
+  # A device whose own session the platform refuses can neither check its key
+  # nor mint a replacement. Saying nothing leaves the session exporting into
+  # a 401 with no sign of why, so the one repair a person can make is named.
+
+  @unit
+  Scenario: A signed-out device is told to sign in again
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a platform that refuses the device's session
+    When the hook runs
+    Then no new key is minted
+    And the user is told to sign this machine in again
+
+  @unit
+  Scenario: A withheld heal spends the throttle
+    Given a hook that was told a person revoked its key minutes ago
+    When the collector answers 401 again
+    Then the platform is not asked again inside the window
+
+  @unit
+  Scenario: Wiring that writes no target leaves the cached key in place
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a device where writing the tool's wiring lands no target
+    When the hook runs
+    Then the hook reports no healed target
+    And the cache still holds the key the collector rejected, so the next
+    session heals instead of comparing against a key it never exported with
+    And stdout stays empty and the exit code is zero
+
+  # A heal the device cannot remember is not a heal. The next 401 is repaired
+  # only when the rejected key is the one the cache names, so a tool wired
+  # with a key the cache never recorded would decline its own repair forever.
+
+  @unit
+  Scenario: A key the cache cannot record is not reported as healed
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a device whose config file cannot be written
+    When the hook runs
+    Then the tool's wiring is left on the key the collector rejected
+    And the hook reports no healed target
 
   @unit
   Scenario: A payload that never arrives does not outlive the session
@@ -222,3 +590,188 @@ Rule: The hook never disturbs the session
     Given an opencode plugin whose hook command cannot be spawned
     When a session event reaches it
     Then the event handler resolves and nothing is thrown
+
+Rule: Copilot reports through one hook file LangWatch owns
+  ADR-039 §Extension #3. The Copilot CLI and Copilot Chat in VS Code both load
+  every file in ~/.copilot/hooks, so LangWatch writes its own file there and
+  never edits the user's. The captured payloads live in
+  sdks/typescript/src/cli/commands/ingestion/__tests__/fixtures/copilot-hook-payloads.json.
+
+  @unit
+  Scenario: A VS Code Copilot hook payload reads like Claude Code's
+    Given the hook payloads captured from VS Code Copilot Chat
+    When each payload is read
+    Then it yields the session id, the directory and Claude Code's event name
+
+  @unit
+  Scenario: A Copilot CLI hook payload yields its session id and directory
+    Given the hook payloads captured from the Copilot CLI, which spell the session id sessionId
+    When each payload is read
+    Then it yields the session id and the directory
+
+  @unit
+  Scenario: Installing copilot writes LangWatch's own hook file
+    Given a Copilot hooks folder without the LangWatch file
+    When the copilot ingestion install runs twice
+    Then exactly one LangWatch hook file is present
+    And it runs the hook command for copilot on sessionStart and agentStop
+    And each entry carries the command for both bash and PowerShell, so it runs on Windows too
+
+  @unit
+  Scenario: The Copilot hook file follows COPILOT_HOME
+    Given COPILOT_HOME points at another folder
+    When the copilot ingestion install runs
+    Then the LangWatch hook file is written under that folder's hooks directory
+
+  @unit
+  Scenario: The user's own Copilot hook files are never touched
+    Given a Copilot hooks folder holding a hook file the user wrote
+    When the copilot ingestion install runs and logout then removes the telemetry targets
+    Then the user's hook file is unchanged throughout
+    And the LangWatch hook file is gone after logout
+
+  # Running the LangWatch command does not make a file LangWatch's: only a file
+  # holding nothing but LangWatch's own entries is, so no user hook is lost.
+  @unit
+  Scenario: A langwatch.json the user wrote around the LangWatch command is never rewritten or removed
+    Given a Copilot langwatch.json that runs the LangWatch hook command beside the user's own hooks
+    When the copilot ingestion install runs and logout then removes the telemetry targets
+    Then the file is unchanged throughout
+    And logout does not offer to remove it
+
+  @unit
+  Scenario: A langwatch.json the CLI cannot read is never written over
+    Given a Copilot langwatch.json that exists but cannot be read
+    When the copilot ingestion install runs
+    Then it fails naming the file
+    And the file is left exactly as it was
+
+  @unit
+  Scenario: A Copilot hook file holding only LangWatch's entries is brought up to date
+    Given a langwatch.json an older CLI wrote, holding only LangWatch's entries in another shape
+    When the copilot ingestion install runs
+    Then the file is rewritten to the current LangWatch hook file
+
+  # A user's file at LangWatch's path means Copilot sessions never report their
+  # repository, so saying "wired" and nothing else would hide that for good.
+  @unit
+  Scenario: Instrumenting Copilot over the user's langwatch.json says repository linking is off
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file does not run the LangWatch hook command
+    When `langwatch instrument copilot` or `langwatch instrument code` runs
+    Then the file is left exactly as it was
+    And the user is told the file is not LangWatch's and was left alone
+    And that Copilot sessions will not report their repository or branch
+    And to rename the file and run the same command again
+
+  # A user's file that runs the LangWatch hook command itself still reports
+  # each session's repository and branch, so saying linking is off would be
+  # wrong, and asking them to rename it would cost them their own hooks.
+  @unit
+  Scenario: A user's langwatch.json that runs the LangWatch hook is not reported as turning linking off
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file runs the LangWatch hook command for copilot beside hooks of the user's own
+    When `langwatch instrument copilot`, the copilot wrapper or the copilot ingestion install runs
+    Then the file is left exactly as it was
+    And the user is not told repository linking is off
+    And the ingestion install does not say a LangWatch hook file was added
+
+  # The user may launch the CLI by its full path, through npx, or the way the
+  # CLI writes itself into codex (the node binary and the CLI's entry script).
+  # Each still runs the hook; a different program whose name only starts with
+  # langwatch does not.
+  @unit
+  Scenario Outline: A user's langwatch.json running the hook by path or npx is not reported as turning linking off
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file runs `<command>` on sessionStart
+    When the copilot hook file is asserted
+    Then the file is reported as the user's own file that runs the LangWatch hook
+    And the file is left exactly as it was
+
+    Examples:
+      | launcher           | command                                                                                         |
+      | an absolute path   | /opt/homebrew/bin/langwatch ingest hook copilot                                                 |
+      | a quoted path      | "/Users/me/My Tools/langwatch" ingest hook copilot                                              |
+      | npx                | npx langwatch ingest hook copilot                                                               |
+      | npx with a version | npx -y langwatch@1.19.0 ingest hook copilot                                                     |
+      | node and the entry | /usr/local/bin/node /usr/local/lib/node_modules/langwatch/dist/cli/index.js ingest hook copilot |
+
+  @unit
+  Scenario Outline: A user's langwatch.json running another program named like langwatch still gets the notice
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file runs `<command>` on sessionStart
+    When the copilot hook file is asserted
+    Then the file is reported as not LangWatch's, with repository linking off
+
+    Examples:
+      | command                                             |
+      | /opt/homebrew/bin/langwatch-foo ingest hook copilot |
+      | npx langwatch-foo ingest hook copilot               |
+      | npx @acme/langwatch ingest hook copilot             |
+      | langwatch ingest hook claude-code                   |
+
+  @unit
+  Scenario: The copilot ingestion install reports the user's langwatch.json it left alone
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file does not run the LangWatch hook command
+    When the copilot ingestion install runs
+    Then the report says the file is not LangWatch's and repository linking is off
+    And it does not say a LangWatch hook file was added
+
+  # A user who only ever runs `langwatch copilot` or `langwatch code` never runs
+  # the install, so the wrapper's offer to keep capturing writes the file too.
+  # Its question names the file, because a bare Enter is a yes.
+  @unit
+  Scenario: Starting Copilot through the wrapper writes the LangWatch hook file
+    Given a Copilot hooks folder without the LangWatch file
+    When the user says yes to the offer `langwatch copilot` or `langwatch code` makes to keep capturing
+    Then the question named the LangWatch hook file before the answer
+    And the LangWatch hook file runs the hook command for copilot on sessionStart and agentStop
+
+  @unit
+  Scenario: The wrapper's offer never promises a hook file it will not write
+    Given a Copilot langwatch.json that LangWatch did not write
+    And the file does not run the LangWatch hook command
+    When the user says yes to the offer the copilot wrapper makes to keep capturing
+    Then the question did not name the hook file
+    And the file is left exactly as it was
+    And the wrapper says the file is not LangWatch's and repository linking is off
+
+  @unit
+  Scenario: Declining the wrapper's offer writes no Copilot hook file
+    Given a Copilot hooks folder without the LangWatch file
+    When the user answers no to the offer the copilot wrapper makes to keep capturing
+    Then no LangWatch hook file is written
+
+  @unit
+  Scenario: A device that persisted Copilot capture earlier still gets the hook file
+    Given a scoped copilot function persisted before the wrapper wrote the hook file
+    When the wrapper re-asserts that device's telemetry wiring
+    Then the LangWatch hook file is written without asking again
+
+  @unit
+  Scenario: A login re-asserts the Copilot hook file where Copilot capture is persisted
+    Given a scoped copilot function persisted for this login and no LangWatch hook file
+    When a new login refreshes the telemetry wiring
+    Then the LangWatch hook file is written
+
+  @unit
+  Scenario: The copilot record declares the copilot agent and the span session id
+    Given a Copilot hook invocation inside a git repository
+    When the hook runs
+    Then one record is posted declaring the agent "copilot"
+    And it carries the session id from the payload, which is the conversation id on Copilot's spans
+
+  @unit
+  Scenario: A Copilot hook posts with the personal key of the surface that ran it
+    Given personal ingest keys for copilot_cli and copilot_vscode
+    When the hook runs from the Copilot CLI, which sets COPILOT_CLI
+    And the hook runs from VS Code, which does not
+    Then the first posts with the copilot_cli key
+    And the second posts with the copilot_vscode key
+
+  @unit
+  Scenario: Every agent's hook wiring comes from one per-agent table
+    Given the per-agent table that names each agent's tool slug, server agent id, key source types, session id source and hook target
+    When the hooks are installed and run for Claude Code, Codex and opencode
+    Then their hook files, records and key lookups are the same as before the table

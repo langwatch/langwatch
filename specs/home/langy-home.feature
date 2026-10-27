@@ -1,6 +1,6 @@
 @unit
 Feature: The Langy home
-  As a project member who has Langy
+  As a project member
   I want the home page to open with a place to ask
   So that the first thing I meet is a way into my own work, not a lobby
 
@@ -13,31 +13,29 @@ Feature: The Langy home
   The block only ever renders on the shared announcement canvas: it layers
   over it and never mounts a second one.
 
-  Which home renders is resolved in a strict order, specified in
-  specs/home/signal-focused-home-rollout.feature: the signal-focused home
-  first, then this one, then the classic home. This feature covers the second
-  branch and what the block contains. The send animation and its states are
-  specified in specs/home/langy-home-morph.feature.
+  Every reader gets this home. Without Langy the block keeps its shape and its
+  field is the command bar alone; Langy only decides what the block offers.
+  This feature covers what the block contains. The send animation and its
+  states are specified in specs/home/langy-home-morph.feature.
 
   Background:
     Given I am signed in on a project's home page
 
-  Scenario: The Langy home renders when the signal-focused home is off
+  Scenario: The Langy home renders for a reader with Langy
     Given I have Langy
-    But the signal-focused home is not enabled for me
     When the home page renders
     Then the lit block leads the page with a composer I can type into
     And recent work and the setup checklist still follow underneath
 
-  # Having Langy IS having the Langy home — there is no second rollout to
-  # forget. A project with the panel and a classic lobby was a state nobody
-  # could explain from the page, so it is no longer a state.
-  Scenario: Without Langy the classic home renders
+  # There is one home. A second layout for readers without Langy was a state
+  # nobody could explain from the page, so it is no longer a state.
+  Scenario: Without Langy the home shows the command bar and says Langy isn't enabled
     Given I do not have Langy
-    And the signal-focused home is not enabled for me
     When the home page renders
-    Then the classic home renders
-    And the lit block is not shown
+    Then the lit block still leads the page, with recent work and the setup checklist underneath
+    And its field is the command bar, for searching and jumping to anything
+    And no example asks or ways to hand work to Langy are offered
+    And one quiet line under the field says "Langy isn't enabled for this workspace."
 
   Scenario: The Langy home carries an announcement about Langy
     Given the Langy home renders
@@ -46,7 +44,8 @@ Feature: The Langy home
     And following it starts that conversation in place, without leaving the page
 
   Scenario: That announcement is not shown to readers without Langy
-    Given the classic home renders
+    Given I do not have Langy
+    When the home page renders
     Then no announcement about Langy is carried
     Because an announcement about something I cannot reach is only noise
 
@@ -55,6 +54,26 @@ Feature: The Langy home
     Then the announcement's moving canvas is the block's own ground
     And exactly one such canvas is on the page
     And the current announcement reads as a single line across the block's top
+
+  # The block's light bleeds well past its own box on purpose. It lights the
+  # page from behind: a card it reaches stays readable without any stacking
+  # order of its own, in either colour mode.
+  @integration @regression
+  Scenario: The block's light stays behind the cards around it
+    Given the Langy home renders
+    And a card sits directly above the block, within reach of its light
+    Then the card paints above the block's light
+    And the card needs no stacking order of its own to stay readable
+
+  # The results carry a line above them in the raised Cmd+K bar, where the
+  # field and the list share one card and the line is the boundary between
+  # them. Here the results are their own panel under the field, so that line
+  # became a second edge a few pixels inside the panel's own.
+  Scenario: The results panel draws one edge, not two
+    Given the Langy home renders
+    When I type into the field
+    Then the results hang under it as one panel with one border
+    And no further line runs above the first group
 
   Scenario: The example asks are the ones Langy actually offers
     Given the Langy home renders
@@ -85,6 +104,17 @@ Feature: The Langy home
     And one quiet line tells me how to get access
     And the example asks are not shown
 
+  # The field starts conversations and the panel's composer continues them.
+  # Offered together, a line typed here while the panel was open on a
+  # conversation went into a new one.
+  Scenario: The field stands down while a conversation is open
+    Given the Langy home renders
+    And the Langy panel is open on a conversation, or a question I handed over is on its way
+    Then the ask field is not offered
+    And a quiet line offers to continue that conversation
+    And choosing it opens the panel and puts the cursor in its composer, and starts nothing
+    And the example asks step aside, keeping their room
+
   Scenario: A project with nothing in it yet still opens with the composer
     Given the Langy home renders
     And the project has never received a trace
@@ -99,8 +129,13 @@ Feature: The Langy home
     Given the Langy home renders
     And the project has never received a trace
     Then a prominent send-your-first-trace control sits above the example asks
-    And it offers Langy's walkthrough, a prompt for my coding agent, and the docs
+    And it offers the same routes in the same order as every empty page: the
+      prompt for my coding agent first, Langy's walkthrough second, the docs third
+    And the prompt it copies is the tracing skill, led by the project's keys,
+      falling back to the install line while the skill is still on its way
+      (specs/skills/empty-state-skill-setup.feature)
     And the walkthrough route is withheld when I cannot start conversations
+    And the control's glyphs count the routes it opens with
 
   Scenario: A populated project keeps the quiet onboarding route
     Given the Langy home renders
@@ -133,10 +168,18 @@ Feature: The Langy home
     Then the docs and guides section is on the page
     And the footer's quiet resource links are still there too
 
-  Scenario: Developers can preview every state of this home
-    Given the app is running a development build
-    When I use the home state control in the page footer
-    Then I can pin the page to any state the block can be in
-    And I can compare the ways the figures can be presented, side by side over time
-    And I can return it to the project's real data
-    And the control is never rendered in production builds
+  # What the block offers is decided by Langy's gate, and a gate that has not
+  # answered yet is not the same as one that is off. Drawing the block on the
+  # assumption of "off" means swapping its field and its asks a beat later.
+  Scenario: The page waits rather than guessing which home it is
+    Given I am loading the home page
+    And Langy's gate has not answered yet
+    When the page renders
+    Then a single neutral placeholder renders in place of the home
+    And the placeholder is announced as loading
+
+  Scenario: The placeholder gives way to the home once Langy's gate answers
+    Given I am loading the home page
+    And the placeholder is showing
+    When Langy's gate has answered
+    Then the home renders in its place, offering what that answer allows

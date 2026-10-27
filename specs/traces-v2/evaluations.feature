@@ -379,7 +379,7 @@ Rule: Feedback is displayed as events
     And the user opens a trace drawer
 
   Scenario: Feedback appears in the Events accordion
-    Given the trace has a "user.feedback" event with vote "up"
+    Given the trace has a "thumbs_up_down" event with vote "up"
     When the user expands the Events accordion
     Then the feedback event is visible alongside other events
 
@@ -389,16 +389,14 @@ Rule: Feedback is displayed as events
     Then there is no dedicated feedback section or field on the summary
 
   Scenario: Feedback can be filtered via the event facet
-    When the user applies the filter "event:user.feedback"
+    When the user applies the filter "event:thumbs_up_down"
     Then only traces with feedback events are shown
-    # `event` is a real facet field exposed via `query-language/metadata`
+    # `event` is a real facet field exposed by Trace query metadata
     # and the "Trace" facet group in the sidebar.
 
-  @planned
+  @unit
   Scenario: `@has:feedback` shorthand
-    # Not yet implemented as of 2026-05-01 — the query language supports
-    # `has:eval`, `has:user`, `has:conversation`, etc., but no `has:feedback`
-    # shorthand is registered.
+    # Feedback is the `thumbs_up_down` tracked event, from the REST API or the SDK.
     When the user applies the filter "has:feedback"
     Then only traces with feedback events are shown
 
@@ -506,6 +504,7 @@ Rule: Per-evaluator eval columns persist like any column
   Background:
     Given the user is authenticated with "traces:view" permission
 
+  @unit
   Scenario: Eval column survives a reload
     Given the user added an eval column for "Faithfulness" on field "Score"
     When the page reloads
@@ -652,3 +651,25 @@ Rule: Data gating for evaluations
     Given the trace has multiple runs of "Faithfulness"
     When the user clicks "Show N earlier runs" beneath the head card
     Then each prior run is rendered with status, score, time, and span jump affordance
+
+Rule: Runs the evaluator service could not take yet
+  While the evaluator service is down the worker records each failed attempt and tries again
+  later. The drawer says so instead of counting the run as plainly pending.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the user opens a trace drawer
+
+  @integration
+  Scenario: A pending run with failed attempts shows as a retrying row
+    Given the trace has a pending evaluation that failed 2 attempts with the error "evaluator unavailable"
+    And its next attempt is due in 4 minutes
+    When the Evals accordion is expanded
+    Then a row reads "Retrying · attempt 2 · last error: evaluator unavailable · next try in 4m"
+    And that run is not counted among the pending evaluations
+
+  @integration
+  Scenario: A failed run that was attempted more than once says how many attempts it took
+    Given the trace has an evaluation that ended in error after 3 attempts
+    When the Evals accordion is expanded
+    Then the error reads "after 3 attempts" beside the error message

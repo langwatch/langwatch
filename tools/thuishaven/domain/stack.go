@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Service is one routed process within a stack.
 type Service struct {
@@ -9,6 +12,26 @@ type Service struct {
 	Hostname string `json:"hostname"`
 	URL      string `json:"url"`
 	Port     int    `json:"port"`
+	// DNSPort is the IdP simulator's verification nameserver, and is zero for
+	// every other service.
+	//
+	// It is a port haven allocates rather than the simulator's own default,
+	// because the default is a fixed well-known one: a second stack finds it
+	// busy, falls back to an ephemeral port, and says so in a log nobody
+	// reads — leaving the app pointed at the FIRST stack's nameserver, which
+	// answers confidently for somebody else's domains. Allocated here, the
+	// two sides are told the same number and there is nothing to collide.
+	DNSPort int `json:"dnsPort,omitempty"`
+	// SMTPPort is the mail sink's SMTP listener, and is zero for every other
+	// service. Same reasoning as DNSPort: it is a second listener the one
+	// PerWorktreeServices port cannot name, allocated by haven rather than left
+	// to the sink's own fixed default, so two stacks' sinks can never collide.
+	SMTPPort int `json:"smtpPort,omitempty"`
+	// Aliases are the extra hostnames routed to this same listener (see
+	// ServiceHostAliases). Hostname stays the one canonical address; these are
+	// recorded so a report can show every way in and teardown can remove every
+	// route it registered.
+	Aliases []string `json:"aliases,omitempty"`
 	// IsFallback is true when this worktree does not run the service itself and the
 	// hostname resolves to a shared baseline stack's copy instead. The hostname is
 	// always defined; only the backing port differs.
@@ -22,24 +45,45 @@ type Stack struct {
 	WorktreeDir string `json:"worktreeDir"`
 	Branch      string `json:"branch"`
 	LauncherPID int    `json:"launcherPid"`
-	RedisDB     int    `json:"redisDb"`
-	// APIPort is the Hono API's loopback port. The API is NOT a routed hostname
-	// of its own: it is a backend of `app`, reached same-origin at
-	// app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort). One app URL, not
-	// two confusable ones — the frontend and its API share a single origin.
-	APIPort           int `json:"apiPort"`
+	// LauncherStart is the launcher's start time (System.ProcessStart): with
+	// LauncherPID it is the launcher's identity. Empty on records written
+	// before it existed, which fall back to liveness alone.
+	LauncherStart string `json:"launcherStart,omitempty"`
+	// OwnerPID and OwnerStart name the foreground up that stays the stack's
+	// client (D7); empty for a detached stack.
+	OwnerPID   int    `json:"ownerPid,omitempty"`
+	OwnerStart string `json:"ownerStart,omitempty"`
+	RedisDB    int    `json:"redisDb"`
+	// APIPort is the Hono API's loopback port. It is reached two ways: same-
+	// origin at app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort, so
+	// the frontend and its API still share one URL for the browser), and
+	// additionally at its own routed hostname, api.<slug>.langwatch.localhost
+	// (domain.APIService) - a direct route for tooling that wants the API
+	// with no dev-server proxy in front of it. Both point at this same port.
+	APIPort int `json:"apiPort"`
+	// WorkerMetricsPort is the background worker lane's own loopback port
+	// (/metrics and /healthz). It belongs to that process alone: the worker is
+	// its own application, so `haven restart workers` bounces the group holding
+	// this port and can never reach the API's.
 	WorkerMetricsPort int `json:"workerMetricsPort"`
-	// HasStandaloneWorkers is true only when this stack runs a separate `workers`
-	// lane (WorkerMetricsPort is that lane's own port). In the default in-process
-	// mode the app/api child hosts the workers and holds WorkerMetricsPort itself,
-	// so there is no separate group to bounce — `haven restart workers` must not
-	// target it (it would kill the API's group). See planChildren.
-	HasStandaloneWorkers bool   `json:"hasStandaloneWorkers,omitempty"`
-	ClickHouseHTTPPort   int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
-	ClickHouseDatabase   string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
-	PostgresPort         int    `json:"postgresPort"`       // shared managed Postgres's port (0 = unmanaged)
-	PostgresDatabase     string `json:"postgresDatabase"`   // this stack's isolated PG database (lw_<slug>)
-	RedisPort            int    `json:"redisPort"`          // shared managed Redis's port (0 = unmanaged)
+	// VoiceSocketPort is the worker's raw voice socket (VOICE_WS_PORT); each
+	// stack needs its own or two stacks collide on the default 3300.
+	VoiceSocketPort int `json:"voiceSocketPort"`
+	// OutboundTLSPort is outboundsim's https listener on 127.0.0.1, under a certificate the
+	// portless CA signs: the push-service stand-in the product reaches over https by IP.
+	OutboundTLSPort    int    `json:"outboundTlsPort,omitempty"`
+	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
+	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
+	// ClickHousePostgresHost is how that server reaches host Postgres for
+	// LangWatchQL; "" on a stack recorded before native ClickHouse (colima's route).
+	ClickHousePostgresHost string `json:"clickhousePostgresHost,omitempty"`
+	// ClickHouseUser/ClickHousePassword are the stack's own login (its workload
+	// and memory cap ride on it); empty keeps the shared admin login.
+	ClickHouseUser     string `json:"clickhouseUser,omitempty"`
+	ClickHousePassword string `json:"clickhousePassword,omitempty"`
+	PostgresPort       int    `json:"postgresPort"`     // shared managed Postgres's port (0 = unmanaged)
+	PostgresDatabase   string `json:"postgresDatabase"` // this stack's isolated PG database (lw_<slug>)
+	RedisPort          int    `json:"redisPort"`        // shared managed Redis's port (0 = unmanaged)
 	// ObservabilityOTLPPort is the shared LGTM collector's OTLP/HTTP port when the
 	// stack is up, and 0 when it is not. Non-zero is what makes OverlayEnv emit the
 	// OTel wiring, so a worktree exports its logs/traces/metrics the moment the
@@ -79,9 +123,38 @@ type Stack struct {
 	// in to running DLP: nothing is emitted, so .env governs the check — for the
 	// rare case of exercising DLP locally against real credentials.
 	DisableGoogleDLP bool `json:"disableGoogleDlp,omitempty"`
+	// Mode is the deployment mode `haven up --mode` applied, ModeEnv its values
+	// (appended last to OverlayEnv), ModeOverriddenBy the mode variables the root
+	// .env sets otherwise and so wins, and EffectiveMode what status names.
+	Mode             string   `json:"mode,omitempty"`
+	ModeEnv          []string `json:"modeEnv,omitempty"`
+	ModeOverriddenBy []string `json:"modeOverriddenBy,omitempty"`
+	EffectiveMode    string   `json:"effectiveMode,omitempty"`
+	// AppOff marks a stack whose ui, api and worker are stopped (`haven up -app`).
+	AppOff bool `json:"appOff,omitempty"`
+	// KeeperReplans marks a keeper that applies a rewritten plan on SIGHUP, so
+	// a ±service starts or stops only the lanes it changes (app/keeper_live.go).
+	KeeperReplans bool `json:"keeperReplans,omitempty"`
+	// Refresh is the mode this stack was brought up in: still, watch or hmr.
+	Refresh RefreshMode `json:"refresh,omitempty"`
+	// MockInstantEvalJudge injects INSTANT_EVAL_CLASSIFIER=memory, so Instant
+	// Evals judge with the app's deterministic stand-in and need no classifier
+	// key or license. Off by default; the instant-eval-mock-judge setting.
+	MockInstantEvalJudge bool `json:"mockInstantEvalJudge,omitempty"`
+	// PublicURL is the external origin a tunnel (tailscale serve, cloudflared)
+	// presents to browsers. When set, OverlayEnv carries it in BASE_HOST and
+	// NEXTAUTH_URL instead of the local app URL, so sign-in from the tunnel
+	// origin passes better-auth's trusted-origin check. Every other URL stays
+	// local — only the two better-auth-facing lines change.
+	PublicURL string `json:"publicUrl,omitempty"`
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
 	IsBaseline bool `json:"baseline,omitempty"`
+	// NxPrivateDir is set only for an untrusted checkout (a fork under `haven pr`,
+	// a play sandbox). Nx runs the checkout's own plugins at graph time, so its
+	// cache and workspace data live here, never in the shared ~/.nx cache that
+	// trusted worktrees replay (ADR-150). Empty means the shared cache.
+	NxPrivateDir string `json:"nxPrivateDir,omitempty"`
 	// LangyImage is the content-addressed langy image tag this stack was planned
 	// with (empty on the host tier or with langy off). `up` compares it against
 	// the freshly-derived tag so a source edit restarts the stack onto new bytes.
@@ -92,38 +165,98 @@ type Stack struct {
 	// sandboxed. It decides whether the worker runs in colima or on the host and
 	// which callback URLs the overlay hands the control plane.
 	LangyTier LangyTier `json:"langyTier,omitempty"`
-	Services  []Service `json:"services"`
+	// PortlessDisabled marks a stack provisioned with PORTLESS=0: every service
+	// serves plain HTTP on its own loopback port instead of routing through the
+	// portless proxy. The zero value is false (portless enabled, the historical
+	// behavior), so a stack persisted before this field existed reads back as it
+	// always behaved. `up` compares it against the requested run so flipping
+	// PORTLESS between runs restarts the stack onto the requested mode instead of
+	// silently keeping the old one (see reconcileRunningStack).
+	PortlessDisabled bool `json:"portlessDisabled,omitempty"`
+	// Layout is the source shape of the checkout this stack was brought up
+	// from, detected once at `up` (see DetectLayout). It decides which lanes
+	// the stack is made of. The zero value reads as modular, which is what
+	// every stack recorded before layouts existed was.
+	Layout   Layout    `json:"layout,omitempty"`
+	Services []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // PerWorktreeServices are the routed hostnames a stack always plans for — each
-// gets its own <name>.<slug>.langwatch.localhost. The Hono API is deliberately
-// absent: it shares `app`'s origin at /api (see Stack.APIPort), so the app and
-// its API are one URL. Order is the launch + print order.
+// gets its own <name>.<slug>.langwatch.localhost, and a port allocated from
+// the same pool. The Hono API is deliberately absent from THIS list: it needs
+// no port of its own (it reuses Stack.APIPort, allocated separately) and
+// never opts out the way gateway/nlp/langyagent can, so it is registered as
+// its own domain.APIService entry right after this loop rather than
+// complicating this one's allocation and fallback logic. `app` is the browser
+// application's port - the `ui` lane (apps/ui, Vite) is what listens on it.
+// `mail` is the local mail sink (mailsim): on by default, like idp, because
+// nothing about it is a developer tool — the product's own outgoing email
+// lands there. The last two ARE developer tools rather than parts of the
+// product: off unless the worktree selects them, and never counted among the
+// three Node lanes (see Lanes). Order is the launch + print order.
 var PerWorktreeServices = []struct{ Name, Role string }{
 	{"app", "App — UI + API at /api"},
 	{"gateway", "AI Gateway (Go)"},
 	{"nlp", "NLP engine (Go)"},
 	{"langyagent", "Langy agent manager (Go)"},
+	{"idp", "IdP simulator (Go)"},
+	{MailService, "Mail sink (mailsim)"},
+	{StorageService, "Object storage (storagesim)"},
+	{VoiceService, "Voice providers (voicesim)"},
+	{LLMService, "LLM providers (llmsim)"},
+	{AnalyticsService, "Product analytics (analyticssim)"},
+	{OutboundService, "Slack, webhooks and SQS (outboundsim)"},
+	{PaymentService, "Stripe (paymentsim)"},
+	{TelemetryService, "OTLP sender (telemetrysim)"},
+	{LambdaService, "NLP Lambda fleet (lambdasim)"},
+	{GithubService, "GitHub App, API and webhooks (githubsim)"},
+	{McpService, "MCP clients against hosted MCP (mcpsim)"},
+	{DesignSystemService, "Design system — Storybook"},
+	{MailRoomService, "Mail studio — transactional message preview"},
+	{LangevalsService, "Evaluators (Python)"},
 }
 
-// BaselinePort finds a live baseline stack that runs `service` locally (not itself
-// a fallback), so a worktree that opts out of the service can route its hostname
-// there. alive reports whether a launcher pid is still running.
-func BaselinePort(stacks []Stack, service string, alive func(pid int) bool) (int, bool) {
+// ServiceHostAliases are extra hostnames routed to the same listener as a
+// service's own, so nobody has to remember which spelling was chosen. `ds` is
+// the short form of the design system. The mail studio has no alias — its
+// hostname is mail-room.<slug>, full stop. The service's own name stays the
+// one hostname printed, linked and put in the overlay; these only ever add
+// ways in.
+var ServiceHostAliases = map[string][]string{
+	DesignSystemService: {"ds"},
+}
+
+// BaselineService finds a live baseline stack that runs `service` locally (not
+// itself a fallback), so a worktree that opts out of the service can route its
+// hostname there. alive reports whether a launcher pid is still running.
+//
+// The whole service is returned rather than its port alone, because a
+// fallback has to inherit every endpoint the real one has: an idp resolved
+// this way answers OIDC on the baseline's HTTP port AND domain proofs on the
+// baseline's nameserver, and taking only the first would point the app at a
+// nameserver that is not running.
+func BaselineService(stacks []Stack, service string, alive func(pid int) bool) (Service, bool) {
 	for _, st := range stacks {
 		if !st.IsBaseline || !alive(st.LauncherPID) {
 			continue
 		}
 		for _, s := range st.Services {
 			if s.Name == service && !s.IsFallback && s.Port != 0 {
-				return s.Port, true
+				return s, true
 			}
 		}
 	}
-	return 0, false
+	return Service{}, false
+}
+
+// BaselinePort is BaselineService's port alone, for the callers that route a
+// hostname and need nothing else.
+func BaselinePort(stacks []Stack, service string, alive func(pid int) bool) (int, bool) {
+	svc, ok := BaselineService(stacks, service, alive)
+	return svc.Port, ok
 }
 
 // Stale reports whether the stack's heartbeat is older than ttl (ttl <= 0
@@ -133,4 +266,50 @@ func (s Stack) Stale(now time.Time, ttl time.Duration) bool {
 		return false
 	}
 	return now.Sub(s.UpdatedAt) > ttl
+}
+
+// Lane is one supervised process lane of a stack, as `haven status --json`
+// reports it. The routed Services list answers "what hostname resolves where";
+// this answers "what processes is this stack running", which stopped being the
+// same question when the platform application became three applications: the
+// api and workers lanes hold loopback ports and no hostname of their own.
+type Lane struct {
+	Name string `json:"name"`
+	Port int    `json:"port"`
+}
+
+// Lanes are the Node application lanes every stack supervises, in launch order:
+// the browser application (on the routed `app` port) and the api — which hosts
+// the worker application beside it in ONE local process (ADR-004, amendment
+// 2026-09-07) and is named for what a person reaches. The api lane is reported
+// on the API port; its worker half's metrics listener is WorkerMetricsPort,
+// which the same report already carries.
+//
+// The Go services are omitted because they are one-to-one with their routed
+// services, which the same report already lists.
+func (s Stack) Lanes() []Lane {
+	// A monolith checkout has neither package: one process serves the browser
+	// application and its API, so there is one lane, and it is named after the
+	// hostname that reaches it.
+	if s.Layout.IsMonolith() {
+		return []Lane{{Name: MonolithAppLane, Port: s.svc("app").Port}}
+	}
+	return []Lane{
+		{Name: "ui", Port: s.svc("app").Port},
+		{Name: "api", Port: s.APIPort},
+	}
+}
+
+// HealthProbeURL is the loopback address that answers once this stack is
+// serving: the health path, on the API port haven allocated. It is what the ui
+// lane waits for on a modular stack and what the Go services wait for on a
+// monolith, where the app lane is the API.
+func (s Stack) HealthProbeURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d/api/health", s.APIPort)
+}
+
+// ReadinessURL is the api's readiness probe, which answers 503 until the
+// upgrade ledger is current for its image and 200 after.
+func (s Stack) ReadinessURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d/readyz", s.APIPort)
 }

@@ -1,0 +1,146 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any, TypeVar, cast
+
+from attrs import define as _attrs_define
+
+T = TypeVar("T", bound="ListCliIngestionTemplatesResponse200IngestionTemplatesItem")
+
+
+@_attrs_define
+class ListCliIngestionTemplatesResponse200IngestionTemplatesItem:
+    """
+    Attributes:
+        id (str):
+        organization_id (None | str):
+        slug (str):
+        source_type (str):
+        display_name (str):
+        description (None | str):
+        icon_asset (None | str):
+        credential_schema (None | str):
+        ottl_rules (str):
+        platform_published (bool):
+        enabled (bool):
+    """
+
+    id: str
+    organization_id: None | str
+    slug: str
+    source_type: str
+    display_name: str
+    description: None | str
+    icon_asset: None | str
+    credential_schema: None | str
+    ottl_rules: str
+    platform_published: bool
+    enabled: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        id = self.id
+
+        organization_id: None | str
+        organization_id = self.organization_id
+
+        slug = self.slug
+
+        source_type = self.source_type
+
+        display_name = self.display_name
+
+        description: None | str
+        description = self.description
+
+        icon_asset: None | str
+        icon_asset = self.icon_asset
+
+        credential_schema: None | str
+        credential_schema = self.credential_schema
+
+        ottl_rules = self.ottl_rules
+
+        platform_published = self.platform_published
+
+        enabled = self.enabled
+
+        field_dict: dict[str, Any] = {}
+
+        field_dict.update(
+            {
+                "id": id,
+                "organization_id": organization_id,
+                "slug": slug,
+                "source_type": source_type,
+                "display_name": display_name,
+                "description": description,
+                "icon_asset": icon_asset,
+                "credential_schema": credential_schema,
+                "ottl_rules": ottl_rules,
+                "platform_published": platform_published,
+                "enabled": enabled,
+            }
+        )
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        d = dict(src_dict)
+        id = d.pop("id")
+
+        def _parse_organization_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        organization_id = _parse_organization_id(d.pop("organization_id"))
+
+        slug = d.pop("slug")
+
+        source_type = d.pop("source_type")
+
+        display_name = d.pop("display_name")
+
+        def _parse_description(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        description = _parse_description(d.pop("description"))
+
+        def _parse_icon_asset(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        icon_asset = _parse_icon_asset(d.pop("icon_asset"))
+
+        def _parse_credential_schema(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        credential_schema = _parse_credential_schema(d.pop("credential_schema"))
+
+        ottl_rules = d.pop("ottl_rules")
+
+        platform_published = d.pop("platform_published")
+
+        enabled = d.pop("enabled")
+
+        list_cli_ingestion_templates_response_200_ingestion_templates_item = cls(
+            id=id,
+            organization_id=organization_id,
+            slug=slug,
+            source_type=source_type,
+            display_name=display_name,
+            description=description,
+            icon_asset=icon_asset,
+            credential_schema=credential_schema,
+            ottl_rules=ottl_rules,
+            platform_published=platform_published,
+            enabled=enabled,
+        )
+
+        return list_cli_ingestion_templates_response_200_ingestion_templates_item

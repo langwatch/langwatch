@@ -1,6 +1,10 @@
 package domain
 
-import "testing"
+import (
+	"strconv"
+	"strings"
+	"testing"
+)
 
 func TestDeriveSlugIsTheWorktreeName(t *testing.T) {
 	if got := DeriveSlug("/work/trees/portless", nil); got != "portless" {
@@ -167,6 +171,8 @@ func TestOverlayDisablesGoogleDLPWhenAsked(t *testing.T) {
 // not disarm the production alerts that read them), so haven's own container,
 // which has no backups and therefore no system.backup_log, has to opt out, or
 // every 15s stats tick fails on a missing table.
+//
+// @scenario "haven opts local worktrees out"
 func TestOverlayOptsOutOfBackupMetricsWhenManagingClickHouse(t *testing.T) {
 	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
 		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
@@ -179,6 +185,30 @@ func TestOverlayOptsOutOfBackupMetricsWhenManagingClickHouse(t *testing.T) {
 	managed.ClickHouseDatabase = "lw_brave_otter"
 	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_BACKUP_METRICS_ENABLED"); got != "false" {
 		t.Errorf("CLICKHOUSE_BACKUP_METRICS_ENABLED = %q, want %q", got, "false")
+	}
+}
+
+// The app sizes its ClickHouse pool from the server's stated cap, and assumes a
+// 300-query server when nobody states it. haven renders the cap into the
+// container's config, so it is the one party that knows the number; left
+// unexported, a 32-query dev server met a pool sized for a 300-query one and
+// rejected the governance cost pull mid-page (#8064).
+func TestOverlayExportsClickHouseConcurrencyCapWhenManaged(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES") {
+		t.Fatalf("unmanaged stack must not claim to know its ClickHouse server's cap")
+	}
+	managed := base
+	managed.ClickHouseHTTPPort = 18123
+	managed.ClickHouseDatabase = "lw_brave_otter"
+	want := strconv.Itoa(ClickHouseMaxConcurrentQueries)
+	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES"); got != want {
+		t.Errorf("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES = %q, want %q (the cap haven renders)", got, want)
+	}
+	if !strings.Contains(RenderClickHouseConfig(DefaultClickHouseLimits(0)), "<max_concurrent_queries>"+want+"</max_concurrent_queries>") {
+		t.Errorf("the exported cap must be the one rendered into the server's config")
 	}
 }
 
@@ -277,6 +307,24 @@ func validCHIdentifier(s string) bool {
 	return true
 }
 
+// @scenario "a tunneled stack signs in through its public origin"
+func TestOverlayCarriesPublicURLOnlyOnAuthLines(t *testing.T) {
+	st := Stack{Slug: "portless", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.portless.langwatch.localhost"},
+		{Name: "gateway"}, {Name: "nlp"},
+	}, PublicURL: "https://box.example.ts.net:8443"}
+	env := st.OverlayEnv()
+	if got := valueOf(env, "BASE_HOST"); got != st.PublicURL {
+		t.Errorf("BASE_HOST = %q, want the public URL %q", got, st.PublicURL)
+	}
+	if got := valueOf(env, "NEXTAUTH_URL"); got != st.PublicURL {
+		t.Errorf("NEXTAUTH_URL = %q, want the public URL %q", got, st.PublicURL)
+	}
+	if got := valueOf(env, "LANGWATCH_ENDPOINT"); got != "https://app.portless.langwatch.localhost" {
+		t.Errorf("LANGWATCH_ENDPOINT = %q, want the local app URL unchanged", got)
+	}
+}
+
 func TestOverlayEmitsHavenSeedLangwatchAPIKey(t *testing.T) {
 	st := Stack{Slug: "portless", APIPort: 1, Services: []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}}}
 	if valueOf(st.OverlayEnv(), "HAVEN_SEED_LANGWATCH_API_KEY") != "" {
@@ -296,6 +344,14 @@ func TestOverlayPinsTheSevenDayRetentionDefault(t *testing.T) {
 	}
 	if DefaultRetentionDays%7 != 0 {
 		t.Errorf("DefaultRetentionDays = %d is not a whole number of weeks", DefaultRetentionDays)
+	}
+}
+
+// @scenario "haven names the development badge after its stack"
+func TestOverlayLabelsTheDevelopmentBadgeWithTheSlug(t *testing.T) {
+	st := Stack{Slug: "feat-strict-feature-layout-v0", APIPort: 1, Services: []Service{{Name: "app"}}}
+	if got := valueOf(st.OverlayEnv(), "DEV_INDICATOR_LABEL"); got != st.Slug {
+		t.Errorf("DEV_INDICATOR_LABEL = %q, want the stack slug %q", got, st.Slug)
 	}
 }
 
@@ -325,6 +381,49 @@ func TestOverlayNeverEmitsLangwatchApiKey(t *testing.T) {
 	}
 	if !hasKey(st.OverlayEnv(), "LANGWATCH_ENDPOINT") {
 		t.Errorf("overlay must still emit LANGWATCH_ENDPOINT (a benign address, unchanged)")
+	}
+}
+
+// TestOverlayGivesTheSeededLegacyKeyFullAccess pins that the seeded local key, a legacy
+// project key, reaches every route on a haven stack, not only ingestion.
+func TestOverlayGivesTheSeededLegacyKeyFullAccess(t *testing.T) {
+	st := Stack{Slug: "portless", APIPort: 1, LocalAPIKey: DefaultLocalAPIKey}
+	if got := valueOf(st.OverlayEnv(), "LEGACY_PROJECT_KEY_FULL_ACCESS"); got != "1" {
+		t.Errorf("LEGACY_PROJECT_KEY_FULL_ACCESS = %q, want 1", got)
+	}
+}
+
+// TestOverlayLeavesNxCacheLocationToNx pins ADR-150's shared cache: Nx 23 already
+// shares one cache and its index across every checkout (~/.nx/<id>), and any of
+// these variables makes it fall back to a per-checkout index over that cache.
+// @scenario "A trusted worktree leaves the Nx cache location to Nx"
+func TestOverlayLeavesNxCacheLocationToNx(t *testing.T) {
+	st := Stack{
+		Slug: "portless", APIPort: 1, LocalAPIKey: DefaultLocalAPIKey,
+		Services: []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}, {Name: "langyagent"}},
+	}
+	for _, key := range []string{"NX_CACHE_DIRECTORY", "NX_WORKSPACE_DATA_DIRECTORY", "NX_PROJECT_GRAPH_CACHE_DIRECTORY"} {
+		if hasKey(st.OverlayEnv(), key) {
+			t.Errorf("overlay emitted %s, which turns off Nx's cross-checkout cache", key)
+		}
+	}
+}
+
+// TestOverlayGivesUntrustedCheckoutAPrivateNxCache is the other direction: Nx
+// must never store a fork's task results in the cache trusted worktrees replay.
+// @scenario "An untrusted checkout gets a private Nx cache and no daemon"
+func TestOverlayGivesUntrustedCheckoutAPrivateNxCache(t *testing.T) {
+	st := Stack{Slug: "haven-pr-7", NxPrivateDir: "/home/.haven/nx-untrusted/haven-pr-7"}
+	env := EnvMap(st.OverlayEnv())
+	want := map[string]string{
+		"NX_CACHE_DIRECTORY":          "/home/.haven/nx-untrusted/haven-pr-7/cache",
+		"NX_WORKSPACE_DATA_DIRECTORY": "/home/.haven/nx-untrusted/haven-pr-7/workspace-data",
+		"NX_DAEMON":                   "false",
+	}
+	for k, v := range want {
+		if env[k] != v {
+			t.Errorf("%s = %q, want %q", k, env[k], v)
+		}
 	}
 }
 

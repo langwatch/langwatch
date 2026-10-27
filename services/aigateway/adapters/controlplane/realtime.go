@@ -1,0 +1,338 @@
+package controlplane
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"math"
+	"net/http"
+	"net/url"
+	"time"
+
+	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/domain"
+)
+
+// The control plane owns the record of open realtime voice sessions
+// (ADR-097). The gateway keeps none of its own: a session outlives the
+// request that minted it, the vendor's post-call report lands on whichever
+// replica answers next, and the per-key cap has to be counted somewhere that
+// every replica sees.
+
+const (
+	realtimeSessionsPath = "/api/internal/gateway/realtime-sessions"
+	// realtimeRegistryTimeout bounds a registry call. The mint holds a
+	// caller while this runs, and a caller here is a person waiting to
+	// speak, so it is short: the alternative to a fast refusal is a slow
+	// one.
+	realtimeRegistryTimeout = 3 * time.Second
+	realtimeMaxResponseBody = 32 << 10
+)
+
+// reserveRequest books a session and asks the control plane to decide the
+// per-key cap in the same transaction that inserts the row.
+type reserveRequest struct {
+	SessionID       string `json:"session_id"`
+	ProjectID       string `json:"project_id"`
+	OrganizationID  string `json:"organization_id"`
+	VirtualKeyID    string `json:"virtual_key_id"`
+	ModelProviderID string `json:"model_provider_id"`
+	TraceID         string `json:"trace_id"`
+	RequestedModel  string `json:"requested_model"`
+	Vendor          string `json:"vendor"`
+	AgentID         string `json:"agent_id,omitempty"`
+	Model           string `json:"model"`
+	// The four below say how the session is metered. Each is left off the
+	// wire when the mint does not know it.
+	Kind                string `json:"kind,omitempty"`
+	Metering            string `json:"metering,omitempty"`
+	TranscriptionModel  string `json:"transcription_model,omitempty"`
+	EndUserID           string `json:"end_user_id,omitempty"`
+	CredentialExpiresAt int64  `json:"credential_expires_at,omitempty"`
+}
+
+// epochMillis is the wire form of an instant, zero when it is not known.
+func epochMillis(at time.Time) int64 {
+	if at.IsZero() {
+		return 0
+	}
+	return at.UnixMilli()
+}
+
+// realtimeUsageWire is the quantity vocabulary the spend wire already
+// speaks. Same field names, so the control plane validates it with the same
+// schema it validates a confirmation with and hands it straight on.
+type realtimeUsageWire struct {
+	InputTokens       int `json:"input_tokens"`
+	OutputTokens      int `json:"output_tokens"`
+	CacheReadTokens   int `json:"cache_read_input_tokens"`
+	InputAudioTokens  int `json:"input_audio_tokens"`
+	OutputAudioTokens int `json:"output_audio_tokens"`
+	AudioMS           int `json:"audio_ms"`
+	InputChars        int `json:"input_chars"`
+}
+
+// usageWire maps the gateway's usage onto the spend wire, with the cached
+// tokens taken out of the input count and the audio duration in milliseconds.
+func usageWire(usage *domain.Usage) *realtimeUsageWire {
+	if usage == nil {
+		return nil
+	}
+	return &realtimeUsageWire{
+		InputTokens:       usage.BillableInputTokens(),
+		OutputTokens:      usage.CompletionTokens,
+		CacheReadTokens:   usage.CacheReadTokens,
+		InputAudioTokens:  usage.InputAudioTokens,
+		OutputAudioTokens: usage.OutputAudioTokens,
+		AudioMS:           int(math.Round(usage.AudioSeconds * 1000)),
+		InputChars:        usage.InputChars,
+	}
+}
+
+// reportUsageRequest is one usage report on the internal wire. Optional
+// fields are left off so a report with no key reads as the session total.
+type reportUsageRequest struct {
+	ProjectID    string             `json:"project_id"`
+	VirtualKeyID string             `json:"virtual_key_id"`
+	Usage        *realtimeUsageWire `json:"usage,omitempty"`
+	ReportKey    string             `json:"report_key,omitempty"`
+	PricedAs     string             `json:"priced_as,omitempty"`
+	Model        string             `json:"model,omitempty"`
+	Final        bool               `json:"final,omitempty"`
+	DurationMS   int64              `json:"duration_ms,omitempty"`
+	Source       string             `json:"source,omitempty"`
+}
+
+// reportUsageAnswer is what the control plane answers a recorded report with.
+type reportUsageAnswer struct {
+	Status             string `json:"status"`
+	CostNanoUSD        int64  `json:"cost_nano_usd"`
+	SessionCostNanoUSD int64  `json:"session_cost_nano_usd"`
+	Budget             struct {
+		Exceeded bool   `json:"exceeded"`
+		Scope    string `json:"scope"`
+		BudgetID string `json:"budget_id"`
+		Unknown  bool   `json:"unknown"`
+	} `json:"budget"`
+}
+
+// Reserve books a session, or answers why it may not open.
+func (c *Client) Reserve(ctx context.Context, r domain.RealtimeReservation) error {
+	payload, err := json.Marshal(reserveRequest{
+		SessionID:       r.SessionID,
+		ProjectID:       r.ProjectID,
+		OrganizationID:  r.OrganizationID,
+		VirtualKeyID:    r.VirtualKeyID,
+		ModelProviderID: r.ModelProviderID,
+		TraceID:         r.TraceID,
+		RequestedModel:  r.RequestedModel,
+		Vendor:          string(r.Vendor),
+		AgentID:         r.AgentID,
+		Model:           r.Model,
+
+		Kind:                string(r.Kind),
+		Metering:            string(r.Metering),
+		TranscriptionModel:  r.TranscriptionModel,
+		EndUserID:           r.EndUserID,
+		CredentialExpiresAt: epochMillis(r.CredentialExpiresAt),
+	})
+	if err != nil {
+		return realtimeRegistryUnavailable(ctx, 0, err)
+	}
+	status, body, err := c.realtimeCall(ctx, realtimeRequest{
+		method: http.MethodPost, path: realtimeSessionsPath, payload: payload,
+	})
+	if err != nil {
+		return realtimeRegistryUnavailable(ctx, 0, err)
+	}
+	switch {
+	case status >= 200 && status < 300:
+		return nil
+	case status == http.StatusTooManyRequests:
+		var refusal struct {
+			Error struct {
+				Open  int `json:"open"`
+				Limit int `json:"limit"`
+			} `json:"error"`
+		}
+		_ = json.Unmarshal(body, &refusal)
+		return herr.New(ctx, domain.ErrRealtimeSessionLimit, herr.M{
+			"message": "this virtual key already holds the most realtime voice sessions it may keep open at once. A session frees its slot when the call ends",
+			"fault":   "customer",
+			"open":    refusal.Error.Open,
+			"limit":   refusal.Error.Limit,
+		})
+	default:
+		return realtimeRegistryUnavailable(ctx, status, nil)
+	}
+}
+
+// Correlate records what the mint answer said about a booking: the vendor's
+// own conversation id, when the credential expires, or both.
+func (c *Client) Correlate(ctx context.Context, correlation domain.RealtimeCorrelation) error {
+	payload, err := json.Marshal(struct {
+		ProjectID            string `json:"project_id"`
+		VendorConversationID string `json:"vendor_conversation_id,omitempty"`
+		CredentialExpiresAt  int64  `json:"credential_expires_at,omitempty"`
+	}{
+		ProjectID:            correlation.ProjectID,
+		VendorConversationID: correlation.VendorConversationID,
+		CredentialExpiresAt:  epochMillis(correlation.CredentialExpiresAt),
+	})
+	if err != nil {
+		return err
+	}
+	return c.realtimePatch(ctx, correlation.SessionID, payload)
+}
+
+// Release closes a booking whose mint never produced a credential.
+func (c *Client) Release(ctx context.Context, release domain.RealtimeRelease) error {
+	payload, err := json.Marshal(map[string]string{
+		"project_id": release.ProjectID,
+		"status":     release.Status,
+		"reason":     release.Reason,
+	})
+	if err != nil {
+		return err
+	}
+	return c.realtimePatch(ctx, release.SessionID, payload)
+}
+
+// ReportUsage records one usage report against a booked session and answers
+// what the control plane made of it: the rated cost, the session's running
+// total, and whether a blocking budget is now spent.
+func (c *Client) ReportUsage(ctx context.Context, report domain.RealtimeUsageReport) (domain.RealtimeUsageReceipt, error) {
+	var receipt domain.RealtimeUsageReceipt
+	payload, err := json.Marshal(reportUsageRequest{
+		ProjectID:    report.ProjectID,
+		VirtualKeyID: report.VirtualKeyID,
+		Usage:        usageWire(report.Usage),
+		ReportKey:    report.ReportKey,
+		PricedAs:     report.PricedAs,
+		Model:        report.Model,
+		Final:        report.Final,
+		DurationMS:   report.DurationMS,
+		Source:       string(report.Source),
+	})
+	if err != nil {
+		return receipt, realtimeRegistryUnavailable(ctx, 0, err)
+	}
+	path, err := url.JoinPath(realtimeSessionsPath, url.PathEscape(report.SessionID), "usage")
+	if err != nil {
+		return receipt, realtimeRegistryUnavailable(ctx, 0, err)
+	}
+	status, body, err := c.realtimeCall(ctx, realtimeRequest{
+		method: http.MethodPost, path: path, payload: payload,
+	})
+	if err != nil {
+		return receipt, realtimeRegistryUnavailable(ctx, 0, err)
+	}
+	if status == http.StatusNotFound {
+		return receipt, herr.New(ctx, domain.ErrNotFound, herr.M{
+			"message": "no open realtime session with that id belongs to this key",
+			"fault":   "customer",
+		})
+	}
+	if status < 200 || status >= 300 {
+		return receipt, realtimeRegistryUnavailable(ctx, status, nil)
+	}
+	return usageReceipt(body), nil
+}
+
+// usageReceipt reads the control plane's answer. A body that does not parse
+// still means the report landed, so it reads as recorded with no figures
+// rather than as a failure the caller would retry.
+func usageReceipt(body []byte) domain.RealtimeUsageReceipt {
+	var answer reportUsageAnswer
+	if err := json.Unmarshal(body, &answer); err != nil || answer.Status == "" {
+		return domain.RealtimeUsageReceipt{Status: domain.RealtimeReportRecorded}
+	}
+	// A control plane one release behind answers the session's own state.
+	status := domain.RealtimeReportStatus(answer.Status)
+	if answer.Status == "CLOSED" {
+		status = domain.RealtimeReportClosed
+	}
+	return domain.RealtimeUsageReceipt{
+		Status:             status,
+		CostNanoUSD:        answer.CostNanoUSD,
+		SessionCostNanoUSD: answer.SessionCostNanoUSD,
+		Budget: domain.RealtimeBudgetState{
+			Exceeded: answer.Budget.Exceeded,
+			Scope:    answer.Budget.Scope,
+			BudgetID: answer.Budget.BudgetID,
+			Unknown:  answer.Budget.Unknown,
+		},
+	}
+}
+
+// realtimePatch updates one session record. Transport failures come back as
+// ErrRealtimeRegistryUnavailable, the same code Reserve and ReportUsage
+// return, so a caller can classify a registry outage without knowing which
+// verb reached it.
+func (c *Client) realtimePatch(ctx context.Context, sessionID string, payload []byte) error {
+	path, err := url.JoinPath(realtimeSessionsPath, url.PathEscape(sessionID))
+	if err != nil {
+		return realtimeRegistryUnavailable(ctx, 0, err)
+	}
+	status, _, err := c.realtimeCall(ctx, realtimeRequest{
+		method: http.MethodPatch, path: path, payload: payload,
+	})
+	if err != nil {
+		return realtimeRegistryUnavailable(ctx, 0, err)
+	}
+	if status < 200 || status >= 300 {
+		return realtimeRegistryUnavailable(ctx, status, nil)
+	}
+	return nil
+}
+
+// realtimeRequest is one registry call: the verb, the path under the
+// control plane's base URL, and the body to sign and send.
+type realtimeRequest struct {
+	method  string
+	path    string
+	payload []byte
+}
+
+// realtimeCall performs one signed registry request under its own deadline.
+func (c *Client) realtimeCall(ctx context.Context, call realtimeRequest) (int, []byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, realtimeRegistryTimeout)
+	defer cancel()
+
+	endpoint, err := url.JoinPath(c.baseURL, call.path)
+	if err != nil {
+		return 0, nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, call.method, endpoint, bytes.NewReader(call.payload))
+	if err != nil {
+		return 0, nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.setCommonHeaders(req)
+	// The signature covers the method and path, so PATCH signs as PATCH.
+	c.sign(req, call.payload)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, realtimeMaxResponseBody))
+	return resp.StatusCode, body, nil
+}
+
+// realtimeRegistryUnavailable is the refusal when the session could not be
+// recorded. The message says the mint did not happen, because the caller's
+// next move is to retry rather than to look for a credential.
+func realtimeRegistryUnavailable(ctx context.Context, status int, cause error) error {
+	meta := herr.M{
+		"message":     "the voice session could not be recorded, so no session credential was minted. Retry shortly",
+		"fault":       "gateway",
+		"http_status": status,
+	}
+	if cause == nil {
+		return herr.New(ctx, domain.ErrRealtimeRegistryUnavailable, meta)
+	}
+	return herr.New(ctx, domain.ErrRealtimeRegistryUnavailable, meta, cause)
+}

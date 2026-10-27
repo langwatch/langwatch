@@ -10,7 +10,7 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
   # control plane answers just as happily as the right one. Only the
   # spend, budget and auth side effects land somewhere else, silently.
   #
-  # `pnpm dev` (platform/app/scripts/start.sh) derives this URL from the
+  # `pnpm dev` (dev/scripts/dev-stack.sh) derives this URL from the
   # app's own PORT before it starts a gateway itself, so a freshly-started
   # gateway is always correct. That path is proven, existing behavior and
   # is not what this feature covers.
@@ -48,7 +48,7 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
 
   @unit
   Scenario: make service leaves an explicit control-plane URL untouched
-    Given LW_GATEWAY_BASE_URL is already set, whether inherited from the shell or from platform/app/.env
+    Given LW_GATEWAY_BASE_URL is already set, whether inherited from the shell or from .env
     When "make service svc=aigateway" resolves its environment
     Then the explicit value is used unchanged
 
@@ -57,6 +57,26 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
     Given neither PORT nor LW_GATEWAY_BASE_URL is set
     When "make service svc=aigateway" resolves its environment
     Then it derives the same control-plane URL as the single-worktree default case
+
+  @unit
+  Scenario: make service loads a DEV_ENV_FILE named without a slash under any POSIX sh
+    Given DEV_ENV_FILE names a file in the current directory without a slash, such as ".env"
+    And the recipe shell is a POSIX /bin/sh that looks such names up on PATH only, as dash does
+    When "make service svc=aigateway" or "make service-watch svc=aigateway" loads its environment
+    Then the variables that file sets are in the environment the service starts with
+
+  @unit
+  Scenario: make service loads DEV_ENV_FILE from a path that contains spaces
+    Given DEV_ENV_FILE points at a file whose path contains spaces
+    When "make service svc=aigateway" or "make service-watch svc=aigateway" loads its environment
+    Then the variables that file sets are in the environment the service starts with
+
+  @unit
+  Scenario: make service stops when DEV_ENV_FILE exists but fails to load
+    Given DEV_ENV_FILE names a file that exists and fails while it is loaded
+    When "make service svc=aigateway" or "make service-watch svc=aigateway" loads its environment
+    Then the command fails before the service starts
+    And it does not report the file as missing
 
   # --- The gateway's own awareness of how it was configured ---
 
@@ -88,14 +108,16 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
     Then it reports that exact URL
     And the endpoint requires no credential, matching the k8s probes and the metrics endpoint
 
-  @unit
+  # Gap: pnpm dev asks no reused gateway for /debug/control-plane; dev-stack.sh does no check, and main had none.
+  @unit @unimplemented
   Scenario: a reused gateway pointed at the right control plane raises no warning
     Given pnpm dev finds a gateway already listening on the port it would have started its own on
     And that gateway's debug endpoint reports the same control-plane URL this worktree expects
     When pnpm dev evaluates whether to trust the reused gateway
     Then it raises no warning
 
-  @unit
+  # Gap: pnpm dev asks no reused gateway for /debug/control-plane; dev-stack.sh does no check, and main had none.
+  @unit @unimplemented
   Scenario: a reused gateway pointed at a different control plane raises a loud, actionable warning
     Given pnpm dev finds a gateway already listening on the port it would have started its own on
     And that gateway's debug endpoint reports a control-plane URL different from what this worktree expects
@@ -103,7 +125,8 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
     Then it raises a multi-line warning naming both the expected and the actual control-plane URL
     And the warning states how to fix it
 
-  @unit
+  # Gap: pnpm dev asks no reused gateway for /debug/control-plane; dev-stack.sh does no check, and main had none.
+  @unit @unimplemented
   Scenario: a reused gateway whose control-plane target cannot be verified is treated as suspect, not silently trusted
     Given pnpm dev finds a gateway already listening on the port it would have started its own on
     And that gateway's debug endpoint cannot be reached, for instance because it predates this check

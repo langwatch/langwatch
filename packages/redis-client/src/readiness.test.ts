@@ -1,9 +1,17 @@
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
-import { RedisReadinessService } from "./readiness";
-import type { RedisConnection } from "./types";
 
-function connectionThat(ping: () => Promise<unknown>): RedisConnection {
-  return { ping } as unknown as RedisConnection;
+import { RedisReadinessService } from "./readiness.ts";
+import type { RedisConnection } from "./types.ts";
+
+const REDIS_7_INFO = "# Server\r\nredis_version:7.4.2\r\nredis_mode:standalone\r\n";
+
+function connectionThat(
+  ping: () => Promise<unknown>,
+  serverInfo: string | (() => Promise<string>) = REDIS_7_INFO,
+): RedisConnection {
+  const info = typeof serverInfo === "string" ? () => Promise.resolve(serverInfo) : serverInfo;
+  return redisDouble({ ping, info });
 }
 
 function createLoggerSpy() {
@@ -23,10 +31,7 @@ describe("RedisReadinessService", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(logger.info).toHaveBeenCalledWith(
-        { target: "redis://localhost:6379" },
-        "redis ready",
-      );
+      expect(logger.info).toHaveBeenCalledWith({ target: "redis://localhost:6379" }, "redis ready");
       expect(logger.error).not.toHaveBeenCalled();
     });
   });
@@ -98,10 +103,7 @@ describe("RedisReadinessService", () => {
         target: "one:6379,two:6380",
       });
 
-      expect(logger.info).toHaveBeenCalledWith(
-        { target: "one:6379,two:6380" },
-        "redis ready",
-      );
+      expect(logger.info).toHaveBeenCalledWith({ target: "one:6379,two:6380" }, "redis ready");
     });
   });
 
@@ -155,6 +157,85 @@ describe("RedisReadinessService", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe("given a server older than Redis 7", () => {
+    /** @scenario "A Redis older than 7.0 is refused at start" */
+    it("rejects naming the version found and the minimum", async () => {
+      const logger = createLoggerSpy();
+      const redis6 = "# Server\r\nredis_version:6.2.14\r\nredis_mode:standalone\r\n";
+
+      await expect(
+        new RedisReadinessService({ logger }).ping({
+          connection: connectionThat(() => Promise.resolve("PONG"), redis6),
+          target: "redis://redis.internal:6379",
+        }),
+      ).rejects.toMatchObject({ code: "redis_version_unsupported", version: "6.2.14" });
+
+      expect(logger.info).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given Valkey 8, which reports a Redis 7.2 compatible version", () => {
+    /** @scenario "Valkey 7.2 or later is accepted at start" */
+    it("resolves and reports the server ready", async () => {
+      const logger = createLoggerSpy();
+      const valkey8 =
+        "# Server\r\nredis_version:7.2.4\r\nserver_name:valkey\r\nvalkey_version:8.1.10\r\n";
+
+      await new RedisReadinessService({ logger }).ping({
+        connection: connectionThat(() => Promise.resolve("PONG"), valkey8),
+        target: "redis://valkey.internal:6379",
+      });
+
+      expect(logger.info).toHaveBeenCalledWith(
+        { target: "redis://valkey.internal:6379" },
+        "redis ready",
+      );
+    });
+  });
+
+  describe("given a server that answers PING but reports no version", () => {
+    /** @scenario "A server that reports no version starts with a warning" */
+    it("resolves, warns that the version is unknown and reports the server ready", async () => {
+      const logger = createLoggerSpy();
+
+      await new RedisReadinessService({ logger }).ping({
+        connection: connectionThat(
+          () => Promise.resolve("PONG"),
+          "# Server\r\nredis_mode:standalone\r\n",
+        ),
+        target: "redis://redis.internal:6379",
+      });
+
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(logger.info).toHaveBeenCalledWith(
+        { target: "redis://redis.internal:6379" },
+        "redis ready",
+      );
+    });
+  });
+
+  describe("given a server that answers PING but refuses INFO", () => {
+    /** @scenario "A server that refuses INFO starts with a warning" */
+    it("resolves, warns that the version is unknown and logs nothing as unreachable", async () => {
+      const logger = createLoggerSpy();
+      const refused = () =>
+        Promise.reject(new Error("NOPERM User app has no permissions to run the 'info' command"));
+
+      await new RedisReadinessService({ logger }).ping({
+        connection: connectionThat(() => Promise.resolve("PONG"), refused),
+        target: "redis://redis.internal:6379",
+      });
+
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(logger.info).toHaveBeenCalledWith(
+        { target: "redis://redis.internal:6379" },
+        "redis ready",
+      );
     });
   });
 });

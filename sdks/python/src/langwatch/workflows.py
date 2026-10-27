@@ -88,7 +88,7 @@ class WorkflowsFacade:
         Returns:
             Dictionary with workflow data.
         """
-        response = self._http().get("/api/workflows")
+        response = self._http().get("/api/v1/workflows")
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -102,7 +102,7 @@ class WorkflowsFacade:
         Returns:
             Dictionary containing the workflow data.
         """
-        response = self._http().get(f"/api/workflows/{_quote(workflow_id)}")
+        response = self._http().get(f"/api/v1/workflows/{_quote(workflow_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -124,7 +124,7 @@ class WorkflowsFacade:
         """
         body = params or {}
         response = self._http().patch(
-            f"/api/workflows/{_quote(workflow_id)}", json=body
+            f"/api/v1/workflows/{_quote(workflow_id)}", json=body
         )
         _raise_for_status(response, operation="update")
         return response.json()
@@ -139,6 +139,6 @@ class WorkflowsFacade:
         Returns:
             Dictionary with deletion result.
         """
-        response = self._http().delete(f"/api/workflows/{_quote(workflow_id)}")
+        response = self._http().delete(f"/api/v1/workflows/{_quote(workflow_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()

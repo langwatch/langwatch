@@ -1,0 +1,73 @@
+# Findings reviewed and cleared, keyed by gitleaks fingerprint
+# (commit:path:rule:line). This file clears ONE finding in ONE commit — unlike
+# a `.gitleaks.toml` allowlist, which is a standing rule that keeps matching
+# new values forever. Prefer this whenever the finding is historical and the
+# working tree is already clean, so the scanner keeps its teeth on the path.
+#
+# A test fixture for the credential-redaction path used a realistic PKCS#8
+# base64 prefix. It is the standard ASN.1 header every RSA private key starts
+# with, carries no key material, and was never a credential — but its entropy
+# is a key's, which is the whole point of the rule and not something gitleaks
+# should be asked to tell apart. The fixture was replaced in fbbfc1d35b with a
+# low-entropy marker, so the tree is clean; the finding survives only because
+# the gate walks every commit in the pull request's range, and this one is now
+# history.
+4c7f177f4f5b4a4290d9281031dc4cdeff2d23a6:services/aigateway/adapters/providers/bifrost_error_test.go:generic-api-key:217
+
+# A Slack connection test named its refused bot token `xoxb-revoked-5678`, which
+# clears the generic-api-key entropy bar beside a `secret:` key. It was never a
+# credential; the fixture now reads `xoxb-bad-5678`, below the bar, so the tree
+# is clean and only this pull request's history still carries the literal.
+5575c828111cee9893e905201a240c26aa3d7437:platform/app/src/server/app-layer/automations/slack-integration/__tests__/slack-integration.service.unit.test.ts:generic-api-key:288
+
+# The SSO gate test set LANGWATCH_LICENSE_KEY to a made-up activation code
+# (LW- followed by sixteen characters), which clears the generic-api-key bar
+# beside a LICENSE_KEY name. It was never a credential; the test now mints a
+# code at runtime, so only this pull request's history carries the literal.
+ee724546d96949b22f8d04adc3a2ec5d8c79616a:platform/app/ee/sso/__tests__/sso-gate.test.ts:generic-api-key:248
+
+# Test fixtures moved into modules on this branch: a JWT whose payload is
+# {"projectId":"project-1"} signed with the word "signature", and named
+# placeholders (tok_live_partner_123, tok_live_rotated_456, lw-revoked-...).
+# None was ever a credential; the commits carrying them are history.
+41e28084ce434702e92ed7341bd82b8203f113a6:modules/api-key/process/src/services/__tests__/api-key-token-resolution.service.unit.test.ts:jwt:357
+41e28084ce434702e92ed7341bd82b8203f113a6:modules/auth/process/src/services/__tests__/api-rest-credentials.service.unit.test.ts:jwt:262
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/agent/process/src/services/__tests__/agent-http-secrets.integration.test.ts:generic-api-key:56
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/channels/__tests__/staged-run-body-seal.unit.test.ts:generic-api-key:13
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/services/__tests__/workflow-http-secrets.service.unit.test.ts:generic-api-key:12
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/services/__tests__/workflow-http-secrets.service.unit.test.ts:generic-api-key:159
+48f9eb920a2a021bbb8723d1d61896acea00b2b7:modules/api-key/process/src/services/__tests__/api-key-token-resolution-cache.unit.test.ts:generic-api-key:550
+
+# A connect-protocol test named its never-logged sentinel SECRET_MARKER with the
+# value SECRETMARK-9f3a, which clears the generic-api-key bar beside a SECRET
+# name. It was never a credential; the constant now reads CONTENT_MARKER =
+# "content-marker", so only this pull request's history carries the literal.
+e361040a34adcefc378718482969f16445ac70e9:modules/agent/process/src/transport/__tests__/agent-connect-output.rest.unit.test.ts:generic-api-key:21
+2ab77b8edccec30eca91ddab0618a9765b9b6a01:charts/langwatch/tests/credentials-secret-previous.sh:generic-api-key:57
+
+# An ops checkup test used the placeholder licence fingerprint "0123456789abcdef".
+# It was never a credential.
+14cdab9b9513879fea0976c2f37dcfb4cc7a7217:modules/ops/process/src/services/__tests__/ops-checkup.service.unit.test.ts:generic-api-key:95
+
+# Fixture keys for the paymentsim simulator.
+3111d76eea6039cd6836088e6e0b6d5b0a8e1c36:enterprise/modules/billing/process/src/__tests__/billing-paymentsim.integration.test.ts:stripe-access-token:34
+53c229dcf1a1106317544e0de7ed32b7387f1367:.claude/skills/paymentsim/SKILL.md:stripe-access-token:19
+53c229dcf1a1106317544e0de7ed32b7387f1367:tools/thuishaven/domain/overlay.go:stripe-access-token:494
+53c229dcf1a1106317544e0de7ed32b7387f1367:services/paymentsim/paymentsim_test.go:stripe-access-token:106
+92fb5a1a350349f390de4db5777371913fb29771:.claude/skills/paymentsim/SKILL.md:stripe-access-token:19
+92fb5a1a350349f390de4db5777371913fb29771:tools/thuishaven/README.md:stripe-access-token:238
+47d388239a9827aa4f01dd366260ff1263f793c5:tools/visualdiff/publish_test.go:generic-api-key:114
+47d388239a9827aa4f01dd366260ff1263f793c5:tools/visualdiff/runner/src/__tests__/totp.unit.test.ts:generic-api-key:6
+f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feature:generic-api-key:40
+6078b9b5db2995fab5636ab022dd490f5d53343e:.github/scripts/nightly-hygiene.test.ts:generic-api-key:147
+
+# A relay test quoted a made-up OpenAI key (`sk-proj-abc123`) inside a refused
+# key message, to prove the span drops it. It was never a credential; the
+# fixture now reads "Incorrect API key provided." with no key, so the tree is
+# clean and only this pull request's history still carries the literal.
+785058250c14fe307ce07f37644f3668c23cea47:services/langyagent/adapters/otelrelay/llmproxy_credit_test.go:generic-api-key:129
+# The monitor error-rate redaction test quoted a made-up OpenAI-style key to
+# prove the email and pause reason drop it. It was never a credential; the
+# fixture now uses a low-entropy marker, so only this pull request's history
+# still carries the literal.
+1a9993210beeb0dbe75b66591570721e16d484b1:modules/evaluation/process/src/rules/__tests__/monitor-error-rate.rules.unit.test.ts:generic-api-key:18

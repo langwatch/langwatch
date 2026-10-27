@@ -31,7 +31,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/prompts/{id}".format(
+        "url": "/api/v1/prompts/{id}".format(
             id=quote(str(id), safe=""),
         ),
         "params": params,
@@ -111,7 +111,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     version: int | Unset = UNSET,
     tag: str | Unset = UNSET,
 ) -> Response[
@@ -156,7 +156,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     version: int | Unset = UNSET,
     tag: str | Unset = UNSET,
 ) -> (
@@ -197,7 +197,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     version: int | Unset = UNSET,
     tag: str | Unset = UNSET,
 ) -> Response[
@@ -240,7 +240,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     version: int | Unset = UNSET,
     tag: str | Unset = UNSET,
 ) -> (

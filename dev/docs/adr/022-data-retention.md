@@ -41,8 +41,8 @@ The design space had four hard constraints:
    instance-local state. Reconciler-style logic on the cluster must be
    idempotent.
 
-The orphan-cleanup half of this — PG rows referencing CH traces that TTL
-deletes — has a distinct enough shape that it gets its own ADR (ADR-023).
+Postgres rows that reference ClickHouse traces may outlive those traces. ADR-025
+defines the deliberate policy: no ingestion-coupled orphan sweeper.
 
 ## Decision
 
@@ -79,14 +79,14 @@ and returns `appliedRetentionDays` so the UI shows the truth, not the form.
 
 ### Constants (`src/server/data-retention/retentionPolicy.schema.ts`)
 
-| Constant | Value | Purpose |
-|---|---|---|
-| `PLATFORM_DEFAULT_RETENTION_DAYS` | 49 | What new rows get stamped when no override resolves. Default-on. |
-| `MIN_RETENTION_DAYS` | 49 | Floor for any override; below this, ClickHouse TTL churn ROI collapses. |
-| `MAX_RETENTION_DAYS` | 65534 | UInt16 max, kept week-aligned. |
-| `RETENTION_WEEK_DAYS` | 7 | Tables are weekly-partitioned; values must be multiples of 7. |
-| `INDEFINITE_RETENTION_DAYS` | 0 | Sentinel. Platform-admin only. Maps to year-2106 TTL expiry. |
-| `MIGRATION_DEFAULT_RETENTION_DAYS` | 308 | The `DEFAULT 308` in migration 00032. Only read by rows that pre-existed the column. Distinct from `PLATFORM_DEFAULT_RETENTION_DAYS`. |
+| Constant                           | Value | Purpose                                                                                                                               |
+| ---------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `PLATFORM_DEFAULT_RETENTION_DAYS`  | 49    | What new rows get stamped when no override resolves. Default-on.                                                                      |
+| `MIN_RETENTION_DAYS`               | 49    | Floor for any override; below this, ClickHouse TTL churn ROI collapses.                                                               |
+| `MAX_RETENTION_DAYS`               | 65534 | UInt16 max, kept week-aligned.                                                                                                        |
+| `RETENTION_WEEK_DAYS`              | 7     | Tables are weekly-partitioned; values must be multiples of 7.                                                                         |
+| `INDEFINITE_RETENTION_DAYS`        | 0     | Sentinel. Platform-admin only. Maps to year-2106 TTL expiry.                                                                          |
+| `MIGRATION_DEFAULT_RETENTION_DAYS` | 308   | The `DEFAULT 308` in migration 00032. Only read by rows that pre-existed the column. Distinct from `PLATFORM_DEFAULT_RETENTION_DAYS`. |
 
 The 49 / 308 distinction is load-bearing: **49** is what new rows get
 stamped going forward; **308** is what pre-migration rows read lazily
@@ -109,8 +109,22 @@ metadata-only on the local replica. `IF NOT EXISTS` makes reruns no-ops.
 Down migrations are commented out — rollback is manual.
 
 Tables map to three categories that cascade independently
-(`RETENTION_TABLE_CATEGORY_MAP`): `traces` (7 tables), `scenarios`
-(2 tables), `experiments` (2 tables).
+(`RETENTION_TABLE_CATEGORY_MAP`): `traces`, `scenarios`, and `experiments`.
+`event_log` is the exception to table-level classification: each row is
+classified by `event-log-retention-policy.ts`. Only authentication, SSO,
+identity, authorization, and related security history uses
+`_retention_days = 0` and never expires. That includes virtual-key lifecycle
+events, but not other events on the shared `governance_subject` aggregate such
+as budget crossings. Every non-security family follows the matching customer
+category, including automation, coding-agent, ingestion, usage, gateway,
+configuration, operational, and billing events.
+
+The corresponding identity, SSO, SCIM, credential, membership, and
+authorization heads remain in PostgreSQL and are outside tenant retention.
+`SECURITY_RETENTION_EXEMPT_TABLES` reserves their storage names against the
+ClickHouse retention registry, and startup fails if a future table mapping
+tries to enroll one. This does not override explicit revocation, teardown,
+user/privacy erasure, or the normal expiry of sessions and verification proofs.
 
 PG carries `RetentionPolicy(scopeType, scopeId, category, retentionDays)`
 with a denormalized `organizationId` anchor for plan-gating and
@@ -155,19 +169,25 @@ when `CLICKHOUSE_COLD_STORAGE_ENABLED=true`.
 
 ### Ingestion stamping
 
-Every CH repository for the 11 managed tables takes a
-`RetentionPolicyResolver` and stamps `_retention_days` per row:
+Every CH repository for the retention-managed tables takes a
+`RetentionPolicyResolver` and stamps `_retention_days` per row. `event_log`
+uses one exhaustive aggregate map, with event-type prefix fallbacks for
+identity and authorization history plus an exact exemption for virtual-key
+lifecycle events. Security families are stamped 0; policy-bound families
+resolve their category:
 
 ```ts
+const retentionClass = classifyEventLogRowRetention(record);
 const retentionDays =
-  (await resolver?.getRetentionDays(tenantId, "traces"))
-  ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+  retentionClass === "indefinite"
+    ? INDEFINITE_RETENTION_DAYS
+    : (policy[retentionClass] ?? PLATFORM_DEFAULT_RETENTION_DAYS);
 ```
 
 `_size_bytes` is `MATERIALIZED` — CH computes it server-side at insert
 from the payload columns; the app must never pass it (CH rejects the row).
-Floor is 49 in production; 0 is only acceptable in test fixtures for
-backdated rows that would otherwise age out during a test.
+Floor is 49 in production for policy-bound rows. Zero is reserved for the
+explicitly indefinite security families.
 
 ### Retroactive (`retroactiveUpdate.service.ts`)
 
@@ -180,6 +200,21 @@ UPDATE _retention_days = {retentionDays:UInt16}
 WHERE TenantId = {tenantId:String} AND _retention_days != {retentionDays:UInt16}
 ```
 
+Every category also mutates its matching `event_log` rows. The predicate is
+generated from the same exhaustive classification used at ingestion. It
+excludes all indefinite security rows, selects simulation/suite aggregates for
+`scenarios`, experiment aggregates for `experiments`, and treats every other
+finite or unknown historical aggregate as `traces`. This prevents a customer
+retroactive change from shortening security history or applying a
+trace policy to mixed scenario and experiment events.
+
+Each `event_log` mutation includes a constant category marker in its predicate.
+Conflict detection treats marked mutations from other categories as independent,
+so the settings page can launch trace, scenario, and experiment updates in
+parallel. Progress derives the event-log category from the same marker. An
+unmarked legacy mutation blocks every category and is labelled `traces`, which
+is conservative for commands created before markers existed.
+
 The `!= N` predicate skips parts already at target. Before issuing the
 ALTER, we query `system.mutations` with
 `position(command, escapedTenantFilter)` and reject the request if any
@@ -188,7 +223,7 @@ in-flight `_retention_days` mutation matches the tenant + target tables.
 stores the command string and closes a CodeQL incomplete-encoding flag for
 project ids containing `'` or `\`.
 
-### Storage metering (`storageMeter.service.ts`)
+### Storage metering (`modules/data-retention/process`)
 
 Per-tenant total is computed as per-table `sum(_size_bytes)` scalars
 union-summed:
@@ -215,12 +250,11 @@ row exists. Two interaction surfaces: `pin` (`source=manual`) and
 user can share, then explicitly pin — the row's source becomes `manual`
 while the share is still active.
 
-The unpin guard is `hasActiveShareForTrace`, **not** `pin.source === share`
-— an earlier version checked source and missed the share→manual promotion
-path. The router translates `PinnedToActiveShareError` to tRPC `CONFLICT`;
-the UI greys the unpin action and points at the share toggle.
-`PinnedTraceService` and `ShareService` would form a cycle; broken by
-injecting `hasActiveShareForTrace` as a predicate from `presets.ts`.
+Share owns the unpin guard because it owns active-link discovery. It throws
+`PinnedToActiveShareError` before delegating pin persistence to Data Retention;
+the router translates it to tRPC `CONFLICT`. The guard checks active links,
+not `pin.source`, so it still catches a share pin promoted to a manual pin.
+Data Retention does not query Share, keeping the service graph acyclic.
 
 ### Authorization
 
@@ -228,12 +262,12 @@ Four independent gates, asserted at the router. Read paths use the same
 predicates to compute `writable` flags so the UI never offers a control
 the save will reject.
 
-| Gate | When | Failure |
-|---|---|---|
-| `assertCanWriteRetentionScope` | Always; per scope tier (`organization:manage` / `team:manage` / `project:update`) | FORBIDDEN |
-| `assertRetentionPlanForScope` | Set/remove; plan-gates against the **scope-owning org** | FORBIDDEN |
-| `assertCanDisableRetention` | Only when setting `INDEFINITE_RETENTION_DAYS`; `ADMIN_EMAILS` allow-list | FORBIDDEN |
-| `checkProjectPermission("project:update")` | Retroactive endpoint | FORBIDDEN |
+| Gate                                       | When                                                                              | Failure   |
+| ------------------------------------------ | --------------------------------------------------------------------------------- | --------- |
+| `assertCanWriteRetentionScope`             | Always; per scope tier (`organization:manage` / `team:manage` / `project:update`) | FORBIDDEN |
+| `assertRetentionPlanForScope`              | Set/remove; plan-gates against the **scope-owning org**                           | FORBIDDEN |
+| `assertCanDisableRetention`                | Only when setting `INDEFINITE_RETENTION_DAYS`; `ADMIN_EMAILS` allow-list          | FORBIDDEN |
+| `checkProjectPermission("project:update")` | Retroactive endpoint                                                              | FORBIDDEN |
 
 PROJECT-tier write uses `project:update` (not `manage`) to match the read
 snapshot's `writable` flag. Plan gating uses `resolveScopeOrganizationId`,
@@ -298,10 +332,12 @@ silently keeps data alive past policy — the underlying CH rows don't
 expire. Mitigation: regression tests for the MODIFY-TTL re-emit
 invariant, plus a check on every deploy.
 
-A bug in ingestion stamping that floors to 0 instead of 49 silently makes
-data indefinite for new inserts. Mitigation: `_retention_days = 0` is
-only acceptable in test fixtures; production paths always fall back to
-`PLATFORM_DEFAULT_RETENTION_DAYS`.
+A bug in ingestion classification can still make policy-bound data indefinite
+or make security history expire. Mitigation: the exhaustive aggregate map is
+shared by ingestion and retroactive SQL, unknown aggregates fall back to
+`traces`, and tests pin both the indefinite and policy-bound families.
+`_retention_days = 0` is a valid production stamp only for an explicitly
+indefinite security family.
 
 **Neutral.** Pinning growth is unbounded — manual pins survive until
 explicitly unpinned. Since the orphan sweep was removed (ADR-025), a
@@ -310,12 +346,13 @@ lingers as a stale reference. Acceptable given expected pin volume.
 
 ## References
 
-- Related ADRs: ADR-023 (orphan-sweep reactor + chain — superseded),
+- Related ADRs: ADR-025 (orphan sweep removed),
   ADR-025 (orphan sweep removed), ADR-019 (repository-service layering)
 - Migration: `platform/app/src/server/clickhouse/migrations/00032_add_retention_and_size_columns.sql`
 - Code: `platform/app/src/server/data-retention/`,
   `platform/app/src/server/clickhouse/ttlReconciler.ts`,
-  `platform/app/src/server/api/routers/dataRetention.ts`,
+  `modules/data-retention/process/src/api/app-trpc/data-retention.api.ts`,
+  `platform/app/src/runtime/app/internal-api/data-retention.router.ts`,
   `platform/app/src/pages/settings/data-retention.tsx`
 - Specs: `specs/data-retention/`
 - PR: #4147

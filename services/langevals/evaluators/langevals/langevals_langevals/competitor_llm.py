@@ -1,16 +1,16 @@
 import litellm
 from litellm.utils import get_max_tokens
 from litellm.cost_calculator import completion_cost
-from litellm import Choices, Message
 from litellm.files.main import ModelResponse
 from litellm.utils import trim_messages
 
 from pydantic import Field
 from typing import List, Optional, cast
-import os
-import json
 
+from langevals_core.tool_calls import read_tool_call_arguments
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
+    DEFAULT_MAX_TOKENS,
     BaseEvaluator,
     EvaluatorEntry,
     EvaluationResult,
@@ -58,10 +58,6 @@ class CompetitorLLMEvaluator(
     def evaluate(self, entry: CompetitorLLMEntry) -> SingleEvaluationResult:
         passed = True
         vendor, model = self.settings.model.split("/")
-        if vendor == "azure":
-            os.environ["AZURE_API_KEY"] = self.get_env("AZURE_API_KEY")
-            os.environ["AZURE_API_BASE"] = self.get_env("AZURE_API_BASE")
-            os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
         content = ""
         content += entry.input if entry.input else ""
         content += "\n" + entry.output if entry.output else ""
@@ -81,11 +77,7 @@ class CompetitorLLMEvaluator(
         if max_tokens_retrieved is None:
             raise ValueError("Model not mapped yet, cannot retrieve max tokens.")
         llm_max_tokens: int = int(max_tokens_retrieved)
-        max_tokens = (
-            min(self.settings.max_tokens, llm_max_tokens)
-            if self.settings.max_tokens
-            else llm_max_tokens
-        )
+        max_tokens = min(self.settings.max_tokens or DEFAULT_MAX_TOKENS, llm_max_tokens)
         messages = [
             {
                 "role": "system",
@@ -109,6 +101,7 @@ class CompetitorLLMEvaluator(
             ),
         )
         response = litellm.completion(
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             model=litellm_model,
             messages=messages,
             tools=[
@@ -122,7 +115,7 @@ class CompetitorLLMEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "Use this field to ponder and write the reasoning behind the decision written before a result is actually given",
+                                    "description": "A short reasoning for the decision, written before the result",
                                 },
                                 "competitor_mentioned": {
                                     "type": "boolean",
@@ -145,9 +138,11 @@ class CompetitorLLMEvaluator(
             tool_choice={"type": "function", "function": {"name": "competitor_check"}},  # type: ignore
         )
         response = cast(ModelResponse, response)
-        choice = cast(Choices, response.choices[0])
-        arguments = json.loads(
-            cast(Message, choice.message).tool_calls[0].function.arguments
+        arguments = read_tool_call_arguments(
+            response,
+            "competitor_check",
+            required=["competitor_mentioned"],
+            model=self.settings.model,
         )
         passed = not arguments["competitor_mentioned"] if "competitor_mentioned" in arguments else True
         confidence = arguments["confidence"] if "confidence" in arguments else 1

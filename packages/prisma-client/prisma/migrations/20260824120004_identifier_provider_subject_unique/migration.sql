@@ -1,0 +1,71 @@
+-- ADR-116: a provider subject names one account, so it may back one live
+-- identifier.
+--
+-- `Account` has always been `@@unique([provider, providerAccountId])` on
+-- better-auth's OWN provider id. The identity branch dropped that guarantee:
+-- `Identifier` carried only an index, and every lookup matched on the FOLDED
+-- `provider` vocabulary, which collapses auth0, okta and every custom OIDC
+-- connection into `oidc`. A subject is unique only WITHIN an issuer, so two
+-- enterprise IdPs minting the same subject string resolved to one identifier
+-- and the older row won - one customer signed in as another. The queries now
+-- key on `providerId`, and this index is the guarantee behind them.
+--
+-- Unique where `value` is not, and the difference is what the columns mean.
+-- One user legitimately holds several proven identifiers carrying the same
+-- ADDRESS - a password sign-in and a Google sign-in are two rows with one
+-- email, both VERIFIED - which is why `value` cannot be unique and why "one
+-- user per proven address" lives in `IdentifierReservation` instead. A
+-- provider SUBJECT is not like that: it names exactly one account at exactly
+-- one IdP, so two LIVE identifiers sharing `(providerId, providerAccountId)`
+-- are always either a duplicate or a takeover. Legacy already enforces it
+-- globally; this restores parity.
+--
+-- Partial on both axes, and both matter:
+--   * `providerAccountId IS NOT NULL` - a credential or email identifier has
+--     no subject, and every one of them would otherwise collide on NULL in
+--     engines that treat NULLs as equal. (Postgres does not, but the
+--     predicate says what is meant rather than relying on that.)
+--   * live states only - a DETACHED or DEAD_END row is a tombstone, and
+--     re-linking a provider account a customer previously unlinked is
+--     ordinary. Without the state filter the tombstone would block it.
+--
+-- The three literals ARE `LIVE_IDENTIFIER_STATES`
+-- (packages/identity/src/vocabulary.ts), which every repository `IN` clause
+-- and `isLiveIdentifierState` read from. This file cannot import it - a
+-- migration is immutable history - so the copy here does not follow a change
+-- made there. Adding a live state therefore takes a NEW migration that drops
+-- and recreates this index with the new state in its predicate, or rows in
+-- that state fall outside the guarantee. The constant carries the same note.
+--
+-- FORWARD CONSTRAINT, load-bearing, and the reason this comment is long: the
+-- real invariant is that a subject is unique PER CONNECTION. `providerId`
+-- stands in for the connection today only because there is exactly one
+-- connection per configured provider - auth0, okta, cognito, onelogin, oidc.
+-- The Auth0 exit changes that: Auth0 is a broker today and namespaces every
+-- enterprise customer's subjects behind one `providerId: "auth0"`, and after
+-- the exit each customer connects directly, minting subjects however their own
+-- IdP does (sequential integers and email addresses included). When
+-- connections become data (D04), every connection MUST get its own distinct
+-- provider id, or this index MUST be extended to include `connectionId`. Many
+-- customer connections sharing one provider id - `oidc`, built from the
+-- `OIDC_*` env vars, is the one to watch - re-opens exactly the cross-tenant
+-- sign-in this index closes.
+--
+-- Cannot fail on existing data. Every identifier carrying a subject was
+-- adopted from an `Account` row (`identity-backfill-plan.ts` sets `providerId`
+-- from `Account.provider` and `providerAccountId` from the row, together), or
+-- stated by a ceremony that requires `providerId` before it attaches anything;
+-- the born-finalized entrance only ever states an `email` identifier, with
+-- both columns null. So the source of every indexed row is a table already
+-- unique on this pair. The write gate also still ships closed, so no identity
+-- event has been emitted at all.
+--
+-- To roll back, uncomment and run manually. Dropping the index loses the
+-- guarantee, not any data.
+-- DROP INDEX "Identifier_providerId_providerAccountId_live_key";
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Identifier_providerId_providerAccountId_live_key"
+    ON "Identifier"("providerId", "providerAccountId")
+    WHERE "providerAccountId" IS NOT NULL
+      AND "state" IN ('ATTACHED', 'VERIFIED', 'PRIMARY');

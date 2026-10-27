@@ -255,18 +255,129 @@ func TestWorker_ClaimTurn_SerialisesConcurrentTurns(t *testing.T) {
 	}
 }
 
-func TestPool_Acquire_AtCapacityReturnsErrMaxWorkers(t *testing.T) {
+// @scenario "A real turn's spawn evicts an idle worker at capacity"
+func TestPool_Acquire_AtCapacityEvictsIdleWorkerForATurn(t *testing.T) {
 	p := newTestPool(1)
-	// One worker already occupies the single slot.
-	p.workers["existing"] = &Worker{}
+	// One IDLE worker (a pre-warm nobody messaged, or a leftover between turns)
+	// occupies the single slot.
+	p.workers["existing"] = &Worker{conversationID: "existing"}
+	_, err := p.Acquire(context.Background(), "new-conv", domain.Credentials{
+		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
+	})
+	// The spawn itself fails in this environment (no sessions root); what the
+	// eviction contract promises is that capacity was NOT the refusal and the
+	// idle worker gave up its slot.
+	if herr.IsCode(err, domain.ErrMaxWorkers) {
+		t.Fatalf("a turn acquire must evict an idle worker instead of refusing at capacity, got %v", err)
+	}
+	p.mu.Lock()
+	_, stillThere := p.workers["existing"]
+	p.mu.Unlock()
+	if stillThere {
+		t.Fatalf("the idle worker should have been evicted to free the slot")
+	}
+}
+
+// @scenario "A turn waits only when every worker is genuinely busy"
+func TestPool_Acquire_AtCapacityAllBusyReturnsErrMaxWorkers(t *testing.T) {
+	p := newTestPool(1)
+	busy := &Worker{conversationID: "existing"}
+	if busy.ClaimTurn("t1") != app.ClaimGranted {
+		t.Fatalf("claiming the seeded worker's turn should be granted")
+	}
+	p.workers["existing"] = busy
 	_, err := p.Acquire(context.Background(), "new-conv", domain.Credentials{
 		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
 	})
 	if err == nil {
-		t.Fatalf("expected ErrMaxWorkers when the pool is full")
+		t.Fatalf("expected ErrMaxWorkers when every worker is busy")
 	}
 	if !herr.IsCode(err, domain.ErrMaxWorkers) {
 		t.Fatalf("expected herr(ErrMaxWorkers), got %v", err)
+	}
+}
+
+// @scenario "A warm at capacity evicts the least-recently-active idle worker"
+func TestPool_AcquireWarm_AtCapacityEvictsIdleWorker(t *testing.T) {
+	p := newTestPool(1)
+	// The slot holds an idle worker that HAS served a turn. Its conversation
+	// survives in the persistent session store, so evicting it costs only a
+	// cheap resume later — the newest warm follows the user's attention.
+	served := &Worker{conversationID: "existing"}
+	if served.ClaimTurn("t1") != app.ClaimGranted {
+		t.Fatalf("claiming the seeded worker's turn should be granted")
+	}
+	served.Release()
+	p.workers["existing"] = served
+	_, err := p.AcquireWarm(context.Background(), "warm-conv", domain.Credentials{
+		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
+	})
+	// The spawn itself fails in this environment (no sessions root); the
+	// contract under test is that capacity was NOT the refusal and the idle
+	// worker gave up its slot.
+	if herr.IsCode(err, domain.ErrMaxWorkers) {
+		t.Fatalf("a warm must evict an idle worker instead of refusing at capacity, got %v", err)
+	}
+	p.mu.Lock()
+	_, stillThere := p.workers["existing"]
+	p.mu.Unlock()
+	if stillThere {
+		t.Fatalf("the idle worker should have been evicted for the newer warm")
+	}
+}
+
+// @scenario "A warm never disturbs a busy worker"
+func TestPool_AcquireWarm_AtCapacityAllBusyRefuses(t *testing.T) {
+	p := newTestPool(1)
+	busy := &Worker{conversationID: "existing"}
+	if busy.ClaimTurn("t1") != app.ClaimGranted {
+		t.Fatalf("claiming the seeded worker's turn should be granted")
+	}
+	p.workers["existing"] = busy
+	_, err := p.AcquireWarm(context.Background(), "warm-conv", domain.Credentials{
+		LangwatchAPIKey: "k", LLMVirtualKey: "vk", GatewayBaseURL: "g", LangwatchEndpoint: "e",
+	})
+	if !herr.IsCode(err, domain.ErrMaxWorkers) {
+		t.Fatalf("expected herr(ErrMaxWorkers) for a warm when every worker is busy, got %v", err)
+	}
+	p.mu.Lock()
+	_, stillThere := p.workers["existing"]
+	p.mu.Unlock()
+	if !stillThere {
+		t.Fatalf("a warm must never evict a worker that is running a turn")
+	}
+}
+
+// @scenario "A warm never replaces the conversation's live worker"
+func TestPool_AcquireWarm_CredentialMismatchReturnsLiveWorkerUntouched(t *testing.T) {
+	p := newTestPool(4)
+	creds := domain.Credentials{
+		Model: "openai/gpt-5-mini", LangwatchAPIKey: "k", LLMVirtualKey: "vk",
+		GatewayBaseURL: "g", LangwatchEndpoint: "e",
+	}
+	// The conversation's worker is MID-TURN when a background warm arrives
+	// carrying a different model. Killing it here killed real replies in the
+	// field ("pi worker process exited mid-turn"); the warm must yield.
+	busy := &Worker{conversationID: "c", credSig: sigOf(creds)}
+	if busy.ClaimTurn("t1") != app.ClaimGranted {
+		t.Fatalf("claiming the seeded worker's turn should be granted")
+	}
+	p.workers["c"] = busy
+
+	warmCreds := creds
+	warmCreds.Model = "gemini/gemini-3.7-flash"
+	got, err := p.AcquireWarm(context.Background(), "c", warmCreds)
+	if err != nil {
+		t.Fatalf("a mismatched warm should return the live worker, got error %v", err)
+	}
+	if got.(*Worker) != busy {
+		t.Fatalf("a mismatched warm must return the conversation's live worker untouched")
+	}
+	p.mu.Lock()
+	still := p.workers["c"]
+	p.mu.Unlock()
+	if still != busy {
+		t.Fatalf("the live worker must not be killed or replaced by a warm")
 	}
 }
 
@@ -314,9 +425,89 @@ func TestPool_SurvivesPanicInBackgroundGoroutine(t *testing.T) {
 
 	// The manager is still alive and responsive after the panic: Status takes the
 	// pool lock and returns, which a dead process could never do.
-	if active, max := p.Status(); active != 0 || max != 4 {
-		t.Fatalf("pool Status after a background panic = (%d,%d), want (0,4)", active, max)
+	if active, capacity := p.Status(); active != 0 || capacity != 4 {
+		t.Fatalf("pool Status after a background panic = (%d,%d), want (0,4)", active, capacity)
 	}
 	// And the pool's internal sweep machinery still runs without deadlock.
 	p.reapIdle()
+}
+
+// @scenario "The session store survives the worker's teardown"
+func TestPool_TombstoneLeavesSessionStashIntact(t *testing.T) {
+	p := newTestPool(2)
+	p.sessionsRoot = t.TempDir()
+	conv := "langyconv_stash1"
+	home := filepath.Join(p.sessionsRoot, conv)
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatalf("mkdir home: %v", err)
+	}
+	stash := p.piSessionDir(conv)
+	if err := os.MkdirAll(stash, 0o700); err != nil {
+		t.Fatalf("mkdir stash: %v", err)
+	}
+	sessionFile := filepath.Join(stash, "session.jsonl")
+	if err := os.WriteFile(sessionFile, []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write session: %v", err)
+	}
+
+	tombstone := tombstoneWorkerHome(context.Background(), p.sessionsRoot, conv)
+	if tombstone == "" {
+		t.Fatalf("tombstone failed for a valid conversation home")
+	}
+	if _, err := os.Stat(home); !os.IsNotExist(err) {
+		t.Fatalf("the home should be renamed away, stat err = %v", err)
+	}
+	if _, err := os.Stat(sessionFile); err != nil {
+		t.Fatalf("the session file must survive the home's teardown: %v", err)
+	}
+}
+
+// @scenario "A quiet conversation's session store is swept after a day"
+func TestPool_SweepSessionStashes(t *testing.T) {
+	p := newTestPool(2)
+	p.sessionsRoot = t.TempDir()
+	old := time.Now().Add(-sessionStashTTL - time.Hour)
+
+	makeStash := func(conv string, mtime time.Time) string {
+		dir := p.piSessionDir(conv)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("mkdir stash: %v", err)
+		}
+		file := filepath.Join(dir, "session.jsonl")
+		if err := os.WriteFile(file, []byte("{}\n"), 0o600); err != nil {
+			t.Fatalf("write session: %v", err)
+		}
+		if err := os.Chtimes(file, mtime, mtime); err != nil {
+			t.Fatalf("chtimes file: %v", err)
+		}
+		if err := os.Chtimes(dir, mtime, mtime); err != nil {
+			t.Fatalf("chtimes dir: %v", err)
+		}
+		return dir
+	}
+
+	stale := makeStash("langyconv_stale1", old)
+	// The directory is old but its session file was written minutes ago — an
+	// active conversation whose stash dir simply never changed shape.
+	recent := makeStash("langyconv_fresh1", old)
+	now := time.Now()
+	if err := os.Chtimes(filepath.Join(recent, "session.jsonl"), now, now); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+	live := makeStash("langyconv_live11", old)
+	withLocked(p, func() {
+		p.workers["langyconv_live11"] = &Worker{conversationID: "langyconv_live11"}
+	})
+
+	p.sweepSessionStashes()
+
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("the stale stash should be swept, stat err = %v", err)
+	}
+	if _, err := os.Stat(recent); err != nil {
+		t.Errorf("a stash with a recent session write must be kept: %v", err)
+	}
+	if _, err := os.Stat(live); err != nil {
+		t.Errorf("a live worker's stash must be kept: %v", err)
+	}
 }

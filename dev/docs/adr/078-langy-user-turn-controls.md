@@ -30,7 +30,7 @@ control of one in-flight turn:
 
 3. **Carry on after a refresh.** ADR-077 made the durable token buffer the resume
    state and the server already settles a turn whose terminal frame was missed
-   (`langyTurnSettlement.ts`), but the browser never *rejoins* a running turn on a
+   (`langyTurnSettlement.ts`), but the browser never _rejoins_ a running turn on a
    cold mount — `reconnectToStream()` returns null and the "Catching up…" state is
    hard-coded off. A refresh mid-answer drops you to a working-line placeholder
    that only reconciles once the turn ends.
@@ -43,7 +43,7 @@ has to respect that, not route around it.
 
 ## Decision
 
-### 1. A stop is a third terminal *outcome*, not a new event
+### 1. A stop is a third terminal _outcome_, not a new event
 
 `agent_responded` already carries `outcome: "completed" | "failed"` and the whole
 final answer as its payload. A user-stop is not a failure (nothing went wrong) and
@@ -58,8 +58,8 @@ This buys the entire terminal machinery for free:
 - **First-writer-wins for free.** The stop dispatches `recordAgentResponse` on the
   same `turn-terminal:${turnId}` slot as a natural completion. If the real answer
   landed first, the stop collapses (the user simply gets the whole answer); if the
-  stop landed first, the worker's late final collapses. The messageId is *derived
-  from the turnId* (`turnMessageId`), so the two writers even agree on the message
+  stop landed first, the worker's late final collapses. The messageId is _derived
+  from the turnId_ (`turnMessageId`), so the two writers even agree on the message
   identity — no duplicate reply.
 - **The partial is preserved for free.** The message map projection already
   materialises the assistant message from `agent_responded` regardless of outcome.
@@ -156,15 +156,15 @@ and the panel renders the final/stopped answer instead of reattaching to nothing
 
 - **A dedicated `agent_response_stopped` event.** Rejected: it would need its own
   command, schema, map-projection branch (to store the partial as a message), and
-  fold handlers, and a *second* terminal slot to keep first-writer-wins — all to
+  fold handlers, and a _second_ terminal slot to keep first-writer-wins — all to
   express what `outcome` already discriminates. The house already carries
   completed/failed on one `agent_responded`; stopped is the same shape.
 - **Client-only stop (status quo) + a server "reap" sweep.** Rejected: the sweep is
-  the liveness backstop for *dead* workers; using it for a deliberate stop means
+  the liveness backstop for _dead_ workers; using it for a deliberate stop means
   minutes of token burn and a UI that lies until the sweep catches up.
 - **Worker-authored stop (the worker POSTs a stopped-final on cancel).** Rejected
-  as the *primary* path: it makes confirmation depend on a live, responsive worker.
-  Kept as the *token-burn* half only; the control-plane terminal is authoritative.
+  as the _primary_ path: it makes confirmation depend on a live, responsive worker.
+  Kept as the _token-burn_ half only; the control-plane terminal is authoritative.
 - **Kill the worker process to stop generation (`Pool.kill`).** Rejected as the
   default: it destroys the warm session and cold-starts the next turn. The opencode
   session abort is surgical; process kill stays the heavy fallback it already is.
@@ -178,18 +178,18 @@ and the panel renders the final/stopped answer instead of reattaching to nothing
    terminal frame) and the surgical opencode abort is a fast follow, with the turn
    still detaching cleanly in the meantime. Verify against the pinned build.
 2. **Turn-fold projection version.** Adding a `stopped` status value does not change
-   how any *existing* event folds (only new stopped terminals produce it), so no
+   how any _existing_ event folds (only new stopped terminals produce it), so no
    version bump / re-projection is strictly required. Confirm we are comfortable
    not bumping `CONVERSATION_TURN`.
 3. **Continue depth.** V1 continues by re-driving against durable history. Reusing
-   the ADR-048 handoff/`revive` machinery to resume the *same* opencode session
+   the ADR-048 handoff/`revive` machinery to resume the _same_ opencode session
    (preserving in-memory context past a hard cancel) is a later enhancement.
 
 ## References
 
 - [`specs/langy/langy-stop-and-resume.feature`](../../../specs/langy/langy-stop-and-resume.feature)
   — the behavioural contract for stop / continue / resume.
-- `platform/app/prisma/migrations/20260722060000_langy_turn_status_text/migration.sql`
+- `packages/prisma-client/prisma/migrations/20260722060000_langy_turn_status_text/migration.sql`
   — drops the turn-status enum in favour of TEXT, driven by the `stopped` status
   this ADR introduces. **Its comment cites this ADR as "ADR-058".** That number
   predates the renumber that moved this document from 058 to 078; live ADR-058 is

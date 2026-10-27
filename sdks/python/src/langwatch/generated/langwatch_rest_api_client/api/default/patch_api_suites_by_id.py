@@ -7,11 +7,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_suites_by_id_body import PatchApiSuitesByIdBody
 from ...models.patch_api_suites_by_id_response_200 import PatchApiSuitesByIdResponse200
-from ...models.patch_api_suites_by_id_response_400 import PatchApiSuitesByIdResponse400
-from ...models.patch_api_suites_by_id_response_401 import PatchApiSuitesByIdResponse401
 from ...models.patch_api_suites_by_id_response_404 import PatchApiSuitesByIdResponse404
-from ...models.patch_api_suites_by_id_response_422 import PatchApiSuitesByIdResponse422
-from ...models.patch_api_suites_by_id_response_500 import PatchApiSuitesByIdResponse500
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -24,7 +20,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": "/api/suites/{id}".format(
+        "url": "/api/v1/suites/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }
@@ -40,44 +36,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PatchApiSuitesByIdResponse200
-    | PatchApiSuitesByIdResponse400
-    | PatchApiSuitesByIdResponse401
-    | PatchApiSuitesByIdResponse404
-    | PatchApiSuitesByIdResponse422
-    | PatchApiSuitesByIdResponse500
-    | None
-):
+) -> PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404 | None:
     if response.status_code == 200:
         response_200 = PatchApiSuitesByIdResponse200.from_dict(response.json())
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = PatchApiSuitesByIdResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = PatchApiSuitesByIdResponse401.from_dict(response.json())
-
-        return response_401
-
     if response.status_code == 404:
         response_404 = PatchApiSuitesByIdResponse404.from_dict(response.json())
 
         return response_404
-
-    if response.status_code == 422:
-        response_422 = PatchApiSuitesByIdResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = PatchApiSuitesByIdResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -87,14 +55,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PatchApiSuitesByIdResponse200
-    | PatchApiSuitesByIdResponse400
-    | PatchApiSuitesByIdResponse401
-    | PatchApiSuitesByIdResponse404
-    | PatchApiSuitesByIdResponse422
-    | PatchApiSuitesByIdResponse500
-]:
+) -> Response[PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -109,17 +70,10 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiSuitesByIdBody | Unset = UNSET,
-) -> Response[
-    PatchApiSuitesByIdResponse200
-    | PatchApiSuitesByIdResponse400
-    | PatchApiSuitesByIdResponse401
-    | PatchApiSuitesByIdResponse404
-    | PatchApiSuitesByIdResponse422
-    | PatchApiSuitesByIdResponse500
-]:
-    """Update a suite (run plan)
+) -> Response[PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404]:
+    """Update a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
@@ -130,7 +84,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse400 | PatchApiSuitesByIdResponse401 | PatchApiSuitesByIdResponse404 | PatchApiSuitesByIdResponse422 | PatchApiSuitesByIdResponse500]
+        Response[PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -148,18 +102,10 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiSuitesByIdBody | Unset = UNSET,
-) -> (
-    PatchApiSuitesByIdResponse200
-    | PatchApiSuitesByIdResponse400
-    | PatchApiSuitesByIdResponse401
-    | PatchApiSuitesByIdResponse404
-    | PatchApiSuitesByIdResponse422
-    | PatchApiSuitesByIdResponse500
-    | None
-):
-    """Update a suite (run plan)
+) -> PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404 | None:
+    """Update a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
@@ -170,7 +116,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse400 | PatchApiSuitesByIdResponse401 | PatchApiSuitesByIdResponse404 | PatchApiSuitesByIdResponse422 | PatchApiSuitesByIdResponse500
+        PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404
     """
 
     return sync_detailed(
@@ -183,17 +129,10 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiSuitesByIdBody | Unset = UNSET,
-) -> Response[
-    PatchApiSuitesByIdResponse200
-    | PatchApiSuitesByIdResponse400
-    | PatchApiSuitesByIdResponse401
-    | PatchApiSuitesByIdResponse404
-    | PatchApiSuitesByIdResponse422
-    | PatchApiSuitesByIdResponse500
-]:
-    """Update a suite (run plan)
+) -> Response[PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404]:
+    """Update a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
@@ -204,7 +143,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse400 | PatchApiSuitesByIdResponse401 | PatchApiSuitesByIdResponse404 | PatchApiSuitesByIdResponse422 | PatchApiSuitesByIdResponse500]
+        Response[PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -220,18 +159,10 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiSuitesByIdBody | Unset = UNSET,
-) -> (
-    PatchApiSuitesByIdResponse200
-    | PatchApiSuitesByIdResponse400
-    | PatchApiSuitesByIdResponse401
-    | PatchApiSuitesByIdResponse404
-    | PatchApiSuitesByIdResponse422
-    | PatchApiSuitesByIdResponse500
-    | None
-):
-    """Update a suite (run plan)
+) -> PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404 | None:
+    """Update a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         id (str):
@@ -242,7 +173,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse400 | PatchApiSuitesByIdResponse401 | PatchApiSuitesByIdResponse404 | PatchApiSuitesByIdResponse422 | PatchApiSuitesByIdResponse500
+        PatchApiSuitesByIdResponse200 | PatchApiSuitesByIdResponse404
     """
 
     return (

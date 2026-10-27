@@ -1,0 +1,40 @@
+import type { AgentResponse } from "@/client-sdk/services/agents/agents-api.service";
+
+/** An offline row unseen for this long, with a newer sibling, is left out of the list. */
+export const STALE_SIBLING_MS = 24 * 60 * 60 * 1000;
+
+const seenAtMs = (agent: AgentResponse): number => {
+  const stamp = agent.lastSeenAt ?? agent.updatedAt;
+  const ms = new Date(stamp).getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+};
+
+const siblingKey = (agent: AgentResponse): string => `${agent.name}\0${agent.environment ?? ""}`;
+
+/**
+ * One row per name and environment: keeps every online row, the latest row of
+ * each pair and any row seen in the last day; drops an offline row a sibling
+ * outlived by more than a day. Spec: specs/typescript-sdk/cli-agents.feature
+ */
+export const collapseStaleSiblings = ({
+  agents,
+  now = Date.now(),
+}: {
+  agents: AgentResponse[];
+  now?: number;
+}): AgentResponse[] => {
+  const newestSeen = new Map<string, number>();
+  for (const agent of agents) {
+    if (agent.type !== "connected") continue;
+    const key = siblingKey(agent);
+    newestSeen.set(key, Math.max(newestSeen.get(key) ?? 0, seenAtMs(agent)));
+  }
+
+  return agents.filter((agent) => {
+    if (agent.type !== "connected" || agent.status === "online") return true;
+    const seen = seenAtMs(agent);
+    const newest = newestSeen.get(siblingKey(agent)) ?? seen;
+    if (seen >= newest) return true;
+    return now - seen < STALE_SIBLING_MS;
+  });
+};

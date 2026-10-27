@@ -1,0 +1,60 @@
+/** Maps Traceloop span kinds and entity messages to canonical GenAI keys. */
+
+import { ATTR_KEYS } from "./attributeKeys.ts";
+import {
+  type AttributeCanonicaliser,
+  type ExtractorContext,
+  takeAttribute,
+} from "./canonicalAttributes.ts";
+import {
+  ALLOWED_SPAN_TYPES,
+  extractInputMessages,
+  extractOutputMessages,
+  recordValueType,
+} from "./canonicalExtraction.ts";
+
+export class TraceloopCanonicaliserService implements AttributeCanonicaliser {
+  static create(): TraceloopCanonicaliserService {
+    return new TraceloopCanonicaliserService();
+  }
+
+  private constructor() {}
+
+  readonly id = "traceloop";
+
+  apply(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+
+    if (!attrs.has(ATTR_KEYS.SPAN_TYPE)) {
+      const rawKind = takeAttribute(attrs, ATTR_KEYS.TRACELOOP_SPAN_KIND);
+      const kind = typeof rawKind === "string" ? rawKind.toLowerCase() : null;
+
+      if (kind && ALLOWED_SPAN_TYPES[kind] === true) {
+        ctx.setAttr(ATTR_KEYS.SPAN_TYPE, kind);
+        ctx.recordRule(`${this.id}:span.kind`);
+      }
+    } else {
+      takeAttribute(attrs, ATTR_KEYS.TRACELOOP_SPAN_KIND);
+    }
+
+    if (
+      extractInputMessages(
+        ctx,
+        [{ type: "attr", keys: [ATTR_KEYS.TRACELOOP_ENTITY_INPUT] }],
+        `${this.id}:entity.input->gen_ai.input.messages`,
+      )
+    ) {
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+    }
+
+    if (
+      extractOutputMessages(
+        ctx,
+        [{ type: "attr", keys: [ATTR_KEYS.TRACELOOP_ENTITY_OUTPUT] }],
+        `${this.id}:entity.output->gen_ai.output.messages`,
+      )
+    ) {
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
+    }
+  }
+}

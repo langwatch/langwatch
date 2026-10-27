@@ -306,6 +306,33 @@ Feature: AI Gateway virtual key creation
     And the budget row is kept with its spend history
 
   @integration
+  Scenario: Revoking a key retires a cap that targets only that key
+    Given a budget created on the budgets page that targets one key
+    When that key is revoked
+    Then the budget is retired too, because a revoked key can never spend again
+
+  @integration
+  Scenario: Revoking a key retires a per-end-user allowance anchored on it
+    Given a per-end-user budget anchored on a key
+    When that key is revoked
+    Then the allowance is retired, because no further end user can be attributed to it
+
+  @integration
+  Scenario: Revoking a key leaves a project budget standing
+    Given a project has a budget
+    And a key scoped to that project
+    When the key is revoked
+    Then the project budget still applies, because another key can be scoped there
+
+  @integration
+  Scenario: Clearing the drawer budget leaves an independently created cap alone
+    Given a key with a drawer budget
+    And a budget created on the budgets page that targets the same key
+    When the drawer budget field is cleared
+    Then only the drawer budget is retired
+    And the independently created cap still applies, because the key is still live
+
+  @integration
   Scenario: The drawer lists the budgets that already constrain this key
     Given the organization has a monthly budget
     And project "web-app" has a monthly budget

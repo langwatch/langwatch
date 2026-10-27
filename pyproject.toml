@@ -1,0 +1,52 @@
+# The Python workspace root — the uv counterpart of pnpm-workspace.yaml
+# (ADR-076 for JavaScript, ADR-145 for Python). Virtual on purpose: nothing
+# builds or publishes from here, it only names the members that share one
+# uv.lock and one .venv. services/langevals stays out — its evaluator
+# dependency zoo needs its own resolution (see the ADR).
+
+[tool.uv.workspace]
+members = ["sdks/python", "packages/ksuid-python"]
+
+# Resolution settings live here because uv only honours them at the workspace
+# root; a member's [tool.uv] block is silently ignored. They apply to every
+# member's resolution.
+[tool.uv]
+# exclude-newer-package below needs uv 0.9.25+ (dev/docs/best_practices/dependency-age-gates.md).
+required-version = ">=0.9.25"
+exclude-newer = "7 days"
+
+# Security fixes released inside the 7-day window above. Each entry admits one
+# package up to a fixed date, so the rest of the tree keeps the cooldown. Drop
+# an entry once its date is more than 7 days old (#8958). streamlit is here
+# because 1.66.1 is its first release that accepts Pillow 13. Each date sits
+# just after the patched release, so nothing newer slips in.
+exclude-newer-package = { certifi = "2026-10-21T00:00:00Z", pillow = "2026-10-17T00:00:00Z", pypdf = "2026-10-18T00:00:00Z", streamlit = "2026-10-22T00:00:00Z" }
+
+# Transitive-dependency security pins. Keep these even when the importing
+# package isn't a direct dependency, so a future re-resolution can't silently
+# pull a vulnerable version back in.
+constraint-dependencies = [
+  "jupyter-server>=2.20.0", # security: CVE-2026-44727 stored XSS in nbconvert handlers (GHSA-fcw5-x6j4-ccmp)
+  "vcrpy>=8.2.1", # security: vcrpy advisory (#1531)
+  "langsmith>=0.8.18", # security: langsmith advisory (#1532)
+  "python-engineio>=4.13.2", # security: python-engineio advisory (#1545, #1546)
+  "python-socketio>=5.16.2", # security: python-socketio advisory (#1547)
+  "bleach>=6.4.0", # security: bleach advisory (#1494)
+  "onnx>=1.22.0", # security: onnx advisory (#1560)
+  "transformers>=5.10.0", # security: transformers advisory (#2196)
+  "mistune>=3.3.3", # security: mistune advisory (#2216)
+  "tornado>=6.5.9", # security: tornado advisories covering <=6.5.8 (#2803-#2805)
+  "anyio>=4.14.2", # security: anyio advisories (#2434, #2435)
+  "soupsieve>=2.9.0", # security: soupsieve advisories (#2422, #2423)
+  "accelerate>=1.15.0", # security: accelerate advisory covers <=1.14.0 (#2787)
+  "pyjwt>=2.15.0", # security: PyJWT advisories covering <=2.14.0 (#2788-#2798, #2802, #2806, #2819)
+  "urllib3>=2.8.0", # security: urllib3 advisories covering <2.8.0 (#2799-#2801)
+  "fsspec>=2026.6.0", # security: fsspec advisory covering <2026.6.0 (#2751)
+  "langgraph-sdk>=0.4.4", # security: langgraph-sdk advisory covering <=0.4.3 (#2750)
+  "notebook>=7.6.3", # security: notebook advisory covering 7.5.0-7.6.2 (#2815)
+  "multidict>=6.9.1", # security: multidict advisory covering 6.7.0-6.9.0 (#2818)
+  "aiohttp>=3.14.4", # security: aiohttp advisories covering <=3.14.3, two HIGH (#2854-#2856)
+  "certifi>=2026.10.19", # security: certifi advisory covering <2026.10.19 (#2949)
+  "pillow>=13.0.0", # security: Pillow advisories covering <13.0.0, three CRITICAL (#2955-#2963, #3038-#3075)
+  "mcp>=1.30.0,!=2.0.*,!=2.1.*", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2829)
+]

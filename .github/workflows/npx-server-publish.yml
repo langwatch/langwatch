@@ -9,12 +9,16 @@
 #   exception to the `<component>@<version>` shape: Go requires a submodule's
 #   tag to be `<subdir>/vX.Y.Z`, so it tags as `sdks/go/v*`.
 # - `workflow_dispatch` from main for break-glass / first publish / beta
-#   bumps. The dispatched run reads the version from package.json — it does
+#   bumps. The dispatched run reads the version from apps/server/package.json — it does
 #   NOT require a release tag.
 #
-# Version lock: root package.json and platform/app/package.json must match.
-# Both are auto-bumped in lockstep by release-please-config.json (the `.`
-# package's extra-files list). The pre-publish step verifies it.
+# What a release ships (ADR-180): the AI gateway binaries and one prebuilt app archive per platform
+# on the GitHub release v$VERSION, then the npm package, which is the CLI alone. npm publish waits
+# for every archive, so a platform whose archive failed to build never meets a CLI that wants it.
+#
+# Version lock: apps/server/package.json and apps/api/package.json must match.
+# Both are auto-bumped in lockstep by release-please-config.json. The
+# pre-publish step verifies it.
 #
 # npm dist-tag is auto-derived from the package version:
 #   3.1.0          → @latest
@@ -26,7 +30,7 @@
 # add provider `GitHub Actions` with:
 #   Repository:        langwatch/langwatch
 #   Workflow filename: npx-server-publish.yml
-#   Environment:       (leave empty — we don't use job environments)
+#   Environment:       (leave empty: we do not use job environments)
 # Once configured, the NPM_API_TOKEN secret can be deleted; the
 # `id-token: write` permission below is sufficient for npm to mint a
 # short-lived publish token from the OIDC token.
@@ -38,51 +42,48 @@ on:
     types: [published]
   workflow_dispatch:
 
-# A publish run drains — see publish-docker-app. This job uploads monobinaries
-# onto the GitHub release AND publishes to npm, so a cancelled run can leave a
-# release carrying a partial set of assets that nothing reconciles.
+# A publish run drains — see publish-docker-app. These jobs upload binaries and archives onto the
+# GitHub release AND publish to npm, so a cancelled run can leave a release carrying a partial set
+# of assets that nothing reconciles.
 concurrency:
   group: npx-server-publish-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
-  contents: write # for creating/updating GH release with aigateway monobinaries
+  contents: write # for creating/updating the GH release with binaries and app archives
   id-token: write # for npm provenance + Trusted Publishers OIDC exchange
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'langwatch@')) ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     timeout-minutes: 20
+    outputs:
+      version: ${{ steps.versions.outputs.version }}
+      npm_tag: ${{ steps.versions.outputs.npm_tag }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        with:
-          run_install: false
+      - name: Setup pnpm + Node
+        uses: ./.github/actions/setup-pnpm-node
 
       - name: Resolve and verify versions
         id: versions
         run: |
           set -e
-          pkg_version="$(node -p "require('./package.json').version")"
-          app_version="$(node -p "require('./platform/app/package.json').version")"
+          pkg_version="$(node -p "require('./apps/server/package.json').version")"
+          app_version="$(node -p "require('./apps/api/package.json').version")"
           tag="${GITHUB_REF_NAME:-}"
-          echo "package.json version:           $pkg_version"
-          echo "platform/app/package.json version: $app_version"
+          echo "apps/server/package.json version: $pkg_version"
+          echo "apps/api/package.json version:    $app_version"
           echo "release tag (if any):           $tag"
 
           if [ "$pkg_version" != "$app_version" ]; then
-            echo "✗ version mismatch: root=$pkg_version langwatch=$app_version"
+            echo "✗ version mismatch: server=$pkg_version langwatch=$app_version"
             echo "  release-please should keep these in lockstep — check release-please-config.json"
             exit 1
           fi
@@ -101,7 +102,7 @@ jobs:
 
           # Auto-derive npm dist-tag from version: any `-` suffix (beta, rc,
           # alpha, next, etc.) → `prerelease`; clean semver → `latest`.
-          # Same convention as scenario js (.github/workflows/javascript-publish.yml).
+          # Same convention as the langwatch/scenario JS publish.
           if [[ "$pkg_version" == *"-"* ]]; then
             npm_tag="prerelease"
           else
@@ -112,12 +113,9 @@ jobs:
           echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
           echo "npm_tag=$npm_tag" >> "$GITHUB_OUTPUT"
 
-      - name: Install pnpm dependencies (workspace)
-        run: pnpm install --frozen-lockfile
-
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: "go.mod"
+          go-version-file: go.work
           cache: true
 
       # Build the aigateway monobinary for all 4 platforms and create a
@@ -164,177 +162,124 @@ jobs:
             if [[ "$VERSION" == *"-"* ]]; then prerelease_flag="--prerelease"; fi
             gh release create "$tag" \
               --title "v$VERSION" \
-              --notes "@langwatch/server@$VERSION — aigateway monobinaries" \
+              --notes "@langwatch/server@$VERSION — aigateway monobinaries and prebuilt app archives" \
               $prerelease_flag \
               _pack/aigateway-*
           fi
 
-      - name: Build @langwatch/server CLI
-        run: pnpm --filter @langwatch/server-cli build
+  # One archive per platform, each on a runner of that platform so native dependencies match
+  # (ADR-180). The npx CLI's `app` predep downloads
+  #   https://github.com/langwatch/langwatch/releases/download/v$VERSION/langwatch-app-$SLUG.tar.gz
+  app-archive:
+    needs: release
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { slug: linux-amd64, runner: ubuntu-latest }
+          - { slug: linux-arm64, runner: ubuntu-24.04-arm }
+          - { slug: darwin-amd64, runner: macos-15-intel }
+          - { slug: darwin-arm64, runner: macos-latest }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
 
-      # Pre-build the langwatch app (vite client + the dist/server bundles +
-      # mcp-server) so the published tarball ships dist/ artifacts. Without
-      # this, end users see vite chunder past at startup on first run —
-      # exactly the bureaucracy we're trying to eliminate.
-      #
-      # No separate app install: since ADR-076 langwatch/ is a member of the
-      # single root workspace, so "Install pnpm dependencies (workspace)"
-      # above already covers it and a filtered re-install here would only
-      # re-resolve the same lockfile for a subset.
-      #
-      # node_modules/ never reaches the tarball (dev/scripts/pack-npm.sh excludes
-      # it), so end users still run `pnpm install` once on first start, which
-      # is what generates the platform-specific Prisma client via prisma's
-      # postinstall hook — see packages/server/src/services/node-deps.ts.
-      - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm --filter "@langwatch/web..." run build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      # The workspace install pulls node-pty through mcp-server; the shared action puts node-gyp
+      # on PATH and makes pnpm's bundled gyp_main.py executable, and sets up Go for build:server.
+      - name: Setup pnpm + Node
+        uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: all
+
+      # The one recipe the smoke workflow runs too: generated files, the dist bundles, the
+      # declarations, then the browser bundle and the scenario child bundle.
+      - name: Build what the backend serves (build:server)
+        run: pnpm run build:server
         env:
           NODE_ENV: production
 
-      - name: Pack the npm tarball
+      - name: Build the app archive
+        run: bash dev/scripts/build-app-archive.sh --out _pack
+
+      - name: Check the app archive
+        run: |
+          set -e
+          archive="_pack/langwatch-app-${{ matrix.slug }}.tar.gz"
+          test -f "$archive" || { echo "✗ this runner built no $archive"; ls -l _pack; exit 1; }
+          bash dev/scripts/check-app-archive.sh "$archive"
+
+      - name: Upload the app archive to release v$VERSION
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          gh release upload "v$VERSION" \
+            "_pack/langwatch-app-${{ matrix.slug }}.tar.gz" \
+            "_pack/langwatch-app-${{ matrix.slug }}.tar.gz.sha256" \
+            --clobber
+
+  publish:
+    needs: [release, app-archive]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Setup pnpm + Node
+        uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/server..."
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Build @langwatch/server CLI
+        run: pnpm --filter @langwatch/server build
+
+      # The package is the CLI alone; the script refuses anything else in it.
+      - name: Pack the npm package
         id: pack
         run: |
-          mkdir -p _pack
           bash dev/scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
           tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
-          echo "tarball size:"; ls -lh "$tarball"
-          echo ""
-          echo "first 50 paths in tarball:"
-          tar -tzf "$tarball" | head -n 50
+          ls -lh "$tarball"
+          tar -tzf "$tarball"
 
-      - name: Sanity-check tarball contents
+      - name: Check the npm package carries the Apache-2.0 licence
         run: |
           set -e
-          tarball="${{ steps.pack.outputs.tarball }}"
-          # Everything lives under package/app/ since ADR-076: the artifact is
-          # staged one level down so the workspace root is NOT the package
-          # root, which is the only way npm will carry pnpm-lock.yaml.
-          required=(
-            "package/app/packages/server/dist/cli.cjs"
-            # The lockfile and workspace definition. npm deletes a lockfile at
-            # the package ROOT unconditionally, so these two paths existing is
-            # the whole reason for the staged layout — assert them, or a future
-            # layout change silently returns the end-user install to
-            # non-reproducible.
-            "package/app/pnpm-lock.yaml"
-            "package/app/pnpm-workspace.yaml"
-            "package/app/package.json"
-            "package/app/platform/app/package.json"
-            "package/app/platform/app/dist/client/index.html"
-            # The server bundles. `start:app` and `start:workers` execute these
-            # directly on plain node, and the published tree has no tsx to fall
-            # back to, so a tarball missing any of them is a server that cannot
-            # boot. `task.cjs` runs the migrations, and the scenario bundle is
-            # what keeps simulation cold-starts to seconds.
-            "package/app/platform/app/dist/server/server.cjs"
-            "package/app/platform/app/dist/server/workers.cjs"
-            "package/app/platform/app/dist/server/task.cjs"
-            "package/app/platform/app/dist/server/scenario-child-process.cjs"
-            # goose reads the ClickHouse migrations from ${__dirname}/migrations,
-            # which in the bundle is dist/server/migrations.
-            "package/app/platform/app/dist/server/migrations"
-            "package/app/services/langevals/pyproject.toml"
-            # langevals resolves the python SDK as a local path dependency,
-            # so the tarball must ship sdks/python/pyproject.toml + src/.
-            "package/app/sdks/python/pyproject.toml"
-            "package/app/sdks/python/src"
-            # mcp/typescript is a workspace dependency of the app; without the
-            # prebuilt dist the langwatch app crashes loading
-            # "@langwatch/mcp-server/create-mcp-server".
-            "package/app/mcp/typescript/package.json"
-            "package/app/mcp/typescript/dist/create-mcp-server.js"
-            # Langy reads the platform feature map at runtime
-            # (platform/app/src/shared/langy/featureMap.ts imports it from the
-            # repo root).
-            "package/app/feature-map.json"
-            # The app's prepare step imports the skills front-matter helper
-            # (scripts/generate-langy-skills.ts) when a tree rebuilds. The
-            # source is .ts (tsx resolves the .js import specifier back to
-            # it); the tarball never ships a compiled .js, so asserting .js
-            # here always failed even on a correctly packaged tarball.
-            "package/app/skills/_lib/frontmatter.ts"
-          )
-          # Every workspace package in the checkout must ship: a missing one
-          # leaves dangling pnpm links in the installed tree and the app dies
-          # with MODULE_NOT_FOUND at first boot; 3.6.0 shipped exactly that
-          # way (.npmignore still excluded the app's packages/ after runtime
-          # packages moved in). The root packages/* members
-          # are derived from a directory listing rather than named one by one,
-          # so a new package on either side is covered by this gate the day
-          # it appears, with nothing to remember to add here.
-          # packages/server is no longer skipped: since ADR-076 it is a member
-          # of the single workspace, so `--frozen-lockfile` on the end user's
-          # machine checks the lockfile against its manifest and fails without
-          # it. Every member's package.json must ship, this one included.
-          for pkgdir in packages/*/; do
-            pkgdir="${pkgdir%/}"
-            [ -f "$pkgdir/package.json" ] || continue
-            required+=("package/app/$pkgdir/package.json")
-          done
-          # The remaining members carry no source into the tarball, only the
-          # manifest the workspace needs to stay coherent.
-          for member in sdks/typescript tests/agentic-e2e; do
-            required+=("package/app/$member/package.json")
-          done
-          forbidden=(
-            "package/app/platform/app/node_modules"
-            "package/app/platform/app/.next/cache"
-            "package/app/.env"
-            # The lockfile must be under app/, never at the package root —
-            # npm would delete it there and the guard above would still pass
-            # if someone re-added it in both places.
-            "package/pnpm-lock.yaml"
-          )
-          listing="$(mktemp)"
-          tar -tzf "$tarball" > "$listing"
-          for path in "${required[@]}"; do
-            if ! grep -qE "^${path}(/|$)" "$listing"; then
-              echo "✗ tarball missing required path: $path"; exit 1
-            fi
-          done
-          for path in "${forbidden[@]}"; do
-            if grep -qE "^${path}(/|$)" "$listing"; then
-              echo "✗ tarball contains forbidden path: $path"; exit 1
-            fi
-          done
-          # Tarball gzipped should be < 300 MB.
-          size_bytes="$(stat -c%s "$tarball" 2>/dev/null || stat -f%z "$tarball")"
-          echo "size=$size_bytes bytes"
-          if [ "$size_bytes" -gt $((300 * 1024 * 1024)) ]; then
-            echo "✗ tarball too large (>300 MB)"; exit 1
-          fi
-
-          # Sanity check: the tarball must ship the Apache-2.0 LICENSE.md.
           extract_dir="$(mktemp -d)"
-          tar -xzf "$tarball" -C "$extract_dir" package/LICENSE.md
-          if grep -q "Apache License" "$extract_dir/package/LICENSE.md"; then
-            echo "✓ tarball ships Apache-2.0 LICENSE.md"
-          else
-            echo "✗ tarball LICENSE.md is not Apache-2.0"
-            head -5 "$extract_dir/package/LICENSE.md"
-            exit 1
-          fi
-          rm -rf "$extract_dir"
+          tar -xzf "${{ steps.pack.outputs.tarball }}" -C "$extract_dir" package/LICENSE.md
+          grep -q "Apache License" "$extract_dir/package/LICENSE.md" \
+            || { echo "✗ tarball LICENSE.md is not Apache-2.0"; head -5 "$extract_dir/package/LICENSE.md"; exit 1; }
+          echo "✓ tarball ships Apache-2.0 LICENSE.md"
 
       - name: Publish to npm with provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
         run: |
           set -e
-          tarball="${{ steps.pack.outputs.tarball }}"
-          npm publish "$tarball" \
+          npm publish "${{ steps.pack.outputs.tarball }}" \
             --access public \
             --provenance \
-            --tag "${{ steps.versions.outputs.npm_tag }}"
+            --tag "${{ needs.release.outputs.npm_tag }}"
 
+  notify:
+    needs: [release, app-archive, publish]
+    # Only a release this workflow published from: other tags skip `release` and report nothing.
+    if: always() && github.event_name == 'release' && needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
       - name: Notify Slack
-        if: always() && github.event_name == 'release'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
-          STATUS: ${{ job.status }}
-          VERSION: ${{ steps.versions.outputs.version }}
-          NPM_TAG: ${{ steps.versions.outputs.npm_tag }}
+          STATUS: ${{ needs.publish.result }}
+          VERSION: ${{ needs.release.outputs.version }}
+          NPM_TAG: ${{ needs.release.outputs.npm_tag }}
         run: |
           if [ -z "$SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL" ]; then exit 0; fi
           if [ "$STATUS" = "success" ]; then

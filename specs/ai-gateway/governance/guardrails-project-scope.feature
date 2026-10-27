@@ -2,7 +2,7 @@ Feature: AI Gateway — GatewayGuardrail is a project-scoped first-class resourc
 
   Guardrails graduate from VK-embedded config to a top-level table:
   `GatewayGuardrail`. They are project-scoped only (for now), exposed as
-  their own admin surface at `/settings/gateway/guardrails`, and VKs
+  their own admin surface at `/gateway/guardrails`, and VKs
   attach to them by reference (`{direction, guardrailId[]}` tuples) rather
   than embedding the evaluator + failure-mode config inline. This lets
   operators apply gateway guardrails per project without re-authoring
@@ -42,13 +42,13 @@ Feature: AI Gateway — GatewayGuardrail is a project-scoped first-class resourc
     And VK→guardrail attachments live in `VirtualKey.config.guardrailAttachments[]` as `{direction, guardrailId[]}` tuples
 
   # ============================================================================
-  # Admin surface: /settings/gateway/guardrails
+  # Admin surface: /gateway/guardrails
   # ============================================================================
 
   @bdd @guardrails @ui @unimplemented
   Scenario: New top-level admin page lists project guardrails with create/edit/delete
     Given user "carol@acme.com" holds `gatewayGuardrails:view` + `gatewayGuardrails:manage` at PROJECT "demo"
-    When carol navigates to /settings/gateway/guardrails
+    When carol navigates to /gateway/guardrails
     Then the page lists every GatewayGuardrail row where projectId = "demo"
     And each row shows: name, evaluator (linked), direction(s), failure mode (fail_open / fail_closed), attached-VK count
     And the page has "+ New guardrail" CTA
@@ -56,7 +56,7 @@ Feature: AI Gateway — GatewayGuardrail is a project-scoped first-class resourc
 
   @bdd @guardrails @ui @unimplemented
   Scenario: Create-guardrail drawer enforces project-scope schema invariant
-    Given carol is on /settings/gateway/guardrails
+    Given carol is on /gateway/guardrails
     When carol clicks "+ New guardrail"
     Then the drawer renders fields: name, evaluator (filtered to AS_GUARDRAIL mode within PROJECT "demo"), direction (pre / post / stream_chunk), failure mode toggle (fail_open / fail_closed)
     And there is NO scope picker (project is implicit from the current project context)
@@ -104,7 +104,7 @@ Feature: AI Gateway — GatewayGuardrail is a project-scoped first-class resourc
   @bdd @guardrails @rbac @unimplemented
   Scenario: gatewayGuardrails:view is required to list guardrails
     Given user "ariana@acme.test" holds NO gatewayGuardrails perms at PROJECT "demo"
-    When ariana navigates to /settings/gateway/guardrails
+    When ariana navigates to /gateway/guardrails
     Then the page returns 403 / "missing_perm:gatewayGuardrails:view"
 
   @bdd @guardrails @rbac @unimplemented

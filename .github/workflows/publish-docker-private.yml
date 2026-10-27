@@ -1,0 +1,161 @@
+name: publish-docker-private
+
+# Manual build of the one platform image from any ref into the artifacts ECR.
+# Dispatch it from main: the OIDC role trusts refs/heads/main only, so the run
+# assumes the role as main and builds the `ref` input. Arm64 only, as
+# publish-docker-ecr.yml. Every tag starts with `ref-`, so it can never replace
+# main's `git-<sha>`, a release version or `latest`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or tag of this repository to build"
+        required: false
+        default: main
+        type: string
+      image_tag:
+        description: "Custom image tag, starting with ref- (default: ref-<short-sha> of the built ref)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Never cancel in flight: a superseded run may already have pushed layers.
+concurrency:
+  group: publish-docker-private-${{ inputs.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+  IMAGE: langwatch-app
+
+jobs:
+  build-and-push:
+    runs-on: arm64-runner-32gb
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write # OIDC assume-role into the artifacts account
+    steps:
+      - name: Refuse a dispatch from anything but main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Dispatch this workflow from main (Use workflow from: main) and put the branch to build in 'ref'."
+          exit 1
+
+      # Only a branch or tag of this repository: a raw sha or refs/pull/* could be
+      # a commit that lives only in a fork, which GitHub serves across the network.
+      - name: Resolve ref to a branch or tag of this repository
+        id: ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          case "${INPUT_REF}" in
+            "" | *[!A-Za-z0-9._/@-]* | refs/pull/* | -*)
+              echo "::error::ref must be a branch or tag name of this repository"; exit 1 ;;
+          esac
+          # An explicit refs/heads/ or refs/tags/ prefix is kept; a bare name tries the branch, then the tag.
+          case "${INPUT_REF}" in
+            refs/heads/* | refs/tags/*) CANDIDATES="${INPUT_REF}" ;;
+            *) CANDIDATES="refs/heads/${INPUT_REF} refs/tags/${INPUT_REF}" ;;
+          esac
+          NAME="${INPUT_REF#refs/heads/}"; NAME="${NAME#refs/tags/}"
+          SHA=""
+          for CANDIDATE in ${CANDIDATES}; do
+            # An annotated tag lists its object and, as `^{}`, the commit; take the commit.
+            SHA=$(git ls-remote "${REPO_URL}" "${CANDIDATE}" "${CANDIDATE}^{}" |
+              awk -v ref="${CANDIDATE}" '$2 == ref "^{}" {print $1; exit} $2 == ref {first=$1} END {if (first) print first}' |
+              head -n1)
+            [ -n "${SHA}" ] && break
+          done
+          if [ -z "${SHA}" ]; then
+            echo "::error::'${NAME}' is not a branch or tag of this repository"; exit 1
+          fi
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ steps.ref.outputs.sha }}
+          persist-credentials: false
+
+      # `case` matches the whole string, newlines included, unlike `grep -E`.
+      - name: Resolve tag
+        id: meta
+        env:
+          INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          SHA=$(git rev-parse HEAD)
+          IMAGE_TAG="${INPUT_IMAGE_TAG:-ref-${SHA:0:10}}"
+          case "${IMAGE_TAG}" in
+            *[!A-Za-z0-9._-]*) echo "::error::image_tag is not a valid Docker tag"; exit 1 ;;
+            ref-?*) ;;
+            *) echo "::error::image_tag must start with 'ref-' so it can never replace a main or release tag"; exit 1 ;;
+          esac
+          if [ "${#IMAGE_TAG}" -gt 128 ]; then
+            echo "::error::image_tag is longer than 128 characters"; exit 1
+          fi
+          {
+            echo "image_tag=${IMAGE_TAG}"
+            echo "sha=${SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+          role-session-name: publish-docker-private-${{ github.run_id }}
+
+      # Same login as publish-docker-ecr.yml: the account id stays in the secret.
+      - name: Log in to Amazon ECR
+        id: ecr
+        env:
+          ROLE_ARN: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(printf '%s' "${ROLE_ARN}" | cut -d: -f5)"
+          echo "::add-mask::${ACCOUNT_ID}"
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
+          aws ecr get-login-password --region "${AWS_REGION}" \
+            | docker login --username AWS --password-stdin "${REGISTRY}"
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: infra/docker/Dockerfile
+          push: true
+          platforms: linux/arm64/v8
+          provenance: false
+          cache-from: type=gha,scope=private-langwatch-app-arm64
+          cache-to: type=gha,mode=max,scope=private-langwatch-app-arm64,ignore-error=true
+          build-args: |
+            VERSION=${{ steps.meta.outputs.image_tag }}
+            SERVICE_VERSION=${{ steps.meta.outputs.image_tag }}
+            LANGWATCH_BUILD_COMMIT=${{ steps.meta.outputs.sha }}
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ steps.meta.outputs.image_tag }}
+
+      - name: Write summary
+        env:
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          REF: ${{ inputs.ref }}
+          SHA: ${{ steps.meta.outputs.sha }}
+        run: |
+          {
+            echo "Published \`${IMAGE}:${IMAGE_TAG}\` to ECR (ref \`${REF}\`, \`${SHA}\`)"
+            echo ""
+            echo "- Digest: \`${DIGEST}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

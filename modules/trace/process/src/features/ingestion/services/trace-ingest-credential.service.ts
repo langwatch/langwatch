@@ -1,0 +1,215 @@
+/**
+ * The project credential both ingestion doors (SDK collector, OTLP
+ * receiver) resolve for themselves. One resolution, refused by throwing;
+ * each door renders the refusal in its own vocabulary.
+ */
+import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
+import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
+import type { RestKeyCredential } from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { HandledError } from "@langwatch/handled-error";
+import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observability";
+import type { OtlpIngestCredential, OtlpIngestCredentialInput } from "@langwatch/otlp/door";
+
+import type { CollectorCredential } from "../../../transport/collector.rest.ts";
+import {
+  extractTraceIngestCredentials,
+  extractTraceLegacyRequestCredentials,
+  type TraceLegacyRequestCredentials,
+} from "../rules/trace-request-credentials.rules.ts";
+import type { TraceIngestSourceBillingService } from "./trace-ingest-source-billing.service.ts";
+
+/** Exactly the API-key directory operations an ingestion door reaches. */
+type TraceIngestApiKeys = Pick<ApiKeyApi, "findResolvedToken" | "markUsed">;
+
+/** The one permission an ingestion key is measured against. */
+const INGEST_PERMISSION = "traces:create" as const;
+
+/**
+ * One ceiling-refusal line per key per window. A misconfigured exporter retries
+ * its refused batch many times a second, and every retry is the same fact.
+ */
+const CEILING_REFUSAL_LOG_WINDOW_MS = 5 * 60_000;
+
+/** A resolved ingestion credential and the clock stamp it earns once its body is accepted. */
+type TraceIngestResolution = Readonly<{
+  resolved: ResolvedApiKeyCredential;
+  markUsed: () => void;
+}>;
+
+/** The two peers this door reads, and trace's own fold of the source billing fact. */
+type TraceIngestCredentialOptions = Readonly<{
+  /** Narrowed to what this door calls: it resolves a token and stamps its clock. */
+  apiKeys: TraceIngestApiKeys;
+  authz: Pick<AuthzApi, "hasApiKeyPermission">;
+  sourceBilling: Pick<TraceIngestSourceBillingService, "receiverPolicies">;
+  logger?: Pick<Logger, "warn"> | undefined;
+  /** The clock the refusal log samples against. */
+  now?: (() => number) | undefined;
+}>;
+
+export class TraceIngestCredentialService {
+  static create(options: TraceIngestCredentialOptions): TraceIngestCredentialService {
+    return new TraceIngestCredentialService({
+      ...options,
+      logger: options.logger ?? createLogger("langwatch:trace:ingest-credential"),
+    });
+  }
+
+  #apiKeys: TraceIngestApiKeys;
+  #authz: Pick<AuthzApi, "hasApiKeyPermission">;
+  #sourceBilling: Pick<TraceIngestSourceBillingService, "receiverPolicies">;
+  #logger: Pick<Logger, "warn">;
+  #now: () => number;
+  #refusalLog = createWarnThrottle(CEILING_REFUSAL_LOG_WINDOW_MS);
+
+  private constructor(
+    options: TraceIngestCredentialOptions & Readonly<{ logger: Pick<Logger, "warn"> }>,
+  ) {
+    this.#apiKeys = options.apiKeys;
+    this.#authz = options.authz;
+    this.#sourceBilling = options.sourceBilling;
+    this.#logger = options.logger;
+    this.#now = options.now ?? Date.now;
+  }
+
+  /** The collector's credential; a refusal is thrown for the door to render. */
+  async resolveForCollector(input: { request: Request }): Promise<CollectorCredential> {
+    const resolution = await this.#authenticate(input.request);
+
+    return {
+      project: projectOf(resolution.resolved),
+      markUsed: resolution.markUsed,
+      key: collectorKeyOf(resolution.resolved),
+    };
+  }
+
+  /** The receiver's credential, plus the identity it stamps provenance from. */
+  async resolveForOtlp(input: OtlpIngestCredentialInput): Promise<OtlpIngestCredential> {
+    const { resolved } = await this.#authenticateCredentials(extractTraceIngestCredentials(input));
+    const project = projectOf(resolved);
+
+    if (resolved.type !== "apiKey") {
+      return {
+        project,
+        identity: {
+          apiKeyId: null,
+          organizationId: project.organizationId,
+          ingestSourceType: null,
+          ingestionTemplateId: null,
+        },
+      };
+    }
+
+    const identity = {
+      apiKeyId: resolved.apiKeyId,
+      organizationId: resolved.organizationId,
+      ingestSourceType: resolved.ingestSourceType,
+      ingestionTemplateId: resolved.ingestionTemplateId,
+    };
+    if (!resolved.ingestSourceType) return { project, identity };
+    // Every ingestion-source key is admitted; trace's billing row only decides the marker.
+    const policies = await this.#sourceBilling.receiverPolicies({
+      organizationId: resolved.organizationId,
+      sourceType: resolved.ingestSourceType,
+      templateId: resolved.ingestionTemplateId,
+    });
+    return { project, identity: { ...identity, sourcePolicy: { status: "ready", policies } } };
+  }
+
+  /** The receiver calls this only after it has parsed a valid signal body. */
+  markOtlpCredentialUsed(input: { apiKeyId: string }): void {
+    this.#apiKeys.markUsed({ id: input.apiKeyId });
+  }
+
+  /**
+   * Present, then resolves, then within the key's ceiling - in that order, so a
+   * caller with no credential at all is never told a permission is missing.
+   */
+  async #authenticate(request: Request): Promise<TraceIngestResolution> {
+    return this.#authenticateCredentials(extractTraceLegacyRequestCredentials(request));
+  }
+
+  async #authenticateCredentials(
+    credentials: TraceLegacyRequestCredentials | null,
+  ): Promise<TraceIngestResolution> {
+    if (!credentials) throw new ProjectMissingCredentialsError();
+
+    const resolved = await this.#apiKeys.findResolvedToken(credentials);
+    if (!resolved) throw new ProjectInvalidCredentialsError();
+
+    // A legacy project key is ingestion-only, which is all this door asks of it
+    // (modules/auth/specs/legacy-project-key-scope.feature).
+    if (resolved.type === "apiKey") {
+      const allowed = await this.#authz.hasApiKeyPermission({
+        apiKeyId: resolved.apiKeyId,
+        userId: resolved.userId ?? null,
+        organizationId: resolved.organizationId,
+        scope: { type: "project", id: resolved.project.id, teamId: resolved.project.teamId },
+        permission: INGEST_PERMISSION,
+      });
+      if (!allowed) throw this.#ceilingRefusal(resolved);
+    }
+
+    return {
+      resolved,
+      markUsed: () => {
+        if (resolved.type === "apiKey") this.#apiKeys.markUsed({ id: resolved.apiKeyId });
+      },
+    };
+  }
+
+  /** The sender's own key configuration: a customer fault, logged as a warning, sampled per key. */
+  #ceilingRefusal(resolved: Extract<ResolvedApiKeyCredential, { type: "apiKey" }>): HandledError {
+    const suppressedRefusals = this.#refusalLog.claim({
+      key: resolved.apiKeyId,
+      now: this.#now(),
+    });
+    if (suppressedRefusals !== undefined) {
+      this.#logger.warn(
+        {
+          apiKeyId: resolved.apiKeyId,
+          userId: resolved.userId ?? null,
+          projectId: resolved.project.id,
+          permission: INGEST_PERMISSION,
+          suppressedRefusals,
+        },
+        "API key ceiling denial",
+      );
+    }
+    return new ApiKeyPermissionDeniedError(INGEST_PERMISSION);
+  }
+}
+
+/** The key a collector bearer is, as the access record names it: id and kind, never the token. */
+function collectorKeyOf(resolved: ResolvedApiKeyCredential): RestKeyCredential {
+  if (resolved.type === "legacyProjectKey") {
+    return { kind: "legacy_project_key", apiKeyId: null, ownerUserId: null };
+  }
+  return {
+    kind: collectorKeyKindOf(resolved),
+    apiKeyId: resolved.apiKeyId,
+    ownerUserId: resolved.userId,
+  };
+}
+
+function collectorKeyKindOf(
+  resolved: Exclude<ResolvedApiKeyCredential, { type: "legacyProjectKey" }>,
+): RestKeyCredential["kind"] {
+  if (resolved.isLangySessionKey) return "langy_session_key";
+  // A source type is what makes a key an ingestion key; a template is optional on one.
+  if (resolved.ingestSourceType) return "ingestion_key";
+  return "api_key";
+}
+
+/** The three ids both doors record a batch against. */
+function projectOf(
+  resolved: ResolvedApiKeyCredential,
+): Readonly<{ id: string; teamId: string; organizationId: string }> {
+  return {
+    id: resolved.project.id,
+    teamId: resolved.project.teamId,
+    organizationId: resolved.project.organizationId,
+  };
+}

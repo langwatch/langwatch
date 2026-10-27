@@ -1,7 +1,10 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
+import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface Project {
   id: string;
@@ -28,6 +31,12 @@ export interface UpdateProjectInput {
   language?: string;
   framework?: string;
   piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
+  /**
+   * Moves the project to this team. The platform refuses a team outside the
+   * organization, an archived one, and a move across the personal workspace
+   * boundary.
+   */
+  teamId?: string;
 }
 
 export interface ProjectWithServiceKey extends Project {
@@ -56,6 +65,12 @@ export class ProjectsApiError extends Error {
     message: string,
     public readonly operation: string,
     public readonly originalError?: unknown,
+    /**
+     * The status the platform answered with. A 401/403 means the credential
+     * cannot see the listing at all -- a different answer than "no project
+     * of yours matches this name".
+     */
+    public readonly status?: number,
   ) {
     super(message);
     this.name = "ProjectsApiError";
@@ -71,17 +86,23 @@ export class ProjectsApiService {
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
+  /**
+   * Bearer, never the project-pinned Basic shape: the listing asks "which
+   * projects can this credential see?", so naming one project in the header
+   * would scope the answer and defeat the call, including `--project <slug>`.
+   */
   private headers(): Record<string, string> {
     return {
+      ...buildSdkIdentityHeaders(),
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
     };
   }
 
   private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.endpoint}${path}`, {
+    const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...init,
-      headers: { ...this.headers(), ...(init?.headers ?? {}) },
+      headers: mergeHeaders(this.headers(), init?.headers),
     });
     if (!response.ok) {
       let parsedBody: unknown;
@@ -101,7 +122,7 @@ export class ProjectsApiService {
         status: response.status,
         message,
       });
-      throw new ProjectsApiError(message, operation, parsedBody);
+      throw new ProjectsApiError(message, operation, parsedBody, response.status);
     }
     return (await response.json()) as T;
   }
@@ -113,29 +134,41 @@ export class ProjectsApiService {
     const qs = params.toString();
     return this.request<PaginatedProjects>(
       "list projects",
-      `/api/projects${qs ? `?${qs}` : ""}`,
+      `/api/v1/projects${qs ? `?${qs}` : ""}`,
     );
   }
 
   async get(id: string): Promise<Project> {
     return this.request<Project>(
       `get project "${id}"`,
-      `/api/projects/${encodeURIComponent(id)}`,
+      `/api/v1/projects/${encodeURIComponent(id)}`,
     );
   }
 
-  async create(input: CreateProjectInput): Promise<ProjectWithServiceKey> {
-    return this.request<ProjectWithServiceKey>(
-      "create project",
-      "/api/projects",
-      { method: "POST", body: JSON.stringify(input) },
+  /**
+   * The project's ingest key. The platform hands it out only to a credential
+   * with `project:update` on the project, so a 403 here is the answer "this
+   * login may not", not a transport failure.
+   */
+  async getApiKey(id: string): Promise<string> {
+    const answer = await this.request<{ apiKey: string }>(
+      `get api key of project "${id}"`,
+      `/api/v1/projects/${encodeURIComponent(id)}/api-key`,
     );
+    return answer.apiKey;
+  }
+
+  async create(input: CreateProjectInput): Promise<ProjectWithServiceKey> {
+    return this.request<ProjectWithServiceKey>("create project", "/api/v1/projects", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   async update(id: string, input: UpdateProjectInput): Promise<Project> {
     return this.request<Project>(
       `update project "${id}"`,
-      `/api/projects/${encodeURIComponent(id)}`,
+      `/api/v1/projects/${encodeURIComponent(id)}`,
       { method: "PATCH", body: JSON.stringify(input) },
     );
   }
@@ -143,7 +176,7 @@ export class ProjectsApiService {
   async archive(id: string): Promise<ArchivedProject> {
     return this.request<ArchivedProject>(
       `archive project "${id}"`,
-      `/api/projects/${encodeURIComponent(id)}`,
+      `/api/v1/projects/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     );
   }

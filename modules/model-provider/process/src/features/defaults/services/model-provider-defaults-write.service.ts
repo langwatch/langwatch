@@ -1,0 +1,158 @@
+import {
+  ModelDefaultNotFoundError,
+  ModelDefaultValidationError,
+  ModelProviderInvalidError,
+  modelDefaultAssignmentInputSchema,
+  modelDefaultConfigWriteInputSchema,
+  type ModelDefaultAssignmentInput,
+  type ModelDefaultConfig,
+  type ModelDefaultConfigWriteInput,
+  type ModelDefaultDeleteInput,
+} from "@langwatch/model-provider-contract";
+
+import type { ModelDefaultRepository } from "../../../repositories/model-default.repository.ts";
+import type { ModelProviderDecisionModelService } from "../../../services/model-provider-decision-model.service.ts";
+import type { ModelProviderScopeService } from "../../../services/model-provider-scope.service.ts";
+import type { ModelProviderWriteAuthorizationService } from "../../../services/model-provider-write-authorization.service.ts";
+import type { ModelProviderIdService } from "../../../services/prefixed-model-provider-id.service.ts";
+import type { ModelProviderCatalog } from "../../../services/registry-model-provider-catalog.service.ts";
+
+type ModelProviderDefaultsWriteOptions = {
+  defaults: ModelDefaultRepository;
+  catalog: ModelProviderCatalog;
+  writeAuthorization: ModelProviderWriteAuthorizationService;
+  ids: ModelProviderIdService;
+  scopes: ModelProviderScopeService;
+  /** Refuses an own decision model for an organization without the flag (ADR-182 decision 4). */
+  decisionModels: Pick<ModelProviderDecisionModelService, "assertMayStore">;
+};
+
+export class ModelProviderDefaultsWriteService {
+  private constructor(private readonly options: ModelProviderDefaultsWriteOptions) {}
+
+  static create(options: ModelProviderDefaultsWriteOptions): ModelProviderDefaultsWriteService {
+    return new ModelProviderDefaultsWriteService(options);
+  }
+
+  async set(input: ModelDefaultAssignmentInput): Promise<void> {
+    const parsed = modelDefaultAssignmentInputSchema.parse(input);
+    const { config } = this.options.catalog.sanitizeDefaultConfig({
+      config: { [parsed.key]: parsed.model ?? "" },
+    });
+    if (parsed.model !== null && !config[parsed.key]) {
+      throw new ModelProviderInvalidError(`Model is not allowed for default key: ${parsed.key}`);
+    }
+
+    const actorId = parsed.actorId ?? parsed.authorId;
+    if (actorId) {
+      await this.options.writeAuthorization.assertCanWriteDefault(actorId, [parsed.scope]);
+    }
+
+    const organizationId = await this.options.scopes.getOrganizationIdForScope(parsed.scope);
+    await this.options.decisionModels.assertMayStore({ organizationId, config });
+    await this.options.defaults.set({
+      id: this.options.ids.generate({ type: "default" }),
+      organizationId,
+      ...parsed,
+      authorId: parsed.authorId ?? null,
+    });
+  }
+
+  async save(input: ModelDefaultConfigWriteInput): Promise<ModelDefaultConfig> {
+    const parsed = modelDefaultConfigWriteInputSchema.parse(input);
+    const existing = parsed.id ? await this.options.defaults.getById(parsed.id) : null;
+    this.assertExistingConfig(existing);
+
+    if (parsed.scopes?.length === 0) {
+      return this.deleteEmptyConfig(parsed.actorId, existing);
+    }
+
+    const { config, droppedRestricted } = this.options.catalog.sanitizeDefaultConfig({
+      config: parsed.config ?? existing?.config ?? {},
+      stored: existing?.config,
+    });
+    if (Object.keys(config).length === 0 && droppedRestricted) {
+      throw new ModelDefaultValidationError(
+        "Every model in this config is restricted to coding-assistant surfaces. Pick another model, or remove the config.",
+      );
+    }
+    if (Object.keys(config).length === 0) {
+      if (existing) {
+        return this.deleteEmptyConfig(parsed.actorId, existing);
+      }
+
+      throw new ModelDefaultValidationError(
+        "Pick at least one model. A default-models config with every key on inherit has no effect.",
+      );
+    }
+
+    const scopes = parsed.scopes ?? existing?.scopes ?? [];
+    if (scopes.length === 0) {
+      throw new ModelDefaultValidationError(
+        "Pick at least one scope for this default-models config.",
+      );
+    }
+
+    if (parsed.actorId) {
+      await this.options.writeAuthorization.assertCanWriteDefault(parsed.actorId, [
+        ...(existing?.scopes ?? []),
+        ...scopes,
+      ]);
+    }
+
+    const organizationId = await this.options.scopes.getOrganizationIdForScopes(scopes);
+    await this.options.decisionModels.assertMayStore({
+      organizationId,
+      config,
+      ...(existing ? { stored: existing.config } : {}),
+    });
+
+    return this.options.defaults.save({
+      id: parsed.id ?? this.options.ids.generate({ type: "default" }),
+      organizationId,
+      config,
+      scopes,
+      authorId: parsed.authorId ?? existing?.authorId ?? null,
+    });
+  }
+
+  getById(input: { id: string }): Promise<ModelDefaultConfig> {
+    return this.options.defaults.getById(input.id);
+  }
+
+  async delete(input: ModelDefaultDeleteInput): Promise<void> {
+    const existing = await this.options.defaults.getById(input.id);
+    if (existing.scopes.length === 0) {
+      throw new ModelDefaultNotFoundError();
+    }
+
+    if (input.actorId) {
+      await this.options.writeAuthorization.assertCanWriteDefault(input.actorId, existing.scopes);
+    }
+
+    await this.options.defaults.delete(input.id);
+  }
+
+  private assertExistingConfig(existing: ModelDefaultConfig | null): void {
+    if (existing && existing.scopes.length === 0) {
+      throw new ModelDefaultNotFoundError();
+    }
+  }
+
+  private async deleteEmptyConfig(
+    actorId: string | undefined,
+    existing: ModelDefaultConfig | null,
+  ): Promise<ModelDefaultConfig> {
+    if (!existing) {
+      throw new ModelDefaultNotFoundError();
+    }
+
+    if (actorId) {
+      await this.options.writeAuthorization.assertCanWriteDefault(actorId, existing.scopes);
+    }
+
+    await this.options.defaults.delete(existing.id);
+
+    return existing;
+  }
+}

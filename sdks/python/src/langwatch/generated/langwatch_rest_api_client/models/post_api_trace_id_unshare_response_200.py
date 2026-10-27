@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
-from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PostApiTraceIdUnshareResponse200")
 
@@ -15,30 +13,34 @@ T = TypeVar("T", bound="PostApiTraceIdUnshareResponse200")
 class PostApiTraceIdUnshareResponse200:
     """
     Attributes:
-        message (str | Unset):
+        status (Literal['success']):
     """
 
-    message: str | Unset = UNSET
+    status: Literal["success"]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        message = self.message
+        status = self.status
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if message is not UNSET:
-            field_dict["message"] = message
+        field_dict.update(
+            {
+                "status": status,
+            }
+        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        message = d.pop("message", UNSET)
+        status = cast(Literal["success"], d.pop("status"))
+        if status != "success":
+            raise ValueError(f"status must match const 'success', got '{status}'")
 
         post_api_trace_id_unshare_response_200 = cls(
-            message=message,
+            status=status,
         )
 
         post_api_trace_id_unshare_response_200.additional_properties = d

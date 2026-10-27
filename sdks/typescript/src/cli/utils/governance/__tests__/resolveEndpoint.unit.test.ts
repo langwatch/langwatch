@@ -1,16 +1,12 @@
 /**
- * Unit tests for the single source of truth for control-plane endpoint
- * resolution. Locks the 4-source priority (flag > env > config > default)
- * and ensures every command that imports `resolveControlPlaneUrl()`
- * sees the same value for the same inputs.
+ * The single source of truth for control-plane endpoint resolution: locks
+ * the 4-source priority (flag > env > config > default) so every importer
+ * of `resolveControlPlaneUrl()` sees the same value for the same inputs.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import * as configMod from "../config";
-import {
-  resolveControlPlaneEndpoint,
-  resolveControlPlaneUrl,
-} from "../resolveEndpoint";
+import type * as configMod from "../config";
+import { resolveControlPlaneEndpoint, resolveControlPlaneUrl } from "../resolveEndpoint";
 
 // Stub loadConfig so the tests don't leak the developer's local
 // ~/.langwatch/config.json (which on a dogfooded box sets
@@ -26,10 +22,12 @@ vi.mock("../config", async () => {
 
 const ORIG_ENV = { ...process.env };
 
-const cfgFixture = (overrides: Partial<{
-  control_plane_url: string;
-  gateway_url: string;
-}> = {}): any => ({
+const cfgFixture = (
+  overrides: Partial<{
+    control_plane_url: string;
+    gateway_url: string;
+  }> = {},
+): any => ({
   control_plane_url: "https://config.example.com",
   gateway_url: "https://gw.example.com",
   ...overrides,
@@ -45,7 +43,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     vi.restoreAllMocks();
   });
 
-  describe("priority 1 — `--endpoint` flag wins over everything", () => {
+  describe("when the --endpoint flag is set", () => {
     it("flag wins over env", () => {
       process.env.LANGWATCH_ENDPOINT = "https://env.example.com";
       const result = resolveControlPlaneEndpoint({
@@ -74,7 +72,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("priority 2 — LANGWATCH_ENDPOINT env wins over config + default", () => {
+  describe("when LANGWATCH_ENDPOINT is set without an --endpoint flag", () => {
     it("env wins over persisted config", () => {
       process.env.LANGWATCH_ENDPOINT = "https://env.example.com";
       const result = resolveControlPlaneEndpoint({
@@ -100,7 +98,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("priority 3 — persisted config wins over default", () => {
+  describe("when persisted config exists without a flag or env var", () => {
     it("config wins when neither flag nor env is set", () => {
       const result = resolveControlPlaneEndpoint({
         cfg: cfgFixture({ control_plane_url: "https://config.example.com" }),
@@ -120,7 +118,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("priority 4 — built-in default", () => {
+  describe("when nothing else is set", () => {
     it("default fires when nothing else is set", () => {
       const result = resolveControlPlaneEndpoint({});
       expect(result.url).toBe("https://app.langwatch.ai");
@@ -128,7 +126,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("LANGWATCH_URL legacy alias is DROPPED", () => {
+  describe("when only the legacy LANGWATCH_URL alias is set", () => {
     it("does NOT read LANGWATCH_URL even when LANGWATCH_ENDPOINT is unset", () => {
       process.env.LANGWATCH_URL = "https://legacy.example.com";
       const result = resolveControlPlaneEndpoint({});
@@ -192,7 +190,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("resolveControlPlaneUrl convenience", () => {
+  describe("resolveControlPlaneUrl()", () => {
     /** @scenario every CLI command resolves the endpoint via the same single function */
     it("returns just the URL string", () => {
       process.env.LANGWATCH_ENDPOINT = "https://env.example.com";

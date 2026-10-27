@@ -33,9 +33,27 @@ Feature: ClickHouse analytics stays available under concurrent query load
     Then the read is not retried
     And the error is surfaced immediately
 
+  # Writes are not idempotent: there is no insert dedup token, so a batch that
+  # failed after it was sent (a reset, a hang up, a cancelled query) may already
+  # have landed, and retrying it in place writes it twice. The job that owns the
+  # write retries it instead. Only a refused connection provably sent nothing.
+
   @unit @regression
-  Scenario: Live polling eases off when ClickHouse is overloaded
-    Given the traces view is polling for new traces every few seconds
-    When a poll fails because ClickHouse is overloaded
-    Then the next poll is scheduled after a longer interval
-    And polling returns to its fast cadence once a poll succeeds again
+  Scenario: An insert that failed after it was sent is not retried in place
+    Given ClickHouse drops the connection while an insert is in flight
+    When the insert runs
+    Then the insert is attempted exactly once
+    And the failure is surfaced to the caller unchanged
+
+  @unit @regression
+  Scenario: An insert whose connection was refused before sending is retried
+    Given ClickHouse refuses the connection for the first insert attempt
+    When the insert runs
+    Then the insert is retried and the batch is written once
+
+  @unit @regression @unimplemented
+  Scenario: The traces view updates on its server event and never on a timer
+    Given the traces view is showing the newest traces
+    When ClickHouse is overloaded and a read fails
+    Then no timer retries it
+    And the view updates again on the next server event that names new traces

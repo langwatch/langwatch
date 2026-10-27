@@ -1,0 +1,136 @@
+/**
+ * The Conversation Context panel carries a panel-level Translate toggle: it translates
+ * every visible turn preview to English at once and flips back on "Show original".
+ * @vitest-environment jsdom
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => false }),
+}));
+vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
+  useTraceDrawer: (selector: (s: { viewMode: string }) => unknown) =>
+    selector({ viewMode: "summary" }),
+}));
+
+vi.mock("../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
+  useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
+}));
+
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1" },
+  }),
+}));
+
+const translateMock = vi.fn(async ({ textToTranslate }: { textToTranslate: string }) => ({
+  translation: `EN::${textToTranslate}`,
+}));
+
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
+  api: {
+    translate: {
+      translate: {
+        useMutation: () => ({ mutateAsync: translateMock, isLoading: false }),
+      },
+    },
+  },
+}));
+
+const turnsState = {
+  conversationId: "conv_1",
+  total: 2,
+  position: 2,
+  turns: [],
+  previous: {
+    traceId: "trace_prev",
+    timestamp: 1,
+    name: "prev",
+    rootSpanType: null,
+    status: "ok",
+    input: "pregunta previa",
+    output: "respuesta previa",
+    inputRedacted: false,
+    outputRedacted: false,
+    inputVisibleTo: null,
+    outputVisibleTo: null,
+  },
+  next: null,
+  isLoading: false,
+};
+
+vi.mock("../../../../../features/conversation/behavior/use-conversation-context.ts", () => ({
+  useConversationContext: () => ({
+    ...turnsState,
+    turns: [turnsState.previous, current()],
+    current: current(),
+  }),
+}));
+
+function current() {
+  return {
+    traceId: "trace_1",
+    timestamp: 2,
+    name: "curr",
+    rootSpanType: null,
+    status: "ok",
+    input: "pregunta actual",
+    output: "respuesta actual",
+    inputRedacted: false,
+    outputRedacted: false,
+    inputVisibleTo: null,
+    outputVisibleTo: null,
+  };
+}
+
+import { ConversationContext } from "../conversation-context.tsx";
+
+function renderStrip() {
+  return renderWithDesignSystem(
+    <ConversationContext
+      conversationId="conv_1"
+      traceId="trace_1"
+      collapsed={false}
+      onToggleCollapsed={() => undefined}
+    />,
+  );
+}
+
+afterEach(() => {
+  cleanup();
+  translateMock.mockClear();
+});
+
+describe("Conversation Context translate", () => {
+  describe("when the panel is expanded with turn content", () => {
+    it("shows a Translate action", () => {
+      renderStrip();
+      expect(screen.getByRole("button", { name: /translate/i })).toBeInTheDocument();
+    });
+
+    it("translates the visible previews and flips back on Show original", async () => {
+      const user = userEvent.setup();
+      renderStrip();
+      expect(screen.getByText("pregunta actual")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /translate/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText("EN::pregunta actual")).toBeInTheDocument();
+      });
+      expect(translateMock).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        textToTranslate: "pregunta actual",
+      });
+
+      await user.click(screen.getByRole("button", { name: /show original/i }));
+      expect(screen.getByText("pregunta actual")).toBeInTheDocument();
+      expect(screen.queryByText("EN::pregunta actual")).not.toBeInTheDocument();
+    });
+  });
+});

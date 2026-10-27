@@ -71,47 +71,59 @@ CHANGELOG_CONTENT=$(echo "$CHANGELOG_CONTENT" | sed \
   | sed -E 's/ \(\[#[0-9]+\]\(([^)]+)\)\)/: \1/g' \
   | sed -E 's/ \(\[[0-9a-f]+\]\([^)]+\)\)//g')
 
-# Escape special characters for JSON
-CHANGELOG_JSON=$(echo "$CHANGELOG_CONTENT" | jq -Rs .)
+# Slack caps a section's text at 3000 characters and rejects the whole
+# payload as invalid_blocks past it, so split the changelog into chunks and
+# give each chunk its own section block. Chunks break at line boundaries,
+# and a single line longer than the cap is cut into pieces so it cannot
+# escape the limit on its own. The 2900 target leaves 100 characters of
+# margin, which absorbs the few emoji that count as more than one character.
+# jq measures and slices strings in characters, not bytes, which is what
+# Slack counts.
+CHUNKS_JSON=$(printf '%s' "$CHANGELOG_CONTENT" | jq -Rs --argjson max 2900 '
+  def split_long($max):
+    if length <= $max then [.] else [.[0:$max]] + (.[$max:] | split_long($max)) end;
 
-# Create the Slack message with blocks for better formatting
-MESSAGE=$(cat <<EOF
-{
-  "blocks": [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "$MOTIVATIONAL_MESSAGE",
-        "emoji": true
-      }
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*$COMPONENT_NAME v$VERSION* has been released! 🎉"
-      }
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": $CHANGELOG_JSON
-      }
-    },
-    {
-      "type": "divider"
-    }
-  ]
-}
-EOF
-)
+  sub("\n+$"; "")
+  | split("\n")
+  | map(split_long($max))
+  | (add // [])
+  | reduce .[] as $line ([];
+      if length == 0 then [$line]
+      elif ((.[-1] | length) + 1 + ($line | length)) > $max then . + [$line]
+      else .[0:-1] + [.[-1] + "\n" + $line] end)
+  | map(select(length > 0))')
 
-# Send to Slack
-curl -X POST \
+RELEASES_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-langwatch/langwatch}/releases"
+
+MESSAGE=$(jq -n \
+  --arg header "$MOTIVATIONAL_MESSAGE" \
+  --arg intro "*$COMPONENT_NAME v$VERSION* has been released! 🎉" \
+  --arg releases_url "$RELEASES_URL" \
+  --argjson chunks "$CHUNKS_JSON" \
+  '{blocks: ([
+      {type: "header", text: {type: "plain_text", text: $header, emoji: true}},
+      {type: "section", text: {type: "mrkdwn", text: $intro}}
+    ]
+    + ($chunks[0:4] | map({type: "section", text: {type: "mrkdwn", text: .}}))
+    + (if ($chunks | length) > 4 then
+        [{type: "section", text: {type: "mrkdwn", text: ("_Changelog truncated. Full notes: " + $releases_url + "_")}}]
+      else [] end)
+    + [{type: "divider"}])}')
+
+# Send to Slack. The webhook answers 200 "ok" on success and an error string
+# such as invalid_blocks otherwise, so the body is the success signal. The
+# timeouts keep a stalled webhook from holding the release job open until the
+# runner limit.
+RESPONSE=$(curl -sS -X POST \
+  --connect-timeout 10 \
+  --max-time 30 \
   -H 'Content-type: application/json' \
   --data "$MESSAGE" \
-  "$SLACK_WEBHOOK_URL"
+  "$SLACK_WEBHOOK_URL")
+
+if [ "$RESPONSE" != "ok" ]; then
+  echo "❌ Slack rejected the notification: $RESPONSE"
+  exit 1
+fi
 
 echo "✅ Slack notification sent successfully!"

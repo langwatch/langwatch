@@ -99,7 +99,9 @@ Feature: the login agent owns the Copilot app launch and injects capture env
       When the user runs `langwatch logout`
       Then the capture login agent is removed
 
-    @integration @unimplemented
+    @integration
     Scenario: Logout revokes the copilot_app ingest key
       When the user runs `langwatch logout`
       Then the personal ingest key of sourceType "copilot_app" is revoked
+      # Bound server-side: the key is parented to the session's login key and
+      # the logout cascade retires it (ingest-api-key-lifecycle.feature).

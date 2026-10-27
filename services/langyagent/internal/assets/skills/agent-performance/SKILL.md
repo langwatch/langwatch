@@ -12,34 +12,6 @@ This skill is a production diagnostician. It reads the real traffic, not the cod
 
 ## Step 1: Set up the LangWatch CLI
 
-Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
-
-```bash
-langwatch docs                                    # Docs index
-langwatch docs integration/python/guide           # Python integration
-langwatch docs integration/typescript/guide       # TypeScript integration
-langwatch docs prompt-management/cli              # Prompts CLI
-langwatch scenario-docs                           # Scenario docs index
-```
-
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
-
-If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
-
-**Projects and API keys: target a real project, not a personal one.**
-
-LangWatch has two kinds of project:
-
-- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
-- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
-
-And two ways to authenticate:
-
-- **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
-- **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
-
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
-
 ## Step 2: Baseline the Vital Signs
 
 Establish the macro picture first, always comparing against the previous period (the analytics API returns both periods for every query):
@@ -75,7 +47,9 @@ langwatch trace export --format jsonl --limit 1000 --origin application -o trace
 langwatch trace export --format jsonl --limit 1000 --origin application --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
 
-`--origin application` scopes the sample to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+`--origin application` scopes the export to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+
+That narrowing belongs to the export and to nothing else. An export is a local sample you analyse offline, so choosing its origins is part of the analysis, and a count taken from it is a count of production traffic rather than of what the Trace Explorer shows. `trace search` is the other case: it answers with cards and a "View in Trace Explorer" link, and the link carries whatever the search named. Name an origin there and the Explorer opens narrower than the page the user was on, with a smaller number than the one beside it. So on `trace search`, name no origin unless the user does.
 
 Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 
@@ -87,10 +61,13 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search -q "<keyword from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
+langwatch trace search --errors-only --limit 25 --format json  # Every failure, without guessing at text
+langwatch trace search -q "<one phrase from a pattern>" --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
+
+A search that names no origin counts what the Trace Explorer counts (every trace except Langy's own), so the numbers you report match the link on the card. When the ask is to find specific traces rather than to diagnose the agent ("show me the thumbs down ones", "filter to alice"), use the `find-traces` skill: it drives the Explorer and searches every form a concept can take.
 
 For every pattern you claim, keep 2-3 example trace IDs as evidence. Never report a pattern without example traces behind it.
 
@@ -109,7 +86,7 @@ Open the report path for the user and also summarize the top findings directly i
 
 ## Step 5: Hand Off to Improvement
 
-Diagnosis without treatment is just bad news. If the `agent-improve` skill is installed, run it on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. Pass along the report — agent-improve uses these findings and trace examples as its evidence base.
+If the `agent-improve` skill is installed, offer it as the next step: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. It writes to the platform, which this skill does not, so run it only once the user says to. Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
 
 ## Common Mistakes
 
@@ -119,5 +96,6 @@ Diagnosis without treatment is just bad news. If the `agent-improve` skill is in
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
 - Do NOT stop at an empty evaluation metric; when evaluations have no data, the answer comes from the traces (and simulation runs), with a closing invitation to dig deeper
-- Do NOT mix origins blindly; questions about production behavior are answered from `--origin application` traffic
-- If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text — an activity card already shows the underlying failure
+- Do NOT mix origins blindly in an export; a question about production behavior is analysed from `--origin application` traffic
+- Do NOT pass `--origin` to `trace search` unless the user named an origin; the card's link carries it and opens the Explorer on a narrower set than the count beside it
+- If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text. An activity card already shows the underlying failure

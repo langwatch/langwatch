@@ -1,20 +1,18 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import {
-  isSpanContextValid,
-  context as otelContext,
-  trace,
-} from "@opentelemetry/api";
+
+import { isSpanContextValid, context as otelContext, trace } from "@opentelemetry/api";
 
 /**
- * Business context that can be propagated across async boundaries.
- * Used for logging correlation (org/project/user).
- *
- * Note: Trace/span IDs come directly from OTel context, not stored here.
+ * Business context propagated across async boundaries, for logging
+ * correlation (org/project/user). Trace/span IDs come directly from OTel
+ * context, not stored here.
  */
 export interface RequestContext {
   organizationId?: string;
   projectId?: string;
   userId?: string;
+  /** Internal queue scope propagated across durable event fan-out. */
+  queueDispatchScopeKey?: string;
 }
 
 /**
@@ -28,6 +26,7 @@ export interface JobContextMetadata {
   organizationId?: string;
   projectId?: string;
   userId?: string;
+  queueDispatchScopeKey?: string;
 }
 
 const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
@@ -71,9 +70,7 @@ export function updateCurrentContext(updates: Partial<RequestContext>): void {
  * Gets the current OTel span context if available.
  * Used for propagating trace context to job payloads for span linking.
  */
-export function getOtelSpanContext():
-  | { traceId: string; spanId: string }
-  | undefined {
+export function getOtelSpanContext(): { traceId: string; spanId: string } | undefined {
   const span = trace.getSpan(otelContext.active());
   if (!span) return undefined;
 
@@ -97,13 +94,12 @@ export type JobDataWithContext<T extends Record<string, unknown>> = T & {
  * Rebuilds business context from propagated job metadata. Trace/span context is
  * restored by the queue's OpenTelemetry instrumentation rather than ALS.
  */
-export function createContextFromJobData(
-  metadata?: JobContextMetadata,
-): RequestContext {
+export function createContextFromJobData(metadata?: JobContextMetadata): RequestContext {
   return {
     organizationId: metadata?.organizationId,
     projectId: metadata?.projectId,
     userId: metadata?.userId,
+    queueDispatchScopeKey: metadata?.queueDispatchScopeKey,
   };
 }
 
@@ -120,5 +116,6 @@ export function getJobContextMetadata(): JobContextMetadata {
     organizationId: context?.organizationId,
     projectId: context?.projectId,
     userId: context?.userId,
+    queueDispatchScopeKey: context?.queueDispatchScopeKey,
   };
 }

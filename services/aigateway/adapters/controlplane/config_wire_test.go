@@ -459,14 +459,76 @@ func TestConfigWire_KeyExpiry(t *testing.T) {
 // design and therefore silent: the cap would quietly stop following a changed
 // date. Pin both the field and its unit.
 func TestControlPlaneMaterialiserEmitsTheKeyExpiry(t *testing.T) {
-	src := readControlPlaneSource(t, "src", "server", "gateway", "config.materialiser.ts")
+	src := readControlPlaneSource(t,
+		"modules", "gateway", "process", "src", "services",
+		"gateway-config-materialisation.service.ts")
 
 	// Whitespace-tolerant: a formatter may break the expression across lines
 	// without breaking the contract it expresses.
-	if !regexp.MustCompile(`expires_at:\s*expiresAtWire\(\s*vk\.expiresAt\s*\)`).MatchString(src) {
-		t.Error("config.materialiser.ts no longer emits expires_at from the key's own date")
+	if !regexp.MustCompile(`expires_at:\s*toExpiresAtWire\(\s*vk\.expiresAt\s*\)`).MatchString(src) {
+		t.Error("gateway-config-materialisation.service.ts no longer emits expires_at from the key's own date")
 	}
-	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.getTime\(\)\s*/\s*1000\s*\)`).MatchString(src) {
-		t.Error("config.materialiser.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
+
+	// toExpiresAtWire's own seconds conversion now lives in the shared
+	// wire-rules module the materialiser calls through to.
+	rulesSrc := readControlPlaneSource(t,
+		"modules", "gateway", "process", "src", "rules",
+		"gateway-config-wire.rules.ts")
+	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.epochMilliseconds\s*/\s*1000\s*\)`).MatchString(rulesSrc) {
+		t.Error("gateway-config-wire.rules.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
 	}
+}
+
+// The bundle's budget validity horizon: the earliest instant one of its
+// enforceable budgets leaves the period its spend figure was read in. The
+// auth cache re-reads rather than revalidates past it, because the config
+// version token does not move when a period ends.
+//
+// Spec: specs/ai-gateway/auth-cache.feature
+//
+//	(@unit — "A budget period that ends invalidates the spend the gateway
+//	 is holding").
+/** @scenario "a bundle knows when its spend figures stop describing the current period" */
+func TestConfigWire_BudgetsValidUntil(t *testing.T) {
+	day := int64(1788739200)  // the earlier boundary
+	week := int64(1789171200) // the later one
+
+	t.Run("takes the earliest boundary any enforceable budget is heading for", func(t *testing.T) {
+		w := configWire{Budgets: []budgetWire{
+			{ID: "b_week", Window: "week", LimitMicroUSD: 50_000_000, ResetsAt: week},
+			{ID: "b_day", Window: "day", LimitMicroUSD: 5_000_000, ResetsAt: day},
+		}}
+		assert.Equal(t, time.Unix(day, 0), w.toDomain().Budget.ValidUntil,
+			"the first period to end is the first that can leave a spend figure describing a period that is over")
+	})
+
+	t.Run("ignores a budget with no limit", func(t *testing.T) {
+		w := configWire{Budgets: []budgetWire{
+			{ID: "b_week", Window: "week", LimitMicroUSD: 50_000_000, ResetsAt: week},
+			{ID: "b_unset", Window: "day", LimitMicroUSD: 0, ResetsAt: day},
+		}}
+		assert.Equal(t, time.Unix(week, 0), w.toDomain().Budget.ValidUntil,
+			"a budget that can never block must not shorten the config's life")
+	})
+
+	t.Run("ignores a boundary the control plane did not send", func(t *testing.T) {
+		w := configWire{Budgets: []budgetWire{
+			{ID: "b_week", Window: "week", LimitMicroUSD: 50_000_000, ResetsAt: week},
+			{ID: "b_total", Window: "total", LimitMicroUSD: 5_000_000, ResetsAt: 0},
+		}}
+		assert.Equal(t, time.Unix(week, 0), w.toDomain().Budget.ValidUntil,
+			"an absent boundary is no answer, not a period that ended in 1970")
+	})
+
+	t.Run("is zero when nothing carries a boundary", func(t *testing.T) {
+		w := configWire{Budgets: []budgetWire{
+			{ID: "b_total", Window: "total", LimitMicroUSD: 5_000_000, ResetsAt: 0},
+		}}
+		assert.True(t, w.toDomain().Budget.ValidUntil.IsZero(),
+			"with nothing to expire, the ordinary staleness clock is the only schedule")
+	})
+
+	t.Run("is zero when the key has no budgets at all", func(t *testing.T) {
+		assert.True(t, (&configWire{}).toDomain().Budget.ValidUntil.IsZero())
+	})
 }

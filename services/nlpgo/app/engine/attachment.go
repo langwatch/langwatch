@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -32,13 +33,8 @@ import (
 // referencing a link, not attaching a file. A URL that cannot be fetched fails
 // the run with a clear, user-facing error rather than a broken request.
 
-const (
-	// defaultMaxAttachmentBytes caps a single fetched attachment. Large enough
-	// for real photos/audio/PDFs, small enough to refuse a runaway download.
-	defaultMaxAttachmentBytes int64 = 20 * 1024 * 1024
-	// defaultAttachmentTimeout bounds the whole fetch (connect + read).
-	defaultAttachmentTimeout = 30 * time.Second
-)
+// defaultAttachmentTimeout bounds the whole fetch (connect + read).
+const defaultAttachmentTimeout = 30 * time.Second
 
 // httpURLRe matches an http(s) URL token: the scheme followed by a run of
 // non-space characters that are not URL-hostile delimiters. Trailing
@@ -50,6 +46,10 @@ var httpURLRe = regexp.MustCompile("https?://[^\\s<>\"'`]+")
 // content parts. It applies the same SSRF policy as the HTTP block (private,
 // loopback, and cloud-metadata addresses are refused, with DNS-rebinding
 // protection via SafeDialer), a wall-clock timeout, and a size cap.
+//
+// The engine holds one fetcher for every request it serves, so the fetcher is
+// never mutated after construction: a request that runs under its own size cap
+// takes a copy from withMaxBytes.
 type attachmentFetcher struct {
 	client   *http.Client
 	ssrf     httpblock.SSRFOptions
@@ -70,8 +70,17 @@ func newAttachmentFetcher(ssrf httpblock.SSRFOptions) *attachmentFetcher {
 			Transport: transport,
 		},
 		ssrf:     ssrf,
-		maxBytes: defaultMaxAttachmentBytes,
+		maxBytes: app.DefaultMaxAttachmentBytes,
 	}
+}
+
+// withMaxBytes returns a fetcher that applies the per-request size cap. The
+// copy shares the HTTP client (and so its connection pool) with the receiver,
+// which stays untouched for the requests running beside this one.
+func (f *attachmentFetcher) withMaxBytes(requested int64) *attachmentFetcher {
+	scoped := *f
+	scoped.maxBytes = app.ResolveMaxAttachmentBytes(requested)
+	return &scoped
 }
 
 // fetchedAttachment is the validated result of fetching a URL.
@@ -102,13 +111,9 @@ func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedA
 	if resp.StatusCode >= 400 {
 		return nil, attachmentError(rawURL, fmt.Sprintf("returned an error status (%d)", resp.StatusCode), resp.StatusCode)
 	}
-	// Read one byte past the cap so an oversized body is detectable.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, f.maxBytes+1))
-	if err != nil {
-		return nil, attachmentError(rawURL, "could not be read ("+err.Error()+")", 0)
-	}
-	if int64(len(body)) > f.maxBytes {
-		return nil, attachmentError(rawURL, fmt.Sprintf("is larger than the %d MB attachment limit", f.maxBytes/(1024*1024)), 0)
+	body, ne := f.readBody(resp, rawURL)
+	if ne != nil {
+		return nil, ne
 	}
 	mt := normalizeMediaType(resp.Header.Get("Content-Type"))
 	// Sniff from the bytes when the server omits or generalizes the type, so
@@ -119,8 +124,54 @@ func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedA
 	return &fetchedAttachment{mediaType: mt, data: body, sourceURL: rawURL}, nil
 }
 
+// readBody reads the response body under the size cap. A server that declares
+// an oversized body is refused before any of it is read; one that declares
+// nothing is read one byte past the cap, so an oversized body is detectable.
+func (f *attachmentFetcher) readBody(resp *http.Response, rawURL string) ([]byte, *NodeError) {
+	if resp.ContentLength > f.maxBytes {
+		return nil, attachmentTooLargeError(rawURL, f.maxBytes)
+	}
+	body, err := readAllSized(io.LimitReader(resp.Body, f.maxBytes+1), resp.ContentLength)
+	if err != nil {
+		return nil, attachmentError(rawURL, "could not be read ("+err.Error()+")", 0)
+	}
+	if int64(len(body)) > f.maxBytes {
+		return nil, attachmentTooLargeError(rawURL, f.maxBytes)
+	}
+	return body, nil
+}
+
+// readAllSized reads r to the end. When the server declared the body length the
+// buffer is allocated once at that size, so a large attachment is not copied
+// through a series of growing buffers on the way in. The caller bounds r, and a
+// declared length past that bound never reaches here.
+func readAllSized(r io.Reader, declared int64) ([]byte, error) {
+	if declared <= 0 {
+		return io.ReadAll(r)
+	}
+	buf := bytes.NewBuffer(make([]byte, 0, declared+bytes.MinRead))
+	_, err := buf.ReadFrom(r)
+	return buf.Bytes(), err
+}
+
+// attachmentTooLargeError names the limit the request ran under, so the author
+// reads the figure their organization actually holds.
+func attachmentTooLargeError(rawURL string, maxBytes int64) *NodeError {
+	return attachmentError(rawURL, "is larger than the "+formatAttachmentLimit(maxBytes)+" attachment limit", 0)
+}
+
+// formatAttachmentLimit renders a byte limit in MB (1 MB = 1024 * 1024 bytes),
+// whole when the limit is a whole number of them.
+func formatAttachmentLimit(maxBytes int64) string {
+	const mb = 1024 * 1024
+	if maxBytes%mb == 0 {
+		return fmt.Sprintf("%d MB", maxBytes/mb)
+	}
+	return fmt.Sprintf("%.2f MB", float64(maxBytes)/mb)
+}
+
 // rewrite fetches remote attachment URLs in every message and re-homes them
-// into content parts. It runs after splitMessagesWithImages, so inline data:
+// into content parts. It runs after splitMessagesWithAttachments, so inline data:
 // URLs are already parts; this pass handles http(s) URLs in string content, in
 // text parts, and carried by existing image_url parts.
 func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMessage) ([]app.ChatMessage, *NodeError) {
@@ -141,16 +192,10 @@ func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMess
 		}
 		// A system message that gained an attachment part must be re-homed:
 		// providers reject non-text parts in system role. Mirrors the same
-		// re-homing splitMessagesWithImages does for inline data-URL images.
+		// re-homing splitMessagesWithAttachments does for inline data URLs.
 		if m.Role == "system" {
 			if parts, ok := newContent.([]any); ok && hasNonTextPart(parts) {
-				systemText, rest := splitLeadingText(parts)
-				if systemText != "" {
-					out = append(out, app.ChatMessage{Role: "system", Content: systemText})
-				}
-				if len(rest) > 0 {
-					out = append(out, app.ChatMessage{Role: "user", Content: rest})
-				}
+				out = append(out, rehomeSystemParts(parts)...)
 				continue
 			}
 		}
@@ -160,37 +205,34 @@ func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMess
 	return out, nil
 }
 
-// inlineImageInputs resolves image-typed inputs that carry a remote http(s)
-// URL into inline base64 data URLs before message templating, so the existing
-// data-URL image splitter delivers them as image parts. An image-typed input
-// is an explicit attachment: the author declared the field an image, so a URL
-// it carries that cannot be fetched as an image fails the run with a clear,
-// user-facing error rather than being left as text for the model to guess from
-// (e.g. from a filename). Inputs that are not image-typed, not http(s) URLs, or
-// already inline data URLs are left untouched. The returned map is a copy only
-// when a value was replaced, so the caller's original inputs (surfaced verbatim
-// in execution events) keep the readable URL rather than a base64 blob.
-func (f *attachmentFetcher) inlineImageInputs(ctx context.Context, node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
+// inlineAttachmentInputs resolves image-typed and file-typed inputs that carry
+// a remote http(s) URL into inline base64 data URLs before message templating,
+// so the data-URL splitter delivers them as content parts. Such an input is an
+// explicit attachment: the author declared the field an image or a file, so a
+// URL it carries that cannot be fetched fails the run with a clear, user-facing
+// error rather than being left as text for the model to guess from (e.g. from a
+// filename).
+//
+// An image-typed input keeps the stricter rule that the response must be an
+// image. A file-typed input accepts any content type, including a web page,
+// because the author declared the value a file; its file name comes from the
+// URL path and travels in the data URL as a ";name=" parameter.
+//
+// Inputs of any other type, values that are not http(s) URLs, and values that
+// are already inline data URLs are left untouched. The returned map is a copy
+// only when a value was replaced, so the caller's original inputs (surfaced
+// verbatim in execution events) keep the readable URL rather than a base64 blob.
+func (f *attachmentFetcher) inlineAttachmentInputs(ctx context.Context, node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
 	out := inputs
 	copied := false
 	for _, field := range node.Data.Inputs {
-		if field.Type != dsl.FieldTypeImage {
-			continue
-		}
-		raw, ok := inputs[field.Identifier].(string)
+		rawURL, ok := remoteAttachmentInputURL(field, inputs)
 		if !ok {
 			continue
 		}
-		rawURL := strings.TrimSpace(raw)
-		if !isHTTPURL(rawURL) {
-			continue // already a data URL or not a remote reference
-		}
-		att, ne := f.fetch(ctx, rawURL)
+		inlined, ne := f.inlineOneAttachment(ctx, field.Type, rawURL)
 		if ne != nil {
 			return nil, ne
-		}
-		if !strings.HasPrefix(att.mediaType, "image/") {
-			return nil, attachmentError(rawURL, "could not be loaded as an image (its content type is "+att.mediaType+")", 0)
 		}
 		if !copied {
 			out = make(map[string]any, len(inputs))
@@ -199,9 +241,43 @@ func (f *attachmentFetcher) inlineImageInputs(ctx context.Context, node *dsl.Nod
 			}
 			copied = true
 		}
-		out[field.Identifier] = dataURL(att)
+		out[field.Identifier] = inlined
 	}
 	return out, nil
+}
+
+// remoteAttachmentInputURL returns the URL an attachment-typed input holds, and
+// false for every input the resolution leaves alone: a field of another type, a
+// value that is not a string, and a value that is already an inline data URL.
+func remoteAttachmentInputURL(field dsl.Field, inputs map[string]any) (string, bool) {
+	if field.Type != dsl.FieldTypeImage && field.Type != dsl.FieldTypeFile {
+		return "", false
+	}
+	raw, ok := inputs[field.Identifier].(string)
+	if !ok {
+		return "", false
+	}
+	rawURL := strings.TrimSpace(raw)
+	if !isHTTPURL(rawURL) {
+		return "", false
+	}
+	return rawURL, true
+}
+
+// inlineOneAttachment fetches one attachment-typed input and returns the data
+// URL that replaces it.
+func (f *attachmentFetcher) inlineOneAttachment(ctx context.Context, fieldType dsl.FieldType, rawURL string) (string, *NodeError) {
+	att, ne := f.fetch(ctx, rawURL)
+	if ne != nil {
+		return "", ne
+	}
+	if fieldType == dsl.FieldTypeImage {
+		if !strings.HasPrefix(att.mediaType, "image/") {
+			return "", attachmentError(rawURL, "could not be loaded as an image (its content type is "+att.mediaType+")", 0)
+		}
+		return dataURL(att), nil
+	}
+	return dataURLWithName(att, fileNameFromURL(att.sourceURL, "attachment"+extensionForMediaType(att.mediaType))), nil
 }
 
 // hasNonTextPart reports whether a content-part list contains any part that is
@@ -342,17 +418,107 @@ func contentPartForAttachment(att *fetchedAttachment) (map[string]any, bool) {
 }
 
 func dataURL(att *fetchedAttachment) string {
-	return "data:" + att.mediaType + ";base64," + base64.StdEncoding.EncodeToString(att.data)
+	return encodeDataURL("data:"+att.mediaType+";base64,", att.data)
 }
 
-// redactAttachmentsForTracing returns a copy of messages with heavy inline
-// attachment bytes (base64 data URLs in image_url / file parts and raw base64 in
-// input_audio parts) replaced by a short "[media-type, N bytes]" summary. The
-// model still receives the full bytes — only the copy handed to tracing is
-// shrunk — so a fetched 20 MB image/PDF/audio is not JSON-serialized into the
-// span's langwatch.input (which would blow OTLP/ClickHouse size limits and store
-// the private payload). Text and plain (non-data) URLs are left untouched.
-func redactAttachmentsForTracing(messages []app.ChatMessage) []app.ChatMessage {
+// encodeDataURL appends the base64 of data to prefix in one allocation. A
+// separate encode followed by a concatenation holds the encoded attachment
+// twice, which matters once an attachment is hundreds of megabytes.
+func encodeDataURL(prefix string, data []byte) string {
+	var b strings.Builder
+	b.Grow(len(prefix) + base64.StdEncoding.EncodedLen(len(data)))
+	b.WriteString(prefix)
+	enc := base64.NewEncoder(base64.StdEncoding, &b)
+	_, _ = enc.Write(data)
+	_ = enc.Close()
+	return b.String()
+}
+
+// dataURLWithName builds a data URL that carries the file name as an RFC 2397
+// parameter, the form the application uses for a file cell. The splitter reads
+// the name back off it and drops the parameter before the provider sees it.
+func dataURLWithName(att *fetchedAttachment, name string) string {
+	if name == "" {
+		return dataURL(att)
+	}
+	return encodeDataURL("data:"+att.mediaType+";name="+escapeAttachmentName(name)+";base64,", att.data)
+}
+
+// escapeAttachmentName percent-encodes a file name for the ";name=" parameter,
+// the same way the application does with encodeURIComponent. A semicolon, a
+// comma or a space in the name would end the parameter early and hide the whole
+// data URL from the splitter, so every one of them is encoded.
+func escapeAttachmentName(name string) string {
+	return strings.ReplaceAll(url.QueryEscape(name), "+", "%20")
+}
+
+// An attachment reaches the trace as real content when it fits, and keeps a
+// short "[media-type, N bytes]" summary when it does not.
+//
+// The ceiling is the collector's OTLP body limit, not the fetch limit: an
+// attachment fetch may return up to the request's per-file limit (20 MB by
+// default, up to app.MaxAttachmentBytesCeiling for an organization that holds a
+// raised one) while the collector refuses a body over 10 MB, and a rejected
+// body loses the whole
+// trace, which is far worse than a summarized picture. The budget is shared
+// across the message set so several medium attachments cannot add up past the
+// same limit. Both figures count DECODED bytes; base64 inflates a payload by a
+// third, so they leave headroom for the encoding and for the rest of the batch.
+//
+// Anything under the ceiling is carried through verbatim and the ingestion edge
+// externalizes it to the content-addressed store, exactly as it does for media
+// sent by any other SDK. That is what puts the picture in the trace instead of
+// a placeholder that renders as broken media.
+const (
+	maxTracedAttachmentBytes       = 3 << 20
+	maxTracedAttachmentBudgetBytes = 4 << 20
+)
+
+// traceAttachmentBudget is the per-message-set allowance described above.
+// remainingText is the separate allowance small text parts ride on, so
+// ordinary prompt text never spends the attachment budget and a message set
+// that inlines many small text files still has a ceiling.
+type traceAttachmentBudget struct {
+	remaining     int
+	remainingText int
+}
+
+// admit reports whether an attachment with this base64 payload is carried into
+// the trace, spending the budget when it is.
+func (b *traceAttachmentBudget) admit(payload string) bool {
+	return b.admitBytes(approxBase64Bytes(payload))
+}
+
+// admitBytes is admit for content that is already counted in decoded bytes,
+// such as a text attachment the engine decoded out of a data URL.
+func (b *traceAttachmentBudget) admitBytes(n int) bool {
+	if n > maxTracedAttachmentBytes || n > b.remaining {
+		return false
+	}
+	b.remaining -= n
+	return true
+}
+
+// admitText carries a text part. A small part rides the free text allowance,
+// which bounds how much text one message set carries without touching the
+// attachment budget. A larger part, or one past that allowance, is charged
+// like an attachment, so a prompt that inlines many text files can never make
+// the traced body unbounded.
+func (b *traceAttachmentBudget) admitText(n int) bool {
+	if n <= smallTracedTextBytes && n <= b.remainingText {
+		b.remainingText -= n
+		return true
+	}
+	return b.admitBytes(n)
+}
+
+// messagesForTracing returns the copy of messages handed to the span. The model
+// always receives the originals, so nothing here changes what it sees.
+func messagesForTracing(messages []app.ChatMessage) []app.ChatMessage {
+	budget := &traceAttachmentBudget{
+		remaining:     maxTracedAttachmentBudgetBytes,
+		remainingText: maxTracedFreeTextBytes,
+	}
 	out := make([]app.ChatMessage, len(messages))
 	for i, m := range messages {
 		out[i] = m
@@ -360,48 +526,111 @@ func redactAttachmentsForTracing(messages []app.ChatMessage) []app.ChatMessage {
 		if !ok {
 			continue
 		}
-		redacted := make([]any, len(parts))
+		traced := make([]any, len(parts))
 		for j, p := range parts {
-			redacted[j] = redactPartForTracing(p)
+			traced[j] = partForTracing(p, budget)
 		}
-		out[i].Content = redacted
+		out[i].Content = traced
 	}
 	return out
 }
 
-// redactPartForTracing replaces the inline bytes of a single content part with a
-// summary, leaving every other part shape untouched.
-func redactPartForTracing(p any) any {
+// partForTracing carries one content part into the trace, summarizing its
+// inline bytes only when they do not fit. Every other part shape is untouched.
+func partForTracing(p any, budget *traceAttachmentBudget) any {
 	block, ok := p.(map[string]any)
 	if !ok {
 		return p
 	}
 	switch block["type"] {
 	case "image_url":
-		if img, ok := block["image_url"].(map[string]any); ok {
-			if u, _ := img["url"].(string); strings.HasPrefix(u, "data:") {
-				return map[string]any{"type": "image_url", "image_url": map[string]any{"url": summarizeDataURL(u)}}
-			}
-		}
+		return imageURLForTracing(p, block, budget)
 	case "file":
-		if file, ok := block["file"].(map[string]any); ok {
-			if fd, _ := file["file_data"].(string); strings.HasPrefix(fd, "data:") {
-				return map[string]any{"type": "file", "file": map[string]any{
-					"filename": file["filename"], "file_data": summarizeDataURL(fd),
-				}}
-			}
-		}
+		return fileForTracing(p, block, budget)
 	case "input_audio":
-		if audio, ok := block["input_audio"].(map[string]any); ok {
-			if data, _ := audio["data"].(string); data != "" {
-				format, _ := audio["format"].(string)
-				return map[string]any{"type": "input_audio", "input_audio": map[string]any{
-					"data": fmt.Sprintf("[audio, %d bytes]", approxBase64Bytes(data)), "format": format,
-				}}
-			}
-		}
+		return inputAudioForTracing(p, block, budget)
+	case "text":
+		return textForTracing(p, block, budget)
+	default:
+		return p
 	}
-	return p
+}
+
+// smallTracedTextBytes is the size under which one text part rides the free
+// text allowance rather than the attachment budget. Ordinary prompt text sits
+// far below it.
+//
+// maxTracedFreeTextBytes is how much text the whole message set may carry that
+// way. A prompt spends a few kilobytes of it; a prompt that inlines a hundred
+// small text files spends it all and the rest is charged like an attachment,
+// which is what keeps the traced body bounded whatever the part count.
+const (
+	smallTracedTextBytes   = 8 << 10
+	maxTracedFreeTextBytes = 256 << 10
+)
+
+// textForTracing carries a text part into the trace, summarizing it only when
+// neither the free text allowance nor the shared attachment budget has room
+// for it.
+func textForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	text, _ := block["text"].(string)
+	if budget.admitText(len(text)) {
+		return p
+	}
+	return map[string]any{"type": "text", "text": fmt.Sprintf("[text, %d bytes]", len(text))}
+}
+
+func imageURLForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	img, ok := block["image_url"].(map[string]any)
+	if !ok {
+		return p
+	}
+	u, _ := img["url"].(string)
+	if !strings.HasPrefix(u, "data:") || budget.admit(dataURLPayload(u)) {
+		return p
+	}
+	return map[string]any{
+		"type":      "image_url",
+		"image_url": map[string]any{"url": summarizeDataURL(u)},
+	}
+}
+
+func fileForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	file, ok := block["file"].(map[string]any)
+	if !ok {
+		return p
+	}
+	fd, _ := file["file_data"].(string)
+	if !strings.HasPrefix(fd, "data:") || budget.admit(dataURLPayload(fd)) {
+		return p
+	}
+	return map[string]any{"type": "file", "file": map[string]any{
+		"filename": file["filename"], "file_data": summarizeDataURL(fd),
+	}}
+}
+
+func inputAudioForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	audio, ok := block["input_audio"].(map[string]any)
+	if !ok {
+		return p
+	}
+	data, _ := audio["data"].(string)
+	if data == "" || budget.admit(data) {
+		return p
+	}
+	format, _ := audio["format"].(string)
+	return map[string]any{"type": "input_audio", "input_audio": map[string]any{
+		"data":   fmt.Sprintf("[audio, %d bytes]", approxBase64Bytes(data)),
+		"format": format,
+	}}
+}
+
+// dataURLPayload returns the base64 payload of a data URL, or "" when it has none.
+func dataURLPayload(s string) string {
+	if comma := strings.IndexByte(s, ','); comma >= 0 {
+		return s[comma+1:]
+	}
+	return ""
 }
 
 // summarizeDataURL turns "data:image/png;base64,AAAA..." into a short
@@ -414,11 +643,7 @@ func summarizeDataURL(s string) string {
 			mediaType = rest[:i]
 		}
 	}
-	n := 0
-	if comma := strings.IndexByte(s, ','); comma >= 0 {
-		n = approxBase64Bytes(s[comma+1:])
-	}
-	return fmt.Sprintf("[%s, %d bytes]", mediaType, n)
+	return fmt.Sprintf("[%s, %d bytes]", mediaType, approxBase64Bytes(dataURLPayload(s)))
 }
 
 // approxBase64Bytes estimates the decoded byte length of a base64 string

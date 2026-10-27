@@ -9,6 +9,7 @@
 The initial docs onboarding split users by **identity**: "For Developers", "For Teams & PMs", "Use the Platform", "Manual Setup". This assumed that job title maps to tool choice, which was a reasonable assumption in 2024 but is wrong in 2026.
 
 Today:
+
 - CEOs use Claude Code to instrument their agents
 - PMs use Cursor to write scenario tests
 - "Non-technical" people prompt coding assistants to set up entire evaluation pipelines
@@ -19,11 +20,11 @@ Calling something "For Developers" scares away the CEO. Calling it "For Teams & 
 
 We will onboard users by **what tool they're already using**, not by who they are:
 
-| Before (identity-based) | After (workflow-based) |
-|---|---|
-| "For Developers" | "Using a Coding Assistant" |
-| "For Teams & PMs" | "Using a Chat Assistant" |
-| "Choose Your Path" | "Quick Start" |
+| Before (identity-based) | After (workflow-based)     |
+| ----------------------- | -------------------------- |
+| "For Developers"        | "Using a Coding Assistant" |
+| "For Teams & PMs"       | "Using a Chat Assistant"   |
+| "Choose Your Path"      | "Quick Start"              |
 
 ### Two paths, defined by tool capability
 
@@ -50,10 +51,12 @@ LangWatch Skills/
 ### Two categories of skills
 
 Two categories of skills emerged:
+
 1. **Feature skills** -- map 1:1 to platform features (tracing, evaluations, scenarios, prompts)
 2. **Recipes** -- domain-specific, use-case-specific actionable guides (test-compliance, generate-rag-dataset, debug-instrumentation)
 
 We will organize skills into feature skills and recipes:
+
 - Feature skills handle both code and platform approaches with disambiguation
 - Recipes solve specific domain problems and are the 2026 evolution of cookbooks
 - Both are AgentSkills-compliant and publishable to the skills directory

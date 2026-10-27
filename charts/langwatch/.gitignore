@@ -1,1 +1,5 @@
 charts/
+# Resolved at build time from the file:// subcharts and the exact prometheus
+# pin in Chart.yaml. A committed lock goes stale on every release that bumps
+# a subchart version and breaks `helm dependency build`.
+Chart.lock

@@ -1,0 +1,23 @@
+/* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
+
+.llm-turn {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+}
+
+.llm-text {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.llm-settings {
+  max-width: 32rem;
+}
+
+.llm-search {
+  max-width: 24rem;
+}

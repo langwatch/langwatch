@@ -1,0 +1,362 @@
+import { randomUUID } from "node:crypto";
+
+/**
+ * @vitest-environment node
+ * Privacy-rule contract test: run against both memory and Postgres backends
+ * (isolated by organization). Spec: specs/data-privacy-service.feature
+ */
+import type { DataPrivacyConfig, DataPrivacyScope } from "@langwatch/data-privacy-contract";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
+
+import type { DataPrivacyPolicyRepository } from "../data-privacy.repository.ts";
+import { MemoryDataPrivacyPolicyRepository } from "../memory/memory.data-privacy.repository.ts";
+import { PrismaDataPrivacyPolicyRepository } from "../prisma/prisma.data-privacy.repository.ts";
+
+/**
+ * One backend under test. The namespace keeps a run's ids off every other
+ * row in a shared database: the stored unique key is (scopeType, scopeId,
+ * personalOnly) across all organizations, so a fixed id would collide.
+ */
+type Backend = Readonly<{ repository: () => DataPrivacyPolicyRepository; namespace: () => string }>;
+
+const DROP_INPUT: DataPrivacyConfig = { categories: { input: { disposition: "drop" } } };
+const CAPTURE_INPUT: DataPrivacyConfig = { categories: { input: { disposition: "capture" } } };
+
+function contractCases(backend: Backend): void {
+  const acme = () => `org_acme_${backend.namespace()}`;
+  const other = () => `org_other_${backend.namespace()}`;
+  const team = (): DataPrivacyScope => ({
+    scopeType: "TEAM",
+    scopeId: `team_${backend.namespace()}`,
+  });
+  const project = (): DataPrivacyScope => ({
+    scopeType: "PROJECT",
+    scopeId: `project_${backend.namespace()}`,
+  });
+
+  describe("when the organization has written no rule", () => {
+    /** @scenario "The memory and Postgres privacy rule repositories answer alike" */
+    it("answers a scope chain with no rows", async () => {
+      const repository = backend.repository();
+
+      await expect(
+        repository.findForProjectChain({
+          organizationId: acme(),
+          scopes: [{ ...project(), personalOnly: false }],
+        }),
+      ).resolves.toEqual([]);
+    });
+
+    it("lists nothing for the organization", async () => {
+      const repository = backend.repository();
+
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual(
+        [],
+      );
+    });
+
+    it("deletes a rule nobody wrote without complaint", async () => {
+      const repository = backend.repository();
+
+      await expect(
+        repository.deleteForScope({
+          organizationId: acme(),
+          scope: team(),
+          personalOnly: false,
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when a rule is written for a scope", () => {
+    it("reads the rule back on the scope's chain", async () => {
+      const repository = backend.repository();
+
+      await repository.upsertForScope({
+        organizationId: acme(),
+        scope: team(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+
+      await expect(
+        repository.findForProjectChain({
+          organizationId: acme(),
+          scopes: [
+            { ...team(), personalOnly: false },
+            { ...project(), personalOnly: false },
+          ],
+        }),
+      ).resolves.toEqual([{ ...team(), personalOnly: false, config: DROP_INPUT }]);
+    });
+
+    it("lists the rule with the organization that wrote it", async () => {
+      const repository = backend.repository();
+
+      const written = await repository.upsertForScope({
+        organizationId: acme(),
+        scope: team(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+
+      expect(written).toMatchObject({
+        organizationId: acme(),
+        ...team(),
+        personalOnly: false,
+      });
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual([
+        written,
+      ]);
+    });
+
+    it("rewrites the same rule rather than adding a second one", async () => {
+      const repository = backend.repository();
+
+      const first = await repository.upsertForScope({
+        organizationId: acme(),
+        scope: team(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+      const second = await repository.upsertForScope({
+        organizationId: acme(),
+        scope: team(),
+        personalOnly: false,
+        config: CAPTURE_INPUT,
+      });
+
+      expect(second.id).toBe(first.id);
+      expect(second.config).toEqual(CAPTURE_INPUT);
+      await expect(
+        repository.findAllInOrganization({ organizationId: acme() }),
+      ).resolves.toHaveLength(1);
+    });
+
+    it("keeps the personal-only rule apart from the shared one on the same scope", async () => {
+      const repository = backend.repository();
+
+      await repository.upsertForScope({
+        organizationId: acme(),
+        scope: team(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+      await repository.upsertForScope({
+        organizationId: acme(),
+        scope: team(),
+        personalOnly: true,
+        config: CAPTURE_INPUT,
+      });
+
+      const listed = await repository.findAllInOrganization({ organizationId: acme() });
+
+      expect(listed).toHaveLength(2);
+      expect(
+        listed.map((row) => row.personalOnly).toSorted((a, b) => Number(a) - Number(b)),
+      ).toEqual([false, true]);
+    });
+
+    it("removes only the rule it was asked to remove", async () => {
+      const repository = backend.repository();
+
+      await repository.upsertForScope({
+        organizationId: acme(),
+        scope: team(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+      await repository.upsertForScope({
+        organizationId: acme(),
+        scope: project(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+
+      await repository.deleteForScope({
+        organizationId: acme(),
+        scope: team(),
+        personalOnly: false,
+      });
+
+      const listed = await repository.findAllInOrganization({ organizationId: acme() });
+
+      expect(listed).toHaveLength(1);
+      expect(listed[0]).toMatchObject(project());
+    });
+  });
+
+  describe("when another organization holds a rule on the same scope", () => {
+    it("never answers a chain with the other organization's rule", async () => {
+      const repository = backend.repository();
+
+      await repository.upsertForScope({
+        organizationId: other(),
+        scope: team(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+
+      await expect(
+        repository.findForProjectChain({
+          organizationId: acme(),
+          scopes: [{ ...team(), personalOnly: false }],
+        }),
+      ).resolves.toEqual([]);
+    });
+
+    it("never lists the other organization's rule", async () => {
+      const repository = backend.repository();
+
+      await repository.upsertForScope({
+        organizationId: other(),
+        scope: team(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual(
+        [],
+      );
+    });
+
+    it("never deletes the other organization's rule", async () => {
+      const repository = backend.repository();
+
+      await repository.upsertForScope({
+        organizationId: other(),
+        scope: team(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+
+      await repository.deleteForScope({
+        organizationId: acme(),
+        scope: team(),
+        personalOnly: false,
+      });
+
+      await expect(
+        repository.findAllInOrganization({ organizationId: other() }),
+      ).resolves.toHaveLength(1);
+    });
+  });
+
+  describe("when a rule is merged", () => {
+    /** @scenario "The memory and Postgres privacy rule repositories answer alike" */
+    it("hands the merge nothing and writes what it answers when no rule is stored", async () => {
+      const repository = backend.repository();
+      const seen: (DataPrivacyConfig | undefined)[] = [];
+
+      const written = await repository.mergeConfigForScope({
+        organizationId: acme(),
+        scope: project(),
+        personalOnly: false,
+        merge: (config) => {
+          seen.push(config);
+          return DROP_INPUT;
+        },
+      });
+
+      expect(seen).toEqual([undefined]);
+      expect(written).toMatchObject({ organizationId: acme(), ...project(), config: DROP_INPUT });
+    });
+
+    it("hands the merge the stored config and replaces it with the answer", async () => {
+      const repository = backend.repository();
+      await repository.upsertForScope({
+        organizationId: acme(),
+        scope: project(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+
+      await repository.mergeConfigForScope({
+        organizationId: acme(),
+        scope: project(),
+        personalOnly: false,
+        merge: (config) => ({ ...config, pii: { level: "strict" } }),
+      });
+
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual([
+        expect.objectContaining({ config: { ...DROP_INPUT, pii: { level: "strict" } } }),
+      ]);
+    });
+
+    it("writes nothing when the merge throws", async () => {
+      const repository = backend.repository();
+
+      await expect(
+        repository.mergeConfigForScope({
+          organizationId: acme(),
+          scope: project(),
+          personalOnly: false,
+          merge: () => {
+            throw new Error("refused");
+          },
+        }),
+      ).rejects.toThrow("refused");
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual(
+        [],
+      );
+    });
+  });
+}
+
+describe("given the memory data privacy repository", () => {
+  let repository: DataPrivacyPolicyRepository;
+
+  beforeEach(() => {
+    repository = MemoryDataPrivacyPolicyRepository.create();
+  });
+
+  contractCases({ repository: () => repository, namespace: () => "memory" });
+});
+
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
+const connection = databaseUrl
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("data-privacy-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
+  : null;
+
+function database(): PrismaClient {
+  if (connection === null) throw new Error("LANGWATCH_TEST_DATABASE_URL is required here");
+  return connection.client;
+}
+
+describe.skipIf(!databaseUrl)("given the Postgres data privacy repository", () => {
+  const namespace = randomUUID();
+  const clean = () =>
+    cleanupTestRows(database(), [
+      [
+        "dataPrivacyPolicy",
+        { organizationId: { in: [`org_acme_${namespace}`, `org_other_${namespace}`] } },
+      ],
+    ]);
+
+  beforeEach(clean);
+  afterAll(clean);
+
+  contractCases({
+    repository: () => PrismaDataPrivacyPolicyRepository.create({ prisma: database() }),
+    namespace: () => namespace,
+  });
+});
+import { createLogger } from "@langwatch/observability";

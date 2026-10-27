@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from ..models.patch_api_gateway_v1_virtual_keys_by_id_body_config_rate_limits import (
         PatchApiGatewayV1VirtualKeysByIdBodyConfigRateLimits,
     )
+    from ..models.patch_api_gateway_v1_virtual_keys_by_id_body_config_realtime import (
+        PatchApiGatewayV1VirtualKeysByIdBodyConfigRealtime,
+    )
 
 
 T = TypeVar("T", bound="PatchApiGatewayV1VirtualKeysByIdBodyConfig")
@@ -39,6 +42,7 @@ class PatchApiGatewayV1VirtualKeysByIdBodyConfig:
         fallback (PatchApiGatewayV1VirtualKeysByIdBodyConfigFallback | Unset):
         guardrail_attachments (list[PatchApiGatewayV1VirtualKeysByIdBodyConfigGuardrailAttachmentsItem] | Unset):
         rate_limits (PatchApiGatewayV1VirtualKeysByIdBodyConfigRateLimits | Unset):
+        realtime (PatchApiGatewayV1VirtualKeysByIdBodyConfigRealtime | Unset):
         metadata (PatchApiGatewayV1VirtualKeysByIdBodyConfigMetadata | Unset):
     """
 
@@ -48,6 +52,7 @@ class PatchApiGatewayV1VirtualKeysByIdBodyConfig:
     fallback: PatchApiGatewayV1VirtualKeysByIdBodyConfigFallback | Unset = UNSET
     guardrail_attachments: list[PatchApiGatewayV1VirtualKeysByIdBodyConfigGuardrailAttachmentsItem] | Unset = UNSET
     rate_limits: PatchApiGatewayV1VirtualKeysByIdBodyConfigRateLimits | Unset = UNSET
+    realtime: PatchApiGatewayV1VirtualKeysByIdBodyConfigRealtime | Unset = UNSET
     metadata: PatchApiGatewayV1VirtualKeysByIdBodyConfigMetadata | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -89,6 +94,10 @@ class PatchApiGatewayV1VirtualKeysByIdBodyConfig:
         if not isinstance(self.rate_limits, Unset):
             rate_limits = self.rate_limits.to_dict()
 
+        realtime: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.realtime, Unset):
+            realtime = self.realtime.to_dict()
+
         metadata: dict[str, Any] | Unset = UNSET
         if not isinstance(self.metadata, Unset):
             metadata = self.metadata.to_dict()
@@ -108,6 +117,8 @@ class PatchApiGatewayV1VirtualKeysByIdBodyConfig:
             field_dict["guardrailAttachments"] = guardrail_attachments
         if rate_limits is not UNSET:
             field_dict["rateLimits"] = rate_limits
+        if realtime is not UNSET:
+            field_dict["realtime"] = realtime
         if metadata is not UNSET:
             field_dict["metadata"] = metadata
 
@@ -129,6 +140,9 @@ class PatchApiGatewayV1VirtualKeysByIdBodyConfig:
         )
         from ..models.patch_api_gateway_v1_virtual_keys_by_id_body_config_rate_limits import (
             PatchApiGatewayV1VirtualKeysByIdBodyConfigRateLimits,
+        )
+        from ..models.patch_api_gateway_v1_virtual_keys_by_id_body_config_realtime import (
+            PatchApiGatewayV1VirtualKeysByIdBodyConfigRealtime,
         )
 
         d = dict(src_dict)
@@ -201,6 +215,13 @@ class PatchApiGatewayV1VirtualKeysByIdBodyConfig:
         else:
             rate_limits = PatchApiGatewayV1VirtualKeysByIdBodyConfigRateLimits.from_dict(_rate_limits)
 
+        _realtime = d.pop("realtime", UNSET)
+        realtime: PatchApiGatewayV1VirtualKeysByIdBodyConfigRealtime | Unset
+        if isinstance(_realtime, Unset):
+            realtime = UNSET
+        else:
+            realtime = PatchApiGatewayV1VirtualKeysByIdBodyConfigRealtime.from_dict(_realtime)
+
         _metadata = d.pop("metadata", UNSET)
         metadata: PatchApiGatewayV1VirtualKeysByIdBodyConfigMetadata | Unset
         if isinstance(_metadata, Unset):
@@ -215,6 +236,7 @@ class PatchApiGatewayV1VirtualKeysByIdBodyConfig:
             fallback=fallback,
             guardrail_attachments=guardrail_attachments,
             rate_limits=rate_limits,
+            realtime=realtime,
             metadata=metadata,
         )
 

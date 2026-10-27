@@ -19,7 +19,7 @@ Feature: Unified authorization engine
   # See ADR-092 "Grant semantics" for why. That file's premise sentence -
   # "The most specific scope always wins" - is superseded by the same
   # decision and gets rewritten with those scenarios in the contract PR
-  # (the delivery plan's PR 4), not before: until then it still describes
+  # (the delivery plan's PR 6, the contract), not before: until then it still describes
   # the resolver in production for not-yet-cut-over organizations.
   #
   # Also superseded: fetch-org-role-permission-resolution.feature's "Demo
@@ -113,6 +113,14 @@ Feature: Unified authorization engine
     # effective(key) = grants(key) ∩ grants(owner), evaluated live.
 
   @unit
+  Scenario: An API key and its owner are read from one storage head when grants are not cached
+    Given the grants cache is off, or its epoch store is unreachable
+    And storage is being cut over between two heads that disagree about the key and its owner
+    When the API key's permission is checked, by scope or by ids
+    Then the key's grants and its owner's grants are read from the same head
+    And the check is decided as either head alone would decide it
+
+  @unit
   Scenario: A share token grants exactly one permission on exactly one resource
     Given trace "t1" in project "chatbot" has a public share token
     When an anonymous visitor presents the token
@@ -129,7 +137,7 @@ Feature: Unified authorization engine
     # keeps that line, so anonymous callers resolve through shares alone.
 
   # ============================================================================
-  # Lite member is a role, not a cross-cutting cap
+  # Lite member: the role's own grants, capped by the seat however granted
   # ============================================================================
 
   @unit
@@ -140,17 +148,15 @@ Feature: Unified authorization engine
     And sarah's permission "datasets:manage" is denied
     # The denial reason is "lite-member-restricted" so the UI can explain it.
 
-  # Unit-unprovable today: CollectedGrants has no seat field to hold constant,
-  # because seat classification lives in billing tables the engine never
-  # reads. Stage C separates the concepts; the proving test is an integration
-  # test over billing + authz together.
-  @unimplemented
-  Scenario: Seat classification is billing data and never consulted for access
-    Given user "sarah" is classified as a lite seat for billing
-    And sarah has been granted a custom role with "datasets:manage" on "chatbot"
+  # Ruling (Alex, 2026-10-09): a Lite Member seat holds at most Lite Member permissions however
+  # the grant arrives; a direct custom role no longer escapes the cap.
+  @unit
+  Scenario: A Lite Member seat caps a direct custom role at Lite Member permissions
+    Given user "sarah" holds a Lite Member seat in "acme"
+    And sarah has been granted a custom role with "datasets:manage" and "annotations:create" on "chatbot"
     When sarah's permission "datasets:manage" is checked on project "chatbot"
-    Then the check is granted
-    And the seat classification is unchanged
+    Then the check is denied
+    And sarah's permission "annotations:create" is granted
 
   # ============================================================================
   # Fail-closed surfaces
@@ -161,7 +167,7 @@ Feature: Unified authorization engine
   # routes and their build-time enumeration. What is left unbound is the
   # tRPC stack, which has no equivalent sweep yet - stage D adds one, and
   # Gate D is the two stacks answering to the same rule with no allowlist.
-  @unimplemented
+  @unit
   Scenario: Every tRPC procedure declares its access decision or an explicit reason not to
     When the tRPC surface is enumerated at build time
     Then every procedure either declares a permission
@@ -192,6 +198,13 @@ Feature: Unified authorization engine
     Then the write is rejected
     # Tenancy holds on create AND update - a role definition another
     # organization controls must never decide access in this one.
+
+  @unit
+  Scenario: A custom role whose stored permissions are not a list cannot be granted
+    Given a custom role whose stored permissions are not a list
+    When an administrator grants it
+    Then the grant is refused as invalid
+    And no binding is written
 
   @unit
   Scenario: Replacing a grant is one atomic swap
@@ -250,7 +263,7 @@ Feature: Unified authorization engine
   # append is accepted, a revocation applies the deny effect synchronously
   # on the calling path, without waiting for the queued fold. Redis never
   # gates it, so the guarantee below must hold with Redis stopped entirely.
-  @integration @unimplemented
+  @integration
   Scenario: A revocation holds before the revoke call returns, with Redis stopped
     Given user "alice" has role "member" bound at project "chatbot"
     And Redis is unavailable
@@ -266,6 +279,19 @@ Feature: Unified authorization engine
     When the platform checks 50 permissions for alice across the same scopes
     Then no further database reads occur for those checks
     And the answers match a fresh resolution exactly
+
+  @unit
+  Scenario: Checks asked by ids read the same cached grants as a resolved-scope check
+    Given alice's grants were resolved once after the latest grant change
+    When the platform checks alice's permissions by organization, project and batch ids
+    Then no further grant reads occur for those checks
+    And the answers match a fresh resolution exactly
+
+  @unit
+  Scenario: A revocation reaches a check asked by ids on the caller's next request
+    Given alice's grants are being served from a cache
+    When an admin revokes alice's binding, or demotes the owner of alice's API key
+    Then the next check asked by ids is denied
 
   @unimplemented
   Scenario: An impersonated request records both identities
@@ -283,12 +309,56 @@ Feature: Unified authorization engine
     And dave's own session is granted "project:delete" on project "chatbot"
 
   # ============================================================================
+  # Runtime authorization reads current grant facts directly
+  # ============================================================================
+  # Migration inventory and projection proofs remain separate from runtime
+  # authorization. Once the application handles a request, checks and access
+  # listings use the current grant and role rows directly.
+
+  @unit
+  Scenario: A permission check uses the caller's current grants
+    Given a member holds a live grant at project "chatbot"
+    When the member's permission is checked on project "chatbot"
+    Then the check is granted by that grant
+
+  @unit
+  Scenario: A permission check without a matching grant is denied
+    Given a member has no grant for project "chatbot"
+    When the member's permission is checked on project "chatbot"
+    Then the check is denied
+
+  @unit
+  Scenario: A grant collection reads live grant facts
+    Given a member has a live grant in "acme"
+    When grants are collected for that member
+    Then the snapshot contains the grant
+    And no legacy binding table is read
+
+  @unit
+  Scenario: A grants listing returns current binding facts
+    Given a member has a live grant at project "chatbot"
+    When the organization's bindings are listed for the Access page
+    Then the member's grant appears in the listing
+
+  @unit
+  Scenario: A grants listing excludes legacy-only rows
+    Given a member has no live grant for project "chatbot"
+    When the organization's bindings are listed for the Access page
+    Then no legacy-only binding is synthesized
+
+  @unit
+  Scenario: A role listing reads current role facts
+    Given a custom role exists in the current role projection
+    When the organization's roles are listed
+    Then the role appears with its name, description and permissions
+
+  # ============================================================================
   # The resource tier (ADR-092 §8) — sharing is a grant on the tree
   # ============================================================================
   #
   # Scope note: this section pins what the ENGINE decides about a resource
   # grant. It deliberately does not restate what a customer sees when they
-  # open a share link - specs/traces-v2/sharing.feature owns that, including
+  # open a share link - modules/share/specs/share.feature owns that, including
   # "A public link resolves for an anonymous viewer" and the Rule covering
   # the redactions an anonymous viewer's payload carries. The engine
   # supplies the audience; that spec pins what the audience is shown.

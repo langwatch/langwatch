@@ -1,4 +1,4 @@
-import { createAgent as apiCreateAgent } from "../langwatch-api-agents.js";
+import { createAgent as apiCreateAgent } from "../langwatch-api-agents.ts";
 
 export async function handleCreateAgent(params: {
   name: string;

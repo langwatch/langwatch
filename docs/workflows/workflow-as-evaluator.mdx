@@ -1,0 +1,47 @@
+---
+title: Workflow as Evaluator
+sidebarTitle: Workflow as evaluator
+keywords: langwatch, custom evaluator, workflow evaluator, evaluator from workflow, publish evaluator, passed score label details
+description: Publish a workflow as a custom evaluator, so online evaluations, experiments and other workflows score outputs with your own multi-step logic.
+---
+
+## What a workflow evaluator is
+
+A workflow evaluator is a workflow that LangWatch runs as an evaluator. Its Entry point declares the fields the evaluator receives, and its End node returns the fixed evaluator results: `passed`, `score`, `label` and `details`. Every place that picks an evaluator lists it next to the built-in ones.
+
+For example, a workflow evaluator can call a retrieval API in an HTTP Call node, compare the answer with the retrieved facts in an LLM node, and return `passed` with the reasoning in `details`.
+
+## Create one
+
+You can start from the evaluator picker or from the Workflows page. Both paths create the same workflow.
+
+- **From the evaluator picker**: wherever you choose an evaluator (an online evaluation, an experiment, or an Evaluator node in a workflow), pick **Custom (from Workflow)** in the **Choose Evaluator Category** drawer. The **Create Workflow Evaluator** form asks for a name, an icon and a description. It creates the workflow, publishes its first version, saves an evaluator of type workflow linked to it, and opens the editor.
+- **From the Workflows page**: click **New Workflow** and pick **Custom Evaluator**. This creates the workflow only. Publish it to make it an evaluator.
+
+The workflow starts with an Entry point that has one `question` input, one LLM judge node and an End node with the four results. Edit the nodes as on any workflow, see [Building a workflow](/workflows/building-a-workflow).
+
+## The evaluator contract
+
+| Entry point | End node |
+|---|---|
+| One input per field the evaluator receives, for example `input`, `output`, `contexts` or `expected_output`. The names become the fields the caller maps. | The results are fixed: `details` (Text), `passed` (Boolean), `score` (Number) and `label` (Text). You cannot add, remove or rename them. |
+
+Every result is optional. Connect only the ones your logic produces; the others stay empty in the evaluation result.
+
+## Publish
+
+Click **Publish**, then **Publish Workflow**. The dialog saves a version and publishes it. On a workflow created as an evaluator, publishing also registers it as an evaluator of the project. The published version is the one every evaluation runs, so publish again after each change you want live.
+
+<Frame>
+<img className="block" src="/images/workflows/publish-dialog.png" alt="The Publish Workflow dialog after publishing version 2, with the View API Reference button" />
+</Frame>
+
+**Unpublish Evaluator** in the same menu removes it from the evaluator lists. The workflow and its versions stay.
+
+## Where it shows up
+
+- **Evaluators**: an evaluator created from the picker is a saved evaluator of the project, with the type workflow. See [Saved evaluators](/evaluations/evaluators/saved-evaluators).
+- **Online evaluations** and **Experiments**: pick it as the evaluator and map its entry inputs to the trace or dataset fields. See [Set up an online evaluation](/evaluations/online-evaluation/setup-monitors).
+- **Other workflows**: drag an **Evaluator** node and pick it from the evaluator list.
+
+**Also check:** [Custom scoring](/evaluations/evaluators/custom-scoring) to send scores computed in your own code instead.

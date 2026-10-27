@@ -21,6 +21,13 @@ Feature: Billing spend events, one durable record per gateway request
       And its attribution is already resolved
 
     @unit
+    Scenario: A request that names no model opens no spend record
+      Given a request whose body names no model
+      When it enters the gateway pipeline
+      Then no admit or fail command is emitted
+      And the caller is answered with the missing-model error
+
+    @unit
     Scenario: A gateway rejection admits and fails with its own taxonomy token
       Given a request a budget or guardrail rejects
       When the gateway refuses it
@@ -181,6 +188,12 @@ Feature: Billing spend events, one durable record per gateway request
       Then nothing is reported, because zero is the right answer
 
     @unit
+    Scenario: The image count is display only and never a billable quantity
+      Given an image request that reported an image count and no tokens
+      When it rates at zero
+      Then nothing is reported, because the count prices nothing on its own
+
+    @unit
     Scenario: The failed payload keeps the full error taxonomy
       When a fail command is serialized
       Then the error class and http status ride verbatim
@@ -201,8 +214,40 @@ Feature: Billing spend events, one durable record per gateway request
     Scenario: A worker without the spend pipeline refuses the command instead of acknowledging it
       Given a worker whose build does not register the gateway spend pipeline
       When a confirm command for that pipeline reaches it
-      Then the command is rejected so another worker retries it
-      And the rejection names the gateway request at error level
+      Then the command is rejected so another worker runs it
+      And the rejection names the gateway request at warn level
+
+    # The same rule one tier earlier. The API process is where the drained
+    # batch arrives, and it can only queue a command on a pipeline it has
+    # registered. A door that answered 200 without one would let the drainer
+    # delete the spool segment that held the only copy of the charge.
+
+    @integration
+    Scenario: The ingest door accepts a drained batch and prices it on the way in
+      Given a process that registered the gateway spend pipeline
+      When a signed batch of outcomes reaches the ingest door
+      Then every record is accepted and queued under its own command
+      And the queued outcome carries a cost the wire never sent
+
+    @integration
+    Scenario: A process that registered no spend pipeline refuses the whole batch
+      Given a process with no gateway spend registration
+      When a signed batch of outcomes reaches the ingest door
+      Then the batch is refused with the code the gateway's drainer spools against
+      And nothing is acknowledged, so the spool segment is kept
+
+    # Registering the definition is not the same decision as running it. The
+    # pipeline mounts process managers that write budgets and ship a
+    # customer's webhooks, and those belong to the process that claims the
+    # shared queue; a tier that produced onto the queue and also drained it
+    # would be doing the worker's work inside a web request.
+
+    @unit
+    Scenario: The tier that ingests registers the pipeline as a producer only
+      Given the process that serves the ingest door
+      When it registers the gateway spend pipeline
+      Then it registers the same pipeline, aggregate and commands the worker does
+      And it mounts none of that pipeline's process managers
 
   Rule: Attribution the gateway cannot see is resolved once, at ingest
 
@@ -296,6 +341,17 @@ Feature: Billing spend events, one durable record per gateway request
       Given a confirmation that arrived before its admission
       When the admission folds afterwards
       Then the status stays confirmed and the attribution fills in
+
+    @unit
+    Scenario: An outcome states the attribution its admission has not delivered
+      Given an outcome that carries its own attribution and no admission yet
+      When it folds
+      Then the record names the organization and the key from the outcome
+      And a later admission still wins wherever it states a value
+      # A brokered voice session is admitted by the gateway and confirmed by
+      # the control plane. Two emitters on two paths means the confirmation
+      # can fold first, and a priced row naming no organization is spend that
+      # belongs to nobody.
 
     @unit
     Scenario: A settled request is its own event type with unknown cost
@@ -507,6 +563,33 @@ Feature: Billing spend events, one durable record per gateway request
       When the row is mapped for the pull surface
       Then the envelope type is admitted with usage, cost, and duration null
       And that type never appears on the push stream
+
+  Rule: Published usage states every quantity the price was rated from
+
+    An image request is priced from image tokens, which the text buckets never
+    hold. A surface that publishes only the text buckets answers with a cost
+    and no quantity behind it, and a customer reconciling spend has nothing to
+    check the charge against.
+
+    @integration
+    Scenario: An image generation publishes its output image tokens
+      Given a confirmed image generation billed on output image tokens
+      When the spend events are pulled
+      Then the usage carries the image token quantities and the image count
+      And the text output total stays zero, because the buckets are disjoint
+
+    @integration
+    Scenario: An image edit publishes its input image tokens and image count
+      Given a confirmed image edit that sent one image beside its text prompt
+      When the spend events are pulled
+      Then the usage carries the input image tokens beside the text input tokens
+      And the image count states how many images the request carried
+
+    @integration
+    Scenario: The rollups sum image quantities beside the text ones
+      Given image and text spend records for one end user in one window
+      When the summaries and the end-user rollup are read
+      Then both sum the image token quantities and the image count
 
   Rule: Summaries are the reconciliation checksum
 

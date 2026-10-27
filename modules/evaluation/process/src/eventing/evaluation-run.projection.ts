@@ -1,0 +1,207 @@
+import {
+  type EvaluationRunData,
+  type EvaluationAttemptFailedEvent,
+  type EvaluationCompletedEvent,
+  type EvaluationReportedEvent,
+  type EvaluationScheduledEvent,
+  type EvaluationStartedEvent,
+  EVALUATION_PROJECTION_VERSIONS,
+  evaluationAttemptFailedEventSchema,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+  deriveVerdictPassed,
+  deriveVerdictScore,
+} from "@langwatch/evaluation-contract";
+import {
+  type FoldProjectionStore,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
+
+const evaluationRunEvents = [
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
+  evaluationAttemptFailedEventSchema,
+] as const;
+
+/**
+ * Type-safe fold projection for evaluation run state. Implements FoldEventHandlers;
+ * events applied in order: scheduled → in_progress (each failed attempt) → terminal
+ * (processed/error/skipped). A terminal run keeps its attempts and has no next attempt.
+ */
+export class EvaluationRunFoldProjection
+  extends AbstractFoldProjection<
+    EvaluationRunData,
+    typeof evaluationRunEvents,
+    "createdAt",
+    "updatedAt",
+    "LastEventOccurredAt"
+  >
+  implements FoldEventHandlers<typeof evaluationRunEvents, EvaluationRunData>
+{
+  static create(deps: {
+    store: FoldProjectionStore<EvaluationRunData>;
+  }): EvaluationRunFoldProjection {
+    return new EvaluationRunFoldProjection(deps);
+  }
+
+  readonly name = "evaluationRun";
+  readonly version = EVALUATION_PROJECTION_VERSIONS.STATE;
+  readonly store: FoldProjectionStore<EvaluationRunData>;
+  readonly options = { eventOrdering: "acceptedAt" } as const;
+
+  protected readonly events = evaluationRunEvents;
+
+  constructor(deps: { store: FoldProjectionStore<EvaluationRunData> }) {
+    super({
+      createdAtKey: "createdAt",
+      updatedAtKey: "updatedAt",
+      LastEventOccurredAtKey: "LastEventOccurredAt",
+    });
+    this.store = deps.store;
+  }
+
+  protected initState(): Omit<
+    EvaluationRunData,
+    "createdAt" | "updatedAt" | "LastEventOccurredAt"
+  > {
+    return {
+      evaluationId: "",
+      evaluatorId: "",
+      evaluatorType: "",
+      evaluatorName: null,
+      traceId: null,
+      isGuardrail: false,
+      status: "scheduled" as const,
+      score: null,
+      passed: null,
+      label: null,
+      details: null,
+      inputs: null,
+      error: null,
+      errorDetails: null,
+      archivedAt: null,
+      scheduledAt: null,
+      startedAt: null,
+      completedAt: null,
+      costId: null,
+      attempts: 0,
+      lastAttemptAt: null,
+      lastAttemptError: null,
+      nextAttemptAt: null,
+    };
+  }
+
+  handleEvaluationScheduled(
+    event: EvaluationScheduledEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    return {
+      ...state,
+      evaluationId: event.data.evaluationId,
+      evaluatorId: event.data.evaluatorId,
+      evaluatorType: event.data.evaluatorType,
+      evaluatorName: event.data.evaluatorName ?? null,
+      traceId: event.data.traceId ?? null,
+      isGuardrail: event.data.isGuardrail ?? false,
+      status: "scheduled",
+      scheduledAt: event.occurredAt,
+    };
+  }
+
+  handleEvaluationStarted(
+    event: EvaluationStartedEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    return {
+      ...state,
+      evaluationId: state.evaluationId || event.data.evaluationId,
+      evaluatorId: state.evaluatorId || event.data.evaluatorId,
+      evaluatorType: state.evaluatorType || event.data.evaluatorType,
+      evaluatorName: state.evaluatorName ?? event.data.evaluatorName ?? null,
+      traceId: state.traceId ?? event.data.traceId ?? null,
+      isGuardrail: event.data.isGuardrail ?? state.isGuardrail,
+      status: "in_progress",
+      startedAt: event.occurredAt,
+    };
+  }
+
+  handleEvaluationCompleted(
+    event: EvaluationCompletedEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    return {
+      ...state,
+      evaluationId: state.evaluationId || event.data.evaluationId,
+      status: event.data.status,
+      // Verdicts are gated on status === "processed" (#6833) — shared with
+      // the slim fold so the documented slim<->runs parity holds.
+      score: deriveVerdictScore(event.data),
+      passed: deriveVerdictPassed(event.data),
+      label: event.data.label ?? null,
+      details: event.data.details ?? null,
+      inputs: event.data.inputs ?? null,
+      error: event.data.error ?? null,
+      errorDetails: event.data.errorDetails ?? null,
+      completedAt: event.occurredAt,
+      costId: event.data.costId ?? null,
+      nextAttemptAt: null,
+    };
+  }
+
+  handleEvaluationReported(
+    event: EvaluationReportedEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    return {
+      ...state,
+      evaluationId: event.data.evaluationId,
+      evaluatorId: event.data.evaluatorId,
+      evaluatorType: event.data.evaluatorType,
+      evaluatorName: event.data.evaluatorName ?? null,
+      traceId: event.data.traceId ?? null,
+      isGuardrail: event.data.isGuardrail ?? false,
+      status: event.data.status,
+      // Verdicts are gated on status === "processed" (#6833) — shared with
+      // the slim fold so the documented slim<->runs parity holds.
+      score: deriveVerdictScore(event.data),
+      passed: deriveVerdictPassed(event.data),
+      label: event.data.label ?? null,
+      details: event.data.details ?? null,
+      inputs: event.data.inputs ?? null,
+      error: event.data.error ?? null,
+      errorDetails: event.data.errorDetails ?? null,
+      costId: event.data.costId ?? null,
+      startedAt: event.occurredAt,
+      completedAt: event.occurredAt,
+      nextAttemptAt: null,
+    };
+  }
+
+  handleEvaluationAttemptFailed(
+    event: EvaluationAttemptFailedEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    // A run that already ended stays ended; its attempts are history.
+    if (state.completedAt !== null) return state;
+    return {
+      ...state,
+      evaluationId: state.evaluationId || event.data.evaluationId,
+      evaluatorId: state.evaluatorId || event.data.evaluatorId,
+      evaluatorType: state.evaluatorType || event.data.evaluatorType,
+      evaluatorName: state.evaluatorName ?? event.data.evaluatorName ?? null,
+      traceId: state.traceId ?? event.data.traceId ?? null,
+      isGuardrail: event.data.isGuardrail ?? state.isGuardrail,
+      status: "in_progress",
+      startedAt: state.startedAt ?? event.occurredAt,
+      attempts: Math.max(state.attempts ?? 0, event.data.attempt),
+      lastAttemptAt: event.occurredAt,
+      lastAttemptError: event.data.error,
+      nextAttemptAt: event.data.nextAttemptAt,
+    };
+  }
+}

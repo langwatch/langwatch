@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
-from ..models.patch_api_monitors_by_id_body_mappings_type_0_expansions_item import (
-    PatchApiMonitorsByIdBodyMappingsType0ExpansionsItem,
-)
 
 if TYPE_CHECKING:
     from ..models.patch_api_monitors_by_id_body_mappings_type_0_mapping import (
@@ -24,20 +20,17 @@ class PatchApiMonitorsByIdBodyMappingsType0:
     """
     Attributes:
         mapping (PatchApiMonitorsByIdBodyMappingsType0Mapping):
-        expansions (list[PatchApiMonitorsByIdBodyMappingsType0ExpansionsItem]):
+        expansions (list[str]):
     """
 
     mapping: PatchApiMonitorsByIdBodyMappingsType0Mapping
-    expansions: list[PatchApiMonitorsByIdBodyMappingsType0ExpansionsItem]
+    expansions: list[str]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         mapping = self.mapping.to_dict()
 
-        expansions = []
-        for expansions_item_data in self.expansions:
-            expansions_item = expansions_item_data.value
-            expansions.append(expansions_item)
+        expansions = self.expansions
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -59,12 +52,7 @@ class PatchApiMonitorsByIdBodyMappingsType0:
         d = dict(src_dict)
         mapping = PatchApiMonitorsByIdBodyMappingsType0Mapping.from_dict(d.pop("mapping"))
 
-        expansions = []
-        _expansions = d.pop("expansions")
-        for expansions_item_data in _expansions:
-            expansions_item = PatchApiMonitorsByIdBodyMappingsType0ExpansionsItem(expansions_item_data)
-
-            expansions.append(expansions_item)
+        expansions = cast(list[str], d.pop("expansions"))
 
         patch_api_monitors_by_id_body_mappings_type_0 = cls(
             mapping=mapping,

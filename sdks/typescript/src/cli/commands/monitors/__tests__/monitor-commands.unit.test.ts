@@ -1,7 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -12,11 +16,12 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listMonitorsCommand } from "../list";
-import { getMonitorCommand } from "../get";
+import { applyOutputContext, resolveOutputOptions } from "../../../utils/output";
 import { createMonitorCommand } from "../create";
-import { updateMonitorCommand } from "../update";
 import { deleteMonitorCommand } from "../delete";
+import { getMonitorCommand } from "../get";
+import { listMonitorsCommand } from "../list";
+import { updateMonitorCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -24,8 +29,7 @@ class ProcessExitError extends Error {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-const noop = () => {};
+const noop = () => undefined;
 
 const mockProcessExit = () => {
   vi.spyOn(process, "exit").mockImplementation((code) => {
@@ -72,8 +76,8 @@ describe("listMonitorsCommand()", () => {
 
     await listMonitorsCommand();
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors"),
-      expect.any(Object)
+      expect.stringContaining("/api/v1/monitors"),
+      expect.any(Object),
     );
   });
 
@@ -100,8 +104,19 @@ describe("listMonitorsCommand()", () => {
   });
 });
 
+const jsonError = async (run: () => Promise<unknown>) => {
+  await applyOutputContext(resolveOutputOptions({ output: "json" }, {}));
+  await expect(run()).rejects.toThrow(ProcessExitError);
+  // process.exit is mocked to throw inside the command's try, so a second document can follow.
+  const doc = JSON.parse(String(vi.mocked(console.log).mock.calls[0]![0])) as {
+    error: { code: string; message: string };
+  };
+  await applyOutputContext(resolveOutputOptions({}, {}));
+  return doc.error;
+};
+
 describe("getMonitorCommand()", () => {
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: Mock<(url: string) => Promise<unknown>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -120,14 +135,62 @@ describe("getMonitorCommand()", () => {
 
     await getMonitorCommand("mon_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors/mon_abc"),
-      expect.any(Object)
+      expect.stringContaining("/api/v1/monitors/mon_abc"),
+      expect.any(Object),
     );
   });
 
   it("exits when monitor not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
     await expect(getMonitorCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+  });
+
+  const notFoundThenList = (rows: unknown[]) => {
+    mockFetch.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith("/api/v1/monitors")
+          ? { ok: true, status: 200, json: async () => rows }
+          : { ok: false, status: 404, text: async () => '{"error":"monitor_not_found"}' },
+      ),
+    );
+  };
+
+  describe("when the reference is a display name, not an id", () => {
+    /** @scenario Get a monitor by display name */
+    it("returns the monitor with that name", async () => {
+      notFoundThenList([makeMonitor({ id: "mon_xyz", name: "Toxicity Check" })]);
+
+      const result = await getMonitorCommand("toxicity check");
+
+      expect((result as { data: { id: string } }).data.id).toBe("mon_xyz");
+    });
+  });
+
+  describe("when nothing matches the reference", () => {
+    /** @scenario Get a monitor by a name nothing matches */
+    it("fails with the monitor_not_found code", async () => {
+      notFoundThenList([makeMonitor()]);
+
+      expect((await jsonError(() => getMonitorCommand("ghost"))).code).toBe("monitor_not_found");
+    });
+  });
+
+  describe("when two monitors share the display name", () => {
+    it("fails with a validation_error listing both ids", async () => {
+      notFoundThenList([
+        makeMonitor({ id: "mon_1", slug: "a", name: "Twin" }),
+        makeMonitor({ id: "mon_2", slug: "b", name: "Twin" }),
+      ]);
+
+      const error = await jsonError(() => getMonitorCommand("Twin"));
+
+      expect(error.code).toBe("validation_error");
+      expect(error.message).toContain("mon_1, mon_2");
+    });
   });
 });
 
@@ -154,11 +217,11 @@ describe("createMonitorCommand()", () => {
       evaluatorId: "eval_abc",
     });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors"),
+      expect.stringContaining("/api/v1/monitors"),
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("ragas/toxicity"),
-      })
+      }),
     );
   });
 
@@ -168,7 +231,7 @@ describe("createMonitorCommand()", () => {
         checkType: "ragas/toxicity",
         evaluatorId: "eval_abc",
         executionMode: "INVALID",
-      })
+      }),
     ).rejects.toThrow(ProcessExitError);
   });
 
@@ -177,9 +240,9 @@ describe("createMonitorCommand()", () => {
     it("fails before calling the API and points at evaluator create and list", async () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-      await expect(
-        createMonitorCommand("Test", { checkType: "ragas/toxicity" })
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createMonitorCommand("Test", { checkType: "ragas/toxicity" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(mockFetch).not.toHaveBeenCalled();
       const output = errorSpy.mock.calls.map((call) => call.join(" ")).join("\n");
@@ -212,16 +275,20 @@ describe("updateMonitorCommand()", () => {
 
     await updateMonitorCommand("mon_abc", { enabled: "false" });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors/mon_abc"),
-      expect.objectContaining({ method: "PATCH" })
+      expect.stringContaining("/api/v1/monitors/mon_abc"),
+      expect.objectContaining({ method: "PATCH" }),
     );
   });
 
   it("exits when monitor not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
-    await expect(
-      updateMonitorCommand("bad_id", { name: "New Name" })
-    ).rejects.toThrow(ProcessExitError);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
+    await expect(updateMonitorCommand("bad_id", { name: "New Name" })).rejects.toThrow(
+      ProcessExitError,
+    );
   });
 });
 
@@ -245,13 +312,28 @@ describe("deleteMonitorCommand()", () => {
 
     await deleteMonitorCommand("mon_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors/mon_abc"),
-      expect.objectContaining({ method: "DELETE" })
+      expect.stringContaining("/api/v1/monitors/mon_abc"),
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 
   it("exits when monitor not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
     await expect(deleteMonitorCommand("bad_id")).rejects.toThrow(ProcessExitError);
+  });
+
+  describe("when given a display name", () => {
+    /** @scenario Delete a monitor by display name is refused */
+    it("says to find the id with monitor get", async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+
+      const error = await jsonError(() => deleteMonitorCommand("Toxicity Check"));
+
+      expect(error.message).toContain("langwatch monitor get <name>");
+    });
   });
 });

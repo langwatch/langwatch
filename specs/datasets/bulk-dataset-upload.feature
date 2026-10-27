@@ -118,6 +118,26 @@ Feature: Bulk dataset upload
     And each row reports its own progress
     And each becomes ready on its own
 
+  @integration
+  Scenario: A single uploaded file opens its dataset once ready
+    Given I have added one file
+    When I start the upload and it becomes ready
+    Then its dataset opens and the drawer closes
+
+  @integration
+  Scenario: A ready row opens its dataset
+    Given I have uploaded several files
+    When one of them is ready
+    Then its row offers to open the dataset
+    And choosing it opens that dataset
+
+  @integration
+  Scenario: A single upload finishing after I closed the drawer stays put
+    Given I have started uploading one file
+    And I closed the drawer before it was ready
+    When it becomes ready
+    Then I stay where I am
+
   @unit
   Scenario: A large batch starts a few files and queues the rest
     Given I have added more files than prepare at once
@@ -186,6 +206,13 @@ Feature: Bulk dataset upload
     When I cancel one file while it is still uploading
     Then that file stops and leaves nothing half-created behind
     And the other two continue preparing
+
+  @unit
+  Scenario: A file's row leaves Preparing when its dataset settles, without polling
+    Given a file whose dataset the server is preparing
+    When the server finishes normalising it, ready or failed
+    Then it states that the dataset's normalisation settled, with where it came to rest
+    And the dataset reads refresh on that fact, so the row shows ready or failed in place
 
   @integration @unimplemented
   Scenario: Closing the drawer mid-upload keeps the files preparing

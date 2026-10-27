@@ -1,0 +1,60 @@
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Temporal, toEpochMs } from "@langwatch/time";
+import type { ColumnFiltersState, RowSelectionState } from "@tanstack/react-table";
+
+import { scenarioContextChip } from "../../../behavior/langy/langy-context-chips.ts";
+import type { Scenario } from "../../../behavior/scenario-api.ts";
+import { type ScenarioListItem } from "../../../model/scenario-list.types.ts";
+import { ScenarioTable as ScenarioTableView } from "../../elements/scenario-table.tsx";
+import { TagList } from "../../elements/tag-list.tsx";
+import { LangyContextTarget } from "../langy/langy-context-target.tsx";
+
+export type ScenarioTableProps = {
+  scenarios: Scenario[];
+  columnFilters: ColumnFiltersState;
+  onColumnFiltersChange(filters: ColumnFiltersState): void;
+  onRowClick(scenarioId: string): void;
+  rowSelection: RowSelectionState;
+  onRowSelectionChange(selection: RowSelectionState): void;
+  onArchive: (scenario: Scenario) => void;
+};
+
+function toScenarioListItem(scenario: Scenario): ScenarioListItem {
+  return {
+    id: scenario.id,
+    name: scenario.name,
+    labels: scenario.labels,
+    updatedAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(scenario.updatedAt)),
+  };
+}
+
+export function ScenarioTable({ scenarios, onArchive, ...props }: ScenarioTableProps) {
+  const scenarioItems = scenarios.map(toScenarioListItem);
+
+  return (
+    <ScenarioTableView
+      {...props}
+      scenarios={scenarioItems}
+      formatUpdatedAt={(updatedAt) => formatTimeAgo(updatedAt.epochMilliseconds) ?? ""}
+      renderLabels={(labels) => <TagList labels={labels} />}
+      renderRow={(scenario, row) => (
+        <LangyContextTarget
+          key={scenario.id}
+          target={scenarioContextChip({
+            scenarioId: scenario.id,
+            name: scenario.name,
+            noun: "scenario",
+          })}
+        >
+          {row}
+        </LangyContextTarget>
+      )}
+      onArchive={(scenario) => {
+        const sourceScenario = scenarios.find(({ id }) => id === scenario.id);
+        if (sourceScenario) {
+          onArchive(sourceScenario);
+        }
+      }}
+    />
+  );
+}

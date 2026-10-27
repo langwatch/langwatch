@@ -1,12 +1,9 @@
-import { runWorkflow as apiRunWorkflow } from "../langwatch-api-workflows.js";
+import { runWorkflow as apiRunWorkflow } from "../langwatch-api-workflows.ts";
 
 /**
  * Handles the platform_run_workflow MCP tool invocation.
  */
-export async function handleRunWorkflow(params: {
-  id: string;
-  input?: string;
-}): Promise<string> {
+export async function handleRunWorkflow(params: { id: string; input?: string }): Promise<string> {
   let parsedInput: Record<string, unknown> = {};
   if (params.input) {
     try {

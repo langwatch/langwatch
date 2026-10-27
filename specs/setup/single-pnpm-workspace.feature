@@ -5,23 +5,23 @@ Feature: One workspace for every JavaScript project in the repo
     between two projects can actually be shared
 
   See dev/docs/adr/076-single-pnpm-workspace.md.
+  See dev/docs/adr/111-physical-application-workspaces.md for the planned
+  physical application packages and amended npm staging workspace closure.
 
   # These scenarios describe how the repository installs, resolves and packages
-  # itself. The @unit ones bind to packages/server/test/workspace-invariants.test.ts
-  # (and, for the fresh-clone scenario, tools/thuishaven/app/deps_test.go),
-  # which assert the shape directly against the repo — one lockfile, one
-  # workspace definition, no member holding install rules pnpm would ignore,
-  # the app and the SDK on different names, the install argv pinned to
-  # --frozen-lockfile and the app's closure.
+  # itself. The @unit ones bind to apps/server/test/workspace-invariants.test.ts
+  # (and, for the fresh-clone scenario, tools/thuishaven/app/deps_test.go; for
+  # the entry-point scenario apps/server/test/pack-npm.test.ts, which runs the
+  # real packaging script against a fixture repository; and for the prebuilt
+  # app's install and links apps/server/test/app-archive.test.ts), which assert
+  # the shape directly against the repo.
   #
-  # The @unimplemented ones are the ones a unit test cannot honestly reach —
-  # they are about what a PACKED ARTIFACT contains or what a full install
-  # resolves. Their enforcement is the build: the fail-closed assertions inside
-  # dev/scripts/pack-npm.sh (the tarball must carry the lockfile, the prebuilt
-  # client, every tracked source file, and nothing secret-shaped), and the
-  # npx-server-smoke job, which packs, installs and boots the artifact on
-  # three platforms. Binding them to a manifest-inspecting unit test would
-  # read as coverage while proving nothing about the artifact.
+  # Since ADR-180 the published package is the CLI alone and the app ships as a
+  # prebuilt archive per platform (dev/docs/adr/180-npx-server-downloads-a-prebuilt-app.md,
+  # specs/npx-installer/09-prebuilt-app.feature). The @unimplemented ones are
+  # about what a full install resolves; their enforcement is the build: the
+  # archive checks in dev/scripts/check-app-archive.sh and the npx-server-smoke
+  # job, which boots the archive on three platforms.
 
   # Context. The repo grew six independent pnpm install roots — the repo root,
   # the application, the TypeScript SDK, the MCP server, the skills compiler,
@@ -160,28 +160,17 @@ Feature: One workspace for every JavaScript project in the repo
   Scenario: The published package still installs on an end user's machine
     Given someone runs the published LangWatch server package
     When it prepares the application on first start
-    Then it installs from the workspace shipped inside the package
-    And it installs only the application and what the application needs
-    And it does not install the SDK, the skills compiler, or the test suites
-
-  @unimplemented
-  Scenario: The published package carries a lockfile
-    Given the published package
-    When its contents are listed
-    Then a lockfile is present
-    # Not a given. The packaging tool deletes a lockfile sitting at the very
-    # top of a published package, silently, no matter what the manifest asks
-    # for — one directory further down it is kept. The old layout satisfied
-    # this by accident, because the lockfile happened to live beside the
-    # application rather than at the top.
+    Then it installs the prebuilt app built for its version and platform
+    And nothing is installed or built on that machine
+    And the app holds no SDK sources, skills compiler or test suites
 
   @unit
   Scenario: The install still refuses to drift from the lockfile
-    Given the published package
-    When it installs the application's dependencies
+    Given the prebuilt app is being built
+    When its production dependencies are installed
     Then the install fails if the lockfile does not match the manifests
-    # The frozen-lockfile guarantee is what makes an end user's install
-    # reproducible; narrowing the install must not weaken it.
+    # The frozen-lockfile guarantee is what makes the app reproducible; the
+    # production image and the app archive share the one install that keeps it.
 
   @unimplemented
   Scenario: The published layout is not a mirror of the repository layout
@@ -193,16 +182,60 @@ Feature: One workspace for every JavaScript project in the repo
     # install exactly that way.
 
   @unit
+  Scenario: Every entry point the published package advertises resolves inside it
+    Given the published package holds only the CLI
+    When its manifest is written for that layout
+    Then every path it advertises as an entry point names a file the package ships
+    # Once the package advertised the repository's paths: nothing failed at
+    # publish time, and only someone importing the package by name found
+    # nothing there.
+
+  @unit
   Scenario: Every project the lockfile mentions is resolvable
-    Given the published package
-    When its dependencies are installed
+    Given the prebuilt app is built
+    When its links are checked
     Then no internal package link is left pointing at a missing directory
-    # A workspace member whose directory was left out of the tarball installs
-    # without complaint and fails much later, inside a database migration.
+    # A workspace member missing from the tree installs without complaint and
+    # fails much later, inside a database migration.
 
   # ===========================================================================
   # Building
   # ===========================================================================
+
+  @unit
+  Scenario: A fresh clone starts the applications without a manual build step
+    Given someone has cloned the repo and installed once from the root
+    And two workspace packages are consumed as a bundle rather than as source
+    When they start any of the three Node applications
+    Then those two bundles are produced first, without being asked for
+    And the repository's file-generation step no longer builds them
+    # They used to be built by the same `&&` chain that generates the Prisma
+    # client and the evaluator types, so a contributor who did not know that
+    # chain existed got a dependency-scan failure from the browser build tool
+    # and an unresolvable import in the API — neither of which names a build.
+
+  @unit
+  Scenario: A stale SDK build is rebuilt before the browser application starts
+    Given the TypeScript SDK's source has changed since its bundle was built
+    When the browser application is started
+    Then the SDK is rebuilt before the application starts
+    And an application whose bundles are already current starts without
+      rebuilding anything
+    # The check is a modification-time comparison, not a build system: the
+    # point is that a lane never serves a bundle older than the source it was
+    # built from, and never pays for a build it does not need.
+
+  @unit
+  Scenario: A fresh worktree prepares its databases without a manual bundle build
+    Given a worktree that has installed but never built the TypeScript SDK
+    When its databases are prepared, by haven or by `pnpm start:prepare:db`
+    Then the SDK is built first, without being asked for
+    And a worktree whose SDK bundle is newer than its sources builds nothing
+    And `pnpm task`, `pnpm prisma:migrate` and `pnpm clickhouse:migrate` do the same
+    # The migration tasks load the observability package, which resolves the
+    # published SDK from its built dist; a fresh worktree failed there with
+    # ERR_MODULE_NOT_FOUND. The root script and dev-stack.sh ensure it first;
+    # the production image runs the api script and never builds.
 
   @unimplemented
   Scenario: Building a project builds what it depends on first

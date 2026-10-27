@@ -1,0 +1,56 @@
+import { test } from "vitest";
+
+import { redactSecretsInText } from "../secrets.ts";
+
+/**
+ * These payloads are the three shapes that decide redaction's per-span cost
+ * (the connection-URL rule was 0.1ms on URL-dense text, 2.4ms on prose with
+ * none). Run with `pnpm --filter @langwatch/redaction bench`; compare ratios.
+ */
+const SIZE = 200_000;
+
+function payloadOf(chunk: string): string {
+  return chunk.repeat(Math.ceil(SIZE / chunk.length)).slice(0, SIZE);
+}
+
+/** An LLM prompt or completion: words, no structure, no credentials. */
+const PROSE = payloadOf(
+  "Summarise the release notes for the 3.9.0 tag and tell me which of the " +
+    "three migrations is the risky one. The customer reported that the " +
+    "dashboard stopped loading after the upgrade and the workers queue kept " +
+    "growing. Explain what an exclusive lock does to a table rewrite.\n",
+);
+
+/** A coding-agent transcript: prose, code, JSON, paths, hashes, logs. */
+const MIXED = payloadOf(
+  "The agent read modules/trace/process/src/services/trace-legacy-read.service.ts:72 and " +
+    "found the redaction service constructed there.\n" +
+    "const apiKey = process.env.OPENAI_API_KEY;\n" +
+    '{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","model":"claude-opus-5"}\n' +
+    "commit 51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5 bumped the web package\n" +
+    "GET https://app.langwatch.ai/api/trace/abc123?include=spans 200 OK\n",
+);
+
+/** Configuration and connection strings, where the URL rule does its work. */
+const URLS = payloadOf(
+  "postgres://app:hunter2@db.internal:5432/langwatch\n" +
+    "redis://default:Ab3xY9zQ@cache-01:6379\n" +
+    "amqp://guest:guest@localhost:5672/%2f\n",
+);
+
+test("redactSecretsInText, 200 KB", async ({ bench, expect }) => {
+  const prose = bench("prose with no URL", () => {
+    redactSecretsInText({ text: PROSE });
+  });
+
+  const mixed = bench("a coding-agent transcript", () => {
+    redactSecretsInText({ text: MIXED });
+  });
+
+  const urls = bench("connection strings", () => {
+    redactSecretsInText({ text: URLS });
+  });
+
+  const results = await bench.compare(prose, mixed, urls);
+  expect(results.get("connection strings").name).toBe("connection strings");
+});

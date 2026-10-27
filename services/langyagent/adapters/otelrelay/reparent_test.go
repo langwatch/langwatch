@@ -21,7 +21,7 @@ func turnContext() trace.SpanContext {
 	})
 }
 
-// workerBatch builds a two-span batch as opencode would export it: a root span
+// workerBatch builds a two-span batch as a worker would export it: a root span
 // (its own trace, no parent) with one child.
 func workerBatch() (ptrace.Traces, pcommon.SpanID, pcommon.SpanID) {
 	td := ptrace.NewTraces()

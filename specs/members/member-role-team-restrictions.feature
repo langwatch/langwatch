@@ -6,7 +6,7 @@ Feature: Member Role Team Restrictions
 
   # The role-validation + auto-correction logic is bound below to
   # the unit tests in
-  # `platform/app/src/utils/__tests__/memberRoleConstraints.unit.test.ts`
+  # `modules/organization/process/src/services/__tests__/member-role-constraints.unit.test.ts`
   # and `computeEffectiveTeamRoleUpdates.unit.test.ts`. Remaining
   # `@unimplemented` scenarios describe UI dropdown behaviour ("only
   # see Viewer in dropdown", "team role updates render in form",
@@ -252,6 +252,23 @@ Feature: Member Role Team Restrictions
     And it does not report a team that still has another admin
 
   @integration
+  Scenario: A seat change whose access rows have not landed yet keeps the new seat
+    Given a member holds a shared team role
+    When an organization admin moves them to a Lite Member seat
+    And the grant ledger accepts the corrections but cannot confirm them in time
+    Then the seat change is saved with the Lite Member seat
+    And every correction is still commanded
+    And the organization's cached access is dropped
+
+  @integration
+  Scenario: A seat change whose access rows are refused goes back to the old seat
+    Given a member holds a shared team role
+    When an organization admin moves them to a Lite Member seat
+    And the grant ledger refuses a correction
+    Then the change is refused
+    And the member keeps the seat they held
+
+  @integration
   Scenario: A seat change that names team roles outright still keeps the guard
     Given a member is the only admin of a shared team
     When a caller asks for that team role to be Viewer as part of the seat change
@@ -285,6 +302,22 @@ Feature: Member Role Team Restrictions
     When an organization admin changes that team role from the team's own members
     Then the change is refused
     And the refusal names the team
+
+  @integration
+  Scenario: Two team admins removed at the same time cannot both succeed
+    Given a team whose only two admins are being removed concurrently
+    When both removals race each other
+    Then at most one of them commits
+    And the team keeps at least one admin
+
+  @integration
+  Scenario: A team admin removal that starts while another is being written is refused
+    Given a team whose only two admins are admin A and admin B
+    And the removal of admin A has been checked but its revocation has not landed yet
+    When the removal of admin B starts
+    Then it waits for the removal of admin A to finish
+    And it is refused because admin B is now the team's last admin
+    And the team keeps exactly one admin
 
   # "Has an admin" counts people. A group given the Admin role on a team
   # administers it through every one of its members, so a change the group can
@@ -329,3 +362,33 @@ Feature: Member Role Team Restrictions
     Given a member with a personal workspace
     When an organization admin moves them to a Lite Member seat
     Then their personal workspace access rows are untouched
+
+  # ============================================================================
+  # Inviting a Lite Member with no team
+  # ============================================================================
+  #
+  # A lite seat carries no organization-wide access of its own: the invite
+  # grants what its teams grant and nothing else. So a lite invite naming no
+  # team produces somebody who can sign in, see nothing, and hold a seat while
+  # they do it, and the admin only finds out when that person tells them.
+  #
+  # Warned rather than refused: assigning the team afterwards is a legitimate
+  # way to work, and the admin is the one who knows whether they mean to.
+
+  @integration
+  Scenario: Inviting a Lite Member with no team warns that they will see nothing
+    Given I am inviting someone as a Lite Member
+    When no team is assigned to them
+    Then I am told they will not be able to see anything
+    And I am told I can add a team later
+
+  @integration
+  Scenario: The warning does not block the invitation
+    Given I am inviting someone as a Lite Member with no team
+    Then I can still send the invitation
+
+  @integration
+  Scenario: Inviting a full member with no team is not warned about
+    Given I am inviting someone as a full member
+    When no team is assigned to them
+    Then no warning about team access is shown

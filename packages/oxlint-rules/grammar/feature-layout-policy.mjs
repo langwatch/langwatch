@@ -1,0 +1,366 @@
+// The strict feature layout grammar: what a source file inside a feature
+// package, or an opted-in framework package, may be called and where it may
+// sit. The oxlint rules `feature-source-filename`, `feature-source-layout` and
+// `feature-source-subject` decide with these; the CLI imports the same
+// patterns for the checks that need the whole package graph.
+
+export const NAME = "[a-z0-9]+(?:-[a-z0-9]+)*";
+const NAME_RE = new RegExp(`^${NAME}$`);
+
+/**
+ * Every artifact suffix the layout knows, once. `side` is the half it may sit
+ * in; `canonical` lets it end a filename; `subject` makes the name before it a
+ * claimed subject; `qualified` lets a tier or backend segment precede that name.
+ */
+const ARTIFACT_TABLE = {
+  api: { side: "process", canonical: true },
+  app: { side: "contract", canonical: true, subject: true },
+  channel: { side: "process", canonical: true, subject: true, qualified: true },
+  commands: { side: "contract", canonical: true, subject: true },
+  composition: { side: "process", canonical: true },
+  errors: { side: "contract", canonical: true, subject: true },
+  events: { side: "contract", canonical: true, subject: true },
+  fixture: {},
+  intent: { side: "process", canonical: true, subject: true },
+  mapper: { side: "process", qualified: true },
+  migration: { side: "process", canonical: true, qualified: true },
+  process: { side: "process", canonical: true, subject: true },
+  projection: { side: "process", canonical: true, subject: true },
+  queries: { side: "contract", canonical: true, subject: true },
+  repository: { side: "process", canonical: true, subject: true, qualified: true },
+  rules: { side: "process", canonical: true },
+  // Lua source beside the Redis repository that runs it; a framework home only (ADR-181).
+  script: { side: "process", qualified: true },
+  service: { side: "contract", canonical: true, subject: true },
+  store: { side: "process", canonical: true, subject: true, qualified: true },
+  subscriber: { side: "process", canonical: true, subject: true },
+  task: { side: "process", canonical: true },
+};
+
+function artifactsWhere(predicate) {
+  return Object.keys(ARTIFACT_TABLE).filter((name) => predicate(ARTIFACT_TABLE[name]));
+}
+
+export const CANONICAL_ARTIFACTS = new Set(artifactsWhere((artifact) => artifact.canonical));
+export const ARTIFACT_PARTS = new Set(Object.keys(ARTIFACT_TABLE));
+export const QUALIFIED_ARTIFACTS = new Set(artifactsWhere((artifact) => artifact.qualified));
+const CONTRACT_ARTIFACTS = artifactsWhere((artifact) => artifact.side === "contract").join("|");
+const PROCESS_ONLY_ARTIFACTS = artifactsWhere((artifact) => artifact.side === "process");
+
+/** The process-only suffixes, in prose, for the message that refuses one in a contract. */
+export const PROCESS_ONLY_ARTIFACT_LIST = PROCESS_ONLY_ARTIFACTS.map((name) => `\`.${name}\``).join(
+  ", ",
+);
+
+export const TEST_LEVELS = new Set(["unit", "integration", "e2e"]);
+
+/** Test sources, at any depth; the same definition `classify` uses, so the two cannot disagree. */
+export const TEST_DIRECTORY = /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)/;
+
+export const PROCESS_QUALIFIERS = [
+  "clickhouse",
+  "eventing",
+  "in-memory",
+  "ledger",
+  "memory",
+  "postgres",
+  "prisma",
+  "redis",
+  "routed",
+];
+
+/**
+ * The tiers a channel implementation may sit in. The folder name and the
+ * filename's first qualifier are the same word, so a file cannot claim one
+ * tier while living in another.
+ */
+export const CHANNEL_TIERS = [
+  "eventing",
+  "http",
+  "memory",
+  "redis",
+  "s3",
+  "ses",
+  "slack",
+  "smtp",
+  "sqs",
+];
+const CHANNEL_TIER = CHANNEL_TIERS.join("|");
+
+/** The feature API token has one portable home; other API modules are transports. */
+export function isFeatureApiContract(sourcePath, feature) {
+  return sourcePath === `${feature}.api.ts`;
+}
+
+export const CONTRACT_ARTIFACT = new RegExp(`^${NAME}\\.(?:${CONTRACT_ARTIFACTS})\\.ts$`);
+export const PROCESS_ONLY_CONTRACT_ARTIFACT = new RegExp(
+  `\\.(?:${PROCESS_ONLY_ARTIFACTS.join("|")})\\.ts$`,
+);
+export const CONTRACT_ARTIFACT_SUFFIX = new RegExp(`\\.(?:${CONTRACT_ARTIFACTS})\\.ts$`);
+export const CONTRACT_ARTIFACT_ONLY = new RegExp(`^(?:${CONTRACT_ARTIFACTS})\\.ts$`);
+
+/**
+ * The closed list of process-source homes, in prose, for the message a refused
+ * file prints. A test pins it to `PROCESS_PATTERNS` so the two cannot drift.
+ */
+export const PROCESS_HOMES =
+  "index.ts, <feature>.module.ts, app/<feature>.app.ts, app/<feature>.members.ts (deleted, §15: conversion debt that only shrinks), " +
+  "transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, " +
+  "repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), " +
+  "channels/ (the interface, the bundle, the registry, and a tier folder beside them), " +
+  "eventing/<feature>.pipeline.ts and what it names, rules/<name>.rules.ts, " +
+  "tasks/<name>.task.ts, migrations/, " +
+  "features/<concern>/ holding that concern's own services/, rules/, repositories/ and eventing/ " +
+  "(one level, nothing else nests), " +
+  "app/<feature>-composition.build.ts (deleted, §15: the ported process composition a converted module still carries; it only shrinks)";
+
+/**
+ * One level of concern nesting (ARCHITECTURE.md, "Process and contract nest
+ * the same way"): services, rules, repositories and eventing may sit under
+ * `features/<concern>/`. Everything else stays at the top.
+ */
+export const FEATURE_PREFIX = `(?:features/${NAME}/)?`;
+const FEATURE_PREFIX_RE = new RegExp(`^features/${NAME}/`);
+
+/** The path with a leading `features/<concern>/` removed, so a layer reads the same
+ * nested or not. */
+export function stripFeaturePrefix(path) {
+  return path.replace(FEATURE_PREFIX_RE, "");
+}
+
+const APP_HOME = new RegExp(`^app/${NAME}\\.app\\.ts$`);
+const SERVICE_HOME = new RegExp(`^${FEATURE_PREFIX}services/${NAME}\\.service\\.ts$`);
+// One-shot programs run from the task launcher, composed by apps/tasks.
+const TASK_HOME = new RegExp(`^tasks/${NAME}\\.task\\.ts$`);
+
+const REPOSITORY_HOMES = [
+  new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
+  // A feature can select a repository bundle by persistence backend.
+  new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:-repositories)?\\.registry\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:\\.${NAME})?\\.repositories\\.ts$`),
+  new RegExp(
+    `^${FEATURE_PREFIX}repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|repositories|store)\\.ts$`,
+  ),
+];
+
+/** A channel carries messages to or from something its owner does not own. */
+function channelHomes(prefix) {
+  return [
+    new RegExp(`^${prefix}channels/${NAME}(?:\\.${NAME})?\\.channel\\.ts$`),
+    new RegExp(`^${prefix}channels/${NAME}(?:-channels)?\\.registry\\.ts$`),
+    new RegExp(`^${prefix}channels/${NAME}(?:\\.${NAME})?\\.channels\\.ts$`),
+    new RegExp(`^${prefix}channels/(${CHANNEL_TIER})/\\1\\.${NAME}\\.(?:channel|channels)\\.ts$`),
+  ];
+}
+
+// Event sourcing is one folder, not six. The pipeline declares the aggregate,
+// its events, its projections, its subscribers, its process managers and its
+// commands through `definePipeline` from `@langwatch/eventing`; the files
+// beside it hold what that declaration names.
+function eventingHomes(prefix) {
+  return [
+    new RegExp(`^${prefix}eventing/${NAME}\\.pipeline\\.ts$`),
+    new RegExp(
+      `^${prefix}eventing/${NAME}\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
+    ),
+    new RegExp(
+      `^${prefix}eventing/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
+    ),
+  ];
+}
+
+export const PROCESS_PATTERNS = [
+  /^index\.ts$/,
+  new RegExp(`^${NAME}\\.module\\.ts$`),
+  APP_HOME,
+  // The closed record of members a process hands the app (ADR-144), declared
+  // beside the app it feeds.
+  new RegExp(`^app/${NAME}\\.members\\.ts$`),
+  // The ported process composition a converted module still carries. A named,
+  // documented artifact rather than a refusal, because redlining it mid-recovery
+  // helps nobody; the expectation is that it shrinks to nothing as repositories
+  // and members conversion completes (ADR-144).
+  new RegExp(`^app/${NAME}-composition\\.build\\.ts$`),
+  SERVICE_HOME,
+  ...REPOSITORY_HOMES,
+  ...channelHomes(""),
+  ...eventingHomes(FEATURE_PREFIX),
+  TASK_HOME,
+  // Flat API declarations and explicit WebSocket protocol integrations.
+  new RegExp(`^transport/${NAME}\\.(?:rest|trpc|ws)\\.ts$`),
+  new RegExp(`^migrations/${NAME}-import\\.${NAME}\\.migration\\.ts$`),
+];
+
+export const SERVICE_MODULE_PATTERN = new RegExp(`^${FEATURE_PREFIX}services/.+\\.service\\.ts$`);
+export const PROCESS_MANAGER_SERVICE_PATTERN = new RegExp(
+  `^${FEATURE_PREFIX}services/.+-process\\.service\\.ts$`,
+);
+
+// A pure function/constant module: a package of functions in the Go sense,
+// not a single-method class. Checked separately because it carries its own
+// purity and import rules.
+export const RULES_PATTERN = new RegExp(`^${FEATURE_PREFIX}rules/${NAME}\\.rules\\.ts$`);
+
+/** The `package.json` value a framework package opts into the feature layout with (ADR-181). */
+export const FEATURE_LAYOUT = "features";
+
+/**
+ * Whether a manifest opts its package into the feature layout:
+ * `"langwatch": { "layout": "features" }` in the package's own `package.json`.
+ *
+ * @param {{ langwatch?: { layout?: unknown } } | undefined} manifest
+ */
+export function optsIntoFeatureLayout(manifest) {
+  return manifest?.langwatch?.layout === FEATURE_LAYOUT;
+}
+
+const ENTRY_TARGET = /^\.\/src\/([^*]+\.[cm]?tsx?)$/;
+
+/**
+ * The `src/`-relative files a manifest's `exports` publishes: the package's entry files.
+ *
+ * @param {unknown} exportsField
+ * @returns {Set<string>}
+ */
+export function entrySourcePaths(exportsField) {
+  if (typeof exportsField === "string") {
+    const match = exportsField.match(ENTRY_TARGET);
+    return new Set(match ? [match[1]] : []);
+  }
+  if (!exportsField || typeof exportsField !== "object") return new Set();
+
+  return new Set(Object.values(exportsField).flatMap((target) => [...entrySourcePaths(target)]));
+}
+
+/**
+ * The closed list of framework-source homes, in prose, for the message a refused
+ * file prints. A test pins it to `FRAMEWORK_PATTERNS` so the two cannot drift.
+ */
+export const FRAMEWORK_HOMES =
+  "the entry files the package.json `exports` names (`export ... from` lines only), " +
+  "app/<name>.app.ts, vocabulary/<name>.ts (or <name>.errors.ts, <name>.schemas.ts), " +
+  "rules/<name>.rules.ts, telemetry/<name>.metrics.ts, tasks/<name>.task.ts, " +
+  "repositories/ (interfaces and a tier folder beside them, Lua as " +
+  "repositories/redis/redis.<name>.script.ts), " +
+  "channels/ (interfaces and a tier folder beside them), " +
+  "features/<concern>/ holding that concern's services/<name>.service.ts, " +
+  "eventing/<name>.pipeline.ts and what it names, and its own vocabulary/, rules/, " +
+  "repositories/ and channels/ (one level, nothing else nests; no registry or bundle file)";
+
+const CONCERN_PREFIX = `features/${NAME}/`;
+
+/**
+ * A framework package that opts in nests like a process half (ADR-181 decision 1):
+ * services and eventing live only under a concern, and nothing selects a tier by
+ * registry or bundle (coordinator, 2026-10-19). Entry files are homes, read per package.
+ */
+export const FRAMEWORK_PATTERNS = [
+  APP_HOME,
+  new RegExp(`^${FEATURE_PREFIX}vocabulary/${NAME}(?:\\.(?:errors|schemas))?\\.ts$`),
+  new RegExp(`^telemetry/${NAME}\\.metrics\\.ts$`),
+  TASK_HOME,
+  new RegExp(`^${CONCERN_PREFIX}services/${NAME}\\.service\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
+  new RegExp(
+    `^${FEATURE_PREFIX}repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|store)\\.ts$`,
+  ),
+  // Plain Lua strings beside the Redis repository that runs them, one script per method.
+  new RegExp(`^${FEATURE_PREFIX}repositories/redis/redis\\.${NAME}\\.script\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}channels/${NAME}(?:\\.${NAME})?\\.channel\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}channels/(${CHANNEL_TIER})/\\1\\.${NAME}\\.channel\\.ts$`),
+  ...eventingHomes(CONCERN_PREFIX),
+];
+
+/**
+ * Whether a framework source has a home: an entry file, a rules module or a pattern.
+ *
+ * @param {{ entry?: boolean, sourcePath: string }} source
+ */
+export function isFrameworkHome({ entry, sourcePath }) {
+  if (entry || RULES_PATTERN.test(sourcePath)) return true;
+
+  return FRAMEWORK_PATTERNS.some((pattern) => pattern.test(sourcePath));
+}
+
+/**
+ * Built-ins a rules module may construct: a value, not a collaborator and not
+ * a reading of the world. `Date` is deliberately absent — `new Date()` is the
+ * clock, the impurity this check exists to keep out of rules.
+ */
+export const PURE_VALUE_CONSTRUCTORS = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "Map",
+  "Set",
+  "WeakMap",
+  "WeakSet",
+  "RegExp",
+  "URL",
+  "URLSearchParams",
+  "TextEncoder",
+  "TextDecoder",
+  "Uint8Array",
+  "Uint16Array",
+  "Uint32Array",
+  "Int8Array",
+  "Int16Array",
+  "Int32Array",
+  "Float32Array",
+  "Float64Array",
+  "ArrayBuffer",
+  "DataView",
+]);
+
+export function isLowerKebabFilename(name) {
+  const extension = name.match(/\.[cm]?[jt]sx?$/)?.[0];
+  if (!extension) return false;
+  if (name.endsWith(".d.ts")) return true;
+  const stem = name.slice(0, -extension.length);
+  const parts = stem.split(".");
+  if (parts.length === 1) return NAME_RE.test(parts[0]);
+  if (parts.length === 2 && CANONICAL_ARTIFACTS.has(parts[1])) {
+    return NAME_RE.test(parts[0]);
+  }
+  if (parts.length === 3 && parts[2] === "test" && TEST_LEVELS.has(parts[1])) {
+    return NAME_RE.test(parts[0]);
+  }
+  if (parts.length === 3 && CANONICAL_ARTIFACTS.has(parts[2])) {
+    return parts.every((part) => NAME_RE.test(part));
+  }
+  const hasArtifactSuffix = CANONICAL_ARTIFACTS.has(parts.at(-1));
+  if (hasArtifactSuffix) return false;
+  // Non-architectural domain qualifiers (generated, native) are retained when
+  // their components are already lower kebab case.
+  return parts.every((part) => NAME_RE.test(part));
+}
+
+export function isStrictProcessFilename(name) {
+  if (!isLowerKebabFilename(name)) return false;
+
+  const extension = name.match(/\.[cm]?[jt]sx?$/)?.[0];
+  if (!extension) return false;
+  const parts = name.slice(0, -extension.length).split(".");
+  if (parts.length !== 2 || !QUALIFIED_ARTIFACTS.has(parts[1])) return true;
+
+  return !PROCESS_QUALIFIERS.some((qualifier) => parts[0].startsWith(`${qualifier}-`));
+}
+
+export const SUBJECT_ARTIFACT = new RegExp(
+  `\\.(?:${artifactsWhere((artifact) => artifact.subject).join("|")})\\.tsx?$`,
+);
+
+export function claimsSubject(candidate, feature, subject) {
+  if (candidate === subject) return true;
+  return candidate.startsWith(`${feature}-`) && candidate.slice(feature.length + 1) === subject;
+}
+
+export function claimedSubjects(path) {
+  const filename = path.slice(path.lastIndexOf("/") + 1, -3);
+  const parts = filename.split(".");
+  const artifact = parts.at(-1);
+  if (parts.length >= 3 && artifact && QUALIFIED_ARTIFACTS.has(artifact)) {
+    return [parts.at(-2)];
+  }
+  return parts.filter((part) => !ARTIFACT_PARTS.has(part));
+}

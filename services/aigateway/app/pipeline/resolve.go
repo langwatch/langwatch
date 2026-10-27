@@ -3,7 +3,8 @@ package pipeline
 import (
 	"context"
 
-	"github.com/bytedance/sonic"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -49,17 +50,21 @@ func rewriteResolvedModel(call *Call, resolved *domain.ResolvedModel) error {
 	if err := call.MaterializeBody(); err != nil {
 		return err
 	}
-	call.Request.Body = rewriteModel(call.Request.Body, resolved.ModelID)
+	call.Request.Body = rewriteModel(call.Request.Body, call.Request.ModelBodyPath(), resolved.ModelID)
 	return nil
 }
 
-func rewriteModel(body []byte, model string) []byte {
-	var obj map[string]any
-	if err := sonic.Unmarshal(body, &obj); err != nil {
+// rewriteModel sets the model at path and leaves every other byte of the
+// body alone. In place rather than a decode and re-encode of the whole
+// object, because the realtime mint forwards the caller's session
+// declaration to the vendor and a round trip would rewrite fields the caller
+// set. A body that is not a JSON object carries no model field to fix, so it
+// passes through.
+func rewriteModel(body []byte, path, model string) []byte {
+	if !gjson.ParseBytes(body).IsObject() {
 		return body
 	}
-	obj["model"] = model
-	out, err := sonic.Marshal(obj)
+	out, err := sjson.SetBytes(body, path, model)
 	if err != nil {
 		return body
 	}

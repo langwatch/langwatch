@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -155,10 +156,11 @@ func (r *BifrostRouter) dispatchCodexStream(
 		})
 	}
 
-	body, err := codexRequestBody(req.Body, model)
+	body, droppedParams, err := codexRequestBody(req.Body, model)
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+		return nil, classifyRequestBuildError(ctx, err)
 	}
+	recordParamsDropped(ctx, droppedParams)
 
 	accessToken := cred.APIKey
 	accountID := cred.Extra["account_id"]
@@ -247,15 +249,90 @@ func codexSessionExpiredError(ctx context.Context) error {
 	})
 }
 
-// codexRequestBody pins the backend's invariants onto the caller's raw body:
+// codexRequestBody builds the outgoing body under the codex parameter
+// policy (codexParamPolicyTable) and pins the backend's invariants onto it:
 // the bare model name (the gateway stays in control of what lands upstream),
-// stream on, store off, and no sampling params the backend refuses.
-func codexRequestBody(raw []byte, model string) ([]byte, error) {
+// stream on, store off. Mapped fields are copied, droppable fields are
+// removed and reported back for the response-side drop signals, and a
+// functional field the backend refuses fails the request here as a
+// paramRefusalError, before a provider round trip is paid.
+func codexRequestBody(raw []byte, model string) ([]byte, []string, error) {
 	body := raw
 	if len(bytes.TrimSpace(body)) == 0 {
 		body = []byte("{}")
 	}
+	// A Responses call is a JSON object, and only an object has fields to
+	// filter. Without this, anything else read as no fields at all and was
+	// rebuilt into the pins alone: a truncated body, an array, or plain text
+	// went upstream as a well-formed request with no turn in it, and the
+	// caller paid a provider round trip to be told what we could see here.
+	if !gjson.ValidBytes(body) {
+		return nil, nil, errors.New("codex body is not valid JSON")
+	}
+	if !gjson.ParseBytes(body).IsObject() {
+		return nil, nil, errors.New("codex body must be a JSON object")
+	}
+	// The outgoing body is BUILT from the mapped names, rather than the
+	// caller's body having the refused ones deleted out of it. A field name is
+	// data, and turning data into an sjson path is what let a name break the
+	// very call this filtering exists to save: ".", "*", "?" and ":" select
+	// something else, so ":input" deleted "input"; "|", "#" and "@" make the
+	// path complex, which DeleteBytes refuses; and an empty name has no path
+	// at all. Copying under our own fixed names cannot address anything but
+	// the field we mean, whatever the caller called theirs.
 	bare := strings.TrimPrefix(model, codexModelPrefix)
+	out, dropped, err := codexPolicyPass(body, bare)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err = pinCodexInvariants(out, bare)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out, dropped, nil
+}
+
+// codexPolicyPass walks the caller's top-level keys through the codex
+// disposition table: mapped fields are copied into a fresh object, droppable
+// fields are collected for the response-side signals, a refused field fails
+// the pass.
+func codexPolicyPass(body []byte, bare string) ([]byte, []string, error) {
+	strict := !dropTuningParamsEnabled(body)
+	out := []byte("{}")
+	var dropped []string
+	var refusal *paramRefusalError
+	var err error
+	gjson.ParseBytes(body).ForEach(func(key, value gjson.Result) bool {
+		name := key.String()
+		if name == "drop_tuning_params" {
+			// The gateway's own directive, consumed by strict above.
+			return true
+		}
+		verdict := classifyCodexParam(name, bare, strict)
+		if verdict.refusal != nil {
+			refusal = verdict.refusal
+			return false
+		}
+		if verdict.drop {
+			dropped = append(dropped, name)
+			return true
+		}
+		out, err = sjson.SetRawBytes(out, name, []byte(value.Raw))
+		return err == nil
+	})
+	if refusal != nil {
+		return nil, nil, refusal
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("build codex body: %w", err)
+	}
+	sort.Strings(dropped)
+	return out, dropped, nil
+}
+
+// pinCodexInvariants forces what the backend requires of every call: the
+// bare model name, stream on, store off.
+func pinCodexInvariants(body []byte, bare string) ([]byte, error) {
 	var err error
 	for _, set := range []struct {
 		path  string
@@ -268,19 +345,6 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 		body, err = sjson.SetBytes(body, set.path, set.value)
 		if err != nil {
 			return nil, fmt.Errorf("rewrite %s on codex body: %w", set.path, err)
-		}
-	}
-	// The codex backend refuses the sampling params the wider Responses API
-	// accepts: a body carrying temperature or top_p comes back 400 Bad Request.
-	// Clients that set them for other providers (the title generator and the
-	// tiny assists both send temperature) would break every codex call, so
-	// strip them here where the gateway already owns the backend's invariants.
-	// DeleteBytes is a no-op when the key is absent, so this is safe for the
-	// opencode turns that never set them.
-	for _, path := range []string{"temperature", "top_p"} {
-		body, err = sjson.DeleteBytes(body, path)
-		if err != nil {
-			return nil, fmt.Errorf("strip %s from codex body: %w", path, err)
 		}
 	}
 	return body, nil

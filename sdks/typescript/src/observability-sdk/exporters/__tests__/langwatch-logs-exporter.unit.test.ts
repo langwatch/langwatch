@@ -1,5 +1,7 @@
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
+import { CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatchLogsExporter, type LangWatchLogsExporterOptions } from "../langwatch-logs-exporter";
+
 import {
   LANGWATCH_SDK_NAME_OBSERVABILITY as LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_LANGUAGE,
@@ -7,13 +9,16 @@ import {
   LANGWATCH_SDK_RUNTIME,
   LOGS_PATH,
 } from "../../../internal/constants";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import {
+  LangWatchLogsExporter,
+  type LangWatchLogsExporterOptions,
+} from "../langwatch-logs-exporter";
 
 const DEFAULT_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
 const DEFAULT_URL = `${DEFAULT_ENDPOINT}${LOGS_PATH}`;
 
 // Mock the OTLP exporter
-vi.mock("@opentelemetry/exporter-logs-otlp-http", () => ({
+vi.mock("@opentelemetry/exporter-logs-otlp-proto", () => ({
   OTLPLogExporter: vi.fn().mockImplementation(function (this: any, config: any) {
     this.config = config;
     this.url = config.url;
@@ -37,7 +42,7 @@ describe("LangWatchLogsExporter", () => {
     vi.clearAllMocks();
   });
 
-  describe("constructor", () => {
+  describe("constructor()", () => {
     it("creates exporter with default values when no options provided", () => {
       const exporter = new LangWatchLogsExporter();
 
@@ -79,7 +84,33 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("environment variable fallbacks", () => {
+  describe("when choosing compression", () => {
+    const lastConfig = () => vi.mocked(OTLPLogExporter).mock.calls.at(-1)?.[0];
+
+    it("defaults to gzip", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "");
+      vi.stubEnv("OTEL_EXPORTER_OTLP_LOGS_COMPRESSION", "");
+      new LangWatchLogsExporter();
+      expect(lastConfig()?.compression).toBe("gzip");
+      vi.unstubAllEnvs();
+    });
+
+    it("leaves the choice to the OTel env var when it is set", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "none");
+      new LangWatchLogsExporter();
+      expect(lastConfig()?.compression).toBeUndefined();
+      vi.unstubAllEnvs();
+    });
+
+    it("lets an explicit option win", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip");
+      new LangWatchLogsExporter({ compression: CompressionAlgorithm.NONE });
+      expect(lastConfig()?.compression).toBe("none");
+      vi.unstubAllEnvs();
+    });
+  });
+
+  describe("when falling back to environment variables", () => {
     it("fallbacks to LANGWATCH_API_KEY environment variable", () => {
       const apiKey = "env-api-key";
       process.env.LANGWATCH_API_KEY = apiKey;
@@ -135,7 +166,7 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("header configuration", () => {
+  describe("when configuring headers", () => {
     it("includes all required SDK headers", () => {
       const exporter = new LangWatchLogsExporter();
 
@@ -165,7 +196,7 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("URL construction", () => {
+  describe("when constructing the URL", () => {
     it("constructs URL correctly with default endpoint", () => {
       const exporter = new LangWatchLogsExporter();
 
@@ -202,7 +233,7 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("inheritance from OTLPLogExporter", () => {
+  describe("when inheriting from OTLPLogExporter", () => {
     it("extends OTLPLogExporter", () => {
       new LangWatchLogsExporter();
 
@@ -216,12 +247,12 @@ describe("LangWatchLogsExporter", () => {
             "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
           }),
           url: expect.stringContaining(LOGS_PATH),
-        })
+        }),
       );
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("handles empty string API key", () => {
       const exporter = new LangWatchLogsExporter({ apiKey: "" });
 
@@ -232,7 +263,7 @@ describe("LangWatchLogsExporter", () => {
     it("handles empty string endpoint", () => {
       expect(() => {
         new LangWatchLogsExporter({ endpoint: "" });
-      }).toThrow(); // URL constructor should throw for empty string
+      }).toThrow(TypeError); // URL constructor should throw for empty string
     });
 
     it("handles null values in options", () => {
@@ -249,13 +280,13 @@ describe("LangWatchLogsExporter", () => {
       const endpoint = "https://subdomain.example.com:8080/path";
       const exporter = new LangWatchLogsExporter({ endpoint });
 
-      // URL constructor behavior: new URL("/api/otel/v1/logs", "https://subdomain.example.com:8080/path")
-      // results in "https://subdomain.example.com:8080/api/otel/v1/logs" (path gets replaced, not appended)
+      // URL constructor behavior: a leading-slash path replaces the base's
+      // path rather than appending to it (not "...:8080/path/api/otel/v1/logs").
       expect((exporter as any).url).toBe(`https://subdomain.example.com:8080${LOGS_PATH}`);
     });
   });
 
-  describe("type safety", () => {
+  describe("when checking type safety", () => {
     it("accepts valid LangWatchLogsExporterOptions", () => {
       const options: LangWatchLogsExporterOptions = {
         apiKey: "test-key",

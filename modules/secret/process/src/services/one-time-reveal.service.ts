@@ -1,0 +1,93 @@
+/**
+ * The one-time reveal: a secret parked under an id and served once, so the id
+ * may travel where the value must not.
+ * Spec: modules/secret/specs/one-time-reveal.feature.
+ */
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import {
+  ONE_TIME_REVEAL_KSUID_RESOURCE,
+  ONE_TIME_REVEAL_TTL_MS,
+  SecretAlreadyRevealedError,
+  SecretRevealExpiredError,
+  type RevealedSecret,
+  type RevealOnceInput,
+  type SecretCaller,
+  type StashedReveal,
+  type StashRevealInput,
+} from "@langwatch/secret-contract";
+
+import type { OneTimeRevealRepository } from "../repositories/one-time-reveal.repository.ts";
+
+const logger = createLogger("langwatch:secret:one-time-reveal");
+
+interface OneTimeRevealDeps {
+  store: OneTimeRevealRepository;
+  ttlMs?: number;
+}
+
+export class OneTimeRevealService {
+  static create(deps: OneTimeRevealDeps): OneTimeRevealService {
+    return new OneTimeRevealService(deps);
+  }
+
+  private constructor(private readonly deps: OneTimeRevealDeps) {}
+
+  /** Parks the secret and answers the id that reads it once. */
+  async stash(input: StashRevealInput): Promise<StashedReveal> {
+    const revealId = generate(ONE_TIME_REVEAL_KSUID_RESOURCE).toString();
+    await this.deps.store.put({
+      organizationId: input.organizationId,
+      recipientUserId: input.recipientUserId,
+      revealId,
+      reveal: {
+        kind: input.kind,
+        keyId: input.keyId,
+        preview: input.preview,
+        secret: input.secret,
+      },
+      ttlMs: this.ttlMs,
+    });
+    logger.info(
+      { organizationId: input.organizationId, kind: input.kind, keyId: input.keyId },
+      "Stashed a secret for a one-time reveal",
+    );
+    return { revealId };
+  }
+
+  /**
+   * Serves the secret to its recipient and forgets it. A second read of the
+   * same id is refused as already revealed; an id with nothing behind it -
+   * expired, never stashed, or another organization's or person's - as expired.
+   */
+  async reveal(
+    { organizationId, revealId }: RevealOnceInput,
+    by: SecretCaller,
+  ): Promise<RevealedSecret> {
+    const address = { organizationId, recipientUserId: by.id, revealId };
+    const taken = await this.deps.store.take(address);
+    if (!taken.taken) {
+      const served = await this.deps.store.wasServed(address);
+      throw served
+        ? new SecretAlreadyRevealedError(revealId)
+        : new SecretRevealExpiredError(revealId);
+    }
+
+    const stored = taken.reveal;
+    await this.deps.store.markServed({ ...address, ttlMs: this.ttlMs });
+    logger.info(
+      { organizationId, kind: stored.kind, keyId: stored.keyId },
+      "Served a one-time reveal",
+    );
+    return {
+      kind: stored.kind,
+      keyId: stored.keyId,
+      preview: stored.preview,
+      secret: stored.secret,
+    };
+  }
+
+  private get ttlMs(): number {
+    return this.deps.ttlMs ?? ONE_TIME_REVEAL_TTL_MS;
+  }
+}

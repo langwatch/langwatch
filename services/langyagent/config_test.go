@@ -2,6 +2,7 @@ package langyagent
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -58,8 +59,8 @@ func TestLoadConfig_DefaultsWhenOnlySecretSet(t *testing.T) {
 	if cfg.Server.MaxRequestBodyBytes != defaultMaxBodyBytes {
 		t.Errorf("MaxRequestBodyBytes default = %d, want %d", cfg.Server.MaxRequestBodyBytes, defaultMaxBodyBytes)
 	}
-	if cfg.OpenCodeBinaryPath != "opencode" {
-		t.Errorf("OpenCodeBinaryPath default = %q, want opencode", cfg.OpenCodeBinaryPath)
+	if cfg.PiWorkerBinaryPath != "langy-worker" {
+		t.Errorf("PiWorkerBinaryPath default = %q, want langy-worker", cfg.PiWorkerBinaryPath)
 	}
 	if cfg.WorkspaceRoot != "/workspace" {
 		t.Errorf("WorkspaceRoot default = %q, want /workspace", cfg.WorkspaceRoot)
@@ -205,6 +206,7 @@ func TestLoadConfig_UnsafeDevDisableIsolationAllowedInLocalEnvs(t *testing.T) {
 	}
 }
 
+// @scenario "The manager refuses the isolation bypass outside a local environment"
 func TestLoadConfig_UnsafeDevDisableIsolationRefusedInNonLocalEnvs(t *testing.T) {
 	// Allowlist fail-closed: production, staging, and any unknown/prod-like value
 	// must reject the bypass, so it can never be armed off a dev box.
@@ -215,8 +217,12 @@ func TestLoadConfig_UnsafeDevDisableIsolationRefusedInNonLocalEnvs(t *testing.T)
 			t.Setenv("ENVIRONMENT", env)
 			t.Setenv("LANGY_UNSAFE_DEV_DISABLE_ISOLATION", "true")
 
-			if _, err := LoadConfig(context.Background()); err == nil {
+			_, err := LoadConfig(context.Background())
+			if err == nil {
 				t.Fatalf("expected LoadConfig to refuse LANGY_UNSAFE_DEV_DISABLE_ISOLATION when ENVIRONMENT=%q", env)
+			}
+			if !strings.Contains(err.Error(), "LANGY_UNSAFE_DEV_DISABLE_ISOLATION") || !strings.Contains(err.Error(), env) {
+				t.Fatalf("refusal %q names neither the bypass nor the environment", err)
 			}
 		})
 	}

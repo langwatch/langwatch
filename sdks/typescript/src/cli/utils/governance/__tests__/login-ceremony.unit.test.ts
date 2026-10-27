@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  formatLoginCeremony,
-  type LoginCeremonyInput,
-} from "../login-ceremony";
+import { formatLoginCeremony, type LoginCeremonyInput } from "../login-ceremony";
 
 const baseInput: LoginCeremonyInput = {
   email: "jane@acme.com",
@@ -36,7 +33,7 @@ describe("formatLoginCeremony", () => {
     return slug !== undefined && slug !== "open";
   };
 
-  describe("AI tools block", () => {
+  describe("when rendering the AI tools block", () => {
     describe("when the org publishes coding-assistant tools", () => {
       it("lists exactly those tools as runnable commands with their names", () => {
         const lines = formatLoginCeremony({
@@ -58,18 +55,8 @@ describe("formatLoginCeremony", () => {
         const lines = formatLoginCeremony(baseInput);
         const toolLines = lines.filter(isToolCommand);
         expect(toolLines).toHaveLength(7);
-        for (const slug of [
-          "claude",
-          "codex",
-          "copilot",
-          "code",
-          "cursor",
-          "gemini",
-          "opencode",
-        ]) {
-          expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(
-            true,
-          );
+        for (const slug of ["claude", "codex", "copilot", "code", "cursor", "gemini", "opencode"]) {
+          expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(true);
         }
       });
 
@@ -81,7 +68,7 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("model providers block", () => {
+  describe("when rendering the model providers block", () => {
     describe("when providers are supplied", () => {
       it("renders providers under a clearly distinct virtual-key heading", () => {
         const lines = formatLoginCeremony({
@@ -91,9 +78,7 @@ describe("formatLoginCeremony", () => {
             { name: "openai", displayName: "OpenAI", configured: true },
           ],
         });
-        expect(lines).toContain(
-          "Model providers you can issue a virtual key for:",
-        );
+        expect(lines).toContain("Model providers you can issue a virtual key for:");
         // NOT labelled "AI tools" — that confusion is the bug being fixed.
         expect(lines).not.toContain("Your AI tools are ready:");
         const providerLines = lines.filter((l) => l.startsWith("  •"));
@@ -129,14 +114,13 @@ describe("formatLoginCeremony", () => {
 
       it("omits the providers section when the array is empty", () => {
         const lines = formatLoginCeremony({ ...baseInput, providers: [] });
-        expect(lines).not.toContain(
-          "Model providers you can issue a virtual key for:",
-        );
+        expect(lines).not.toContain("Model providers you can issue a virtual key for:");
       });
     });
   });
 
-  describe("when a budget is supplied", () => {
+  describe("when the server predates the overview and sends only the collapsed budget", () => {
+    /** @scenario "The login epilogue falls back to the legacy single line on a server without the overview" */
     it("renders the budget line with the storyboard formatting", () => {
       const lines = formatLoginCeremony({
         ...baseInput,
@@ -170,7 +154,145 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("open hint", () => {
+  describe("when rendering per-budget labelled overview lines", () => {
+    const orgBudget = {
+      spentUsd: 2.43,
+      limitUsd: 100,
+      window: "MONTH",
+      scopePhrase: "whole organization budget",
+      resetsAt: "2026-08-01T00:00:00.000Z",
+    };
+    const personalBudget = {
+      spentUsd: 0.1,
+      limitUsd: 25,
+      window: "MONTH",
+      scopePhrase: "personal budget",
+      resetsAt: "2026-08-01T00:00:00.000Z",
+    };
+    const deptBudget = {
+      spentUsd: 5,
+      limitUsd: 50,
+      window: "WEEK",
+      scopePhrase: "department budget (Engineering)",
+      resetsAt: "2026-08-03T00:00:00.000Z",
+    };
+
+    // The ceremony is handed an empty list for two different server
+    // answers: gateway access denied, and access granted with no budget
+    // bound. Both must render nothing, so both are covered here.
+    describe("when the organization gives the member no gateway access", () => {
+      /** @scenario "The login epilogue renders nothing without gateway access" */
+      it("renders no budget section at all", () => {
+        const lines = formatLoginCeremony({ ...baseInput, budgets: [] });
+        expect(lines).not.toContain("Budgets that apply to your key:");
+        expect(lines.find((l) => l.includes("budget"))).toBeUndefined();
+      });
+
+      it("suppresses the legacy collapsed line even when also supplied", () => {
+        // gatewayAccess=false and zero-budget cases both arrive as an
+        // empty list; the unlabeled legacy number must not resurface.
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budget: { period: "monthly", limitUsd: 100, usedUsd: 2.43 },
+          budgets: [],
+        });
+        expect(lines.find((l) => l.startsWith("Monthly budget:"))).toBeUndefined();
+      });
+    });
+
+    describe("when one budget applies", () => {
+      /** @scenario "The login epilogue names each budget that applies to the key" */
+      it("renders it with its scope phrase and reset day", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [orgBudget],
+        });
+        expect(lines).toContain("Budgets that apply to your key:");
+        expect(lines).toContain(
+          "  $2.43 used of $100.00 this month (whole organization budget), resets Aug 1",
+        );
+      });
+
+      it("appends the provider filter when the budget counts one provider", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [{ ...orgBudget, providerLabel: "OpenAI" }],
+        });
+        expect(lines).toContain(
+          "  $2.43 used of $100.00 this month (whole organization budget, OpenAI only), resets Aug 1",
+        );
+      });
+
+      it("omits the reset suffix for TOTAL windows", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [
+            {
+              spentUsd: 1,
+              limitUsd: 10,
+              window: "TOTAL",
+              scopePhrase: "personal budget",
+              resetsAt: null,
+            },
+          ],
+        });
+        expect(lines).toContain("  $1.00 used of $10.00 all time (personal budget)");
+      });
+    });
+
+    describe("when three budgets apply", () => {
+      it("renders all three, one line each", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [personalBudget, deptBudget, orgBudget],
+        });
+        const budgetLines = lines.filter((l) => l.includes(" used of "));
+        expect(budgetLines).toHaveLength(3);
+        expect(budgetLines[0]).toContain("(personal budget)");
+        expect(budgetLines[1]).toContain("(department budget (Engineering))");
+        expect(budgetLines[2]).toContain("(whole organization budget)");
+      });
+    });
+
+    describe("when five budgets apply", () => {
+      /** @scenario "The login epilogue caps at three budgets and links the rest" */
+      it("caps at three lines and links to the budgets page for the rest", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budgets: [
+            personalBudget,
+            deptBudget,
+            orgBudget,
+            { ...orgBudget, scopePhrase: "team budget (Core)" },
+            { ...orgBudget, scopePhrase: "project budget (Demo)" },
+          ],
+          budgetsUrl: "https://app.langwatch.ai/settings/gateway/budgets",
+        });
+        const budgetLines = lines.filter((l) => l.includes(" used of "));
+        expect(budgetLines).toHaveLength(3);
+        expect(lines).toContain(
+          "  ...and 2 more: https://app.langwatch.ai/settings/gateway/budgets",
+        );
+      });
+    });
+
+    describe("when the overview supersedes the legacy line", () => {
+      /** @scenario "The labelled budget lines replace the legacy single line" */
+      it("renders the labelled lines, not the collapsed number", () => {
+        const lines = formatLoginCeremony({
+          ...baseInput,
+          budget: { period: "monthly", limitUsd: 100, usedUsd: 2.43 },
+          budgets: [orgBudget],
+        });
+        expect(lines.find((l) => l.startsWith("Monthly budget:"))).toBeUndefined();
+        expect(lines).toContain(
+          "  $2.43 used of $100.00 this month (whole organization budget), resets Aug 1",
+        );
+      });
+    });
+  });
+
+  describe("when rendering the open hint", () => {
     it("appears by default", () => {
       const lines = formatLoginCeremony(baseInput);
       expect(lines).toContain("Or open the app in your browser:");
@@ -186,7 +308,7 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("full ceremony output (golden)", () => {
+  describe("when rendering the full ceremony output (golden)", () => {
     it("renders the two distinct sections end-to-end", () => {
       const lines = formatLoginCeremony({
         email: "jane@acme.com",

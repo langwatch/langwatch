@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/pkg/jwtverify"
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 func TestFetchConfig_EscapesVKID(t *testing.T) {
@@ -328,4 +329,43 @@ func TestFetchConfig_UnreadableBody_IsAnError(t *testing.T) {
 		assert.Empty(t, res.ETag)
 		assert.False(t, res.NotModified)
 	})
+}
+
+// TestFetchConfig_NotFound_IsTheKeysOwnRejection pins a config 404 as the
+// key's own rejection rather than a transport failure.
+// @scenario "a definitive rejection from the control plane is never overridden by the fallback"
+func TestFetchConfig_NotFound_IsTheKeysOwnRejection(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+	cp := NewClient(ClientOptions{
+		BaseURL:    srv.URL,
+		Sign:       func(_ *http.Request, _ []byte) {},
+		HTTPClient: srv.Client(),
+	})
+
+	_, err := cp.FetchConfig(context.Background(), "vk_deleted", "")
+
+	require.ErrorIs(t, err, domain.ErrInvalidAPIKey, "a deleted key is a rejection, not an outage")
+}
+
+func TestFetchConfig_KeyStatus(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body     string
+		inactive bool
+	}{
+		"an active key":                        {`{"status":"active","models_allowed":[]}`, false},
+		"a revoked key":                        {`{"status":"revoked","models_allowed":[]}`, true},
+		"a control plane older than the field": {`{"models_allowed":[]}`, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cp := (&configServer{revision: "42", body: tc.body}).start(t)
+
+			res, err := cp.FetchConfig(context.Background(), "vk_acme", "")
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.inactive, res.KeyInactive)
+		})
+	}
 }

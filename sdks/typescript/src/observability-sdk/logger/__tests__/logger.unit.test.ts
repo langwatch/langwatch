@@ -1,23 +1,39 @@
+import { logs, createNoopLogger } from "@opentelemetry/api-logs";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getLangWatchLogger, getLangWatchLoggerFromProvider, setLangWatchLoggerProvider, createLangWatchLogger } from "..";
-import { logs, NoopLoggerProvider } from "@opentelemetry/api-logs";
-import { type LangWatchLogRecord } from "../types";
+
+import {
+  getLangWatchLogger,
+  getLangWatchLoggerFromProvider,
+  setLangWatchLoggerProvider,
+  createLangWatchLogger,
+} from "..";
 import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
+import { type LangWatchLogRecord } from "../types";
 
 vi.mock("@opentelemetry/api-logs", () => ({
   logs: {
     getLoggerProvider: vi.fn(),
   },
-  NoopLoggerProvider: vi.fn().mockImplementation(function () {
-    return {
-      getLogger: vi.fn().mockReturnValue({
-        emit: vi.fn(),
-      }),
-    };
+  // `NoopLoggerProvider` was dropped from the package's public exports;
+  // `createNoopLogger` is its replacement.
+  createNoopLogger: vi.fn().mockReturnValue({
+    emit: vi.fn(),
+    enabled: vi.fn().mockReturnValue(false),
   }),
 }));
 
+describe("LangWatchLoggerInternal enabled()", () => {
+  it("delegates enabled state to the wrapped logger", () => {
+    const wrappedLogger = {
+      emit: vi.fn(),
+      enabled: vi.fn().mockReturnValue(true),
+    };
+    const logger = createLangWatchLogger(wrappedLogger as any);
 
+    expect(logger.enabled()).toBe(true);
+    expect(wrappedLogger.enabled).toHaveBeenCalledWith(undefined);
+  });
+});
 
 describe("LangWatch Logger", () => {
   let mockLogger: any;
@@ -45,7 +61,7 @@ describe("LangWatch Logger", () => {
     resetObservabilitySdkConfig();
   });
 
-  describe("setLangWatchLoggerProvider", () => {
+  describe("setLangWatchLoggerProvider()", () => {
     it("sets the logger provider for LangWatch logging", () => {
       const customLoggerInstance = {
         emit: vi.fn(),
@@ -70,7 +86,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("getLangWatchLogger", () => {
+  describe("getLangWatchLogger()", () => {
     it("creates a logger with the given name", () => {
       const logger = getLangWatchLogger("test-logger");
 
@@ -96,8 +112,13 @@ describe("LangWatch Logger", () => {
     });
 
     it("uses NoOp logger when no provider is set", () => {
-      // Reset to use NoOp logger
-      new NoopLoggerProvider();
+      // An earlier test in this suite calls `setLangWatchLoggerProvider`, which
+      // mutates module-level state that `resetObservabilitySdkConfig` doesn't
+      // touch. Reset it explicitly here so this test actually exercises the
+      // NoOp path instead of a leftover custom provider.
+      setLangWatchLoggerProvider({
+        getLogger: () => createNoopLogger(),
+      });
 
       const logger = getLangWatchLogger("test-logger");
 
@@ -106,16 +127,13 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("getLangWatchLoggerFromProvider", () => {
+  describe("getLangWatchLoggerFromProvider()", () => {
     it("creates a logger from a specific provider", () => {
       const customProvider = {
         getLogger: vi.fn().mockReturnValue(mockLogger),
       };
 
-      const logger = getLangWatchLoggerFromProvider(
-        customProvider as any,
-        "custom-logger"
-      );
+      const logger = getLangWatchLoggerFromProvider(customProvider as any, "custom-logger");
 
       expect(logger).toBeDefined();
       expect(customProvider.getLogger).toHaveBeenCalledWith("custom-logger", undefined);
@@ -129,7 +147,7 @@ describe("LangWatch Logger", () => {
       const logger = getLangWatchLoggerFromProvider(
         customProvider as any,
         "custom-logger",
-        "2.0.0"
+        "2.0.0",
       );
 
       expect(logger).toBeDefined();
@@ -137,7 +155,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("LangWatchLogger emit functionality", () => {
+  describe("when LangWatchLogger emits", () => {
     it("emits log records with LangWatch attributes", () => {
       const logger = getLangWatchLogger("test-logger");
 
@@ -190,7 +208,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("Data capture functionality", () => {
+  describe("when capturing data", () => {
     it("preserves log record body when output capture is enabled", () => {
       // Initialize config with output capture enabled
       initializeObservabilitySdkConfig({
@@ -205,7 +223,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -214,7 +232,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: originalBody,
-        })
+        }),
       );
     });
 
@@ -232,7 +250,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -241,7 +259,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
 
@@ -259,7 +277,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -268,7 +286,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: originalBody,
-        })
+        }),
       );
     });
 
@@ -286,7 +304,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -295,7 +313,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
 
@@ -312,7 +330,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: originalBody,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -321,7 +339,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: originalBody,
-        })
+        }),
       );
     });
 
@@ -338,7 +356,7 @@ describe("LangWatch Logger", () => {
         severityText: "ERROR",
         severityNumber: 17,
         body: "Test log message",
-        attributes: { "test": "value", "custom": "attribute" },
+        attributes: { test: "value", custom: "attribute" },
         timestamp: new Date(),
       };
 
@@ -350,9 +368,9 @@ describe("LangWatch Logger", () => {
           severityText: "ERROR",
           severityNumber: 17,
           body: undefined, // Only body should be modified
-          attributes: { "test": "value", "custom": "attribute" },
+          attributes: { test: "value", custom: "attribute" },
           timestamp: expect.any(Date),
-        })
+        }),
       );
     });
 
@@ -369,7 +387,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         // No body property
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -378,7 +396,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
 
@@ -395,7 +413,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: null as any,
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -404,7 +422,7 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
 
@@ -421,7 +439,7 @@ describe("LangWatch Logger", () => {
         severityText: "INFO",
         severityNumber: 9,
         body: "",
-        attributes: { "test": "value" },
+        attributes: { test: "value" },
       };
 
       logger.emit(logRecord);
@@ -430,12 +448,12 @@ describe("LangWatch Logger", () => {
       expect(mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: undefined,
-        })
+        }),
       );
     });
   });
 
-  describe("Logger naming and versioning", () => {
+  describe("when naming and versioning the logger", () => {
     it("handles different logger names", () => {
       const loggers = [
         getLangWatchLogger("app-logger"),
@@ -444,7 +462,7 @@ describe("LangWatch Logger", () => {
       ];
 
       expect(loggers).toHaveLength(3);
-      loggers.forEach(logger => {
+      loggers.forEach((logger) => {
         expect(logger).toBeDefined();
         expect(typeof logger.emit).toBe("function");
       });
@@ -458,14 +476,14 @@ describe("LangWatch Logger", () => {
       ];
 
       expect(loggers).toHaveLength(3);
-      loggers.forEach(logger => {
+      loggers.forEach((logger) => {
         expect(logger).toBeDefined();
         expect(typeof logger.emit).toBe("function");
       });
     });
   });
 
-  describe("Integration with OpenTelemetry logs API", () => {
+  describe("when integrating with the OpenTelemetry logs API", () => {
     it("uses the current logger provider by default", () => {
       getLangWatchLogger("test-logger");
 
@@ -484,7 +502,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("Error handling", () => {
+  describe("when handling errors", () => {
     it("handles undefined version gracefully", () => {
       const logger = getLangWatchLogger("test-logger", undefined);
 
@@ -500,7 +518,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("Type safety", () => {
+  describe("when checking type safety", () => {
     it("maintains LangWatchLogger type", () => {
       const logger = getLangWatchLogger("test-logger");
 

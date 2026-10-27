@@ -1,18 +1,11 @@
+import { Command } from "commander";
 /**
- * The gate that decides whether a command may answer in the format it was
- * asked for — `assertFormatIsSupported`.
- *
- * The failure this exists to prevent is a command that cannot serialize
- * anything quietly rendering a chalk table at exit 0 for a caller who asked for
- * JSON. Refusing is the only honest answer, so the interesting cases here are
- * the ones where refusing would be WRONG: the legacy `-f json` spelling that
- * has always worked, a command that owns its own `--json`, and agent mode
- * detected from the environment rather than demanded on the command line.
- *
- * Split out of `output-port.unit.test.ts`, which pins the port itself.
+ * `assertFormatIsSupported`: the gate deciding whether a command may answer
+ * in the format it was asked for -- refusing must not fire for the legacy
+ * `-f json` spelling, a command's own `--json`, or env-detected agent mode.
  */
 import { describe, it, expect } from "vitest";
-import { Command } from "commander";
+
 import {
   assertFormatIsSupported,
   registerOutputOptions,
@@ -62,10 +55,7 @@ describe("assertFormatIsSupported", () => {
         const legacy = legacyCommand();
         legacy.setOptionValue("format", "json");
 
-        const effective = await assertFormatIsSupported(
-          legacy,
-          resolveActionOutputOptions(legacy),
-        );
+        const effective = await assertFormatIsSupported(legacy, resolveActionOutputOptions(legacy));
 
         expect(exited).toEqual([]);
         expect(effective.format).toBe("json");
@@ -118,10 +108,7 @@ describe("assertFormatIsSupported", () => {
         const legacy = legacyCommand();
         legacy.setOptionValue("agent", true);
 
-        const effective = await assertFormatIsSupported(
-          legacy,
-          resolveActionOutputOptions(legacy),
-        );
+        const effective = await assertFormatIsSupported(legacy, resolveActionOutputOptions(legacy));
 
         expect(exited).toEqual([]);
         expect(effective.format).toBe("table");
@@ -140,10 +127,7 @@ describe("assertFormatIsSupported", () => {
         registerOutputOptions(program);
         owner.setOptionValue("json", true);
 
-        const effective = await assertFormatIsSupported(
-          owner,
-          resolveActionOutputOptions(owner),
-        );
+        const effective = await assertFormatIsSupported(owner, resolveActionOutputOptions(owner));
 
         expect(exited).toEqual([]);
         expect(effective.format).toBe("json");

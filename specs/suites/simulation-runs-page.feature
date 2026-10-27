@@ -204,10 +204,10 @@ Feature: Runs Page — Unified Navigation & URL Routing
     Then I am redirected to "/my-project/simulations"
 
   @integration @unimplemented
-  Scenario: Old individual run URL redirects to unified page with drawer
+  Scenario: Old individual run URL renders the standalone run page
     When I navigate to "/my-project/simulations/python-examples/scenariobatch_abc/scenariorun_xyz"
-    Then I am redirected to "/my-project/simulations/python-examples/scenariobatch_abc?openRun=scenariorun_xyz"
-    And the scenario run detail drawer opens for "scenariorun_xyz"
+    Then the standalone run page shows "scenariorun_xyz"
+    And I am not redirected
 
   # ============================================================================
   # Save and Run Redirect

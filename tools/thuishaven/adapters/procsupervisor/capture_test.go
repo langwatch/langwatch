@@ -1,0 +1,170 @@
+package procsupervisor
+
+import (
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
+)
+
+// captureSink builds a proc that writes only to a file, so a test can read back
+// exactly what capture kept.
+func captureSink(t *testing.T) (proc, string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "api.log")
+	return proc{name: "api", isPlain: true, preview: &recentLogs{}, sink: newCapture(app.Child{Name: "api", LogPath: path}, time.Time{})}, path
+}
+
+// The api lane prints its errors as one-line JSON, so a stack dump arrives as a
+// single line of megabytes. Capture has to keep going after it: the old reader
+// stopped at the first over-long line and the lane's log file went quiet for
+// days while the process kept serving.
+// @scenario "One unreadable line never ends the capture"
+func TestStreamSurvivesALineLongerThanTheReadBuffer(t *testing.T) {
+	c, path := captureSink(t)
+	huge := strings.Repeat("x", 3*streamMaxLine)
+
+	c.stream(strings.NewReader("before\n" + huge + "\nafter\n"))
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	captured := string(b)
+	if !strings.Contains(captured, "before") {
+		t.Error("the line before the over-long one was dropped")
+	}
+	if !strings.Contains(captured, "after") {
+		t.Fatal("capture stopped at the over-long line: everything after it is lost")
+	}
+	if got := strings.Count(captured, "x"); got != len(huge) {
+		t.Errorf("kept %d bytes of the long line, want all %d (split across lines is fine)", got, len(huge))
+	}
+}
+
+// errAfter reads n bytes and then fails the way a broken pipe does.
+type errAfter struct {
+	r    io.Reader
+	err  error
+	done bool
+}
+
+func (e *errAfter) Read(p []byte) (int, error) {
+	if e.done {
+		return 0, e.err
+	}
+	n, err := e.r.Read(p)
+	if errors.Is(err, io.EOF) {
+		e.done = true
+		return n, e.err
+	}
+	return n, err
+}
+
+// A read error is not EOF: the old reader swallowed it silently, so an operator
+// grepping the log saw a lane that simply stopped talking.
+// @scenario "A read error is recorded, not swallowed"
+func TestStreamRecordsAReadErrorAndKeepsWhatItHad(t *testing.T) {
+	c, path := captureSink(t)
+
+	c.stream(&errAfter{r: strings.NewReader("one\ntwo\n"), err: errors.New("input/output error")})
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	captured := string(b)
+	for _, want := range []string{"one", "two", "log capture read error: input/output error"} {
+		if !strings.Contains(captured, want) {
+			t.Errorf("capture = %q, want it to contain %q", captured, want)
+		}
+	}
+}
+
+// A trailing fragment with no newline is what a crashing process leaves behind.
+// It is the most interesting line in the file, so it must be captured.
+func TestStreamCapturesTheLastLineWithoutANewline(t *testing.T) {
+	c, path := captureSink(t)
+
+	c.stream(strings.NewReader("finished\nsegmentation fault"))
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "segmentation fault") {
+		t.Errorf("capture = %q, want the unterminated last line", string(b))
+	}
+}
+
+// The whole point of draining: a child that writes more than the pipe buffer
+// holds blocks on write until somebody reads. One over-long line used to stop
+// the reader, and the process then wedged with no log line explaining why.
+// @scenario "One unreadable line never ends the capture"
+func TestAChildThatPrintsAHugeLineIsNotBlocked(t *testing.T) {
+	c, path := captureSink(t)
+	// One line far larger than both the pipe buffer and streamMaxLine, then a
+	// marker: the marker only prints if the child got past that write.
+	c.dir, c.shell = ".", `head -c 2000000 /dev/zero | tr '\0' 'y'; echo; echo CHILD-FINISHED`
+
+	cmd := c.command(t.Context())
+	waitStreams := c.pipe(cmd)
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		waitStreams()
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("child should exit cleanly: %v", err)
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("the child never finished: the reader stopped draining its pipe")
+	}
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "CHILD-FINISHED") {
+		t.Error("the child blocked on its own output instead of running to the end")
+	}
+	// At least: the login shell may add its own stderr chatter, which is
+	// captured too.
+	if got := strings.Count(string(b), "y"); got < 2000000 {
+		t.Errorf("captured %d bytes of the huge line, want all 2000000", got)
+	}
+}
+
+// A build note or a run's summary is plain output: each line shows as itself, never folded into
+// one error line. Only a run holding a stack frame is a crash, collapsed at error.
+//
+// @scenario "A failed seed says why on its last line"
+func TestPlainRawRunsShowLineByLineAndOnlyCrashesCollapse(t *testing.T) {
+	c, _ := captureSink(t)
+	c.stream(strings.NewReader("ensure-built: building @langwatch/mail\nbuilt in 9s\nseeded: 3 orgs\n"))
+	plain := strings.Join(c.preview.lines, "\n")
+	if len(c.preview.lines) != 3 || strings.Contains(plain, "error") || strings.Contains(plain, "+2 lines") {
+		t.Errorf("plain run rendered as %q, want three lines and no error", c.preview.lines)
+	}
+	c.preview.lines = nil
+	c.stream(strings.NewReader(strings.Repeat("CJS dist/index.js 60 KB\n", 20)))
+	if len(c.preview.lines) != 1 || strings.Contains(c.preview.lines[0], "error") {
+		t.Errorf("a build's burst rendered as %q, want one info line", c.preview.lines)
+	}
+	c.preview.lines = nil
+	c.stream(strings.NewReader("file:///x.js:1\nSyntaxError: boom\n    at load (node:internal)\n"))
+	if len(c.preview.lines) != 1 || !strings.Contains(c.preview.lines[0], "error") {
+		t.Errorf("crash rendered as %q, want one collapsed error line", c.preview.lines)
+	}
+}

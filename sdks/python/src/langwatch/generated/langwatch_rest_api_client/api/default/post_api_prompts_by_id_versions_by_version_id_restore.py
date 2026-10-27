@@ -33,7 +33,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/prompts/{id}/versions/{version_id}/restore".format(
+        "url": "/api/v1/prompts/{id}/versions/{version_id}/restore".format(
             id=quote(str(id), safe=""),
             version_id=quote(str(version_id), safe=""),
         ),
@@ -114,7 +114,7 @@ def sync_detailed(
     id: str,
     version_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
@@ -154,7 +154,7 @@ def sync(
     id: str,
     version_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
@@ -190,7 +190,7 @@ async def asyncio_detailed(
     id: str,
     version_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
@@ -228,7 +228,7 @@ async def asyncio(
     id: str,
     version_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
