@@ -347,10 +347,13 @@ export class BrowserSessionService {
     const records = await this.deps.sessions.findForUser({ userId });
     if (!records.some((record) => record.id === sessionId)) return { ended: 0 };
 
-    await this.#endDocsKeys({ userId, sessionIds: [sessionId] });
+    const [docsKeys] = await Promise.allSettled([
+      this.#endDocsKeys({ userId, sessionIds: [sessionId] }),
+    ]);
     const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const ended = await this.deps.sessions.deleteById({ id: sessionId });
     await this.#cachedSessions.clearCachedSessions({ userId, tokens });
+    if (docsKeys.status === "rejected") throw docsKeys.reason;
     logger.info({ ended, sessionId, userId }, "Ended one of a person's own browser sessions");
 
     return { ended };
@@ -371,13 +374,16 @@ export class BrowserSessionService {
     const minted = records.filter((record) => record.identifierId === identifierId);
     if (minted.length === 0) return { ended: 0 };
 
-    await this.#endDocsKeys({ userId, sessionIds: minted.map((record) => record.id) });
+    const [docsKeys] = await Promise.allSettled([
+      this.#endDocsKeys({ userId, sessionIds: minted.map((record) => record.id) }),
+    ]);
     const tokens = await this.#cachedSessions.tokensToClear({ userId });
     let ended = 0;
     for (const record of minted) {
       ended += await this.deps.sessions.deleteById({ id: record.id });
     }
     await this.#cachedSessions.clearCachedSessions({ userId, tokens });
+    if (docsKeys.status === "rejected") throw docsKeys.reason;
     logger.info({ ended, identifierId, userId }, "Ended the sessions one sign-in method minted");
 
     return { ended };
@@ -386,10 +392,13 @@ export class BrowserSessionService {
   /** Rows first, then the cache (Better Auth's own order), so no refresh re-caches a dead row. */
   async revokeAllBrowserSessions({ userId }: { userId: string }): Promise<void> {
     const records = await this.deps.sessions.findForUser({ userId });
-    await this.#endDocsKeys({ userId, sessionIds: records.map((record) => record.id) });
+    const [docsKeys] = await Promise.allSettled([
+      this.#endDocsKeys({ userId, sessionIds: records.map((record) => record.id) }),
+    ]);
     const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const deleted = await this.deps.sessions.deleteAllForUser({ userId });
     await this.#cachedSessions.clearCachedSessions({ userId, tokens });
+    if (docsKeys.status === "rejected") throw docsKeys.reason;
     logger.info({ deleted, userId }, "Revoked all browser sessions for user");
   }
 
@@ -424,10 +433,12 @@ export class BrowserSessionService {
   }): Promise<void> {
     const keep = await this.deps.sessions.findById({ id: keepSessionId });
     const others = await this.deps.sessions.findForUser({ userId });
-    await this.#endDocsKeys({
-      userId,
-      sessionIds: others.map((record) => record.id).filter((id) => id !== keepSessionId),
-    });
+    const [docsKeys] = await Promise.allSettled([
+      this.#endDocsKeys({
+        userId,
+        sessionIds: others.map((record) => record.id).filter((id) => id !== keepSessionId),
+      }),
+    ]);
     const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const deleted = await this.deps.sessions.deleteOthersForUser({ userId, keepSessionId });
     await this.#cachedSessions.clearCachedSessions({
@@ -435,10 +446,12 @@ export class BrowserSessionService {
       tokens,
       keepToken: keep?.sessionToken,
     });
+    if (docsKeys.status === "rejected") throw docsKeys.reason;
     logger.info({ deleted, keepSessionId, userId }, "Revoked other browser sessions for user");
   }
 
-  /** Before the rows go: a docs key outliving the session that minted it is the leak (ADR-185). */
+  /* Before the rows go: a docs key outliving its session is the leak (ADR-185). A failure here is
+     thrown only after the rows are deleted, so a broken api-key never keeps a session alive. */
   async #endDocsKeys({
     userId,
     sessionIds,

@@ -1,7 +1,7 @@
 import { z } from "zod/mini";
 
 import { liveRequest, type RequestState } from "./codegen.ts";
-import type { Operation } from "./operation.ts";
+import type { Operation, Scheme } from "./operation.ts";
 
 /** The message type the app's consent page posts back to the docs (ADR-185). */
 export const DOCS_SESSION_MESSAGE = "langwatch:docs-session";
@@ -95,6 +95,11 @@ export function readConsentAnswer({
   const { token, project, expiresIn } = grant.data;
   const endsAt = receivedAt + expiresIn * 1000;
   return { outcome: "granted", session: { token, endsAt, project, appOrigin } };
+}
+
+/** A docs session key is a project key: it can answer only operations that take `X-Auth-Token`. */
+export function sessionCovers({ scheme }: { scheme?: Scheme }): boolean {
+  return scheme?.type === "apiKey" && scheme.in === "header" && scheme.name === "X-Auth-Token";
 }
 
 /** The live request sent as the connected member: the app's API, the key as X-Auth-Token. */

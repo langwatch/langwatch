@@ -97,8 +97,11 @@ stored.
   `https://app.langwatch.ai`), never from the current URL. A build without one shows
   only the pasted-key path.
 - The API answers CORS preflights for registered docs origins only, for the methods
-  the REST API uses and the `X-Auth-Token` and `Content-Type` headers, without
-  credentials. Same-origin docs need no CORS at all.
+  the REST API uses and the `X-Auth-Token`, `Authorization`, `Content-Type` and
+  `Idempotency-Key` headers (a pasted bearer key and the declared header parameter),
+  without credentials. Same-origin docs need no CORS at all.
+- The docs offer the session only on operations that take `X-Auth-Token`; an operation
+  on another scheme keeps the pasted key, so a project key never meets another door.
 
 ### Ownership and authorisation
 

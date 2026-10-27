@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { docsAppOrigin } from "../../../config.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { paramKey } from "../model/codegen.ts";
+import { sessionCovers } from "../model/docs-session.ts";
 import type { Operation, Parameter, Scheme } from "../model/operation.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { Panel } from "./panel.tsx";
@@ -145,7 +146,7 @@ function AuthField({
       }}
     >
       <summary>API key · {scheme.type === "apiKey" ? scheme.name : "Authorization"}</summary>
-      {docsAppOrigin ? <SessionControls /> : null}
+      {docsAppOrigin && sessionCovers({ scheme }) ? <SessionControls /> : null}
       <Flex gap="2" marginTop="1" data-docs-manual-key="">
         <Input
           id="pg-auth"

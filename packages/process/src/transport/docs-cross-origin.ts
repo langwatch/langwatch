@@ -7,7 +7,8 @@ import { TrpcHost } from "@langwatch/api/trpc";
 import type { MiddlewareHandler } from "hono";
 
 const ALLOWED_METHODS = "GET, POST, PUT, PATCH, DELETE";
-const ALLOWED_HEADERS = "X-Auth-Token, Content-Type";
+/* Authorization for the bearer schemes a pasted key uses; Idempotency-Key is a declared header. */
+const ALLOWED_HEADERS = "X-Auth-Token, Authorization, Content-Type, Idempotency-Key";
 const PREFLIGHT_MAX_AGE_SECONDS = "600";
 const SESSION_LANES = [TrpcHost.path, TrpcHost.streamPath, "/api/auth"] as const;
 

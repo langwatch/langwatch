@@ -27,7 +27,9 @@ describe("given a registered docs origin and an unregistered origin", () => {
 
     expect(answer.status).toBe(204);
     expect(answer.headers.get("access-control-allow-origin")).toBe(REGISTERED);
-    expect(answer.headers.get("access-control-allow-headers")).toBe("X-Auth-Token, Content-Type");
+    expect(answer.headers.get("access-control-allow-headers")).toBe(
+      "X-Auth-Token, Authorization, Content-Type, Idempotency-Key",
+    );
     expect(answer.headers.get("access-control-allow-methods")).toContain("DELETE");
     expect(answer.headers.get("access-control-allow-credentials")).toBeNull();
     expect(answer.headers.get("vary")).toContain("Origin");

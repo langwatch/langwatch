@@ -33,7 +33,9 @@ export function showSession({ note }: { note?: string } = {}) {
   const connectButton = part("connect");
   const disconnectButton = part("disconnect");
   const manual = document.querySelector<HTMLElement>("[data-docs-manual-key]");
-  if (connectButton) connectButton.hidden = Boolean(session);
+  /* A page whose endpoint the session cannot answer has no controls and keeps its key field. */
+  if (!connectButton) return;
+  connectButton.hidden = Boolean(session);
   if (disconnectButton) disconnectButton.hidden = !session;
   if (manual) manual.hidden = Boolean(session);
   if (!status) return;

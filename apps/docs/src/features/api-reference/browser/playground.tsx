@@ -4,7 +4,7 @@ import type { Root } from "react-dom/client";
 import { z } from "zod/mini";
 
 import { generateExample, liveRequest } from "../model/codegen.ts";
-import { connectedRequest } from "../model/docs-session.ts";
+import { connectedRequest, sessionCovers } from "../model/docs-session.ts";
 import { operationSchema } from "../model/operation-schema.ts";
 import type { Operation } from "../model/operation.ts";
 import { requestErrorOutcome } from "../model/playground-outcome.ts";
@@ -34,7 +34,7 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
   );
   const send = async () => {
     const state = requestState({ operation });
-    const session = currentSession();
+    const session = sessionCovers({ scheme: operation.schemes[0] }) ? currentSession() : null;
     const key = session ? session.token : fieldValue({ id: "pg-auth" });
     const errors = validateRequest({ operation, state, key });
     showErrors({ errors });

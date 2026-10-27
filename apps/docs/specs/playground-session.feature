@@ -62,3 +62,9 @@ Feature: Use my LangWatch account in the API playground
     When I connect the playground, choose a project and send a request
     Then the response comes from my project
     And signing out of the app makes the next request answer 401
+
+  @unit
+  Scenario: Offer the connection only where a project key answers
+    Given an endpoint that takes an admin or other bearer token, not X-Auth-Token
+    Then the playground offers no connection there and sends the pasted key
+    And an endpoint that takes X-Auth-Token offers the connection

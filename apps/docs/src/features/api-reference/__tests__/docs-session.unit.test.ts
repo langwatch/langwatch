@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { readBuildOptions } from "../../../paths.ts";
-import { connectedRequest, readConsentAnswer, resolveAppOrigin } from "../model/docs-session.ts";
+import {
+  connectedRequest,
+  readConsentAnswer,
+  resolveAppOrigin,
+  sessionCovers,
+} from "../model/docs-session.ts";
 import { operationSchema } from "../model/operation-schema.ts";
 
 const APP = "https://app.example.test";
@@ -104,5 +109,19 @@ describe("when the build names the app", () => {
     expect(() => readBuildOptions({ args: ["--app-origin", "app.example.test"] })).toThrow(
       /an app origin is self, none or an http\(s\) URL/,
     );
+  });
+});
+
+describe("which endpoints a docs session can answer", () => {
+  /** @scenario "Offer the connection only where a project key answers" */
+  it("answers X-Auth-Token endpoints only, never a bearer or another header", () => {
+    expect(
+      sessionCovers({ scheme: { id: "k", type: "apiKey", in: "header", name: "X-Auth-Token" } }),
+    ).toBe(true);
+    expect(sessionCovers({ scheme: { id: "admin", type: "http", scheme: "bearer" } })).toBe(false);
+    expect(
+      sessionCovers({ scheme: { id: "k", type: "apiKey", in: "header", name: "X-Other" } }),
+    ).toBe(false);
+    expect(sessionCovers({ scheme: undefined })).toBe(false);
   });
 });

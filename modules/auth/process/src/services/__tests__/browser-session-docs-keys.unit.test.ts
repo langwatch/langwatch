@@ -15,7 +15,7 @@ import { signInSecurityFixture } from "./sign-in-security.fixture.ts";
 
 const NOW = Temporal.Instant.from("2026-10-26T09:00:00.000Z");
 
-function world() {
+function world({ docsKeysDown = false }: { docsKeysDown?: boolean } = {}) {
   const now = (): Instant => NOW;
   const memory = MemoryAuthDatabase.create();
   const revoked: RevokeDocsSessionKeysInput[] = [];
@@ -34,6 +34,7 @@ function world() {
   const service = BrowserSessionService.create({
     docsKeys: {
       revokeDocsSessionKeys: async (input) => {
+        if (docsKeysDown) throw new Error("api-key unavailable");
         revoked.push(input);
         sessionsAtRevoke.push(memory.db.Session.map((session) => session.id));
         return { revoked: true as const };
@@ -47,7 +48,7 @@ function world() {
     now,
   });
 
-  return { service, revoked, sessionsAtRevoke };
+  return { service, revoked, sessionsAtRevoke, memory };
 }
 
 describe("given docs session keys minted by a browser session", () => {
@@ -83,5 +84,15 @@ describe("given docs session keys minted by a browser session", () => {
     expect(
       "browserSessionIds" in revoked[0]! ? [...revoked[0].browserSessionIds].toSorted() : [],
     ).toEqual(["session-1", "session-2", "session-3"]);
+  });
+
+  it("still ends every session when the docs keys cannot be revoked, then reports the failure", async () => {
+    const { service, memory } = world({ docsKeysDown: true });
+
+    await expect(service.revokeAllBrowserSessions({ userId: "sam" })).rejects.toThrow(
+      "api-key unavailable",
+    );
+
+    expect(memory.db.Session).toEqual([]);
   });
 });
