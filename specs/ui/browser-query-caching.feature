@@ -79,6 +79,16 @@ Feature: The browser caches a read in memory and mirrors it to disk by default
     When the user signs out
     Then every persisted query cache is removed and unrelated entries are kept
 
+  # An operator impersonating a customer reads the customer's data on the operator's device, so
+  # none of it is kept there: the operator's own mirror is wiped when the impersonation starts,
+  # and nothing the impersonated session reads reaches the disk.
+
+  @integration
+  Scenario: An impersonated session mirrors nothing and wipes the store
+    Given an operator's mirrored reads on this device
+    When they start impersonating a customer and the customer's reads land
+    Then every mirrored read is removed and nothing is written to the store
+
   # The mirror is sealed per session and the seal expires: every row on disk is AES-GCM under
   # the session's key for a seven-day epoch, which the session read hands over with last
   # epoch's key. A new session after expiry gets a new key, so its old mirror is refetched.
@@ -134,7 +144,8 @@ Feature: The browser caches a read in memory and mirrors it to disk by default
     When a persisted read is cached
     Then nothing is written to the store
 
-  # Each user's mirror is bounded: 25 MB, 500 rows, 2 MB a row, least recently read first out.
+  # Each user's mirror is bounded: 100 MB, 500 rows, 2 MB a row, least recently read first out.
+  # Room is made before a row is written, so a write never takes the mirror over its budget.
 
   @integration
   Scenario: Over budget, the least recently read row is evicted
@@ -153,6 +164,21 @@ Feature: The browser caches a read in memory and mirrors it to disk by default
     Given a read whose answer is larger than one row may be
     When it lands
     Then nothing is written, the smaller copy it replaces is removed, and it is logged once per path
+
+  # The browser's own limit can be reached before the mirror's: by a nearly full disk, or by
+  # everything else the site stores. A refused write sheds rows rather than going quiet.
+
+  @integration
+  Scenario: A write the browser refuses for space sheds the coldest half and retries once
+    Given a mirror holding rows and a browser whose storage for the site is full
+    When another read is mirrored
+    Then the least recently read half of the rows is removed and the write is tried once more
+
+  @integration
+  Scenario: A disk that stays full drops the row without breaking the page
+    Given a browser that refuses every write for space
+    When a read is mirrored
+    Then nothing is thrown and the row is not mirrored
 
   # A screen can say how old a restored read is and whether the network has confirmed it.
 

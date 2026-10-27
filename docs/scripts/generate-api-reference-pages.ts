@@ -81,6 +81,9 @@ const UNDOCUMENTED_CHECKUP =
 const UNDOCUMENTED_DASHBOARD_WIDGETS =
   "Live surface gated behind the release_dashboards and release_lwql_workbench feature flags, deliberately undocumented until release.";
 
+const UNDOCUMENTED_DASHBOARDS_API =
+  "Live surface gated behind the release_dashboards feature flag (it answers 404 while the flag is off for the key's project), deliberately undocumented until release.";
+
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
 
@@ -138,6 +141,10 @@ const SKIP_PATHS: Record<string, string> = {
     UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
     UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/dashboards": UNDOCUMENTED_DASHBOARDS_API,
+  "/api/v1/dashboards/{dashboardId}": UNDOCUMENTED_DASHBOARDS_API,
+  "/api/v1/dashboards/{dashboardId}/widgets": UNDOCUMENTED_DASHBOARDS_API,
+  "/api/v1/dashboards/{dashboardId}/widgets/{widgetId}": UNDOCUMENTED_DASHBOARDS_API,
   "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/session": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/validate": UNDOCUMENTED_APP_INTERNAL,
@@ -376,11 +383,11 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "List, run and archive the workflows you build in the LangWatch workflow editor, and update their name, icon and description.",
   },
   {
-    name: "Dashboards",
-    dirName: "dashboards",
-    pathPrefixes: ["/api/dashboards"],
+    name: "Reports",
+    dirName: "reports",
+    pathPrefixes: ["/api/analytics/reports"],
     overviewDescription:
-      "Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.",
+      "Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs.",
   },
   {
     name: "Graphs",

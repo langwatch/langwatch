@@ -19,7 +19,7 @@ langwatch.setup(
 
 @cl.on_chat_start
 async def on_chat_start():
-    model = ChatOpenAI(streaming=True)
+    model = ChatOpenAI(model="gpt-5-mini", streaming=True)
     prompt = ChatPromptTemplate.from_messages(
         [
             (

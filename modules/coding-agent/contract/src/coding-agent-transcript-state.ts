@@ -29,6 +29,8 @@ export type ClaimedToolCalls = Map<string, RenderedToolCall>;
 export interface SpanEntryAccumulator {
   entries: TranscriptEntry[];
   spanReplies: SpanReply[];
+  /** The prompts the model calls answered, kept only when no log event reported any. */
+  spanPrompts: TranscriptEntry[];
   totals: CodingAgentTranscript["totals"];
   subAgentToolCounts: Map<string, number>;
   claimedToolCalls: ClaimedToolCalls;
@@ -41,6 +43,7 @@ export function createSpanEntryAccumulator(): SpanEntryAccumulator {
   return {
     entries: [],
     spanReplies: [],
+    spanPrompts: [],
     totals: { modelCalls: 0, toolCalls: 0, tokens: 0, costUsd: 0 },
     subAgentToolCounts: new Map(),
     claimedToolCalls: new Map(),
