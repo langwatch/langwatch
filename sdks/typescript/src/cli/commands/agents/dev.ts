@@ -18,7 +18,8 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { type AuthProxy, startAuthProxy } from "./dev/auth-proxy";
-import { startQuickTunnel, type TunnelHandle } from "./dev/quick-tunnel";
+import type { TunnelHandle } from "./dev/cloudflared-process";
+import { startQuickTunnel } from "./dev/quick-tunnel";
 import {
   fail,
   rememberAgentForDirectory,

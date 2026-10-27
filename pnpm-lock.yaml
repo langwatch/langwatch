@@ -1319,9 +1319,6 @@ importers:
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
-      cloudflared:
-        specifier: 0.7.3
-        version: 0.7.3
       commander:
         specifier: ^15.0.0
         version: 15.0.0
@@ -6655,10 +6652,6 @@ packages:
   clone@2.1.2:
     resolution: {integrity: sha512-3Pe/CF1Nn94hyhIYpjtiLhdCoEoz0DqQ+988E9gmeEdQZlojxnOb74wctFyuwWQHzqyf9X7C7MG8juUpqBJT8w==}
     engines: {node: '>=0.8'}
-
-  cloudflared@0.7.3:
-    resolution: {integrity: sha512-dR4QMS4PbD287QqOV/vAoE1BcQCXphLOVrN9vjNUgkLrPDA5qxn9Dz0VId0P7/Czj4Mxu3hoLgbrVx5OtOWr5Q==}
-    hasBin: true
 
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
@@ -18208,8 +18201,6 @@ snapshots:
   clone@1.0.4: {}
 
   clone@2.1.2: {}
-
-  cloudflared@0.7.3: {}
 
   clsx@2.1.1: {}
 

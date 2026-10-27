@@ -4,45 +4,42 @@
  * quick tunnel for the local URL.
  */
 
+import * as os from "node:os";
+import * as path from "node:path";
 import { ensureCloudflaredBinary } from "./cloudflared-binary";
+import { launchQuickTunnel, type TunnelHandle } from "./cloudflared-process";
 
 /** How long to wait for the tunnel to report its public URL. */
 const TUNNEL_URL_TIMEOUT_MS = 30_000;
 
-/** The tunnel process surface the session needs, satisfied by cloudflared's Tunnel. */
-export interface TunnelHandle {
-  stop: () => void;
-  once(event: "url", listener: (url: string) => void): unknown;
-  once(event: "error", listener: (error: Error) => void): unknown;
-  once(
-    event: "exit",
-    listener: (code: number | null, signal: unknown) => void,
-  ): unknown;
+/**
+ * Where the CLI keeps the cloudflared binary it downloads and verifies: its
+ * own directory under ~/.langwatch, so the file is the CLI's to replace.
+ */
+function cloudflaredBinPath(): string {
+  const name = process.platform === "win32" ? "cloudflared.exe" : "cloudflared";
+  return path.join(os.homedir(), ".langwatch", "bin", name);
 }
 
 /**
- * Provision the Cloudflare quick tunnel via the `cloudflared` package, after
- * {@link ensureCloudflaredBinary} has put the pinned release on disk (with
- * the Cloudflare terms notice printed before any download) and verified it.
- * Resolves with the public URL and a handle to stop the tunnel; rejects when
- * no URL arrives within the timeout.
- *
- * The import is lazy on purpose: only tunnel-provisioning runs pay for it,
- * and `--tunnel-url` sessions never load it (CLI boot-graph rule).
+ * Provision the Cloudflare quick tunnel, after {@link ensureCloudflaredBinary}
+ * has put the pinned release on disk (with the Cloudflare terms notice printed
+ * before any download) and verified it. Resolves with the public URL and a
+ * handle to stop the tunnel; rejects when no URL arrives within the timeout.
  */
 export async function startQuickTunnel({
   localUrl,
 }: {
   localUrl: string;
 }): Promise<{ url: string; tunnel: TunnelHandle }> {
-  const cloudflared = await import("cloudflared");
+  const binPath = cloudflaredBinPath();
 
   // Every run, not only the first: a binary already on disk may come from an
-  // earlier release, another tool, or a tampered cache, and it must match the
-  // pinned digest before it runs.
-  await ensureCloudflaredBinary({ binPath: cloudflared.bin });
+  // earlier release or a tampered cache, and it must match the pinned digest
+  // before it runs.
+  await ensureCloudflaredBinary({ binPath });
 
-  const tunnel = cloudflared.Tunnel.quick(localUrl);
+  const tunnel = launchQuickTunnel({ binPath, localUrl });
   const url = await new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {
       tunnel.stop();

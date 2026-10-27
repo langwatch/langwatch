@@ -55,9 +55,10 @@ Feature: Agent dev tunnel
     Then the request is rejected as unauthorized
     And a request carrying the session secret reaches the local agent
 
-  # The tunnel runs a `cloudflared` binary the CLI downloads on first use. The
-  # CLI pins one reviewed release and its published SHA-256 digests, and
-  # never runs a binary it has not matched against them.
+  # The tunnel runs a `cloudflared` binary the CLI downloads into its own
+  # directory under ~/.langwatch. The CLI pins one reviewed release and its
+  # published SHA-256 digests, and never runs a binary it has not matched
+  # against them. Installing the SDK downloads nothing.
 
   Scenario: The tunnel binary is checked against the pinned release on every run
     Given a cloudflared binary from the pinned release is already on disk
@@ -89,11 +90,11 @@ Feature: Agent dev tunnel
     When a dev tunnel session starts
     Then the session fails without downloading or running anything
 
-  Scenario: A binary the developer chose themselves is never deleted
-    Given CLOUDFLARED_BIN points at a cloudflared binary outside the pinned release
-    When a dev tunnel session starts
-    Then the session fails and says to unset CLOUDFLARED_BIN or bring your own tunnel
-    And the developer's binary is left untouched
+  Scenario: The tunnel process never updates itself mid-session
+    Given a dev tunnel session running the verified binary
+    When the tunnel process starts
+    Then it is started with automatic updates turned off
+    And the public URL it reports is the one the session uses
 
   Scenario: A transport failure on a tunneled agent is named a dead dev tunnel
     Given a scenario run targeting an HTTP agent that carries the tunnel marker

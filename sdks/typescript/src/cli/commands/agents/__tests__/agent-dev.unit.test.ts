@@ -3,10 +3,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Binary verification has its own tests (cloudflared-binary.unit.test.ts);
-// these exercise the session flow, so the verifier is stubbed out. Running
-// it for real here would match the node executable the cloudflared mock
-// points at against the pinned digest, and remove it on the mismatch.
+// Binary verification and the tunnel process have their own tests
+// (cloudflared-binary, cloudflared-process); these exercise the session flow,
+// so both are stubbed out and nothing is downloaded or spawned.
 const ensureBinaryMock = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("../dev/cloudflared-binary", () => ({
   ensureCloudflaredBinary: ensureBinaryMock,
@@ -39,9 +38,8 @@ vi.mock("ora", () => ({
 
 const fakeTunnels: EventEmitter[] = [];
 const quickMock = vi.hoisted(() => vi.fn());
-vi.mock("cloudflared", () => ({
-  bin: process.execPath,
-  Tunnel: { quick: quickMock },
+vi.mock("../dev/cloudflared-process", () => ({
+  launchQuickTunnel: quickMock,
 }));
 
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";

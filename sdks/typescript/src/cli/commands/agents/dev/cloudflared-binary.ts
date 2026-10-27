@@ -3,9 +3,9 @@
  * the SHA-256 digests Cloudflare publishes, downloaded by this CLI and matched
  * against those digests before every run.
  *
- * The download is ours rather than the `cloudflared` package's `install()`,
- * because that one unpacks the macOS archive before anything checks it and
- * leaves a binary on disk that nothing ever replaces.
+ * The CLI owns the download, the file and the process (no `cloudflared` npm
+ * package): that package fetches whatever `latest` is at install time, for
+ * every SDK user, and unpacks the macOS archive before anything checks it.
  */
 
 import { execFileSync } from "node:child_process";
@@ -105,20 +105,17 @@ function fileMatches(filePath: string, expected: string): boolean {
  * downloading it when it is missing or from another release, and returns
  * once the file on disk has matched the pinned digest. Throws, without
  * running or leaving behind anything unverified, when the platform has no
- * pin, the download does not match, or `userChosen` (CLOUDFLARED_BIN) names
- * a binary of some other release: a file the developer picked is never
- * deleted.
+ * pin or the download does not match. `binPath` must be a file the CLI owns,
+ * since one that does not match is replaced.
  */
 export async function ensureCloudflaredBinary({
   binPath,
   platformKey = `${process.platform}-${process.arch}`,
-  userChosen = Boolean(process.env.CLOUDFLARED_BIN),
   pins = CLOUDFLARED_PINS,
   fetchAsset = fetchAssetOverHttps,
 }: {
   binPath: string;
   platformKey?: string;
-  userChosen?: boolean;
   pins?: Record<string, PinnedAsset>;
   fetchAsset?: FetchAsset;
 }): Promise<void> {
@@ -132,11 +129,6 @@ export async function ensureCloudflaredBinary({
   if (fileMatches(binPath, pin.sha256)) return;
 
   if (fs.existsSync(binPath)) {
-    if (userChosen) {
-      throw new Error(
-        `CLOUDFLARED_BIN points at ${binPath}, which is not the cloudflared ${CLOUDFLARED_RELEASE} release this CLI verifies. Unset CLOUDFLARED_BIN to use the verified release. ${BRING_YOUR_OWN}`,
-      );
-    }
     console.log(
       chalk.gray(
         `Replacing the cloudflared binary on disk, which is not release ${CLOUDFLARED_RELEASE}.`,

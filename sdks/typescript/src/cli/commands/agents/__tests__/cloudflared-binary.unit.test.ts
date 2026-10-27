@@ -78,7 +78,6 @@ describe("ensureCloudflaredBinary", () => {
       await ensureCloudflaredBinary({
         binPath,
         platformKey: "linux-x64",
-        userChosen: false,
         pins,
         fetchAsset,
       });
@@ -97,7 +96,6 @@ describe("ensureCloudflaredBinary", () => {
       await ensureCloudflaredBinary({
         binPath,
         platformKey: "linux-x64",
-        userChosen: false,
         pins,
         fetchAsset,
       });
@@ -116,7 +114,6 @@ describe("ensureCloudflaredBinary", () => {
       await ensureCloudflaredBinary({
         binPath,
         platformKey: "darwin-arm64",
-        userChosen: false,
         pins,
         fetchAsset: async () => archive,
       });
@@ -134,8 +131,7 @@ describe("ensureCloudflaredBinary", () => {
         ensureCloudflaredBinary({
           binPath,
           platformKey: "darwin-arm64",
-          userChosen: false,
-          pins,
+            pins,
           fetchAsset: async () => tampered,
         }),
       ).rejects.toThrow(/does not match the pinned/);
@@ -154,8 +150,7 @@ describe("ensureCloudflaredBinary", () => {
         ensureCloudflaredBinary({
           binPath,
           platformKey: "darwin-arm64",
-          userChosen: false,
-          pins: wrongBinaryPins,
+            pins: wrongBinaryPins,
           fetchAsset: async () => archive,
         }),
       ).rejects.toThrow(/does not match the pinned/);
@@ -170,8 +165,7 @@ describe("ensureCloudflaredBinary", () => {
         ensureCloudflaredBinary({
           binPath,
           platformKey: "linux-x64",
-          userChosen: false,
-          pins,
+            pins,
           fetchAsset: async () => OLD_BINARY,
         }),
       ).rejects.toThrow(/--tunnel-url/);
@@ -188,31 +182,10 @@ describe("ensureCloudflaredBinary", () => {
         ensureCloudflaredBinary({
           binPath,
           platformKey: "freebsd-x64",
-          userChosen: false,
-          pins,
+            pins,
           fetchAsset,
         }),
       ).rejects.toThrow(/No pinned cloudflared release for freebsd-x64/);
-      expect(fetchAsset).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when CLOUDFLARED_BIN names a binary of another release", () => {
-    /** @scenario "A binary the developer chose themselves is never deleted" */
-    it("refuses and leaves the developer's binary in place", async () => {
-      writeBin(OLD_BINARY);
-      const fetchAsset = vi.fn();
-
-      await expect(
-        ensureCloudflaredBinary({
-          binPath,
-          platformKey: "linux-x64",
-          userChosen: true,
-          pins,
-          fetchAsset,
-        }),
-      ).rejects.toThrow(/Unset CLOUDFLARED_BIN/);
-      expect(fs.readFileSync(binPath)).toEqual(OLD_BINARY);
       expect(fetchAsset).not.toHaveBeenCalled();
     });
   });
