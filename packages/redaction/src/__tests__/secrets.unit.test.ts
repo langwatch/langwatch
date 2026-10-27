@@ -1,3 +1,4 @@
+import { generate, Ksuid, KSUID_RESOURCES, Node } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -1104,11 +1105,35 @@ describe("detectSecretsInText", () => {
 });
 
 describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
-  const STORED_OBJECT_ID = "so_000000000002Ckax9GYtOrWQlpTOa";
+  // Minted the way the stored-object service mints them, so the fixtures
+  // follow the id format instead of freezing one.
+  const STORED_OBJECT_ID = generate(KSUID_RESOURCES.STORED_OBJECT).toString();
+  const DEV_STORED_OBJECT_ID = new Node("dev", undefined, (components) => new Ksuid(components))
+    .generate(KSUID_RESOURCES.STORED_OBJECT)
+    .toString();
+  const LEGACY_STORED_OBJECT_ID = "so_000000000002Ckax9GYtOrWQlpTOa";
 
   describe("given an /api/files reference whose project id has no allowlisted prefix", () => {
     it("keeps the URL intact instead of eating the path as one token", () => {
       const url = `/api/files/local-dev-project/${STORED_OBJECT_ID}`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+      expect(redactedCount).toBe(0);
+    });
+
+    it("keeps an env-prefixed id from a non-prod deployment intact", () => {
+      const url = `/api/files/local-dev-project/${DEV_STORED_OBJECT_ID}`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+      expect(redactedCount).toBe(0);
+    });
+
+    it("keeps a reference that names its file after the id intact", () => {
+      const url = `/api/files/local-dev-project/${STORED_OBJECT_ID}/photo.png`;
 
       const { text, redactedCount } = redactSecretsInText({ text: url });
 
@@ -1125,7 +1150,7 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
     });
   });
 
-  describe("given the production and legacy URL shapes", () => {
+  describe("given the production, id-only and legacy URL shapes", () => {
     it("keeps a project_-prefixed reference intact", () => {
       const url = `/api/files/project_awkQTIH4hwMYdL8KsHbo1/${STORED_OBJECT_ID}`;
 
@@ -1134,12 +1159,17 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
       expect(text).toBe(url);
     });
 
-    it("keeps a legacy id-only reference intact", () => {
-      // No path tail to exempt here — what protects the bare reference is
-      // the shape floor: stored-object ids are minted content-addressed with
-      // a FIXED zero timestamp (deriveStoredObjectId), so every real id
-      // leads with a long run of zeros and can never read as key material.
+    it("keeps an id-only reference intact", () => {
       const url = `/api/files/${STORED_OBJECT_ID}`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+      expect(redactedCount).toBe(0);
+    });
+
+    it("keeps a legacy so_ id imported from the old index intact", () => {
+      const url = `/api/files/local-dev-project/${LEGACY_STORED_OBJECT_ID}/photo.png`;
 
       const { text } = redactSecretsInText({ text: url });
 
@@ -1147,11 +1177,29 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
     });
   });
 
+  describe("given a key-shaped secret ahead of a stored-object reference", () => {
+    it("redacts it when the id is followed by a filename", () => {
+      const input = `creds acme_Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M/${STORED_OBJECT_ID}/photo.png here`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("redacts a key-shaped last segment the id does not vouch for", () => {
+      const input = `path local-dev-project/${STORED_OBJECT_ID}/Ke6Ng1Jd5Hf0Cu3Tb9Wm4Xp2Zr8Nq1 here`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Ke6Ng1Jd5Hf0Cu3Tb9Wm4Xp2Zr8Nq1");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   describe("given a bare so_-prefixed value that IS key-shaped", () => {
-    // `so` earns no global prefix exemption: two letters is the shape vendors
-    // mint keys in, and a real stored-object id never looks like this (leading
-    // zeros, low entropy). The tail exemption needs the LAST segment to BE a
-    // stored-object id — the prefix alone proves nothing.
+    // `so` earns no prefix exemption: two letters is the shape vendors mint
+    // keys in. Only a value matching a stored-object id IN FULL is exempt.
     it("redacts it like any other unknown-vendor key", () => {
       const input = "creds so_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0 here";
 
@@ -1165,8 +1213,7 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
       // The outer match spans the whole token, and declining it on the tail
       // prefix alone would consume the key-shaped value unredacted — a costume
       // the bare value cannot wear, so the path must not lend it one.
-      const input =
-        "path local-dev-project/so_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0 here";
+      const input = "path local-dev-project/so_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0 here";
 
       const { text, redactedCount } = redactSecretsInText({ text: input });
 
@@ -1189,7 +1236,7 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
   describe("given a credential followed by a record reference in one span", () => {
     // The record id says what the span points at, not what the earlier
     // segments carry. Exempting the whole span on the tail alone would hand
-    // any secret a costume: append `/so_<id>` and walk past the detector.
+    // any secret a costume: append `/<stored-object id>` and walk past.
     it("redacts the span whole — the reference does not launder the key ahead of it", () => {
       const input = `creds acme_Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M/${STORED_OBJECT_ID} here`;
 
@@ -1227,8 +1274,7 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
       // A `project_` tail must be a validated record-id shape, not any
       // high-entropy value wearing the prefix; else `/project_<secret>`
       // launders the key ahead of it just as a bare costume would.
-      const input =
-        "creds acme_Zx9Qm2Lp7Rt4Vw8s/project_Ke6Ng1Jd5Hf0Cu3Tb9Wm4Xp2Zr8Nq1 here";
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/project_Ke6Ng1Jd5Hf0Cu3Tb9Wm4Xp2Zr8Nq1 here";
 
       const { text, redactedCount } = redactSecretsInText({ text: input });
 
@@ -1261,10 +1307,9 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
     });
 
     it("still redacts a key whose last segment starts with so_ but is no stored-object id", () => {
-      // The `so_` twin of the `sha_` case: a 16-char head under the shape
-      // floor, a tail that borrows the prefix without the fixed-timestamp
-      // zeros every real id carries. The full 38-char body is key-shaped and
-      // that is the judgment that must stand.
+      // The `so_` twin of the `sha_` case: a sub-floor head and a tail that
+      // borrows the prefix without being a stored-object id. The full body
+      // is key-shaped and that judgment must stand.
       const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/so_Ke6Ng1Jd5Hf0Cu3Tb9 here";
 
       const { text, redactedCount } = redactSecretsInText({ text: input });
