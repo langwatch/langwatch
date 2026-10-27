@@ -26,10 +26,10 @@ model Account {
   userId            String
   type              String    @default("oauth")
   provider          String
-  /// WHO asserted `providerAccountId` — the other half of better-auth 1.7's
-  /// account key, which it looks up as `(issuer, accountId)`. Nullable only
-  /// so the column could be added to a populated table; every write path
-  /// supplies it and the migration backfilled every existing row.
+  /// WHO asserted `providerAccountId`. Better Auth keys accounts by
+  /// `(provider, providerAccountId)`; auth's account create hook writes this
+  /// (modules/auth/specs/account-issuer.feature). Nullable only so the column
+  /// could be added to a populated table; the migration backfilled every row.
   issuer            String?
   providerAccountId String
   refresh_token     String?   @db.Text
@@ -47,7 +47,7 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@index([userId])
-  // The pair better-auth 1.7 looks a row up by. NOT unique, on purpose: the
+  // The pair identity reads look a row up by. NOT unique, on purpose: the
   // uniqueness that matters is already enforced above, and every issuer here
   // is derived from `provider`, so this pair is unique exactly when that one
   // is. See migration 20260825030000.

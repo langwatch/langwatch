@@ -129,7 +129,6 @@ import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.re
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
-import { providerAccountIssuer } from "../rules/provider-account-issuer.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
@@ -1304,7 +1303,6 @@ function betterAuthCredentialAccounts(
       ).internalAdapter.linkAccount({
         userId,
         providerId: "credential",
-        issuer: providerAccountIssuer({ connectionIssuer: undefined, provider: "credential" }),
         accountId: userId,
         password: passwordHash,
       });

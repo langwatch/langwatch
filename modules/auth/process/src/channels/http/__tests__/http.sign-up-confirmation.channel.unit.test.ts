@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { releaseHandledRefusal } from "../http.better-auth.channel.ts";
+import { answeringReleasedRefusals, releaseHandledRefusal } from "../http.better-auth.channel.ts";
 import {
   signUpConfirmationPlugin,
   type SignUpAddressConfirmation,
@@ -60,7 +60,9 @@ function harness(answer: (token: string) => Confirmed) {
   });
   const host = new Hono();
   host.onError(createErrorHandler());
-  host.all("/api/auth/*", (context) => auth.handler(context.req.raw));
+  host.all("/api/auth/*", (context) =>
+    answeringReleasedRefusals(() => auth.handler(context.req.raw)),
+  );
 
   const post = (path: string, body: unknown) =>
     host.fetch(
