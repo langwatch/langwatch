@@ -82,6 +82,20 @@ describe("ensureCloudflaredBinary", () => {
       expect(fetchAsset).not.toHaveBeenCalled();
       expect(fs.readFileSync(binPath)).toEqual(PINNED_BINARY);
     });
+
+    it("restores the execute bit a copied cache lost", async () => {
+      writeBin(PINNED_BINARY);
+      fs.chmodSync(binPath, 0o644);
+
+      await ensureCloudflaredBinary({
+        binPath,
+        platformKey: "linux-x64",
+        pins,
+        fetchAsset: vi.fn(),
+      });
+
+      expect(fs.statSync(binPath).mode & 0o111).not.toBe(0);
+    });
   });
 
   describe("when a binary from another release is on disk", () => {
@@ -102,6 +116,8 @@ describe("ensureCloudflaredBinary", () => {
       );
       expect(fs.readFileSync(binPath)).toEqual(PINNED_BINARY);
       expect(fs.statSync(binPath).mode & 0o111).not.toBe(0);
+      // Written through a staged file, which is gone once renamed into place.
+      expect(fs.readdirSync(path.dirname(binPath))).toEqual(["cloudflared"]);
     });
   });
 
@@ -187,7 +203,7 @@ describe("ensureCloudflaredBinary", () => {
     });
   });
 
-  describe("the shipped pins", () => {
+  describe("given the shipped pins", () => {
     it("pin an archive digest for every platform that ships an archive", () => {
       for (const pin of Object.values(CLOUDFLARED_PINS)) {
         expect(pin.sha256).toMatch(/^[0-9a-f]{64}$/);

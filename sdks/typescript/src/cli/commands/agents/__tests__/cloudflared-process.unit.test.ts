@@ -9,9 +9,10 @@ import { launchQuickTunnel, type TunnelHandle } from "../tunnel/cloudflared-proc
 const TUNNEL_URL = "https://lively-otter.trycloudflare.com";
 
 /**
- * A stand-in for the cloudflared binary: records its arguments, logs the
- * quick-tunnel URL to stderr split across two writes the way a chunked pipe
- * can deliver it, then waits to be stopped.
+ * A stand-in for the cloudflared binary: records its arguments, logs a failed
+ * request to the quick-tunnel service (whose api.trycloudflare.com URL is not
+ * the tunnel), then the quick-tunnel URL split across two writes the way a
+ * chunked pipe can deliver it, then waits to be stopped.
  */
 function writeFakeCloudflared(dir: string): string {
   const binPath = path.join(dir, "cloudflared");
@@ -19,6 +20,7 @@ function writeFakeCloudflared(dir: string): string {
     binPath,
     `#!/bin/sh
 printf '%s\\n' "$@" > "${dir}/args"
+printf 'ERR failed to request quick Tunnel: Post "https://api.trycloudflare.com/tunnel"\\n' >&2
 printf 'INF |  https://lively-ot' >&2
 sleep 0.05
 printf 'ter.trycloudflare.com  |\\n' >&2

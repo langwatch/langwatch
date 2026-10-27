@@ -8,8 +8,12 @@ import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import * as readline from "node:readline";
 
-/** The hostname Cloudflare assigns a quick tunnel, as cloudflared logs it. */
-const QUICK_TUNNEL_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
+/**
+ * The hostname Cloudflare assigns a quick tunnel, as cloudflared logs it.
+ * `api.trycloudflare.com` is the service cloudflared asks for a tunnel, and
+ * it appears in the log when that request fails, so it is never the URL.
+ */
+const QUICK_TUNNEL_URL = /https:\/\/(?!api\.)[a-z0-9-]+\.trycloudflare\.com/;
 
 /** The tunnel process surface the session needs. */
 export interface TunnelHandle {
@@ -41,12 +45,12 @@ export function launchQuickTunnel({
     stdio: ["ignore", "pipe", "pipe"],
   });
 
-  let reported = false;
+  let hasReportedUrl = false;
   const onLine = (line: string) => {
-    if (reported) return;
+    if (hasReportedUrl) return;
     const match = QUICK_TUNNEL_URL.exec(line);
     if (match) {
-      reported = true;
+      hasReportedUrl = true;
       events.emit("url", match[0]);
     }
   };

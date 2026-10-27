@@ -78,17 +78,33 @@ export const CLOUDFLARED_PINS: Record<string, PinnedAsset> = {
 
 const BRING_YOUR_OWN = "You can also bring your own tunnel with --tunnel-url.";
 
+/**
+ * How long the whole download may take, body included: long enough for the
+ * ~40 MB asset on a slow link, short enough that a stalled connection fails
+ * instead of leaving the session spinning.
+ */
+const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
+
 /** Fetches one release asset's bytes. */
 export type FetchAsset = (url: string) => Promise<Buffer>;
 
 const fetchAssetOverHttps: FetchAsset = async (url) => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(
-      `Downloading cloudflared ${CLOUDFLARED_RELEASE} failed with HTTP ${response.status}. Check your network connection and try again. ${BRING_YOUR_OWN}`,
-    );
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+    if (!response.ok) {
+      throw new Error(
+        `Downloading cloudflared ${CLOUDFLARED_RELEASE} failed with HTTP ${response.status}. Check your network connection and try again. ${BRING_YOUR_OWN}`,
+      );
+    }
+    return Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new Error(
+        `Downloading cloudflared ${CLOUDFLARED_RELEASE} did not finish within ${DOWNLOAD_TIMEOUT_MS / 60_000} minutes. Check your network connection and try again. ${BRING_YOUR_OWN}`,
+      );
+    }
+    throw error;
   }
-  return Buffer.from(await response.arrayBuffer());
 };
 
 function sha256Of(bytes: Buffer): string {
@@ -125,7 +141,11 @@ export async function ensureCloudflaredBinary({
     );
   }
 
-  if (fileMatches(binPath, pin.sha256)) return;
+  if (fileMatches(binPath, pin.sha256)) {
+    // The bytes are right, but a copied or restored cache can lose the mode.
+    fs.chmodSync(binPath, 0o755);
+    return;
+  }
 
   if (fs.existsSync(binPath)) {
     console.log(
@@ -150,11 +170,14 @@ export async function ensureCloudflaredBinary({
     }
     unpackBinary({ archive: downloaded, binPath });
   } else {
-    // Checked in memory, so an unverified binary is never written.
+    // Checked in memory, so an unverified binary is never written. Staged and
+    // renamed so a second session never reads a half-written file.
     if (sha256Of(downloaded) !== pin.sha256) {
       throw mismatch();
     }
-    fs.writeFileSync(binPath, downloaded);
+    const staged = `${binPath}.${process.pid}.download`;
+    fs.writeFileSync(staged, downloaded);
+    fs.renameSync(staged, binPath);
   }
 
   if (!fileMatches(binPath, pin.sha256)) {
