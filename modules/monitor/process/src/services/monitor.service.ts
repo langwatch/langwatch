@@ -18,6 +18,7 @@ import {
   monitorReplicationInputSchema,
   monitorToggleInputSchema,
   monitorUpdateInputSchema,
+  enabledGuardrailMonitorSchema,
   type EnabledGuardrailMonitor,
   type Monitor,
   type MonitorCreateInput,
@@ -82,9 +83,49 @@ export class MonitorService {
   async listEnabledGuardrailMonitors(
     input: MonitorEnabledGuardrailInput,
   ): Promise<EnabledGuardrailMonitor[]> {
-    return this.options.repository.findEnabledGuardrails(
-      monitorEnabledGuardrailInputSchema.parse(input),
+    const parsed = monitorEnabledGuardrailInputSchema.parse(input);
+    const monitors = await this.options.repository.findEnabledGuardrails(parsed);
+    return Promise.all(
+      monitors.map((monitor) => this.guardrailAtLabel({ monitor, projectId: parsed.projectId })),
     );
+  }
+
+  /** A guardrail pinned to a label runs the evaluator's settings at it, or the latest when gone. */
+  private async guardrailAtLabel({
+    monitor,
+    projectId,
+  }: {
+    monitor: EnabledGuardrailMonitor;
+    projectId: string;
+  }): Promise<EnabledGuardrailMonitor> {
+    if (!monitor.evaluatorLabel) return monitor;
+    const latest = await this.options.evaluators.findById({ id: monitor.evaluatorId, projectId });
+    if (!latest) return monitor;
+    const evaluator = await this.options.evaluators.atLabelOrLatest({
+      evaluator: latest,
+      label: monitor.evaluatorLabel,
+    });
+    const { config } = evaluator;
+    const record =
+      config !== null && typeof config === "object" && !Array.isArray(config) ? config : null;
+    const parameters =
+      monitor.parameters !== null &&
+      typeof monitor.parameters === "object" &&
+      !Array.isArray(monitor.parameters)
+        ? monitor.parameters
+        : null;
+    const { settings } = resolveEvaluatorEffectiveSettings({
+      config: record,
+      parameters,
+      evaluatorRecordType: evaluator.type,
+      recoveryDisabled: await this.readRecoveryDisabled(),
+    });
+    return enabledGuardrailMonitorSchema.parse({
+      ...monitor,
+      checkType:
+        typeof record?.evaluatorType === "string" ? record.evaluatorType : monitor.checkType,
+      parameters: settings ?? monitor.parameters,
+    });
   }
 
   async getById(input: MonitorIdInput): Promise<MonitorWithEvaluator> {

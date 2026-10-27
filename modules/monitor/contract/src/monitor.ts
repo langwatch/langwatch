@@ -132,6 +132,8 @@ const enabledGuardrailMonitorSchemaDefinition = z
     evaluatorId: z.string().min(1),
     checkType: z.string().min(1),
     parameters: z.json(),
+    /** The evaluator's deploy label the guardrail runs; null runs the monitor's own settings. */
+    evaluatorLabel: z.string().nullish(),
   })
   .strict();
 export interface EnabledGuardrailMonitorSchema extends Named<

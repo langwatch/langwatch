@@ -129,6 +129,14 @@ Feature: Evaluator versions and deploy labels
     When the monitor is read for an evaluation
     Then its evaluator carries the latest settings
 
+  @unit
+  Scenario: A guardrail pinned to a label runs that evaluator version
+    Given a gateway guardrail monitor on an evaluator, pinned to the label "production"
+    And the evaluator's production settings differ from the monitor's own settings
+    When the gateway lists the enabled guardrail monitors
+    Then the monitor carries the production settings
+    And a guardrail monitor with no label carries its own settings
+
   # --- Backfill ---
 
   @unit
