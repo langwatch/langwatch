@@ -123,8 +123,7 @@ Feature: Coding-agent sessions
     Then they apply in the order the agent produced them
 
   # Claude Code logs both ends of every hook run. Only the completion says what
-  # the hook did, and nothing reads the start, so it costs no contribution.
-  @unit
+  # the hook did, so the start is dropped rather than paid for as a contribution.
   Scenario: a hook's start is not contributed, its completion is
     Given a Claude Code session whose hooks log their start and their completion
     When those log records are lifted into contributions
