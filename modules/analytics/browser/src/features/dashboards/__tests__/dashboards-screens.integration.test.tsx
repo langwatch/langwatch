@@ -122,6 +122,7 @@ describe("the Dashboards screens", () => {
         });
 
         expect(await screen.findByRole("heading", NOT_FOUND)).toBeInTheDocument();
+        expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
         expect(refused.container.innerHTML).toBe(flagOffPage);
       });
     });

@@ -8,15 +8,6 @@ import { Badge, HStack } from "@langwatch/design-system/primitives";
 import type { MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** The look of a legacy badge, shared by the interactive pill and its static placeholder. */
-export const LEGACY_BADGE_STYLE = {
-  variant: "subtle",
-  colorPalette: "red",
-  fontSize: "2xs",
-  paddingX: 1.5,
-  lineHeight: 1.2,
-} as const;
-
 /**
  * Flags a feature as legacy with an inline, dismissable explanation, so
  * we can steer toward the replacement without a hard cutover. A popover,
@@ -75,7 +66,11 @@ export function LegacyPill({
     >
       <PopoverAnchor asChild>
         <Badge
-          {...LEGACY_BADGE_STYLE}
+          variant="subtle"
+          colorPalette={"red"}
+          fontSize="2xs"
+          paddingX={1.5}
+          lineHeight={1.2}
           cursor="pointer"
           asChild
           aria-haspopup="dialog"
@@ -85,7 +80,10 @@ export function LegacyPill({
           onFocus={handleOpen}
           onBlur={handleClose}
           onClick={(e: MouseEvent) => {
+            // Pill renders inside SideMenuLink's <Link href>; preventDefault
+            // keeps the click a popover toggle rather than a navigation.
             e.stopPropagation();
+            e.preventDefault();
             setOpen((prev) => !prev);
           }}
         >

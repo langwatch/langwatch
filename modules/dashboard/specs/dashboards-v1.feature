@@ -34,7 +34,7 @@ Feature: Dashboards v1
     And the sidebar shows nothing else besides Quick Search
 
   # Switch-over: where Dashboards opens, the Analytics entry leads to Dashboards and the
-  # legacy pages stay at /[project]/analytics, unchanged, with a banner pointing back (AC20).
+  # legacy pages stay at /[project]/analytics, with a banner pointing to Dashboards (AC20).
   @integration
   Scenario: AC3b The Analytics entry opens Dashboards when the project can reach them
     Given the member holds analytics:view
@@ -42,7 +42,6 @@ Feature: Dashboards v1
     When the member looks at the LLM Ops sidebar
     Then the Analytics entry opens /[project]/dashboards
     And it carries no Legacy pill
-    And it is marked active on the Dashboards pages
 
   @integration
   Scenario: AC3h The Analytics entry opens analytics when Dashboards is out of reach
@@ -94,11 +93,10 @@ Feature: Dashboards v1
     Then a warning banner at the top says it is the legacy view
 
   @integration
-  Scenario: AC3g A legacy Analytics entry that cannot open is still announced as legacy
-    Given the Analytics entry is marked legacy
-    And the entry cannot open yet
-    When a screen reader reads the sidebar
-    Then the entry is named "Analytics (Legacy)"
+  Scenario: AC3k The Analytics entry waits for the Dashboards answer
+    Given the release_dashboards flag is still loading
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry is not shown yet
 
   # ---------------------------------------------------------------------------
   # Agent Flight Deck
@@ -250,11 +248,12 @@ Feature: Dashboards v1
     And no request goes to a legacy analytics endpoint
 
   # AC20 "legacy analytics files are untouched" is a merge-time diff check, not a test.
+  # The one change allowed is the legacy banner on those pages (AC3c to AC3f).
   @integration
   Scenario: AC20 Legacy analytics pages behave exactly as before
     Given the change is merged
     When a member opens the legacy analytics pages
-    Then they behave exactly as they did before the change
+    Then they behave exactly as they did before the change, apart from the legacy banner (AC3c to AC3f)
 
   @integration
   Scenario: AC21 A member without analytics:view is refused
@@ -382,7 +381,7 @@ Feature: Dashboards v1
   # AC 17: "Langy insights on a block" (withdrawn: a widget's result lives in its sandboxed frame; no scenario until it can be read)
   # AC 18: "Every Project board is visible to every project member" (changed by langwatch/tasks#911; scope added on 2026-10-09, dashboards-v2.feature AC170-186) -> Scenario: AC18 Every Project board is visible to every member of the project; Scenario: AC18 Blocks on a Project board are reachable to every member; Scenario: AC18 Saved charts on a Project board are reachable to every member
   # AC 19: "LWQL only" → Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
-  # AC 20: "Legacy analytics untouched" → Scenario: AC20 Legacy analytics pages behave exactly as before (the "files are untouched" half is a merge-time diff check, see the note above the scenario)
+  # AC 20: "Legacy analytics untouched except for the legacy banner" → Scenario: AC20 Legacy analytics pages behave exactly as before (the "files are untouched" half is a merge-time diff check, see the note above the scenario)
   # AC 21: "Permissions" (sharpened) → Scenario: AC21 A member without analytics:view is refused; Scenario: AC21 A refused member sees the same not-found page
   # AC 22: "Gateway routing and coding agents ship in the state their data supports" → Scenario: AC22 An unqueryable source ships as a call to action; Scenario: AC22 A queryable source follows the normal widget rules
   # AC 23: "A failing query does not take the board down" → Scenario: AC23 A failing query does not take the board down

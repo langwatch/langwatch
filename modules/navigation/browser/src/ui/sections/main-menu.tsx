@@ -50,7 +50,7 @@ export const MainMenuSections = function MainMenuSections({
     { enabled: !!project?.id && navigation.test },
   );
   const codingAgentLinks = useCodingAgentLinks();
-  const { reachableProducts } = useReachableProducts();
+  const { reachableProducts, isLoading: productsLoading } = useReachableProducts();
 
   const sectionProps = { showExpanded, project, pathname };
 
@@ -73,6 +73,7 @@ export const MainMenuSections = function MainMenuSections({
         codingAgentLinks={codingAgentLinks}
         showAnalytics={navigation.analytics}
         analyticsLeadsToDashboards={reachableProducts.includes("dashboards")}
+        analyticsSettled={!productsLoading}
         showOnlineEvaluations={navigation.onlineEvaluations}
       />
       {navigation.test && (
@@ -119,16 +120,19 @@ function ObserveSection({
   codingAgentLinks,
   showAnalytics,
   analyticsLeadsToDashboards,
+  analyticsSettled,
   showOnlineEvaluations,
 }: ProjectSectionProps & {
   codingAgentLinks: CodingAgentLinks;
   showAnalytics: boolean;
   analyticsLeadsToDashboards: boolean;
+  /** False while the flag answers: the entry waits, so its address never flips under a click. */
+  analyticsSettled: boolean;
   showOnlineEvaluations: boolean;
 }) {
   return (
     <SidebarSection id="observe" label="Observe" showExpanded={showExpanded}>
-      {showAnalytics && (
+      {showAnalytics && analyticsSettled && (
         <PageMenuLink
           path={
             analyticsLeadsToDashboards
@@ -138,10 +142,7 @@ function ObserveSection({
           icon={featureIcons.analytics.icon}
           label={projectNavItems.analytics.title}
           project={project}
-          isActive={
-            pathname.includes("/analytics") ||
-            (analyticsLeadsToDashboards && pathname.includes("/dashboards"))
-          }
+          isActive={pathname.includes("/analytics")}
           showLabel={showExpanded}
         />
       )}

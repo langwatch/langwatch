@@ -22,6 +22,7 @@ import { type CuratedBoard, curatedBoardById } from "../../model/curated-boards.
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
+import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { CuratedWidgetsGrid } from "./curated-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
@@ -98,7 +99,12 @@ function Curated() {
   const templateId = useAnalyticsHost().route().params.templateId ?? "";
   const board = curatedBoardById(templateId);
   if (!board) return <UiPageNotFound />;
-  return <OpenCuratedBoard key={board.templateId} board={board} />;
+  return (
+    <>
+      <OldAnalyticsBanner />
+      <OpenCuratedBoard key={board.templateId} board={board} />
+    </>
+  );
 }
 
 export default function CuratedBoardScreen() {

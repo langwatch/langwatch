@@ -67,11 +67,13 @@ function renderSidebar({
   pathname,
   permissions = ["analytics:view"],
   dashboardsFlag = true,
+  dashboardsLoading = false,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "settings";
   pathname: string;
   permissions?: string[];
   dashboardsFlag?: boolean;
+  dashboardsLoading?: boolean;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
@@ -80,7 +82,7 @@ function renderSidebar({
         project: PROJECT,
         pathname,
         permissions,
-        flags: { release_dashboards: { enabled: dashboardsFlag, isLoading: false } },
+        flags: { release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading } },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
       }}
     >
@@ -135,7 +137,7 @@ describe("the LLM Ops sidebar", () => {
     it("carries no Dashboards entry and no saved-dashboards list", () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo" });
 
-      expect(screen.getByRole("link", { name: /^Analytics/ })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Analytics" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Dashboards" })).toBeNull();
       expect(screen.queryByTestId("saved-dashboards")).toBeNull();
     });
@@ -151,14 +153,11 @@ describe("the LLM Ops sidebar", () => {
       expect(within(link).queryByText("Legacy")).toBeNull();
     });
 
-    /** @scenario "AC3b The Analytics entry opens Dashboards when the project can reach them" */
-    it("is marked active on the Dashboards pages", () => {
-      renderSidebar({ surface: "llm-ops", pathname: "/demo/dashboards/agent-flight-deck" });
+    /** @scenario "AC3k The Analytics entry waits for the Dashboards answer" */
+    it("shows no Analytics entry while the flag is still loading", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", dashboardsLoading: true });
 
-      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
-        "aria-current",
-        "page",
-      );
+      expect(screen.queryByRole("link", { name: "Analytics" })).toBeNull();
     });
 
     /** @scenario "AC3h The Analytics entry opens analytics when Dashboards is out of reach" */

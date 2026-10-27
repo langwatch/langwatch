@@ -1,7 +1,7 @@
 /**
  * Points a Dashboards page back to the legacy Analytics pages, which the Analytics menu
- * entry no longer opens (dashboards-v1.feature AC3i). The gate shows it only where
- * Dashboards opens, which needs analytics:view.
+ * entry no longer opens (dashboards-v1.feature AC3i). Each screen renders it once it is
+ * past the gate and its own refusals, so a refused member never sees it (AC21).
  */
 
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
