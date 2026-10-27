@@ -10,6 +10,7 @@ metadata:
 
 import CliInstall from "../../_shared/cli-install.mdx";
 import ImprovingTheAgent from "../../_shared/improving-the-agent.mdx";
+import RedTeamSetup from "../../_shared/red-team-setup.mdx";
 
 # Cover the OWASP Top 10 for LLM Apps
 
@@ -56,20 +57,7 @@ Show the user this plan in a few lines, with what you found in Step 1 per catego
 
 ## Step 3: Set Up Scenario
 
-Read the red-teaming docs. Do NOT guess the `RedTeamAgent` API:
-
-```bash
-langwatch scenario-docs advanced/red-teaming
-```
-
-Install the test dependencies with the project's package manager:
-
-- Python: `langwatch-scenario`, `pytest`, `pytest-asyncio`.
-- TypeScript: `@langwatch/scenario`, `vitest`, and the AI SDK provider for the attacker model (for example `@ai-sdk/openai`).
-
-The attacker and the judge need a model key in the environment (for example `OPENAI_API_KEY`). Ask the user for it when it is missing; never hardcode it.
-
-With `langwatch-scenario` 1.6.0 or older (Python): pin `litellm<1.106` (litellm 1.106 makes the judge fail with `No module named 'mcp'`), and add `litellm.drop_params = True` at the top of the test file when the attacker is a reasoning model (gpt-5 family, o-series), which refuses the attacker's fixed temperature.
+<RedTeamSetup />
 
 ## Step 4: Write the Tests
 
