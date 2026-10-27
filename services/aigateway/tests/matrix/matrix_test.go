@@ -182,7 +182,8 @@ func chatBody_ToolCalling(model string) []byte {
 }
 
 // chatBody_StructuredOutputs asks for a strict json_schema: json_object has
-// no enforcing mode on Bedrock, so the gateway refuses it there by design.
+// no enforcing mode on the Anthropic and Bedrock lanes, so the gateway
+// refuses it there by design.
 func chatBody_StructuredOutputs(model string) []byte {
 	return mustJSON(map[string]any{
 		"model": model,
