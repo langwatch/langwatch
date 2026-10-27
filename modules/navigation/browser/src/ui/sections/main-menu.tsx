@@ -11,11 +11,11 @@ import React from "react";
 
 import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
+import { useAnalyticsEntry } from "../../behavior/use-analytics-entry.ts";
 import {
   type CodingAgentLinks,
   useCodingAgentLinks,
 } from "../../behavior/use-coding-agent-links.ts";
-import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
 import {
   isExperimentsActivePath,
@@ -50,9 +50,7 @@ export const MainMenuSections = function MainMenuSections({
     { enabled: !!project?.id && navigation.test },
   );
   const codingAgentLinks = useCodingAgentLinks();
-  const { reachableProducts } = useReachableProducts();
-  // Only this flag decides where the entry leads; other loads must not hold it.
-  const dashboardsFlagLoading = host.featureFlag(FrontendFlags.release_dashboards).isLoading;
+  const analyticsEntry = useAnalyticsEntry();
 
   const sectionProps = { showExpanded, project, pathname };
 
@@ -74,8 +72,7 @@ export const MainMenuSections = function MainMenuSections({
         {...sectionProps}
         codingAgentLinks={codingAgentLinks}
         showAnalytics={navigation.analytics}
-        analyticsLeadsToDashboards={reachableProducts.includes("dashboards")}
-        analyticsSettled={!dashboardsFlagLoading}
+        analyticsEntry={analyticsEntry}
         showOnlineEvaluations={navigation.onlineEvaluations}
       />
       {navigation.test && (
@@ -121,31 +118,24 @@ function ObserveSection({
   pathname,
   codingAgentLinks,
   showAnalytics,
-  analyticsLeadsToDashboards,
-  analyticsSettled,
+  analyticsEntry,
   showOnlineEvaluations,
 }: ProjectSectionProps & {
   codingAgentLinks: CodingAgentLinks;
   showAnalytics: boolean;
-  analyticsLeadsToDashboards: boolean;
-  /** False while the flag answers: the entry waits, so its address never flips under a click. */
-  analyticsSettled: boolean;
+  analyticsEntry: ReturnType<typeof useAnalyticsEntry>;
   showOnlineEvaluations: boolean;
 }) {
   return (
     <SidebarSection id="observe" label="Observe" showExpanded={showExpanded}>
-      {showAnalytics && analyticsSettled && (
+      {showAnalytics && analyticsEntry.isSettled && (
         <PageMenuLink
-          path={
-            analyticsLeadsToDashboards
-              ? projectNavItems.dashboards.path
-              : projectNavItems.analytics.path
-          }
+          path={analyticsEntry.path}
           icon={featureIcons.analytics.icon}
           label={projectNavItems.analytics.title}
           project={project}
           // Dashboards draws its own sidebar: an entry leading there is never active on /analytics.
-          isActive={!analyticsLeadsToDashboards && pathname.includes("/analytics")}
+          isActive={!analyticsEntry.leadsToDashboards && pathname.includes("/analytics")}
           showLabel={showExpanded}
         />
       )}

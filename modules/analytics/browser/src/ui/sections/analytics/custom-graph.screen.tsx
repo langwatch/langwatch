@@ -367,7 +367,6 @@ function AnalyticsCustomGraphContent({
 
   return (
     <SavedViewsScope>
-      <LegacyAnalyticsBanner />
       <PageLayout.Header>
         <PageLayout.Heading>Custom graph</PageLayout.Heading>
         <Spacer />
@@ -1546,7 +1545,7 @@ function GraphTypeField({ form }: { form: ReturnType<typeof useForm<CustomGraphF
  * The chart builder, at both of its addresses. ONE SCREEN, TWO KEYS, AND THE MODE ARRIVES AS A
  * PROP.
  */
-function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
+function CustomGraphScreenBody({ mode }: { mode: CustomGraphScreenMode }) {
   const host = useAnalyticsHost();
   const graphId = host.route().params.id;
   const projectId = host.project()?.id ?? "";
@@ -1560,7 +1559,6 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   if (stored.error) {
     return (
       <>
-        <LegacyAnalyticsBanner />
         <PageLayout.Header>
           <PageLayout.Heading>Graph not found</PageLayout.Heading>
         </PageLayout.Header>
@@ -1580,12 +1578,7 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   if (!stored.data?.graph) return null;
   const graph = customGraphInputSchema.safeParse(stored.data.graph);
   if (!graph.success) {
-    return (
-      <>
-        <LegacyAnalyticsBanner />
-        <Box padding={8}>This chart was saved in a shape the chart builder cannot open.</Box>
-      </>
-    );
+    return <Box padding={8}>This chart was saved in a shape the chart builder cannot open.</Box>;
   }
 
   const alert = formAlertOf(stored.data?.alert);
@@ -1605,6 +1598,16 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
         : {})}
       {...(alert ? { alert } : {})}
     />
+  );
+}
+
+/** The banner sits above every state, loading included, so no branch carries its own copy. */
+function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
+  return (
+    <>
+      <LegacyAnalyticsBanner />
+      <CustomGraphScreenBody mode={mode} />
+    </>
   );
 }
 

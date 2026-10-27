@@ -69,6 +69,7 @@ function renderSidebar({
   dashboardsFlag = true,
   dashboardsLoading = false,
   organizationLoading = false,
+  kind,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "settings";
   pathname: string;
@@ -76,12 +77,13 @@ function renderSidebar({
   dashboardsFlag?: boolean;
   dashboardsLoading?: boolean;
   organizationLoading?: boolean;
+  kind?: string;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
-        project: PROJECT,
+        project: kind ? { ...PROJECT, kind } : PROJECT,
         pathname,
         permissions,
         isLoading: organizationLoading,
@@ -163,14 +165,37 @@ describe("the LLM Ops sidebar", () => {
       expect(screen.queryByRole("link", { name: "Analytics" })).toBeNull();
     });
 
-    /** @scenario "AC3k The Analytics entry waits for the Dashboards answer" */
-    it("waits for the flag alone, not for the organization to load", () => {
+    /** @scenario "AC3p The Analytics entry waits for the permission read as well" */
+    it("shows no Analytics entry while the grant is still being read", () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo", organizationLoading: true });
 
-      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
-        "href",
-        "/demo/dashboards",
-      );
+      expect(screen.queryByRole("link", { name: "Analytics" })).toBeNull();
+    });
+
+    /** @scenario "AC3p The Analytics entry waits for the permission read as well" */
+    it("never shows the analytics address on a project switch before the grant settles", () => {
+      const view = renderSidebar({
+        surface: "llm-ops",
+        pathname: "/demo",
+        permissions: [],
+        organizationLoading: true,
+      });
+      const seen = () =>
+        screen.queryByRole("link", { name: "Analytics" })?.getAttribute("href") ?? null;
+      expect(seen()).toBeNull();
+
+      view.unmount();
+      renderSidebar({ surface: "llm-ops", pathname: "/demo" });
+      expect(seen()).toBe("/demo/dashboards");
+    });
+
+    /** @scenario "AC3q An aggregate project keeps the Analytics entry on analytics" */
+    it("keeps an aggregate project on analytics even when Dashboards is reachable", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo/analytics", kind: "aggregate" });
+
+      const link = screen.getByRole("link", { name: "Analytics" });
+      expect(link).toHaveAttribute("href", "/demo/analytics");
+      expect(link).toHaveAttribute("aria-current", "page");
     });
 
     /** @scenario "AC3m The Analytics entry is not marked active on a legacy analytics page when it leads to Dashboards" */

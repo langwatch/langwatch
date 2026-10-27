@@ -127,6 +127,35 @@ Feature: Dashboards v1
     When the member opens that graph
     Then a warning banner at the top says it is the legacy view
 
+  @integration
+  Scenario: AC3p The Analytics entry waits for the permission read as well
+    Given the release_dashboards flag is on for the project
+    And the member's permissions are still being read
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry is not shown yet
+    And once they are read the entry opens /[project]/dashboards
+
+  @integration
+  Scenario: AC3q An aggregate project keeps the Analytics entry on analytics
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    And the project is an aggregate project
+    When the member looks at the LLM Ops sidebar
+    Then the Analytics entry opens /[project]/analytics
+    And a legacy analytics page shows no legacy banner
+
+  @integration
+  Scenario: AC3r Quick Search opens the same Analytics destination as the sidebar
+    Given the member searches for "analytics" in Quick Search
+    Then the Analytics page opens where the sidebar Analytics entry would
+
+  @integration
+  Scenario: AC3s The Dashboards pages show no old-Analytics banner to a member without analytics:view
+    Given the release_dashboards flag is on for the project
+    And the member lacks analytics:view
+    When the member opens a Dashboards page
+    Then no old-Analytics banner shows
+
   # ---------------------------------------------------------------------------
   # Agent Flight Deck
   # ---------------------------------------------------------------------------

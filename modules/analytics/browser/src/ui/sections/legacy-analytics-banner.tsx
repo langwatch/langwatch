@@ -4,24 +4,27 @@
  */
 
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import {
   DASHBOARDS_FLAG,
   DASHBOARDS_PERMISSION,
   dashboardsAccess,
-} from "../../features/dashboards/model/dashboards-access.ts";
-import { useAnalyticsHost } from "../../model/analytics-host.ts";
+} from "../../model/dashboards-access.ts";
 import { Link } from "../elements/analytics-link.tsx";
 
 export function LegacyAnalyticsBanner() {
   const host = useAnalyticsHost();
-  const slug = host.project()?.slug;
+  const project = host.project();
+  const slug = project?.slug;
   const access = dashboardsAccess({
     flag: host.featureFlag(DASHBOARDS_FLAG),
     isSettled: host.isSettled(),
     canView: host.hasPermission(DASHBOARDS_PERMISSION),
   });
-  if (!slug || access !== "open") return null;
+  // Aggregate projects have no Dashboards, so there is nothing to offer.
+  if (!slug || access !== "open" || isAggregateProjectKind(project?.kind)) return null;
 
   return (
     <Banner

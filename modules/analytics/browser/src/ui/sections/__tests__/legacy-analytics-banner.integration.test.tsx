@@ -53,4 +53,24 @@ describe("given the legacy analytics page", () => {
       expect(screen.queryByTestId("legacy-analytics-banner")).toBeNull();
     });
   });
+
+  describe("when the project is an aggregate", () => {
+    /** @scenario "AC3q An aggregate project keeps the Analytics entry on analytics" */
+    it("shows no banner, as aggregates have no Dashboards", () => {
+      render(
+        <AnalyticsTestHarness
+          host={
+            new StubAnalyticsHost({
+              project: { ...PROJECT, kind: "aggregate" },
+              flags: { release_dashboards: true },
+            })
+          }
+        >
+          <LegacyAnalyticsBanner />
+        </AnalyticsTestHarness>,
+      );
+
+      expect(screen.queryByTestId("legacy-analytics-banner")).toBeNull();
+    });
+  });
 });
