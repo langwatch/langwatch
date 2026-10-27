@@ -41,3 +41,31 @@ export const evaluationLifecycleCompletedEventDataSchema: EvaluationLifecycleCom
 export type EvaluationLifecycleCompletedEventData = z.infer<
   typeof evaluationLifecycleCompletedEventDataSchema
 >;
+
+export const EVALUATION_MONITOR_ERROR_RATE_EXCEEDED_EVENT_TYPE =
+  "lw.evaluation.monitor_error_rate_exceeded" as const;
+
+/**
+ * Most of an on-message monitor's runs in the last hour settled as an error; recorded once per
+ * revision of the monitor (`monitorRevision` is its `updatedAt` in epoch milliseconds).
+ */
+const evaluationMonitorErrorRateExceededEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  projectId: z.string().min(1),
+  monitorId: z.string().min(1),
+  monitorRevision: z.number().int().nonnegative(),
+  windowMs: z.number().int().positive(),
+  runs: z.number().int().positive(),
+  errors: z.number().int().nonnegative(),
+  /** The most common error message, shortened and with secrets redacted. */
+  topError: z.string().nullable(),
+});
+export interface EvaluationMonitorErrorRateExceededEventDataSchema extends Named<
+  typeof evaluationMonitorErrorRateExceededEventDataSchemaDefinition
+> {}
+export const evaluationMonitorErrorRateExceededEventDataSchema: EvaluationMonitorErrorRateExceededEventDataSchema =
+  evaluationMonitorErrorRateExceededEventDataSchemaDefinition;
+export type EvaluationMonitorErrorRateExceededEventData = z.infer<
+  typeof evaluationMonitorErrorRateExceededEventDataSchema
+>;

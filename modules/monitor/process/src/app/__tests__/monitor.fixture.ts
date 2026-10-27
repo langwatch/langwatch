@@ -11,8 +11,11 @@ import {
   type EvaluatorApi,
 } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
@@ -127,6 +130,9 @@ export function createMonitorTestApp(
     recoverySwitch?: FakeRecoverySwitch;
     replication?: FakeMonitorReplication;
     publicBaseUrl?: string;
+    projects?: ProjectApi;
+    users?: UserApi;
+    notifications?: NotificationService;
   }> = {},
 ): MonitorModule {
   const evaluators = input.evaluators ?? new FakeMonitorEvaluators();
@@ -152,6 +158,9 @@ export function createMonitorTestApp(
       workflows: createApiFixture<WorkflowApi>({
         deleteUncommitted: (reference) => replication.deleteUncommitted(reference),
       }),
+      projects: input.projects ?? createApiFixture<ProjectApi>(),
+      users: input.users ?? createApiFixture<UserApi>(),
+      notifications: input.notifications ?? createApiFixture<NotificationService>(),
     },
     resources: new ResourceScope(),
     secrets: createApiFixture<MonitorTestSetup["secrets"]>(),

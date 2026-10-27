@@ -43,6 +43,8 @@ export const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
   API_KEY_PEPPER: "synthetic-api-key-pepper",
   LW_VIRTUAL_KEY_PEPPER: "synthetic-virtual-key-pepper",
   CREDENTIALS_SECRET: "0".repeat(64),
+  // Live suites give each test its own X-Forwarded-For address; tests reach the api over loopback.
+  TRUSTED_PROXY_ADDRESSES: "127.0.0.1,::1",
 };
 
 /** A port the kernel just handed out, free again for the api to bind. */
