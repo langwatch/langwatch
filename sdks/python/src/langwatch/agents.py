@@ -52,6 +52,18 @@ def _raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
     raise RuntimeError(f"Unexpected status {status}: {detail}")
 
 
+def _version_params(
+    *, label: Optional[str], version: Optional[int]
+) -> Dict[str, Any]:
+    """The label and version query parameters; neither reads the latest."""
+    params: Dict[str, Any] = {}
+    if label is not None:
+        params["label"] = label
+    if version is not None:
+        params["version"] = version
+    return params
+
+
 def _quote(value: str) -> str:
     """URL-quote a path segment."""
     return urllib.parse.quote(value, safe="")
@@ -107,17 +119,28 @@ class AgentsFacade:
         _raise_for_status(response, operation="list")
         return response.json()
 
-    def get(self, agent_id: str) -> Dict[str, Any]:
+    def get(
+        self,
+        agent_id: str,
+        *,
+        label: Optional[str] = None,
+        version: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """
-        Retrieve a single agent by ID.
+        Retrieve a single agent by ID, at the latest version unless a label or a version is given.
 
         Args:
-            agent_id: The agent ID.
+            agent_id: The agent ID. Also takes a suffix: "agent_1:production" or "agent_1:3".
+            label: A deploy label, such as "production", to read the version it points at.
+            version: A version number to read.
 
         Returns:
             Dictionary containing the agent data.
         """
-        response = self._http().get(f"/api/v1/agents/{_quote(agent_id)}")
+        response = self._http().get(
+            f"/api/v1/agents/{_quote(agent_id)}",
+            params=_version_params(label=label, version=version),
+        )
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -180,4 +203,32 @@ class AgentsFacade:
         """
         response = self._http().delete(f"/api/v1/agents/{_quote(agent_id)}")
         _raise_for_status(response, operation="delete")
+        return response.json()
+
+    def list_versions(self, agent_id: str) -> Dict[str, Any]:
+        """
+        List an agent's versions, newest first, with the deploy labels on each.
+
+        Returns:
+            Dictionary with a 'data' list of versions and the 'labels' with their versions.
+        """
+        response = self._http().get(f"/api/v1/agents/{_quote(agent_id)}/versions")
+        _raise_for_status(response, operation="list versions")
+        return response.json()
+
+    def assign_label(self, agent_id: str, label: str, version: int) -> Dict[str, Any]:
+        """Point a deploy label, such as "production", at one of the agent's versions."""
+        response = self._http().put(
+            f"/api/v1/agents/{_quote(agent_id)}/labels/{_quote(label)}",
+            json={"version": version},
+        )
+        _raise_for_status(response, operation="assign label")
+        return response.json()
+
+    def remove_label(self, agent_id: str, label: str) -> Dict[str, Any]:
+        """Remove a deploy label from the agent."""
+        response = self._http().delete(
+            f"/api/v1/agents/{_quote(agent_id)}/labels/{_quote(label)}"
+        )
+        _raise_for_status(response, operation="remove label")
         return response.json()

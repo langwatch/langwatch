@@ -1495,17 +1495,55 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("get <idSlugOrName>")
-      .description("Get evaluator details by ID, slug or display name")
+      .description(
+        "Get evaluator details by ID, slug or display name, at the latest version unless --label or --version is given",
+      )
+      .option("--label <label>", "Read the version this deploy label points at, such as production")
+      .option("--version <number>", "Read a specific version instead of the latest")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (idSlugOrName: string) => {
+    async (idSlugOrName: string, options: { label?: string; version?: string }) => {
       try {
         const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
-        return await impl(idSlugOrName);
+        return await impl(idSlugOrName, options);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
         process.exit(1);
       }
+    },
+  );
+
+  emitsResult(
+    evaluatorCmd
+      .command("versions <idSlugOrName>")
+      .description("List an evaluator's versions, newest first, with their deploy labels")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (reference: string) => {
+      const { evaluatorVersionsCommand: impl } = await import("./commands/evaluators/versions.js");
+      return impl(reference);
+    },
+  );
+
+  emitsResult(
+    evaluatorCmd
+      .command("deploy <idSlugOrName> <label>")
+      .description("Point a deploy label, such as production, at one of the evaluator's versions")
+      .option("--version <number>", "Version to point the label at (defaults to the latest)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (reference: string, label: string, options: { version?: string }) => {
+      const { evaluatorDeployCommand: impl } = await import("./commands/evaluators/versions.js");
+      return impl(reference, label, options);
+    },
+  );
+
+  emitsResult(
+    evaluatorCmd
+      .command("undeploy <idSlugOrName> <label>")
+      .description("Remove a deploy label from an evaluator")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (reference: string, label: string) => {
+      const { evaluatorUndeployCommand: impl } = await import("./commands/evaluators/versions.js");
+      return impl(reference, label);
     },
   );
 
@@ -1553,8 +1591,12 @@ function registerEvaluatorCommands(program: Command): void {
       .description("Update an evaluator by id or slug (find the id with `evaluator get <name>`)")
       .option("--name <name>", "New evaluator name")
       .option("--settings <json>", "Evaluator config settings as JSON")
+      .option("--commit-message <message>", "What changed, kept on the version this update creates")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (idOrSlug: string, options: { name?: string; settings?: string }) => {
+    async (
+      idOrSlug: string,
+      options: { name?: string; settings?: string; commitMessage?: string },
+    ) => {
       try {
         const { updateEvaluatorCommand: impl } = await import("./commands/evaluators/update.js");
         return await impl(idOrSlug, options);
@@ -1894,11 +1936,49 @@ function registerAgentCommands(program: Command): void {
   emitsResult(
     agentCmd
       .command("get <id>")
-      .description("Get agent details by ID")
+      .description(
+        "Get agent details by ID, at the latest version unless --label or --version is given",
+      )
+      .option("--label <label>", "Read the version this deploy label points at, such as production")
+      .option("--version <number>", "Read a specific version instead of the latest")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { label?: string; version?: string }) => {
+      const { getAgentCommand: impl } = await import("./commands/agents/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    agentCmd
+      .command("versions <id>")
+      .description("List an agent's versions, newest first, with their deploy labels")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
-      const { getAgentCommand: impl } = await import("./commands/agents/get.js");
+      const { agentVersionsCommand: impl } = await import("./commands/agents/versions.js");
       return impl(id);
+    },
+  );
+
+  emitsResult(
+    agentCmd
+      .command("deploy <id> <label>")
+      .description("Point a deploy label, such as production, at one of the agent's versions")
+      .option("--version <number>", "Version to point the label at (defaults to the latest)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, label: string, options: { version?: string }) => {
+      const { agentDeployCommand: impl } = await import("./commands/agents/versions.js");
+      return impl(id, label, options);
+    },
+  );
+
+  emitsResult(
+    agentCmd
+      .command("undeploy <id> <label>")
+      .description("Remove a deploy label from an agent")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, label: string) => {
+      const { agentUndeployCommand: impl } = await import("./commands/agents/versions.js");
+      return impl(id, label);
     },
   );
 
@@ -2011,8 +2091,12 @@ function registerAgentCommands(program: Command): void {
       .option("--name <name>", "New agent name")
       .option("--type <type>", "New agent type: signature, code, workflow, or http")
       .option("--config <json>", "Updated configuration as JSON")
+      .option("--commit-message <message>", "What changed, kept on the version this update creates")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; type?: string; config?: string }) => {
+    async (
+      id: string,
+      options: { name?: string; type?: string; config?: string; commitMessage?: string },
+    ) => {
       const { updateAgentCommand: impl } = await import("./commands/agents/update.js");
       return impl(id, options);
     },

@@ -9,6 +9,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { versionSelectorOf } from "../../utils/versionCommands";
 
 /** One parameter on one line: name, type, options, default and whether it is required. */
 export const describeParameter = (parameter: AgentParameterSpec): string => {
@@ -24,14 +25,18 @@ export const describeParameter = (parameter: AgentParameterSpec): string => {
  * Returns the agent rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getAgentCommand = async (id: string): Promise<CommandResult | void> => {
+export const getAgentCommand = async (
+  id: string,
+  options: { label?: string; version?: string } = {},
+): Promise<CommandResult | void> => {
+  const selector = versionSelectorOf(options);
   await resolveCredentials();
 
   const service = new AgentsApiService();
   const spinner = createSpinner(`Fetching agent "${id}"...`).start();
 
   try {
-    const agent = await service.get(id);
+    const agent = await service.get(id, selector);
     spinner.succeed(`Found agent "${agent.name}"`);
 
     return {
@@ -44,12 +49,25 @@ export const getAgentCommand = async (id: string): Promise<CommandResult | void>
   }
 };
 
+/** The version this read shows, where its deploy labels point, and who created it. */
+function printVersioning(
+  agent: Pick<Awaited<ReturnType<AgentsApiService["get"]>>, "version" | "labels" | "createdBy">,
+): void {
+  if (agent.version) console.log(`  ${chalk.gray("Version:")}     v${agent.version}`);
+  if (agent.labels && agent.labels.length > 0) {
+    const labels = agent.labels.map(({ label, version }) => `${label} → v${version}`);
+    console.log(`  ${chalk.gray("Labels:")}      ${labels.join(", ")}`);
+  }
+  if (agent.createdBy?.name) console.log(`  ${chalk.gray("Created by:")}  ${agent.createdBy.name}`);
+}
+
 function printAgent(agent: Awaited<ReturnType<AgentsApiService["get"]>>): void {
   console.log();
   console.log(chalk.bold.cyan(agent.name));
   console.log(chalk.gray("─".repeat(40)));
   console.log(`  ${chalk.gray("ID:")}          ${agent.id}`);
   console.log(`  ${chalk.gray("Type:")}        ${chalk.yellow(agent.type)}`);
+  printVersioning(agent);
   if (agent.environment) {
     console.log(`  ${chalk.gray("Environment:")} ${agent.environment}`);
   }

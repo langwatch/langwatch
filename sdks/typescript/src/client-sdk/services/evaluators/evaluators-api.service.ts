@@ -11,7 +11,10 @@ import { EvaluatorsApiError } from "./errors";
 import type {
   CreateEvaluatorBody,
   DeleteEvaluatorResponse,
+  EvaluatorLabelResponse,
   EvaluatorResponse,
+  EvaluatorVersionSelector,
+  EvaluatorVersionsResponse,
   UpdateEvaluatorBody,
 } from "./types";
 
@@ -54,11 +57,12 @@ export class EvaluatorsApiService {
   }
 
   /**
-   * Fetches a single evaluator by its ID or slug.
+   * Fetches a single evaluator by its ID or slug, at the latest version unless a `label` or a
+   * `version` is asked for. The slug also takes a suffix: `toxicity:production` or `toxicity:2`.
    */
-  async get(idOrSlug: string): Promise<EvaluatorResponse> {
+  async get(idOrSlug: string, selector: EvaluatorVersionSelector = {}): Promise<EvaluatorResponse> {
     const { data, error, response } = await this.apiClient.GET("/api/v1/evaluators/{idOrSlug}", {
-      params: { path: { idOrSlug } },
+      params: { path: { idOrSlug }, query: selector },
     });
     return unwrapApiResult({
       operation: `fetch evaluator with ID or slug "${idOrSlug}"`,
@@ -116,5 +120,50 @@ export class EvaluatorsApiService {
       response,
       onError: this.handleApiError.bind(this),
     });
+  }
+
+  /** Every version of the evaluator, newest first, with the labels on each. */
+  async listVersions(id: string): Promise<EvaluatorVersionsResponse> {
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/evaluators/{evaluatorId}/versions",
+      { params: { path: { evaluatorId: id } } },
+    );
+    return unwrapApiResult({
+      operation: `list versions of evaluator "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
+  }
+
+  /** Points a deploy label, such as `production`, at one of the evaluator's versions. */
+  async assignLabel(id: string, label: string, version: number): Promise<EvaluatorLabelResponse> {
+    const { data, error, response } = await this.apiClient.PUT(
+      "/api/v1/evaluators/{evaluatorId}/labels/{label}",
+      { params: { path: { evaluatorId: id, label } }, body: { version } },
+    );
+    return unwrapApiResult({
+      operation: `deploy label "${label}" of evaluator "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
+  }
+
+  /** Removes a deploy label from the evaluator. */
+  async removeLabel(id: string, label: string): Promise<{ label: string; removed: true }> {
+    const { data, error, response } = await this.apiClient.DELETE(
+      "/api/v1/evaluators/{evaluatorId}/labels/{label}",
+      { params: { path: { evaluatorId: id, label } } },
+    );
+    return unwrapApiResult({
+      operation: `remove label "${label}" of evaluator "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as { label: string; removed: true };
   }
 }
