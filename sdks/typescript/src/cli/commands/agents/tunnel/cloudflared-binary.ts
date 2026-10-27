@@ -12,7 +12,7 @@ import * as path from "node:path";
 import chalk from "chalk";
 
 /** The reviewed cloudflared release this CLI downloads and runs. */
-export const CLOUDFLARED_RELEASE = "2026.10.4";
+export const CLOUDFLARED_RELEASE = "2026.10.5";
 
 const RELEASE_DOWNLOAD_BASE = `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_RELEASE}/`;
 
@@ -37,37 +37,37 @@ export interface PinnedAsset {
 export const CLOUDFLARED_PINS: Record<string, PinnedAsset> = {
   "linux-x64": {
     asset: "cloudflared-linux-amd64",
-    sha256: "ae5e8add7884b0531d66bbca4570d1de491ff6da51e4ebe7eb160cdf241d9e42",
+    sha256: "e1bc0cf084fd9e590554fe769a86b1db46701c3f847a43d902f7b974a4e16298",
   },
   "linux-arm64": {
     asset: "cloudflared-linux-arm64",
-    sha256: "2b7203b4fb0ba28a0c1e12f8855ce2c25f76d266a8d5edafac5540b6812acff6",
+    sha256: "72e0d05a67e09da87cf495e409a28c3cc5994dd23fc66a982eebea6a55923b7d",
   },
   "linux-ia32": {
     asset: "cloudflared-linux-386",
-    sha256: "a759230628a894c9262cfc0535926ba1e0cc54260e0b35a6e6cf3833919c67f2",
+    sha256: "f2de713829081837130b38e27f3c95aa9d7fc1a4f48b833362d21234dd8780d8",
   },
   "linux-arm": {
     asset: "cloudflared-linux-arm",
-    sha256: "f29b44e97ec18dd2971dfdd9bad0c6d460aaa78223b91b186219f02135c08d8c",
+    sha256: "a018911e1bbfd739937f3011f589e9e73245baeee14742f8b3413472bb007adc",
   },
   "win32-x64": {
     asset: "cloudflared-windows-amd64.exe",
-    sha256: "411b16d40c8d872243efeb52c550053d00af0a8a97fbb32e730fb8aba429eaa8",
+    sha256: "db4e4c413612a0916f3e1679d3caaf376f94911952d163028fb726fb2e0516a9",
   },
   "win32-ia32": {
     asset: "cloudflared-windows-386.exe",
-    sha256: "6d38146a071184959adde89c299e87132d89777ee5318dcb066e6fac861ec63c",
+    sha256: "66cba8003e4f87a8e6b772f331b8c04c7d41ac4f2dc30dd2c13ae09de3b6007e",
   },
   "darwin-x64": {
     asset: "cloudflared-darwin-amd64.tgz",
-    sha256: "fdec0f9a1c726f4c10283fc0cd70e602d510c72887b737270433c81a08c883a9",
-    archiveSha256: "f11fbef4207d715892331917dafd437f032cf4b7137ed64dea3008338c1c613d",
+    sha256: "cb09afb9b4d0a4730de477ac710aebb6107568930a8345775629bf264f70c284",
+    archiveSha256: "6699392fed92367808c248c2d90bed66e49bbf66e1b4ee3e4141230f3f7391b3",
   },
   "darwin-arm64": {
     asset: "cloudflared-darwin-arm64.tgz",
-    sha256: "49e7963072b2ca83fb44c09f4d4a7cda52d390c0c9c6f55bac83454a5bc43910",
-    archiveSha256: "68b6bc4080ac1330234db2a9002d07f98b000537a1bd531a687b660d4160fa7f",
+    sha256: "2b23964528ddcd641c1449275df8b5b51e3c7193b5257919846331bc5bc13b0f",
+    archiveSha256: "184c7d4f5f977348243a6d7ca8f6cf6073b9b2746cfe8c1fe15aa59e9a522bf0",
   },
 };
 
