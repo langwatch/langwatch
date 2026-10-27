@@ -142,6 +142,30 @@ Feature: Agent versions and deploy labels
     Then the response lists both versions with their labels
 
   @unit
+  Scenario: The TypeScript SDK reads an agent at a label and moves its labels
+    Given the SDK's agents service
+    When it gets an agent with { label: "production" } or { version: 2 }
+    Then it calls GET /api/v1/agents/id with that label or version in the query
+    And listVersions, assignLabel and removeLabel call the versions and labels routes
+
+  @unit
+  Scenario: The Python SDK reads an agent at a label and moves its labels
+    Given the Python SDK's agents client
+    When it gets an agent with label="production" or version=2
+    Then the request carries that label or version as a query parameter
+    And list_versions, assign_label and remove_label call the versions and labels routes
+
+  @unit
+  Scenario: The CLI lists an agent's versions and deploys a label
+    When a user runs "langwatch agent versions <id>"
+    Then the versions are printed newest first with their labels
+    When a user runs "langwatch agent deploy <id> production --version 2"
+    Then production points at version 2
+    And without --version the label points at the latest version
+    When a user runs "langwatch agent undeploy <id> production"
+    Then the label is removed
+
+  @unit
   Scenario: An experiment agent target pinned to a label runs that version
     Given an experiment target naming an agent and the label "production"
     When the experiment loads its targets

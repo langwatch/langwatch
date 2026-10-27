@@ -92,6 +92,30 @@ Feature: Evaluator versions and deploy labels
     Then the response carries the version 2 settings
 
   @unit
+  Scenario: The TypeScript SDK reads an evaluator at a label and moves its labels
+    Given the SDK's evaluators service
+    When it gets an evaluator with { label: "production" } or { version: 2 }
+    Then it calls GET /api/v1/evaluators/idOrSlug with that label or version in the query
+    And listVersions, assignLabel and removeLabel call the versions and labels routes
+
+  @unit
+  Scenario: The Python SDK reads an evaluator at a label and moves its labels
+    Given the Python SDK's evaluators client
+    When it gets an evaluator with label="production" or version=2
+    Then the request carries that label or version as a query parameter
+    And list_versions, assign_label and remove_label call the versions and labels routes
+
+  @unit
+  Scenario: The CLI lists an evaluator's versions and deploys a label
+    When a user runs "langwatch evaluator versions <idOrSlug>"
+    Then the versions are printed newest first with their labels
+    When a user runs "langwatch evaluator deploy <idOrSlug> production --version 2"
+    Then production points at version 2
+    And without --version the label points at the latest version
+    When a user runs "langwatch evaluator undeploy <idOrSlug> production"
+    Then the label is removed
+
+  @unit
   Scenario: A monitor pinned to a label runs that evaluator version
     Given a monitor on an evaluator, pinned to the label "production"
     And the evaluator's latest settings differ from its production settings
