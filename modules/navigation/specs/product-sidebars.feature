@@ -232,3 +232,23 @@ Feature: Product sidebars
     Then one dashboard is made, and the control ignores the second press while it is made
     When the pin fails after the dashboard is made
     Then that one dashboard still exists, opens with "Add a widget" open, and I see "Couldn't pin the dashboard"
+
+  @integration
+  Scenario: With the pinned list unreadable, the Dashboards section keeps its title and plus and lists nothing
+    Given I may create dashboards in this project
+    And the list of my pinned dashboards cannot be read
+    When I am in LLM Ops
+    Then the Dashboards section still shows its title and the "+"
+    But it lists no dashboard and offers no "Add dashboard" item
+
+  @integration
+  Scenario: A member who may not create dashboards causes no dashboard list read
+    Given I may not create dashboards in this project
+    When I am in LLM Ops
+    Then the sidebar reads my pinned dashboards and nothing else about dashboards
+
+  @integration
+  Scenario: A member who may create but not edit dashboards gets the new dashboard without Add a widget
+    Given I may create dashboards in this project but not edit them
+    When I press the "+" at the right of the "Dashboards" title
+    Then a new dashboard is made and pinned, and it opens without "Add a widget" open

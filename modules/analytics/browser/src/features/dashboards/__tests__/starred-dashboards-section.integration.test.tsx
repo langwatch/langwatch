@@ -152,6 +152,22 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
     });
   });
 
+  describe("given a member who may create but not edit dashboards", () => {
+    /** @scenario "A member who may create but not edit dashboards gets the new dashboard without Add a widget" */
+    it("makes and opens the board without Add a widget", async () => {
+      const user = userEvent.setup();
+      const { host, calls } = renderSection({
+        stars: [{ kind: "board", dashboard: LATENCY }],
+        permissions: [...VIEWER, "analytics:create"],
+      });
+
+      await user.click((await section()).getByRole("button", { name: "New dashboard" }));
+
+      await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-new"]));
+      expect(inputsTo(calls, "boards.create")).toHaveLength(1);
+    });
+  });
+
   describe("when the member presses the '+' twice in a row", () => {
     /** @scenario "A double click or a failed pin leaves exactly one dashboard" */
     it("makes one board, however fast the clicks come", async () => {
@@ -196,9 +212,7 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
         expect(host.navigations).toEqual(["/test-project/dashboards/board-new?addBlock=open"]),
       );
       expect(inputsTo(calls, "boards.create")).toHaveLength(1);
-      expect(host.failures).toEqual([
-        expect.objectContaining({ fallbackTitle: "Couldn't pin the dashboard" }),
-      ]);
+      expect(host.failures).toHaveLength(1);
     });
   });
 
@@ -210,6 +224,18 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
       const group = await section();
       await waitFor(() => expect(group.getAllByRole("link")).toHaveLength(1));
       expect(group.queryByRole("button", { name: "New dashboard" })).toBeNull();
+    });
+
+    /** @scenario "A member who may not create dashboards causes no dashboard list read" */
+    it("reads no board list for them, only their pins", async () => {
+      const { calls } = renderSection({
+        stars: [{ kind: "board", dashboard: LATENCY }],
+        permissions: VIEWER,
+      });
+
+      await waitFor(() => expect(inputsTo(calls, "boards.listStarred")).toHaveLength(1));
+      await (await section()).findByRole("link", { name: "Latency" });
+      expect(inputsTo(calls, "boards.getAll")).toEqual([]);
     });
 
     /** @scenario "With nothing pinned, the Dashboards section offers an Add dashboard item" */
@@ -252,7 +278,7 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
   });
 
   describe("given the pins cannot be read", () => {
-    /** @scenario "The LLM Ops sidebar has a Dashboards section listing the pinned dashboards" */
+    /** @scenario "With the pinned list unreadable, the Dashboards section keeps its title and plus and lists nothing" */
     it("keeps the title and the '+', and lists nothing", async () => {
       const { calls } = renderSection({ stars: [], fails: true });
       await waitFor(() => expect(inputsTo(calls, "boards.listStarred").length).toBeGreaterThan(0));

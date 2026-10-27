@@ -9,6 +9,7 @@ import type { StarredDashboardsProps } from "@langwatch/analytics-client";
 import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { Box, Link as ChakraLink, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { LayoutDashboard, Plus } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
@@ -20,16 +21,15 @@ import { CURATED_BOARDS } from "../../model/curated-boards.ts";
 import { type StarredLink, starredLinks } from "../../model/sidebar-boards.ts";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 
-/** Whether a dashboard made from this section starts pinned to the project for its maker. */
-export const PIN_SIDEBAR_DASHBOARDS_BY_DEFAULT = true;
-
 /** Rows shown before the rest sit behind "All pinned (N)": the sidebar stays short. */
 const PINNED_SHOWN_MAX = 7;
+
+/** What the create path offers: the "+" and the empty-state item both run `onAdd`. */
+type CreateControls = { isCreating: boolean; onAdd: () => void };
 
 export function StarredDashboardsSection(_props: StarredDashboardsProps) {
   const host = useAnalyticsHost();
   const favourites = useFavourites();
-  const saved = useSavedDashboards();
   const { mayCreate } = useBoardReader();
   const projectSlug = host.project()?.slug;
   if (!projectSlug) return null;
@@ -39,8 +39,35 @@ export function StarredDashboardsSection(_props: StarredDashboardsProps) {
     : [];
   // A member who may not add one sees the section only for what it lists.
   if (!mayCreate && links.length === 0) return null;
-  const addDashboard = () =>
-    saved.createBoard({ pin: PIN_SIDEBAR_DASHBOARDS_BY_DEFAULT, addWidget: true });
+  const frame = (create?: CreateControls) => (
+    <SectionFrame links={links} isLoaded={isLoaded} projectSlug={projectSlug} create={create} />
+  );
+  // The create path reads the board list to name the new one; only members who may create mount it.
+  return mayCreate ? <WithCreate>{frame}</WithCreate> : frame();
+}
+
+function WithCreate({ children }: { children: (create: CreateControls) => ReactNode }) {
+  const saved = useSavedDashboards();
+  // "Add a widget" is an edit, so a create-only member gets the board without it.
+  const { mayEdit } = useBoardReader();
+  return children({
+    isCreating: saved.isCreating,
+    // Pinned on creation; drop `pin` to stop pinning.
+    onAdd: () => saved.createBoard({ pin: true, addWidget: mayEdit }),
+  });
+}
+
+function SectionFrame({
+  links,
+  isLoaded,
+  projectSlug,
+  create,
+}: {
+  links: StarredLink[];
+  isLoaded: boolean;
+  projectSlug: string;
+  create?: CreateControls;
+}) {
   const shown = links.slice(0, PINNED_SHOWN_MAX);
 
   return (
@@ -48,11 +75,11 @@ export function StarredDashboardsSection(_props: StarredDashboardsProps) {
       {/* The same frame and label as navigation's own groups, so it reads like "Build". */}
       <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
         <SidebarSectionLabel label="Dashboards" />
-        {mayCreate && <NewDashboardButton isCreating={saved.isCreating} onCreate={addDashboard} />}
+        {create && <NewDashboardButton isCreating={create.isCreating} onCreate={create.onAdd} />}
       </HStack>
       <VStack as="ul" align="stretch" gap={0.5} margin={0} padding={0}>
-        {isLoaded && links.length === 0 && (
-          <AddDashboardRow isCreating={saved.isCreating} onAdd={addDashboard} />
+        {create && isLoaded && links.length === 0 && (
+          <AddDashboardRow isCreating={create.isCreating} onAdd={create.onAdd} />
         )}
         {shown.map((link) => (
           <PinnedRow key={link.key} link={link} />

@@ -5,7 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -96,6 +96,26 @@ describe("given a member creates a board", () => {
       { projectId: "project-1", name: "Untitled dashboard 2" },
       expect.anything(),
     );
+  });
+});
+
+describe("given the pin fails after the board is made", () => {
+  /** @scenario "A double click or a failed pin leaves exactly one dashboard" */
+  it("tells the member, and the created board still opens with Add a widget", async () => {
+    const error = new Error("pin down");
+    mocks.create.mutate.mockImplementationOnce(
+      (_input: unknown, options: { onSuccess: (board: { id: string }) => Promise<void> }) =>
+        void options.onSuccess({ id: "board-new" }),
+    );
+    mocks.star.mutateAsync.mockRejectedValueOnce(error);
+    const { result } = renderHook(() => useSavedDashboards());
+
+    act(() => result.current.createBoard({ pin: true, addWidget: true }));
+
+    await waitFor(() =>
+      expect(mocks.host.navigate).toHaveBeenCalledWith("/acme/dashboards/board-new?addBlock=open"),
+    );
+    expect(mocks.host.failed).toHaveBeenCalledWith(expect.objectContaining({ error }));
   });
 });
 
