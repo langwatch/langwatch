@@ -89,6 +89,23 @@ describe("ScenarioRunKeyService", () => {
     ]);
   });
 
+  /** @scenario "A scenario run started with a service key is minted under that key" */
+  it("mints under the service key when no person started the run", async () => {
+    const { service, calls } = createService();
+
+    await service.tokenFor({ projectId, adapter: codeAdapter, startedByApiKeyId: "service-1" });
+
+    expect(calls).toEqual([
+      {
+        userId: null,
+        callerApiKeyId: "service-1",
+        projectId,
+        permissions: ["traces:create", "traces:view", "scenarios:create"],
+        minRemainingMs: CHILD_PROCESS.TIMEOUT_MS,
+      },
+    ]);
+  });
+
   /** @scenario "A scenario run nobody started acts as the system" */
   it("asks for an ownerless key when nobody started the run", async () => {
     const { service, calls } = createService();

@@ -11,51 +11,56 @@ export type RunActorLabel = (typeof RUN_ACTOR_LABELS)[number];
 
 export const runActorLabelSchema = z.enum(RUN_ACTOR_LABELS);
 
-/** The person a run is recorded against, and how they reached it. */
+/** Who a run is recorded against: a person, the key it was started with, or both. */
 const runActorSchemaDefinition = z
   .object({
-    /** The platform user id. */
-    id: z.string().min(1),
+    /** The platform user id; absent when the starting key belongs to no person. */
+    id: z.string().min(1).optional(),
     label: runActorLabelSchema,
-    /** The API key they started it with; the run's own key holds no more than it. */
+    /** The API key the run was started with; the run's own key holds no more than it. */
     apiKeyId: z.string().min(1).optional(),
   })
-  .strict();
+  .strict()
+  .refine((actor) => actor.id !== undefined || actor.apiKeyId !== undefined, {
+    message: "A run actor names a person, a starting key, or both",
+  });
 export interface RunActorSchema extends Named<typeof runActorSchemaDefinition> {}
 export const runActorSchema: RunActorSchema = runActorSchemaDefinition;
 export type RunActor = z.infer<typeof runActorSchema>;
 
-/**
- * The `actorId` and `actorLabel` entries of the reserved namespace, or
- * nothing at all: both are written together, since a surface with no
- * person behind it should say nothing rather than a label to filter out.
- */
-export function withActor(
-  actor: RunActor | undefined,
-): { actorId: string; actorLabel: RunActorLabel; actorApiKeyId?: string } | Record<string, never> {
-  if (!actor?.id) return {};
+/** The person a run reads back as started by: only a run that names a person records one. */
+export type RecordedRunActor = { id: string; label: RunActorLabel };
 
-  return {
-    actorId: actor.id,
-    actorLabel: actor.label,
-    ...(actor.apiKeyId ? { actorApiKeyId: actor.apiKeyId } : {}),
-  };
+/**
+ * The reserved namespace entries of an actor. `actorId` and `actorLabel` are written together or
+ * not at all, so a key with no person behind it records no actor, only `actorApiKeyId`: the key
+ * the run's own key is minted under.
+ */
+export function withActor(actor: RunActor | undefined): {
+  actorId?: string;
+  actorLabel?: RunActorLabel;
+  actorApiKeyId?: string;
+} {
+  const key = actor?.apiKeyId ? { actorApiKeyId: actor.apiKeyId } : {};
+  if (!actor?.id) return key;
+
+  return { actorId: actor.id, actorLabel: actor.label, ...key };
 }
 
 /**
- * The actor of a REST call, or nothing when the credential names no person
- * — a project key records no actor. Only `X-LangWatch-Surface: cli` is
- * honored, so a caller cannot claim an in-app surface over the wire.
+ * The actor of a REST call: the person the key belongs to and the key itself, or the key alone
+ * when it belongs to no person. Nothing when the credential is neither. Only
+ * `X-LangWatch-Surface: cli` is honored, so a caller cannot claim an in-app surface.
  */
 export function deriveRunActor(params: {
   userId: string | null | undefined;
   surfaceHeader: string | null | undefined;
   apiKeyId?: string | null | undefined;
 }): RunActor | undefined {
-  if (!params.userId) return undefined;
+  if (!params.userId && !params.apiKeyId) return undefined;
   const declared = params.surfaceHeader?.toLowerCase();
   return {
-    id: params.userId,
+    ...(params.userId ? { id: params.userId } : {}),
     label: declared === "cli" ? "cli" : "api",
     ...(params.apiKeyId ? { apiKeyId: params.apiKeyId } : {}),
   };
