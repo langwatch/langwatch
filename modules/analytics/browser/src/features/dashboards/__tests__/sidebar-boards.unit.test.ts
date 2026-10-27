@@ -177,7 +177,7 @@ describe("sameStar", () => {
 });
 
 describe("starredLinks", () => {
-  /** @scenario "Starred dashboards show in the other products' sidebars" */
+  /** @scenario "The LLM Ops sidebar has a Dashboards section listing the pinned dashboards" */
   it("links every star in the member's order, My dashboard included, into Dashboards", () => {
     const links = starredLinks({
       stars: [

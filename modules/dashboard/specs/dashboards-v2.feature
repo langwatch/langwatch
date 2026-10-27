@@ -769,6 +769,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the board is made
     Then it is starred for nobody, its creator included
     # My dashboard is the one exception: it starts starred for its maker (AC160b)
+    # The LLM Ops sidebar's "+" stars its new board for its maker (product-sidebars.feature)
 
   @unit
   Scenario: AC157 Stars are per member
