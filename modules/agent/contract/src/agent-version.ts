@@ -11,15 +11,25 @@ export const AGENT_LATEST_LABEL = "latest";
 const LABEL_NAME = /^[a-z][a-z0-9_-]*$/;
 const NUMERIC = /^\d+$/;
 
-/** Why a label name is refused, or null when it may be assigned. Same rules as prompt tags. */
-export function agentLabelProblem(label: string): string | null {
-  if (label === AGENT_LATEST_LABEL) return `"latest" always points at the newest version.`;
-  if (NUMERIC.test(label)) return "A label cannot be a number; numbers pick versions.";
-  if (!LABEL_NAME.test(label)) {
-    return "A label starts with a lowercase letter and holds only lowercase letters, digits, hyphens or underscores.";
+export type AgentLabelCheck = { valid: true } | { valid: false; reason: string };
+
+/** Whether a label name may be assigned, and why not. Same rules as prompt tags. */
+export function checkAgentLabel(label: string): AgentLabelCheck {
+  if (label === AGENT_LATEST_LABEL) {
+    return { valid: false, reason: `"latest" always points at the newest version.` };
   }
-  if (label.length > 64) return "A label is at most 64 characters.";
-  return null;
+  if (NUMERIC.test(label)) {
+    return { valid: false, reason: "A label cannot be a number; numbers pick versions." };
+  }
+  if (!LABEL_NAME.test(label)) {
+    return {
+      valid: false,
+      reason:
+        "A label starts with a lowercase letter and holds only lowercase letters, digits, hyphens or underscores.",
+    };
+  }
+  if (label.length > 64) return { valid: false, reason: "A label is at most 64 characters." };
+  return { valid: true };
 }
 
 export type AgentAddress = {
@@ -155,7 +165,7 @@ export const agentLabelRestBodySchema: AgentLabelRestBodySchema =
   agentLabelRestBodySchemaDefinition;
 
 const agentLabelRestParamsSchemaDefinition = z.object({
-  id: z.string().min(1).describe("The agent id."),
+  agentId: z.string().min(1).describe("The agent id."),
   label: z.string().min(1).max(64).describe("The deploy label, for example production."),
 });
 export interface AgentLabelRestParamsSchema extends Named<
@@ -163,6 +173,15 @@ export interface AgentLabelRestParamsSchema extends Named<
 > {}
 export const agentLabelRestParamsSchema: AgentLabelRestParamsSchema =
   agentLabelRestParamsSchemaDefinition;
+
+const agentVersionsRestParamsSchemaDefinition = z.object({
+  agentId: z.string().min(1).describe("The agent id."),
+});
+export interface AgentVersionsRestParamsSchema extends Named<
+  typeof agentVersionsRestParamsSchemaDefinition
+> {}
+export const agentVersionsRestParamsSchema: AgentVersionsRestParamsSchema =
+  agentVersionsRestParamsSchemaDefinition;
 
 /** What a reader names: the person behind a created or updated row. */
 const agentPersonViewSchemaDefinition = z.object({ id: z.string(), name: z.string().nullable() });

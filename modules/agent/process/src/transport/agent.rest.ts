@@ -15,6 +15,7 @@ import {
   agentRestParamsSchema,
   agentRestQuerySchema,
   agentVersionListResponseSchema,
+  agentVersionsRestParamsSchema,
   archiveResultSchema,
   createAgentRequestSchema,
   relayCallBodySchema,
@@ -242,14 +243,14 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
         return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
       })
 
-      .get("/:id/versions", "listAgentVersions")
-      .withParams(agentRestParamsSchema)
+      .get("/:agentId/versions", "listAgentVersions")
+      .withParams(agentVersionsRestParamsSchema)
       .withPermission("project:view")
       .withOutput(agentVersionListResponseSchema)
       .withDocs({ summary: "List an agent's versions, newest first, with the labels on each" })
       .handle(async ({ app, input, scope }) => {
         const versions = agentVersionsWithoutSecrets(
-          await app.listVersions({ projectId: scope.id, agentId: input.id }),
+          await app.listVersions({ projectId: scope.id, agentId: input.agentId }),
         );
 
         return {
@@ -258,7 +259,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
         };
       })
 
-      .put("/:id/labels/:label", "assignAgentLabel")
+      .put("/:agentId/labels/:label", "assignAgentLabel")
       .keepsRecords()
       .withAudit("agents.assignLabel")
       .withParams(agentLabelRestParamsSchema)
@@ -271,7 +272,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .handle(async ({ app, input, scope, actor }) => {
         const label = await app.assignLabel({
           projectId: scope.id,
-          agentId: input.id,
+          agentId: input.agentId,
           label: input.label,
           version: input.version,
           caller: agentCallerOf(actor),
@@ -280,7 +281,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
         return { label: label.label, version: label.version, versionId: label.versionId };
       })
 
-      .delete("/:id/labels/:label", "removeAgentLabel")
+      .delete("/:agentId/labels/:label", "removeAgentLabel")
       .withAudit("agents.removeLabel")
       .withConfirmation({
         resource: "agent deploy label",
@@ -293,7 +294,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withOutput(z.object({ label: z.string(), removed: z.literal(true) }))
       .withDocs({ summary: "Remove a deploy label from an agent" })
       .handle(async ({ app, input, scope }) => {
-        await app.removeLabel({ projectId: scope.id, agentId: input.id, label: input.label });
+        await app.removeLabel({ projectId: scope.id, agentId: input.agentId, label: input.label });
 
         return { label: input.label, removed: true as const };
       })
