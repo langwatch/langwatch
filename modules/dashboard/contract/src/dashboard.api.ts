@@ -233,9 +233,11 @@ export interface DashboardApi {
     dashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget[]>;
+  /** With `onDashboardId`, a widget on any other board, or on none, is not found. */
   getDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget>;
   /** Placed on `dashboardId` when named, otherwise on the unplaced authoring grid. */
@@ -247,10 +249,12 @@ export interface DashboardApi {
       viewer?: DashboardViewer;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget>;
+  /** With `onDashboardId`, a widget on any other board, or on none, is not found. */
   updateDashboardWidget(
     input: {
       projectId: string;
       id: string;
+      onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
     } & Partial<DashboardWidgetDefinitionInput>,
@@ -261,9 +265,11 @@ export interface DashboardApi {
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget>;
+  /** With `onDashboardId`, a widget on any other board, or on none, is not found. */
   deleteDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<void>;
   /** Moves or resizes one widget; an id naming no widget here changes nothing. */

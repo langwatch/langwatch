@@ -200,10 +200,11 @@ func TestParseCredentialFromHeaders_APIKeyOnlyProviders(t *testing.T) {
 	// (XAI_API_KEY, GROQ_API_KEY, ...). A default model like xai/grok-4.3
 	// must route instead of 400ing with missing_provider.
 	cases := map[string]domain.ProviderID{
-		"xai/grok-4.3":           domain.ProviderXAI,
-		"groq/llama-3.3-70b":     domain.ProviderGroq,
-		"cerebras/llama-3.3-70b": domain.ProviderCerebras,
-		"deepseek/deepseek-chat": domain.ProviderDeepSeek,
+		"xai/grok-4.3":                               domain.ProviderXAI,
+		"groq/llama-3.3-70b":                         domain.ProviderGroq,
+		"cerebras/llama-3.3-70b":                     domain.ProviderCerebras,
+		"deepseek/deepseek-chat":                     domain.ProviderDeepSeek,
+		"doubleword/deepseek-ai/DeepSeek-V4.1-Flash": domain.ProviderDoubleword,
 	}
 	for model, want := range cases {
 		t.Run(model, func(t *testing.T) {
@@ -278,10 +279,34 @@ func TestBareModel_StripsProviderPrefix(t *testing.T) {
 		"bedrock/anthropic.claude-3-sonnet-20240229-v1:0": "anthropic.claude-3-sonnet-20240229-v1:0",
 		"vertex_ai/gemini-2.0-flash":                      "gemini-2.0-flash",
 		"no-prefix-here":                                  "no-prefix-here",
+		"doubleword/deepseek-ai/DeepSeek-V4.1-Flash":      "deepseek-ai/DeepSeek-V4.1-Flash",
 	}
 	for in, want := range cases {
 		if got := gatewayproxy.BareModel(in); got != want {
 			t.Errorf("BareModel(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// The app's playground and prompt studio calls reach the engine as
+// x-litellm-* headers naming "doubleword/<model>".
+//
+// @scenario "Playground and workflow calls route to Doubleword"
+func TestParseCredentialFromHeaders_Doubleword(t *testing.T) {
+	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+		"x-litellm-model", "doubleword/deepseek-ai/DeepSeek-V4.1-Flash",
+		"x-litellm-api_key", "sk-dw",
+	))
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if cred.ProviderID != domain.ProviderDoubleword {
+		t.Errorf("ProviderID = %q, want doubleword", cred.ProviderID)
+	}
+	if cred.APIKey != "sk-dw" {
+		t.Errorf("APIKey = %q", cred.APIKey)
+	}
+	if got := gatewayproxy.BareModel("doubleword/deepseek-ai/DeepSeek-V4.1-Flash"); got != "deepseek-ai/DeepSeek-V4.1-Flash" {
+		t.Errorf("BareModel = %q, want the vendor slash kept", got)
 	}
 }
