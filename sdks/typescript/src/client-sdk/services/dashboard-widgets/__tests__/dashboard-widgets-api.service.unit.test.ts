@@ -3,7 +3,7 @@
  *
  * Spec: modules/dashboard/specs/dashboards-v2.feature (AC199l)
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LangwatchApiClient } from "@/internal/api/client";
 
@@ -34,6 +34,46 @@ describe("DashboardWidgetsApiService", () => {
       expect(data).toEqual([board]);
       expect(GET).toHaveBeenCalledWith("/api/v1/projects/{projectId}/analytics/boards", {
         params: { path: { projectId: "project_1" } },
+      });
+    });
+  });
+
+  describe("getBoard()", () => {
+    it("reads one board by its id on the project route", async () => {
+      const GET = vi.fn().mockResolvedValue({ data: { id: "board_1" }, error: undefined });
+      const service = new DashboardWidgetsApiService({
+        langwatchApiClient: { GET } as never,
+        projectId: "project_1",
+      });
+
+      await service.getBoard("board_1");
+
+      expect(GET).toHaveBeenCalledWith("/api/v1/projects/{projectId}/analytics/boards/{boardId}", {
+        params: { path: { projectId: "project_1", boardId: "board_1" } },
+      });
+    });
+
+    describe("when only an API key is set", () => {
+      afterEach(() => vi.unstubAllEnvs());
+
+      const service = (GET: ReturnType<typeof vi.fn>) =>
+        new DashboardWidgetsApiService({ langwatchApiClient: { GET } as never });
+
+      it("reads the board under the project the key belongs to", async () => {
+        vi.stubEnv("LANGWATCH_PROJECT_ID", "   ");
+        const GET = vi
+          .fn()
+          .mockResolvedValueOnce({ data: { id: "key_project" } })
+          .mockResolvedValueOnce({ data: { id: "board_1" } });
+
+        await service(GET).getBoard("board_1");
+
+        expect(GET).toHaveBeenNthCalledWith(1, "/api/v1/me/project");
+        expect(GET).toHaveBeenNthCalledWith(
+          2,
+          "/api/v1/projects/{projectId}/analytics/boards/{boardId}",
+          { params: { path: { projectId: "key_project", boardId: "board_1" } } },
+        );
       });
     });
   });

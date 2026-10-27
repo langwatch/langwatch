@@ -16,6 +16,10 @@ export type DashboardWidget =
 export type DashboardBoard =
   paths["/api/v1/projects/{projectId}/analytics/boards"]["get"]["responses"]["200"]["content"]["application/json"]["data"][number];
 
+/** One Dashboards board, as the board route answers it. */
+export type DashboardBoardDetail =
+  paths["/api/v1/projects/{projectId}/analytics/boards/{boardId}"]["get"]["responses"]["200"]["content"]["application/json"];
+
 /** One named LangWatchQL query a widget may run, as a create/update submits it. */
 export type DashboardWidgetQueryInput =
   paths["/api/v1/projects/{projectId}/analytics/dashboard-widgets"]["post"]["requestBody"]["content"]["application/json"]["queries"][number];
@@ -80,9 +84,31 @@ export class DashboardWidgetsApiService {
     throw new DashboardWidgetsApiError(message, operation, error, status);
   }
 
+  /** A blank value is no value, as `cli/utils/apiKey.ts` reads `LANGWATCH_PROJECT_ID`. */
+  private resolvedProjectId(): string | undefined {
+    const candidates = [
+      this.configuredProjectId,
+      scopedProjectId(),
+      process.env.LANGWATCH_PROJECT_ID,
+    ];
+    return candidates.map((value) => value?.trim()).find((value) => value);
+  }
+
+  /**
+   * The project in scope, else the one the API key itself belongs to (`/api/v1/me/project`):
+   * a plain API key names no project anywhere else.
+   */
+  private async projectIdOrKeyProject(operation: string): Promise<string> {
+    const inScope = this.resolvedProjectId();
+    if (inScope) return inScope;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/me/project");
+    if (error) this.handleApiError({ operation, error, response });
+    if (!data?.id) return this.projectId(operation);
+    return data.id;
+  }
+
   private projectId(operation: string): string {
-    const projectId =
-      this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
+    const projectId = this.resolvedProjectId();
     if (!projectId) {
       throw new DashboardWidgetsApiError(
         "No project is in scope. Pass --project <slug-or-id>, or set LANGWATCH_PROJECT_ID.",
@@ -171,6 +197,17 @@ export class DashboardWidgetsApiService {
     );
     if (error) this.handleApiError({ operation: "list dashboards", error, response });
     return data as unknown as { data: DashboardBoard[] };
+  }
+
+  /** One Dashboards board by id; an Analytics Reports board answers 404. */
+  async getBoard(id: string): Promise<DashboardBoardDetail> {
+    const projectId = await this.projectIdOrKeyProject(`get dashboard "${id}"`);
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/projects/{projectId}/analytics/boards/{boardId}",
+      { params: { path: { projectId, boardId: id } } },
+    );
+    if (error) this.handleApiError({ operation: `get dashboard "${id}"`, error, response });
+    return data as unknown as DashboardBoardDetail;
   }
 
   /** Adds a widget to a dashboard at the next free row, keeping its size. */

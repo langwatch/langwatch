@@ -14,6 +14,7 @@ import {
   sidebarGroups,
   starredLinks,
   starRefOf,
+  swapShownStars,
 } from "../model/sidebar-boards.ts";
 
 const board = (id: string, name: string, createdById = "user-1"): SidebarBoard => ({
@@ -197,5 +198,35 @@ describe("starredLinks", () => {
       { name: "My dashboard", href: "/demo/dashboards/mine" },
       { name: "Weekly review", href: "/demo/dashboards/b%202" },
     ]);
+  });
+});
+
+describe("swapShownStars", () => {
+  const mine = { kind: "board", dashboardId: "mine" } as const;
+  const shop = { kind: "board", dashboardId: "shop" } as const;
+  const fresh = { kind: "board", dashboardId: "new" } as const;
+
+  describe("given a star the section does not show", () => {
+    /** @scenario "AC155b Stars the section does not show keep their place in the star order" */
+    it("keeps it at its index while the two shown stars swap", () => {
+      expect(
+        swapShownStars({ all: [mine, shop, fresh], shown: [shop, fresh], from: 1, to: 0 }),
+      ).toEqual([mine, fresh, shop]);
+    });
+
+    /** @scenario "AC155b Stars the section does not show keep their place in the star order" */
+    it("keeps it between the two shown stars that swap", () => {
+      expect(
+        swapShownStars({ all: [shop, mine, fresh], shown: [shop, fresh], from: 0, to: 1 }),
+      ).toEqual([fresh, mine, shop]);
+    });
+  });
+
+  /** @scenario "AC155 Move up and Move down reorder the member's stars" */
+  it("answers null past either end", () => {
+    expect(
+      swapShownStars({ all: [shop, fresh], shown: [shop, fresh], from: 0, to: -1 }),
+    ).toBeNull();
+    expect(swapShownStars({ all: [shop, fresh], shown: [shop, fresh], from: 1, to: 2 })).toBeNull();
   });
 });
