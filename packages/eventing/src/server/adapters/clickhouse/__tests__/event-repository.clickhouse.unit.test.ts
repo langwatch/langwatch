@@ -19,26 +19,6 @@ function repositoryFor(client: EventingClickHouseClient): EventingClickHouseEven
   });
 }
 
-/** An index ready on every target, answering one range for every aggregate it is asked. */
-function indexedRepository({ rows }: { rows: unknown[] }) {
-  const query = vi.fn(async () => ({ json: vi.fn().mockResolvedValue(rows) }));
-  const client: EventingClickHouseClient = { query, insert: vi.fn() };
-  const indexBounds = vi.fn(async () => ({
-    n: 1,
-    fromMs: 1_600_000_000_000,
-    toMs: 1_700_000_000_000,
-  }));
-  const repository = EventingClickHouseEventRepository.create({
-    resolveClient: async () => client,
-    retention,
-    eventLogIndex: {
-      reader: { targetOf: async () => "shared", indexBounds },
-      readiness: { isReady: () => true },
-    },
-  });
-  return { repository, query, indexBounds };
-}
-
 /**
  * A client that answers with the stored row projected through the query's own
  * SELECT list, the way ClickHouse does — a mock returning every column
@@ -221,7 +201,7 @@ describe("EventRepositoryClickHouse read projections", () => {
     upToEventId: "evt",
   };
 
-  describe("given the four reads that rehydrate an event record", () => {
+  describe("given the three reads that rehydrate an event record", () => {
     describe("when any of them runs", () => {
       it("projects every column the record mapper reads", async () => {
         const client = createMockClient({});
@@ -238,15 +218,8 @@ describe("EventRepositoryClickHouse read projections", () => {
           after: undefined,
           limit: 10,
         });
-        await repository.getEventRecordsPaged({
-          tenantId: "tenant",
-          aggregateType: "trace",
-          aggregateId: "id",
-          after: undefined,
-          limit: 10,
-        });
 
-        for (let call = 0; call < 4; call++) {
+        for (let call = 0; call < 3; call++) {
           expect(queryOf({ client, call })).toContain(EVENT_LOG_SELECT_COLUMNS);
         }
       });
@@ -277,70 +250,61 @@ describe("EventRepositoryClickHouse read projections", () => {
   });
 });
 
-describe("EventRepositoryClickHouse paged reads", () => {
-  const history = {
-    tenantId: "tenant",
-    aggregateType: "trace",
-    aggregateId: "id",
-    after: undefined,
-  };
-  const upTo = { ...history, upToTimestamp: 1700000000001, upToEventId: "evt" };
-
-  describe.each([0, -1, 1.5])("given a page limit of %s", (limit) => {
-    describe("when either paged read runs", () => {
-      /** @scenario A page of an aggregate's history reads payloads only for its own rows */
-      it("refuses the limit before any query runs", async () => {
-        const { repository, query, indexBounds } = indexedRepository({ rows: [] });
-
-        await expect(repository.getEventRecordsPaged({ ...history, limit })).rejects.toThrow(
-          RangeError,
-        );
-        await expect(repository.getEventRecordsUpToPaged({ ...upTo, limit })).rejects.toThrow(
-          RangeError,
-        );
-        expect(query).not.toHaveBeenCalled();
-        expect(indexBounds).not.toHaveBeenCalled();
-      });
-    });
-  });
-});
-
 describe("EventRepositoryClickHouse full-scan declarations", () => {
   const history = { tenantId: "tenant", aggregateType: "user", aggregateId: "id" };
   const upTo = { ...history, upToTimestamp: 1700000000001, upToEventId: "evt" };
   const declared = expect.objectContaining({ SKIP_COLD_SCAN_CHECK: true });
 
-  /** Runs the four aggregate-history reads, each with or without a lower bound. */
-  async function readAllHistoryReads({ occurredAtFromMs }: { occurredAtFromMs?: number }) {
+  /** Runs the three aggregate-history reads, each with or without a lower bound. */
+  async function readAllThree({ occurredAtFromMs }: { occurredAtFromMs?: number }) {
     const client = createMockClient({});
     const repository = repositoryFor(client);
     const bound = occurredAtFromMs === undefined ? {} : { occurredAtFromMs };
     await repository.getEventRecords({ ...history, ...bound });
     await repository.getEventRecordsUpTo({ ...upTo, ...bound });
     await repository.getEventRecordsUpToPaged({ ...upTo, ...bound, after: undefined, limit: 10 });
-    await repository.getEventRecordsPaged({ ...history, ...bound, after: undefined, limit: 10 });
     return client.query;
   }
 
   describe("given a long-lived aggregate read with no lower bound", () => {
     /** @scenario "An aggregate's unbounded history read is a declared full scan" */
     it("declares every history read a full scan", async () => {
-      const query = await readAllHistoryReads({});
-      for (const call of [1, 2, 3, 4]) expect(query).toHaveBeenNthCalledWith(call, declared);
+      const query = await readAllThree({});
+      for (const call of [1, 2, 3]) expect(query).toHaveBeenNthCalledWith(call, declared);
     });
   });
 
   describe("given a time-local aggregate read with a lower bound", () => {
     /** @scenario "An aggregate's unbounded history read is a declared full scan" */
     it("declares none of them, so the bound is what prunes", async () => {
-      const query = await readAllHistoryReads({ occurredAtFromMs: 1700000000000 });
-      expect(query).toHaveBeenCalledTimes(4);
+      const query = await readAllThree({ occurredAtFromMs: 1700000000000 });
+      expect(query).toHaveBeenCalledTimes(3);
       expect(query).not.toHaveBeenCalledWith(declared);
     });
   });
 });
 
 describe("EventRepositoryClickHouse over a ready event log index", () => {
+  /** An index ready on every target, answering one range for every aggregate it is asked. */
+  function indexedRepository({ rows }: { rows: unknown[] }) {
+    const query = vi.fn(async () => ({ json: vi.fn().mockResolvedValue(rows) }));
+    const client: EventingClickHouseClient = { query, insert: vi.fn() };
+    const indexBounds = vi.fn(async () => ({
+      n: 1,
+      fromMs: 1_600_000_000_000,
+      toMs: 1_700_000_000_000,
+    }));
+    const repository = EventingClickHouseEventRepository.create({
+      resolveClient: async () => client,
+      retention,
+      eventLogIndex: {
+        reader: { targetOf: async () => "shared", indexBounds },
+        readiness: { isReady: () => true },
+      },
+    });
+    return { repository, query, indexBounds };
+  }
+
   describe("given a read that names its own lower bound", () => {
     /** @scenario "a read that already has a lower bound skips the index" */
     it("reads with that bound and never asks the index", async () => {
