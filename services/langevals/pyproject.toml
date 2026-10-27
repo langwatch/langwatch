@@ -68,14 +68,13 @@ packages = ["langevals"]
 exclude-newer = "7 days"
 # Emergency exceptions to the 7-day age gate (dev/docs/best_practices/
 # dependency-age-gates.md), each scoped by timestamp to the one patched
-# release a CRITICAL or HIGH advisory needs. Pillow 13.0.0 (uploaded 2026-10-16)
+# release a CRITICAL advisory needs. Pillow 13.0.0 (uploaded 2026-10-16)
 # closes 28 advisories, three of them critical; certifi 2026.10.19 (uploaded
-# 2026-10-20) closes GHSA-6q48-6c7w-9gw2 (critical); nltk 3.10.4 (uploaded
-# 2026-10-21) closes GHSA-j456-xh4h-cpf2 (high). Remove each entry once its
-# upload is older than 7 days (Pillow from 2026-10-24, certifi from 2026-10-28,
-# nltk from 2026-10-29): a timestamp here then holds the package back.
+# 2026-10-20) closes GHSA-6q48-6c7w-9gw2 (critical). Remove both entries once
+# those uploads are older than 7 days (Pillow from 2026-10-24, certifi from
+# 2026-10-28): a timestamp here then holds the package back, not forward.
 required-version = ">=0.9.25"
-exclude-newer-package = { pillow = "2026-10-17T00:00:00Z", certifi = "2026-10-21T00:00:00Z", nltk = "2026-10-22T00:00:00Z" }
+exclude-newer-package = { pillow = "2026-10-17T00:00:00Z", certifi = "2026-10-21T00:00:00Z" }
 override-dependencies = [
   # The langchain family is on the 1.x line, where the advisories affecting it
   # are fixed. Each floor is the highest first-patched version across the
@@ -119,10 +118,8 @@ override-dependencies = [
   # covering <13.0.0, three of them critical.
   "pillow>=13.0.0",
   # nltk unsafe deserialization in the pickle loader path, plus the advisories
-  # closed in 3.10.1 and 3.10.3, then GHSA-j456-xh4h-cpf2, fixed in 3.10.4.
-  # 3.10.4 also sandboxes the model-artifact paths of GHSA-8mgp-746c-j5xp,
-  # which names no fixed release, so that advisory stays open upstream.
-  "nltk>=3.10.4",
+  # closed in 3.10.1 and 3.10.3.
+  "nltk>=3.10.3",
   # authlib (via arize-phoenix and fastmcp): JWS empty-signature validation
   # (CRITICAL) and further advisories, all fixed by 1.9.1.
   "authlib>=1.9.1",
@@ -148,6 +145,11 @@ override-dependencies = [
   #
   # NOT fixed here, deliberately:
   #   ragas, diskcache: no patched release exists upstream yet.
+  #   nltk: GHSA-j456-xh4h-cpf2 (high) is fixed in 3.10.4, and 3.10.4 also
+  #   sandboxes the model-artifact paths of GHSA-8mgp-746c-j5xp, which names
+  #   no fix. 3.10.4 (uploaded 2026-10-21) is inside the age gate, neither
+  #   advisory is a 0-day or exploited, and langevals reaches nltk only through
+  #   rouge-score's stemmer. Raise the floor to 3.10.4 from 2026-10-29.
 ]
 
 # Security floors that only need to raise a version. Constraints add to the
