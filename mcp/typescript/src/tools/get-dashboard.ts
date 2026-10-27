@@ -1,13 +1,11 @@
 import { getBoard } from "../langwatch-api-boards.js";
 import { getDashboard as apiGetDashboard } from "../langwatch-api-dashboards.ts";
-import { getCurrentProject } from "../langwatch-api-projects.js";
 import { LangWatchApiError } from "../langwatch-api.js";
 
 /** A Dashboards board has no Reports graphs; this renders what the board route answers. */
 async function describeBoardOrThrow({ id, notFound }: { id: string; notFound: unknown }) {
-  const project = await getCurrentProject();
   try {
-    const board = await getBoard({ projectId: project.id, boardId: id });
+    const board = await getBoard({ boardId: id });
     return [
       `# ${board.name}\n`,
       `**ID**: ${board.id}`,
