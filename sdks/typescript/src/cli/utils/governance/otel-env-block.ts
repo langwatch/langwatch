@@ -40,15 +40,8 @@ export function telemetryEnvVarNames(tool: string): string[] {
 }
 
 /**
- * Env var names langwatch USED to write for `tool` but no longer does, so an
- * install/refresh/logout run can strip them from a previously-written block
- * on upgrade. The merge-only install path never prunes on its own, and once a
- * key leaves buildOtelEnvBlock it also leaves telemetryEnvVarNames, so a
- * dropped key would otherwise linger in an existing settings file forever.
- *   - claude: OTEL_LOG_RAW_API_BODIES — replaced by the lighter
- *     OTEL_LOG_ASSISTANT_RESPONSES; we stopped defaulting the full-body
- *     export (#8284). Kept here so upgrading users get it removed on their
- *     next `langwatch claude` / `langwatch instrument claude`.
+ * Env var names langwatch used to write for `tool`. Install only merges, so a dropped
+ * key would linger in an existing block; refresh and logout strip these (#8284).
  */
 export function legacyTelemetryEnvVarNames(tool: string): string[] {
   switch (tool) {
@@ -71,16 +64,9 @@ export function buildOtelEnvBlock(
 
   switch (tool) {
     case "claude":
-      // Four light OTel knobs, all ON: TOOL_DETAILS/TOOL_CONTENT lift tool I/O
-      // onto tool events; ASSISTANT_RESPONSES emits the light
-      // `claude_code.assistant_response` event carrying just the reply text
-      // (claude-code 2.1.193+), which the receiver already reads;
+      // ASSISTANT_RESPONSES carries the reply text; RAW_API_BODIES is opt-in because it
+      // serialises the whole request and response on every call (#8284).
       // ENHANCED_TELEMETRY_BETA unlocks span-tracing into a reconstructable tree.
-      // We deliberately do NOT set OTEL_LOG_RAW_API_BODIES: it serialises the
-      // entire request (whole conversation, up to 1M tokens) plus the whole
-      // response on every model call — avoidable CPU/memory for content we
-      // already get from the light events. A user who wants raw bodies can set
-      // the flag themselves and the receiver keeps reading it when present (#8284).
       return {
         CLAUDE_CODE_ENABLE_TELEMETRY: "1",
         CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: "1",

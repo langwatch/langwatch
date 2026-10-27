@@ -326,13 +326,8 @@ describe("resolveWrapperMode", () => {
   });
 
   describe("when claude resolves to ingestion mode", () => {
-    /**
-     * claude-code 2.x needs all 4 OTEL_LOG_* knobs or the wire is
-     * metadata-only; ASSISTANT_RESPONSES carries the reply text via the
-     * light assistant_response event. RAW_API_BODIES is deliberately NOT
-     * set (#8284). Pinned against silent drift.
-     */
-    it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", async () => {
+    /** Without the four light knobs the wire is metadata-only; raw bodies stay opt-in (#8284). */
+    it("sets the four light claude OTEL_LOG_* knobs, not raw bodies", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
       (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
         token: "sk-lw-claude-test-token",

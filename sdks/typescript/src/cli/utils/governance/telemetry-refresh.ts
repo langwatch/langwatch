@@ -90,19 +90,8 @@ export function otelWiringLooksLangwatchAuthored(env: Record<string, string>): b
 }
 
 /**
- * The legacy keys to strip from a langwatch-authored claude block, or none.
- *
- * Stripping must be a ONE-TIME migration, not a recurring prune: after the
- * upgrade a user may deliberately add OTEL_LOG_RAW_API_BODIES=1 back for
- * debugging (the documented opt-in), and a prune on every refresh would
- * silently delete it at the next launch. Ownership (endpoint/header shape)
- * says the block is ours; it cannot say who added this particular flag.
- *
- * The migration marker is OTEL_LOG_ASSISTANT_RESPONSES itself: a block that
- * still lacks it was written by a pre-#8284 CLI and has not migrated, so a
- * RAW_API_BODIES beside it is the old default. Once the new key is present
- * the block has migrated, and any RAW_API_BODIES is a later user choice we
- * must preserve. No extra state file needed.
+ * One-time migration (#8284): a block without OTEL_LOG_ASSISTANT_RESPONSES predates it, so its
+ * RAW_API_BODIES is the old default. Once migrated, a RAW_API_BODIES is the user's opt-in.
  */
 function legacyKeysToStrip(tool: string, current: Record<string, string>): string[] {
   if (tool !== "claude") return [];
@@ -267,13 +256,7 @@ export function refreshClaudeUserTelemetryEnv({
     // The env is the refresh that matters; the seam is best-effort.
     void 0;
   }
-  // One-time migration: strip the legacy OTEL_LOG_RAW_API_BODIES from a
-  // block a pre-#8284 CLI wrote — installAppEnv only merges, it never
-  // prunes. Only fires while the block still lacks the replacement key
-  // (see legacyKeysToStrip), so a RAW_API_BODIES the user adds back later
-  // as a deliberate opt-in survives every subsequent refresh. A block that
-  // lacks the replacement key cannot match `vars`, which carries it, so a
-  // strip always falls through to the install below and returns its label.
+  // installAppEnv only merges, so strip the pre-#8284 default here; see legacyKeysToStrip.
   const legacyKeys = legacyKeysToStrip("claude", current);
   if (legacyKeys.length > 0 && appEnvHasAnyVar(target, legacyKeys)) {
     removeAppEnvVars(target, legacyKeys);
@@ -364,26 +347,13 @@ export function ensureClaudeProjectTelemetryPin({
   const current = appEnvValues(target);
   const hasOwnedKey = Object.keys(vars).some((k) => k in current);
   const isLangwatchAuthored = !hasOwnedKey || otelWiringLooksLangwatchAuthored(current);
-  // Whether an established LangWatch pin is already here, as opposed to
-  // "nothing to conflict with" (a fresh file, or one that merely lacks any
-  // of our current keys, e.g. carries only a hand-set legacy flag with no
-  // other langwatch-shaped wiring yet). isLangwatchAuthored's `!hasOwnedKey`
-  // branch is right for deciding it's safe to WRITE such a file, but wrong
-  // for deciding it's safe to STRIP a legacy key from it: that file was
-  // never langwatch's pin to begin with, so its OTEL_LOG_RAW_API_BODIES is
-  // not "the old default" - it's a setting we have no history with.
+  // A file with no langwatch key is safe to write but was never our pin, so its
+  // RAW_API_BODIES is not the old default and must not be stripped.
   const hasLangwatchBlock = hasOwnedKey && otelWiringLooksLangwatchAuthored(current);
-  // One-time migration: strip the legacy OTEL_LOG_RAW_API_BODIES from a
-  // pre-#8284 pin so it clears on upgrade (installAppEnv only merges). Only
-  // when the block is ours to touch, and only while it still lacks the
-  // replacement key (see legacyKeysToStrip), so a RAW_API_BODIES the user
-  // adds back later as a deliberate opt-in survives every later refresh.
   const legacyKeys = legacyKeysToStrip("claude", current);
-  const strippedLegacy =
-    hasLangwatchBlock &&
-    legacyKeys.length > 0 &&
-    appEnvHasAnyVar(target, legacyKeys) &&
-    removeAppEnvVars(target, legacyKeys);
+  const shouldStrip =
+    hasLangwatchBlock && legacyKeys.length > 0 && appEnvHasAnyVar(target, legacyKeys);
+  const strippedLegacy = shouldStrip ? removeAppEnvVars(target, legacyKeys) : false;
   if (appEnvHasAllVars(target, vars)) {
     return { action: strippedLegacy ? "updated" : "unchanged", ...base };
   }
@@ -403,8 +373,7 @@ export function ensureClaudeProjectTelemetryPin({
  */
 export function removeClaudeProjectTelemetryPin({ cwd }: { cwd: string }): boolean {
   const target = claudeProjectSettingsTarget(cwd);
-  // Include legacy keys we no longer write (OTEL_LOG_RAW_API_BODIES, #8284)
-  // so logout / gateway-mode cleanup also clears a block a prior version left.
+  // Legacy keys too, so cleanup clears a block a pre-#8284 CLI left.
   const keys = [...telemetryEnvVarNames("claude"), ...legacyTelemetryEnvVarNames("claude")];
   if (!appEnvHasAnyVar(target, keys)) return false;
   const envValues = appEnvValues(target);

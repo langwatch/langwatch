@@ -17074,13 +17074,13 @@ The session reports the repository and branch it works on: automatically from it
 
 The setup that `langwatch claude` and `langwatch instrument claude` write turns on the four Claude Code content flags, because the content is what makes a trace worth reading:
 
-| Flag | What it puts on the wire |
-| --- | --- |
-| `OTEL_LOG_USER_PROMPTS` | The text of every prompt |
-| `OTEL_LOG_TOOL_DETAILS` | What each tool call was asked to do, such as the command text or the change to a file |
-| `OTEL_LOG_TOOL_CONTENT` | What each tool call returned, including the contents of files it read |
-| `OTEL_LOG_ASSISTANT_RESPONSES` | The assistant's response text, on a light event of its own |
-| `OTEL_LOG_RAW_API_BODIES` | The full request and response JSON of every model call. Opt-in, for debugging |
+| Flag                           | What it puts on the wire                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `OTEL_LOG_USER_PROMPTS`        | The text of every prompt                                                              |
+| `OTEL_LOG_TOOL_DETAILS`        | What each tool call was asked to do, such as the command text or the change to a file |
+| `OTEL_LOG_TOOL_CONTENT`        | What each tool call returned, including the contents of files it read                 |
+| `OTEL_LOG_ASSISTANT_RESPONSES` | The assistant's response text, on a light event of its own                            |
+| `OTEL_LOG_RAW_API_BODIES`      | The full request and response JSON of every model call. Opt-in, for debugging         |
 
 Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: tokens, cost, model, latency, the tool call tree and the subagent tree stay, and the content stops.
 
