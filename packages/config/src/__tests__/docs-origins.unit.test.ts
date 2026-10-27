@@ -68,9 +68,9 @@ describe("registeredDocsOrigins", () => {
       registeredDocsOrigins({
         configured: ["https://docs.internal"],
         isSaas: true,
-        publicBaseUrl: undefined,
+        publicBaseUrl: "https://app.langwatch.ai/",
       }),
-    ).toEqual(["https://docs.internal"]);
+    ).toEqual(["https://docs.internal", "https://app.langwatch.ai"]);
   });
 });
 

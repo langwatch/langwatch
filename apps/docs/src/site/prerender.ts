@@ -45,6 +45,7 @@ import {
 import { builtFontPaths, publishMedia } from "./hashed-assets.ts";
 import { optimisePageImages } from "./image-variants.ts";
 import { writeOutputFiles } from "./output-files.ts";
+import { authoredHeroPreload } from "./page-images.ts";
 import { renderCache, renderedPageSchema, type RenderedPage } from "./render-cache.ts";
 import { failOnSkippedPages } from "./render-failures.ts";
 import {
@@ -60,8 +61,6 @@ import { optimisePageVideos } from "./video-variants.ts";
    build context, renders pages on worker threads of this same bundle (or reuses them from the
    render cache), then writes every output file once, beside the client's hashed assets. */
 const STYLE_PLACEHOLDER = "/assets/prerender.css";
-const HERO_PRELOAD = ({ site }: { site: (path: string) => string }) =>
-  `<link rel="preload" as="image" href="${site("/images/coding-agents/optimized/session-detail-1024.webp")}" imagesrcset="${site("/images/coding-agents/optimized/session-detail-640.webp")} 640w, ${site("/images/coding-agents/optimized/session-detail-1024.webp")} 1024w, ${site("/images/coding-agents/optimized/session-detail-1560.webp")} 1560w" imagesizes="(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)">`;
 const manifestSchema = z.record(
   z.string(),
   z.looseObject({
@@ -118,8 +117,7 @@ async function renderPage({
   slug: string;
   context: RenderContext;
 }): Promise<RenderedPage> {
-  const { template, islands, nav, basePath } = context;
-  const site = (sitePath: string) => withBasePath({ basePath, path: sitePath });
+  const { template, islands, nav } = context;
   const placeholder = styleLink({ href: STYLE_PLACEHOLDER });
   const result = await render({ slug });
   const styled = extractStyles({ html: result.html });
@@ -135,7 +133,7 @@ async function renderPage({
     return { page, rules: styled.rules, search: null };
   }
   const { html, title, description, operation, headings } = result;
-  const preload = slug === "coding-agents/overview" ? HERO_PRELOAD({ site }) : "";
+  const preload = authoredHeroPreload({ html });
   const page = composeDocument({
     template,
     islands,

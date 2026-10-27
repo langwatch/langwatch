@@ -111,6 +111,20 @@ function openTag({ scan, match }: { scan: Scan; match: RegExpExecArray }) {
   scan.stack.push({ name, hidden, theme: themeOf({ classes }) });
 }
 
+/** A preload for the authored responsive image a page marks `fetchPriority="high"` (its hero). */
+export function authoredHeroPreload({ html }: { html: string }): string {
+  for (const [tag] of html.matchAll(/<img\b[^>]*>/g)) {
+    if (attribute({ tag, name: "fetchpriority" }) !== "high") continue;
+    const src = attribute({ tag, name: "src" });
+    const srcset = attribute({ tag, name: "srcset" });
+    if (!src || !srcset) continue;
+    const sizes = attribute({ tag, name: "sizes" });
+    const quote = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+    return `<link rel="preload" as="image" href="${quote(src)}" imagesrcset="${quote(srcset)}"${sizes ? ` imagesizes="${quote(sizes)}"` : ""} fetchpriority="high">`;
+  }
+  return "";
+}
+
 /** Every `docs-img` in the page's article that is not already inside a `<picture>`. */
 export function pageImages({ html }: { html: string }): PageImage[] {
   const article = html.search(/<article\b[^>]*\bdocs-prose\b/);

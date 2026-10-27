@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { pageRasters, rewritePageImages, type ImageVariants } from "../page-images.ts";
+import {
+  authoredHeroPreload,
+  pageRasters,
+  rewritePageImages,
+  type ImageVariants,
+} from "../page-images.ts";
 
 const head = "<html><head><title>Guide</title></head><body><header><h1>Guide</h1></header>";
 const page = ({ article }: { article: string }) =>
@@ -96,5 +101,22 @@ describe("the first image a reader sees", () => {
       expect(html).not.toContain('loading="eager"');
       expect(html).toContain("<picture");
     }
+  });
+});
+
+describe("authoredHeroPreload", () => {
+  it("preloads the responsive image a page marks high priority, with its candidates and sizes", () => {
+    const html = page({
+      article:
+        '<img src="/docs/a-640.webp" srcset="/docs/a-640.webp 640w, /docs/a-1024.webp 1024w" sizes="100vw" fetchpriority="high" alt=""/>',
+    });
+    expect(authoredHeroPreload({ html })).toBe(
+      '<link rel="preload" as="image" href="/docs/a-640.webp" imagesrcset="/docs/a-640.webp 640w, /docs/a-1024.webp 1024w" imagesizes="100vw" fetchpriority="high">',
+    );
+  });
+
+  it("preloads nothing when no responsive image is marked high priority", () => {
+    const html = page({ article: img({ src: "/docs/images/a.png" }) });
+    expect(authoredHeroPreload({ html })).toBe("");
   });
 });
