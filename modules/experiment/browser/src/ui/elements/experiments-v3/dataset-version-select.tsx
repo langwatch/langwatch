@@ -1,4 +1,4 @@
-import { HStack, NativeSelect, Text } from "@langwatch/design-system/primitives";
+import { NativeSelect } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import type { DatasetVersionOption } from "../../../behavior/experiments-v3/use-dataset-version-options.ts";
@@ -36,13 +36,8 @@ export function DatasetVersionSelect({
       : versions;
 
   return (
-    <HStack gap={1.5} flexShrink={0}>
-      <Tooltip content={DATASET_VERSION_PIN_HINT} positioning={{ placement: "top" }} showArrow>
-        <Text textStyle="caption" color="fg.muted">
-          Dataset version
-        </Text>
-      </Tooltip>
-      <NativeSelect.Root size="xs" width="200px" disabled={disabled}>
+    <Tooltip content={DATASET_VERSION_PIN_HINT} positioning={{ placement: "top" }} showArrow>
+      <NativeSelect.Root size="xs" width="150px" flexShrink={0} disabled={disabled}>
         <NativeSelect.Field
           aria-label="Dataset version"
           data-testid="experiment-dataset-version"
@@ -52,7 +47,7 @@ export function DatasetVersionSelect({
             onChange(selected === LATEST ? null : Number(selected));
           }}
         >
-          <option value={LATEST}>Latest</option>
+          <option value={LATEST}>Latest version</option>
           {options.map((option) => (
             <option key={option.version} value={String(option.version)}>
               {datasetVersionLabel(option)}
@@ -61,6 +56,6 @@ export function DatasetVersionSelect({
         </NativeSelect.Field>
         <NativeSelect.Indicator />
       </NativeSelect.Root>
-    </HStack>
+    </Tooltip>
   );
 }

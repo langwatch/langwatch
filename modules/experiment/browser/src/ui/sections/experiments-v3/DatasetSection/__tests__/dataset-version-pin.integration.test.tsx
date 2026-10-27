@@ -84,7 +84,7 @@ describe("DatasetTabs dataset version pin", () => {
       const labels = within(versionSelect())
         .getAllByRole("option")
         .map((option) => option.textContent);
-      expect(labels).toEqual(["Latest", "Version 2 · cleaned", "Version 1"]);
+      expect(labels).toEqual(["Latest version", "Version 2 · cleaned", "Version 1"]);
       expect(versionsQuery).toHaveBeenCalledWith(
         { projectId: "project-1", datasetId: "dataset-1" },
         expect.objectContaining({ enabled: true }),
@@ -115,7 +115,7 @@ describe("DatasetTabs dataset version pin", () => {
         renderWithDesignSystem(<DatasetTabs {...handlers} />);
         expect(versionSelect()).toHaveValue("1");
 
-        await user.selectOptions(versionSelect(), "Latest");
+        await user.selectOptions(versionSelect(), "Latest version");
 
         expect(activeDatasetVersion()).toBeUndefined();
         expect(versionSelect()).toHaveValue("latest");
