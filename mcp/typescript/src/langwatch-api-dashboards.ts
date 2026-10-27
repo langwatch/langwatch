@@ -42,7 +42,7 @@ export async function listProjectDashboards({
 }): Promise<{ data: DashboardListItem[] }> {
   return makeRequest(
     "GET",
-    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/dashboards`,
+    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/boards`,
   ) as Promise<{ data: DashboardListItem[] }>;
 }
 
@@ -56,7 +56,7 @@ export async function getProjectDashboard({
 }): Promise<Dashboard> {
   return makeRequest(
     "GET",
-    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/dashboards/${encodeURIComponent(dashboardId)}`,
+    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/boards/${encodeURIComponent(dashboardId)}`,
   ) as Promise<Dashboard>;
 }
 

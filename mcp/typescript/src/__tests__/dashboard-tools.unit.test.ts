@@ -113,15 +113,15 @@ describe("given the dashboard client", () => {
 
 describe("given the project-path dashboard reads", () => {
   /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
-  it("reads /analytics/dashboards under the project, never /analytics/boards", async () => {
+  it("reads /analytics/boards under the project, which old and new servers both answer", async () => {
     const calls = stubFetch();
 
     await listProjectDashboards({ projectId: "proj_1" });
     await getProjectDashboard({ projectId: "proj_1", dashboardId: "b_1" });
 
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
-      "GET /api/v1/projects/proj_1/analytics/dashboards",
-      "GET /api/v1/projects/proj_1/analytics/dashboards/b_1",
+      "GET /api/v1/projects/proj_1/analytics/boards",
+      "GET /api/v1/projects/proj_1/analytics/boards/b_1",
     ]);
   });
 });

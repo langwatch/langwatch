@@ -14,7 +14,7 @@ export type DashboardWidget =
 
 /** A dashboard a widget can be added to, as the dashboards list answers it. */
 export type DashboardListItem =
-  paths["/api/v1/projects/{projectId}/analytics/dashboards"]["get"]["responses"]["200"]["content"]["application/json"]["data"][number];
+  paths["/api/v1/projects/{projectId}/analytics/boards"]["get"]["responses"]["200"]["content"]["application/json"]["data"][number];
 
 /** One named LangWatchQL query a widget may run, as a create/update submits it. */
 export type DashboardWidgetQueryInput =
@@ -175,7 +175,7 @@ export class DashboardWidgetsApiService {
   async listDashboards(): Promise<{ data: DashboardListItem[] }> {
     const projectId = this.projectId("list dashboards");
     const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/projects/{projectId}/analytics/dashboards",
+      "/api/v1/projects/{projectId}/analytics/boards",
       { params: { path: { projectId } } },
     );
     if (error) this.handleApiError({ operation: "list dashboards", error, response });

@@ -467,7 +467,7 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/undo-redo.feature",
   "specs/features/agent-cli.feature",
   "specs/features/annotation-cli.feature",
-  "specs/features/dashboard-cli.feature",
+  "specs/features/analytics-reports-cli.feature",
   "specs/features/dataset-python-sdk.feature",
   "specs/features/devtools/issue-creation-skill.feature",
   "specs/features/devtools/orchestrator-bug-fix-workflow.feature",
