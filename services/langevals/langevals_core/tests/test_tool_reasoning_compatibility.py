@@ -42,6 +42,7 @@ AFFECTED_MODELS = [
     "openai/gpt-6-luna",
     "openai/gpt-6-sol",
     "openai/gpt-6.1-sol",
+    "openai/gpt-6.1-terra",
 ]
 
 
