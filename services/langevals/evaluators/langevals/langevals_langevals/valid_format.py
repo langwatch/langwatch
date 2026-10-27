@@ -49,7 +49,8 @@ class ValidFormatEvaluator(
     is_guardrail = True
 
     def evaluate(self, entry: ValidFormatEntry) -> SingleEvaluationResult:
-        if not entry.output:
+        # A blank completion is empty whatever its whitespace, for every format.
+        if not entry.output or not entry.output.strip():
             return EvaluationResultSkipped(details="Output is empty")
 
         if self.settings.format == "json":
@@ -107,16 +108,12 @@ class ValidFormatEvaluator(
                 return ValidFormatResult(
                     score=0, passed=False, details=f"Invalid Python: {e}"
                 )
-            # ast.parse() accepts whitespace-only and comment-only source as a
-            # valid empty module (comments are not AST nodes), so the leading
-            # empty-string guard misses them. A completion with no statements
-            # is not valid Python output — treat it as a failure, not a pass
-            # (#8283).
+            # Comment-only source parses to an empty module; no statements is not Python output.
             if not parsed_module.body:
                 return ValidFormatResult(
                     score=0,
                     passed=False,
-                    details="Invalid Python: no statements (whitespace- or comment-only output)",
+                    details="Invalid Python: no statements (comment-only output)",
                 )
         elif self.settings.format == "sql":
             try:

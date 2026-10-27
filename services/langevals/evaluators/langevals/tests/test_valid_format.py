@@ -65,27 +65,34 @@ def test_valid_format_evaluator_python():
 
 
 def test_valid_format_evaluator_python_whitespace_only():
-    # Whitespace-only source parses as a valid empty module, but is not valid
-    # Python output — it must not score as passed (#8283).
     entry = ValidFormatEntry(output="   \n\t\n  ")
     evaluator = ValidFormatEvaluator(settings=ValidFormatSettings(format="python"))
     result = evaluator.evaluate(entry)
 
-    assert result.status == "processed"
-    assert result.passed == False
-    assert "Invalid Python" in result.details  # type: ignore
+    assert result.status == "skipped"
+    assert "Output is empty" in result.details  # type: ignore
 
 
 def test_valid_format_evaluator_python_comment_only():
-    # Comment-only source also parses to an empty module (comments are not AST
-    # nodes), so it must fail too (#8283).
+    # Comments are not AST nodes, so this parses to an empty module.
     entry = ValidFormatEntry(output="# just a comment\n# another line")
     evaluator = ValidFormatEvaluator(settings=ValidFormatSettings(format="python"))
     result = evaluator.evaluate(entry)
 
     assert result.status == "processed"
     assert result.passed == False
+    assert result.score == 0
     assert "Invalid Python" in result.details  # type: ignore
+
+
+def test_valid_format_evaluator_sql_whitespace_only():
+    # sqlglot.parse returns [None] for blank source instead of raising.
+    entry = ValidFormatEntry(output="   \n ")
+    evaluator = ValidFormatEvaluator(settings=ValidFormatSettings(format="sql"))
+    result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert "Output is empty" in result.details  # type: ignore
 
 
 def test_valid_format_evaluator_sql():
