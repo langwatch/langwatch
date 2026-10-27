@@ -129,6 +129,10 @@ func TestValidatorRefusesACloudDomainDressedAsOnPremise(t *testing.T) {
 		"s3.amazonaws.com.localhost.local",
 		"s3.amazonaws.com.local.localhost",
 		"grafana.internal.local",
+		"metadata.google.internal..local",
+		"s3.amazonaws.com..local",
+		"metadata.local",
+		"metadata.goog.local",
 	)
 }
 

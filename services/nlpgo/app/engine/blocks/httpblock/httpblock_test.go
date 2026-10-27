@@ -530,6 +530,28 @@ func TestSafeDialer_DialsAnAllowlistedPrivateNameAtTheCheckedAddress(t *testing.
 	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
 }
 
+// @scenario "An allowlisted hostname that resolves to the metadata address is refused"
+func TestSafeDialer_ASilentAddressDoesNotSpendTheWholeDeadline(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		AllowedHosts: []string{"agent.corp.local"},
+		Resolver: func(string) ([]net.IP, error) {
+			// 192.0.2.1 is a documentation address: a dial to it hangs or fails.
+			return []net.IP{net.ParseIP("192.0.2.1"), net.ParseIP("127.0.0.1")}, nil
+		},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	conn, err := dial(ctx, "tcp", net.JoinHostPort("agent.corp.local", port))
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
+}
+
 // TestSafeDialer_BlocksLiteralPrivateIP catches direct dials by IP.
 func TestSafeDialer_BlocksLiteralPrivateIP(t *testing.T) {
 	dial := httpblock.SafeDialer(httpblock.SSRFOptions{})

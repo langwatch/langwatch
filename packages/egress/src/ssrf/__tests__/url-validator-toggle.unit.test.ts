@@ -144,6 +144,10 @@ describe("SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS half)", () => {
       "s3.amazonaws.com.localhost.local",
       "s3.amazonaws.com.local.localhost",
       "grafana.internal.local",
+      "metadata.google.internal..local",
+      "s3.amazonaws.com..local",
+      "metadata.local",
+      "metadata.goog.local",
     ])("refuses %s", async (hostname) => {
       const validate = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [hostname] });
       await expect(validate(`http://${hostname}/`)).rejects.toThrow(

@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -347,6 +348,7 @@ func isCloudMetadataHost(hostname string) bool {
 }
 
 func isBlockedCloudDomain(hostname string) bool {
+	hostname = withoutTrailingDot(hostname)
 	if hostname == "localhost" || hostname == "local" {
 		return false
 	}
@@ -364,7 +366,7 @@ func isBlockedCloudDomain(hostname string) bool {
 // still read as metadata.google.internal.
 func isOnPremiseDomain(hostname string) bool {
 	labels := strings.Split(hostname, ".")
-	if len(labels) < 2 {
+	if len(labels) < 2 || slices.Contains(labels, "") {
 		return false
 	}
 	if _, ok := onPremiseLabels[labels[len(labels)-1]]; !ok {
@@ -376,7 +378,8 @@ func isOnPremiseDomain(hostname string) bool {
 		}
 		labels = labels[:len(labels)-1]
 	}
-	return !isBlockedCloudDomain(strings.Join(labels, "."))
+	rest := strings.Join(labels, ".")
+	return !isBlockedCloudDomain(rest) && !isCloudMetadataHost(rest)
 }
 
 func anyMetadata(addrs []netip.Addr) bool {

@@ -200,9 +200,17 @@ type checkedAddrs struct {
 // dial tries each checked address in turn, falling back as a dial by name
 // would, and never reaches an address that was not checked.
 func (c checkedAddrs) dial(ctx context.Context, base *net.Dialer, network string) (net.Conn, error) {
+	// Each remaining address gets an equal share of the time left, as Go's own
+	// serial dial does, so one silent address cannot spend the whole timeout.
+	deadline := time.Now().Add(base.Timeout)
+	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+		deadline = d
+	}
 	var lastErr error
-	for _, ip := range c.ips {
-		conn, err := base.DialContext(ctx, network, net.JoinHostPort(ip.String(), c.port))
+	for i, ip := range c.ips {
+		attemptCtx, cancel := context.WithTimeout(ctx, time.Until(deadline)/time.Duration(len(c.ips)-i))
+		conn, err := base.DialContext(attemptCtx, network, net.JoinHostPort(ip.String(), c.port))
+		cancel()
 		if err == nil {
 			return conn, nil
 		}

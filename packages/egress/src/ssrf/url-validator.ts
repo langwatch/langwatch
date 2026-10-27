@@ -133,10 +133,12 @@ const onPremiseLabels = new Set<string>(ON_PREMISE_SUFFIXES.map((suffix) => suff
  */
 function isOnPremiseDomain(hostname: string): boolean {
   const labels = hostname.split(".");
-  if (labels.length < 2 || !onPremiseLabels.has(labels.at(-1)!)) return false;
+  if (labels.length < 2 || labels.includes("")) return false;
+  if (!onPremiseLabels.has(labels.at(-1)!)) return false;
 
   while (labels.length > 1 && onPremiseLabels.has(labels.at(-1)!)) labels.pop();
-  return !isBlockedCloudDomain(labels.join("."));
+  const rest = labels.join(".");
+  return !isBlockedCloudDomain(rest) && !isCloudMetadataHost(rest);
 }
 
 /**
