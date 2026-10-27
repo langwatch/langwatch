@@ -21,6 +21,8 @@ export const weatherAgent = new Agent({
 
       Use the weatherTool to fetch current weather data.
 `,
+  // Mastra calls OpenAI models through the Responses API, which accepts
+  // function tools on gpt-6 with reasoning on, so no reasoning setting is needed.
   model: "openai/gpt-6-luna",
   tools: { weatherTool },
   scorers: {
