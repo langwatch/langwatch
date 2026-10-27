@@ -150,7 +150,8 @@ langwatch_retriever_tool = create_retriever_tool(
 
 # 4. Use the wrapped retriever in your agent/chain
 tools = [langwatch_retriever_tool]
-model = ChatOpenAI(model="gpt-6-luna", streaming=True)
+# gpt-6 models only accept function tools on Chat Completions with reasoning off
+model = ChatOpenAI(model="gpt-6-luna", reasoning_effort="none", streaming=True)
 prompt = ChatPromptTemplate.from_messages(
     [
         ("system", "You are a helpful assistant. Answer questions based on the retrieved context.\n{agent_scratchpad}"),
