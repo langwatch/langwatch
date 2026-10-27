@@ -52,6 +52,7 @@ describe("ProjectRequestService legacy keys", () => {
       expect(keys.map((key) => key.projectId)).toEqual(["project_alpha", "project_beta"]);
     });
 
+    /** @scenario A reader only sees the legacy rows of the projects they can manage */
     it("drops the row of a project the reader cannot manage", async () => {
       const { requests, probePermission } = service({ manageable: ["project_beta"] });
 
@@ -68,6 +69,7 @@ describe("ProjectRequestService legacy keys", () => {
       });
     });
 
+    /** @scenario A reader who manages no project receives no legacy keys */
     it("answers none to a reader who manages neither", async () => {
       const { requests } = service({ manageable: [] });
 

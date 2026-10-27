@@ -113,6 +113,34 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And each row is scoped to its own project and carries its own Revoke
 
     @integration
+    Scenario: The banner names every live project without a bulk revoke action
+      Given project "alpha" and project "beta" both still have a live legacy key
+      When "ada" opens the API keys
+      Then the warning banner names both projects
+      And the banner offers no "Revoke and replace" action
+
+    @integration
+    Scenario: Same-named projects remain distinguishable before revoking a legacy key
+      Given two projects named "Web App" have different slugs and live legacy keys
+      When "ada" opens the API keys and chooses Revoke for the second project
+      Then the rows, action labels and confirmation identify the projects by slug
+      And confirming revokes only the second project's legacy key
+
+    @integration
+    Scenario: A replacement key's snippets name the replaced project
+      Given the remembered project is "alpha" and project "beta" has a live legacy key
+      When a reader revokes and replaces the key of project "beta"
+      Then both service and personal replacement keys are scoped to project "beta"
+      And the setup snippets use project "beta"
+
+    @integration
+    Scenario: Legacy key loading does not show an empty key list
+      Given the API key list is empty and the legacy key read has not answered
+      When "ada" opens the API keys
+      Then the table shows loading rows
+      And neither an empty list nor a no-matches message is shown
+
+    @integration
     Scenario: Revoking one project's legacy key leaves the other project's row and the banner
       Given project "alpha" and project "beta" both still have a live legacy key
       And "ada" revoked the legacy key of project "alpha"
@@ -129,12 +157,12 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then no "Project key" row is listed
       And no warning banner is shown
 
-    @integration
+    @unit
     Scenario: A reader only sees the legacy rows of the projects they can manage
       Given project "alpha" and project "beta" both still have a live legacy key
-      And "max" can manage project "beta" only
-      When "max" opens the API keys
-      Then a "Project key" row is listed for project "beta" only
+      And "pat" administers project "beta" only
+      When "pat" requests the organisation's legacy keys
+      Then only project "beta" is returned
 
     @integration
     Scenario: The banner's button revokes and replaces the legacy key
@@ -155,12 +183,11 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the project's stored key is replaced by a value that never authenticates
       And a trace sent with the old key is refused
 
-    @integration
-    Scenario: A reader who cannot manage the project sees no legacy row and no error
-      Given project "alpha" still has a live legacy key
-      When "max" opens the API keys of project "alpha"
-      Then the legacy key status is not read
-      And no legacy row and no error is shown
+    @unit
+    Scenario: A reader who manages no project receives no legacy keys
+      Given project "alpha" and project "beta" both still have a live legacy key
+      When "max" requests the organisation's legacy keys
+      Then no legacy keys are returned
 
     @integration
     Scenario: A project that never had a legacy key shows no legacy row

@@ -27,13 +27,14 @@ import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chip
 import { ScopeFilter } from "@langwatch/design-system/scope-filter";
 import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
 import { Key, Plus } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { type LegacyProjectKey, useLegacyKeys } from "../../behavior/use-legacy-keys.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
 import type { CreateApiKeyInput } from "../../model/api-key-form.ts";
 import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
+import { findBindingAtScope } from "../../model/api-key-permissions.ts";
 import {
   filterRowsByScope,
   scopeFilterAddressWrite,
@@ -81,19 +82,6 @@ function createInputProblem(
     description:
       "You have no role bindings in this organization, so there is nothing to grant to a key.",
   };
-}
-
-/** Whether a just-created key can reach this project, for the setup snippet's picker. */
-function isProjectReachable({
-  project,
-  keyInput,
-}: {
-  project: { id: string };
-  keyInput: CreateApiKeyInput | null;
-}): boolean {
-  if (!keyInput || keyInput.keyType === "service") return true;
-  if (keyInput.permissionMode !== "restricted") return true;
-  return keyInput.bindings.some((binding) => binding.scopeId === project.id);
 }
 
 function isExpired(key: ApiKeyRow): boolean {
@@ -303,16 +291,21 @@ function LegacyKeyTableRow({
         </VStack>
       </ListTable.Cell>
       <ListTable.Cell>
-        <ProviderScopeChips
-          size="xs"
-          scopes={[
-            {
-              scopeType: "PROJECT",
-              scopeId: legacyKey.projectId,
-              name: legacyKey.projectName,
-            },
-          ]}
-        />
+        <VStack align="start" gap={0} minWidth={0}>
+          <ProviderScopeChips
+            size="xs"
+            scopes={[
+              {
+                scopeType: "PROJECT",
+                scopeId: legacyKey.projectId,
+                name: legacyKey.projectName,
+              },
+            ]}
+          />
+          <Text textStyle="caption" color="fg.muted">
+            {legacyKey.projectSlug}
+          </Text>
+        </VStack>
       </ListTable.Cell>
       <ListTable.Cell>
         <PermissionBadge permissionMode="all" />
@@ -330,7 +323,7 @@ function LegacyKeyTableRow({
             <Button
               size="xs"
               variant="ghost"
-              aria-label={`Actions for the legacy project key of ${legacyKey.projectName}`}
+              aria-label={`Actions for the legacy project key of ${legacyKey.projectName} (${legacyKey.projectSlug})`}
               data-testid="legacy-key-actions"
             >
               <MoreVerticalIcon size={14} />
@@ -363,6 +356,7 @@ export default function ApiKeysScreen() {
   const apiKeys = apiKeyApi.apiKey.list.useQuery({ organizationId });
   const myBindings = apiKeyApi.apiKey.myBindings.useQuery({ organizationId });
   const orgProjects = apiKeyApi.apiKey.orgProjects.useQuery({ organizationId });
+  const availableProjects = orgProjects.data ?? [];
   const orgTeams = apiKeyApi.apiKey.orgTeams.useQuery({ organizationId });
   const orgMembers = apiKeyApi.apiKey.orgMembers.useQuery({ organizationId });
   // An empty member list is how the page knows the reader is not an
@@ -389,20 +383,16 @@ export default function ApiKeysScreen() {
   // The scopes the reader can see: the filter's options, and the names the
   // per-row chips resolve their ids to.
   const filterAvailable = host.availableScopes();
-  const hierarchy = useMemo(() => scopeHierarchyOf(filterAvailable), [filterAvailable]);
+  const hierarchy = scopeHierarchyOf(filterAvailable);
 
   // READ from the address rather than mirrored into state: the platform hook
   // kept a `useState` synced to `?scope=` by an effect, and a mirror can only
   // ever disagree with the URL it is mirroring. The data-governance and
   // model-provider families made the same correction.
-  const scopeFilter = useMemo(
-    () =>
-      scopeFilterFromAddress({
-        raw: reading.query[API_KEY_SCOPE_QUERY_KEY],
-        available: filterAvailable,
-      }),
-    [reading.query, filterAvailable],
-  );
+  const scopeFilter = scopeFilterFromAddress({
+    raw: reading.query[API_KEY_SCOPE_QUERY_KEY],
+    available: filterAvailable,
+  });
 
   const handleScopeFilterChange = (next: ScopeFilterValue) => {
     const write = scopeFilterAddressWrite(next, {
@@ -421,42 +411,32 @@ export default function ApiKeysScreen() {
   // service API keys. They render in two separate labeled sections. `!= null`
   // catches both null and undefined so keys without the field stay in the
   // regular list.
-  const allApiKeys = useMemo(() => apiKeys.data ?? [], [apiKeys.data]);
-  const ingestionKeys = useMemo(
-    () => allApiKeys.filter((k) => k.ingestSourceType != null),
-    [allApiKeys],
-  );
-  const serviceApiKeys = useMemo(
-    () => allApiKeys.filter((k) => k.ingestSourceType == null),
-    [allApiKeys],
-  );
+  const allApiKeys = apiKeys.data ?? [];
+  const ingestionKeys = allApiKeys.filter((key) => key.ingestSourceType != null);
+  const serviceApiKeys = allApiKeys.filter((key) => key.ingestSourceType == null);
 
   // Client-side filter: map each regular key's grants → scopes so the
   // shared inclusive cascade applies directly. The scope filter only governs
   // the regular API keys section.
-  const filteredKeys = useMemo(
-    () =>
-      filterRowsByScope(
-        serviceApiKeys.map((k) => ({
-          ...k,
-          scopes: k.grants.map((rb) => ({
-            scopeType: rb.scopeType,
-            scopeId: rb.scopeId,
-          })),
-        })),
-        scopeFilter,
-        {
-          hierarchy,
-          currentTeamId: scope.teamId,
-          currentProjectId: scope.projectId,
-        },
-      ),
-    [serviceApiKeys, scopeFilter, hierarchy, scope.teamId, scope.projectId],
+  const filteredKeys = filterRowsByScope(
+    serviceApiKeys.map((k) => ({
+      ...k,
+      scopes: k.grants.map((rb) => ({
+        scopeType: rb.scopeType,
+        scopeId: rb.scopeId,
+      })),
+    })),
+    scopeFilter,
+    {
+      hierarchy,
+      currentTeamId: scope.teamId,
+      currentProjectId: scope.projectId,
+    },
   );
 
   // Deep links land on `#api-key-<id>`, but the rows only exist once the keys
   // query resolves, long after the browser has given up on the fragment.
-  const isLoadingKeys = apiKeys.isLoading;
+  const isLoadingKeys = apiKeys.isLoading || legacyKeys.isLoading;
   const anchorId = reading.fragment;
   useEffect(() => {
     if (isLoadingKeys || !anchorId || typeof document === "undefined") return;
@@ -692,7 +672,7 @@ export default function ApiKeysScreen() {
           isOpen={(isCreateOpen || legacyReplacement !== null) && !newToken}
           isCreating={createMutation.isPending}
           myBindings={myBindings}
-          orgProjects={orgProjects.data ?? []}
+          orgProjects={availableProjects}
           orgTeams={orgTeams.data ?? []}
           organizationId={organizationId}
           organizationName={scope.organizationName}
@@ -711,7 +691,7 @@ export default function ApiKeysScreen() {
           apiKey={apiKeyToEdit}
           isUpdating={updateMutation.isPending}
           myBindings={myBindings}
-          orgProjects={orgProjects.data ?? []}
+          orgProjects={availableProjects}
           orgTeams={orgTeams.data ?? []}
           organizationId={organizationId}
           organizationName={scope.organizationName}
@@ -726,8 +706,14 @@ export default function ApiKeysScreen() {
           keyName={newKeyInput?.name}
           projectId={scope.projectId}
           endpoint={endpoint}
-          orgProjects={(orgProjects.data ?? []).filter((project) =>
-            isProjectReachable({ project, keyInput: newKeyInput }),
+          orgProjects={availableProjects.filter((project) =>
+            findBindingAtScope({
+              bindings: newKeyInput?.bindings,
+              scopeType: "PROJECT",
+              scopeId: project.id,
+              organizationId,
+              orgProjects: availableProjects,
+            }),
           )}
           onClose={() => {
             setNewToken(null);
@@ -746,6 +732,7 @@ export default function ApiKeysScreen() {
         <RevokeLegacyKeyDialog
           open={legacyKeyToRevoke !== null}
           projectName={legacyKeyToRevoke?.projectName}
+          projectSlug={legacyKeyToRevoke?.projectSlug}
           isRevoking={revokeLegacyMutation.isPending}
           access={readerAccess([myBindings, orgMembers, orgProjects])}
           onClose={() => setLegacyKeyToRevoke(null)}

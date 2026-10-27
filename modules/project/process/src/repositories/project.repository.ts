@@ -166,7 +166,7 @@ export interface ProjectRepository {
   markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void>;
   /** When the legacy key last authenticated, or nothing when no use was stamped. */
   findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null>;
-  /** Every live non-governance project in the organisation whose legacy key still authenticates. */
+  /** Live legacy keys in the organisation, excluding UNMANAGED_PROJECT_KEY_KINDS. */
   findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyProjectKey[]>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;

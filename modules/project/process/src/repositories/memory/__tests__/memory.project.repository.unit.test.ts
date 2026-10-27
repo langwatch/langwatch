@@ -108,6 +108,12 @@ describe("MemoryProjectRepository", () => {
       await repository.create({ ...creation, id: "project_live", name: "Beta", slug: "beta" });
       await repository.create({
         ...creation,
+        id: "project_live_alpha",
+        name: "Alpha",
+        slug: "alpha-live",
+      });
+      await repository.create({
+        ...creation,
         id: "project_revoked",
         name: "Alpha",
         slug: "alpha",
@@ -126,6 +132,12 @@ describe("MemoryProjectRepository", () => {
       });
 
       expect(await repository.findLiveLegacyKeys({ organizationId: ORGANIZATION_ID })).toEqual([
+        {
+          projectId: "project_live_alpha",
+          projectName: "Alpha",
+          projectSlug: "alpha-live",
+          lastUsedAt: null,
+        },
         {
           projectId: "project_live",
           projectName: "Beta",
