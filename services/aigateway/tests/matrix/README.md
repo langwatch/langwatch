@@ -27,6 +27,15 @@ LANGWATCH_INSTANCE_ADMIN_API_KEY=... OPENAI_API_KEY=... \
   go run ./cmd/matrixseed -base-url http://localhost:5560 -env-file /tmp/matrix.env
 ```
 
+## Credentials in CI
+
+The `gateway-matrix` job runs a cell only when its provider's secret is set; the rest skip.
+
+- **Bedrock:** no stored key. The job assumes `MATRIX_AWS_ROLE_ARN` by OIDC and the gateway signs with that session.
+- **Vertex:** `MATRIX_VERTEX_SERVICE_ACCOUNT_JSON`. The seed stores it on the model provider, and the job mints `VERTEX_ACCESS_TOKEN` from it with the runner's `gcloud` for the cache cell, which calls Vertex directly.
+- **Azure:** `MATRIX_AZURE_OPENAI_API_KEY` and `MATRIX_AZURE_OPENAI_ENDPOINT`; the optional variable `MATRIX_AZURE_OPENAI_API_VERSION` pins the api version.
+- **Refusals:** a refused model-provider request prints its status only, never the body; other refusals print a snippet with every submitted value removed.
+
 ## Running one cell
 
 ```bash
