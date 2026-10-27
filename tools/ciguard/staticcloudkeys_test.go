@@ -89,9 +89,21 @@ func TestStaticCloudKeysRejectsAStoredKey(t *testing.T) {
 }
 
 // @scenario "A workflow that reads a stored AWS key fails CI"
+func TestStaticCloudKeysAllowsAnOIDCSessionExport(t *testing.T) {
+	step := "      - env:\n          AWS_ACCESS_KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}\n          KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}\n        run: |\n          aws configure --profile p set aws_access_key_id \"${KEY_ID}\"\n"
+	workflow := strings.Replace(oidcOnlyWorkflow, "      - run: aws s3 ls \"$AWS_ACCESS_KEY_ID\"\n", step, 1)
+	require.NotEqual(t, oidcOnlyWorkflow, workflow)
+
+	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{".github/workflows/other.yml": workflow}))
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
+// @scenario "A workflow that reads a stored AWS key fails CI"
 func TestStaticCloudKeysRejectsAKeyInJobEnv(t *testing.T) {
 	jobEnv := strings.Replace(oidcOnlyWorkflow, "    runs-on: ubuntu-latest\n",
-		"    runs-on: ubuntu-latest\n    env:\n      AWS_SECRET_ACCESS_KEY: ${{ secrets.MATRIX_AWS_SECRET_ACCESS_KEY }}\n", 1)
+		"    runs-on: ubuntu-latest\n    env:\n      AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_KEY }}\n", 1)
 
 	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{embedsPath: jobEnv}))
 
@@ -113,10 +125,16 @@ func TestStaticCloudKeysIgnoresCase(t *testing.T) {
 // @scenario "A workflow that reads a stored AWS key fails CI"
 func TestStaticCloudKeysFindsKeysOutsideBlockStyle(t *testing.T) {
 	cases := map[string]string{
-		"flow mapping input": "      - uses: aws-actions/configure-aws-credentials@0000000000000000000000000000000000000000\n        with: { aws-region: eu-central-1, aws-access-key-id: \"${{ inputs.key }}\" }\n",
-		"quoted input key":   "      - uses: aws-actions/configure-aws-credentials@0000000000000000000000000000000000000000\n        with:\n          'aws-secret-access-key': ${{ inputs.secret }}\n",
-		"index into secrets": "      - env:\n          K: ${{ secrets['AWS_ACCESS_KEY_ID'] }}\n        run: aws s3 ls\n",
-		"index into vars":    "      - env:\n          K: ${{ vars[\"MATRIX_AWS_SECRET_ACCESS_KEY\"] }}\n        run: aws s3 ls\n",
+		"flow mapping input":             "      - uses: aws-actions/configure-aws-credentials@0000000000000000000000000000000000000000\n        with: { aws-region: eu-central-1, aws-access-key-id: \"${{ inputs.key }}\" }\n",
+		"quoted input key":               "      - uses: aws-actions/configure-aws-credentials@0000000000000000000000000000000000000000\n        with:\n          'aws-secret-access-key': ${{ inputs.secret }}\n",
+		"index into secrets":             "      - env:\n          K: ${{ secrets['AWS_ACCESS_KEY_ID'] }}\n        run: aws s3 ls\n",
+		"env key, any secret name":       "      - env:\n          AWS_ACCESS_KEY_ID: ${{ secrets.CI_KEY }}\n        run: aws s3 ls\n",
+		"env session token":              "      - env:\n          AWS_SESSION_TOKEN: ${{ vars.CI_TOKEN }}\n        run: aws s3 ls\n",
+		"flow style env":                 "      - env: { AWS_SECRET_ACCESS_KEY: '${{ secrets.PUBLISHER_SECRET }}' }\n        run: aws s3 ls\n",
+		"aws configure set":              "      - run: aws configure set aws_access_key_id ${{ secrets.PROD_KEY }}\n",
+		"aws configure set with profile": "      - run: aws configure --profile p set aws_secret_access_key \"${{ secrets.PROD_SECRET }}\"\n",
+		"lowercase secret name":          "      - env:\n          AWS_ACCESS_KEY_ID: ${{ secrets.ci_key }}\n        run: aws s3 ls\n",
+		"index into vars":                "      - env:\n          K: ${{ vars[\"MATRIX_AWS_SECRET_ACCESS_KEY\"] }}\n        run: aws s3 ls\n",
 	}
 	for name, step := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -17,9 +17,13 @@ import (
 // configure-aws-credentials' aws-access-key-id or aws-secret-access-key input,
 // in block or flow (`with: { aws-access-key-id: ... }`) style. A shell
 // `$AWS_ACCESS_KEY_ID` is a session the job already holds, so it is ignored.
+// An AWS_* env key or `aws configure set` fed from secrets or vars is caught
+// whatever the secret is called.
 // Case-insensitive, because GitHub resolves context names case-insensitively.
 var storedAWSKey = regexp.MustCompile(
 	`(?i)\b(?:secrets|env|vars)\s*(?:\.\s*|\[\s*['"])[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY)\b` +
+		`|\bAWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)['"]?\s*:\s*['"]?\$\{\{\s*(?:secrets|vars)\b` +
+		`|\baws_(?:access_key_id|secret_access_key|session_token)\s+['"]?\$\{\{\s*(?:secrets|vars)\b` +
 		`|(?:^|[\s{,])['"]?aws-(?:access-key-id|secret-access-key)['"]?\s*:`,
 )
 
