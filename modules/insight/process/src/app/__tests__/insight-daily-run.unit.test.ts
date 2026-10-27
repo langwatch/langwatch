@@ -439,6 +439,26 @@ describe("given the board a run is asked for", () => {
     expect(installed.boardReads).toEqual([]);
   });
 
+  /** @scenario "A From LangWatch board is read from the catalogue" */
+  it("files a finding on a From LangWatch widget with its catalogue query", async () => {
+    const template: InsightRunBoard = { kind: "template", id: "data", name: "Data" };
+    const [widget] = curatedBoardDefinitionById("data")?.widgets ?? [];
+    const [query] = widget?.definition.queries ?? [];
+    if (!widget || !query) throw new Error("No From LangWatch board named data ships a query");
+    const widgetId = `template:data:${widget.key}`;
+    installed.world.langy.answer = answerWith([finding({ widgetId, lwql: query.sql })]);
+
+    await run({ board: template });
+
+    expect(await insightsOf()).toEqual([
+      expect.objectContaining({
+        lwql: query.sql,
+        board: expect.objectContaining({ id: "data", widget: { id: widgetId, name: widget.name } }),
+      }),
+    ]);
+    expect(await lastRunOf({ board: template })).toMatchObject({ outcome: "filed", filedCount: 1 });
+  });
+
   /** @scenario "A From LangWatch board no longer offered reads as unreadable" */
   it("skips a From LangWatch board the catalogue no longer offers as board_unreadable", async () => {
     const gone: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };

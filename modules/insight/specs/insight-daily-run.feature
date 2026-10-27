@@ -751,6 +751,13 @@ Feature: The daily insights run
       And a stored board with the same id is still undecided
 
     @integration
+    Scenario: A From LangWatch board is named by the catalogue, and one not offered is refused
+      Given a template id the catalogue offers, sent with another name
+      When a member turns its daily run on
+      Then the schedule keeps the catalogue's name for it
+      And a template id the catalogue does not offer is refused as not found, with nothing recorded
+
+    @integration
     Scenario: A setting a schedule does not take is refused
       Given an hour outside 0 to 23, a time zone that is no IANA zone name, or a maximum that is not 1, 3, 5 or 10
       When a member sends it as their daily run's setting
