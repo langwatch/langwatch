@@ -1729,7 +1729,8 @@ function guardOutput({
   };
 
   if (!output) {
-    return async (opts: ResolverOptions) => voidOutput({ procedure, value: await invoke(opts) });
+    return async (opts: ResolverOptions) =>
+      voidOutput({ procedure, kind, value: await invoke(opts) });
   }
 
   if (kind === "subscription") {
@@ -1748,8 +1749,19 @@ function guardOutput({
     validateDeclaredOutput({ procedure, schema: output, value: await invoke(opts) });
 }
 
-/** A procedure that declared no output answers nothing; a value is logged, then dropped. */
-function voidOutput({ procedure, value }: { procedure: string; value: unknown }): unknown {
+/**
+ * A procedure that declared no output answers nothing; a value is logged, then dropped. A
+ * subscription has no nothing to answer, so one without an output stays a 500.
+ */
+function voidOutput({
+  procedure,
+  kind,
+  value,
+}: {
+  procedure: string;
+  kind: TrpcContractMember["kind"];
+  value: unknown;
+}): unknown {
   if (value === undefined) return value;
 
   outputLogger.error(
@@ -1760,6 +1772,10 @@ function voidOutput({ procedure, value }: { procedure: string; value: unknown })
     },
     "tRPC handler response did not match its declared output schema",
   );
+
+  if (kind === "subscription") {
+    throw new Error(`tRPC ${procedure} streams values but declares no output schema`);
+  }
 
   return undefined;
 }

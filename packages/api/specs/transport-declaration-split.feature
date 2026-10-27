@@ -88,6 +88,7 @@ Feature: Transport declaration split
     And the log carries no response contents
     And the caller receives the handler's answer rather than an internal error
     And the answer carries no key the output schema does not name
+    And no value of a type the output schema does not allow for its field
 
   @unit
   Scenario: A procedure that declares no output and answers a value is logged and answers nothing

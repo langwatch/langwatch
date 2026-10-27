@@ -27,6 +27,7 @@ const WRAPPERS = [
   z.ZodDefault,
   z.ZodReadonly,
   z.ZodNonOptional,
+  z.ZodPrefault,
 ] as const;
 
 function innerOf(schema: z.ZodType): z.ZodType | undefined {
@@ -38,13 +39,16 @@ function innerOf(schema: z.ZodType): z.ZodType | undefined {
 
   if (schema instanceof z.ZodLazy) return schema.def.getter() as z.ZodType;
 
-  // The handler's value is what goes INTO the pipe, unless a preprocess step owns that side.
-  if (schema instanceof z.ZodPipe) {
-    return (schema.def.in instanceof z.ZodTransform ? schema.def.out : schema.def.in) as z.ZodType;
+  // A pipe or codec answers what its output side names; a transform there is unknowable.
+  if (schema instanceof z.ZodPipe || schema instanceof z.ZodCodec) {
+    return schema.def.out instanceof z.ZodTransform ? NOTHING : (schema.def.out as z.ZodType);
   }
 
   return undefined;
 }
+
+/** Names a value nothing may be answered for: the salvage keeps none of it. */
+const NOTHING = z.never();
 
 function salvage(schema: z.ZodType, value: unknown): unknown {
   const inner = innerOf(schema);
@@ -63,28 +67,19 @@ function salvage(schema: z.ZodType, value: unknown): unknown {
 
   if (schema instanceof z.ZodUnknown || schema instanceof z.ZodAny) return value;
 
-  // A schema that answers nothing keeps nothing of what the handler gave it.
-  if (schema instanceof z.ZodVoid || schema instanceof z.ZodUndefined) return undefined;
-
-  return asLeaf(value);
-}
-
-/**
- * A value where the schema expected no container: a primitive is kept, an object or array is
- * dropped, since nothing names the keys inside it.
- */
-function asLeaf(value: unknown): unknown {
-  return value !== null && typeof value === "object" ? undefined : value;
+  // A leaf that refused its value (a string where a boolean is named, an object where a string
+  // is): the schema bounds a named field's value as well as its keys, so it is dropped.
+  return undefined;
 }
 
 function salvageArray(schema: z.ZodArray, value: unknown): unknown {
-  if (!Array.isArray(value)) return asLeaf(value);
+  if (!Array.isArray(value)) return undefined;
 
   return value.map((item) => withoutUndeclaredKeys(schema.element as z.ZodType, item));
 }
 
 function salvageRecord(schema: z.ZodRecord, value: unknown): unknown {
-  if (!isPlainObject(value)) return asLeaf(value);
+  if (!isPlainObject(value)) return undefined;
 
   const keyType = schema.keyType as z.ZodType;
 
@@ -105,7 +100,7 @@ function salvageIntersection(schema: z.ZodIntersection, value: unknown): unknown
 }
 
 function salvageObject(schema: z.ZodObject, value: unknown): unknown {
-  if (!isPlainObject(value)) return asLeaf(value);
+  if (!isPlainObject(value)) return undefined;
 
   const shape = schema.shape as Record<string, z.ZodType>;
   const others = otherKeysOf(schema);
@@ -183,5 +178,5 @@ function closestObjectOption(options: z.ZodType[], keys: string[]): z.ZodObject 
 function salvageUnionLeaf(options: z.ZodType[], value: unknown): unknown {
   const list = options.find((option): option is z.ZodArray => option instanceof z.ZodArray);
 
-  return Array.isArray(value) && list ? salvageArray(list, value) : asLeaf(value);
+  return Array.isArray(value) && list ? salvageArray(list, value) : undefined;
 }

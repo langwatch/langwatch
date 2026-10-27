@@ -293,7 +293,7 @@ describe("a mounted contract procedure", () => {
 
   describe("given the handler answers a shape its declaration refuses", () => {
     /** @scenario "A procedure whose answer breaks its output schema is logged and still answered" */
-    it("logs the procedure and the issue path, never the body, and answers without undeclared keys", async () => {
+    it("logs the procedure and the issue path, never the body, and answers only what the schema allows", async () => {
       const { runtime } = harness();
       const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
 
@@ -311,7 +311,7 @@ describe("a mounted contract procedure", () => {
 
       const answer = await caller.getById({ projectId: "project-1", id: "annotation-1" });
 
-      expect(answer).toEqual({ id: "annotation-1", comment: 7 });
+      expect(answer).toEqual({ id: "annotation-1" });
       const record = logged[0] as { fields: Record<string, unknown>; message: string };
       expect(record.fields.endpoint).toBe("review.getById");
       expect(record.fields.protocol).toBe("trpc");

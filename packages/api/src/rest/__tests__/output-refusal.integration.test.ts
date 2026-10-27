@@ -51,7 +51,7 @@ const things = defineRestRouter(ThingApi)
 
 describe("given a route whose handler answers a shape its output schema refuses", () => {
   /** @scenario "A procedure whose answer breaks its output schema is logged and still answered" */
-  it("answers the handler's value without the keys the schema does not name", async () => {
+  it("answers the handler's value without what the schema does not allow", async () => {
     const runtime = createRestRuntime({
       authorization: authorizationPort,
       identity: { authenticate: () => ({ actor: null, scope: null }) },
@@ -68,7 +68,7 @@ describe("given a route whose handler answers a shape its output schema refuses"
     const body = await response.text();
 
     expect(response.status).toBe(200);
-    expect(JSON.parse(body)).toEqual({ id: 7 });
+    expect(JSON.parse(body)).toEqual({});
     expect(body).not.toContain("stored-value");
   });
 });
@@ -108,13 +108,13 @@ function reportApp(body: unknown) {
 describe("given a responds() route whose body its declared status schema refuses", () => {
   /** @scenario "A procedure whose answer breaks its output schema is logged and still answered" */
   it("answers the declared status with the body cut to the keys the schema names", async () => {
-    const response = await reportApp({ status: 7, secret: "stored-value" }).request(
+    const response = await reportApp({ status: "down", secret: "stored-value" }).request(
       "/api/v1/reports",
     );
     const body = await response.text();
 
     expect(response.status).toBe(503);
-    expect(JSON.parse(body)).toEqual({ status: 7 });
+    expect(JSON.parse(body)).toEqual({ status: "down" });
     expect(body).not.toContain("stored-value");
     expect(logged[0]?.fields).toMatchObject({ path: "/api/v1/reports", status: 503 });
     expect(JSON.stringify(logged)).not.toContain("stored-value");
