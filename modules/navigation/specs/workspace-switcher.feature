@@ -127,6 +127,28 @@ Feature: Workspace switcher
     Then the chosen organization becomes the current organization
     And the browser opens "/settings"
 
+  @integration
+  Scenario: Switching organization deep inside settings stays on the same settings page
+    Given I belong to more than one organization
+    And I open "/settings/members"
+    When I pick another organization from the switcher
+    Then the browser opens "/settings/members"
+
+  @integration
+  Scenario: Switching organization forgets the team as well as the project
+    Given I belong to more than one organization
+    When I pick another organization from the switcher
+    Then the remembered team is cleared
+    And the remembered project is cleared
+
+  @integration
+  Scenario: Switching organization before the product gates answer lands on a page of the new organization
+    Given I belong to more than one organization
+    And the product gates for the other organizations have not answered yet
+    When I pick another organization from the switcher
+    Then the browser opens that organization's project home
+    And the browser never opens the root resolver
+
   # -------------------------------------------------------------------------
   # Project switching (buildProjectSwitchHref)
   # -------------------------------------------------------------------------

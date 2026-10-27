@@ -66,6 +66,46 @@ describe("resolveOrgSwitchDestination", () => {
     });
   });
 
+  describe("given the reader is on the settings detour", () => {
+    it("stays on the settings page they were reading", () => {
+      // The detour carries no product, so `currentProduct` is null there;
+      // without the address the resolver would throw them out of settings.
+      expect(
+        resolveOrgSwitchDestination({
+          currentProduct: null,
+          reachableProducts: ["llm-ops"],
+          projectSlug: "beta-app",
+          settingsPathname: "/settings/members",
+        }),
+      ).toBe("/settings/members");
+    });
+
+    it("stays on the settings root", () => {
+      expect(
+        resolveOrgSwitchDestination({
+          currentProduct: null,
+          reachableProducts: [],
+          projectSlug: "beta-app",
+          settingsPathname: "/settings",
+        }),
+      ).toBe("/settings");
+    });
+  });
+
+  describe("given the product gates have not answered yet", () => {
+    it("lands on the new organization's project home rather than the root", () => {
+      // The caller passes no product and nothing reachable while the gates
+      // load; the project home needs no gate.
+      expect(
+        resolveOrgSwitchDestination({
+          currentProduct: null,
+          reachableProducts: [],
+          projectSlug: "beta-app",
+        }),
+      ).toBe("/beta-app");
+    });
+  });
+
   describe("given nothing can be decided", () => {
     it("lands on the root, which re-resolves", () => {
       expect(

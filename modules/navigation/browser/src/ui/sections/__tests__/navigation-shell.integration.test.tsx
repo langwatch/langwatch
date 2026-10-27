@@ -12,14 +12,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 type FlagQueryInput = { flag: string; organizationIds: string[] };
 
 let orgFlags: Record<string, Record<string, boolean>> = {};
+/** Whether the per-organization flag queries have answered yet. */
+let areOrgFlagsLoading = false;
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     featureFlag: {
       isEnabledForEachOrganization: {
-        useQuery: (input: FlagQueryInput) => ({
-          data: { enabledByOrganizationId: orgFlags[input.flag] ?? {} },
-        }),
+        useQuery: (input: FlagQueryInput) =>
+          areOrgFlagsLoading
+            ? { data: undefined, isLoading: true }
+            : {
+                data: { enabledByOrganizationId: orgFlags[input.flag] ?? {} },
+                isLoading: false,
+              },
       },
     },
     annotation: { getPendingItemsCount: { useQuery: () => ({ data: { count: 0 } }) } },
@@ -276,6 +282,7 @@ beforeEach(() => {
     release_ui_ai_governance_enabled: { org_1: true, org_2: true },
     release_ui_ai_gateway_menu_enabled: { org_1: true, org_2: true },
   };
+  areOrgFlagsLoading = false;
   navigateMock.mockReset();
   rememberScopeMock.mockReset();
   openDrawerMock.mockReset();
@@ -584,7 +591,48 @@ describe("the product-switcher top bar", () => {
       await waitFor(() => {
         expect(navigateMock).toHaveBeenCalledWith("/gateway/virtual-keys");
       });
-      expect(rememberScopeMock).toHaveBeenCalledWith({ organizationId: "org_2", projectSlug: "" });
+      expect(rememberScopeMock).toHaveBeenCalledWith({
+        organizationId: "org_2",
+        teamId: "",
+        projectSlug: "",
+      });
+    });
+
+    /** @scenario Switching organization forgets the team as well as the project */
+    it("clears the remembered team, which belongs to the organization being left", async () => {
+      renderShell({
+        readings: { organizations: [orgA, orgB], pathname: "/gateway/virtual-keys" },
+      });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch organization" }));
+      await user.click(await screen.findByText("Beta Corp"));
+
+      expect(rememberScopeMock).toHaveBeenCalledWith({
+        organizationId: "org_2",
+        teamId: "",
+        projectSlug: "",
+      });
+    });
+
+    /** @scenario Switching organization before the product gates answer lands on a page of the new organization */
+    it("opens the new organization's project home rather than bouncing off the root", async () => {
+      // The three per-organization flag queries fire on top-bar mount, so
+      // this is the window right after a page load: nothing is known about
+      // the target organization's products yet.
+      areOrgFlagsLoading = true;
+      renderShell({
+        readings: { organizations: [orgA, orgB], pathname: "/gateway/virtual-keys" },
+      });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch organization" }));
+      await user.click(await screen.findByText("Beta Corp"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/beta-app");
+      });
+      expect(navigateMock).not.toHaveBeenCalledWith("/");
     });
   });
 
@@ -955,10 +1003,11 @@ describe("the product-switcher top bar", () => {
     });
 
     /** @scenario A multi-org user switches organization in place from the org-scoped switcher */
-    it("switches organization in place and lands somewhere valid in the new organization", async () => {
+    it("switches organization in place and stays in settings", async () => {
       // The settings detour carries no product (`activeProductId` is null),
-      // so the resolver falls through to the org's project home rather than
-      // a product home — kept in lockstep with resolve-org-switch-destination.unit.test.ts.
+      // so the resolver is given the address instead: every settings page
+      // exists in every organization, and being thrown out onto a project
+      // page is what reads as "settings redirected me".
       const user = userEvent.setup();
       renderShell({ readings: { pathname: "/settings", organizations: [orgA, orgB] } });
 
@@ -967,10 +1016,24 @@ describe("the product-switcher top bar", () => {
 
       expect(rememberScopeMock).toHaveBeenCalledWith({
         organizationId: "org_2",
+        teamId: "",
         projectSlug: "",
       });
       await waitFor(() => {
-        expect(navigateMock).toHaveBeenCalledWith("/beta-app");
+        expect(navigateMock).toHaveBeenCalledWith("/settings");
+      });
+    });
+
+    /** @scenario Switching organization deep inside settings stays on the same settings page */
+    it("keeps the settings page the reader was on", async () => {
+      const user = userEvent.setup();
+      renderShell({ readings: { pathname: "/settings/members", organizations: [orgA, orgB] } });
+
+      await user.click(screen.getByRole("button", { name: "Switch organization" }));
+      await user.click(await screen.findByText("Beta Corp"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/settings/members");
       });
     });
   });
