@@ -602,16 +602,7 @@ export default function ApiKeysScreen() {
           them in the browser or other client-side code.
         </Text>
 
-        {legacyKeys.keys.length > 0 && (
-          <LegacyProjectKeyBanner
-            projectNames={legacyKeys.keys.map((legacyKey) => legacyKey.projectName)}
-            onRevoke={
-              legacyKeys.keys.length === 1
-                ? () => setLegacyKeyToRevoke(legacyKeys.keys[0] ?? null)
-                : undefined
-            }
-          />
-        )}
+        <LegacyProjectKeyBanner keys={legacyKeys.keys} onRevoke={setLegacyKeyToRevoke} />
 
         <VStack gap={8} width="full" align="stretch">
           {/* Personal + service keys (ingestSourceType == null); the page heading titles them. */}
