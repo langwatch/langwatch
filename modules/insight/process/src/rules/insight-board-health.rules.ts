@@ -4,8 +4,11 @@
  * @see modules/insight/adrs/005-board-health-check.md
  */
 
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { HandledError } from "@langwatch/handled-error";
 import { type InsightEntry, insightExpiresAt, type InsightTone } from "@langwatch/insight-contract";
+
+import { WEB_ADDRESS } from "./web-address.rules.ts";
 
 /** Every card the check files starts its key with this; Langy's keys hold no colon. */
 export const BOARD_HEALTH_KEY_PREFIX = "board-health:";
@@ -61,27 +64,7 @@ export type StatementFailure =
 export type WidgetHealth = "healthy" | BoardHealthReason | "platform" | "unchecked";
 
 /** One stored statement as a widget keeps it, with the parameters it declares. */
-export type HealthStatement = Readonly<{
-  sql: string;
-  parameters?: readonly Readonly<{ name: string; default?: unknown }>[];
-}>;
-
-/**
- * The values a statement runs with: each declared parameter's default. A parameter without
- * one is filled by the widget's own code, which no server runs, so the statement is not run.
- */
-export function statementParameters(
-  statement: HealthStatement,
-):
-  | Readonly<{ isRunnable: true; values: Record<string, unknown> }>
-  | Readonly<{ isRunnable: false }> {
-  const declared = statement.parameters ?? [];
-  if (declared.some((parameter) => parameter.default === undefined)) return { isRunnable: false };
-  return {
-    isRunnable: true,
-    values: Object.fromEntries(declared.map((parameter) => [parameter.name, parameter.default])),
-  };
-}
+export type HealthStatement = Pick<DashboardWidgetQuery, "sql" | "parameters">;
 
 function retryAfterOf(error: HandledError): number {
   const value = error.meta?.retryAfterSeconds;
@@ -200,9 +183,11 @@ function cut(text: string, length: number): string {
   return line.length > length ? `${line.slice(0, length - 3).trimEnd()}...` : line;
 }
 
+const LINK_TO_END_OF_WORD = new RegExp(String.raw`\b(?:${WEB_ADDRESS.source})\S+`, "gi");
+
 /** A refusal's message may quote a link; a card never carries one. */
 function withoutWebAddresses(text: string): string {
-  return text.replace(/\b(?:https?:\/\/|www\.)\S+/gi, "(link removed)");
+  return text.replace(LINK_TO_END_OF_WORD, "(link removed)");
 }
 
 function widgetCard({ widget, reason, failure }: BrokenWidget): BoardHealthCard {

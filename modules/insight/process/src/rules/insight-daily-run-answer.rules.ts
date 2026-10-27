@@ -15,6 +15,7 @@ import {
 import { type LangyInsightsCardFinding, langyInsightsCardPartsOf } from "@langwatch/langy-contract";
 
 import { DAILY_RUN_GRANULARITY_SECONDS } from "./insight-daily-run.rules.ts";
+import { WEB_ADDRESS } from "./web-address.rules.ts";
 
 /**
  * The title of the finding the daily-insights skill shows the shape with. An answer that hands
@@ -57,12 +58,6 @@ type RunAnswerCheck =
   | Readonly<{ ok: false; reason: RunAnswerFault }>;
 
 const REFUSED: RunAnswerCheck = { ok: false, reason: "bad_output" };
-
-/**
- * A web address as a reader could follow it. A finding is read by a person, and a link in it
- * is how text that steered the run would send that person, or their data, somewhere else.
- */
-const WEB_ADDRESS = /https?:\/\/|www\./i;
 
 function holdsWebAddress({ title, body, topic }: InsightRunFinding): boolean {
   return [title, body, topic ?? ""].some((words) => WEB_ADDRESS.test(words));

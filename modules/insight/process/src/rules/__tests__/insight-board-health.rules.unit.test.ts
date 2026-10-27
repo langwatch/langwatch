@@ -17,7 +17,6 @@ import {
   isPlatformWide,
   readResult,
   type StatementOutcome,
-  statementParameters,
   widgetHealth,
 } from "../insight-board-health.rules.ts";
 
@@ -155,16 +154,6 @@ describe("given a widget's statements", () => {
       ],
     });
     expect(cards.map(({ key }) => key)).toEqual(["board-health:widget-1:error"]);
-  });
-
-  it("runs a statement with each parameter's default, and none whose parameter has no default", () => {
-    expect(
-      statementParameters({ sql: "q", parameters: [{ name: "model", default: "gpt" }] }),
-    ).toEqual({ isRunnable: true, values: { model: "gpt" } });
-    expect(statementParameters({ sql: "q" })).toEqual({ isRunnable: true, values: {} });
-    expect(statementParameters({ sql: "q", parameters: [{ name: "model" }] })).toEqual({
-      isRunnable: false,
-    });
   });
 });
 

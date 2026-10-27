@@ -131,6 +131,12 @@ Feature: The daily run checks the board's widgets
       Then the check reports no card instead of failing the run
 
     @unit
+    Scenario: The check cannot start: the project's run caller cannot be resolved
+      Given the project was removed after the gate read, so its run caller cannot be resolved
+      When the run is carried out
+      Then no statement is run, no card is filed, and the check reports no card instead of failing the run
+
+    @unit
     Scenario: A write that fails partway reports the cards already filed
       Given three widgets that show no data, and the insights store fails the second card's write
       When the run is carried out

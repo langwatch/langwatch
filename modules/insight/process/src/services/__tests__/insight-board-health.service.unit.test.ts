@@ -33,11 +33,20 @@ class WindowFull extends HandledError {
   }
 }
 
+class ProjectNotFound extends HandledError {
+  constructor() {
+    super("project_not_found", "gone", { httpStatus: 404, fault: "customer" });
+  }
+}
+
 function harness({
   fullFor,
   store = {},
+  callerFails = false,
 }: {
   fullFor: number;
+  /** The project was removed after the gate read it, so its run caller cannot be resolved. */
+  callerFails?: boolean;
   /** `writeFailsFrom` is the first write, counted from 1, that fails, and every one after. */
   store?: Partial<{ readFails: boolean; writeFailsFrom: number }>;
 }) {
@@ -56,7 +65,10 @@ function harness({
       >
     >({
       isWorkbenchEnabled: async () => true,
-      resolveRunCaller: async () => CALLER,
+      resolveRunCaller: async () => {
+        if (callerFails) throw new ProjectNotFound();
+        return CALLER;
+      },
       validateLangWatchQL: () => ({ parameters: [], appFunctions: [] }),
       describeLangWatchQLJudgements: () => [],
       executeBackgroundLangWatchQL: async ({ sql }: LangWatchQLExecuteInput) => {
@@ -157,6 +169,19 @@ describe("given the project's query window refuses the check, to be retried afte
     expect(started.map(({ sql }) => sql).every((sql) => sql === "query of widget-1")).toBe(true);
     expect(Date.now()).toBeLessThan(START + 180_000);
     expect(report).toEqual({ filedCount: 0, renewedCount: 0, reported: [] });
+    expect(filed).toEqual([]);
+  });
+});
+
+describe("given a project whose run caller cannot be resolved", () => {
+  /** @scenario "The check cannot start: the project's run caller cannot be resolved" */
+  it("runs no statement, files no card and does not throw", async () => {
+    const { service, started, filed } = harness({ fullFor: 0, callerFails: true });
+
+    const report = await checked(service, { ...CHECK, widgets: [widget("widget-1")] });
+
+    expect(report).toEqual({ filedCount: 0, renewedCount: 0, reported: [] });
+    expect(started).toEqual([]);
     expect(filed).toEqual([]);
   });
 });

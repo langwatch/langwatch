@@ -6,6 +6,7 @@
  */
 
 import type { AnalyticsApi, LangWatchQLRunCaller } from "@langwatch/analytics-contract";
+import { validateDashboardWidgetQueryParams } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { defaultBoardExcludedOrigins } from "@langwatch/trace-contract";
@@ -24,7 +25,6 @@ import {
   isPlatformWide,
   readResult,
   type StatementOutcome,
-  statementParameters,
   type WidgetHealth,
   widgetHealth,
 } from "../rules/insight-board-health.rules.ts";
@@ -179,9 +179,10 @@ export class InsightBoardHealthService {
     context: CheckContext;
     statement: HealthStatement;
   }): Promise<StatementOutcome | Stop> {
-    const parameters = statementParameters(statement);
-    if (!parameters.isRunnable) return { kind: "unchecked" };
-    const prepared = { sql: statement.sql, values: parameters.values };
+    // A parameter without a default is filled by the widget's own code, which no server runs.
+    const parameters = validateDashboardWidgetQueryParams({ query: statement, params: {} });
+    if (!parameters.ok) return { kind: "unchecked" };
+    const prepared = { sql: statement.sql, values: parameters.params };
     try {
       if (this.callsAJudge({ context, statement: prepared })) return { kind: "unchecked" };
       return await this.execute({ context, statement: prepared });
