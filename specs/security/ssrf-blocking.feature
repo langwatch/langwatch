@@ -236,7 +236,14 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       And the hostname "imds-bait.example" resolves to the cloud metadata address
       When the NLP service's HTTP block connects to "http://imds-bait.example/latest/meta-data/"
       Then the connection is refused with an SSRF block error
-      And an allowlisted hostname resolving to a private address is still connected to that address
+
+    @unit
+    Scenario: The HTTP block falls back across the addresses it checked
+      Given a hostname that resolves to several addresses, all of which pass the policy
+      And the first address does not answer
+      When the NLP service's HTTP block connects to that hostname
+      Then it connects to the next checked address, never to one it did not check
+      And each address gets an equal share of the time left, so one silent address cannot spend it all
 
     @unit
     Scenario: A bracketed IPv6 metadata literal is refused with local calls allowed

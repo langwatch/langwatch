@@ -510,7 +510,7 @@ func TestSafeDialer_RefusesAnAllowlistedNameThatResolvesToMetadata(t *testing.T)
 	require.ErrorIs(t, httpblock.CheckURL("http://imds-bait.example/latest/meta-data/", opts), httpblock.ErrSSRFBlocked)
 }
 
-// @scenario "An allowlisted hostname that resolves to the metadata address is refused"
+// @scenario "The HTTP block falls back across the addresses it checked"
 func TestSafeDialer_DialsAnAllowlistedPrivateNameAtTheCheckedAddress(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -530,7 +530,7 @@ func TestSafeDialer_DialsAnAllowlistedPrivateNameAtTheCheckedAddress(t *testing.
 	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
 }
 
-// @scenario "An allowlisted hostname that resolves to the metadata address is refused"
+// @scenario "The HTTP block falls back across the addresses it checked"
 func TestSafeDialer_ASilentAddressDoesNotSpendTheWholeDeadline(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

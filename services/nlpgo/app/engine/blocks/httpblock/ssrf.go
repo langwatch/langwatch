@@ -167,15 +167,9 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 			}
 			return checkedAddrs{ips: ips, port: port}.dial(ctx, base, network)
 		}
-		var ips []net.IP
-		if ip := net.ParseIP(host); ip != nil {
-			ips = []net.IP{ip}
-		} else {
-			resolved, err := resolveHost(host, opts)
-			if err != nil {
-				return nil, err
-			}
-			ips = resolved
+		ips, err := addrsOf(host, opts)
+		if err != nil {
+			return nil, err
 		}
 		if len(ips) == 0 {
 			return nil, ErrSSRFBlocked
@@ -232,7 +226,14 @@ func addrsOf(host string, opts SSRFOptions) ([]net.IP, error) {
 func anyMetadata(ips []net.IP, opts SSRFOptions, host string) bool {
 	for _, ip := range ips {
 		addr, ok := netip.AddrFromSlice(ip)
-		if !ok || ssrf.Classify(addr.Unmap()) == ssrf.CategoryMetadata {
+		if !ok {
+			opts.logger().Warn("ssrf_refused",
+				zap.String("host", host),
+				zap.String("reason", "unparseable_address"),
+			)
+			return true
+		}
+		if ssrf.Classify(addr.Unmap()) == ssrf.CategoryMetadata {
 			opts.logger().Warn("ssrf_refused",
 				zap.String("host", host),
 				zap.String("reason", "allowlisted_host_resolves_to_metadata"),

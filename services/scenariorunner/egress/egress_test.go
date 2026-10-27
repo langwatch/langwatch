@@ -63,6 +63,7 @@ func TestValidatorRefusals(t *testing.T) {
 		{"metadata through an allowlisted name", strict, "http://imds.example/", msgResolvesMetadata},
 		{"name resolving to metadata when local is allowed", open, "http://imds.example/", msgResolvesMetadata},
 		{"cloud internal domain", open, "https://bucket.s3.amazonaws.com/", msgCloudDomain},
+		{"cloud internal domain with a doubled trailing dot", open, "https://s3.amazonaws.com../", msgCloudDomain},
 		{"unparseable URL", open, "not a url", msgInvalidURL},
 		{"unsupported protocol", open, "ftp://public.example/", "Unsupported protocol: ftp:"},
 		{"unresolvable when local is blocked", strict, "http://nowhere.example/", `Unable to resolve hostname "nowhere.example"`},
