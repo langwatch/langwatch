@@ -140,6 +140,7 @@ async function projectWithBothBoards({
 
 const BOARDS = "/api/v1/dashboards";
 const REPORTS = "/api/v1/analytics/reports";
+const PROJECT_DASHBOARDS = `/api/v1/projects/${PROJECT}/analytics/dashboards`;
 const PROJECT_BOARDS = `/api/v1/projects/${PROJECT}/analytics/boards`;
 const ids = (json: { data?: { id: string }[] } | undefined) => json?.data?.map(({ id }) => id);
 const refusal = (answer: { status: number; json?: { code?: string } }) => ({
@@ -580,7 +581,7 @@ describe("given the Reports boards at /api/v1/analytics/reports", () => {
         renamed: "Spend",
         deleted: { id, name: "Spend" },
         dashboardsBoard: { status: 404, code: "dashboard_not_found" },
-        headers: answers.map(() => [null, null, null]),
+        headers: answers.map(() => ["true", '</api/v1/dashboards>; rel="successor-version"', null]),
       });
     }
   });
@@ -589,11 +590,51 @@ describe("given the Reports boards at /api/v1/analytics/reports", () => {
   it("leaves the project-path boards read without deprecation headers", async () => {
     const { board, send } = await projectWithBothBoards();
 
-    const listed = await send("projectBoards", PROJECT_BOARDS);
+    const listed = await send("projectBoards", PROJECT_DASHBOARDS);
 
     expect({ ids: ids(listed.json), headers: deprecationHeaders(listed) }).toEqual({
       ids: [board.id],
       headers: [null, null, null],
     });
+  });
+});
+
+describe("given a Dashboards board read on the project path", () => {
+  const deprecationHeaders = (answer: { headers: Headers }) =>
+    ["Deprecation", "Link"].map((name) => answer.headers.get(name));
+
+  /** @scenario "AC199y Names: the project-path dashboards read answers at /analytics/dashboards" */
+  it("answers at /analytics/dashboards, and the same at /analytics/boards, deprecated", async () => {
+    const { board, send } = await projectWithBothBoards();
+
+    const answers = await Promise.all(
+      [
+        PROJECT_DASHBOARDS,
+        `${PROJECT_DASHBOARDS}/${board.id}`,
+        PROJECT_BOARDS,
+        `${PROJECT_BOARDS}/${board.id}`,
+      ].map((path) => send("projectBoards", path)),
+    );
+
+    expect(
+      answers.map((answer) => ({
+        status: answer.status,
+        id: answer.json?.id ?? ids(answer.json)?.[0],
+        headers: deprecationHeaders(answer),
+      })),
+    ).toEqual([
+      { status: 200, id: board.id, headers: [null, null] },
+      { status: 200, id: board.id, headers: [null, null] },
+      {
+        status: 200,
+        id: board.id,
+        headers: ["true", `<${PROJECT_DASHBOARDS}>; rel="successor-version"`],
+      },
+      {
+        status: 200,
+        id: board.id,
+        headers: ["true", `<${PROJECT_DASHBOARDS}/${board.id}>; rel="successor-version"`],
+      },
+    ]);
   });
 });

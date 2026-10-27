@@ -7403,13 +7403,15 @@ langwatch chart run <chart-id> \
 
 `--start`/`--end` fill the reserved period parameters and `--granularity` the datapoint step, which only accepts the offered steps: `1` (second), `60` (minute), `3600` (hour). A chart whose SQL declares the reserved period parameters **requires** `--start` and `--end` on every run — there is no default window, and running without them is refused. Only a chart that declares none of them runs without the flags.
 
-## Step 4: Place it on a dashboard
+## Step 4: Place it on an Analytics Report
 
-**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
+A saved chart goes on an Analytics Report, never on a Dashboards dashboard (those take widgets: the `dashboard-widgets` skill).
+
+**Which report:** place on the Analytics Report in the user's context (the one they are on, or one they named). If none is in context, ask which one with the `question` tool, one option per report with its id in `ref`. Never pick one from `langwatch analytics-report list` on your own.
 
 ```bash
-langwatch dashboard list -f json          # the options for that question
-langwatch chart place <chart-id> --dashboard-id <dashboard-id> -f json
+langwatch analytics-report list -f json  # the options for that question
+langwatch chart place <chart-id> --dashboard-id <report-id> -f json
 ```
 
 With no `--grid-row`, the platform allocates the next free row, so it never lands on top of an existing chart. `langwatch chart unplace <chart-id>` takes it off again without deleting it.
@@ -7488,7 +7490,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Author a Dashboard Widget
 
-Turn a question ("show cost per model as a bar chart") into a saved dashboard widget: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → save it → prove it runs**.
+Turn a question ("show cost per model as a bar chart") into a widget on a dashboard: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → add it to a dashboard → prove it runs**.
 
 Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
 
@@ -7512,14 +7514,14 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
 
-Every `dashboard-widget` command runs against whatever project `LANGWATCH_PROJECT_ID` names in the environment. That variable is normally already set for you — do not invent a `langwatch project ...` command to look it up (there isn't one; `langwatch projects list` is the read command, plural). Only pass `--project <slug-or-id>` on a command yourself when you need to target a *different* project than the one already in scope. If a command fails with "No project is in scope", set `LANGWATCH_PROJECT_ID` or pass `--project` — do not retry the same call unchanged.
+The `langwatch dashboard` commands use the project of your API key. Only `langwatch dashboard widget schema` also reads `LANGWATCH_PROJECT_ID` and accepts `--project <slug-or-id>`; pass `--project` there only when you need a *different* project than the one in scope. Do not invent a `langwatch project ...` command to look the project up (there isn't one; `langwatch projects list` is the read command, plural).
 
 ## Step 1: Discover the schema before writing any SQL
 
 Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
 
 ```bash
-langwatch dashboard-widget schema -f json
+langwatch dashboard widget schema -f json
 ```
 
 Read the datasets, their grain, their time column, and which columns are `available` to you.
@@ -7590,10 +7592,12 @@ More worked examples: `platform/app/scripts/north-star-widgets/`.
 
 `Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
 
-## Step 4: Save the widget, then prove it renders
+## Step 4: Add the widget to a dashboard, then prove it renders
+
+A widget always lives on a dashboard; pick one first (see **Dashboards** below), then:
 
 ```bash
-langwatch dashboard-widget create \
+langwatch dashboard widget add <dashboardId> \
   --name "Cost by model" \
   --code-file widget.tsx \
   --queries-file queries.json \
@@ -7602,42 +7606,32 @@ langwatch dashboard-widget create \
 
 Creating (and updating) validates the queries file's shape and the widget's JS/TSX syntax, but it does not execute the queries or mount the component — a wrong column name or a runtime error in the widget only surfaces when it actually runs. Open the widget's `platformUrl` (printed on success) and confirm it renders with real data before calling the work done.
 
-## Managing saved widgets
+## Dashboards and their widgets
+
+A dashboard is the page widgets live on. **Use an existing dashboard** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new dashboard, or none fits and they agree.
 
 ```bash
-langwatch dashboard-widget list -f json
-langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
-langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
-langwatch dashboard-widget delete <id>
-langwatch dashboard-widget boards -f json                              # the dashboards a widget can go on
-langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
+langwatch dashboard list -f json                          # ids, names, widget counts
+langwatch dashboard get <dashboardId> -f json
+langwatch dashboard create "<name>" -f json               # empty dashboard; prints platformUrl
+langwatch dashboard update <dashboardId> --name "<name>"  # rename; or --description / --clear-description
+langwatch dashboard delete <dashboardId>                  # removes the dashboard and its widgets
+langwatch dashboard widget list <dashboardId> -f json
+langwatch dashboard widget get <dashboardId> <widgetId> -f json   # code, queries, platformUrl
+langwatch dashboard widget add <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
+langwatch dashboard widget update <dashboardId> <widgetId> --code-file widget.tsx --queries-file queries.json
+langwatch dashboard widget delete <dashboardId> <widgetId>
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard-widget boards` for ids. `langwatch dashboard list` lists the Analytics Reports dashboards, which hold no widgets, so `pin` does not find them.
+`add` places the widget at the dashboard's next free row — edit it from the widget's menu on that dashboard. `langwatch analytics-report list` lists the old Analytics Reports, which hold no widgets.
 
-**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board from `langwatch dashboard-widget boards` with its id in `ref`. Never choose a board for the user.
+**Which dashboard:** place on the dashboard in the user's context (the one they are on, or one they named). If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. Never choose a dashboard for the user.
 
-`update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
+- **Never pick a dashboard for the user.** When more than one dashboard fits, ask with the `question` tool (a choices card): one option per dashboard from `langwatch dashboard list`, its id in `ref`.
+- **Confirm before any delete** of a dashboard or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a dashboard takes its widgets with it.
+- The project needs Dashboards switched on. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
 
-## Boards
-
-A board is the page widgets live on. **Use an existing board** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new board, or none fits and they agree.
-
-```bash
-langwatch dashboards list -f json                          # ids, names, widget counts
-langwatch dashboards get <dashboardId> -f json
-langwatch dashboards create "<name>" -f json               # empty board; prints platformUrl
-langwatch dashboards update <dashboardId> --name "<name>"  # rename; or --description / --clear-description
-langwatch dashboards delete <dashboardId>                  # removes the board and its widgets
-langwatch dashboards widgets list <dashboardId> -f json
-langwatch dashboards widgets create <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
-langwatch dashboards widgets update <dashboardId> <widgetId> --code-file widget.tsx --queries-file queries.json
-langwatch dashboards widgets delete <dashboardId> <widgetId>
-```
-
-- **Never pick a board for the user.** When more than one board fits, ask with the `question` tool (a choices card): one option per board from `langwatch dashboards list`, its id in `ref`.
-- **Confirm before any delete** of a board or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a board takes its widgets with it.
-- Boards need Dashboards switched on for the project. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
+`widget update` accepts `--name` or `--description` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
 ## Worked example: bar chart of daily trace counts
 
@@ -7690,10 +7684,10 @@ export default function Widget() {
 ]
 ```
 
-Create it:
+Add it:
 
 ```bash
-langwatch dashboard-widget create \
+langwatch dashboard widget add <dashboardId> \
   --name "Daily traces" \
   --code-file widget.tsx \
   --queries-file queries.json \
@@ -7703,7 +7697,7 @@ langwatch dashboard-widget create \
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
-- `custom_chart_playground_not_enabled` — dashboard widgets are not enabled for this project (they need Dashboards and LangWatchQL); do not retry any `dashboard-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
+- `custom_chart_playground_not_enabled` — dashboard widgets are not enabled for this project (they need Dashboards and LangWatchQL); do not retry any `langwatch dashboard widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
 - A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
 - `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
 - `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
