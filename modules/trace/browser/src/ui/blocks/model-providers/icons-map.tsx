@@ -7,7 +7,10 @@ import React from "react";
 import { Anthropic } from "../../elements/icons/anthropic.tsx";
 import { DeepSeek } from "../../elements/icons/deep-seek.tsx";
 
-export const modelProviderIcons: Record<keyof typeof modelProviders, React.ReactNode> = {
+// `langwatch` is not a configurable provider: it is the prefix of LangWatch's hosted models.
+type ProviderIconKey = keyof typeof modelProviders | "langwatch";
+
+export const modelProviderIcons: Record<ProviderIconKey, React.ReactNode> = {
   openai: designSystemIcons.openai,
   openai_codex: designSystemIcons.openai_codex,
   azure: <Azure />,
@@ -25,12 +28,13 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, React.React
   custom: designSystemIcons.custom,
   xai: designSystemIcons.xai,
   cerebras: designSystemIcons.cerebras,
+  doubleword: designSystemIcons.doubleword,
   voyage: designSystemIcons.voyage,
   azure_safety: <Azure />,
-  // Decision model providers (ADR-182) have no mark in the design system yet.
-  inception: designSystemIcons.custom,
-  perplexity: designSystemIcons.custom,
-  cloudflare: designSystemIcons.custom,
+  inception: designSystemIcons.inception,
+  perplexity: designSystemIcons.perplexity,
+  cloudflare: designSystemIcons.cloudflare,
+  langwatch: designSystemIcons.langwatch,
 };
 
 /**
@@ -38,10 +42,11 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, React.React
  * fill (or with no `fill` at all, so they default to SVG's own black). On the dark
  * theme that lands as near-invisible.
  */
-export const MONOCHROME_PROVIDER_ICONS = new Set<keyof typeof modelProviders>([
+export const MONOCHROME_PROVIDER_ICONS = new Set<ProviderIconKey>([
   "openai",
   "anthropic",
   "voyage",
+  "inception",
 ]);
 
 /**
@@ -52,7 +57,7 @@ export function ProviderIconGlyph({
   provider,
   size,
 }: {
-  provider: keyof typeof modelProviders;
+  provider: ProviderIconKey;
   size: string | number;
 }) {
   const icon = modelProviderIcons[provider];

@@ -68,7 +68,7 @@ describe("given the request paths the MCP server builds", () => {
     });
   });
 
-  describe("when the dashboards tool lists dashboards", () => {
+  describe("when the dashboards tool lists the Analytics Reports dashboards", () => {
     const originalFetch = globalThis.fetch;
 
     beforeEach(() => {
@@ -80,7 +80,7 @@ describe("given the request paths the MCP server builds", () => {
     });
 
     /** @scenario "A dashboard list goes out at the canonical address" */
-    it("requests the canonical /api/v1/dashboards address", async () => {
+    it("requests the canonical /api/v1/analytics/reports address", async () => {
       const fetchSpy = vi
         .fn()
         .mockResolvedValue(new Response(JSON.stringify({ dashboards: [] }), { status: 200 }));
@@ -88,7 +88,7 @@ describe("given the request paths the MCP server builds", () => {
 
       await listDashboards();
 
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://app.example.com/api/v1/dashboards");
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://app.example.com/api/v1/analytics/reports");
     });
   });
 });

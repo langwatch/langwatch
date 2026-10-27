@@ -56,8 +56,10 @@ export const projectApiKeyRotationSchema: ProjectApiKeyRotationSchema =
   projectApiKeyRotationSchemaDefinition;
 export type ProjectApiKeyRotation = z.infer<typeof projectApiKeyRotationSchema>;
 
-/** Whether a legacy project key still authenticates; never the key or any part of it. */
-const projectLegacyKeyStatusSchemaDefinition = z.object({ present: z.boolean() }).strict();
+/** Whether a legacy project key still authenticates and when it last did; never the key itself. */
+const projectLegacyKeyStatusSchemaDefinition = z
+  .object({ present: z.boolean(), lastUsedAt: z.date().nullable() })
+  .strict();
 export interface ProjectLegacyKeyStatusSchema extends Named<
   typeof projectLegacyKeyStatusSchemaDefinition
 > {}

@@ -25,6 +25,7 @@ import {
 import type { SessionModelTotalsRow } from "../../../../repositories/coding-agent-session-event.repository.ts";
 import type { CodingAgentBillingPolicy } from "../../../../services/coding-agent-cost-attribution.service.ts";
 import { CodingAgentFeatureService } from "../../../../services/coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../../../../services/model-catalog-cost-estimator.service.ts";
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 5, 1);
@@ -105,6 +106,7 @@ function modelTotalsRow(over: Partial<SessionModelTotalsRow> = {}): SessionModel
     cacheReadTokens: 20,
     cacheCreationTokens: 10,
     costUsd: 1.5,
+    aiUnits: 0,
     ...over,
   };
 }
@@ -202,6 +204,7 @@ function serviceWith({
     projects: createTestProjects(),
     billing,
     clock: new TestClock(NOW),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
   return {
     service,
@@ -297,6 +300,7 @@ function personalServiceWith({
       isSourceNonBillable({ organizationId: "org-1", sourceType }),
     ),
     clock: new TestClock(NOW),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
   return { service, findByRepositoryBranch, findAllByBranches };
 }
@@ -1089,6 +1093,7 @@ describe("PullRequestUsageService", () => {
           totalTokens: 180,
           costUsd: 1.5,
           tokensKnown: true,
+          aiUnits: 0,
         },
         {
           model: "gpt-5-mini",
@@ -1099,6 +1104,7 @@ describe("PullRequestUsageService", () => {
           totalTokens: 4,
           costUsd: 0.25,
           tokensKnown: true,
+          aiUnits: 0,
         },
       ]);
     });

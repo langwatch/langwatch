@@ -1,5 +1,6 @@
 /**
  * @see specs/prompts/playground-conversation.feature
+ * @see specs/model-providers/doubleword-provider.feature
  */
 import { describe, expect, it } from "vitest";
 
@@ -12,6 +13,18 @@ describe("llmErrorOf", () => {
       type: "rate_limit",
       message: "openai: rate limited",
     });
+  });
+
+  /** @scenario "A provider account with no credit left is named in the playground" */
+  it("names an out-of-credit account for a bare 402", () => {
+    const error = engineRunError("gateway returned non-2xx status 402", 402);
+    expect(llmErrorOf(error).type).toBe("out_of_credit");
+  });
+
+  it("names rejected credentials for a bare 401", () => {
+    expect(llmErrorOf(engineRunError("gateway returned non-2xx status 401", 401)).type).toBe(
+      "auth",
+    );
   });
 
   it("leaves a message with no status unknown", () => {
