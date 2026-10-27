@@ -130,7 +130,11 @@ function isVersionRace(error: unknown): boolean {
 }
 
 export class PrismaEvaluatorRepository
-  extends PrismaRepository.transactionalFor(...VERSION_MODELS)
+  extends PrismaRepository.transactionalFor(
+    "Evaluator",
+    "EvaluatorVersion",
+    "EvaluatorVersionLabel",
+  )
   implements EvaluatorRepository
 {
   static readonly create = this.factory((prisma) => new PrismaEvaluatorRepository(prisma));

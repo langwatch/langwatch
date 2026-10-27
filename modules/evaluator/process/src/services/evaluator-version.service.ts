@@ -26,7 +26,7 @@ import type {
 } from "../repositories/evaluator.repository.ts";
 
 /** An evaluator as one of its versions holds it, and that version's number. */
-export type ResolvedEvaluatorVersion = { evaluator: Evaluator; version: number | null };
+type ResolvedEvaluatorVersion = { evaluator: Evaluator; version: number | null };
 
 const BACKFILL_PAGE = 200;
 

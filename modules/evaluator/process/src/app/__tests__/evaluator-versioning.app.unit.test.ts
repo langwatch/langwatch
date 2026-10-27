@@ -37,7 +37,13 @@ function thresholdOf(evaluator: { config: unknown }): unknown {
   return (evaluator.config as { settings?: { threshold?: unknown } }).settings?.threshold;
 }
 
-function setup(options: { canDeploy?: boolean; history?: AuditLogHistoryEntry[] } = {}) {
+function setup(
+  options: {
+    canDeploy?: boolean;
+    history?: AuditLogHistoryEntry[];
+    unversioned?: Evaluator[];
+  } = {},
+) {
   const people = [profile("user_ada", "Ada")];
   const users = createApiFixture<UserApi>({
     getProfiles: async ({ userIds }) => people.filter((person) => userIds.includes(person.id)),
@@ -51,7 +57,7 @@ function setup(options: { canDeploy?: boolean; history?: AuditLogHistoryEntry[] 
     listEntityHistory: async ({ actionPrefix }) =>
       (options.history ?? []).filter((entry) => entry.action.startsWith(actionPrefix)),
   });
-  const repository = MemoryEvaluatorRepository.create();
+  const repository = MemoryEvaluatorRepository.create({ unversioned: options.unversioned });
   const { app } = createEvaluatorTestApp({ repository, permissions, users, auditLog });
   const backfill = () =>
     EvaluatorVersionService.create({ repository, users, permissions, auditLog }).backfill({
@@ -266,7 +272,6 @@ describe("the evaluator:backfill-versions step", () => {
 
   /** @scenario "Existing evaluators get version 1 from their current settings" */
   it("writes version 1 with the audit-log creator, once", async () => {
-    const { app, repository, backfill } = setup({ history });
     const now = new Date("2026-01-01");
     const old: Evaluator = {
       id: "evaluator_old",
@@ -281,7 +286,7 @@ describe("the evaluator:backfill-versions step", () => {
       createdAt: now,
       updatedAt: now,
     };
-    repository.seedUnversioned(old);
+    const { app, backfill } = setup({ history, unversioned: [old] });
 
     expect((await backfill()).written).toBe(1);
     const { versions } = await app.listVersions({ projectId, evaluatorId: "evaluator_old" });

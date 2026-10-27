@@ -42,8 +42,11 @@ export class MemoryAgentRepository implements AgentRepository {
 
   private constructor() {}
 
-  static create(): MemoryAgentRepository {
-    return new MemoryAgentRepository();
+  /** `unversioned` seeds rows as an older release wrote them, with no versions and no creator. */
+  static create(input: { unversioned?: Agent[] } = {}): MemoryAgentRepository {
+    const repository = new MemoryAgentRepository();
+    for (const row of input.unversioned ?? []) repository.#seedUnversioned(row);
+    return repository;
   }
 
   async getById(input: GetAgentInput): Promise<Agent> {
@@ -345,8 +348,7 @@ export class MemoryAgentRepository implements AgentRepository {
     return true;
   }
 
-  /** Test seam: a row as an older release wrote it, with no versions and no creator. */
-  seedUnversioned(agent: Agent): void {
+  #seedUnversioned(agent: Agent): void {
     this.#agents.set(agent.id, structuredClone(agent));
   }
 

@@ -35,8 +35,11 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
 
   private constructor() {}
 
-  static create(): MemoryEvaluatorRepository {
-    return new MemoryEvaluatorRepository();
+  /** `unversioned` seeds rows as an older release wrote them, with no versions and no creator. */
+  static create(input: { unversioned?: Evaluator[] } = {}): MemoryEvaluatorRepository {
+    const repository = new MemoryEvaluatorRepository();
+    for (const row of input.unversioned ?? []) repository.#seedUnversioned(row);
+    return repository;
   }
 
   async findById(input: { id: string; projectId: string }): Promise<Evaluator | undefined> {
@@ -314,8 +317,7 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
     return true;
   }
 
-  /** Test seam: a row as an older release wrote it, with no versions and no creator. */
-  seedUnversioned(evaluator: Evaluator): void {
+  #seedUnversioned(evaluator: Evaluator): void {
     this.#rows.set(evaluator.id, structuredClone(evaluator));
   }
 
