@@ -3,12 +3,14 @@ title: Dashboards
 description: Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
 ---
 
-## Turn on Dashboards
+## Open Dashboards
 
 Dashboards is a product in the product switcher at the top left of LangWatch.
-It sits behind the `release_dashboards` feature flag, which is off by default.
-Building and editing widgets on a dashboard also needs the `release_lwql_workbench`
-flag, which turns on LangWatchQL. No other flag is needed.
+On LangWatch Cloud, no setup is needed.
+
+On a self-hosted install, Dashboards stays off until an operator turns it on in
+**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards, and
+`release_lwql_workbench` to build and edit widgets on a dashboard.
 
 ## Your first dashboard
 
@@ -385,6 +387,14 @@ list|get|add|update|delete <dashboardId> [<widgetId>]`, and
 `createWidget`, `getWidget`, `updateWidget` and `deleteWidget` in the
 TypeScript SDK (`create_widget`, `get_widget`, `update_widget` and
 `delete_widget` in Python).
+
+### The REST API
+
+`/api/v1/dashboards` serves dashboards and their widgets from API version
+`2026-10-26`. A request pinned to an earlier `X-API-Version` gets a 404. See
+[API reference > Dashboards](/api-reference/dashboards/overview).
+
+Analytics Reports dashboards are at `/api/v1/analytics/reports`.
 
 ### Analytics Reports
 
