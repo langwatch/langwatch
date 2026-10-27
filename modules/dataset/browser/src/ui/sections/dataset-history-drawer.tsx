@@ -284,7 +284,9 @@ function compareFrame({
       ? { title: "Couldn't compare this version", onRetry: () => void comparison.refetch() }
       : undefined,
     footer: { primaryAction: restoreAction },
-    body: comparison.data ? <DatasetVersionComparison comparison={comparison.data} /> : null,
+    body: comparison.data ? (
+      <DatasetVersionComparison comparison={comparison.data} columnOrder={version.columnTypes} />
+    ) : null,
   };
 }
 
