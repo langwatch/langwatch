@@ -85,3 +85,40 @@ func TestMintVertexTokenRefusalIsAnErrorNotAToken(t *testing.T) {
 		t.Fatal("a key with no client_email or private_key must be refused before any request")
 	}
 }
+
+func vertexEnv(keyJSON string) map[string]string {
+	return map[string]string{"VERTEX_SERVICE_ACCOUNT_JSON": keyJSON, "VERTEX_PROJECT": "langwatch", "VERTEX_LOCATION": "us-central1"}
+}
+
+/** @scenario "The Vertex cache cell gets a token minted from the service-account key" */
+func TestRunExportsTheMintedVertexToken(t *testing.T) {
+	keyJSON, pub := serviceAccountJSON(t, "")
+	ts := tokenServer(t, pub, http.StatusOK)
+	keyJSON = strings.Replace(keyJSON, `"token_uri":""`, `"token_uri":"`+ts.URL+`"`, 1)
+	_, server := newStub(t, nil)
+	result := run(t, server.URL, vertexEnv(keyJSON))
+	if got := exported(result)["VERTEX_ACCESS_TOKEN"]; got != "ya29.minted" {
+		t.Fatalf("VERTEX_ACCESS_TOKEN = %q, want the minted token; warnings=%v", got, result.Warnings)
+	}
+	if len(result.Warnings) != 0 || result.Err() != nil {
+		t.Fatalf("a minted token warns of nothing: warnings=%v err=%v", result.Warnings, result.Err())
+	}
+}
+
+/** @scenario "The Vertex cache cell gets a token minted from the service-account key" */
+func TestRunWarnsAndExportsNoTokenWhenTheExchangeIsRefused(t *testing.T) {
+	keyJSON, pub := serviceAccountJSON(t, "")
+	ts := tokenServer(t, pub, http.StatusForbidden)
+	keyJSON = strings.Replace(keyJSON, `"token_uri":""`, `"token_uri":"`+ts.URL+`"`, 1)
+	_, server := newStub(t, nil)
+	result := run(t, server.URL, vertexEnv(keyJSON))
+	if _, ok := exported(result)["VERTEX_ACCESS_TOKEN"]; ok {
+		t.Fatal("a refused exchange must export no VERTEX_ACCESS_TOKEN")
+	}
+	if len(result.Warnings) != 1 || !strings.Contains(result.Warnings[0], "Vertex cache cell skips") {
+		t.Fatalf("want one warning that the cell skips, got %v", result.Warnings)
+	}
+	if result.Err() != nil {
+		t.Fatalf("a refused exchange only skips a cell, it does not fail the seed: %v", result.Err())
+	}
+}
