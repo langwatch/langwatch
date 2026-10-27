@@ -80,6 +80,13 @@ Feature: The live gateway matrix seeds its own control plane
     Then the Azure model provider carries AZURE_OPENAI_API_VERSION
     And an empty api version is not stored
 
+  @unit
+  Scenario: The gateway and matrix run only once the seed has bootstrapped
+    Given the seed provisions the organisation and the project
+    When it has written the project's exports
+    Then it sets the step output bootstrapped=true
+    And when the bootstrap fails it exports nothing and sets no output
+
   @unimplemented
   Scenario: A run on main drives every cell with credentials against the seeded stack
     Given the matrix secrets hold provider credentials

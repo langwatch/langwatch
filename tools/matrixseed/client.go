@@ -39,14 +39,18 @@ func (r route) label() string { return r.method + " " + r.path }
 
 // RefusedError is a route answering anything but the status it promises.
 type RefusedError struct {
-	Call   string
-	Status int
-	Body   string
+	Call     string
+	Status   int
+	Body     string
+	Withheld bool
 }
 
 func (e *RefusedError) Error() string {
-	if e.Body == "" {
+	if e.Withheld {
 		return fmt.Sprintf("%s answered %d (body withheld)", e.Call, e.Status)
+	}
+	if e.Body == "" {
+		return fmt.Sprintf("%s answered %d (empty body)", e.Call, e.Status)
 	}
 	return fmt.Sprintf("%s answered %d: %s", e.Call, e.Status, e.Body)
 }
@@ -151,7 +155,7 @@ func (c *client) call(ctx context.Context, r route, out any) error {
 		return fmt.Errorf("%s: reading the answer: %w", name, err)
 	}
 	if resp.StatusCode != r.want {
-		refused := &RefusedError{Call: name, Status: resp.StatusCode}
+		refused := &RefusedError{Call: name, Status: resp.StatusCode, Withheld: r.carriesKeys}
 		if !r.carriesKeys {
 			refused.Body = snippet(raw, append([]string{c.token}, stringValues(r.body)...))
 		}

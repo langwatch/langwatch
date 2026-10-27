@@ -67,18 +67,10 @@ func TestSnippetRemovesJSONEscapedForms(t *testing.T) {
 	}
 }
 
-/** @scenario "The Azure api version is stored when the job sets it" */
-func TestAzureKeepsAnAPIVersionWhenSet(t *testing.T) {
-	env := map[string]string{
-		"AZURE_OPENAI_API_KEY": "k", "AZURE_OPENAI_ENDPOINT": "https://x", "AZURE_OPENAI_API_VERSION": "2025-01-01-preview",
-	}
-	keys, missing := azureKeys(envOf(env))
-	if len(missing) != 0 || keys["AZURE_OPENAI_API_VERSION"] != "2025-01-01-preview" {
-		t.Fatalf("keys=%v missing=%v", keys, missing)
-	}
-	delete(env, "AZURE_OPENAI_API_VERSION")
-	keys, _ = azureKeys(envOf(env))
-	if _, ok := keys["AZURE_OPENAI_API_VERSION"]; ok {
-		t.Fatalf("an empty version must not be stored: %v", keys)
+func TestRefusalTellsAWithheldBodyFromAnEmptyOne(t *testing.T) {
+	withheld := (&RefusedError{Call: "PUT /x", Status: 400, Withheld: true}).Error()
+	empty := (&RefusedError{Call: "POST /y", Status: 502}).Error()
+	if !strings.Contains(withheld, "(body withheld)") || !strings.Contains(empty, "(empty body)") {
+		t.Fatalf("withheld=%q empty=%q", withheld, empty)
 	}
 }

@@ -43,6 +43,7 @@ func TestEnvOrFallsBackOnlyWhenUnset(t *testing.T) {
 	}
 }
 
+/** @scenario "The gateway and matrix run only once the seed has bootstrapped" */
 func TestWriteBootstrappedAppendsTheStepOutput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "github_output")
 	if err := os.WriteFile(path, []byte("EARLIER=1\n"), 0o600); err != nil {
