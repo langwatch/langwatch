@@ -41845,12 +41845,14 @@ title: Dashboards
 description: Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
 ---
 
-## Turn on Dashboards
+## Open Dashboards
 
 Dashboards is a product in the product switcher at the top left of LangWatch.
-It sits behind the `release_dashboards` feature flag, which is off by default.
-Building and editing widgets on a dashboard also needs the `release_lwql_workbench`
-flag, which turns on LangWatchQL. No other flag is needed.
+On LangWatch Cloud, no setup is needed.
+
+On a self-hosted install, Dashboards stays off until an operator turns it on in
+**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards, and
+`release_lwql_workbench` to build and edit widgets on a dashboard.
 
 ## Your first dashboard
 
@@ -42227,6 +42229,16 @@ list|get|add|update|delete <dashboardId> [<widgetId>]`, and
 `createWidget`, `getWidget`, `updateWidget` and `deleteWidget` in the
 TypeScript SDK (`create_widget`, `get_widget`, `update_widget` and
 `delete_widget` in Python).
+
+### The REST API
+
+`/api/v1/dashboards` serves Dashboards dashboards and their widgets. See
+[API reference > Dashboards](/api-reference/dashboards/overview).
+
+The old Analytics Reports dashboards are at `/api/v1/analytics/reports`
+only. A client that still calls them at `/api/v1/dashboards` gets Dashboards
+dashboards, or a not-found answer if it pins `X-API-Version: 2026-08-07` or an
+earlier date.
 
 ### Analytics Reports
 
@@ -72223,6 +72235,109 @@ The same data renders in the product on the [sessions](/coding-agents/sessions) 
 
 ---
 
+# FILE: ./api-reference/dashboards/create-a-dashboard.mdx
+
+---
+title: "Create a dashboard"
+openapi: "POST /api/v1/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/create-a-widget-on-a-dashboard.mdx
+
+---
+title: "Create a widget on a dashboard"
+openapi: "POST /api/v1/dashboards/{dashboardId}/widgets"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/delete-a-dashboard.mdx
+
+---
+title: "Delete a dashboard"
+openapi: "DELETE /api/v1/dashboards/{dashboardId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/delete-a-widget-on-a-dashboard.mdx
+
+---
+title: "Delete a widget on a dashboard"
+openapi: "DELETE /api/v1/dashboards/{dashboardId}/widgets/{widgetId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/get-a-dashboard.mdx
+
+---
+title: "Get a dashboard"
+openapi: "GET /api/v1/dashboards/{dashboardId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/get-a-widget-on-a-dashboard.mdx
+
+---
+title: "Get a widget on a dashboard"
+openapi: "GET /api/v1/dashboards/{dashboardId}/widgets/{widgetId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/list-a-dashboard-s-widgets.mdx
+
+---
+title: "List a dashboard's widgets"
+openapi: "GET /api/v1/dashboards/{dashboardId}/widgets"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/list-dashboards.mdx
+
+---
+title: "List dashboards"
+openapi: "GET /api/v1/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/overview.mdx
+
+---
+title: "Overview"
+description: "Create and manage Dashboards dashboards and the widgets on them. Each widget holds a LangWatchQL query and a chart setup."
+---
+
+## Intro
+
+Create and manage Dashboards dashboards and the widgets on them. Each widget holds a LangWatchQL query and a chart setup.
+
+---
+
+# FILE: ./api-reference/dashboards/update-a-dashboard.mdx
+
+---
+title: "Update a dashboard"
+openapi: "PATCH /api/v1/dashboards/{dashboardId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/update-a-widget-on-a-dashboard.mdx
+
+---
+title: "Update a widget on a dashboard"
+openapi: "PATCH /api/v1/dashboards/{dashboardId}/widgets/{widgetId}"
+---
+
+---
+
 # FILE: ./api-reference/datasets/action-records.mdx
 
 ---
@@ -74627,11 +74742,29 @@ The slug is optional and is derived from the name when you leave it out. It is a
 
 ---
 
+# FILE: ./api-reference/projects/add-a-dashboard-widget-to-a-dashboard.mdx
+
+---
+title: "Add a dashboard widget to a dashboard"
+openapi: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard"
+---
+
+---
+
 # FILE: ./api-reference/projects/archive-project.mdx
 
 ---
 title: "Archive project"
 openapi: "DELETE /api/v1/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/create-a-dashboard-widget.mdx
+
+---
+title: "Create a dashboard widget"
+openapi: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets"
 ---
 
 ---
@@ -74645,11 +74778,29 @@ openapi: "POST /api/v1/projects"
 
 ---
 
+# FILE: ./api-reference/projects/delete-a-dashboard-widget.mdx
+
+---
+title: "Delete a dashboard widget"
+openapi: "DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+---
+
+---
+
 # FILE: ./api-reference/projects/get-a-dashboard-boards.mdx
 
 ---
 title: "Get a dashboard (deprecated path)"
 openapi: "GET /api/v1/projects/{projectId}/analytics/boards/{dashboardId}"
+---
+
+---
+
+# FILE: ./api-reference/projects/get-a-dashboard-widget.mdx
+
+---
+title: "Get a dashboard widget"
+openapi: "GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
 ---
 
 ---
@@ -74677,6 +74828,15 @@ openapi: "GET /api/v1/projects/{id}/api-key"
 ---
 title: "Get project"
 openapi: "GET /api/v1/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/list-dashboard-widgets.mdx
+
+---
+title: "List dashboard widgets"
+openapi: "GET /api/v1/projects/{projectId}/analytics/dashboard-widgets"
 ---
 
 ---
@@ -74795,6 +74955,15 @@ LANGWATCH_PROJECT_ID=<project id>
 ---
 title: "Regenerate project API key"
 openapi: "POST /api/v1/projects/{id}/regenerate-api-key"
+---
+
+---
+
+# FILE: ./api-reference/projects/update-a-dashboard-widget.mdx
+
+---
+title: "Update a dashboard widget"
+openapi: "PATCH /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
 ---
 
 ---
