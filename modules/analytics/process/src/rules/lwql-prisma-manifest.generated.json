@@ -6255,6 +6255,15 @@
           "documentation": ""
         },
         {
+          "name": "legacyApiKeyLastUsedAt",
+          "columnName": "legacyApiKeyLastUsedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When the legacy apiKey last authenticated a request, written at most once a\nminute per project and process. Spec: modules/api-key/specs/request-credential-type.feature"
+        },
+        {
           "name": "lwqlKey",
           "columnName": "lwqlKey",
           "type": "String",
@@ -7583,6 +7592,24 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "autoPausedAt",
+          "columnName": "autoPausedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "autoPausedReason",
+          "columnName": "autoPausedReason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
           "documentation": ""
         }
       ]
@@ -25968,6 +25995,124 @@
           "isList": false,
           "isOptional": true,
           "documentation": "Set on the report that posted this step and release's one Slack message."
+        }
+      ]
+    },
+    {
+      "name": "SelfHostedNotice",
+      "tableName": "SelfHostedNotice",
+      "documentation": "A notice LangWatch staff send every self-hosted install in Cloud's reply to its daily usage\nreport (enterprise/modules/licensing/specs/self-hosted-notices.feature). Cloud only, and no\ntenant: every install receives every published notice that has not expired.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "severity",
+          "columnName": "severity",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`info`, `warning` or `security`."
+        },
+        {
+          "name": "title",
+          "columnName": "title",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "body",
+          "columnName": "body",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "url",
+          "columnName": "url",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "An https link to read more; null where the notice names none."
+        },
+        {
+          "name": "fixedIn",
+          "columnName": "fixedIn",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The release that fixes what the notice is about; an install on it or newer hides it."
+        },
+        {
+          "name": "status",
+          "columnName": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`draft`, `published` or `withdrawn`. Only a published notice that has not expired is sent."
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "publishedAt",
+          "columnName": "publishedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "publishedBy",
+          "columnName": "publishedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The staff member who published it, by user id."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
         }
       ]
     },

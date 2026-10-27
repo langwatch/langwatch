@@ -64,6 +64,30 @@ describe("refreshTelemetryWiringForLogin", () => {
       expect(result).toMatchObject({ warnings: [notice] });
     });
   });
+  describe("given a copilot scoped function already pointing at this login", () => {
+    /** @scenario "A login re-asserts the Copilot hook file where Copilot capture is persisted" */
+    it("writes the LangWatch Copilot hook file the wiring was persisted without", async () => {
+      vi.spyOn(console, "log").mockImplementation(() => undefined);
+      persistBlockToRc(
+        "zsh",
+        buildScopedToolFunction(
+          "copilot",
+          buildOtelEnvBlock("copilot", CURRENT_ENDPOINT, CURRENT_TOKEN),
+          "zsh",
+        ),
+        toolMarkers("copilot"),
+      );
+      const hookFile = path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+
+      await refreshTelemetryWiringForLogin(baseCfg());
+
+      expect(JSON.parse(fs.readFileSync(hookFile, "utf8")).hooks.agentStop[0].bash).toBe(
+        "langwatch ingest hook copilot",
+      );
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given persisted wiring pointing at a previous instance", () => {
     beforeEach(() => {
       // claude → user-level settings env at the stale instance

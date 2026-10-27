@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import type {
   RecordEvaluationLifecycleCompletedCommandData,
   RecordEvaluationRanCommandData,
+  RecordMonitorErrorRateExceededCommandData,
 } from "../../eventing/evaluation-lifecycle.events.ts";
 import { EvaluationLifecycleService } from "../evaluation-lifecycle.service.ts";
 
@@ -37,6 +38,7 @@ function connectedService() {
   service.connect({
     recordEvaluationRan: recorder<RecordEvaluationRanCommandData>([]),
     recordEvaluationLifecycleCompleted: recorder(completed),
+    recordMonitorErrorRateExceeded: recorder<RecordMonitorErrorRateExceededCommandData>([]),
   });
   return { service, completed };
 }

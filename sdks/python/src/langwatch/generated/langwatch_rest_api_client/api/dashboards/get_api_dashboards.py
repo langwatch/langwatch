@@ -5,6 +5,10 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_dashboards_response_200 import GetApiDashboardsResponse200
+from ...models.get_api_dashboards_response_400 import GetApiDashboardsResponse400
+from ...models.get_api_dashboards_response_401 import GetApiDashboardsResponse401
+from ...models.get_api_dashboards_response_403 import GetApiDashboardsResponse403
+from ...models.get_api_dashboards_response_500 import GetApiDashboardsResponse500
 from ...types import Response, safe_http_status
 
 
@@ -20,11 +24,38 @@ def _get_kwargs() -> dict[str, Any]:
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiDashboardsResponse200 | None:
+) -> (
+    GetApiDashboardsResponse200
+    | GetApiDashboardsResponse400
+    | GetApiDashboardsResponse401
+    | GetApiDashboardsResponse403
+    | GetApiDashboardsResponse500
+    | None
+):
     if response.status_code == 200:
         response_200 = GetApiDashboardsResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 400:
+        response_400 = GetApiDashboardsResponse400.from_dict(response.json())
+
+        return response_400
+
+    if response.status_code == 401:
+        response_401 = GetApiDashboardsResponse401.from_dict(response.json())
+
+        return response_401
+
+    if response.status_code == 403:
+        response_403 = GetApiDashboardsResponse403.from_dict(response.json())
+
+        return response_403
+
+    if response.status_code == 500:
+        response_500 = GetApiDashboardsResponse500.from_dict(response.json())
+
+        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -34,7 +65,13 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetApiDashboardsResponse200]:
+) -> Response[
+    GetApiDashboardsResponse200
+    | GetApiDashboardsResponse400
+    | GetApiDashboardsResponse401
+    | GetApiDashboardsResponse403
+    | GetApiDashboardsResponse500
+]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -49,15 +86,23 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[GetApiDashboardsResponse200]:
-    """List all dashboards for the project with graph counts
+) -> Response[
+    GetApiDashboardsResponse200
+    | GetApiDashboardsResponse400
+    | GetApiDashboardsResponse401
+    | GetApiDashboardsResponse403
+    | GetApiDashboardsResponse500
+]:
+    """List boards
+
+     Lists the Dashboards boards of the key's project, each with how many widgets it holds.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiDashboardsResponse200]
+        Response[GetApiDashboardsResponse200 | GetApiDashboardsResponse400 | GetApiDashboardsResponse401 | GetApiDashboardsResponse403 | GetApiDashboardsResponse500]
     """
 
     kwargs = _get_kwargs()
@@ -72,15 +117,24 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> GetApiDashboardsResponse200 | None:
-    """List all dashboards for the project with graph counts
+) -> (
+    GetApiDashboardsResponse200
+    | GetApiDashboardsResponse400
+    | GetApiDashboardsResponse401
+    | GetApiDashboardsResponse403
+    | GetApiDashboardsResponse500
+    | None
+):
+    """List boards
+
+     Lists the Dashboards boards of the key's project, each with how many widgets it holds.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiDashboardsResponse200
+        GetApiDashboardsResponse200 | GetApiDashboardsResponse400 | GetApiDashboardsResponse401 | GetApiDashboardsResponse403 | GetApiDashboardsResponse500
     """
 
     return sync_detailed(
@@ -91,15 +145,23 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[GetApiDashboardsResponse200]:
-    """List all dashboards for the project with graph counts
+) -> Response[
+    GetApiDashboardsResponse200
+    | GetApiDashboardsResponse400
+    | GetApiDashboardsResponse401
+    | GetApiDashboardsResponse403
+    | GetApiDashboardsResponse500
+]:
+    """List boards
+
+     Lists the Dashboards boards of the key's project, each with how many widgets it holds.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiDashboardsResponse200]
+        Response[GetApiDashboardsResponse200 | GetApiDashboardsResponse400 | GetApiDashboardsResponse401 | GetApiDashboardsResponse403 | GetApiDashboardsResponse500]
     """
 
     kwargs = _get_kwargs()
@@ -112,15 +174,24 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> GetApiDashboardsResponse200 | None:
-    """List all dashboards for the project with graph counts
+) -> (
+    GetApiDashboardsResponse200
+    | GetApiDashboardsResponse400
+    | GetApiDashboardsResponse401
+    | GetApiDashboardsResponse403
+    | GetApiDashboardsResponse500
+    | None
+):
+    """List boards
+
+     Lists the Dashboards boards of the key's project, each with how many widgets it holds.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiDashboardsResponse200
+        GetApiDashboardsResponse200 | GetApiDashboardsResponse400 | GetApiDashboardsResponse401 | GetApiDashboardsResponse403 | GetApiDashboardsResponse500
     """
 
     return (

@@ -13,10 +13,6 @@ import {
 } from "@/cli/utils/governance/claude-session-registry";
 import { type GovernanceConfig, loadConfig } from "@/cli/utils/governance/config";
 import {
-  readWiredExporterTarget,
-  type WiredExporterTarget,
-} from "@/cli/utils/governance/wired-target";
-import {
   defaultStateDir,
   pruneStaleState,
   readFingerprint,
@@ -32,35 +28,39 @@ import {
   parseTraceparent,
   sessionContextFingerprint,
 } from "@/cli/utils/governance/session-context";
+import {
+  HOOK_TIMEOUT_SECONDS,
+  type SessionContextAgent,
+  sessionContextAgentFor,
+} from "@/cli/utils/governance/session-context-agents";
 import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
+import {
+  readWiredExporterTarget,
+  type WiredExporterTarget,
+} from "@/cli/utils/governance/wired-target";
 import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { resolveLogsEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
+import { endProcessWhenDone } from "./end-process";
 import { type GitRunner, readSessionContext, runGitCommand } from "./git-context";
 import { parseHookInput, readStdin } from "./hook-input";
-
-/**
- * What each accepted tool argument means: the agent, plus the environment
- * variables it publishes. The payload's `cwd` beats `projectDirVar`, which
- * stays pinned to the launch directory.
- */
-const TOOLS: Record<string, { agent: string; sessionIdVar?: string; projectDirVar?: string }> = {
-  claude_code: {
-    agent: "claude_code",
-    sessionIdVar: "CLAUDE_CODE_SESSION_ID",
-    projectDirVar: "CLAUDE_PROJECT_DIR",
-  },
-  codex: { agent: "codex" },
-  opencode: { agent: "opencode" },
-};
 
 /** How long the collector has to accept the record before we give up on it. */
 const POST_TIMEOUT_MS = 3_000;
 
+/**
+ * The whole hook's time. Three of the agent's seconds stay spare: node has to
+ * start, and a git call running when the budget ends blocks until it returns.
+ */
+export const HOOK_BUDGET_MS = (HOOK_TIMEOUT_SECONDS - 3) * 1_000;
+
 export interface HookCommandOptions {
-  /** The agent the hook is running for: `claude-code`, `codex` or `opencode`. */
+  /**
+   * The agent the hook is running for: `claude-code`, `codex`, `opencode` or
+   * `copilot`, one row of the session context agent table.
+   */
   tool: string;
   env?: NodeJS.ProcessEnv;
   /** Reads the hook payload. Defaults to draining this process's stdin. */
@@ -81,7 +81,7 @@ export interface HookCommandOptions {
    * no login; defaults to the real healer.
    */
   healRevokedKey?: (params: {
-    agent: string;
+    sourceType: string;
     rejectedToken: string | undefined;
     rejectedTokenSource?: "cache" | "wiring";
   }) => Promise<HealOutcome>;
@@ -90,9 +90,7 @@ export interface HookCommandOptions {
    * settings file (#7958). Injectable so a test needs no home directory;
    * defaults to the real reader.
    */
-  readWiredTarget?: (params: {
-    agent: string;
-  }) => WiredExporterTarget | null;
+  readWiredTarget?: (params: { agent: string }) => WiredExporterTarget | null;
 }
 
 /**
@@ -151,6 +149,21 @@ export async function hookCommand({
   }
 }
 
+/**
+ * The hook as the process an agent spawns: it ends itself once the work is
+ * done or its budget is spent, so nothing left open outlives the agent's timeout.
+ */
+export async function runHookProcess({
+  budgetMs = HOOK_BUDGET_MS,
+  exit,
+  ...options
+}: HookCommandOptions & {
+  budgetMs?: number;
+  exit?: (code: number) => void;
+}): Promise<void> {
+  await endProcessWhenDone({ work: () => hookCommand(options), budgetMs, exit });
+}
+
 async function runHook({
   tool,
   env,
@@ -176,18 +189,21 @@ async function runHook({
   healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
   readWiredTarget: NonNullable<HookCommandOptions["readWiredTarget"]>;
 }): Promise<void> {
-  const spec = TOOLS[tool.trim().toLowerCase().replace(/-/g, "_")];
+  const spec = sessionContextAgentFor(tool);
   if (!spec) {
     debug({ message: `no hook for tool '${tool}'`, env });
     return;
   }
   const agent = spec.agent;
+  // Which personal key this run posts with: the agent's own, or for an agent
+  // with more than one surface, the one of the surface that ran the hook.
+  const sourceType = spec.keySourceType(env);
 
   // Checked before stdin is read and before any git work: an agent with no
   // telemetry configured is the common case, and it must cost nothing but this
   // lookup. Reading first would spend the stdin deadline on a pipe the seam
   // may never close, for a payload nothing was ever going to be sent from.
-  const target = resolveTarget({ env, agent, readCliConfig });
+  const target = resolveTarget({ env, sourceType, readCliConfig });
   if (!target) {
     debug({
       message: "no telemetry target in the environment or the CLI config",
@@ -229,7 +245,7 @@ async function runHook({
   // personal key is re-minted, rewired and retried, with the user told to
   // restart the agent (which still holds the old key); a pinned key just reports.
   let liveTarget = target;
-  if (own.httpStatus === 401 && claimHealWindow({ stateDir, agent, now })) {
+  if (own.httpStatus === 401 && claimHealWindow({ stateDir, sourceType, now })) {
     // A pinned key is not this device's to replace: minting a personal one in
     // its place would move the session's telemetry into another project
     // without saying so. The healer declines a pinned tool for that same
@@ -244,6 +260,7 @@ async function runHook({
     } else {
       await healOrReport({
         agent,
+        sourceType,
         env,
         target,
         own,
@@ -263,6 +280,7 @@ async function runHook({
   // so the one process that could notice actually asks.
   await probeWiredExporter({
     agent,
+    sourceType,
     sessionId,
     env,
     fetchImpl,
@@ -273,34 +291,29 @@ async function runHook({
     healRevokedKey,
   });
 
-  // Whatever this hook had to say about its own directory is said. Anything
-  // the agent declared from a shell that could not reach the collector goes
-  // out now, last, so the declared checkout is the session's current one.
+  // Anything the agent declared from a shell that could not reach the
+  // collector goes out now, last, so the declared checkout is the session's
+  // current one. A collector that just gave no answer is not asked again.
+  if (own.isCollectorUnreachable) return;
   await drainSessionContextSpool({
     stateDir,
     now,
-    post: async (payload) =>
-      (await postSessionContext({ target: liveTarget, env, payload, fetchImpl })).ok,
+    post: async (payload) => {
+      const sent = await postSessionContext({ target: liveTarget, env, payload, fetchImpl });
+      if (sent.status === null) throw new Error("the collector did not answer");
+      return sent.ok;
+    },
   });
 }
 
 /**
- * Ask the collector whether the AGENT's own exporter can still be heard.
- *
- * One empty batch per session, posted to the endpoint and bearer read out of
- * the agent's settings file — the collector authenticates it like any other
- * post and stores nothing. A 401 there is the agent's every span being
- * refused, so it runs the same heal as the hook's own 401 (re-mint, rewrite
- * the wiring, tell the user to restart); a repair this device cannot make on
- * its own is reported plainly, naming the refusing endpoint.
- *
- * Skipped when the wiring matches the target this hook just posted with —
- * that post already asked this exact question — and when the wiring file
- * names no target at all. An offline probe releases its once-per-session
- * marker so the next hook asks again.
+ * Posts one empty batch per session to the agent's own wired target; a 401 there runs the
+ * same heal as the hook's own 401. Skipped when the wiring matches the target just posted
+ * with or names none; an offline probe releases its marker so the next hook asks again.
  */
 async function probeWiredExporter({
   agent,
+  sourceType,
   sessionId,
   env,
   fetchImpl,
@@ -311,6 +324,7 @@ async function probeWiredExporter({
   healRevokedKey,
 }: {
   agent: string;
+  sourceType: string;
   sessionId: string;
   env: NodeJS.ProcessEnv;
   fetchImpl: typeof fetch;
@@ -322,10 +336,7 @@ async function probeWiredExporter({
 }): Promise<void> {
   const wired = readWiredTarget({ agent });
   if (!wired) return;
-  if (
-    wired.endpoint === cliTarget.endpoint &&
-    wired.token === bearerOf(cliTarget.headers)
-  ) {
+  if (wired.endpoint === cliTarget.endpoint && wired.token === bearerOf(cliTarget.headers)) {
     return;
   }
   if (!claimProbeMarker({ stateDir, agent, sessionId })) return;
@@ -347,30 +358,52 @@ async function probeWiredExporter({
     return;
   }
   if (probe.status === 401) {
-    debug({
-      message: `the agent's wired ingest key was refused by ${wired.endpoint}`,
-      env,
-    });
-    if (!claimHealWindow({ stateDir, agent, now })) return;
-    const outcome = await healRevokedKey({
-      agent,
-      rejectedToken: wired.token,
-      rejectedTokenSource: "wiring",
-    }).catch((error: Error) => {
-      debug({ message: `wired heal failed: ${error.message}`, env });
-      return { status: "failed" } as const;
-    });
-    if (outcome.status === "declined") {
-      releaseHealWindow({ stateDir, agent });
-    }
-    if (outcome.status === "healed") {
-      debug({ message: "the agent's wiring was re-minted and rewritten", env });
-      if (agent === "claude_code") notifyClaude(HEAL_NOTICE);
-    } else if (outcome.status === "expired") {
-      if (agent === "claude_code") notifyClaude(SIGNED_OUT_NOTICE);
-    } else if (agent === "claude_code") {
-      notifyClaude(wiredRefusedNotice(wired.endpoint));
-    }
+    await healWiredRejection({ agent, sourceType, env, now, stateDir, wired, healRevokedKey });
+  }
+}
+
+/** The wired key was refused: heal it as the hook's own 401 would be, or report it. */
+async function healWiredRejection({
+  agent,
+  sourceType,
+  env,
+  now,
+  stateDir,
+  wired,
+  healRevokedKey,
+}: {
+  agent: string;
+  sourceType: string;
+  env: NodeJS.ProcessEnv;
+  now: () => number;
+  stateDir: string;
+  wired: WiredExporterTarget;
+  healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
+}): Promise<void> {
+  debug({
+    message: `the agent's wired ingest key was refused by ${wired.endpoint}`,
+    env,
+  });
+  if (!claimHealWindow({ stateDir, sourceType, now })) return;
+  const outcome = await healRevokedKey({
+    sourceType,
+    rejectedToken: wired.token,
+    rejectedTokenSource: "wiring",
+  }).catch((error: Error) => {
+    debug({ message: `wired heal failed: ${error.message}`, env });
+    return { status: "failed" } as const;
+  });
+  if (outcome.status === "declined") {
+    releaseHealWindow({ stateDir, sourceType });
+  }
+  if (agent !== "claude_code") return;
+  if (outcome.status === "healed") {
+    debug({ message: "the agent's wiring was re-minted and rewritten", env });
+    notifyClaude(HEAL_NOTICE);
+  } else if (outcome.status === "expired") {
+    notifyClaude(SIGNED_OUT_NOTICE);
+  } else {
+    notifyClaude(wiredRefusedNotice(wired.endpoint));
   }
 }
 
@@ -397,11 +430,7 @@ function probeMarkerFile({
  * Claim this session's one wired probe, by exclusive create like the heal
  * window. Pruned with the rest of the session state after seven days.
  */
-function claimProbeMarker(params: {
-  stateDir: string;
-  agent: string;
-  sessionId: string;
-}): boolean {
+function claimProbeMarker(params: { stateDir: string; agent: string; sessionId: string }): boolean {
   const file = probeMarkerFile(params);
   try {
     fs.writeFileSync(file, "", { flag: "wx" });
@@ -418,11 +447,7 @@ function claimProbeMarker(params: {
 }
 
 /** Hand the probe back: an offline answer must not spend the session's one ask. */
-function releaseProbeMarker(params: {
-  stateDir: string;
-  agent: string;
-  sessionId: string;
-}): void {
+function releaseProbeMarker(params: { stateDir: string; agent: string; sessionId: string }): void {
   try {
     fs.rmSync(probeMarkerFile(params), { force: true });
   } catch {
@@ -436,6 +461,7 @@ function releaseProbeMarker(params: {
  */
 async function healOrReport({
   agent,
+  sourceType,
   env,
   target,
   own,
@@ -444,6 +470,8 @@ async function healOrReport({
   adoptHealed,
 }: {
   agent: string;
+  /** The source type the rejected personal key is cached under. */
+  sourceType: string;
   env: NodeJS.ProcessEnv;
   target: TelemetryTarget;
   own: OwnContextOutcome;
@@ -452,7 +480,7 @@ async function healOrReport({
   adoptHealed: (target: TelemetryTarget) => void;
 }): Promise<void> {
   const outcome = await healRevokedKey({
-    agent,
+    sourceType,
     rejectedToken: bearerOf(target.headers),
   }).catch((error: Error) => {
     debug({ message: `heal failed: ${error.message}`, env });
@@ -462,7 +490,7 @@ async function healOrReport({
   // without touching the platform, so holding the window would cost nothing
   // to repeat and would silence the next 401 that this device CAN repair.
   if (outcome.status === "declined") {
-    releaseHealWindow({ stateDir, agent });
+    releaseHealWindow({ stateDir, sourceType });
   }
   if (outcome.status === "healed") {
     const healed: TelemetryTarget = { ...outcome.target, source: "personal" };
@@ -504,25 +532,29 @@ const SIGNED_OUT_NOTICE =
 /** How long one heal attempt stands before the hook tries again. */
 const HEAL_THROTTLE_MS = 10 * 60 * 1000;
 
-function healStateFile({ stateDir, agent }: { stateDir: string; agent: string }): string {
-  return path.join(stateDir, `heal-${agent}.json`);
+/**
+ * One heal window per cached key, so the two Copilot surfaces each repair
+ * their own; for every single-surface agent the source type is its agent id.
+ */
+function healStateFile({ stateDir, sourceType }: { stateDir: string; sourceType: string }): string {
+  return path.join(stateDir, `heal-${sourceType}.json`);
 }
 
 /**
- * Take this agent's heal window, or report another attempt holds it, via an
+ * Take this key's heal window, or report another attempt holds it, via an
  * exclusive create so two sessions reading the same 401 can't both re-mint.
  * A stale claim is replaced through its own exclusive takeover marker.
  */
 function claimHealWindow({
   stateDir,
-  agent,
+  sourceType,
   now,
 }: {
   stateDir: string;
-  agent: string;
+  sourceType: string;
   now: () => number;
 }): boolean {
-  const file = healStateFile({ stateDir, agent });
+  const file = healStateFile({ stateDir, sourceType });
   const marker = `${file}.takeover`;
   const claim = JSON.stringify({ attemptedAt: now() });
   const write = (at: string): "claimed" | "taken" | "unwritable" => {
@@ -589,9 +621,15 @@ function standingClaimIsFresh({ file, now }: { file: string; now: () => number }
 }
 
 /** Hand the window back, for an outcome that never reached the platform. */
-function releaseHealWindow({ stateDir, agent }: { stateDir: string; agent: string }): void {
+function releaseHealWindow({
+  stateDir,
+  sourceType,
+}: {
+  stateDir: string;
+  sourceType: string;
+}): void {
   try {
-    fs.rmSync(healStateFile({ stateDir, agent }), { force: true });
+    fs.rmSync(healStateFile({ stateDir, sourceType }), { force: true });
   } catch {
     // A claim we cannot clear stands for the window, costing one repair.
     void 0;
@@ -633,7 +671,7 @@ async function postOwnSessionContext({
   claudeRegistryDir,
   target,
 }: {
-  spec: (typeof TOOLS)[string];
+  spec: SessionContextAgent;
   agent: string;
   sessionId: string;
   input: ReturnType<typeof parseHookInput>;
@@ -716,6 +754,7 @@ async function postOwnSessionContext({
   if (!posted.ok) {
     return {
       httpStatus: posted.status,
+      isCollectorUnreachable: posted.status === null,
       retry: async (healed) => {
         const again = await postSessionContext({
           target: healed,
@@ -740,6 +779,8 @@ async function postOwnSessionContext({
  */
 interface OwnContextOutcome {
   httpStatus: number | null;
+  /** The post got no answer at all: the collector is down or unreachable. */
+  isCollectorUnreachable?: boolean;
   retry?: (target: TelemetryTarget) => Promise<boolean>;
 }
 
@@ -750,11 +791,15 @@ interface OwnContextOutcome {
  */
 export function resolveTarget({
   env,
-  agent,
+  sourceType,
   readCliConfig,
 }: {
   env: NodeJS.ProcessEnv;
-  agent: string;
+  /**
+   * The source type the personal key is cached under. The pin is keyed by
+   * the tool slug, read off this through the same table.
+   */
+  sourceType: string;
   readCliConfig: () => CliTelemetryConfig;
 }): TelemetryTarget | null {
   const fromEnv = resolveLogsEndpoint(env);
@@ -773,7 +818,7 @@ export function resolveTarget({
   // endpoint with it) while it stands -- an explicit choice of where this
   // tool's data goes. `installTelemetryWiring` picks the same credential for
   // the env block, so the record posted here and exported traces land together.
-  const pinned = config.tool_project_keys?.[TOOL_BY_SOURCE_TYPE[agent] ?? agent];
+  const pinned = config.tool_project_keys?.[TOOL_BY_SOURCE_TYPE[sourceType] ?? sourceType];
   const pinnedSecret = pinned?.secret?.trim();
   if (pinnedSecret) {
     const pinnedEndpoint = logsEndpointUnder(pinned?.endpoint ?? controlPlane);
@@ -788,7 +833,7 @@ export function resolveTarget({
   }
 
   const endpoint = logsEndpointUnder(controlPlane);
-  const secret = config.default_personal_ingest_keys?.[agent]?.secret?.trim();
+  const secret = config.default_personal_ingest_keys?.[sourceType]?.secret?.trim();
   if (!endpoint || !secret) return null;
 
   return {

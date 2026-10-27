@@ -1,22 +1,11 @@
 /**
- * The wired-exporter probe: the hook asking whether the AGENT's own key can
- * still be heard, not just its own (#7958).
- *
- * The CLI's cache and the agent's settings file can drift. When they do, the
- * hook posts with a live key and succeeds while every span the agent emits
- * 401s in silence — the exact failure where two days of work produced zero
- * events. The probe posts one empty batch per session to the target read out
- * of the agent's own wiring, and a 401 there heals or reports.
- *
+ * The wired-exporter probe (#7958): the CLI cache and the agent's settings file can drift, so
+ * the hook probes the agent's own wired target once per session and heals or reports a 401.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  ENDPOINT,
-  installHookHarness,
-  type PostedRequest,
-} from "./hook-harness";
+import { ENDPOINT, installHookHarness, type PostedRequest } from "./hook-harness";
 
 const hook = installHookHarness();
 const { posted } = hook;
@@ -55,8 +44,7 @@ const wiredRejectingCollector: typeof fetch = ((
     headers: init.headers,
     body: JSON.parse(init.body) as PostedRequest["body"],
   });
-  const status =
-    init.headers.Authorization === `Bearer ${WIRED_KEY}` ? 401 : 200;
+  const status = init.headers.Authorization === `Bearer ${WIRED_KEY}` ? 401 : 200;
   return Promise.resolve(new Response("{}", { status }));
 }) as unknown as typeof fetch;
 
@@ -78,7 +66,7 @@ describe("the wired-exporter probe", () => {
       expect(probe?.body).toEqual({ resourceLogs: [] });
 
       expect(healRevokedKey).toHaveBeenCalledWith({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: WIRED_KEY,
         rejectedTokenSource: "wiring",
       });
@@ -102,9 +90,7 @@ describe("the wired-exporter probe", () => {
       });
 
       expect(JSON.parse(hook.stdout[0]!)).toEqual({
-        systemMessage: expect.stringContaining(
-          `refused by ${WIRED_ENDPOINT}`,
-        ),
+        systemMessage: expect.stringContaining(`refused by ${WIRED_ENDPOINT}`),
       });
       expect(JSON.parse(hook.stdout[0]!)).toEqual({
         systemMessage: expect.stringContaining("langwatch instrument claude"),
@@ -163,7 +149,10 @@ describe("the wired-exporter probe", () => {
     /** @scenario "An offline probe does not spend the session's one ask" */
     it("releases the session's one ask so the next hook retries", async () => {
       let calls = 0;
-      const flaky: typeof fetch = ((url: string, init: { headers: Record<string, string>; body: string }) => {
+      const flaky: typeof fetch = ((
+        url: string,
+        init: { headers: Record<string, string>; body: string },
+      ) => {
         if (url === WIRED_ENDPOINT) {
           calls += 1;
           if (calls === 1) return Promise.reject(new Error("ECONNREFUSED"));

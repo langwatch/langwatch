@@ -6,6 +6,8 @@ import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./con
  * to a null and a debug line, so a dead key can't be why a running agent's session breaks.
  */
 import { installTelemetryWiring } from "./instrument-wiring";
+import { TOOL_BY_SOURCE_TYPE } from "./otel-env-block";
+import { sessionContextAgentByKeySourceType } from "./session-context-agents";
 import { resolveLiveIngestionKey } from "./telemetry-refresh";
 
 /** The wiring target for one agent's OTLP logs, and what authenticates it. */
@@ -75,90 +77,50 @@ const USER_REVOCATION_CAUSE = "user";
  */
 const OFFBOARDED_REVOCATION_CAUSE = "offboarded";
 
-/** The wiring tool slug for each agent the hook runs for. */
-const TOOL_BY_AGENT: Record<string, string> = {
-  claude_code: "claude",
-  codex: "codex",
-  opencode: "opencode",
-};
+/**
+ * The wiring tool slug for a personal key the hook posts with, or null when no
+ * hooked agent's key is cached under that source type. Only those keys are the
+ * hook's to repair; the slug is the one `langwatch instrument` wires.
+ */
+function wiringToolFor(sourceType: string): string | null {
+  if (!sessionContextAgentByKeySourceType(sourceType)) return null;
+  return TOOL_BY_SOURCE_TYPE[sourceType] ?? null;
+}
 
 /**
- * Re-mint the personal ingest key for `agent` and rewrite its wiring.
- *
- * Declines, without reaching the platform, when this device is not in a
- * position to repair the 401: no login to mint with, a tool pinned to a
- * project (that path is `langwatch instrument --project`), or a rejected
- * token that is not exactly the cached personal key (a pasted credential is
- * the user's, never overwritten, and a request that carried no bearer at all
- * was rejected for another reason).
- *
- * A token read out of the AGENT'S OWN WIRING is the one exception to that
- * cached-key identity check (`rejectedTokenSource: "wiring"`, #7958): the
- * cache and the wiring can drift, and the drifted wired key is exactly the
- * credential the agent's exporter is dying on. Its place in the settings
- * file does not make it this device's, though — a person can wire that file
- * to any collector by hand — so ownership is established from the token
- * itself: it has to be a personal ingest key (`ik-lw-…`, the only kind
- * `installTelemetryWiring` writes) AND the platform has to recognise it as
- * one of this account's. A wired token the platform does not know declines,
- * where a cached one would mint: the cache is this device's own record, the
- * wiring is not.
- *
- * Withholds the repair when the platform says a person revoked the cached
- * key, or recorded no cause for the revoke. A revoke from the API-keys page
- * is a decision about this device, and a device that minted its way past it
- * would make that page a no-op. A key retired with its session, replaced by
- * a rotation or evicted by an older server's cap is re-minted; one retired
- * because its person was offboarded reads as a sign-out instead, since the
- * mint would be refused anyway.
- *
- * Reports a failure once it has gone to the platform and not come back with a
- * wired tool that this device can recognise again: a status call that did not
- * answer inside its deadline, a server that says the cached key is still
- * live, in which case the 401 means something else, or a key that minted but
- * could not be written into the cache or into the tool's wiring.
+ * Re-mints the personal ingest key cached under `sourceType` and rewrites its tool's wiring,
+ * declining without a platform call when this device can't repair the 401. A wiring-sourced
+ * token (#7958) must instead be an `ik-lw-` key the platform knows as this account's.
  */
 export async function healRevokedIngestKey({
-  agent,
+  sourceType,
   rejectedToken,
   rejectedTokenSource = "cache",
   deps = REAL_DEPS,
 }: {
-  agent: string;
+  /** The source type the rejected personal key is cached and minted under. */
+  sourceType: string;
   /** The bearer the collector answered 401 to, without the `Bearer ` word. */
   rejectedToken: string | undefined;
-  /**
-   * Where the rejected bearer was read from. `"cache"` (the default) is the
-   * CLI's own config and demands identity with the cached key; `"wiring"`
-   * says the caller read it out of the agent's wired settings file, where
-   * drift from the cache is the very defect being repaired (#7958).
-   */
+  /** `"cache"` must match the cached key; `"wiring"` is from the agent's settings (#7958). */
   rejectedTokenSource?: "cache" | "wiring";
   deps?: HealDeps;
 }): Promise<HealOutcome> {
-  const tool = TOOL_BY_AGENT[agent];
+  const tool = wiringToolFor(sourceType);
   if (!tool) return DECLINED;
 
   const cfg = deps.loadConfig();
   if (!deps.isLoggedIn(cfg)) return DECLINED;
   if (cfg.tool_project_keys?.[tool]?.secret) return DECLINED;
 
-  // Only a key this device wrote is ours to replace. For the cache source
-  // that means identity with the cached personal key: a 401 the device
-  // carried no bearer for, or carried someone else's, is not this key's
-  // failure. For the wiring source the settings file proves nothing by
-  // itself, so the bearer has to be a personal ingest key — anything else
-  // (a pasted credential, a project key) was never this path's to write —
-  // and the platform has to know it as this account's, checked below.
-  const cached = cfg.default_personal_ingest_keys?.[agent]?.secret;
+  // Only a key this device wrote is ours to replace: the cached key by identity, or a
+  // wired `ik-lw-` key the platform must recognise as this account's (checked below).
+  const cached = cfg.default_personal_ingest_keys?.[sourceType]?.secret;
   if (!rejectedToken) return DECLINED;
   if (rejectedTokenSource === "cache" && (!cached || rejectedToken !== cached)) {
     return DECLINED;
   }
-  if (
-    rejectedTokenSource === "wiring" &&
-    !extractLookupIdFromToken(rejectedToken)
-  ) {
+  if (rejectedTokenSource === "wiring" && !extractLookupIdFromToken(rejectedToken)) {
     return DECLINED;
   }
 
@@ -172,36 +134,18 @@ export async function healRevokedIngestKey({
 
   const resolved = await deps.resolveLiveIngestionKey({
     cfg,
-    sourceType: agent,
+    sourceType,
     allowOfflineFallback: false,
   });
   if (!resolved.minted) return { status: "failed" };
 
-  return adoptMintedKey({ agent, tool, cfg, resolved, deps });
+  return adoptMintedKey({ sourceType, tool, cfg, resolved, deps });
 }
 
 /**
- * The status check that stands between the 401 and the mint, as an outcome
- * when it ends the heal and `null` when the key may be replaced.
- *
- * A platform that does not answer is not a platform that said "re-mint". The
- * one revocation the device must not mint past is a person's, so a status
- * call that times out or errors ends the heal rather than falling through to
- * the mint; the next session asks again once the window is up.
- *
- * A platform that refused the session is the same wall for a different
- * reason: the mint after this check would be refused too, so the heal ends
- * on `expired`, which is the one outcome that names a repair the person can
- * make. A key retired because its person was offboarded is that same wall,
- * read from the key rather than from a refused call.
- *
- * `unknown` — the platform has no such key of THIS account's — is read two
- * ways. For the cached key it is a server from before causes were recorded,
- * or a key the cap evicted long ago, and the device repairs itself. For a
- * key read out of the wiring (`mustBeKnown`) it is the end of the heal: the
- * only proof that wiring is this device's is the platform recognising its
- * key, and a key it does not recognise may be another account's or another
- * collector's, whose wiring a mint here would overwrite.
+ * The status check between the 401 and the mint: an outcome ends the heal, `null` means the
+ * key may still be replaced. A call that errors or times out also ends the heal, and a refused
+ * session ends on `expired`. With `mustBeKnown` (a wired key) an `unknown` key declines.
  */
 async function revocationBlocksHeal({
   cfg,
@@ -242,13 +186,13 @@ async function revocationBlocksHeal({
  * The cache is written first and put back when the wiring lands no target.
  */
 function adoptMintedKey({
-  agent,
+  sourceType,
   tool,
   cfg,
   resolved,
   deps,
 }: {
-  agent: string;
+  sourceType: string;
   tool: string;
   cfg: GovernanceConfig;
   resolved: Awaited<ReturnType<HealDeps["resolveLiveIngestionKey"]>>;
@@ -257,7 +201,7 @@ function adoptMintedKey({
   const cachedKeys = cfg.default_personal_ingest_keys;
   cfg.default_personal_ingest_keys = {
     ...cachedKeys,
-    [agent]: { secret: resolved.token, prefix: resolved.prefix },
+    [sourceType]: { secret: resolved.token, prefix: resolved.prefix },
   };
   try {
     deps.saveConfig(cfg);
