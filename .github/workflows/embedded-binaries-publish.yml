@@ -53,7 +53,7 @@ jobs:
         target:
           # Native runners (no container).
           - { platform: darwin-arm64, runner: macos-latest, container: "" }
-          - { platform: darwin-x64, runner: macos-13, container: "" }
+          - { platform: darwin-x64, runner: macos-15-intel, container: "" }
           - { platform: linux-x64, runner: ubuntu-22.04, container: "" }
           - { platform: linux-arm64, runner: ubuntu-22.04-arm, container: "" }
           # Alpine (musl) build for x64. 3.19 specifically — older musl
