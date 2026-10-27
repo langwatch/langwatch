@@ -117,8 +117,12 @@ function scopes({ types, files, base }) {
   return [{ paths: plainScope({ files: changed, globals: lintGlobals() }), ignores: [] }];
 }
 
+const NOTHING_TO_LINT = "No files found to lint.";
+
 /** The diagnostics of a `-f json` run; undefined when oxlint printed an error instead. */
-function parseReport(out) {
+export function parseReport(out) {
+  // Every path in scope matched an ignore pattern: nothing to lint is a clean run.
+  if (out.trimStart().startsWith(NOTHING_TO_LINT)) return [];
   try {
     return JSON.parse(out).diagnostics;
   } catch {
