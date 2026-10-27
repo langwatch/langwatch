@@ -842,7 +842,7 @@ function logInvalid({
  * Retries a timed-out evaluator once. `details` is typed required but can be
  * missing at runtime; a missing value counts as "not a timeout" (langwatch#8507).
  */
-export function timedOut(result: SingleEvaluationResult): boolean {
+function timedOut(result: SingleEvaluationResult): boolean {
   if (result.status !== "error") return false;
 
   return result.details?.toLowerCase().includes("timed out") ?? false;
