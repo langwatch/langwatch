@@ -78,6 +78,38 @@ describe("ScenarioProcessorService.handleSucceeded, cut at the call limit", () =
     });
   });
 
+  describe("when the agent instance cannot be written", () => {
+    it("still records the cutoff marker", async () => {
+      const failing = createApiFixture<ScenarioExecutionService>();
+      failing.recordAgentInstance = vi
+        .fn<ScenarioExecutionService["recordAgentInstance"]>()
+        .mockRejectedValue(new Error("event log down"));
+      failing.recordCutAtLimit = recordCutAtLimit;
+      const independent = ScenarioProcessorService.create({
+        execution: failing,
+        pool: ScenarioExecutionPoolService.create({ concurrency: 1 }),
+        cancellations: new SilentCancellations(),
+        childProcesses: createApiFixture<ScenarioChildBootstrap>(),
+        metrics: new SilentMetrics(),
+      });
+
+      await independent.handleSucceeded({
+        jobData: JOB,
+        result: {
+          success: true,
+          isCutAtLimit: true,
+          agentInstance: { hostname: "worker-1", label: "blue" },
+        },
+      });
+
+      expect(failing.recordAgentInstance).toHaveBeenCalledOnce();
+      expect(recordCutAtLimit).toHaveBeenCalledWith({
+        projectId: "proj_123",
+        scenarioRunId: "scenariorun_voice1",
+      });
+    });
+  });
+
   describe("when the call finished on its own", () => {
     /** @scenario "A simulated voice run that finished normally records no cutoff marker" */
     it("dispatches no cutoff event", async () => {
