@@ -187,6 +187,20 @@
 		"userPrompt": "Would another provider be cheaper for my usage?"
 	},
 	{
+		"id": "red-team",
+		"label": "Red team",
+		"description": "Write and run one adversarial red-team test against your own AI agent with Scenario's RedTeamAgent. Asks what to attack (system prompt leakage by default, or sensitive data, tool abuse, off-scope answers), then writes a multi-turn Crescendo test with deterministic leak checks and a judge, runs it, and reports whether the agent held. Use when you want to security test your agent against one specific attack.",
+		"category": "recipe",
+		"userPrompt": "Red team my agent"
+	},
+	{
+		"id": "red-team-owasp",
+		"label": "Red team owasp",
+		"description": "Security test your own AI agent against the OWASP Top 10 for LLM Applications (2025). Writes and runs a Scenario red-team test for each of the seven categories a conversation can reach (prompt injection, sensitive information disclosure, improper output handling, excessive agency, system prompt leakage, misinformation, unbounded consumption), reviews the code and configuration by hand for supply chain, data and model poisoning and vector store weaknesses, and reports findings per category. Use when you want broad security coverage of an agent before shipping it.",
+		"category": "recipe",
+		"userPrompt": "Cover the OWASP Top 10 for LLM apps for my agent"
+	},
+	{
 		"id": "scenarios",
 		"label": "Scenarios",
 		"description": "Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI against a connected agent, reading the run parameters that agent declares so the scenarios and comparison runs turn its real levers, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.",
