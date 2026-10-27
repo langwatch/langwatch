@@ -763,3 +763,47 @@ describe("given the callback linking rule (ADR-117 section 3)", () => {
     });
   });
 });
+
+describe("given a connection subject that already has an account row", () => {
+  /** The person at the asserted address has confirmed it, so the resolver itself would link. */
+  const storedUnder = ({ issuer }: { issuer: string | null }) => {
+    const world = createWorld({ confirmed: true });
+    world.store.accounts.set(USER_ID, [
+      {
+        id: `account-${USER_ID}`,
+        provider: CONNECTION_ID,
+        issuer,
+        providerAccountId: SUBJECT,
+        createdAtMs: 0,
+      },
+    ]);
+    return world;
+  };
+
+  describe("when another issuer mints the same subject through the connection", () => {
+    /** @scenario A connection subject stored under another issuer is refused */
+    it("refuses the sign-in rather than signing them in as the row's person", async () => {
+      const { service, proposals } = storedUnder({ issuer: "https://another-idp.test" });
+
+      expect(await service.resolveUser(assertion())).toEqual(NOT_LINKED);
+      expect(proposals).toEqual([]);
+    });
+  });
+
+  describe("when the row was stored before it carried the real issuer", () => {
+    /** @scenario A connection subject stored before its real issuer was recorded still signs in */
+    it.each([
+      ["the asserted issuer", ISSUER],
+      ["no issuer", null],
+      ["the connection's own synthetic namespace", `local:oauth:${CONNECTION_ID}`],
+      ["the same issuer with a trailing slash", `${ISSUER}/`],
+    ])("is not refused for a row with %s", async (_name, issuer) => {
+      const unbound = await createWorld({ confirmed: true }).service.resolveUser(assertion());
+
+      const resolution = await storedUnder({ issuer }).service.resolveUser(assertion());
+
+      expect(unbound).not.toEqual(NOT_LINKED);
+      expect(resolution).not.toEqual(NOT_LINKED);
+    });
+  });
+});

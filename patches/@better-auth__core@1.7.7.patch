@@ -1,5 +1,5 @@
 diff --git a/dist/oauth2/oauth-provider.d.mts b/dist/oauth2/oauth-provider.d.mts
-index 66ba333..de69d80 100644
+index 2321dde..925fcb8 100644
 --- a/dist/oauth2/oauth-provider.d.mts
 +++ b/dist/oauth2/oauth-provider.d.mts
 @@ -22,6 +22,8 @@ type OAuthIdTokenConfig = {

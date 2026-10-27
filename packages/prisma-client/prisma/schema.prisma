@@ -26,10 +26,10 @@ model Account {
   userId            String
   type              String    @default("oauth")
   provider          String
-  /// WHO asserted `providerAccountId` — the other half of better-auth 1.7's
-  /// account key, which it looks up as `(issuer, accountId)`. Nullable only
-  /// so the column could be added to a populated table; every write path
-  /// supplies it and the migration backfilled every existing row.
+  /// WHO asserted `providerAccountId`: LangWatch's issuer namespace (ADR-189),
+  /// stamped by the auth module's account create hook. better-auth keys a row
+  /// by `(provider, providerAccountId)` again since 1.7.3 and writes none.
+  /// Nullable so it could be added to a populated table; migration backfilled.
   issuer            String?
   providerAccountId String
   refresh_token     String?   @db.Text
@@ -47,10 +47,9 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@index([userId])
-  // The pair better-auth 1.7 looks a row up by. NOT unique, on purpose: the
-  // uniqueness that matters is already enforced above, and every issuer here
-  // is derived from `provider`, so this pair is unique exactly when that one
-  // is. See migration 20260825030000.
+  // The pair identity's single sign-on resolution reads a subject by. NOT
+  // unique, on purpose: the key better-auth looks a row up by is the unique
+  // pair above. See migration 20260825030000 and ADR-189.
   @@index([issuer, providerAccountId])
 }
 
@@ -315,8 +314,8 @@ model Identifier {
   // this is the column its uniqueness is keyed by. Null for an identifier no
   // protocol row backs.
   providerId        String?
-  // WHO asserted the subject below - the other half of better-auth 1.7's
-  // account key, and event truth rather than a derivation. A subject is
+  // WHO asserted the subject below - the issuer namespace its Account row
+  // carries (ADR-189), and event truth rather than a derivation. A subject is
   // unique only WITHIN an issuer, so `providerId` has only ever stood in for
   // this while there is exactly one connection per configured provider. Null
   // exactly when `providerId` is.

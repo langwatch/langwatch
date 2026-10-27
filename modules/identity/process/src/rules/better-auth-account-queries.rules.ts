@@ -17,9 +17,8 @@ export type AccountQuery =
   /** findAccountByKey, findAccountOwnerByKey — the IdP callback's lookup.
    *  (Named `findAccountByProviderId` / `findOAuthUser` before 1.7.) */
   | { kind: "byProviderSubject"; providerId: string; accountId: string }
-  /** The same lookup with the user already named, which 1.7 issues when it
-   *  updates a user it has a row for. Served as the subject lookup, refined
-   *  to the user that was asked about. */
+  /** The same lookup with the user already named, which `findCredentialAccount`
+   *  issues. Served as the subject lookup, refined to the user that was asked about. */
   | {
       kind: "byUserProviderSubject";
       userId: string;
@@ -147,8 +146,9 @@ const byIssuerSubject: AccountQueryShape = (where) => {
 
 // `userId` is a refinement, not decoration: the pair is unique, but answering a query that
 // named a user with another user's row is the cross-tenant miss this module refuses to make.
+// 1.7.3 dropped the `issuer` clause from it (ADR-189).
 const byUserProviderSubject: AccountQueryShape = (where) => {
-  if (!only(where, "accountId", "issuer", "providerId", "userId")) return [];
+  if (!only(where, "accountId", "providerId", "userId")) return [];
   const accountId = valueOf(where, "accountId");
   const providerId = valueOf(where, "providerId");
   const userId = valueOf(where, "userId");

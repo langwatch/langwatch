@@ -60,6 +60,22 @@ export class MemorySsoRegistrantReadRepository implements SsoRegistrantReadRepos
     return holders;
   }
 
+  async findSubjectIssuers({
+    connectionId,
+    accountId,
+  }: {
+    connectionId: string;
+    accountId: string;
+  }): Promise<(string | null)[]> {
+    return [...this.store.accounts.values()]
+      .flat()
+      .filter(
+        (account) => account.provider === connectionId && account.providerAccountId === accountId,
+      )
+      .slice(0, 2)
+      .map((account) => account.issuer ?? null);
+  }
+
   async findUsersByEmail({ email }: { email: string }): Promise<SsoResolutionCandidate[]> {
     return [...this.store.users.values()]
       .filter((user) => user.email !== null && user.email === email.trim().toLowerCase())

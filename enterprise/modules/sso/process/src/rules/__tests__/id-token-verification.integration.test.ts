@@ -151,10 +151,17 @@ const buildHarness = () => {
     account: [],
     verification: [],
   };
+  const loggedErrors: string[] = [];
   const auth = betterAuth({
     baseURL: BASE_URL,
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter(db),
+    logger: {
+      level: "error",
+      log: (level, message) => {
+        if (level === "error") loggedErrors.push(message);
+      },
+    },
     account: { accountLinking: { enabled: true } },
     plugins: [
       genericOAuth({
@@ -162,7 +169,7 @@ const buildHarness = () => {
       }),
     ],
   });
-  return { auth, db };
+  return { auth, db, loggedErrors };
 };
 
 const callbackWith = async ({
@@ -234,7 +241,8 @@ describe("the Auth0 provider this deployment builds", () => {
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).not.toContain("error=");
     expect(db.account).toHaveLength(1);
-    expect(db.account?.[0]?.issuer).toBe("local:oauth:auth0");
+    // Better Auth's own key; `Account.issuer` is stamped by the auth module (ADR-189).
+    expect(db.account?.[0]).toMatchObject({ providerId: "auth0", accountId: "auth0|sam" });
     expect(db.session).toHaveLength(1);
   });
 
@@ -256,17 +264,27 @@ describe("the Auth0 provider this deployment builds", () => {
     expect(db.session).toHaveLength(0);
   });
 
-  /** @scenario Supported enterprise providers require ID-token verification */
-  it("refuses to sign in at all when discovery publishes no signing keys to verify with", async () => {
+  /** @scenario Auth0 with no signing keys to verify with is refused at startup, and only Auth0 */
+  it("refuses Auth0 at startup when discovery publishes no signing keys, and only Auth0", async () => {
     publishesSigningKeys = false;
     try {
-      const { auth, db } = buildHarness();
+      const { auth, db, loggedErrors } = buildHarness();
 
-      await expect(callbackWith({ auth, variant: "unsigned" })).rejects.toThrow(
-        "requires verified ID tokens",
+      const started = await auth.handler(
+        new Request(`${BASE_URL}/api/auth/sign-in/social`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ provider: "auth0", disableRedirect: true }),
+        }),
       );
+
+      expect(started.ok).toBe(false);
+      expect(await started.text()).not.toContain("/authorize");
+      expect(loggedErrors.join("\n")).toContain('"auth0": requires verified ID tokens');
       expect(db.account).toHaveLength(0);
       expect(db.session).toHaveLength(0);
+      const session = await auth.handler(new Request(`${BASE_URL}/api/auth/get-session`));
+      expect(session.status).toBe(200);
     } finally {
       publishesSigningKeys = true;
     }

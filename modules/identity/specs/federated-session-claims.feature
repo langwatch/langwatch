@@ -60,6 +60,14 @@ Feature: A federated callback's session claims come only from verified evidence
     Then initialization completes with Okta not mounted
 
   @unit
+  Scenario: Auth0 with no signing keys to verify with is refused at startup, and only Auth0
+    Given Auth0's discovery document publishes no signing key set
+    When the application initializes
+    Then Auth0 is not mounted, and the reason logged is that it requires verified ID tokens
+    And a sign-in through Auth0 is refused before any Account or Session is written
+    And the rest of the authentication API still answers
+
+  @unit
   Scenario: A valid signed Auth0 callback reaches account and session creation
     Given Auth0 discovery publishes the issuer, audience and signing key
     When Auth0 returns a correctly signed token with the callback nonce

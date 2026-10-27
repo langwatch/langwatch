@@ -352,7 +352,7 @@ describe("better-auth over the identity storage adapter", () => {
         stack.db.account = [];
 
         const resolved = await context.internalAdapter.findAccountOwnerByKey({
-          issuer: oauthIssuer("google"),
+          providerId: "google",
           accountId: "g-123",
         });
 
@@ -365,7 +365,7 @@ describe("better-auth over the identity storage adapter", () => {
         stack.gate.open = () => false;
         expect(
           await context.internalAdapter.findAccountByKey({
-            issuer: oauthIssuer("google"),
+            providerId: "google",
             accountId: "g-123",
           }),
         ).toBeNull();
@@ -423,12 +423,12 @@ describe("better-auth over the identity storage adapter", () => {
         // sign-in fails.
         stack.db.account = [];
 
-        // The EXACT call better-auth 1.7 makes on an OAuth callback: two
-        // fields, no providerId and no userId. Naming no user is what makes
+        // The EXACT call better-auth 1.7.7 makes on an OAuth callback:
+        // `(providerId, accountId)` and no userId. Naming no user is what makes
         // it take the fleet-wide gate, so a refusal here fails the sign-in
         // of every user on the deployment and not just this one.
         const owner = await context.internalAdapter.findAccountOwnerByKey({
-          issuer: GOOGLE_ISSUER,
+          providerId: "google",
           accountId: "sub-google-1",
         });
 
@@ -1170,7 +1170,7 @@ describe("better-auth over the identity storage adapter", () => {
         stack.db.account = [];
 
         const found = await context.internalAdapter.findAccountByKey({
-          issuer: oauthIssuer("auth0"),
+          providerId: "auth0",
           accountId: "auth0|abc123",
         });
 
@@ -1183,7 +1183,7 @@ describe("better-auth over the identity storage adapter", () => {
         // The same lookup through the callback's own entry point, which is
         // what better-auth actually calls when the IdP returns.
         const resolved = await context.internalAdapter.findAccountOwnerByKey({
-          issuer: oauthIssuer("auth0"),
+          providerId: "auth0",
           accountId: "auth0|abc123",
         });
         expect(resolved?.kind).toBe("owned");
@@ -1212,7 +1212,7 @@ describe("better-auth over the identity storage adapter", () => {
         stack.db.account = [];
 
         const found = await context.internalAdapter.findAccountByKey({
-          issuer: oauthIssuer("okta"),
+          providerId: "okta",
           accountId: "00u1a2b3c4",
         });
 
@@ -1250,11 +1250,11 @@ describe("better-auth over the identity storage adapter", () => {
         stack.db.account = [];
 
         const fromAuth0 = await context.internalAdapter.findAccountByKey({
-          issuer: oauthIssuer("auth0"),
+          providerId: "auth0",
           accountId: "user-1",
         });
         const fromOkta = await context.internalAdapter.findAccountByKey({
-          issuer: oauthIssuer("okta"),
+          providerId: "okta",
           accountId: "user-1",
         });
 
