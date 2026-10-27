@@ -5,6 +5,7 @@
  */
 
 import type { DashboardProject, DashboardScope } from "@langwatch/dashboard-contract";
+import { useRef, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
@@ -66,6 +67,10 @@ export function useSavedDashboards() {
   const projectId = project?.id ?? "";
   const projectSlug = project?.slug ?? "";
   const utils = analyticsApi.useUtils();
+  // A ref, not the mutation's pending flag: two clicks in one tick, or one landing between the
+  // create answering and the pin starting, would each see "idle" and make a second board.
+  const creating = useRef(false);
+  const [isMakingBoard, setIsMakingBoard] = useState(false);
 
   const list = analyticsApi.boards.getAll.useQuery(
     { projectId, includeOrganization: true },
@@ -90,22 +95,36 @@ export function useSavedDashboards() {
    * pin still opens the board. `addWidget` opens it with "Add a widget" open.
    */
   const createBoard = ({ pin = false, addWidget = false }: CreateBoardOptions = {}) => {
+    if (creating.current) return;
+    creating.current = true;
+    setIsMakingBoard(true);
+    const settle = () => {
+      creating.current = false;
+      setIsMakingBoard(false);
+    };
     create.mutate(
       { projectId, name: untitledBoardName({ existingCount: boards.length }) },
       {
         onSuccess: async (created) => {
-          if (pin) {
-            await star
-              .mutateAsync({ projectId, star: { kind: "board", dashboardId: created.id } })
-              .catch((error: unknown) =>
-                host.failed({ error, fallbackTitle: "Couldn't pin the dashboard" }),
-              );
+          try {
+            if (pin) {
+              await star
+                .mutateAsync({ projectId, star: { kind: "board", dashboardId: created.id } })
+                .catch((error: unknown) =>
+                  host.failed({ error, fallbackTitle: "Couldn't pin the dashboard" }),
+                );
+            }
+            void refresh();
+            const path = dashboardsPath({ projectSlug, dashboardId: created.id });
+            host.navigate(addWidget ? withBlockPickerOpen(path) : path);
+          } finally {
+            settle();
           }
-          void refresh();
-          const path = dashboardsPath({ projectSlug, dashboardId: created.id });
-          host.navigate(addWidget ? withBlockPickerOpen(path) : path);
         },
-        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't create the dashboard" }),
+        onError: (error) => {
+          settle();
+          host.failed({ error, fallbackTitle: "Couldn't create the dashboard" });
+        },
       },
     );
   };
@@ -150,7 +169,7 @@ export function useSavedDashboards() {
     /** True until the first list answer arrives, so a board lookup never reads "missing" early. */
     isLoading: list.data === void 0 && !list.isError,
     loadError: list.error,
-    isCreating: create.isPending || star.isPending,
+    isCreating: isMakingBoard || create.isPending || star.isPending,
     isDeleting: remove.isPending,
     createBoard,
     renameBoard,

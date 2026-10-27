@@ -224,3 +224,11 @@ Feature: Product sidebars
     And it does what the "+" does
     And with one dashboard pinned or more there is no such item
     And a member who may not create dashboards and has pinned none sees no Dashboards section
+
+  @integration
+  Scenario: A double click or a failed pin leaves exactly one dashboard
+    Given I may create dashboards in this project
+    When I press the "+" or the "Add dashboard" item twice in quick succession
+    Then one dashboard is made, and the control ignores the second press while it is made
+    When the pin fails after the dashboard is made
+    Then that one dashboard still exists, opens with "Add a widget" open, and I see "Couldn't pin the dashboard"

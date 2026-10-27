@@ -7,7 +7,7 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -36,10 +36,15 @@ function renderSection({
   stars,
   fails = false,
   permissions,
+  pinFails = false,
+  gate = Promise.resolve(),
 }: {
   stars: unknown[];
   fails?: boolean;
   permissions?: string[];
+  pinFails?: boolean;
+  /** Holds the create answer, so a second press lands while the first is still in flight. */
+  gate?: Promise<void>;
 }) {
   const host = new StubAnalyticsHost(permissions ? { permissions } : {});
   const calls: UiProcedureCall[] = [];
@@ -49,8 +54,12 @@ function renderSection({
       return fails ? Promise.reject(new Error("down")) : Promise.resolve(stars);
     }
     if (call.path === "boards.getAll") return Promise.resolve([]);
-    if (call.path === "boards.create") return Promise.resolve({ ...LATENCY, id: "board-new" });
-    if (call.path === "boards.star") return Promise.resolve({ success: true });
+    if (call.path === "boards.create") {
+      return gate.then(() => ({ ...LATENCY, id: "board-new" }));
+    }
+    if (call.path === "boards.star") {
+      return pinFails ? Promise.reject(new Error("pin down")) : Promise.resolve({ success: true });
+    }
     return NO_PROCEDURES(call);
   };
   renderDashboards({ element: <StarredDashboardsSection />, host, answer });
@@ -139,6 +148,56 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
       ]);
       expect(inputsTo(calls, "boards.star")).toEqual([
         { projectId: "proj-1", star: { kind: "board", dashboardId: "board-new" } },
+      ]);
+    });
+  });
+
+  describe("when the member presses the '+' twice in a row", () => {
+    /** @scenario "A double click or a failed pin leaves exactly one dashboard" */
+    it("makes one board, however fast the clicks come", async () => {
+      const { host, calls } = renderSection({ stars: [{ kind: "board", dashboard: LATENCY }] });
+      const plus = (await section()).getByRole("button", { name: "New dashboard" });
+
+      fireEvent.click(plus);
+      fireEvent.click(plus);
+
+      await waitFor(() => expect(host.navigations).toHaveLength(1));
+      expect(inputsTo(calls, "boards.create")).toHaveLength(1);
+      expect(inputsTo(calls, "boards.star")).toHaveLength(1);
+    });
+  });
+
+  describe("when the member double clicks Add dashboard", () => {
+    /** @scenario "A double click or a failed pin leaves exactly one dashboard" */
+    it("makes one board", async () => {
+      const user = userEvent.setup();
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const { host, calls } = renderSection({ stars: [], gate });
+      const add = await (await section()).findByRole("button", { name: "Add dashboard" });
+
+      await user.dblClick(add);
+      release();
+
+      await waitFor(() => expect(host.navigations).toHaveLength(1));
+      expect(inputsTo(calls, "boards.create")).toHaveLength(1);
+    });
+  });
+
+  describe("when the pin fails after the board is made", () => {
+    /** @scenario "A double click or a failed pin leaves exactly one dashboard" */
+    it("keeps the one board, opens it with Add a widget, and tells the member", async () => {
+      const user = userEvent.setup();
+      const { host, calls } = renderSection({ stars: [], pinFails: true });
+
+      await user.click(await (await section()).findByRole("button", { name: "Add dashboard" }));
+
+      await waitFor(() =>
+        expect(host.navigations).toEqual(["/test-project/dashboards/board-new?addBlock=open"]),
+      );
+      expect(inputsTo(calls, "boards.create")).toHaveLength(1);
+      expect(host.failures).toEqual([
+        expect.objectContaining({ fallbackTitle: "Couldn't pin the dashboard" }),
       ]);
     });
   });
