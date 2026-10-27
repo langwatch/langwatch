@@ -173,6 +173,7 @@ def test_competitor_llm_function_call_reaches_a_verdict():
     ).evaluate(CompetitorLLMFunctionCallEntry(input="Is Vimeo better than YouTube?"))
 
     assert_processed(result)
+    assert result.passed is False
 
 
 # @scenario "A judge reaches a verdict on a model that would otherwise refuse it"
