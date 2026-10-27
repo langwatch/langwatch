@@ -1638,7 +1638,6 @@ containers:
 {{- printf "%s|%s|%s" .Chart.Version (.Chart.AppVersion | default "") (toJson .Values) | sha256sum -}}
 {{- end -}}
 
-{{/* The worker container: the workers Deployment, or a sidecar in each app pod when workers.enabled is false. */}}
 {{- /* Node sizes its heap at about half the memory it sees, so a 4Gi process
        died of heap exhaustion with 2 GiB of its container free. Three quarters
        leaves a quarter outside the heap. Only with a limit (without one the
@@ -1655,6 +1654,7 @@ containers:
 {{- end }}
 {{- end }}
 
+{{/* The worker container: the workers Deployment, or a sidecar in each app pod when workers.enabled is false. */}}
 {{- define "langwatch.workersContainer" -}}
 - name: {{ .Release.Name }}-workers
   securityContext:

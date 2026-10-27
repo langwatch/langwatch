@@ -3,7 +3,10 @@
 //
 // Usage (helm on PATH, chart dependencies built):
 //
-//	go run ./cmd/chartheap [-chart charts/langwatch]
+//	go run ./cmd/chartheap [-chart charts/langwatch] [-prove-node infra/docker/Dockerfile]
+//
+// -prove-node also starts the Dockerfile's Node under a memory limit (docker on PATH)
+// and checks it accepts the ceiling and sizes the heap from the limit.
 //
 // Spec: specs/setup/helm-heap-ceiling.feature
 package main
@@ -20,6 +23,7 @@ import (
 // no-test: a thin loop over chartheap.Checks; tools/chartheap tests every check and the chart workflow runs this.
 func main() {
 	chart := flag.String("chart", "charts/langwatch", "path to the langwatch chart")
+	dockerfile := flag.String("prove-node", "", "Dockerfile whose Node image to start under the ceiling")
 	flag.Parse()
 
 	chartDir, err := filepath.Abs(*chart)
@@ -37,9 +41,25 @@ func main() {
 		}
 		fmt.Printf("ok   %s\n", check.Scenario)
 	}
+	if *dockerfile != "" && !proveNode(*dockerfile) {
+		failures++
+	}
 	if failures > 0 {
 		os.Exit(1)
 	}
+}
+
+func proveNode(dockerfile string) bool {
+	image, err := chartheap.NodeImage(dockerfile)
+	if err == nil {
+		err = chartheap.ProveCeiling(chartheap.ExecRunner, image)
+	}
+	if err != nil {
+		fmt.Printf("FAIL %s accepts the ceiling under a memory limit: %v\n", image, err)
+		return false
+	}
+	fmt.Printf("ok   %s accepts the ceiling under a memory limit\n", image)
+	return true
 }
 
 func runCheck(check chartheap.Check, render chartheap.Render) error {
