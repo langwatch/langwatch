@@ -135,7 +135,7 @@ describe("the LLM Ops sidebar", () => {
     it("carries no Dashboards entry and no saved-dashboards list", () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo" });
 
-      expect(screen.getByRole("link", { name: "Analytics" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /^Analytics/ })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Dashboards" })).toBeNull();
       expect(screen.queryByTestId("saved-dashboards")).toBeNull();
     });
@@ -149,6 +149,18 @@ describe("the LLM Ops sidebar", () => {
       const link = screen.getByRole("link", { name: /Analytics/ });
       expect(link).toHaveAttribute("href", "/demo/analytics");
       expect(within(link).getByText("Legacy")).toBeInTheDocument();
+    });
+
+    /** @scenario "AC3b The Analytics entry is marked legacy and still opens analytics" */
+    it("nests no interactive control in the link and names the legacy status", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo" });
+
+      const link = screen.getByRole("link", { name: /Analytics/ });
+      expect(link).toHaveAccessibleName("Analytics (Legacy)");
+      expect(link.querySelector("a, button, input, select, [tabindex], [role=button]")).toBeNull();
+      // The popover trigger stays reachable, beside the link.
+      const trigger = screen.getByRole("button", { name: "Legacy" });
+      expect(link.contains(trigger)).toBe(false);
     });
 
     /** @scenario "AC3b The Analytics entry is marked legacy and still opens analytics" */

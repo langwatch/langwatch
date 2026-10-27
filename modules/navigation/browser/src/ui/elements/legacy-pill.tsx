@@ -80,10 +80,7 @@ export function LegacyPill({
           onFocus={handleOpen}
           onBlur={handleClose}
           onClick={(e: MouseEvent) => {
-            // Pill renders inside SideMenuLink's <Link href>; preventDefault
-            // keeps the click a popover toggle rather than a navigation.
             e.stopPropagation();
-            e.preventDefault();
             setOpen((prev) => !prev);
           }}
         >

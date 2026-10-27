@@ -25,6 +25,8 @@ export type SideMenuItemProps = {
   betaLabel?: string;
   legacy?: string | boolean;
   legacyLabel?: string;
+  /** An interactive pill is laid over the static one: keep its place, hide its look. */
+  legacyOverlaid?: boolean;
   /** The plan lacks this entry: a lock and "Included in Enterprise" beside the label. */
   isLocked?: boolean;
 };
@@ -32,6 +34,7 @@ export type SideMenuItemProps = {
 const ENTERPRISE_LOCK_MESSAGE = "Included in Enterprise";
 
 const DEFAULT_BETA_MESSAGE = "This feature is in beta";
+const DEFAULT_LEGACY_LABEL = "Legacy";
 const DEFAULT_LEGACY_MESSAGE =
   "This feature is legacy and will be deprecated in the coming months.";
 
@@ -69,6 +72,7 @@ export const SideMenuItem = ({
   betaLabel,
   legacy,
   legacyLabel,
+  legacyOverlaid = false,
   isLocked = false,
 }: SideMenuItemProps) => {
   const betaPill = beta ? (
@@ -77,13 +81,20 @@ export const SideMenuItem = ({
       message={<Text fontSize="sm">{typeof beta === "string" ? beta : DEFAULT_BETA_MESSAGE}</Text>}
     />
   ) : null;
+  // Static: an entry is a link or a button, and neither may hold a control.
+  // The status is in the entry's accessible name (see legacyName), so this is aria-hidden.
   const legacyPill = legacy ? (
-    <LegacyPill
-      label={legacyLabel}
-      message={
-        <Text fontSize="sm">{typeof legacy === "string" ? legacy : DEFAULT_LEGACY_MESSAGE}</Text>
-      }
-    />
+    <Badge
+      variant="subtle"
+      colorPalette="red"
+      fontSize="2xs"
+      paddingX={1.5}
+      lineHeight={1.2}
+      aria-hidden="true"
+      visibility={legacyOverlaid ? "hidden" : "visible"}
+    >
+      {legacyLabel ?? DEFAULT_LEGACY_LABEL}
+    </Badge>
   ) : null;
   const lock = isLocked ? (
     <Tooltip content={ENTERPRISE_LOCK_MESSAGE} positioning={{ placement: "right" }} showArrow>
@@ -196,6 +207,7 @@ export const SideMenuLink = ({
   isLocked,
 }: SideMenuLinkProps) => {
   const linkRef = useRef<HTMLAnchorElement>(null);
+  const density = useSideMenuDensity();
   // A page opened by its address can have its entry below the visible
   // part of a scrolled menu. "nearest" leaves the menu alone whenever
   // the entry is already visible, so click navigation never shifts it.
@@ -235,8 +247,11 @@ export const SideMenuLink = ({
     );
   }
 
+  const legacyName = legacy ? `${label} (${legacyLabel ?? DEFAULT_LEGACY_LABEL})` : label;
+  const overlayLegacy = Boolean(legacy) && showLabel;
+
   // The link recipe's plain variant gives the entry its hover underline.
-  return (
+  const entry = (
     <Link
       asChild
       variant="plain"
@@ -253,7 +268,7 @@ export const SideMenuLink = ({
       <NavigationLink
         ref={linkRef}
         href={href}
-        aria-label={label}
+        aria-label={legacyName}
         data-tour={tourId}
         // The active item is otherwise only a background colour, which a
         // screen reader cannot report and a test cannot read.
@@ -272,9 +287,35 @@ export const SideMenuLink = ({
           betaLabel={betaLabel}
           legacy={legacy}
           legacyLabel={legacyLabel}
+          legacyOverlaid={overlayLegacy}
           isLocked={isLocked}
         />
       </NavigationLink>
     </Link>
+  );
+
+  if (!overlayLegacy) return entry;
+
+  // The explaining popover is a control, so it sits beside the link, laid over the
+  // link's own static pill, not inside the <a>.
+  return (
+    <Box position="relative" width="full">
+      {entry}
+      <Box
+        position="absolute"
+        top="50%"
+        transform="translateY(-50%)"
+        right={`${density.paddingX * 4}px`}
+      >
+        <LegacyPill
+          label={legacyLabel}
+          message={
+            <Text fontSize="sm">
+              {typeof legacy === "string" ? legacy : DEFAULT_LEGACY_MESSAGE}
+            </Text>
+          }
+        />
+      </Box>
+    </Box>
   );
 };
