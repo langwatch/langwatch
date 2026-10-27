@@ -84,13 +84,18 @@ function boardServer({
 }: { excludedOrigins?: string[] | null; refusesUpdate?: boolean } = {}) {
   const calls: UiProcedureCall[] = [];
   const stored = { ...BOARD, excludedOrigins };
+  let refuse: (() => void) | undefined;
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     switch (call.path) {
       case "boards.getAll":
         return Promise.resolve([{ ...stored }]);
       case "boards.update": {
-        if (refusesUpdate) return Promise.reject(new Error("The dashboard could not be saved."));
+        if (refusesUpdate) {
+          return new Promise((_, reject) => {
+            refuse = () => reject(new Error("The dashboard could not be saved."));
+          });
+        }
         const next = (call.input as { excludedOrigins?: string[] | null }).excludedOrigins;
         if (next !== undefined) stored.excludedOrigins = next;
         return Promise.resolve({ ...stored });
@@ -120,7 +125,9 @@ function boardServer({
   /** What each `boards.update` was sent. */
   const updates = () =>
     calls.flatMap(({ path, input }) => (path === "boards.update" ? [input] : []));
-  return { answer, runs, updates };
+  /** Refuses the `boards.update` in flight, once the test has looked at the pending pick. */
+  const refuseUpdate = () => refuse?.();
+  return { answer, runs, updates, refuseUpdate };
 }
 
 /** The host double, with an address that follows each query write as the router's does. */
@@ -322,18 +329,26 @@ describe("given a stored board's Langy traces setting", () => {
 
   describe("when the save of a member's pick is refused", () => {
     /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
-    it("shows Left out again, runs the widget again with langy left out and reports it", async () => {
+    it("shows Left out again, refreshes the widgets again and reports it", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const server = openBoard({ refusesUpdate: true });
-      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+      await screen.findByTestId("sandboxed-frame");
+      const refreshedAt = () =>
+        frames.get(screen.getByTestId("sandboxed-frame"))?.dashboardContext.refreshedAt;
 
       await user.click(await screen.findByRole("button", { name: "Langy traces: Left out" }));
       await user.click(await screen.findByRole("menuitemradio", { name: "Included" }));
-      await vi.waitFor(() => expect(server.host.failures).toHaveLength(1));
+      await screen.findByRole("button", { name: "Langy traces: Included" });
+      await vi.waitFor(() => expect(refreshedAt()).toBeDefined());
+      const afterPick = refreshedAt();
+      await act(async () => server.refuseUpdate());
       await screen.findByRole("button", { name: "Langy traces: Left out" });
-      await frameRuns({ frame: screen.getByTestId("sandboxed-frame"), queryName: "main" });
 
-      expect(server.host.failures[0]?.fallbackTitle).toBe("Couldn't save the Langy setting");
+      await vi.waitFor(() => expect(refreshedAt()).not.toBe(afterPick));
+      expect(server.host.failures.map((failure) => failure.fallbackTitle)).toEqual([
+        "Couldn't save the Langy setting",
+      ]);
+      await frameRuns({ frame: screen.getByTestId("sandboxed-frame"), queryName: "main" });
       expect(server.runs().at(-1)?.excludeOrigins).toEqual(["langy"]);
     });
   });
