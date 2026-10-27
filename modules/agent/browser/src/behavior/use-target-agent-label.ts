@@ -6,7 +6,7 @@ import { agentApi } from "./agent-api.ts";
 import type { TargetEditorDrawer } from "./use-target-input-mapping.ts";
 
 /** What the workbench's deploy label picker shows and writes; null outside the workbench. */
-export type TargetAgentLabel = {
+type TargetAgentLabel = {
   label: string | undefined;
   labels: { label: string; version: number }[];
   latestVersion: number | null;
