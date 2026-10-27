@@ -103,43 +103,47 @@ export function broadcastUiScopeWrite(key: string): void {
 }
 
 /**
- * The remembered scope, re-read on every write in this document, cached against
- * the raw strings so React sees a stable value; a fresh object every
- * read would make `useSyncExternalStore` re-render forever.
+ * The remembered scope as this document last read it: read when its first reader mounts, then
+ * again only on a write in this document. Another tab's write is ignored, even on a later
+ * render, so two tabs in two scopes never take each other's (tasks#987).
  */
 class UiScopeMemoryStore {
-  private raw = "";
   private cached: UiScopeMemory = NOTHING_REMEMBERED;
-  private read = false;
+  private stale = true;
+  private readers = 0;
 
   constructor(private readonly storage: Storage) {}
 
   snapshot = (): UiScopeMemory => {
-    const raw = [
-      this.storage.getItem(UI_SELECTED_ORGANIZATION_ID_KEY),
-      this.storage.getItem(UI_SELECTED_TEAM_ID_KEY),
-      this.storage.getItem(UI_SELECTED_PROJECT_SLUG_KEY),
-    ].join(" ");
-    if (this.read && raw === this.raw) return this.cached;
-    this.raw = raw;
-    this.read = true;
+    if (!this.stale) return this.cached;
+    this.stale = false;
     this.cached = readUiScopeMemory(this.storage);
     return this.cached;
   };
 
-  /** This document's writes only: following another tab's made two tabs overwrite each other. */
   subscribe = (listener: () => void): (() => void) => {
-    window.addEventListener(SAME_DOCUMENT_STORAGE_EVENT, listener);
-    return () => window.removeEventListener(SAME_DOCUMENT_STORAGE_EVENT, listener);
+    const onWrite = () => {
+      this.stale = true;
+      listener();
+    };
+    if (this.readers === 0) this.stale = true;
+    this.readers += 1;
+    window.addEventListener(SAME_DOCUMENT_STORAGE_EVENT, onWrite);
+    return () => {
+      this.readers -= 1;
+      window.removeEventListener(SAME_DOCUMENT_STORAGE_EVENT, onWrite);
+    };
   };
 }
 
-let sharedStore: UiScopeMemoryStore | undefined;
+const stores = new WeakMap<Storage, UiScopeMemoryStore>();
 
 function storeFor(storage: Storage): UiScopeMemoryStore {
-  if (storage !== window.localStorage) return new UiScopeMemoryStore(storage);
-  sharedStore ??= new UiScopeMemoryStore(storage);
-  return sharedStore;
+  const known = stores.get(storage);
+  if (known) return known;
+  const store = new UiScopeMemoryStore(storage);
+  stores.set(storage, store);
+  return store;
 }
 
 /** What the last page left behind, kept current for this render. */
