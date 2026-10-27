@@ -55,7 +55,7 @@ dependencies = [
 [project.optional-dependencies]
 langchain = ["langchain-core>=1.5.4,<2.0.0"]
 dspy = ["dspy-ai>=3.3.0,<4"]
-litellm = ["litellm>=1.100.4"]
+litellm = ["litellm>=1.100.4"] # security: litellm advisory GHSA-7hp6-4w63-5g45, fixed in 1.100.4
 dev = ["ruff>=0.16.2"]
 # tomli is stdlib from 3.11 on; the supported-versions test reads
 # pyproject.toml and runs on 3.10 too.
@@ -108,7 +108,7 @@ examples = [
   "langchain-openai>=1.4.3,<2.0.0",
   "langchain-text-splitters>=1.1.2,<2.0.0",
   "langchain-google-vertexai>=2.0.0,<4.0.0",
-  "litellm>=1.100.4",
+  "litellm>=1.100.4", # security: litellm advisory GHSA-7hp6-4w63-5g45, fixed in 1.100.4
   "openinference-instrumentation-dspy>=0.1.39,<0.2.0",
   "opentelemetry-instrumentation-fastapi>=0.65b0",
   "langgraph>=1.0.0,<2.0.0",

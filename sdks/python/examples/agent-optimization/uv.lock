@@ -19,6 +19,7 @@ certifi = "2026-10-21T00:00:00Z"
 constraints = [
     { name = "aiohttp", specifier = ">=3.14.4" },
     { name = "certifi", specifier = ">=2026.10.19" },
+    { name = "litellm", specifier = ">=1.100.4" },
     { name = "mako", specifier = ">=1.4.2" },
     { name = "multidict", specifier = ">=6.9.1" },
     { name = "pyjwt", specifier = ">=2.15.0" },

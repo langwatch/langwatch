@@ -119,8 +119,9 @@ override-dependencies = [
   # covering <13.0.0, three of them critical.
   "pillow>=13.0.0",
   # nltk unsafe deserialization in the pickle loader path, plus the advisories
-  # closed in 3.10.1 and 3.10.3, then GHSA-8mgp-746c-j5xp and
-  # GHSA-j456-xh4h-cpf2 (model-artifact paths), both fixed in 3.10.4.
+  # closed in 3.10.1 and 3.10.3, then GHSA-j456-xh4h-cpf2, fixed in 3.10.4.
+  # 3.10.4 also sandboxes the model-artifact paths of GHSA-8mgp-746c-j5xp,
+  # which names no fixed release, so that advisory stays open upstream.
   "nltk>=3.10.4",
   # authlib (via arize-phoenix and fastmcp): JWS empty-signature validation
   # (CRITICAL) and further advisories, all fixed by 1.9.1.
