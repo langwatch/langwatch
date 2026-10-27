@@ -783,6 +783,11 @@ function MappingField({
           paddingX={0}
           data-testid={inputTestId}
         />
+        {isSourceMapping && sourceInfo && isMissingDatasetColumn(sourceInfo) && (
+          <Text flexBasis="100%" textStyle="xs" color="red.fg" data-testid="missing-column-note">
+            {`"${sourceInfo.path.join(".")}" is not in the dataset`}
+          </Text>
+        )}
       </HStack>
     </Box>
   );
@@ -813,10 +818,7 @@ function SourceMappingTag({
         : {})}
     >
       {renderSourceIcon?.(sourceInfo.source.type)}
-      <Tag.Label textStyle="monoSm">
-        {sourceTagLabel(sourceInfo)}
-        {isMissingColumn ? " (not in dataset)" : ""}
-      </Tag.Label>
+      <Tag.Label textStyle="monoSm">{sourceTagLabel(sourceInfo)}</Tag.Label>
       <Tag.EndElement>
         <Tag.CloseTrigger
           onClick={(e) => {

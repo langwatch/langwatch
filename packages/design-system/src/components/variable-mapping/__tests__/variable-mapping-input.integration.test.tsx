@@ -52,7 +52,7 @@ describe("VariableMappingInput", () => {
         />,
       );
 
-      expect(screen.getByText("Runs.region (not in dataset)")).toBeInTheDocument();
+      expect(screen.getByText('"region" is not in the dataset')).toBeInTheDocument();
       expect(screen.getByTestId("source-mapping-tag")).toHaveAttribute(
         "data-missing-column",
         "true",

@@ -81,7 +81,7 @@ describe("VariableMappingInput", () => {
         onMappingChange,
       });
 
-      expect(screen.getByText("Test Data.question (not in dataset)")).toBeInTheDocument();
+      expect(screen.getByText('"question" is not in the dataset')).toBeInTheDocument();
       fireEvent.click(screen.getByTestId("clear-mapping-button"));
       expect(onMappingChange).toHaveBeenCalledWith(undefined);
     });
