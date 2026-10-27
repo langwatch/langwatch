@@ -98,6 +98,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	return status
 }
 
+// changedSinceMergeBase is what --changed lints: every change since the merge base.
+func (r runner) changedSinceMergeBase() ([]string, error) {
+	base, err := r.mergeBase()
+	if err != nil {
+		return nil, err
+	}
+	return r.changedFiles(base)
+}
+
 func run(q request, stdout, stderr io.Writer) (int, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -109,15 +118,8 @@ func run(q request, stdout, stderr io.Writer) (int, error) {
 	}
 	r := runner{ctx: context.Background(), root: root, oxlint: filepath.Join(root, "node_modules", ".bin", "oxlint"), stderr: stderr}
 	if q.changed {
-		base, err := r.mergeBase()
-		if err != nil {
+		if q.files, err = r.changedSinceMergeBase(); err != nil || len(q.files) == 0 {
 			return 0, err
-		}
-		if q.files, err = r.changedFiles(base); err != nil {
-			return 0, err
-		}
-		if len(q.files) == 0 {
-			return 0, nil
 		}
 	}
 	diagnostics, failed, err := r.lintScope(q)
