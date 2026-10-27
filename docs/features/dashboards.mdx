@@ -390,13 +390,11 @@ TypeScript SDK (`create_widget`, `get_widget`, `update_widget` and
 
 ### The REST API
 
-`/api/v1/dashboards` serves Dashboards dashboards and their widgets. See
+`/api/v1/dashboards` serves dashboards and their widgets from API version
+`2026-10-26`. A request pinned to an earlier `X-API-Version` gets a 404. See
 [API reference > Dashboards](/api-reference/dashboards/overview).
 
-The old Analytics Reports dashboards are at `/api/v1/analytics/reports`
-only. A client that still calls them at `/api/v1/dashboards` gets Dashboards
-dashboards, or a not-found answer if it pins an `X-API-Version` earlier than
-`2026-10-26`.
+Analytics Reports dashboards are at `/api/v1/analytics/reports`.
 
 ### Analytics Reports
 

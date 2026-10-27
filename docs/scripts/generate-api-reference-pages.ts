@@ -372,7 +372,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     dirName: "dashboards",
     pathPrefixes: ["/api/dashboards"],
     overviewDescription:
-      "Create and manage Dashboards dashboards and the widgets on them. Each widget holds a LangWatchQL query and a chart setup.",
+      "Create and manage dashboards and the widgets on them. Each widget holds a LangWatchQL query and a chart setup.",
   },
   {
     name: "Reports",
