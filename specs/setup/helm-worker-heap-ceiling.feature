@@ -30,6 +30,6 @@ Feature: The worker's JavaScript heap follows its container memory limit
 
     @e2e
     Scenario: The operator's own Node options win
-      Given the operator sets NODE_OPTIONS for the workers
+      Given the operator sets NODE_OPTIONS in the app's or the workers' extra environment
       When the chart renders
-      Then the operator's NODE_OPTIONS is the one the worker starts with
+      Then the worker starts with the operator's NODE_OPTIONS as its only one

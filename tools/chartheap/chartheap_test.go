@@ -39,7 +39,10 @@ func TestLimitGivesThreeQuarterHeap(t *testing.T) { runScenario(t, 0) }
 func TestNoLimitMeansNoCeiling(t *testing.T) { runScenario(t, 1) }
 
 // @scenario "The operator's own Node options win"
-func TestOperatorNodeOptionsWin(t *testing.T) { runScenario(t, 2) }
+func TestOperatorNodeOptionsWin(t *testing.T) {
+	runScenario(t, 2)
+	runScenario(t, 3)
+}
 
 func TestNodeOptionsReadsTheDeploymentInOrder(t *testing.T) {
 	manifest := `---
@@ -81,7 +84,7 @@ func TestAssertionsRejectTheWrongValue(t *testing.T) {
 	if Checks[1].Assert([]string{Ceiling}) == nil {
 		t.Fatal("a ceiling passed where none belongs")
 	}
-	if Checks[2].Assert([]string{"--max-old-space-size=3000", Ceiling}) == nil {
-		t.Fatal("the chart's value passed where the operator's must win")
+	if Checks[2].Assert([]string{Ceiling, "--max-old-space-size=3000"}) == nil {
+		t.Fatal("a duplicate NODE_OPTIONS passed where the operator's must be the only one")
 	}
 }

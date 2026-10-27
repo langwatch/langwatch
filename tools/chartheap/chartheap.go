@@ -32,7 +32,7 @@ type Check struct {
 	Assert   func(nodeOptions []string) error
 }
 
-// Checks are the three scenarios of the spec, in its order.
+// Checks are the spec's scenarios in its order; the operator's scenario is checked from both lists.
 var Checks = []Check{
 	{
 		Scenario: "A worker with a memory limit gets a heap of three quarters of it",
@@ -47,7 +47,12 @@ var Checks = []Check{
 	{
 		Scenario: "The operator's own Node options win",
 		Values:   "workers:\n  extraEnvs:\n    - name: NODE_OPTIONS\n      value: \"--max-old-space-size=3000\"\n",
-		Assert:   lastIs("--max-old-space-size=3000"),
+		Assert:   onlyIs("--max-old-space-size=3000"),
+	},
+	{
+		Scenario: "The operator's own Node options win",
+		Values:   "app:\n  extraEnvs:\n    - name: NODE_OPTIONS\n      value: \"--max-old-space-size=2500\"\n",
+		Assert:   onlyIs("--max-old-space-size=2500"),
 	},
 }
 
@@ -120,6 +125,16 @@ func lastIs(want string) func([]string) error {
 	return func(options []string) error {
 		if len(options) == 0 || options[len(options)-1] != want {
 			return fmt.Errorf("want NODE_OPTIONS %q to win, got %q", want, options)
+		}
+		return nil
+	}
+}
+
+// onlyIs asserts a single NODE_OPTIONS entry: server-side apply refuses a duplicate env name.
+func onlyIs(want string) func([]string) error {
+	return func(options []string) error {
+		if len(options) != 1 || options[0] != want {
+			return fmt.Errorf("want only NODE_OPTIONS %q, got %q", want, options)
 		}
 		return nil
 	}

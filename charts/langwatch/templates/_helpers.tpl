@@ -1658,11 +1658,17 @@ containers:
     - name: LANGWATCH_ENDPOINT
       value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
     {{- /* Node sizes the heap at about half of the memory it sees, so a 4Gi worker
-           died of heap exhaustion with 2 GiB of its container free. Three quarters leaves a quarter for memory outside the
-           heap. Only with a limit: without one the percentage is of the whole
-           node. Before the extraEnvs, so an operator's NODE_OPTIONS wins.
+           died of heap exhaustion with 2 GiB of its container free. Three
+           quarters leaves a quarter for memory outside the heap. Only with a
+           limit, since without one the percentage is of the whole node; and
+           not when an operator names NODE_OPTIONS in either extraEnvs list,
+           whose value wins and must not be rendered beside a second entry.
            specs/setup/helm-worker-heap-ceiling.feature */}}
-    {{- if dig "limits" "memory" "" (.Values.workers.resources | default dict) }}
+    {{- $operatorNodeOptions := false }}
+    {{- range concat (default (list) .Values.app.extraEnvs) (default (list) .Values.workers.extraEnvs) }}
+    {{- if eq (toString .name) "NODE_OPTIONS" }}{{- $operatorNodeOptions = true }}{{- end }}
+    {{- end }}
+    {{- if and (dig "limits" "memory" "" (.Values.workers.resources | default dict)) (not $operatorNodeOptions) }}
     - name: NODE_OPTIONS
       value: "--max-old-space-size-percentage=75"
     {{- end }}
