@@ -359,7 +359,10 @@ jobs:
           # cell t.Skips with a clear reason instead of silently
           # being absent from the report.
           MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio' }}
+        # pipefail: without it the step takes tee's status and a failing cell
+        # leaves the job green.
         run: |
+          set -o pipefail
           go test -tags="$MATRIX_TAGS" -v -count=1 -timeout 1200s \
             ./tests/matrix/... 2>&1 | tee /tmp/matrix.log
 
