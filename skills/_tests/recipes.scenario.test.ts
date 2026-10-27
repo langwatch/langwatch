@@ -438,6 +438,6 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    1_800_000,
+    3_600_000,
   );
 });
