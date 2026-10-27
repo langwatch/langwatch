@@ -242,12 +242,21 @@ app:
   ## @param app.nodeEnv [string] Node.js environment override (falls back to global.env if empty).
   nodeEnv: ""
 
-  # Proxy hops allowed to append the X-Forwarded-For chain used by public auth
-  # rate limits. Set this to the ingress controller or load balancer egress
-  # addresses/CIDRs for the deployment. Empty keeps the safe socket-peer
-  # fallback; the chart cannot infer network-specific CIDRs.
-  ## @param app.trustedProxyAddresses [string, default: ""] Comma-separated trusted proxy addresses or IPv4 CIDR ranges. Required only for a proxy that reaches the app from a public address; a private, loopback or link-local hop is read as infrastructure without it.
-  trustedProxyAddresses: ""
+  # Proxy hops whose X-Forwarded-For chain the app reads the caller's address
+  # from (sign-in and ingest rate limits, audit rows). The default trusts the
+  # private and loopback ranges, where an in-cluster ingress controller sits.
+  # Narrow it to your ingress or load balancer when anything outside it can
+  # reach the app from a private address (a load balancer that rewrites the
+  # source address does). Empty trusts no hop: the socket peer is the caller.
+  ## @param app.trustedProxyAddresses [string] Comma-separated trusted proxy addresses or IPv4/IPv6 CIDR ranges. A forwarding header is read only from a peer inside this set.
+  trustedProxyAddresses: "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128,fc00::/7"
+
+  # Read the caller's address from Cloudflare's CF-Connecting-IP header. Only
+  # from a peer inside trustedProxyAddresses, so set that to Cloudflare's
+  # published ranges as well; the app refuses to start with this on and no
+  # trusted proxy addresses.
+  ## @param app.trustCloudflareClientIp [boolean] Honour CF-Connecting-IP from a trusted proxy peer (TRUST_CLOUDFLARE_CLIENT_IP).
+  trustCloudflareClientIp: false
 
   # Encryption key for securing sensitive credentials
   # This key is used to encrypt/decrypt stored API keys and secrets

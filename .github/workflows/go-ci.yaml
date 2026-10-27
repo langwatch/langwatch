@@ -92,8 +92,14 @@ jobs:
               - '.github/workflows/go-ci.yaml'
             ciguards:
               - '.github/workflows/**'
+              - '.github/pr-filters.yml'
+              - 'cmd/prfilters/**'
               - 'tools/ciguard/**'
               - 'pkg/ciscan/**'
+              # The static-cloud-keys guard walks composite actions too.
+              - '.github/actions/**'
+              # The lambda-workdir guard reads the Lambda images' Dockerfiles.
+              - 'infra/docker/Dockerfile.*.lambda'
       - name: Force the filter true on non-PR events
         if: github.event_name != 'pull_request'
         id: force

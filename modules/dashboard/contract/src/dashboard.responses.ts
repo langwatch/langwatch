@@ -1,6 +1,6 @@
 import type { Named } from "@langwatch/module";
 /**
- * What `/api/dashboards` and `/api/graphs` answer with: no `projectId` (the
+ * What `/api/v1/analytics/reports` and `/api/graphs` answer with: no `projectId` (the
  * credential names the project) and a `platformUrl` the reader opens.
  */
 import { z } from "zod";
