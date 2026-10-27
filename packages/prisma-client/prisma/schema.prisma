@@ -2114,6 +2114,9 @@ model Monitor {
   updatedAt         DateTime                @default(now()) @updatedAt
   autoPausedAt      DateTime? // Set when the monitor paused itself because its evaluations mostly errored
   autoPausedReason  String? // Why it paused itself; cleared with autoPausedAt when enabled again
+  evaluatorLabel    String? // The evaluator's deploy label this monitor runs; null runs the latest
+  createdById       String? // The user who created the monitor; null before creators were recorded
+  updatedById       String? // The user who changed it last
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -4223,12 +4226,53 @@ model Agent {
   archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
+  // The user who created the agent and the one who changed it last; null for
+  // API key callers and for rows written before creators were recorded.
+  createdById       String?
+  updatedById       String?
 
   @@unique([projectId, identityKey])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromAgentId])
   @@index([projectId, lastSeenAt])
+}
+
+/// One immutable snapshot of an agent; the Agent row is always the latest.
+model AgentVersion {
+  id            String   @id
+  projectId     String
+  agentId       String
+  version       Int
+  name          String
+  type          String
+  config        Json
+  workflowId    String?
+  commitMessage String?
+  authorId      String?
+  /// "user", "api_key" or "system": who wrote the version when authorId is null.
+  authorKind    String?
+  createdAt     DateTime @default(now())
+
+  @@unique([agentId, version])
+  @@index([projectId])
+}
+
+/// A deploy label ("production", "staging") pointing at one version of an agent.
+model AgentVersionLabel {
+  id          String   @id
+  projectId   String
+  agentId     String
+  label       String
+  versionId   String
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([agentId, label])
+  @@index([projectId])
+  @@index([versionId])
 }
 
 model Evaluator {
@@ -4249,11 +4293,52 @@ model Evaluator {
   archivedAt            DateTime?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @default(now()) @updatedAt
+  // The user who created the evaluator and the one who changed it last; null
+  // for API key callers and for rows written before creators were recorded.
+  createdById           String?
+  updatedById           String?
 
   @@unique([projectId, slug])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromEvaluatorId])
+}
+
+/// One immutable snapshot of an evaluator; the Evaluator row is always the latest.
+model EvaluatorVersion {
+  id            String   @id
+  projectId     String
+  evaluatorId   String
+  version       Int
+  name          String
+  type          String
+  config        Json
+  workflowId    String?
+  commitMessage String?
+  authorId      String?
+  /// "user", "api_key" or "system": who wrote the version when authorId is null.
+  authorKind    String?
+  createdAt     DateTime @default(now())
+
+  @@unique([evaluatorId, version])
+  @@index([projectId])
+}
+
+/// A deploy label ("production", "staging") pointing at one version of an evaluator.
+model EvaluatorVersionLabel {
+  id          String   @id
+  projectId   String
+  evaluatorId String
+  label       String
+  versionId   String
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([evaluatorId, label])
+  @@index([projectId])
+  @@index([versionId])
 }
 
 model Scenario {
