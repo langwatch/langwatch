@@ -5,8 +5,10 @@ name: publish-docker-ecr
 # OSS-built `git-<sha>` image instead of rebuilding this same source itself.
 #
 # Why a second workflow rather than extra steps in publish-docker-app.yml:
-#   - Different trigger surface. ECR also publishes on every merge to main, so
-#     SaaS always has a `git-<sha>` to pin. Docker Hub stays release/dispatch-only.
+#   - Different trigger surface. ECR publishes on every merge to main, so SaaS
+#     always has a `git-<sha>` to pin, and never on a release: a release build
+#     must not move a `git-<sha>` tag Cloud already uses. Docker Hub stays
+#     release/dispatch-only.
 #   - Different auth. GitHub OIDC role assumption into the artifacts account —
 #     no long-lived AWS keys in this public repository.
 #   - Different tag policy. This workflow NEVER pushes `:latest`. The SaaS
@@ -40,12 +42,12 @@ name: publish-docker-ecr
 #
 # The tags written here, and only these:
 #   - `git-<short-sha>`   always
-#   - `<version>`         additionally, on a `langwatch@v*` release
 #   - `<image_tag>`       instead of `git-<short-sha>`, on a manual dispatch
 #                         that supplies one
 #
 # The OIDC role (`langwatch-oss-ecr-push`, langwatch/langwatch-saas#486) trusts
-# exactly two subjects: `refs/heads/main` and `refs/tags/langwatch@v*`. There is
+# exactly two subjects: `refs/heads/main` and `refs/tags/langwatch@v*`; this
+# workflow only ever runs as the first. There is
 # deliberately no `pull_request` trigger — a PR-ref assume-role is denied by that
 # trust policy, so a PR-triggered run could only ever fail. End-to-end
 # verification happens on the first merge to main.
@@ -55,8 +57,6 @@ name: publish-docker-ecr
 # denied.
 
 on:
-  release:
-    types: [published]
   push:
     branches: [main]
   workflow_dispatch:
@@ -71,7 +71,7 @@ permissions:
 
 # Never cancel in flight: a superseded run may already have pushed per-arch layers.
 # Merges that land while one builds wait as one: each newer commit replaces the
-# waiting one, so a burst builds its first and its newest commit. A release has its own group.
+# waiting one, so a burst builds its first and its newest commit.
 concurrency:
   group: publish-docker-ecr-${{ github.ref }}
   cancel-in-progress: false
@@ -82,17 +82,8 @@ env:
 jobs:
   meta:
     runs-on: ubuntu-latest
-    # Same release gate as publish-docker-app.yml. This repository cuts releases
-    # under several tag prefixes (sdk-python@, mcp@, ...) and only `langwatch@v*`
-    # describes these images — it is also the only tag shape the OIDC trust
-    # policy accepts.
-    if: >-
-      github.event_name != 'release'
-      || startsWith(github.event.release.tag_name, 'langwatch@')
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
-      version: ${{ steps.meta.outputs.version }}
-      is_release: ${{ steps.meta.outputs.is_release }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -107,13 +98,10 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_HASH=$(git rev-parse --short HEAD)
-
-          VERSION=""
-          IS_RELEASE="false"
           IMAGE_TAG="git-${SHORT_HASH}"
 
-          # Both branches below turn external input into a Docker tag. Reject a
-          # malformed one here, where the run has cost nothing, rather than at
+          # The dispatch input below becomes a Docker tag. Reject a malformed
+          # one here, where the run has cost nothing, rather than at
           # the manifest step after eight images have already been pushed.
           #
           # `case` rather than `grep -E '^…$'`: grep matches line by line, so a
@@ -137,32 +125,16 @@ jobs:
             fi
           }
 
-          if [ "${EVENT_NAME}" = "release" ]; then
-            # The gate on this job accepts any `langwatch@` tag, including one
-            # without the `v`. The prefix strip below would then leave VERSION as
-            # the whole ref, and `@` is not a legal tag character.
-            case "${GITHUB_REF}" in
-              refs/tags/langwatch@v*) ;;
-              *) echo "::error::release ref ${GITHUB_REF} is not a langwatch@v* tag"; exit 1 ;;
-            esac
-            VERSION="${GITHUB_REF#refs/tags/langwatch@v}"
-            assert_docker_tag "release version" "${VERSION}"
-            IS_RELEASE="true"
-          elif [ "${EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${INPUT_IMAGE_TAG}" ]; then
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${INPUT_IMAGE_TAG}" ]; then
             assert_docker_tag "image_tag" "${INPUT_IMAGE_TAG}"
             IMAGE_TAG="${INPUT_IMAGE_TAG}"
           fi
 
-          {
-            echo "image_tag=${IMAGE_TAG}"
-            echo "is_release=${IS_RELEASE}"
-            echo "version=${VERSION}"
-          } >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
   # On push:[main], skip the images a commit cannot have affected so a docs-only
-  # merge does not pay for every image build. Release and dispatch always
-  # build everything — those are the runs someone is waiting on a complete set
-  # from.
+  # merge does not pay for every image build. A dispatch always builds
+  # everything: that is the run someone is waiting on a complete set from.
   changes:
     runs-on: ubuntu-latest
     needs: meta
@@ -473,8 +445,8 @@ jobs:
           # The Go images stamp this into main.Version, which every log line and
           # the OTel resource report; the other images ignore it.
           build-args: |
-            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
-            SERVICE_VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            VERSION=${{ needs.meta.outputs.image_tag }}
+            SERVICE_VERSION=${{ needs.meta.outputs.image_tag }}
             LANGWATCH_BUILD_COMMIT=${{ github.sha }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
@@ -526,7 +498,7 @@ jobs:
           cache-from: type=gha,scope=ecr-${{ matrix.image }}-${{ matrix.arch }}
           outputs: type=local,dest=${{ runner.temp }}/cdn
           build-args: |
-            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            VERSION=${{ needs.meta.outputs.image_tag }}
             LANGWATCH_BUILD_COMMIT=${{ github.sha }}
 
       # Only assets/ goes up: index.html is rewritten and served by the pod, and
@@ -615,7 +587,7 @@ jobs:
           cache-from: type=gha,scope=ecr-${{ matrix.image }}-arm64
           cache-to: type=gha,mode=max,ignore-error=true,scope=ecr-${{ matrix.image }}-arm64
           build-args: |
-            VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
+            VERSION=${{ needs.meta.outputs.image_tag }}
             EVALUATOR=${{ matrix.evaluator }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}
@@ -708,8 +680,6 @@ jobs:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           BUILT: ${{ needs.changes.outputs.built }}
           IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
-          IS_RELEASE: ${{ needs.meta.outputs.is_release }}
-          VERSION: ${{ needs.meta.outputs.version }}
           BUCKET: ${{ vars.FRONTEND_ASSETS_BUCKET }}
         run: |
           set -euo pipefail
@@ -778,13 +748,7 @@ jobs:
 
             docker buildx imagetools create -t "${repo}:${IMAGE_TAG}" "${sources[@]}"
 
-            local tags="${IMAGE_TAG}"
-            if [ "${IS_RELEASE}" = "true" ]; then
-              docker buildx imagetools create -t "${repo}:${VERSION}" "${sources[@]}"
-              tags="${tags}, ${VERSION}"
-            fi
-
-            echo "Published \`${image}\` to ECR with tags: ${tags}" >> "$GITHUB_STEP_SUMMARY"
+            echo "Published \`${image}\` to ECR with tags: ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
           }
 
           FAILED=()

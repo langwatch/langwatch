@@ -1,9 +1,9 @@
 // Package chartpush pushes already-packaged Helm charts to an OCI registry and
 // reads back the digest each push produced, for a deploy to pin.
 //
-// prerelease-charts-oci.yml packages each chart once and pushes it to GHCR;
-// this pushes the same file to the artifacts ECR, so LangWatch Cloud pulls
-// its prereleases from the registry its images already come from.
+// prerelease-charts-oci.yml packages each chart once and this pushes it to the
+// artifacts ECR, the only registry prereleases go to, so LangWatch Cloud pulls
+// them from the registry its images already come from.
 //
 // Spec: specs/ci/publish-prerelease-charts-to-ecr.feature
 package chartpush
@@ -82,8 +82,10 @@ func pushOne(ctx context.Context, opts Options, chart string) (Result, error) {
 	return Result{Chart: chart, Version: version, Digest: digest, Output: output}, nil
 }
 
+// findPackage matches `<chart>-<digit>...`: a version starts with a digit, so
+// `langwatch` does not also match langwatch-gateway's package.
 func findPackage(dir, chart string) (string, error) {
-	matches, err := filepath.Glob(filepath.Join(dir, chart+"-*.tgz"))
+	matches, err := filepath.Glob(filepath.Join(dir, chart+"-[0-9]*.tgz"))
 	if err != nil {
 		return "", err
 	}

@@ -17,15 +17,11 @@
 #                    IMAGE_TAG
 #   HEAD_COMMIT      the commit being published (default HEAD); needs its history
 #                    in the working directory's repository
-#   IS_RELEASE       "true" to also write VERSION
-#   VERSION          the release version tag
 set -euo pipefail
 
 image="${1:?repository name required}"
 : "${IMAGE_TAG:?}"
 IMAGE_WAS_BUILT="${IMAGE_WAS_BUILT:-false}"
-IS_RELEASE="${IS_RELEASE:-false}"
-VERSION="${VERSION:-}"
 HEAD_COMMIT="${HEAD_COMMIT:-HEAD}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 err_file="$(mktemp)"
@@ -99,12 +95,7 @@ else
   put_manifest "${previous}" "${IMAGE_TAG}"
 fi
 
-tags="${IMAGE_TAG}"
-if [ "${IS_RELEASE}" = "true" ]; then
-  put_manifest "${IMAGE_TAG}" "${VERSION}"
-  tags="${tags}, ${VERSION}"
-fi
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-  echo "Published \`${image}\` to ECR with tags: ${tags}" >> "${GITHUB_STEP_SUMMARY}"
+  echo "Published \`${image}\` to ECR with tags: ${IMAGE_TAG}" >> "${GITHUB_STEP_SUMMARY}"
 fi
-echo "Published ${image} with tags: ${tags}"
+echo "Published ${image} with tags: ${IMAGE_TAG}"

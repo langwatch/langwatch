@@ -76,11 +76,11 @@ Feature: Publish every deployable image to the artifacts registry
     When publish-docker-ecr re-tags that image for a commit that did not change it
     Then it fails instead of writing the commit tag
 
-  @unit
-  Scenario: A release also tags each Lambda image with its version
-    Given a langwatch@v<version> release
-    When publish-docker-ecr publishes a Lambda image
-    Then the image also gets the <version> tag, naming the same manifest
+  @unimplemented
+  Scenario: A release publishes nothing to the artifacts registry
+    Given a langwatch@v<version> release is published
+    Then publish-docker-ecr does not run
+    And no git-<sha> tag LangWatch Cloud already uses is rebuilt or moved
 
   @unit
   Scenario: A Lambda image starts in a directory Lambda's own user can enter
