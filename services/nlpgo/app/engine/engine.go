@@ -1632,29 +1632,66 @@ func paramAnyMap(params []dsl.Field, name string) map[string]any {
 // declares as a setting of its own. Nothing else on that list is ever
 // read, so everything else is one flattened setting.
 //
-// `name` is deliberately absent. runEvaluator does read it, as the
-// evaluator's display name, but the two competitor evaluators also
-// declare a `name` setting holding the company being defended, and that
-// is the only place the panel writes it. Forwarding it as a setting
-// costs the other evaluators nothing: their settings schemas are
-// non-strict, so the parse drops the key.
+// `name` is deliberately absent: runEvaluator reads it, but for two
+// evaluators it is also a setting, so evaluatorSettings decides per node
+// which of the two it is.
 var evaluatorReservedParams = map[string]struct{}{
 	"evaluator": {},
 	"settings":  {},
 }
 
+// hasEvaluatorParam reports whether an evaluator node carries a parameter
+// under this identifier, whatever its value decodes to.
+func hasEvaluatorParam(params []dsl.Field, identifier string) bool {
+	for _, p := range params {
+		if p.Identifier == identifier {
+			return true
+		}
+	}
+	return false
+}
+
+// evaluatorNonSettingParams returns the identifiers that are not settings on
+// this node: the reserved two always, plus `name` when a legacy `settings`
+// dict marks the node as untouched pre-Go-port DSL, where `name` is the
+// node's display name rather than a competitor evaluator's company.
+func evaluatorNonSettingParams(params []dsl.Field) map[string]struct{} {
+	skip := map[string]struct{}{}
+	for identifier := range evaluatorReservedParams {
+		skip[identifier] = struct{}{}
+	}
+	if hasEvaluatorParam(params, "settings") {
+		skip["name"] = struct{}{}
+	}
+	return skip
+}
+
 // evaluatorSettings assembles the settings dict for an evaluator node.
 // The Studio flattens its panel settings into one parameter per key, so
-// every non-reserved parameter is a setting; a pre-Go-port workflow
+// every parameter evaluatorNonSettingParams does not exclude is a
+// setting; a pre-Go-port workflow
 // instead carries them under one `settings` dict, which is the base the
 // flattened entries overlay. specs/studio/workflow-evaluator-inline-settings.feature
+//
+// `name` is the one identifier whose meaning depends on which producer
+// wrote the node, so it is read from whichever one did. Both Studio
+// shapes write one parameter per setting and never a `settings` dict
+// (modules/workflow/contract/src/merge-local-configs.ts for a saved
+// evaluator carrying panel edits, the inline panel's writeParameters for
+// a bare slug), and for the two competitor evaluators one of those
+// settings is the company being defended, so with no dict present a
+// `name` parameter is that company and travels as a setting. A dict
+// means the node is untouched pre-Go-port DSL, where the sibling `name`
+// parameter is the node's display name instead, so the dict's own `name`
+// stands and the parameter is left to the body field alone.
 func evaluatorSettings(params []dsl.Field) map[string]any {
+	skip := evaluatorNonSettingParams(params)
 	settings := map[string]any{}
 	for identifier, value := range paramAnyMap(params, "settings") {
 		settings[identifier] = value
 	}
 	for _, p := range params {
-		if _, reserved := evaluatorReservedParams[p.Identifier]; reserved {
+		if _, skipped := skip[p.Identifier]; skipped {
 			continue
 		}
 		var value any

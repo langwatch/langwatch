@@ -133,10 +133,10 @@ const COMPETITOR_SETTINGS = {
 };
 
 /**
- * A competitor evaluator. Its settings schema declares `name` as the company
- * being defended, and `mergeEvaluatorLocalConfig` writes every setting to the
- * flattened parameter of the same identifier, so this is the only parameter
- * that is both read in its own right and a setting.
+ * A competitor evaluator, in the shape a bare slug takes: the inline panel
+ * writes its settings straight onto parameters[], with no localConfig. Its
+ * settings schema declares `name` as the company being defended, so that one
+ * parameter is both read in its own right and a setting.
  */
 const competitorEvaluatorNode = (): Component => ({
   cls: "LangWatchEvaluator",
@@ -144,7 +144,7 @@ const competitorEvaluatorNode = (): Component => ({
   evaluator: COMPETITOR_SLUG,
   inputs: [{ identifier: "output", type: "str" }],
   outputs: [{ identifier: "passed", type: "bool" }],
-  localConfig: { name: "Competitor judge", settings: COMPETITOR_SETTINGS },
+  parameters: settingsAsParameters(COMPETITOR_SETTINGS),
 });
 
 const EDGES = [
@@ -273,8 +273,10 @@ describe.skipIf(!hasGo())("the inline evaluator settings round trip", () => {
       it("calls the evaluator with that company among its settings", async () => {
         const dispatched = mergeLocalConfigsIntoDsl(canvasNodes(competitorEvaluatorNode()));
 
-        // The only place the company can travel: the sender writes every
-        // setting to a flattened parameter and emits no other `name`.
+        // The only place the company can travel: the panel writes every
+        // setting to a flattened parameter and no `settings` dict, which is
+        // what tells the engine this `name` is the company and not a display
+        // name.
         const judge = dispatched.find((node) => node.id === "judge");
         expect(judge?.data.parameters).toEqual(
           expect.arrayContaining([

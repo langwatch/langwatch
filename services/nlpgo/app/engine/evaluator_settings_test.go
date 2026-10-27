@@ -137,10 +137,14 @@ func TestDispatchEvaluator_LegacySettingsDictStillWorks(t *testing.T) {
 	assert.EqualValues(t, 128, settings["max_tokens"])
 
 	// The slug the call is routed by is not a setting: it is read in its
-	// own right and would be a nonsense key in the evaluator's merge. The
-	// name is both, which TestDispatchEvaluator_NameTravelsAsBothFieldAndSetting
-	// covers.
+	// own right and would be a nonsense key in the evaluator's merge.
 	assert.NotContains(t, settings, "evaluator")
+
+	// This shape is the pre-Go-port DSL, where `name` is the node's display
+	// name, so it stays off the settings dict. It is a setting only on a
+	// node the panel wrote, which carries no dict;
+	// TestDispatchEvaluator_NameTravelsAsBothFieldAndSetting covers that.
+	assert.NotContains(t, settings, "name")
 	assert.Equal(t, "is-answer-correct", body["name"])
 }
 
@@ -206,8 +210,9 @@ func TestEvaluatorSettings_SkipsNullParameters(t *testing.T) {
 // holding the company being defended, and the panel writes it to the same
 // flattened parameter the body's name field is read from, so excluding it
 // from settings would run those two on the schema default instead of the
-// canvas value. Forwarding it costs the other evaluators nothing: their
-// settings schemas are non-strict, so the endpoint's parse drops the key.
+// canvas value. No `settings` dict is present, which is what marks this
+// node as panel-written; forwarding it costs the other evaluators nothing,
+// since their settings schemas are non-strict and the parse drops the key.
 func TestDispatchEvaluator_NameTravelsAsBothFieldAndSetting(t *testing.T) {
 	body := dispatchEvaluatorBody(t, []dsl.Field{
 		{Identifier: "name", Type: "str", Value: json.RawMessage(`"ACME Corp"`)},
@@ -238,5 +243,26 @@ func TestDispatchEvaluator_EvaluatorAndSettingsStayReserved(t *testing.T) {
 	assert.NotContains(t, settings, "evaluator")
 	assert.NotContains(t, settings, "settings")
 	assert.EqualValues(t, 128, settings["max_tokens"], "the legacy dict is still the base layer")
+	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
+}
+
+// TestDispatchEvaluator_LegacyDictKeepsItsOwnName is the review finding: a
+// pre-Go-port competitor node carries the company inside its `settings`
+// dict and the node's display name in a sibling `name` parameter, the shape
+// services/nlpgo/tests/integration/evaluator_workflow_test.go emits. Letting
+// the parameter overlay the dict would have made the evaluation label the
+// company the judge defends.
+func TestDispatchEvaluator_LegacyDictKeepsItsOwnName(t *testing.T) {
+	body := dispatchEvaluatorBody(t, []dsl.Field{
+		param(t, "evaluator", "langevals/competitor_llm"),
+		{Identifier: "name", Type: "str", Value: json.RawMessage(`"Competitor judge"`)},
+		{Identifier: "settings", Type: "dict", Value: json.RawMessage(`{"model":"openai/gpt-5-mini","name":"ACME Corp"}`)},
+	})
+
+	settings, ok := body["settings"].(map[string]any)
+	require.True(t, ok, "settings missing from the outbound body: %v", body)
+	assert.Equal(t, "ACME Corp", settings["name"],
+		"the dict holds the company and a display-name parameter must not overlay it")
+	assert.Equal(t, "Competitor judge", body["name"], "the display name still labels the evaluation")
 	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
 }
