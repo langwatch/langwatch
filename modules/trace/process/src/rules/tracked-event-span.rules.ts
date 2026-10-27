@@ -14,7 +14,6 @@ import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/
 /** How many hex characters an OTLP span id carries. */
 const SPAN_ID_LENGTH = 16;
 
-
 /** The span id derives from trace and event IDs, making retries idempotent. */
 /** The span id a given event on a given trace always has. */
 function deriveSpanId(input: Readonly<{ traceId: string; eventId: string }>): string {

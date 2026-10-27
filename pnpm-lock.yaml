@@ -14120,6 +14120,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../packages/otlp
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans

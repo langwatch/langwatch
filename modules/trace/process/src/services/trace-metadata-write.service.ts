@@ -1,3 +1,4 @@
+import { epochMsToOtlpNanos } from "@langwatch/otlp/trace-request";
 import { nowInstant } from "@langwatch/time";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
@@ -63,7 +64,7 @@ export class TraceMetadataWriteService {
     });
 
     const now = nowInstant().epochMilliseconds;
-    const nowNano = TraceCollectorSpanService.epochMsToOtlpNanos(now);
+    const nowNano = epochMsToOtlpNanos(now);
     const spanId = generateOtelSpanId();
 
     await this.#ingest.recordSpan({

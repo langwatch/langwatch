@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { epochMsToOtlpNanos } from "@langwatch/otlp/trace-request";
 import type { CallRecord, CallTurn } from "@langwatch/scenario-contract";
 import { DEFAULT_PII_REDACTION_LEVEL, type RecordSpanCommandData } from "@langwatch/trace-contract";
 
@@ -164,8 +165,8 @@ function buildExchangeSpanInput({
       parentSpanId: null,
       name: "Voice Call Turn",
       kind: 1,
-      startTimeUnixNano: String(Math.round(startMs) * 1_000_000),
-      endTimeUnixNano: String(Math.round(endMs) * 1_000_000),
+      startTimeUnixNano: epochMsToOtlpNanos(startMs),
+      endTimeUnixNano: epochMsToOtlpNanos(endMs),
       attributes: exchangeAttributes({
         exchange,
         record,

@@ -52,6 +52,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

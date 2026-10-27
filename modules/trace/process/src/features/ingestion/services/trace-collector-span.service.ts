@@ -221,6 +221,4 @@ export class TraceCollectorSpanService {
   static convertSpanToOtlp = convertSpanToOtlp;
 
   static buildResource = buildResource;
-
-  static epochMsToOtlpNanos = epochMsToOtlpNanos;
 }
