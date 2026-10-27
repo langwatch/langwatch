@@ -9,13 +9,16 @@ import {
 } from "@langwatch/enterprise-saas-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
-import { countUnknownUsageFields, usageReportBodySchema } from "@langwatch/ops-contract";
+import {
+  countUnknownUsageFields,
+  type SelfHostedNotice,
+  usageReportBodySchema,
+} from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { SaasUsageReportPipeline } from "../eventing/saas-usage-report.pipeline.ts";
 import type { SaasRateLimitRepository } from "../repositories/saas-rate-limit.repository.ts";
 import {
-  senderAddressesOf,
   USAGE_REPORT_GLOBAL_KEY,
   USAGE_REPORT_GLOBAL_LIMIT,
   USAGE_REPORT_PER_ADDRESS_LIMIT,
@@ -25,7 +28,10 @@ import {
 } from "../rules/usage-report-limits.rules.ts";
 import type { LangWatchCloudService } from "./langwatch-cloud.service.ts";
 
-type UsageReportRecorder = Pick<LicensingApi, "recordUsageReport">;
+type UsageReportRecorder = Pick<
+  LicensingApi,
+  "recordUsageReport" | "findPublishedSelfHostedNotices"
+>;
 type UsageReportFacts = Readonly<{
   recordUsageReportReceived: Pick<
     EventingCommands<SaasUsageReportPipeline>["recordUsageReportReceived"],
@@ -37,7 +43,11 @@ type ReleaseConfig = Pick<SaasServerConfig, "latestRelease" | "latestReleaseComm
 /**
  * The anonymous daily report a self-hosted install posts. It lands in the
  * install registry and as a `usage_report_received` fact nurturing sends to product
- * analytics; neither failing refuses it, since a refused report takes the install out of view. @see ../../../specs/usage-report-receiver.feature
+ * analytics; neither failing refuses it, since a refused report takes the install out of view.
+ * The reply carries the latest release and the notices staff published; a notice that cannot be
+ * read is logged and left out, never a refusal.
+ * @see ../../../specs/usage-report-receiver.feature
+ * @see ../../../../licensing/specs/self-hosted-notices.feature
  */
 export class UsageReportReceiverService {
   readonly #cloud: LangWatchCloudService;
@@ -73,13 +83,13 @@ export class UsageReportReceiverService {
 
   async receive({
     report,
-    addressHeaders,
+    callerAddress,
   }: IncomingUsageReportRequest): Promise<UsageReportReceipt> {
     this.#cloud.assertCloud();
 
     await this.#admit(USAGE_REPORT_GLOBAL_KEY, USAGE_REPORT_GLOBAL_LIMIT);
-    for (const address of senderAddressesOf(addressHeaders)) {
-      await this.#admit(usageReportAddressKey(address), USAGE_REPORT_PER_ADDRESS_LIMIT);
+    if (callerAddress !== null) {
+      await this.#admit(usageReportAddressKey(callerAddress), USAGE_REPORT_PER_ADDRESS_LIMIT);
     }
 
     const unknownFields = countUnknownUsageFields(report);
@@ -90,7 +100,21 @@ export class UsageReportReceiverService {
     await this.#record({ instanceId, properties, unknownFields });
     await this.#recordFact({ instanceId, event, properties, unknownFields });
 
-    return this.#receipt;
+    const notices = await this.#notices(instanceId);
+    return notices.length > 0 ? { ...this.#receipt, notices } : this.#receipt;
+  }
+
+  /** The notices an install is sent now; none, logged, when they cannot be read. */
+  async #notices(instanceId: string): Promise<SelfHostedNotice[]> {
+    try {
+      return await this.#registry.findPublishedSelfHostedNotices();
+    } catch (error) {
+      this.#logger.error(
+        { error, instanceId },
+        "a usage report was accepted but its reply carries no notices: they could not be read",
+      );
+      return [];
+    }
   }
 
   /** Binds the saas_usage_report pipeline's sender. */

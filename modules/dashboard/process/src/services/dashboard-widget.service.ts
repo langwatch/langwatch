@@ -31,6 +31,9 @@ import type { DashboardAccessService } from "./dashboard-access.service.ts";
 
 type Viewed = Readonly<{ viewer?: DashboardViewer }>;
 
+/** A widget addressed under one board's path: on any other board, or none, it is not found. */
+type OnBoard = Readonly<{ onDashboardId?: string }>;
+
 /** An update's code and queries, each optional; the repository merges them into the stored half. */
 const definitionUpdateSchema = dashboardWidgetDefinitionSchema.partial();
 
@@ -74,7 +77,7 @@ export class DashboardWidgetService {
     return rows.map((row) => this.#present(row));
   }
 
-  async getById(input: DashboardWidgetScope & Viewed): Promise<DashboardWidget> {
+  async getById(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidget> {
     await this.#assertEnabled(input);
     return this.#present(await this.#visibleRow(input));
   }
@@ -99,8 +102,10 @@ export class DashboardWidgetService {
   }
 
   /** The repository merges the halves given into the stored half, which it parses first. */
-  async updateWidget(input: UpdateDashboardWidgetInput & Viewed): Promise<DashboardWidget> {
-    const { viewer: _viewer, ...fields } = input;
+  async updateWidget(
+    input: UpdateDashboardWidgetInput & Viewed & OnBoard,
+  ): Promise<DashboardWidget> {
+    const { viewer: _viewer, onDashboardId: _onBoard, ...fields } = input;
     await this.#assertEnabled(fields);
     await this.#visibleRow(input);
     this.#assertWritable(input.id, definitionUpdateSchema.safeParse(input.input));
@@ -115,7 +120,7 @@ export class DashboardWidgetService {
     return this.#present(await this.#repository.assignToDashboard(fields));
   }
 
-  async deleteWidget(input: DashboardWidgetScope & Viewed): Promise<void> {
+  async deleteWidget(input: DashboardWidgetScope & Viewed & OnBoard): Promise<void> {
     await this.#assertEnabled(input);
     await this.#visibleRow(input);
     return this.#repository.deleteWidget({ projectId: input.projectId, id: input.id });
@@ -149,9 +154,12 @@ export class DashboardWidgetService {
     return rows.filter((row) => row.dashboardId === input.dashboardId);
   }
 
-  async #visibleRow(input: DashboardWidgetScope & Viewed): Promise<DashboardWidgetRow> {
+  async #visibleRow(input: DashboardWidgetScope & Viewed & OnBoard): Promise<DashboardWidgetRow> {
     const row = await this.#repository.getById({ projectId: input.projectId, id: input.id });
     const onBoard = row.dashboardId;
+    if (input.onDashboardId !== undefined && onBoard !== input.onDashboardId) {
+      throw new DashboardWidgetNotFoundError();
+    }
     const hidden =
       onBoard !== null &&
       (await this.#boards.isHidden({
@@ -176,7 +184,7 @@ export class DashboardWidgetService {
     input: { projectId: string; dashboardId: string } & Viewed,
   ): Promise<void> {
     const found = await this.#boards.findReadable(input);
-    if (!found) throw new DashboardWidgetNotFoundError();
+    if (!found) throw new DashboardNotFoundError(input.projectId);
     if (found.standing === "guest") throw new DashboardReadOnlyHereError(input.projectId);
   }
 
