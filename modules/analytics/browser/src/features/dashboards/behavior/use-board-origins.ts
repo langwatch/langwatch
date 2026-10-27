@@ -15,9 +15,12 @@ import {
 export function useBoardOrigins({
   dashboardId,
   stored,
+  onFailed,
 }: {
   dashboardId: string;
   stored: readonly string[] | null;
+  /** The board re-ran with the pick; a refused save runs it again with the stored value. */
+  onFailed?: () => void;
 }) {
   const host = useAnalyticsHost();
   const project = host.project();
@@ -26,7 +29,10 @@ export function useBoardOrigins({
   const update = analyticsApi.boards.update.useMutation({
     // Returned, so the save stays pending until the list holds the new value.
     onSuccess: () => utils.boards.getAll.invalidate({ projectId }),
-    onError: (error) => host.failed({ error, fallbackTitle: "Couldn't save the Langy setting" }),
+    onError: (error) => {
+      onFailed?.();
+      host.failed({ error, fallbackTitle: "Couldn't save the Langy setting" });
+    },
   });
 
   const excludedOrigins =

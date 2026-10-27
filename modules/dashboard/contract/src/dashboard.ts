@@ -76,8 +76,11 @@ export interface DashboardSchema extends Named<typeof dashboardSchemaDefinition>
 export const dashboardSchema: DashboardSchema = dashboardSchemaDefinition;
 export type Dashboard = z.infer<typeof dashboardSchema>;
 
-/** The trace origins a Dashboards board leaves out of every widget, such as `langy`. */
-const boardExcludedOriginsSchemaDefinition = z.array(z.string().trim().min(1).max(100)).max(20);
+/**
+ * The trace origins a Dashboards board leaves out of every widget, such as `langy`. Bounded as the
+ * LangWatchQL query door bounds `excludeOrigins`, so a stored list never fails a widget's query.
+ */
+const boardExcludedOriginsSchemaDefinition = z.array(z.string().trim().min(1).max(64)).max(20);
 export interface BoardExcludedOriginsSchema extends Named<
   typeof boardExcludedOriginsSchemaDefinition
 > {}

@@ -383,6 +383,18 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
 
       expect(refused.status).toBe(422);
     });
+
+    /** @scenario "AC200e Langy setting: the API reads and sets the origins a board leaves out" */
+    it("refuses an origin longer than a widget query accepts", async () => {
+      const { board, send } = await projectWithBothBoards();
+
+      const refused = await send("dashboards", `${BOARDS}/${board.id}`, {
+        method: "PATCH",
+        body: { excludedOrigins: ["o".repeat(65)] },
+      });
+
+      expect(refused.status).toBe(422);
+    });
   });
 
   describe("when a member creates their own My dashboard", () => {
