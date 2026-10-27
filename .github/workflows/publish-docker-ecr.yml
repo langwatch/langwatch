@@ -11,8 +11,10 @@ name: publish-docker-ecr
 #     no long-lived AWS keys in this public repository.
 #   - Different tag policy. This workflow NEVER pushes `:latest`, and nothing
 #     else writes it on these repositories. Their tags are immutable, so every
-#     push here checks first and skips a tag that is already there: a re-run
-#     or a dispatch for a published commit writes nothing.
+#     push here checks first (.github/scripts/ecr-tag-published.sh). A default
+#     `git-<short sha>` tag already there is skipped only when it records this
+#     commit's full sha as its org.opencontainers.image.revision; a custom
+#     `image_tag` already there fails the run, so the dispatcher picks a new one.
 #   - Different architecture set. arm64 only. Every consumer of these images is
 #     Graviton: the EKS node groups are AL2023_ARM_64_STANDARD on m8g, and every
 #     Lambda is `architectures = ["arm64"]`. Building amd64 here doubled the
@@ -92,6 +94,7 @@ jobs:
       || startsWith(github.event.release.tag_name, 'langwatch@')
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
+      custom_tag: ${{ steps.meta.outputs.custom_tag }}
       version: ${{ steps.meta.outputs.version }}
       is_release: ${{ steps.meta.outputs.is_release }}
     steps:
@@ -129,7 +132,7 @@ jobs:
               # The one tag this workflow must never write. Nothing else here
               # can produce it — but a dispatcher can type it into the input
               # box, and a `langwatch@vlatest` tag would reach the same place.
-              latest) echo "::error::$1 must not be 'latest'; the SaaS pipeline owns that tag"; exit 1 ;;
+              latest) echo "::error::$1 must not be 'latest'; nothing writes that tag on these repositories"; exit 1 ;;
               *[!A-Za-z0-9._-]* | [!A-Za-z0-9_]*)
                 echo "::error::$1 must match ^[A-Za-z0-9_][A-Za-z0-9._-]*$"; exit 1 ;;
             esac
@@ -154,8 +157,15 @@ jobs:
             IMAGE_TAG="${INPUT_IMAGE_TAG}"
           fi
 
+          # A custom tag may already name another commit, so it is never skipped.
+          CUSTOM_TAG="false"
+          if [ "${IMAGE_TAG}" != "git-${SHORT_HASH}" ]; then
+            CUSTOM_TAG="true"
+          fi
+
           {
             echo "image_tag=${IMAGE_TAG}"
+            echo "custom_tag=${CUSTOM_TAG}"
             echo "is_release=${IS_RELEASE}"
             echo "version=${VERSION}"
           } >> "$GITHUB_OUTPUT"
@@ -457,15 +467,19 @@ jobs:
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${REGISTRY}"
 
-      # The tags are immutable: a re-run skips a build whose push would be refused.
+      # The tags are immutable: a re-run skips a build whose push would be refused,
+      # once the image there is shown to be this commit's (see the header).
       - name: Check whether ${{ matrix.image }} (${{ matrix.arch }}) is already published
         id: exists
         env:
           IMAGE: ${{ matrix.image }}
           TAG: ${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
+          EXPECTED_REVISION: ${{ github.sha }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
           set -euo pipefail
-          EXISTS=$(bash .github/scripts/ecr-tag-exists.sh "${IMAGE}" "${TAG}")
+          EXISTS=$(bash .github/scripts/ecr-tag-published.sh "${IMAGE}" "${TAG}" label)
           if [ "${EXISTS}" = "true" ]; then
             echo "::notice::${IMAGE}:${TAG} is already in ECR; skipping the build"
           fi
@@ -492,6 +506,9 @@ jobs:
             VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
             SERVICE_VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
             LANGWATCH_BUILD_COMMIT=${{ github.sha }}
+          # Read back by the existence check above on a re-run.
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
 
@@ -623,9 +640,12 @@ jobs:
         env:
           IMAGE: ${{ matrix.image }}
           TAG: ${{ needs.meta.outputs.image_tag }}
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
+          EXPECTED_REVISION: ${{ github.sha }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
           set -euo pipefail
-          EXISTS=$(bash .github/scripts/ecr-tag-exists.sh "${IMAGE}" "${TAG}")
+          EXISTS=$(bash .github/scripts/ecr-tag-published.sh "${IMAGE}" "${TAG}" label)
           if [ "${EXISTS}" = "true" ]; then
             echo "::notice::${IMAGE}:${TAG} is already in ECR; skipping the build"
           fi
@@ -648,6 +668,8 @@ jobs:
           build-args: |
             VERSION=${{ needs.meta.outputs.version || needs.meta.outputs.image_tag }}
             EVALUATOR=${{ matrix.evaluator }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}
 
@@ -732,13 +754,15 @@ jobs:
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${REGISTRY}"
 
-      # No `:latest` here, on purpose: see the header. A tag that is already
-      # there is left as it is, because the repositories' tags are immutable.
+      # No `:latest` here, on purpose: see the header. A default tag already
+      # there for this commit is left as it is; any other existing tag fails.
       - name: Publish this commit's tag
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           BUILT: ${{ needs.changes.outputs.built }}
           IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
+          EXPECTED_REVISION: ${{ github.sha }}
           IS_RELEASE: ${{ needs.meta.outputs.is_release }}
           VERSION: ${{ needs.meta.outputs.version }}
           BUCKET: ${{ vars.FRONTEND_ASSETS_BUCKET }}
@@ -772,9 +796,10 @@ jobs:
           publish() {
             local image="$1" repo="${REGISTRY}/$1" previous="" sources exists
 
-            # Published by an earlier run. Only "not found" goes on; any other
-            # lookup error fails this image.
-            exists=$(bash .github/scripts/ecr-tag-exists.sh "${image}" "${IMAGE_TAG}")
+            # Published by an earlier run for this commit (the index records
+            # it). Only "not found" goes on; a custom tag already there, another
+            # commit's tag or a lookup error fails this image.
+            exists=$(bash .github/scripts/ecr-tag-published.sh "${image}" "${IMAGE_TAG}" annotation)
             if [ "${exists}" = "true" ]; then
               echo "${image}:${IMAGE_TAG} is already published; leaving it"
               echo "\`${image}:${IMAGE_TAG}\` was already published" >> "$GITHUB_STEP_SUMMARY"
@@ -816,11 +841,15 @@ jobs:
               copy_cdn_assets "${previous}"
             fi
 
-            docker buildx imagetools create -t "${repo}:${IMAGE_TAG}" "${sources[@]}"
+            # The commit this tag was published for, which a re-run compares
+            # before it skips the tag. A re-tag names an older image, so the
+            # image's own label cannot say it.
+            local annotation="index:org.opencontainers.image.revision=${GITHUB_SHA}"
+            docker buildx imagetools create --annotation "${annotation}" -t "${repo}:${IMAGE_TAG}" "${sources[@]}"
 
             local tags="${IMAGE_TAG}"
             if [ "${IS_RELEASE}" = "true" ]; then
-              docker buildx imagetools create -t "${repo}:${VERSION}" "${sources[@]}"
+              docker buildx imagetools create --annotation "${annotation}" -t "${repo}:${VERSION}" "${sources[@]}"
               tags="${tags}, ${VERSION}"
             fi
 

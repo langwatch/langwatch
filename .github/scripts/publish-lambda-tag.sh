@@ -19,6 +19,10 @@
 #                    in the working directory's repository
 #   IS_RELEASE       "true" to also write VERSION
 #   VERSION          the release version tag
+#   CUSTOM_TAG       "true" when IMAGE_TAG is a dispatcher's; one already in ECR
+#                    fails instead of being skipped
+#   EXPECTED_REVISION  the full sha of HEAD_COMMIT (default: resolved with git)
+#   REGISTRY         the registry host, to read an existing tag's revision label
 set -euo pipefail
 
 image="${1:?repository name required}"
@@ -27,6 +31,8 @@ IMAGE_WAS_BUILT="${IMAGE_WAS_BUILT:-false}"
 IS_RELEASE="${IS_RELEASE:-false}"
 VERSION="${VERSION:-}"
 HEAD_COMMIT="${HEAD_COMMIT:-HEAD}"
+EXPECTED_REVISION="${EXPECTED_REVISION:-$(git rev-parse "${HEAD_COMMIT}^{commit}")}"
+export CUSTOM_TAG="${CUSTOM_TAG:-false}" EXPECTED_REVISION
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 err_file="$(mktemp)"
 trap 'rm -f "${err_file}"' EXIT
@@ -38,12 +44,19 @@ is_single_manifest() {
   esac
 }
 
-# Succeeds when tag $1 is in ECR, fails when it is not; a lookup that does not
-# answer stops the script.
-tag_exists() {
+# Succeeds when IMAGE_TAG is in ECR for this commit: it records this commit's
+# revision, or it is the manifest $1 a re-tag would copy (a re-tag keeps the
+# older image's label). Fails when it is not there; any other answer (a custom
+# tag, another commit's image, a lookup error) stops the script.
+already_published() {
   local found
-  found=$(bash "${SCRIPT_DIR}/ecr-tag-exists.sh" "${image}" "$1") || exit 1
+  found=$(ACCEPT_DIGEST="$1" bash "${SCRIPT_DIR}/ecr-tag-published.sh" "${image}" "${IMAGE_TAG}" label) || exit 1
   [ "${found}" = "true" ]
+}
+
+digest_of() {
+  aws ecr describe-images --repository-name "${image}" --image-ids imageTag="$1" \
+    --query 'imageDetails[0].imageDigest' --output text
 }
 
 media_type_of() {
@@ -91,27 +104,34 @@ if [ "${IMAGE_WAS_BUILT}" = "true" ]; then
     echo "::error::${image}:${IMAGE_TAG} is ${media_type}, not a single manifest; see build-and-push-lambda"
     exit 1
   fi
-elif tag_exists "${IMAGE_TAG}"; then
-  # An earlier run already published it, and the tag cannot be moved.
-  echo "${image}:${IMAGE_TAG} is already in ECR; nothing to re-tag"
 else
   # Not rebuilt: re-tag the image built from the nearest ancestor of this
-  # commit (see nearest-ancestor-tag.sh).
+  # commit (see nearest-ancestor-tag.sh). IMAGE_TAG itself is no candidate, or
+  # an existing one would always match itself below.
   candidates=$(aws ecr describe-images --repository-name "${image}" \
     --query 'imageDetails[].imageTags[]' --output text | tr '\t' '\n')
-  previous=$(printf '%s\n' "${candidates}" | HEAD_COMMIT="${HEAD_COMMIT}" "${SCRIPT_DIR}/nearest-ancestor-tag.sh")
-  if [ -z "${previous}" ]; then
+  previous=$(printf '%s\n' "${candidates}" | { grep -vxF "${IMAGE_TAG}" || true; } \
+    | HEAD_COMMIT="${HEAD_COMMIT}" "${SCRIPT_DIR}/nearest-ancestor-tag.sh")
+  previous_digest=""
+  if [ -n "${previous}" ]; then
+    previous_digest=$(digest_of "${previous}")
+  fi
+  if already_published "${previous_digest}"; then
+    # An earlier run already published it, and the tag cannot be moved.
+    echo "${image}:${IMAGE_TAG} is already in ECR for this commit; nothing to re-tag"
+  elif [ -z "${previous}" ]; then
     echo "::warning::${image} has no previous git-* image from an ancestor commit to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
     exit 0
+  else
+    # Checked rather than assumed, so an index never reaches a function.
+    media_type=$(media_type_of "${previous}")
+    if ! is_single_manifest "${media_type}"; then
+      echo "::error::${image}:${previous} is ${media_type}, not a single manifest; dispatch this workflow to rebuild it"
+      exit 1
+    fi
+    echo "Re-tagging ${image} ${previous} -> ${IMAGE_TAG} (unchanged by this commit)"
+    put_manifest "${previous}" "${IMAGE_TAG}"
   fi
-  # Checked rather than assumed, so an index never reaches a function.
-  media_type=$(media_type_of "${previous}")
-  if ! is_single_manifest "${media_type}"; then
-    echo "::error::${image}:${previous} is ${media_type}, not a single manifest; dispatch this workflow to rebuild it"
-    exit 1
-  fi
-  echo "Re-tagging ${image} ${previous} -> ${IMAGE_TAG} (unchanged by this commit)"
-  put_manifest "${previous}" "${IMAGE_TAG}"
 fi
 
 tags="${IMAGE_TAG}"

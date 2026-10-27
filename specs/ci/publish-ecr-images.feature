@@ -89,17 +89,40 @@ Feature: Publish every deployable image to the artifacts registry
     Then its runtime stage sets a working directory outside every home directory
 
   # The artifacts repositories' tags are immutable, so every push checks first.
-  # The lookup is .github/scripts/ecr-tag-exists.sh, bound by
-  # .github/scripts/__tests__/ecr-tag-exists.test.sh; the Lambda re-tag by
-  # publish-lambda-tag.test.sh. The build steps' gates are proved by a re-run.
+  # The lookup is .github/scripts/ecr-tag-exists.sh and the skip decision
+  # .github/scripts/ecr-tag-published.sh, bound by their tests under
+  # .github/scripts/__tests__/; the Lambda re-tag by publish-lambda-tag.test.sh.
+  # The build steps' gates are proved by a re-run.
 
   @unit
   Scenario: A re-run publishes nothing that is already there
     Given an earlier run published the git-<short sha> tags of a commit
     When publish-docker-ecr runs again for that commit, by a re-run or a dispatch
-    Then it builds, pushes and re-tags no image whose tag is already in the registry
+    Then it builds, pushes and re-tags no image whose tag is already in the registry for that commit
     And every tag already there still names the image it named before
     And the run succeeds
+
+  @unit
+  Scenario: A dispatch with a custom tag that is already there fails the run
+    Given an image already has the tag a dispatcher typed as image_tag
+    When publish-docker-ecr is dispatched with that image_tag
+    Then it fails and asks for a new tag, even if the tag names this commit's image
+    And it writes no tag
+
+  @unit
+  Scenario: A commit tag already there for another commit fails the run
+    Given another commit sharing this commit's short sha already published git-<short sha>
+    When publish-docker-ecr publishes this commit
+    Then it fails, naming both commits, instead of counting the image as published
+    And it writes no tag
+
+  @unit
+  Scenario: A commit tag already there that records no commit fails the run
+    Given git-<short sha> was published before the images recorded their commit
+    And it is not exactly the image a re-tag for this commit would copy
+    When publish-docker-ecr publishes this commit
+    Then it fails, because it cannot tell which commit the tag was published for
+    And it writes no tag
 
   @unit
   Scenario: A lookup that does not answer whether a tag is there fails the run

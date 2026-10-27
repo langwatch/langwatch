@@ -2,7 +2,8 @@
 # Unit test for publish-lambda-tag.sh
 #
 # Runs the script against a stub `aws` that holds one ECR repository in a
-# directory: one file per tag, holding "<media type> <manifest>". The script's
+# directory: one file per tag, holding "<media type> <manifest>", and a stub
+# `docker` that reads an image's revision label from "labels/<tag>". The script's
 # whole job is which manifest ends up under which tag, and that the tag is
 # never an index, so that is what this pins. The script runs inside a scratch
 # git repository whose commits the `git-<sha>` tags name:
@@ -63,6 +64,8 @@ SIDE="$(commit_in_repo side)"
 git -C "$REPO" checkout -q line
 MID="$(commit_in_repo mid)"
 HEAD_SHA="$(commit_in_repo head)"
+HEAD_FULL="$(git -C "$REPO" rev-parse HEAD)"
+MID_FULL="$(git -C "$REPO" rev-parse HEAD~1)"
 
 # A fresh stub registry. Prints its directory; tags go in "$dir/tags/<tag>",
 # pushed in the order they are created (the stub lists newest first).
@@ -70,7 +73,7 @@ new_registry() {
   local dir
   dir="$(mktemp -d)"
   DIRS+=("$dir")
-  mkdir -p "$dir/bin" "$dir/tags"
+  mkdir -p "$dir/bin" "$dir/tags" "$dir/labels"
   cat > "$dir/bin/aws" <<'STUB'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -85,12 +88,17 @@ case "$1 $2" in
       ls -t "$tags" | paste -sd '\t' -
       exit 0
     fi
-    if [ -n "${STUB_DESCRIBE_ERROR:-}" ]; then
+    # STUB_DESCRIBE_ERROR_TAG, when set, limits the error to that one tag.
+    if [ -n "${STUB_DESCRIBE_ERROR:-}" ] && [ "${STUB_DESCRIBE_ERROR_TAG:-$tag_arg}" = "$tag_arg" ]; then
       echo "An error occurred ($STUB_DESCRIBE_ERROR)" >&2
       exit 254
     fi
     [ -f "$tags/$tag_arg" ] || { echo "An error occurred (ImageNotFoundException)" >&2; exit 254; }
-    cut -d' ' -f1 "$tags/$tag_arg"
+    case "$query" in
+      *imageDigest*) echo "sha256:$(cksum < "$tags/$tag_arg" | cut -d' ' -f1)" ;;
+      *imageManifestMediaType*) cut -d' ' -f1 "$tags/$tag_arg" ;;
+      *) echo '{"imageDetails": []}' ;;
+    esac
     ;;
   "ecr batch-get-image")
     [ -f "$tags/$tag_arg" ] || { echo "An error occurred (ImageNotFoundException)" >&2; exit 254; }
@@ -117,7 +125,18 @@ case "$1 $2" in
   *) echo "stub: unexpected aws call: $*" >&2; exit 1 ;;
 esac
 STUB
-  chmod +x "$dir/bin/aws"
+  cat > "$dir/bin/docker" <<'STUB'
+#!/usr/bin/env bash
+set -uo pipefail
+[ "$1 $2 $3" = "buildx imagetools inspect" ] || { echo "stub: unexpected docker call: $*" >&2; exit 1; }
+tag="${4##*:}"
+if [ -f "$STUB_REGISTRY/labels/$tag" ]; then
+  printf '{"rootfs":{},"config":{"Labels":{"org.opencontainers.image.revision":"%s"}}}\n' "$(cat "$STUB_REGISTRY/labels/$tag")"
+else
+  echo '{"rootfs":{},"config":{}}'
+fi
+STUB
+  chmod +x "$dir/bin/aws" "$dir/bin/docker"
   echo "$dir"
 }
 
@@ -132,7 +151,8 @@ run_subject() {
   local registry="$1"
   shift
   LAST_STATUS=0
-  LAST_OUTPUT="$(cd "$REPO" && env PATH="$registry/bin:$PATH" STUB_REGISTRY="$registry" GITHUB_STEP_SUMMARY= "$@" \
+  LAST_OUTPUT="$(cd "$REPO" && env PATH="$registry/bin:$PATH" STUB_REGISTRY="$registry" GITHUB_STEP_SUMMARY= \
+    REGISTRY=registry.invalid "$@" \
     bash "$SUBJECT" langwatch-eval-ragas 2>&1)" || LAST_STATUS=$?
 }
 
@@ -206,12 +226,76 @@ test_a_tag_already_in_ecr_is_left_as_it_is() {
   push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
   # An earlier run published this commit, from an image the re-tag would not pick.
   push "$reg" "git-$HEAD_SHA" "$PLAIN" '{"published":true}'
+  echo "$HEAD_FULL" > "$reg/labels/git-$HEAD_SHA"
   run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=false
   if [ "$LAST_STATUS" -eq 0 ] && [ "$(manifest_at "$reg" "git-$HEAD_SHA")" = '{"published":true}' ] \
       && [ ! -f "$reg/calls" ]; then
-    record yes "a tag already in ECR succeeds and is not written again"
+    record yes "a tag already in ECR for this commit succeeds and is not written again"
   else
-    record no "a tag already in ECR succeeds and is not written again"
+    record no "a tag already in ECR for this commit succeeds and is not written again"
+  fi
+}
+
+# @scenario "A commit tag already there for another commit fails the run"
+test_a_tag_built_from_another_commit_fails() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
+  # Another commit with the same short sha published this tag.
+  push "$reg" "git-$HEAD_SHA" "$PLAIN" '{"collision":true}'
+  echo "$MID_FULL" > "$reg/labels/git-$HEAD_SHA"
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=false
+  if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q "for commit $MID_FULL, not $HEAD_FULL" \
+      && [ ! -f "$reg/calls" ]; then
+    record yes "a tag recording another commit fails, naming both commits, and writes nothing"
+  else
+    record no "a tag recording another commit fails, naming both commits, and writes nothing"
+  fi
+}
+
+# @scenario "A commit tag already there that records no commit fails the run"
+test_a_tag_with_no_revision_fails_closed() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
+  # Published before the revision was recorded, and not the manifest a re-tag would copy.
+  push "$reg" "git-$HEAD_SHA" "$PLAIN" '{"unlabelled":true}'
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=false
+  if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q "records no org.opencontainers.image.revision" \
+      && [ ! -f "$reg/calls" ]; then
+    record yes "a tag recording no revision fails closed and writes nothing"
+  else
+    record no "a tag recording no revision fails closed and writes nothing"
+  fi
+}
+
+# @scenario "A dispatch with a custom tag that is already there fails the run"
+test_a_custom_tag_already_there_fails() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
+  # Even naming exactly the manifest a re-tag would copy, and recording this commit.
+  push "$reg" hotfix-1 "$PLAIN" '{"mid":true}'
+  echo "$HEAD_FULL" > "$reg/labels/hotfix-1"
+  run_subject "$reg" IMAGE_TAG=hotfix-1 CUSTOM_TAG=true IMAGE_WAS_BUILT=false
+  if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q "pick a new image_tag" \
+      && [ ! -f "$reg/calls" ]; then
+    record yes "a custom tag already in ECR fails, asks for a new tag and writes nothing"
+  else
+    record no "a custom tag already in ECR fails, asks for a new tag and writes nothing"
+  fi
+}
+
+# @scenario "A dispatch with a custom tag that is already there fails the run"
+test_a_new_custom_tag_is_written() {
+  local reg
+  reg="$(new_registry)"
+  push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
+  run_subject "$reg" IMAGE_TAG=hotfix-2 CUSTOM_TAG=true IMAGE_WAS_BUILT=false
+  if [ "$LAST_STATUS" -eq 0 ] && [ "$(manifest_at "$reg" hotfix-2)" = '{"mid":true}' ]; then
+    record yes "a custom tag not yet in ECR is written"
+  else
+    record no "a custom tag not yet in ECR is written"
   fi
 }
 
@@ -220,7 +304,10 @@ test_a_failed_existence_check_fails_and_writes_nothing() {
   local reg
   reg="$(new_registry)"
   push "$reg" "git-$MID" "$PLAIN" '{"mid":true}'
-  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=false STUB_DESCRIBE_ERROR=AccessDeniedException
+  # Only the existence check of the commit tag errors, so a check that read the
+  # error as "not there" would go on to re-tag git-$MID and write a tag.
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=false \
+    STUB_DESCRIBE_ERROR=AccessDeniedException STUB_DESCRIBE_ERROR_TAG="git-$HEAD_SHA"
   if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q AccessDeniedException \
       && [ ! -f "$reg/calls" ]; then
     record yes "a failed existence check fails, shows the registry error and writes nothing"
@@ -354,6 +441,10 @@ test_an_unchanged_image_gets_the_commit_tag
 test_an_image_from_another_line_is_never_retagged
 test_a_tag_already_in_ecr_is_left_as_it_is
 test_a_failed_existence_check_fails_and_writes_nothing
+test_a_tag_built_from_another_commit_fails
+test_a_tag_with_no_revision_fails_closed
+test_a_custom_tag_already_there_fails
+test_a_new_custom_tag_is_written
 test_a_tag_holding_another_image_fails
 test_an_older_ancestor_pushed_later_does_not_win
 test_an_image_with_no_earlier_image_warns_and_writes_nothing

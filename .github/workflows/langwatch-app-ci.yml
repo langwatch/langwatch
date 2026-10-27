@@ -1346,6 +1346,9 @@ jobs:
       - name: Test ecr-tag-exists.sh
         run: bash .github/scripts/__tests__/ecr-tag-exists.test.sh
 
+      - name: Test ecr-tag-published.sh
+        run: bash .github/scripts/__tests__/ecr-tag-published.test.sh
+
       - name: Test detect-changes-source.sh
         run: bash .github/scripts/__tests__/detect-changes-source.test.sh
 
