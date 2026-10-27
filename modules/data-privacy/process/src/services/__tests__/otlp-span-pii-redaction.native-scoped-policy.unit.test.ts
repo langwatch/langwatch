@@ -213,6 +213,31 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
     });
   });
 
+  describe("given a span that names an open-weight model", () => {
+    /** @scenario An open-weight model id is not mistaken for a key */
+    it("keeps the model id whole in the model attributes and in the input", async () => {
+      const { service, batchSpy } = makeService(PLATFORM_DEFAULT_DATA_PRIVACY);
+      const model = "doubleword/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4";
+      const span = spanWith({
+        "gen_ai.request.model": model,
+        "gen_ai.response.model": model,
+        input: `{"model":"${model}","messages":[]}`,
+      });
+
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
+
+      expect(attr(span, "gen_ai.request.model")).toBe(model);
+      expect(attr(span, "gen_ai.response.model")).toBe(model);
+      expect(attr(span, "input")).toBe(`{"model":"${model}","messages":[]}`);
+      expect(batchSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a custom secret pattern", () => {
     /** @scenario A custom pattern redacts a company-specific secret */
     it("redacts a token matching the custom pattern", async () => {

@@ -591,7 +591,7 @@ Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
 ```typescript
 type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
-// Response: successSchema, ../../../packages/api/src/rest/response.ts:249
+// Response: successSchema, ../../../packages/api/src/rest/response.ts:252
 interface Response {
   success: boolean;
 }

@@ -296,6 +296,7 @@ export function sessionEventRecord(
     toolResultBytes: 0,
     promptChars: 0,
     totalTokens: 10,
+    aiUnits: 0,
     // The working context the contribute command stamps on. '' is what a row
     // carries before the session declared one, which is the shape these
     // suites read.
@@ -546,6 +547,8 @@ export class TestEvents extends CodingAgentSessionEventRepository {
     cacheReadTokens: number;
     cacheCreationTokens: number;
     costUsd: number;
+    /** Absent reads as none, as a row from before the column does. */
+    aiUnits?: number;
   }[] = [];
   modelTotalInputs: {
     tenantIds: string[];
@@ -594,10 +597,11 @@ export class TestEvents extends CodingAgentSessionEventRepository {
       cacheReadTokens: number;
       cacheCreationTokens: number;
       costUsd: number;
+      aiUnits: number;
     }[]
   > {
     this.modelTotalInputs.push(input);
-    return this.modelTotals;
+    return this.modelTotals.map((total) => ({ ...total, aiUnits: total.aiUnits ?? 0 }));
   }
 
   async findSessionsByStampedBranch(input: {

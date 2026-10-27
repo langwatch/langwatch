@@ -4,23 +4,36 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../langwatch-api-boards.js", () => ({
+  createBoardWidget: vi.fn(),
   getBoard: vi.fn(),
+  getBoardWidget: vi.fn(),
+  getProjectBoard: vi.fn(),
   listBoards: vi.fn(),
+  listProjectBoards: vi.fn(),
+  updateBoardWidget: vi.fn(),
 }));
 
 vi.mock("../langwatch-api-dashboard-widgets.js", () => ({
-  createDashboardWidget: vi.fn(),
   assignDashboardWidgetToDashboard: vi.fn(),
+  createDashboardWidget: vi.fn(),
   deleteDashboardWidget: vi.fn(),
   getDashboardWidget: vi.fn(),
   updateDashboardWidget: vi.fn(),
 }));
 
 vi.mock("../langwatch-api-projects.js", () => ({
-  getCurrentProject: vi.fn(),
+  getCurrentProject: vi.fn(async () => ({ id: "proj_1" })),
 }));
 
-import { getBoard, listBoards } from "../langwatch-api-boards.js";
+import {
+  createBoardWidget,
+  getBoard,
+  getBoardWidget,
+  getProjectBoard,
+  listBoards,
+  listProjectBoards,
+  updateBoardWidget,
+} from "../langwatch-api-boards.js";
 import {
   assignDashboardWidgetToDashboard,
   createDashboardWidget,
@@ -28,7 +41,6 @@ import {
   getDashboardWidget,
   updateDashboardWidget,
 } from "../langwatch-api-dashboard-widgets.js";
-import { getCurrentProject } from "../langwatch-api-projects.js";
 import { LangWatchApiError } from "../langwatch-api.js";
 import { handleAddDashboardWidget } from "../tools/add-dashboard-widget.js";
 import { handleListDashboardBoards } from "../tools/list-dashboard-boards.js";
@@ -36,12 +48,12 @@ import { handleUpdateDashboardWidget } from "../tools/update-dashboard-widget.js
 
 const mockGetBoard = vi.mocked(getBoard);
 const mockListBoards = vi.mocked(listBoards);
-const mockCreateDashboardWidget = vi.mocked(createDashboardWidget);
-const mockAssignDashboardWidgetToDashboard = vi.mocked(assignDashboardWidgetToDashboard);
-const mockDeleteDashboardWidget = vi.mocked(deleteDashboardWidget);
-const mockGetCurrentProject = vi.mocked(getCurrentProject);
-const mockGetDashboardWidget = vi.mocked(getDashboardWidget);
-const mockUpdateDashboardWidget = vi.mocked(updateDashboardWidget);
+const mockCreateDashboardWidget = vi.mocked(createBoardWidget);
+const mockGetDashboardWidget = vi.mocked(getBoardWidget);
+const mockUpdateDashboardWidget = vi.mocked(updateBoardWidget);
+
+const notFound = () => new LangWatchApiError("LangWatch API error 404: Not found", 404, "{}");
+const mockGetProjectBoard = vi.mocked(getProjectBoard);
 
 const sampleWidget = {
   id: "widget_1",
@@ -62,6 +74,7 @@ const sampleBoard = {
   name: "Agent health",
   description: null,
   scope: "PROJECT" as const,
+  createdById: null,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z",
   platformUrl: "https://app.langwatch.ai/my-project/dashboards/dash_1",
@@ -69,25 +82,18 @@ const sampleBoard = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetCurrentProject.mockResolvedValue({
-    id: "proj_abc123",
-    name: "My Project",
-    slug: "my-project",
-    isPersonal: false,
-  });
   mockGetBoard.mockResolvedValue(sampleBoard);
-  mockCreateDashboardWidget.mockResolvedValue(sampleWidget);
-  mockAssignDashboardWidgetToDashboard.mockResolvedValue({
-    ...sampleWidget,
-    dashboardId: "dash_1",
-  });
-  mockDeleteDashboardWidget.mockResolvedValue(undefined);
+  mockCreateDashboardWidget.mockResolvedValue({ ...sampleWidget, dashboardId: "dash_1" });
+  mockGetProjectBoard.mockResolvedValue(sampleBoard);
 });
+
+/** The board routes answer 404, as while Dashboards is off for the project. */
+const boardRoutesOff = () => mockGetBoard.mockRejectedValue(notFound());
 
 describe("handleAddDashboardWidget()", () => {
   describe("when the dashboard exists and creation succeeds", () => {
     /** @scenario "AC8 An MCP agent adds a widget to a board" */
-    it("creates the widget scoped to the current project, then places it", async () => {
+    it("creates the widget under the board's own path, which places it", async () => {
       const result = await handleAddDashboardWidget({
         dashboardId: "dash_1",
         name: "p95 latency",
@@ -95,17 +101,12 @@ describe("handleAddDashboardWidget()", () => {
         queries: { latency: "SELECT quantile(0.95)(duration) FROM traces" },
       });
 
-      expect(mockGetBoard).toHaveBeenCalledWith({ projectId: "proj_abc123", boardId: "dash_1" });
+      expect(mockGetBoard).toHaveBeenCalledWith({ boardId: "dash_1" });
       expect(mockCreateDashboardWidget).toHaveBeenCalledWith({
-        projectId: "proj_abc123",
+        boardId: "dash_1",
         name: "p95 latency",
         code: "export default () => null;",
         queries: [{ name: "latency", sql: "SELECT quantile(0.95)(duration) FROM traces" }],
-      });
-      expect(mockAssignDashboardWidgetToDashboard).toHaveBeenCalledWith({
-        projectId: "proj_abc123",
-        widgetId: "widget_1",
-        dashboardId: "dash_1",
       });
       expect(result).toContain("widget_1");
       expect(result).toContain("dash_1");
@@ -130,9 +131,8 @@ describe("handleAddDashboardWidget()", () => {
 
   describe("when the dashboard does not exist", () => {
     beforeEach(() => {
-      mockGetBoard.mockRejectedValue(
-        new LangWatchApiError("LangWatch API error 404: Not found", 404, "{}"),
-      );
+      boardRoutesOff();
+      mockGetProjectBoard.mockRejectedValue(notFound());
     });
 
     /** @scenario "AC8b add_dashboard_widget rejects an unknown dashboard" */
@@ -147,7 +147,78 @@ describe("handleAddDashboardWidget()", () => {
       ).rejects.toThrow(/dash_missing/);
 
       expect(mockCreateDashboardWidget).not.toHaveBeenCalled();
-      expect(mockAssignDashboardWidgetToDashboard).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the board routes answer 404, as while Dashboards is off", () => {
+    beforeEach(() => {
+      boardRoutesOff();
+      vi.mocked(createDashboardWidget).mockResolvedValue({ ...sampleWidget });
+      vi.mocked(assignDashboardWidgetToDashboard).mockResolvedValue({
+        ...sampleWidget,
+        dashboardId: "dash_1",
+      });
+    });
+
+    /** @scenario "AC199t The MCP widget tools use the board routes and fall back to the project path on 404" */
+    it("creates then places the widget on the project path", async () => {
+      const result = await handleAddDashboardWidget({
+        dashboardId: "dash_1",
+        name: "p95 latency",
+        code: "export default () => null;",
+        queries: { latency: "SELECT 1" },
+      });
+
+      expect(mockGetProjectBoard).toHaveBeenCalledWith({ projectId: "proj_1", boardId: "dash_1" });
+      expect(createDashboardWidget).toHaveBeenCalledWith({
+        projectId: "proj_1",
+        name: "p95 latency",
+        code: "export default () => null;",
+        queries: [{ name: "latency", sql: "SELECT 1" }],
+      });
+      expect(assignDashboardWidgetToDashboard).toHaveBeenCalledWith({
+        projectId: "proj_1",
+        widgetId: "widget_1",
+        dashboardId: "dash_1",
+      });
+      expect(mockCreateDashboardWidget).not.toHaveBeenCalled();
+      expect(result).toContain("widget_1");
+    });
+
+    it("deletes the widget it created when placing it fails", async () => {
+      vi.mocked(assignDashboardWidgetToDashboard).mockRejectedValue(notFound());
+      vi.mocked(deleteDashboardWidget).mockResolvedValue(undefined);
+
+      await expect(
+        handleAddDashboardWidget({
+          dashboardId: "dash_1",
+          name: "p95 latency",
+          code: "export default () => null;",
+          queries: { latency: "SELECT 1" },
+        }),
+      ).rejects.toThrow(/404/);
+
+      expect(deleteDashboardWidget).toHaveBeenCalledWith({
+        projectId: "proj_1",
+        widgetId: "widget_1",
+      });
+    });
+  });
+
+  describe("when the board routes fail any other way", () => {
+    it("reports that failure and takes no project-path route", async () => {
+      mockGetBoard.mockRejectedValue(new LangWatchApiError("LangWatch API error 500", 500, "{}"));
+
+      await expect(
+        handleAddDashboardWidget({
+          dashboardId: "dash_1",
+          name: "p95 latency",
+          code: "export default () => null;",
+          queries: { latency: "SELECT 1" },
+        }),
+      ).rejects.toThrow(/500/);
+
+      expect(createDashboardWidget).not.toHaveBeenCalled();
     });
   });
 
@@ -165,31 +236,6 @@ describe("handleAddDashboardWidget()", () => {
           queries: { latency: "SELECT 1" },
         }),
       ).rejects.toThrow(/code is too long/);
-
-      expect(mockAssignDashboardWidgetToDashboard).not.toHaveBeenCalled();
-      expect(mockDeleteDashboardWidget).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the assign call fails after the widget was created", () => {
-    it("deletes the orphaned widget and propagates the assign error", async () => {
-      mockAssignDashboardWidgetToDashboard.mockRejectedValue(
-        new LangWatchApiError("LangWatch API error 404: Not found", 404, "{}"),
-      );
-
-      await expect(
-        handleAddDashboardWidget({
-          dashboardId: "dash_1",
-          name: "p95 latency",
-          code: "export default () => null;",
-          queries: { latency: "SELECT 1" },
-        }),
-      ).rejects.toThrow(/404/);
-
-      expect(mockDeleteDashboardWidget).toHaveBeenCalledWith({
-        projectId: "proj_abc123",
-        widgetId: "widget_1",
-      });
     });
   });
 
@@ -255,11 +301,11 @@ describe("handleUpdateDashboardWidget()", () => {
       });
 
       expect(mockGetDashboardWidget).toHaveBeenCalledWith({
-        projectId: "proj_abc123",
+        boardId: "dash_1",
         widgetId: "widget_1",
       });
       expect(mockUpdateDashboardWidget).toHaveBeenCalledWith({
-        projectId: "proj_abc123",
+        boardId: "dash_1",
         widgetId: "widget_1",
         name: "Errors per day",
         code: "export default () => <div />;",
@@ -278,7 +324,7 @@ describe("handleUpdateDashboardWidget()", () => {
       });
 
       expect(mockUpdateDashboardWidget).toHaveBeenCalledWith({
-        projectId: "proj_abc123",
+        boardId: "dash_1",
         widgetId: "widget_1",
         queries: [{ name: "errors", sql: "SELECT 1" }],
         description: "Errors per day",
@@ -308,8 +354,10 @@ describe("handleUpdateDashboardWidget()", () => {
   });
 
   describe("when the widget is on another dashboard", () => {
-    it("names both ids and changes nothing", async () => {
-      mockGetDashboardWidget.mockResolvedValue({ ...placedWidget, dashboardId: "dash_other" });
+    it("names both ids and changes nothing, as the board route answers 404", async () => {
+      mockGetDashboardWidget.mockRejectedValue(
+        new LangWatchApiError("LangWatch API error 404: Not found", 404, "{}"),
+      );
 
       await expect(
         handleUpdateDashboardWidget({
@@ -325,9 +373,8 @@ describe("handleUpdateDashboardWidget()", () => {
 
   describe("when the dashboard does not exist", () => {
     beforeEach(() => {
-      mockGetBoard.mockRejectedValue(
-        new LangWatchApiError("LangWatch API error 404: Not found", 404, "{}"),
-      );
+      boardRoutesOff();
+      mockGetProjectBoard.mockRejectedValue(notFound());
     });
 
     /** @scenario "update_dashboard_widget rejects an unknown dashboard" */
@@ -345,13 +392,60 @@ describe("handleUpdateDashboardWidget()", () => {
     });
   });
 
+  describe("when the board routes answer 404, as while Dashboards is off", () => {
+    beforeEach(() => {
+      boardRoutesOff();
+      vi.mocked(getDashboardWidget).mockResolvedValue({ ...sampleWidget, dashboardId: "dash_1" });
+      vi.mocked(updateDashboardWidget).mockResolvedValue({
+        ...sampleWidget,
+        dashboardId: "dash_1",
+        name: "Errors per day",
+      });
+    });
+
+    /** @scenario "AC199t The MCP widget tools use the board routes and fall back to the project path on 404" */
+    it("changes the widget on the project path", async () => {
+      const result = await handleUpdateDashboardWidget({
+        dashboardId: "dash_1",
+        widgetId: "widget_1",
+        name: "Errors per day",
+      });
+
+      expect(getDashboardWidget).toHaveBeenCalledWith({
+        projectId: "proj_1",
+        widgetId: "widget_1",
+      });
+      expect(updateDashboardWidget).toHaveBeenCalledWith({
+        projectId: "proj_1",
+        widgetId: "widget_1",
+        name: "Errors per day",
+      });
+      expect(mockUpdateDashboardWidget).not.toHaveBeenCalled();
+      expect(result).toContain("Errors per day");
+    });
+
+    it("refuses a widget placed on another dashboard", async () => {
+      vi.mocked(getDashboardWidget).mockResolvedValue({ ...sampleWidget, dashboardId: "other" });
+
+      await expect(
+        handleUpdateDashboardWidget({
+          dashboardId: "dash_1",
+          widgetId: "widget_1",
+          name: "Errors per day",
+        }),
+      ).rejects.toThrow(/not on dashboard "dash_1"/);
+
+      expect(updateDashboardWidget).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when no field to change is given", () => {
     it("refuses without calling the API", async () => {
       await expect(
         handleUpdateDashboardWidget({ dashboardId: "dash_1", widgetId: "widget_1" }),
       ).rejects.toThrow(/at least one/i);
 
-      expect(mockGetCurrentProject).not.toHaveBeenCalled();
+      expect(mockGetBoard).not.toHaveBeenCalled();
       expect(mockUpdateDashboardWidget).not.toHaveBeenCalled();
     });
   });
@@ -359,15 +453,45 @@ describe("handleUpdateDashboardWidget()", () => {
 
 describe("handleListDashboardBoards()", () => {
   describe("when the project has Dashboards boards", () => {
-    it("lists them from the project's boards route, each with the id the widget tools take", async () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
+    it("lists them from /api/v1/dashboards, each with the id the widget tools take", async () => {
       mockListBoards.mockResolvedValue({ data: [{ ...sampleBoard, widgetCount: 3 }] });
 
       const result = await handleListDashboardBoards();
 
-      expect(mockListBoards).toHaveBeenCalledWith({ projectId: "proj_abc123" });
+      expect(mockListBoards).toHaveBeenCalledWith();
+      expect(listProjectBoards).not.toHaveBeenCalled();
       expect(result).toContain("Agent health");
       expect(result).toContain("**ID**: dash_1");
       expect(result).toContain("**Widgets**: 3");
+    });
+  });
+
+  describe("when /api/v1/dashboards answers 404, as while Dashboards is off", () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
+    it("lists them from the project-path list instead", async () => {
+      mockListBoards.mockRejectedValue(
+        new LangWatchApiError("Not found", 404, "{}", { code: "dashboards_not_released" }),
+      );
+      vi.mocked(listProjectBoards).mockResolvedValue({
+        data: [{ ...sampleBoard, widgetCount: 2 }],
+      });
+
+      const result = await handleListDashboardBoards();
+
+      expect(listProjectBoards).toHaveBeenCalledWith({ projectId: "proj_1" });
+      expect(result).toContain("**Widgets**: 2");
+    });
+  });
+
+  describe("when /api/v1/dashboards fails any other way", () => {
+    /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
+    it("reports that failure and asks nothing else", async () => {
+      const failure = new LangWatchApiError("Server error", 500, "{}");
+      mockListBoards.mockRejectedValue(failure);
+
+      await expect(handleListDashboardBoards()).rejects.toBe(failure);
+      expect(listProjectBoards).not.toHaveBeenCalled();
     });
   });
 

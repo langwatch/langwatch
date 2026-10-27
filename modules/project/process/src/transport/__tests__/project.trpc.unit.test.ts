@@ -57,7 +57,10 @@ function mount({
   const revokeProjectApiKey = vi.fn(
     async (_input: { projectId: string; by: { id: string } }) => {},
   );
-  const getLegacyKeyStatus = vi.fn(async (_input: { projectId: string }) => ({ present: true }));
+  const getLegacyKeyStatus = vi.fn(async (_input: { projectId: string }) => ({
+    present: true,
+    lastUsedAt: null,
+  }));
   const browser: ProjectBrowserApi = {
     projects: () => application,
     revokeProjectApiKey,
@@ -185,6 +188,7 @@ describe("the project tRPC namespace", () => {
 
       await expect(caller.getLegacyKeyStatus({ projectId: "project_123" })).resolves.toEqual({
         present: true,
+        lastUsedAt: null,
       });
     });
   });

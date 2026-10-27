@@ -10,7 +10,10 @@ import {
 } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import type { LangWatchQLViewDefinition } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import {
+  LangWatchQLCatalogShapesService,
+  type LangWatchQLViewDefinition,
+} from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { hydratableProjects, scopeLangWatchQL } from "../langwatch-ql-query-scope.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
@@ -28,6 +31,11 @@ const UNTENANTED: LangWatchQLViewDefinition = {
   columns: traces.columns.filter((column) => column.name !== "TenantId"),
 };
 const VIEWS = [...LWQL_VIEW_CATALOG, UNDATED, UNTENANTED];
+// A view with neither column is one the origin exclusion leaves as written.
+const POSTGRES_VIEW = LangWatchQLCatalogShapesService.create()
+  .postgresViews(LWQL_VIEW_CATALOG)
+  .find((view) => !view.columns.some(({ name }) => name === "Origin" || name === "TraceId"));
+if (!POSTGRES_VIEW) throw new Error("the catalogue has no un-narrowed PostgreSQL-resident view");
 
 const B_FROM = `(TenantId = 'project_b' AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})))`;
 const MEMBERS = `(TenantId IN ('project_a') OR ${B_FROM})`;
@@ -156,6 +164,18 @@ describe("scopeLangWatchQL with member windows", () => {
       expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: [modifier] });
     });
 
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it("refuses SAMPLE on a subquery over a narrowed view", () => {
+      const refusal = captureRefusal(() =>
+        scope({
+          sql: "SELECT count() FROM (SELECT * FROM traces) AS q SAMPLE 0.5",
+          memberWindows: [WHOLE_A, DATED_B],
+        }),
+      );
+
+      expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: ["SAMPLE"] });
+    });
+
     /** @scenario "A WITH name spelt like a narrowed view is refused" */
     it.each([
       [
@@ -271,12 +291,99 @@ describe("scopeLangWatchQL with member windows", () => {
 
       expect(scope({ sql, memberWindows: [WHOLE_A] })).toBe(sql);
     });
+
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it("refuses FINAL on a subquery, though the statement is not rewritten", () => {
+      const refusal = captureRefusal(() =>
+        scope({
+          sql: "SELECT count() FROM (SELECT * FROM traces) FINAL",
+          memberWindows: [WHOLE_A],
+        }),
+      );
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+    });
+
+    it("refuses FINAL on a PostgreSQL-resident view, which the store rejects", () => {
+      const refusal = captureRefusal(() =>
+        scope({ sql: `SELECT count() FROM ${POSTGRES_VIEW.name} FINAL`, memberWindows: [WHOLE_A] }),
+      );
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+    });
+  });
+
+  describe("given an excluded origin and a PostgreSQL-resident view it does not narrow", () => {
+    it("refuses FINAL on that view, though the view is not rewritten", () => {
+      const refusal = captureRefusal(() =>
+        scope({
+          sql: `SELECT count() FROM ${POSTGRES_VIEW.name} FINAL`,
+          excludeOrigins: ["langy"],
+        }),
+      );
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+    });
   });
 
   describe("given a plain project", () => {
     /** @scenario "A plain project's statement is left as written" */
     it("runs the statement as written", () => {
       const sql = "SELECT count() FROM traces JOIN spans USING TraceId";
+
+      expect(scope({ sql })).toBe(sql);
+    });
+
+    /** @scenario "FINAL or SAMPLE on a PostgreSQL-resident view is refused with a clear message" */
+    it.each([
+      ["FINAL", `SELECT count() FROM ${POSTGRES_VIEW.name} FINAL`],
+      ["SAMPLE", `SELECT count() FROM ${POSTGRES_VIEW.name} AS p SAMPLE 0.5`],
+    ])("refuses %s on a PostgreSQL-resident view instead of sending it", (modifier, sql) => {
+      const refusal = captureRefusal(() => scope({ sql }));
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+      expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: [modifier] });
+    });
+
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it.each([
+      [
+        "FINAL",
+        "over a Postgres view",
+        `SELECT count() FROM (SELECT * FROM ${POSTGRES_VIEW.name}) FINAL`,
+      ],
+      [
+        "SAMPLE",
+        "over a ClickHouse view",
+        "SELECT count() FROM (SELECT * FROM traces) AS q SAMPLE 0.5",
+      ],
+      [
+        "FINAL",
+        "nested in another",
+        "SELECT count() FROM (SELECT * FROM (SELECT * FROM traces) FINAL)",
+      ],
+    ])("refuses %s on a subquery %s instead of sending it", (modifier, _case, sql) => {
+      const refusal = captureRefusal(() => scope({ sql }));
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+      expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: [modifier] });
+    });
+
+    /** @scenario "FINAL or SAMPLE on a subquery is refused with a clear message" */
+    it("leaves FINAL on a ClickHouse view in place, since the store accepts it", () => {
+      const sql = "SELECT count() FROM traces FINAL";
+
+      expect(scope({ sql })).toBe(sql);
+    });
+
+    it("leaves FINAL on a WITH name spelt like a PostgreSQL-resident view in place", () => {
+      const sql = `WITH ${POSTGRES_VIEW.name} AS (SELECT 1 AS n) SELECT n FROM ${POSTGRES_VIEW.name} FINAL`;
+
+      expect(scope({ sql })).toBe(sql);
+    });
+
+    it("returns a statement that does not parse unchanged, for the validator to refuse", () => {
+      const sql = "SELECT count( FROM traces FINAL";
 
       expect(scope({ sql })).toBe(sql);
     });

@@ -20,6 +20,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem:
         name (str):
         description (None | str):
         scope (GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItemScope):
+        created_by_id (None | str):
         created_at (str):
         updated_at (str):
         platform_url (str):
@@ -30,6 +31,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem:
     name: str
     description: None | str
     scope: GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItemScope
+    created_by_id: None | str
     created_at: str
     updated_at: str
     platform_url: str
@@ -44,6 +46,9 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem:
         description = self.description
 
         scope = self.scope.value
+
+        created_by_id: None | str
+        created_by_id = self.created_by_id
 
         created_at = self.created_at
 
@@ -61,6 +66,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem:
                 "name": name,
                 "description": description,
                 "scope": scope,
+                "createdById": created_by_id,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
                 "platformUrl": platform_url,
@@ -86,6 +92,13 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem:
 
         scope = GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItemScope(d.pop("scope"))
 
+        def _parse_created_by_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        created_by_id = _parse_created_by_id(d.pop("createdById"))
+
         created_at = d.pop("createdAt")
 
         updated_at = d.pop("updatedAt")
@@ -99,6 +112,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem:
             name=name,
             description=description,
             scope=scope,
+            created_by_id=created_by_id,
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
