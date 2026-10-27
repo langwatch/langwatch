@@ -251,6 +251,7 @@ export const CARDS_BY_RESOURCE: Record<string, ResourceCards> = {
   evaluator: { read: "resourceRead", byVerb: { get: "evaluatorConfig" } },
   monitor: { read: "resourceRead", byVerb: { get: "evaluatorConfig" } },
   dashboard: { read: "resourceRead", byVerb: { get: "dashboard" } },
+  "analytics-reports": { read: "resourceRead", byVerb: { get: "dashboard" } },
   graph: { read: "resourceRead", byVerb: { get: "dashboard" } },
   "virtual-keys": { read: "resourceRead", byVerb: { get: "spend" } },
   "simulation-run": { read: "evalRun" },

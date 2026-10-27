@@ -290,7 +290,7 @@ describe("the templates finder", () => {
       const card = screen.getByRole("article", { name: READY.name });
 
       const added = await within(card).findByRole("link", {
-        name: `${READY.name} is added: open its board`,
+        name: `${READY.name} is added: open its dashboard`,
       });
       expect(added).toHaveAttribute("href", "/test-project/dashboards/board-9");
       expect(added).toHaveTextContent("Added");

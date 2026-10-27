@@ -239,7 +239,7 @@ describe("the Dashboards sidebar", () => {
         "true",
       );
       expect(FROM_LANGWATCH_ABOUT).toBe(
-        "Boards LangWatch made for you. They are read-only and improve over time. " +
+        "Dashboards LangWatch made for you. They are read-only and improve over time. " +
           "Duplicate one to make a copy you can edit.",
       );
     });

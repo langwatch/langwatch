@@ -3,7 +3,7 @@
  * requirement its credential class publishes, the 3.1 spelling of an exclusive bound, a
  * hand-written operation, the deprecation headers, and the external URL a caller is linked to.
  */
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute, resolver, type DescribeRouteOptions } from "hono-openapi";
 import { z, type ZodType } from "zod";
 
@@ -838,6 +838,14 @@ export function deprecationNotice({ successor, notice }: RestDeprecation): strin
   return notice ?? `This endpoint is deprecated; use ${successor}`;
 }
 
+/** The successor with each `{param}` the caller's own path named filled in. */
+function successorFor({ successor, c }: { successor: string; c: Context }): string {
+  return successor.replace(/\{(\w+)\}/g, (template, name: string) => {
+    const value = c.req.param(name);
+    return value === undefined ? template : encodeURIComponent(value);
+  });
+}
+
 /**
  * The four deprecation headers, on every answer of whatever it is applied to:
  * a declared route through the runtime, or a whole family through the mount's
@@ -851,7 +859,10 @@ export function deprecatedAlias(deprecation: RestDeprecation): MiddlewareHandler
     // them too: a header written after `next()` is never reached once the
     // error is on its way to the boundary.
     c.header("Deprecation", "true");
-    c.header("Link", `<${deprecation.successor}>; rel="successor-version"`);
+    c.header(
+      "Link",
+      `<${successorFor({ successor: deprecation.successor, c })}>; rel="successor-version"`,
+    );
     c.header("X-API-Deprecation-Notice", notice);
     c.header("Warning", `299 - "${notice}"`);
     await next();

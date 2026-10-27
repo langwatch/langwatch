@@ -58,7 +58,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[DeleteApiV1AnalyticsReportsByReportIdResponse200]:
-    """Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports boards API is
+    """Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards
 
     Args:
@@ -88,7 +88,7 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> DeleteApiV1AnalyticsReportsByReportIdResponse200 | None:
-    """Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports boards API is
+    """Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards
 
     Args:
@@ -113,7 +113,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[DeleteApiV1AnalyticsReportsByReportIdResponse200]:
-    """Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports boards API is
+    """Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards
 
     Args:
@@ -141,7 +141,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> DeleteApiV1AnalyticsReportsByReportIdResponse200 | None:
-    """Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports boards API is
+    """Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards
 
     Args:

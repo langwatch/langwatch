@@ -68,13 +68,15 @@ langwatch chart run <chart-id> \
 
 `--start`/`--end` fill the reserved period parameters and `--granularity` the datapoint step, which only accepts the offered steps: `1` (second), `60` (minute), `3600` (hour). A chart whose SQL declares the reserved period parameters **requires** `--start` and `--end` on every run — there is no default window, and running without them is refused. Only a chart that declares none of them runs without the flags.
 
-## Step 4: Place it on a dashboard
+## Step 4: Place it on an Analytics Report
 
-**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
+A saved chart goes on an Analytics Report, never on a Dashboards dashboard (those take widgets: the `dashboard-widgets` skill).
+
+**Which report:** place on the Analytics Report in the user's context (the one they are on, or one they named). If none is in context, ask which one with the `question` tool, one option per report with its id in `ref`. Never pick one from `langwatch analytics-reports list` on your own.
 
 ```bash
-langwatch dashboard list -f json          # the options for that question
-langwatch chart place <chart-id> --dashboard-id <dashboard-id> -f json
+langwatch analytics-reports list -f json  # the options for that question
+langwatch chart place <chart-id> --dashboard-id <report-id> -f json
 ```
 
 With no `--grid-row`, the platform allocates the next free row, so it never lands on top of an existing chart. `langwatch chart unplace <chart-id>` takes it off again without deleting it.

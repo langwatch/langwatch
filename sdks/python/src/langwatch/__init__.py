@@ -1,3 +1,4 @@
+from types import ModuleType
 from warnings import warn
 from .utils.module import module_property
 from .telemetry.tracing import trace
@@ -58,7 +59,7 @@ if TYPE_CHECKING:
     from .triggers import TriggersFacade
     from .workflows import WorkflowsFacade
     from .dashboards import DashboardsFacade
-    from .boards import BoardsFacade
+    from .analytics_reports import AnalyticsReportsFacade
     from .annotations import AnnotationsFacade
     from .graphs import GraphsFacade
     from .model_providers import ModelProvidersFacade
@@ -85,7 +86,8 @@ if TYPE_CHECKING:
     triggers: TriggersFacade
     workflows: WorkflowsFacade
     dashboards: DashboardsFacade
-    boards: BoardsFacade
+    boards: DashboardsFacade  # deprecated alias of dashboards
+    analytics_reports: AnalyticsReportsFacade
     annotations: AnnotationsFacade
     graphs: GraphsFacade
     model_providers: ModelProvidersFacade
@@ -135,7 +137,7 @@ _LAZY_FACADES = {
     "triggers": (".triggers", "TriggersFacade"),
     "workflows": (".workflows", "WorkflowsFacade"),
     "dashboards": (".dashboards", "DashboardsFacade"),
-    "boards": (".boards", "BoardsFacade"),
+    "analytics_reports": (".analytics_reports", "AnalyticsReportsFacade"),
     "annotations": (".annotations", "AnnotationsFacade"),
     "graphs": (".graphs", "GraphsFacade"),
     "model_providers": (".model_providers", "ModelProvidersFacade"),
@@ -154,6 +156,16 @@ _LAZY_FACADES = {
 
 
 def __getattr__(name: str):
+    if name == "boards":
+        warn(
+            "langwatch.boards is deprecated; use langwatch.dashboards",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        cached = globals().get("dashboards")
+        if cached is not None and not isinstance(cached, ModuleType):
+            return cached
+        return __getattr__("dashboards")
     if name in _LAZY_MODULES:
         if name == "dspy":
             return _get_dspy()
@@ -279,7 +291,7 @@ __all__ = [
     "triggers",
     "workflows",
     "dashboards",
-    "boards",
+    "analytics_reports",
     "annotations",
     "graphs",
     "model_providers",

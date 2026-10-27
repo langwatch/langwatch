@@ -266,13 +266,13 @@ export interface paths {
         };
         /**
          * @deprecated
-         * @description List all dashboards for the project with graph counts The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         * @description List all dashboards for the project with graph counts The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards
          */
         get: operations["getApiV1AnalyticsReports"];
         put?: never;
         /**
          * @deprecated
-         * @description Create a new dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         * @description Create a new dashboard The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards
          */
         post: operations["postApiV1AnalyticsReports"];
         delete?: never;
@@ -290,21 +290,21 @@ export interface paths {
         };
         /**
          * @deprecated
-         * @description Get a dashboard by its id, including its graphs The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         * @description Get a dashboard by its id, including its graphs The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards
          */
         get: operations["getApiV1AnalyticsReportsByReportId"];
         put?: never;
         post?: never;
         /**
          * @deprecated
-         * @description Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         * @description Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards
          */
         delete: operations["deleteApiV1AnalyticsReportsByReportId"];
         options?: never;
         head?: never;
         /**
          * @deprecated
-         * @description Rename a dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         * @description Rename a dashboard The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards
          */
         patch: operations["patchApiV1AnalyticsReportsByReportId"];
         trace?: never;
@@ -485,7 +485,7 @@ export interface paths {
         patch: operations["patchApiDashboardsByDashboardIdWidgetsByWidgetId"];
         trace?: never;
     };
-    "/api/v1/projects/{projectId}/analytics/boards": {
+    "/api/v1/projects/{projectId}/analytics/dashboards": {
         parameters: {
             query?: never;
             header?: never;
@@ -496,7 +496,7 @@ export interface paths {
          * List dashboards
          * @description Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports are listed by /api/v1/analytics/reports instead.
          */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsBoards"];
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboards"];
         put?: never;
         post?: never;
         delete?: never;
@@ -505,7 +505,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{projectId}/analytics/boards/{dashboardId}": {
+    "/api/v1/projects/{projectId}/analytics/dashboards/{dashboardId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -516,7 +516,7 @@ export interface paths {
          * Get a dashboard
          * @description Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only Analytics Reports holds, is reported as not found.
          */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId"];
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8425,7 +8425,7 @@ export interface operations {
             };
         };
     };
-    getApiV1ProjectsByProjectIdAnalyticsBoards: {
+    getApiV1ProjectsByProjectIdAnalyticsDashboards: {
         parameters: {
             query?: never;
             header?: never;
@@ -8580,7 +8580,7 @@ export interface operations {
             };
         };
     };
-    getApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId: {
+    getApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId: {
         parameters: {
             query?: never;
             header?: never;

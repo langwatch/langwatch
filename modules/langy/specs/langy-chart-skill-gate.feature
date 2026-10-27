@@ -25,7 +25,7 @@ Feature: Langy's chart skill follows the Dashboards flag
     When Langy is about to place a chart on a dashboard
     Then the skill says to use the dashboard in the user's context
     And when no dashboard is in context, to ask which board with the question tool
-    And never to pick one from `langwatch dashboard list` on its own
+    And never to pick one from `langwatch analytics-reports list` or `langwatch dashboards list` on its own
 
   # The dashboard-widgets skill also drives boards through `langwatch dashboards`
   # (/api/v1/dashboards). These rules keep that safe.

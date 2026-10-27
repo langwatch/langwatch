@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { initConfig } from "../config.ts";
-import { listAnalyticsReports } from "../langwatch-api-dashboards.ts";
+import { listAnalyticsReports } from "../langwatch-api-analytics-reports.ts";
 
 const SERVER_SRC = resolve(__dirname, "..");
 

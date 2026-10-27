@@ -1,14 +1,18 @@
-import { getDashboard, getProjectDashboard } from "../langwatch-api-boards.js";
+import { getDashboard, getProjectDashboard } from "../langwatch-api-dashboards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
 
 const isNotFound = (error: unknown) => error instanceof LangWatchApiError && error.status === 404;
 
 /**
- * Whether /api/v1/dashboards/{id} answers for this id. A 404 means the board routes are off for the
- * project (Dashboards switched off) or the id is unknown; the caller then takes the project-path
- * routes, whose own check refuses an unknown id.
+ * Whether /api/v1/dashboards/{id} answers for this id. A 404 means the dashboard routes are off
+ * for the project (Dashboards switched off) or the id is unknown; the caller then takes the
+ * project-path routes, whose own check refuses an unknown id.
  */
-export async function isOnBoardRoutes({ dashboardId }: { dashboardId: string }): Promise<boolean> {
+export async function isOnDashboardRoutes({
+  dashboardId,
+}: {
+  dashboardId: string;
+}): Promise<boolean> {
   try {
     await getDashboard({ dashboardId });
     return true;
@@ -19,8 +23,8 @@ export async function isOnBoardRoutes({ dashboardId }: { dashboardId: string }):
 }
 
 /**
- * Refuses a dashboard id that names no Dashboards board in this project, naming the id, so an
- * agent's typo, or the id of an Analytics Reports board, fails before any widget is written.
+ * Refuses a dashboard id that names no Dashboards dashboard in this project, naming the id, so an
+ * agent's typo, or the id of an Analytics Report, fails before any widget is written.
  */
 export async function assertProjectDashboardExists({
   projectId,
@@ -34,7 +38,7 @@ export async function assertProjectDashboardExists({
   } catch (error) {
     if (isNotFound(error)) {
       throw new Error(
-        `No dashboard with ID "${dashboardId}" was found in this project. Use list_dashboard_boards to find a valid dashboard ID.`,
+        `No dashboard with ID "${dashboardId}" was found in this project. Use list_dashboards to find a valid dashboard ID.`,
       );
     }
     throw error;

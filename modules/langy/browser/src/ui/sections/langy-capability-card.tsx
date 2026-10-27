@@ -48,6 +48,7 @@ const SURFACE_ICON: Record<CapabilitySurface, LucideIcon> = {
   datasets: Database,
   prompts: FileText,
   dashboards: LayoutDashboard,
+  analyticsReports: BarChart3,
   simulations: MessagesSquare,
   scenarios: MessagesSquare,
   agents: Bot,

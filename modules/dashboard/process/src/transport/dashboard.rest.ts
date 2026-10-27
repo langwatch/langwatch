@@ -137,7 +137,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   .withDeprecated({
     successor: "/api/v1/dashboards",
     notice:
-      "The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards",
+      "The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards",
   })
 
   .get("/api/v1/analytics/reports", "getApiV1AnalyticsReports")

@@ -113,7 +113,8 @@ def sync_detailed(
 
      Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a
     dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it.
-    Analytics Reports are listed by /api/v1/analytics/reports instead.
+    Analytics Reports are listed by /api/v1/analytics/reports instead. Use
+    /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated
 
     Args:
         project_id (str):
@@ -153,7 +154,8 @@ def sync(
 
      Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a
     dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it.
-    Analytics Reports are listed by /api/v1/analytics/reports instead.
+    Analytics Reports are listed by /api/v1/analytics/reports instead. Use
+    /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated
 
     Args:
         project_id (str):
@@ -187,7 +189,8 @@ async def asyncio_detailed(
 
      Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a
     dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it.
-    Analytics Reports are listed by /api/v1/analytics/reports instead.
+    Analytics Reports are listed by /api/v1/analytics/reports instead. Use
+    /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated
 
     Args:
         project_id (str):
@@ -225,7 +228,8 @@ async def asyncio(
 
      Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a
     dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it.
-    Analytics Reports are listed by /api/v1/analytics/reports instead.
+    Analytics Reports are listed by /api/v1/analytics/reports instead. Use
+    /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated
 
     Args:
         project_id (str):

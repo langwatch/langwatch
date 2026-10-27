@@ -61,7 +61,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiV1AnalyticsReportsBody,
 ) -> Response[PostApiV1AnalyticsReportsResponse201]:
-    """Create a new dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at
+    """Create a new dashboard The Analytics Reports dashboards API is deprecated; use the Dashboards API at
     /api/v1/dashboards
 
     Args:
@@ -91,7 +91,7 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiV1AnalyticsReportsBody,
 ) -> PostApiV1AnalyticsReportsResponse201 | None:
-    """Create a new dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at
+    """Create a new dashboard The Analytics Reports dashboards API is deprecated; use the Dashboards API at
     /api/v1/dashboards
 
     Args:
@@ -116,7 +116,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiV1AnalyticsReportsBody,
 ) -> Response[PostApiV1AnalyticsReportsResponse201]:
-    """Create a new dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at
+    """Create a new dashboard The Analytics Reports dashboards API is deprecated; use the Dashboards API at
     /api/v1/dashboards
 
     Args:
@@ -144,7 +144,7 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiV1AnalyticsReportsBody,
 ) -> PostApiV1AnalyticsReportsResponse201 | None:
-    """Create a new dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at
+    """Create a new dashboard The Analytics Reports dashboards API is deprecated; use the Dashboards API at
     /api/v1/dashboards
 
     Args:

@@ -43,6 +43,7 @@ describe("the real command tree", () => {
       ["graph", "update"],
       ["agent", "run"],
       ["dashboard", "create"],
+      ["analytics-reports", "create"],
       ["dashboards", "create"],
       ["annotation", "create"],
       ["api-keys", "revoke"],

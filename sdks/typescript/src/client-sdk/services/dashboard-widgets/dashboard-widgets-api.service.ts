@@ -14,11 +14,7 @@ export type DashboardWidget =
 
 /** A dashboard a widget can be added to, as the dashboards list answers it. */
 export type DashboardListItem =
-  paths["/api/v1/projects/{projectId}/analytics/boards"]["get"]["responses"]["200"]["content"]["application/json"]["data"][number];
-
-/** One dashboard, as the dashboard route answers it. */
-export type Dashboard =
-  paths["/api/v1/projects/{projectId}/analytics/boards/{dashboardId}"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/projects/{projectId}/analytics/dashboards"]["get"]["responses"]["200"]["content"]["application/json"]["data"][number];
 
 /** One named LangWatchQL query a widget may run, as a create/update submits it. */
 export type DashboardWidgetQueryInput =
@@ -92,19 +88,6 @@ export class DashboardWidgetsApiService {
       process.env.LANGWATCH_PROJECT_ID,
     ];
     return candidates.map((value) => value?.trim()).find((value) => value);
-  }
-
-  /**
-   * The project in scope, else the one the API key itself belongs to (`/api/v1/me/project`):
-   * a plain API key names no project anywhere else.
-   */
-  private async projectIdOrKeyProject(operation: string): Promise<string> {
-    const inScope = this.resolvedProjectId();
-    if (inScope) return inScope;
-    const { data, error, response } = await this.apiClient.GET("/api/v1/me/project");
-    if (error) this.handleApiError({ operation, error, response });
-    if (!data?.id) return this.projectId(operation);
-    return data.id;
   }
 
   private projectId(operation: string): string {
@@ -192,22 +175,11 @@ export class DashboardWidgetsApiService {
   async listDashboards(): Promise<{ data: DashboardListItem[] }> {
     const projectId = this.projectId("list dashboards");
     const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/projects/{projectId}/analytics/boards",
+      "/api/v1/projects/{projectId}/analytics/dashboards",
       { params: { path: { projectId } } },
     );
     if (error) this.handleApiError({ operation: "list dashboards", error, response });
     return data as unknown as { data: DashboardListItem[] };
-  }
-
-  /** One dashboard by id; an Analytics Report answers 404. */
-  async getDashboard(id: string): Promise<Dashboard> {
-    const projectId = await this.projectIdOrKeyProject(`get dashboard "${id}"`);
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/projects/{projectId}/analytics/boards/{dashboardId}",
-      { params: { path: { projectId, dashboardId: id } } },
-    );
-    if (error) this.handleApiError({ operation: `get dashboard "${id}"`, error, response });
-    return data as unknown as Dashboard;
   }
 
   /** Adds a widget to a dashboard at the next free row, keeping its size. */

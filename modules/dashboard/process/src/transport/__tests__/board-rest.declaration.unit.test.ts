@@ -1,6 +1,7 @@
 /**
  * The addresses, methods and permissions the boards REST families publish: the Dashboards
- * boards at `/api/v1/dashboards` with their widgets, and the Reports boards under analytics.
+ * boards at `/api/v1/dashboards` with their widgets, the project-path dashboards reads, and the
+ * Reports boards under analytics.
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
@@ -83,9 +84,32 @@ describe("given the Analytics Reports boards family", () => {
       "/api/v1/dashboards",
       undefined,
     ]);
-    expect(routesOf(boardProjectRest.router())).toEqual([
-      ["get", "/api/v1/projects/:projectId/analytics/boards", "analytics:view"],
-      ["get", "/api/v1/projects/:projectId/analytics/boards/:dashboardId", "analytics:view"],
+    expect(boardProjectRest.router().routes.map((route) => route.path)).toContain(
+      "/api/v1/projects/:projectId/analytics/dashboards",
+    );
+  });
+});
+
+describe("given the project-path dashboards family", () => {
+  const declaration = boardProjectRest.router();
+
+  /** @scenario "AC199y Names: the project-path dashboards read answers at /analytics/dashboards" */
+  it("serves /analytics/dashboards, and /analytics/boards deprecated in its favour", () => {
+    expect(
+      declaration.routes.map((route) => [route.method, route.path, route.deprecated?.successor]),
+    ).toEqual([
+      ["get", "/api/v1/projects/:projectId/analytics/dashboards", undefined],
+      ["get", "/api/v1/projects/:projectId/analytics/dashboards/:dashboardId", undefined],
+      [
+        "get",
+        "/api/v1/projects/:projectId/analytics/boards",
+        "/api/v1/projects/{projectId}/analytics/dashboards",
+      ],
+      [
+        "get",
+        "/api/v1/projects/:projectId/analytics/boards/:dashboardId",
+        "/api/v1/projects/{projectId}/analytics/dashboards/{dashboardId}",
+      ],
     ]);
   });
 });

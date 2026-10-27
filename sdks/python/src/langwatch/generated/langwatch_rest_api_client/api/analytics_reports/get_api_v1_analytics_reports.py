@@ -50,7 +50,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiV1AnalyticsReportsResponse200]:
-    """List all dashboards for the project with graph counts The Analytics Reports boards API is
+    """List all dashboards for the project with graph counts The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards
 
     Raises:
@@ -74,7 +74,7 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> GetApiV1AnalyticsReportsResponse200 | None:
-    """List all dashboards for the project with graph counts The Analytics Reports boards API is
+    """List all dashboards for the project with graph counts The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards
 
     Raises:
@@ -94,7 +94,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiV1AnalyticsReportsResponse200]:
-    """List all dashboards for the project with graph counts The Analytics Reports boards API is
+    """List all dashboards for the project with graph counts The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards
 
     Raises:
@@ -116,7 +116,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> GetApiV1AnalyticsReportsResponse200 | None:
-    """List all dashboards for the project with graph counts The Analytics Reports boards API is
+    """List all dashboards for the project with graph counts The Analytics Reports dashboards API is
     deprecated; use the Dashboards API at /api/v1/dashboards
 
     Raises:

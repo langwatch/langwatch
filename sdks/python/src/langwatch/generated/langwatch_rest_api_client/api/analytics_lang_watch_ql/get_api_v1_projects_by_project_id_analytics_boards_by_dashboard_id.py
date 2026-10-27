@@ -126,7 +126,8 @@ def sync_detailed(
     """Get a dashboard
 
      Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only
-    Analytics Reports holds, is reported as not found.
+    Analytics Reports holds, is reported as not found. Use
+    /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated
 
     Args:
         project_id (str):
@@ -169,7 +170,8 @@ def sync(
     """Get a dashboard
 
      Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only
-    Analytics Reports holds, is reported as not found.
+    Analytics Reports holds, is reported as not found. Use
+    /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated
 
     Args:
         project_id (str):
@@ -206,7 +208,8 @@ async def asyncio_detailed(
     """Get a dashboard
 
      Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only
-    Analytics Reports holds, is reported as not found.
+    Analytics Reports holds, is reported as not found. Use
+    /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated
 
     Args:
         project_id (str):
@@ -247,7 +250,8 @@ async def asyncio(
     """Get a dashboard
 
      Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only
-    Analytics Reports holds, is reported as not found.
+    Analytics Reports holds, is reported as not found. Use
+    /api/v1/projects/{projectId}/analytics/dashboards; /analytics/boards is deprecated
 
     Args:
         project_id (str):

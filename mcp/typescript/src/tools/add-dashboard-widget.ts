@@ -1,10 +1,9 @@
 /**
- * `add_dashboard_widget`: one create under the board's path, which places the widget as it saves
- * it. On a 404 (Dashboards off) it creates, then places, on the project path; a failed placement
+ * `add_dashboard_widget`: one create under the dashboard's path, which also places the widget.
+ * On a 404 (Dashboards off) it creates, then places, on the project path; a failed placement
  * deletes the widget it just created.
  */
 
-import { createWidgetOnDashboard } from "../langwatch-api-boards.js";
 import {
   assignDashboardWidgetToDashboard,
   createDashboardWidget,
@@ -12,8 +11,9 @@ import {
   type DashboardWidget,
   type DashboardWidgetQueryInput,
 } from "../langwatch-api-dashboard-widgets.js";
+import { createWidgetOnDashboard } from "../langwatch-api-dashboards.js";
 import { getCurrentProject } from "../langwatch-api-projects.js";
-import { assertProjectDashboardExists, isOnBoardRoutes } from "./dashboard-exists.js";
+import { assertProjectDashboardExists, isOnDashboardRoutes } from "./dashboard-exists.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,
@@ -29,7 +29,7 @@ export interface AddDashboardWidgetParams {
 export async function handleAddDashboardWidget(params: AddDashboardWidgetParams): Promise<string> {
   const queries = normalizeDashboardWidgetQueries({ queries: params.queries });
 
-  const widget = (await isOnBoardRoutes({ dashboardId: params.dashboardId }))
+  const widget = (await isOnDashboardRoutes({ dashboardId: params.dashboardId }))
     ? await createWidgetOnDashboard({
         dashboardId: params.dashboardId,
         name: params.name,

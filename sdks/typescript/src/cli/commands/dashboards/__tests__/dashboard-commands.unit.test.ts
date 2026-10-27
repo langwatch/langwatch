@@ -1,190 +1,110 @@
-import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+/**
+ * The `langwatch dashboards` command tree, and the old names kept as deprecated aliases, read off
+ * the live commander program. Spec: modules/dashboard/specs/dashboards-v2.feature (AC199s, AC199x)
+ */
+import type { Command } from "commander";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  DashboardsApiError,
-  DashboardsApiService,
-} from "@/client-sdk/services/dashboards/dashboards-api.service";
+import { AnalyticsReportsApiService } from "@/client-sdk/services/analytics-reports/analytics-reports-api.service";
 
-vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    DashboardsApiService: vi.fn(),
-  };
-});
+import { isOutputAware } from "../../../utils/output";
 
-vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({
-    apiKey: "test-key",
-    source: "env",
-    endpoint: "https://app.langwatch.ai",
-  })),
-}));
-
-vi.mock("ora", () => ({
-  default: () => ({
-    start: vi.fn().mockReturnThis(),
-    succeed: vi.fn(),
-    fail: vi.fn(),
+vi.mock(
+  "@/client-sdk/services/analytics-reports/analytics-reports-api.service",
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    AnalyticsReportsApiService: vi.fn(),
   }),
+);
+vi.mock("../../../utils/apiKey", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "k", source: "env", endpoint: "e" })),
+}));
+vi.mock("ora", () => ({
+  default: () => ({ start: vi.fn().mockReturnThis(), succeed: vi.fn(), fail: vi.fn() }),
 }));
 
-import { createDashboardCommand } from "../create";
-import { deleteDashboardCommand } from "../delete";
-import { listDashboardsCommand } from "../list";
+// program.ts reads the tsup-injected __CLI_VERSION__ build constant, which vitest does not define.
+(globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
 
-class ProcessExitError extends Error {
-  constructor(public code: number) {
-    super(`process.exit(${code})`);
-  }
-}
+const child = (parent: Command | undefined, name: string) =>
+  parent?.commands.find((command) => command.name() === name);
+const names = (parent: Command | undefined) => parent?.commands.map((command) => command.name());
 
-const noop = () => {
-  // intentionally empty — suppresses output during tests
-};
+describe("the langwatch dashboards command group", () => {
+  /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
+  it("offers dashboard and widget verbs, each speaking the output contract", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const dashboards = child(buildProgram(), "dashboards");
+    const widgets = child(dashboards, "widgets");
+    const leaves = [
+      ...["list", "get", "create", "update", "delete"].map((verb) => child(dashboards, verb)),
+      ...["list", "get", "create", "update", "delete"].map((verb) => child(widgets, verb)),
+    ];
 
-let exitSpy: MockInstance<typeof process.exit>;
-
-const mockProcessExit = () => {
-  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
-    throw new ProcessExitError(code as number);
-  });
-};
-
-describe("listDashboardsCommand()", () => {
-  let mockList: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockList = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(function () {
-      return {
-        list: mockList,
-        get: vi.fn(),
-        create: vi.fn(),
-        rename: vi.fn(),
-        delete: vi.fn(),
-      } as unknown as DashboardsApiService;
-    });
-    vi.spyOn(console, "log").mockImplementation(noop);
-    vi.spyOn(console, "error").mockImplementation(noop);
-    mockProcessExit();
-  });
-
-  describe("when dashboards exist", () => {
-    it("calls list and prints output", async () => {
-      mockList.mockResolvedValue({
-        data: [
-          {
-            id: "d1",
-            name: "My Dashboard",
-            order: 0,
-            graphCount: 3,
-            createdAt: "2026-01-01",
-            updatedAt: "2026-01-02",
-          },
-        ],
-      });
-
-      await listDashboardsCommand();
-
-      expect(mockList).toHaveBeenCalledOnce();
-    });
-  });
-
-  describe("when no dashboards exist", () => {
-    it("prints empty-state message", async () => {
-      mockList.mockResolvedValue({ data: [] });
-
-      await listDashboardsCommand();
-
-      expect(exitSpy).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the API call fails", () => {
-    it("exits with code 1", async () => {
-      mockList.mockRejectedValue(new DashboardsApiError("Network error", "list dashboards"));
-
-      await expect(listDashboardsCommand()).rejects.toThrow(ProcessExitError);
+    expect({
+      dashboards: names(dashboards),
+      widgets: names(widgets),
+      arguments: child(dashboards, "get")?.registeredArguments.map((arg) => arg.name()),
+      outputAware: leaves.every((leaf) => leaf !== undefined && isOutputAware(leaf)),
+    }).toEqual({
+      dashboards: ["list", "get", "create", "update", "delete", "widgets"],
+      widgets: ["list", "get", "create", "update", "delete"],
+      arguments: ["dashboardId"],
+      outputAware: true,
     });
   });
 });
 
-describe("createDashboardCommand()", () => {
-  let mockCreate: ReturnType<typeof vi.fn>;
+describe("the old command names", () => {
+  const stderr = vi.fn();
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockCreate = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(function () {
-      return {
-        list: vi.fn(),
-        get: vi.fn(),
-        create: mockCreate,
-        rename: vi.fn(),
-        delete: vi.fn(),
-      } as unknown as DashboardsApiService;
+    vi.mocked(AnalyticsReportsApiService).mockImplementation(function () {
+      return { list: async () => ({ data: [] }) } as unknown as AnalyticsReportsApiService;
     });
-    vi.spyOn(console, "log").mockImplementation(noop);
-    vi.spyOn(console, "error").mockImplementation(noop);
-    mockProcessExit();
+    vi.spyOn(console, "error").mockImplementation(stderr);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    stderr.mockReset();
+    vi.restoreAllMocks();
   });
 
-  describe("when creation succeeds", () => {
-    it("calls create with the name", async () => {
-      mockCreate.mockResolvedValue({ id: "d1", name: "My Dashboard" });
+  /** @scenario "AC199x Names: the CLI keeps its old command names as deprecated aliases" */
+  it("runs `dashboard` as `analytics-reports`, with one deprecation line on stderr", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const program = buildProgram();
 
-      await createDashboardCommand("My Dashboard");
+    await program.parseAsync(["node", "langwatch", "analytics-reports", "list"]);
+    const quiet = stderr.mock.calls.length;
+    await program.parseAsync(["node", "langwatch", "dashboard", "list"]);
 
-      expect(mockCreate).toHaveBeenCalledWith({ name: "My Dashboard" });
-    });
-  });
-
-  describe("when creation fails", () => {
-    it("exits with code 1", async () => {
-      mockCreate.mockRejectedValue(new DashboardsApiError("Limit reached", "create dashboard"));
-
-      await expect(createDashboardCommand("My Dashboard")).rejects.toThrow(ProcessExitError);
-    });
-  });
-});
-
-describe("deleteDashboardCommand()", () => {
-  let mockDelete: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockDelete = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(function () {
-      return {
-        list: vi.fn(),
-        get: vi.fn(),
-        create: vi.fn(),
-        rename: vi.fn(),
-        delete: mockDelete,
-      } as unknown as DashboardsApiService;
-    });
-    vi.spyOn(console, "log").mockImplementation(noop);
-    vi.spyOn(console, "error").mockImplementation(noop);
-    mockProcessExit();
-  });
-
-  describe("when deletion succeeds", () => {
-    it("calls delete with the ID", async () => {
-      mockDelete.mockResolvedValue({ id: "d1", name: "My Dashboard" });
-
-      await deleteDashboardCommand("d1");
-
-      expect(mockDelete).toHaveBeenCalledWith("d1");
+    expect({
+      verbs: names(child(program, "dashboard")),
+      inHelp: /^\s+dashboard\s/m.test(program.helpInformation()),
+      quiet,
+      notice: stderr.mock.calls.map(([line]) => line),
+    }).toEqual({
+      verbs: names(child(program, "analytics-reports")),
+      inHelp: false,
+      quiet: 0,
+      notice: ["`langwatch dashboard` is deprecated; use `langwatch analytics-reports` instead."],
     });
   });
 
-  describe("when deletion fails", () => {
-    it("exits with code 1", async () => {
-      mockDelete.mockRejectedValue(new DashboardsApiError("Not found", "delete dashboard"));
+  /** @scenario "AC199x Names: the CLI keeps its old command names as deprecated aliases" */
+  it("keeps `dashboard-widget boards` working but out of the help", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const widget = child(buildProgram(), "dashboard-widget");
+    const help = widget?.helpInformation() ?? "";
 
-      await expect(deleteDashboardCommand("nonexistent")).rejects.toThrow(ProcessExitError);
-    });
+    expect({
+      both: [child(widget, "dashboards"), child(widget, "boards")].every(
+        (command) => command !== undefined && isOutputAware(command),
+      ),
+      listsDashboards: /^\s+dashboards\s/m.test(help),
+      listsBoards: /^\s+boards\s/m.test(help),
+    }).toEqual({ both: true, listsDashboards: true, listsBoards: false });
   });
 });

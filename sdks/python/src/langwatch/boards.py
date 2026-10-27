@@ -1,176 +1,21 @@
 """
-API facade for the Dashboards boards at /api/v1/dashboards and the widgets on them.
+Deprecated: the Dashboards facade was called `boards`; use `langwatch.dashboards`.
 
-The project comes from the API key. While Dashboards is switched off for the
-key's project, every route answers 404.
+`BoardsFacade` is `DashboardsFacade`; methods take `dashboard_id`, not `board_id`.
 
-Spec: modules/dashboard/specs/dashboards-v2.feature (AC199l to AC199s)
+Spec: modules/dashboard/specs/dashboards-v2.feature (AC199w)
 """
 
-import urllib.parse
-from typing import Any, Dict, List, Optional
+import warnings
 
-import httpx
+from langwatch.dashboards import DashboardsFacade
 
-from langwatch.generated.langwatch_rest_api_client.client import (
-    Client as LangWatchRestApiClient,
+warnings.warn(
+    "langwatch.boards is deprecated; use langwatch.dashboards",
+    DeprecationWarning,
+    stacklevel=2,
 )
-from langwatch.state import get_instance
-from langwatch.utils.exceptions import extract_api_error_detail
-from langwatch.utils.initialization import ensure_setup
 
-_UNSET: Any = object()
+BoardsFacade = DashboardsFacade
 
-
-def _raise_for_status(response: httpx.Response) -> None:
-    """Map HTTP error status codes to appropriate exceptions."""
-    if response.is_success:
-        return
-
-    status = response.status_code
-    try:
-        detail = extract_api_error_detail(response.json())
-    except Exception:
-        detail = response.text or ""
-
-    if status == 404:
-        raise ValueError(f"Not found: {detail}" if detail else "Not found")
-    if status in (400, 422):
-        raise ValueError(f"Bad request: {detail}" if detail else "Bad request")
-    if status == 401:
-        raise RuntimeError(
-            f"Authentication failed: {detail}" if detail else "Authentication failed"
-        )
-    if status >= 500:
-        raise RuntimeError(
-            f"Server error ({status}): {detail}" if detail else f"Server error ({status})"
-        )
-    raise RuntimeError(f"Unexpected status {status}: {detail}")
-
-
-def _quote(value: str) -> str:
-    return urllib.parse.quote(value, safe="")
-
-
-class BoardsFacade:
-    """Boards in the Dashboards area and their widgets, over /api/v1/dashboards."""
-
-    def __init__(self, rest_api_client: LangWatchRestApiClient) -> None:
-        self._client = rest_api_client
-
-    @classmethod
-    def from_global(cls) -> "BoardsFacade":
-        """Create a BoardsFacade using the global LangWatch configuration."""
-        ensure_setup()
-        instance = get_instance()
-        if instance is None:
-            raise RuntimeError(
-                "LangWatch client has not been initialized. Call setup() first."
-            )
-        return cls(instance.rest_api_client)
-
-    def _send(self, method: str, path: str, body: Optional[Dict[str, Any]] = None) -> Any:
-        http = self._client.get_httpx_client()
-        response = (
-            http.request(method, path)
-            if body is None
-            else http.request(method, path, json=body)
-        )
-        _raise_for_status(response)
-        return response.json() if response.content else None
-
-    # -- boards --------------------------------------------------------------
-
-    def list(self) -> Dict[str, Any]:
-        """List the boards of the key's project, each with its widget count."""
-        return self._send("GET", "/api/v1/dashboards")
-
-    def get(self, board_id: str) -> Dict[str, Any]:
-        """Read one board."""
-        return self._send("GET", f"/api/v1/dashboards/{_quote(board_id)}")
-
-    def create(self, *, name: str) -> Dict[str, Any]:
-        """Create an empty board."""
-        return self._send("POST", "/api/v1/dashboards", {"name": name})
-
-    def update(
-        self,
-        board_id: str,
-        *,
-        name: Optional[str] = None,
-        description: Optional[str] = _UNSET,
-    ) -> Dict[str, Any]:
-        """Change a board's name or description; `description=None` clears it."""
-        body: Dict[str, Any] = {}
-        if name is not None:
-            body["name"] = name
-        if description is not _UNSET:
-            body["description"] = description
-        if not body:
-            raise ValueError("Provide at least one of name or description.")
-        return self._send("PATCH", f"/api/v1/dashboards/{_quote(board_id)}", body)
-
-    def delete(self, board_id: str) -> Dict[str, Any]:
-        """Delete a board with the widgets on it."""
-        return self._send("DELETE", f"/api/v1/dashboards/{_quote(board_id)}")
-
-    # -- widgets on a board --------------------------------------------------
-
-    def list_widgets(self, board_id: str) -> Dict[str, Any]:
-        """List the widgets on one board."""
-        return self._send("GET", f"/api/v1/dashboards/{_quote(board_id)}/widgets")
-
-    def create_widget(
-        self,
-        board_id: str,
-        *,
-        name: str,
-        code: str,
-        queries: List[Dict[str, Any]],
-        description: Optional[str] = None,
-        prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Create a widget placed on this board."""
-        body: Dict[str, Any] = {"name": name, "code": code, "queries": queries}
-        if description is not None:
-            body["description"] = description
-        if prompt is not None:
-            body["prompt"] = prompt
-        return self._send("POST", f"/api/v1/dashboards/{_quote(board_id)}/widgets", body)
-
-    def get_widget(self, board_id: str, widget_id: str) -> Dict[str, Any]:
-        """Read one widget on this board."""
-        return self._send("GET", self._widget_path(board_id, widget_id))
-
-    def update_widget(
-        self,
-        board_id: str,
-        widget_id: str,
-        *,
-        name: Optional[str] = None,
-        code: Optional[str] = None,
-        queries: Optional[List[Dict[str, Any]]] = None,
-        description: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Change a widget on this board; a field left out keeps its value."""
-        body = {
-            key: value
-            for key, value in {
-                "name": name,
-                "code": code,
-                "queries": queries,
-                "description": description,
-            }.items()
-            if value is not None
-        }
-        if not body:
-            raise ValueError("Provide at least one of name, code, queries or description.")
-        return self._send("PATCH", self._widget_path(board_id, widget_id), body)
-
-    def delete_widget(self, board_id: str, widget_id: str) -> None:
-        """Delete one widget on this board."""
-        self._send("DELETE", self._widget_path(board_id, widget_id))
-
-    @staticmethod
-    def _widget_path(board_id: str, widget_id: str) -> str:
-        return f"/api/v1/dashboards/{_quote(board_id)}/widgets/{_quote(widget_id)}"
+__all__ = ["BoardsFacade"]

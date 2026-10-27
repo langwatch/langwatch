@@ -164,6 +164,28 @@ describe("the OpenAPI document generated from the installed declarations", () =>
     });
   });
 
+  /** @scenario "AC199y Names: the project-path dashboards read answers at /analytics/dashboards" */
+  it("documents /analytics/dashboards and marks the /analytics/boards spelling deprecated", () => {
+    const { paths } = generated as OpenApiDocument;
+    const project = "/api/v1/projects/{projectId}/analytics";
+    const deprecated = (path: string) =>
+      (paths[path]?.get as { deprecated?: boolean } | undefined)?.deprecated === true;
+
+    expect(
+      [
+        `${project}/dashboards`,
+        `${project}/dashboards/{dashboardId}`,
+        `${project}/boards`,
+        `${project}/boards/{dashboardId}`,
+      ].map((path) => [path in paths, deprecated(path)]),
+    ).toEqual([
+      [true, false],
+      [true, false],
+      [true, true],
+      [true, true],
+    ]);
+  });
+
   // Across every family the api installs, not only the host test's own.
   /** @scenario "A header leaves a path the dated family does not serve to the route that does" */
   it("pins X-API-Version only for routes of dated families", () => {
