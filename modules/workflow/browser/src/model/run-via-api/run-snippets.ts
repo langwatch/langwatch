@@ -160,7 +160,7 @@ function dataSourceComment({
     return `${commentPrefix} Evaluate a platform dataset by id.`;
   }
   const named = datasetName ? ` ("${datasetName}")` : "";
-  return `${commentPrefix} Evaluate the attached dataset${named}; parameters set constant inputs the dataset does not provide.`;
+  return `${commentPrefix} Evaluate the attached dataset${named}.\n${commentPrefix} Parameters set constant inputs the dataset does not provide.`;
 }
 
 function buildPythonSnippet(input: BuildRunSnippetInput): string {
