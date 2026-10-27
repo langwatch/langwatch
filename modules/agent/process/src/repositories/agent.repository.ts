@@ -15,6 +15,8 @@ import type {
   ConnectedAgentsInput,
   ConnectedAgentsEnvironmentInput,
   UpdateAgentCommand,
+  AgentVersionAuthorKind,
+  AgentWriteAuthor,
 } from "@langwatch/agent-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -31,13 +33,54 @@ export type PersistAgentInput = {
   identity?: ConnectedAgentIdentity;
   /** A voice row's dedupe key; a connected row carries its key inside `identity`. */
   identityKey?: string;
+  /** Who wrote it; the row's creator and its version 1 author. Connected rows record none. */
+  author?: AgentWriteAuthor;
+  commitMessage?: string;
 };
 
 export type UpdatePersistedAgentInput = UpdateAgentCommand & {
   type: AgentType;
   config: AgentConfig;
+  author?: AgentWriteAuthor;
 };
-export type UpdateAgentCopyInput = GetAgentInput & { name: string; config: AgentConfig };
+export type UpdateAgentCopyInput = GetAgentInput & {
+  name: string;
+  config: AgentConfig;
+  author?: AgentWriteAuthor;
+  commitMessage?: string;
+};
+
+/** One stored version; the agent row is always the newest. */
+export type AgentVersionRecord = {
+  id: string;
+  agentId: string;
+  projectId: string;
+  version: number;
+  name: string;
+  type: AgentType;
+  config: Record<string, unknown>;
+  workflowId: string | null;
+  commitMessage: string | null;
+  authorId: string | null;
+  authorKind: AgentVersionAuthorKind | null;
+  createdAt: Date;
+};
+
+export type AgentLabelRecord = {
+  agentId: string;
+  label: string;
+  versionId: string;
+  version: number;
+  updatedAt: Date;
+  updatedById: string | null;
+};
+
+export type AgentVersionLookup = {
+  projectId: string;
+  agentId: string;
+  version?: number;
+  versionId?: string;
+};
 export type RegisterPersistedAgentInput = PersistAgentInput & { identity: ConnectedAgentIdentity };
 export type AgentPresenceInput = GetAgentInput & { at: Instant };
 
@@ -69,4 +112,25 @@ export interface AgentRepository {
   registerConnected(input: RegisterPersistedAgentInput): Promise<Agent>;
   findByIdentityKey(input: { projectId: string; identityKey: string }): Promise<Agent[]>;
   touchLastSeenAt(input: AgentPresenceInput): Promise<void>;
+
+  /** Newest first. */
+  listVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]>;
+  findVersion(input: AgentVersionLookup): Promise<AgentVersionRecord | undefined>;
+  /** The newest version number of each agent that has any. */
+  latestVersionNumbers(input: AgentIdsInput): Promise<Map<string, number>>;
+  listLabels(input: AgentIdsInput): Promise<AgentLabelRecord[]>;
+  /** Creates or moves the label; the version must belong to the agent. */
+  assignLabel(input: {
+    projectId: string;
+    agentId: string;
+    label: string;
+    versionId: string;
+    actorId: string | null;
+  }): Promise<AgentLabelRecord>;
+  /** True when a label was removed. */
+  removeLabel(input: { projectId: string; agentId: string; label: string }): Promise<boolean>;
+  /** Agents in every project that hold no version yet, by id, for the backfill. */
+  findUnversioned(input: { afterId: string | null; limit: number }): Promise<Agent[]>;
+  /** Writes version 1 from the row and its creator when unset; false when one already existed. */
+  backfillFirstVersion(input: { agent: Agent; createdById: string | null }): Promise<boolean>;
 }

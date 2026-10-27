@@ -6,7 +6,9 @@ import {
   type Agent,
   type AgentOverview,
   type AgentWithFields,
+  type AgentVersions,
   type HttpAgentConfig,
+  httpAgentConfigSchema,
   type HttpAuth,
 } from "@langwatch/agent-contract";
 import { isSameOrigin } from "@langwatch/workflow-contract";
@@ -67,6 +69,20 @@ export function agentWithFieldsWithoutSecrets(agent: AgentWithFields): AgentWith
 /** The same projection of the config alone, for the REST answers. */
 export function agentConfigWithoutSecrets(agent: Agent): Agent["config"] {
   return agent.type === "http" ? httpConfigWithoutSecrets(agent.config) : agent.config;
+}
+
+/** Every version's literal HTTP credentials blank, as a read of the agent row. */
+export function agentVersionsWithoutSecrets(versions: AgentVersions): AgentVersions {
+  return {
+    ...versions,
+    versions: versions.versions.map((version) => {
+      if (version.type !== "http") return version;
+      const parsed = httpAgentConfigSchema.safeParse(version.config);
+      if (parsed.success) return { ...version, config: httpConfigWithoutSecrets(parsed.data) };
+      const { headers: _headers, auth: _auth, ...rest } = version.config;
+      return { ...version, config: rest };
+    }),
+  };
 }
 
 type HttpDestination = HttpSecrets & { url: string };

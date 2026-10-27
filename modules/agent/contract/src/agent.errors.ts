@@ -273,3 +273,79 @@ export class AgentSourcePermissionDeniedError extends HandledError {
     );
   }
 }
+
+/** No version of the agent answers the label or number asked for. */
+export class AgentVersionNotFoundError extends HandledError {
+  declare readonly code: "agent_version_not_found";
+
+  constructor({ agentId, label, version }: { agentId: string; label?: string; version?: number }) {
+    super(
+      "agent_version_not_found",
+      label
+        ? `Agent "${agentId}" has no version labelled "${label}".`
+        : `Agent "${agentId}" has no version ${version ?? "with that number"}.`,
+      {
+        httpStatus: 404,
+        fault: "customer",
+        meta: { agentId, ...(label ? { label } : {}), ...(version ? { version } : {}) },
+      },
+    );
+    this.name = "AgentVersionNotFoundError";
+  }
+}
+
+/** A label name the deploy rules refuse (prompt tag rules: lowercase, not a number, not latest). */
+export class AgentLabelInvalidError extends HandledError {
+  declare readonly code: "agent_label_invalid";
+
+  constructor({ label, reason }: { label: string; reason: string }) {
+    super("agent_label_invalid", `Invalid label "${label}". ${reason}`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { label, reason },
+    });
+    this.name = "AgentLabelInvalidError";
+  }
+}
+
+/** A read named a label and a version at once, in the address or beside it. */
+export class AgentVersionSelectorConflictError extends HandledError {
+  declare readonly code: "agent_version_selector_conflict";
+
+  constructor() {
+    super(
+      "agent_version_selector_conflict",
+      "Name a label or a version, not both, and not in the address and the query at once.",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "AgentVersionSelectorConflictError";
+  }
+}
+
+/** Archiving an agent that a deploy label points at needs `agents:deploy`. */
+export class AgentDeployedLabelProtectedError extends HandledError {
+  declare readonly code: "agent_deployed_label_protected";
+
+  constructor({ agentId, labels }: { agentId: string; labels: string[] }) {
+    super(
+      "agent_deployed_label_protected",
+      `Agent "${agentId}" is deployed as ${labels.join(", ")}; archiving it needs the agents:deploy permission.`,
+      { httpStatus: 403, fault: "customer", meta: { agentId, labels } },
+    );
+    this.name = "AgentDeployedLabelProtectedError";
+  }
+}
+
+/** Connected agents are versioned by the code that registers them, so they carry no labels. */
+export class AgentVersionUnsupportedError extends HandledError {
+  declare readonly code: "agent_version_unsupported";
+
+  constructor({ agentId }: { agentId: string }) {
+    super(
+      "agent_version_unsupported",
+      `Agent "${agentId}" is a connected agent; its versions live in the code that registers it.`,
+      { httpStatus: 422, fault: "customer", meta: { agentId } },
+    );
+    this.name = "AgentVersionUnsupportedError";
+  }
+}

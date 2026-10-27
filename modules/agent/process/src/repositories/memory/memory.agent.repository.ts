@@ -16,7 +16,10 @@ import {
   type AgentWorkflowConfig,
   type AgentName,
   type AgentReferenceState,
+  type AgentWriteAuthor,
+  AgentVersionNotFoundError,
 } from "@langwatch/agent-contract";
+import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
 
 import type {
@@ -27,10 +30,15 @@ import type {
   UpdateAgentCopyInput,
   UpdatePersistedAgentInput,
   AgentCopyRecord,
+  AgentLabelRecord,
+  AgentVersionLookup,
+  AgentVersionRecord,
 } from "../agent.repository.ts";
 
 export class MemoryAgentRepository implements AgentRepository {
   #agents = new Map<string, Agent>();
+  #versions: AgentVersionRecord[] = [];
+  #labels: (Omit<AgentLabelRecord, "version"> & { projectId: string })[] = [];
 
   private constructor() {}
 
@@ -130,9 +138,12 @@ export class MemoryAgentRepository implements AgentRepository {
       hostLabel: input.identity?.hostLabel ?? null,
       identityKey: identityKey ?? null,
       lastSeenAt: input.identity ? now : null,
+      createdById: input.author?.authorId ?? null,
+      updatedById: input.author?.authorId ?? null,
     });
 
     this.#agents.set(agent.id, structuredClone(agent));
+    this.#appendVersion({ agent, author: input.author, commitMessage: input.commitMessage });
 
     return structuredClone(agent);
   }
@@ -140,13 +151,16 @@ export class MemoryAgentRepository implements AgentRepository {
   async update(input: UpdatePersistedAgentInput): Promise<Agent> {
     const agent = this.#get(input);
 
-    return this.#save({
+    const saved = this.#save({
       ...agent,
       name: input.name ?? agent.name,
       type: input.type,
       config: input.config,
       workflowId: input.workflowId ?? agent.workflowId,
+      ...(input.author ? { updatedById: input.author.authorId } : {}),
     });
+    this.#appendVersion({ agent: saved, author: input.author, commitMessage: input.commitMessage });
+    return saved;
   }
 
   updateConfigIfUnchanged(
@@ -201,7 +215,165 @@ export class MemoryAgentRepository implements AgentRepository {
   }
 
   async updateNameAndConfig(input: UpdateAgentCopyInput): Promise<void> {
-    this.#save({ ...this.#get(input), name: input.name, config: input.config });
+    const saved = this.#save({
+      ...this.#get(input),
+      name: input.name,
+      config: input.config,
+      ...(input.author ? { updatedById: input.author.authorId } : {}),
+    });
+    this.#appendVersion({ agent: saved, author: input.author, commitMessage: input.commitMessage });
+  }
+
+  async listVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]> {
+    return structuredClone(
+      this.#versions
+        .filter((row) => row.projectId === input.projectId && row.agentId === input.agentId)
+        .toSorted((left, right) => right.version - left.version),
+    );
+  }
+
+  async findVersion(input: AgentVersionLookup): Promise<AgentVersionRecord | undefined> {
+    const [found] = (await this.listVersions(input)).filter(
+      (row) =>
+        (input.version === void 0 || row.version === input.version) &&
+        (input.versionId === void 0 || row.id === input.versionId),
+    );
+    return found;
+  }
+
+  async latestVersionNumbers(input: AgentIdsInput): Promise<Map<string, number>> {
+    const numbers = new Map<string, number>();
+    for (const row of this.#versions) {
+      if (row.projectId !== input.projectId || !input.ids.includes(row.agentId)) continue;
+      numbers.set(row.agentId, Math.max(numbers.get(row.agentId) ?? 0, row.version));
+    }
+    return numbers;
+  }
+
+  async listLabels(input: AgentIdsInput): Promise<AgentLabelRecord[]> {
+    return this.#labels
+      .filter((row) => row.projectId === input.projectId && input.ids.includes(row.agentId))
+      .flatMap(({ projectId: _projectId, ...row }) => {
+        const version = this.#versions.find((candidate) => candidate.id === row.versionId);
+        return version ? [{ ...structuredClone(row), version: version.version }] : [];
+      })
+      .toSorted((left, right) => left.label.localeCompare(right.label));
+  }
+
+  async assignLabel(input: {
+    projectId: string;
+    agentId: string;
+    label: string;
+    versionId: string;
+    actorId: string | null;
+  }): Promise<AgentLabelRecord> {
+    const version = await this.findVersion({
+      projectId: input.projectId,
+      agentId: input.agentId,
+      versionId: input.versionId,
+    });
+    if (!version) throw new AgentVersionNotFoundError({ agentId: input.agentId });
+    const row = {
+      projectId: input.projectId,
+      agentId: input.agentId,
+      label: input.label,
+      versionId: version.id,
+      updatedAt: toDate(nowInstant()),
+      updatedById: input.actorId,
+    };
+    this.#labels = [
+      ...this.#labels.filter(
+        (candidate) => !(candidate.agentId === input.agentId && candidate.label === input.label),
+      ),
+      row,
+    ];
+    const { projectId: _projectId, ...label } = row;
+    return { ...label, version: version.version };
+  }
+
+  async removeLabel(input: {
+    projectId: string;
+    agentId: string;
+    label: string;
+  }): Promise<boolean> {
+    const before = this.#labels.length;
+    this.#labels = this.#labels.filter(
+      (row) =>
+        !(
+          row.projectId === input.projectId &&
+          row.agentId === input.agentId &&
+          row.label === input.label
+        ),
+    );
+    return this.#labels.length < before;
+  }
+
+  async findUnversioned(input: { afterId: string | null; limit: number }): Promise<Agent[]> {
+    return structuredClone(
+      [...this.#agents.values()]
+        .filter((agent) => agent.type !== "connected")
+        .filter((agent) => input.afterId === null || agent.id > input.afterId)
+        .toSorted((left, right) => left.id.localeCompare(right.id))
+        .slice(0, input.limit),
+    );
+  }
+
+  async backfillFirstVersion(input: {
+    agent: Agent;
+    createdById: string | null;
+  }): Promise<boolean> {
+    const { agent } = input;
+    if (this.#versions.some((row) => row.agentId === agent.id)) return false;
+    this.#versions.push({
+      id: generate("agentversion").toString(),
+      agentId: agent.id,
+      projectId: agent.projectId,
+      version: 1,
+      name: agent.name,
+      type: agent.type,
+      config: structuredClone({ ...agent.config }),
+      workflowId: agent.workflowId,
+      commitMessage: null,
+      authorId: input.createdById,
+      authorKind: input.createdById ? "user" : "system",
+      createdAt: agent.createdAt,
+    });
+    const stored = this.#agents.get(agent.id);
+    if (stored && input.createdById && !stored.createdById) {
+      this.#agents.set(agent.id, { ...stored, createdById: input.createdById });
+    }
+    return true;
+  }
+
+  /** Test seam: a row as an older release wrote it, with no versions and no creator. */
+  seedUnversioned(agent: Agent): void {
+    this.#agents.set(agent.id, structuredClone(agent));
+  }
+
+  #appendVersion(input: {
+    agent: Agent;
+    author: AgentWriteAuthor | undefined;
+    commitMessage: string | undefined;
+  }): void {
+    const { agent } = input;
+    if (agent.type === "connected") return;
+    const latest = this.#versions
+      .filter((row) => row.agentId === agent.id)
+      .reduce((max, row) => Math.max(max, row.version), 0);
+    this.#versions.push({
+      id: generate("agentversion").toString(),
+      agentId: agent.id,
+      projectId: agent.projectId,
+      version: latest + 1,
+      name: agent.name,
+      type: agent.type,
+      config: structuredClone({ ...agent.config }),
+      workflowId: agent.workflowId,
+      commitMessage: input.commitMessage ?? null,
+      authorId: input.author?.authorId ?? null,
+      authorKind: input.author?.authorKind ?? "system",
+      createdAt: toDate(nowInstant()),
+    });
   }
 
   async findConnectedByNameAndEnvironment(

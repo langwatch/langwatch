@@ -25,6 +25,9 @@ it("binds every existing tRPC procedure once and preserves its permission", () =
     ["pushToCopies", "mutation", "evaluations:manage"],
     ["syncFromSource", "mutation", "evaluations:manage"],
     ["getHistory", "query", "evaluations:view"],
+    ["listVersions", "query", "evaluations:view"],
+    ["assignLabel", "mutation", "agents:deploy"],
+    ["removeLabel", "mutation", "agents:deploy"],
   ]);
 });
 

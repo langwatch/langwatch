@@ -29,6 +29,9 @@ const agentRecordSchema = z.object({
   /** What the SDK upserts by, unique within the project. */
   identityKey: z.string().nullable().optional(),
   lastSeenAt: z.date().nullable().optional(),
+  /** The user who created the agent and who changed it last; null for API keys and older rows. */
+  createdById: z.string().nullable().optional(),
+  updatedById: z.string().nullable().optional(),
 });
 
 const agentViewRecordSchema = agentRecordSchema.pick({
