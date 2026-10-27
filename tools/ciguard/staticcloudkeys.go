@@ -12,20 +12,44 @@ import (
 	"github.com/langwatch/langwatch/pkg/ciscan"
 )
 
-// storedAWSKey matches a long-lived AWS key read from secrets, env or vars, by
-// property (`secrets.X`) or index (`secrets['X']`), or passed as
-// configure-aws-credentials' aws-access-key-id or aws-secret-access-key input,
-// in block or flow (`with: { aws-access-key-id: ... }`) style. A shell
-// `$AWS_ACCESS_KEY_ID` is a session the job already holds, so it is ignored.
-// An AWS_* env key or `aws configure set` fed from secrets or vars is caught
-// whatever the secret is called.
-// Case-insensitive, because GitHub resolves context names case-insensitively.
-var storedAWSKey = regexp.MustCompile(
-	`(?i)\b(?:secrets|env|vars)\s*(?:\.\s*|\[\s*['"])[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY)\b` +
-		`|\bAWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)['"]?\s*:\s*['"]?\$\{\{\s*(?:secrets|vars)\b` +
-		`|\baws_(?:access_key_id|secret_access_key|session_token)\s+['"]?\$\{\{\s*(?:secrets|vars)\b` +
-		`|(?:^|[\s{,])['"]?aws-(?:access-key-id|secret-access-key)['"]?\s*:`,
-)
+// awsKeyName is an AWS key variable, setting or input in any spelling:
+// AWS_ACCESS_KEY_ID, aws_secret_access_key, aws-session-token.
+const awsKeyName = `aws[_-](?:access[_-]key[_-]id|secret[_-]access[_-]key|session[_-]token)`
+
+// awsKeyAssignment finds where a line sets an AWS key: a YAML key, `X=`,
+// `export X=`, `-e X=`, or `aws configure set [profile.]x`. A read
+// (`env.X`, `outputs.x`, `$X`, `${X}`) is not an assignment.
+var awsKeyAssignment = regexp.MustCompile(`(?i)(?:(?:^|[^\w.${-]|[^$]\{|\\n)['"]?` + awsKeyName + `['"]?\s*[:=]` +
+	`|\bset\s+(?:[\w.-]+\.)?` + awsKeyName + `\s)\s*`)
+
+// awsKeyFromSession is the only value an AWS key may take: an OIDC step's
+// output or a shell variable, whole. Anything else (secrets, vars, inputs,
+// format(), a prefix, an empty or block value) is refused.
+var awsKeyFromSession = regexp.MustCompile(`(?i)^['"]?(?:\$\{\{\s*steps\.[\w-]+\.outputs\.[\w-]+\s*\}\}|\$[a-z_]\w*|\$\{[a-z_]\w*\})['"]?(?:$|[\s;,})&|])`)
+
+// storedAWSKey is refused anywhere: a secret or var named for a key, the
+// whole secrets context as JSON, or the shared credentials file.
+var storedAWSKey = regexp.MustCompile(`(?i)\b(?:secrets|vars)\s*(?:\.\s*|\[\s*['"])[A-Z0-9_]*AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)\b` +
+	`|\btoJSON\(\s*secrets\s*\)|\bfromJSON\(\s*secrets\s*[.\[]|\.aws/credentials`)
+
+// IsStoredAWSKeyLine reports whether a non-comment line sets an AWS key from
+// anything but an OIDC session, or names a stored key outright. A tripwire for
+// copied snippets, not a boundary: a key relayed under a neutral name passes.
+func IsStoredAWSKeyLine(line string) bool {
+	if strings.HasPrefix(strings.TrimSpace(line), "#") {
+		return false
+	}
+	if storedAWSKey.MatchString(line) {
+		return true
+	}
+	for _, at := range awsKeyAssignment.FindAllStringIndex(line, -1) {
+		if !awsKeyFromSession.MatchString(line[at[1]:]) {
+			return true
+		}
+	}
+
+	return false
+}
 
 // StaticCloudKeys reports every stored AWS key in a workflow or composite
 // action. No condition or variable makes one acceptable: the OIDC cutover is
@@ -52,15 +76,11 @@ func StaticCloudKeys(repoRoot string) ([]string, error) {
 	return problems, nil
 }
 
-// storedKeyLines returns the 1-based numbers of non-comment lines naming a
-// stored AWS key.
+// storedKeyLines returns the 1-based numbers of lines naming a stored AWS key.
 func storedKeyLines(text string) []int {
 	var lines []int
 	for i, line := range strings.Split(text, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "#") {
-			continue
-		}
-		if storedAWSKey.MatchString(line) {
+		if IsStoredAWSKeyLine(line) {
 			lines = append(lines, i+1)
 		}
 	}

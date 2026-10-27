@@ -218,3 +218,90 @@ func TestStaticCloudKeysPassesOnThisRepository(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, problems)
 }
+
+// @scenario "An AWS key set from anything but an OIDC session fails CI"
+func TestIsStoredAWSKeyLineRefusesAKeyFromAnythingButASession(t *testing.T) {
+	for name, line := range map[string]string{
+		"GITHUB_ENV write":            `          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.X }}" >> $GITHUB_ENV`,
+		"shell export":                `        run: export AWS_ACCESS_KEY_ID=${{ secrets.X }}`,
+		"docker run -e":               `          docker run -e AWS_SECRET_ACCESS_KEY=${{ secrets.X }} img`,
+		"container options -e":        `      options: -e AWS_ACCESS_KEY_ID=${{ secrets.X }}`,
+		"format()":                    `          AWS_ACCESS_KEY_ID: ${{ format('{0}', secrets.CI_KEY) }}`,
+		"parenthesised":               `          AWS_ACCESS_KEY_ID: ${{ (secrets.CI_KEY) }}`,
+		"prefixed":                    `          AWS_ACCESS_KEY_ID: x${{ secrets.CI_KEY }}`,
+		"session or secret fallback":  `          AWS_ACCESS_KEY_ID: ${{ steps.c.outputs.k || secrets.CI_KEY }}`,
+		"shell default from a secret": `          export AWS_ACCESS_KEY_ID="${KEY:-${{ secrets.CI_KEY }}}"`,
+		"variable then secret":        `          echo "AWS_ACCESS_KEY_ID=$X${{ secrets.CI_KEY }}" >> "$GITHUB_ENV"`,
+		"quoted YAML key":             `          "AWS_ACCESS_KEY_ID": "${{ secrets.CI_KEY }}"`,
+		"mixed case key":              `          Aws_Secret_Access_Key: ${{ secrets.CI_KEY }}`,
+		"key from vars":               `          AWS_SESSION_TOKEN: ${{ vars.CI_TOKEN }}`,
+		"composite action input env":  `        AWS_ACCESS_KEY_ID: ${{ inputs.aws_key }}`,
+		"composite action key input":  `        aws-access-key-id: ${{ inputs.key }}`,
+		"key input from a secret":     `          aws-secret-access-key: ${{ secrets.CI_KEY }}`,
+		"folded block value":          `          AWS_SECRET_ACCESS_KEY: >-`,
+		"literal block value":         `          AWS_SECRET_ACCESS_KEY: |`,
+		"value on the next line":      `          AWS_SECRET_ACCESS_KEY:`,
+		"env from JSON":               `    env: ${{ fromJSON(secrets.AWS_ENV) }}`,
+		"whole secrets context":       `        run: echo '${{ toJSON(secrets) }}' | jq -r .CI_KEY`,
+		"credentials file printf":     `          printf '[default]\naws_access_key_id = %s' '${{ secrets.X }}' > creds`,
+		"credentials file line":       `            aws_secret_access_key = ${{ secrets.X }}`,
+		"credentials file path":       `          cp creds ~/.aws/credentials`,
+		"aws configure set":           `          aws configure set aws_access_key_id ${{ secrets.PROD_KEY }}`,
+		"aws configure set default":   `          aws configure set default.aws_secret_access_key "${{ secrets.K }}"`,
+		"secret named for a key":      `          K: ${{ secrets.aws_access_key_id }}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.True(t, ciguard.IsStoredAWSKeyLine(line), line)
+		})
+	}
+}
+
+// @scenario "Reading or relaying an OIDC session passes"
+func TestIsStoredAWSKeyLineAllowsAnOIDCSession(t *testing.T) {
+	for _, line := range []string{
+		`        KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}`,
+		`        SECRET: ${{ steps.creds.outputs.aws-secret-access-key }}`,
+		`        TOKEN: ${{ steps.creds.outputs.aws-session-token }}`,
+		`          aws configure --profile "${profile}" set aws_access_key_id "${KEY_ID}"`,
+		`          aws configure --profile "${profile}" set aws_secret_access_key "${SECRET}"`,
+		`          aws configure --profile "${profile}" set aws_session_token "${TOKEN}"`,
+		`          AWS_ACCESS_KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}`,
+		`          aws-access-key-id: ${{ steps.creds.outputs.aws-access-key-id }}`,
+		`        with: { aws-secret-access-key: '${{ steps.creds.outputs.aws-secret-access-key }}', aws-region: x }`,
+		`        if: env.AWS_ACCESS_KEY_ID != ''`,
+		`        run: test -n "${{ env.AWS_ACCESS_KEY_ID }}"`,
+		`          echo "AWS_ACCESS_KEY_ID=${KEY_ID}" >> "$GITHUB_ENV"`,
+		`          export AWS_SESSION_TOKEN="$TOKEN"; aws sts get-caller-identity`,
+		`          docker run -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY img`,
+		`          aws s3 ls "${AWS_ACCESS_KEY_ID:-}" "$AWS_SECRET_ACCESS_KEY"`,
+		`      # aws-access-key-id: ${{ secrets.OLD_AWS_ACCESS_KEY_ID }}`,
+	} {
+		assert.False(t, ciguard.IsStoredAWSKeyLine(line), line)
+	}
+}
+
+// @scenario "An AWS key set from anything but an OIDC session fails CI"
+func TestStaticCloudKeysRefusesAMultilineKeyValue(t *testing.T) {
+	step := "      - env:\n          AWS_SECRET_ACCESS_KEY: >-\n            ${{ secrets.CI_KEY }}\n        run: aws s3 ls\n"
+	workflow := strings.Replace(oidcOnlyWorkflow, "      - run: aws s3 ls \"$AWS_ACCESS_KEY_ID\"\n", step, 1)
+	require.NotEqual(t, oidcOnlyWorkflow, workflow)
+
+	problems, err := ciguard.StaticCloudKeys(writeRepo(t, map[string]string{".github/workflows/other.yml": workflow}))
+
+	require.NoError(t, err)
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], ".github/workflows/other.yml:18:")
+}
+
+func TestStaticCloudKeysScansTheKnownWorkflowsAndActions(t *testing.T) {
+	root, err := ciscan.RepoRoot(".")
+	require.NoError(t, err)
+
+	files, err := ciguard.WorkflowAndActionFiles(root)
+
+	require.NoError(t, err)
+	assert.Contains(t, files, embedsPath)
+	assert.Contains(t, files, ".github/workflows/gateway-matrix.yaml")
+	assert.Contains(t, files, ".github/workflows/go-ci.yaml")
+	assert.GreaterOrEqual(t, len(files), 50, "the guard found too few workflow and action files; is the repository root right?")
+}

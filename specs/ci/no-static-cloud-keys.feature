@@ -7,6 +7,8 @@ Feature: Workflows reach AWS through OIDC roles, not stored keys
   # go-ci. The roles are defined in langwatch-saas Terraform. The move to OIDC
   # is done: no stored-key fallback is allowed under any condition, and
   # break-glass is the AWS root account, not a key in GitHub.
+  # The guard is a tripwire for copied snippets, not a boundary: a key relayed
+  # under a neutral variable name passes. The fix is deleting the stored keys.
 
   @unit
   Scenario: A workflow that reads a stored AWS key fails CI
@@ -14,6 +16,20 @@ Feature: Workflows reach AWS through OIDC roles, not stored keys
     When ciguard runs
     Then it fails and names the file and line
     And it tells the author to assume a role with role-to-assume instead
+
+  @unit
+  Scenario: An AWS key set from anything but an OIDC session fails CI
+    Given a workflow sets AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY or AWS_SESSION_TOKEN
+    And it does so as a YAML key, a shell export, a GITHUB_ENV line, a docker -e flag or an aws configure setting
+    And the value is anything but a step output or a shell variable, including an empty or block value
+    When ciguard runs
+    Then it fails and names the line
+
+  @unit
+  Scenario: Reading or relaying an OIDC session passes
+    Given a workflow reads env.AWS_ACCESS_KEY_ID, or sets a key from a step output or a shell variable
+    When ciguard runs
+    Then it passes
 
   @unit
   Scenario: A composite action that reads a stored AWS key fails CI
