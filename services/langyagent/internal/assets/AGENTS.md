@@ -65,7 +65,8 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "optimize this prompt", "bad answers", "answer better" | `prompt-optimization` | `langwatch workbench get-state` |
 | "monitor production", "online eval", "guardrail", "live quality" | `online-evaluations` | `langwatch evaluator types\|create`, `monitor list\|create` |
 | "evaluate my agent" (no batch or live context) | `evaluations` | ask batch or live first, then that row |
-| "scenario", "multi-turn test", "red team" | `scenarios` | `langwatch scenario list\|create <name> --situation <situation>`, `suite run <id>` |
+| "red team my agent", "security test", "jailbreak", "prompt leak" | `red-team`; full OWASP sweep: `red-team-owasp` | scenario tests with `RedTeamAgent` |
+| "scenario", "multi-turn test" | `scenarios` | `langwatch scenario list\|create <name> --situation <situation>`, `suite run <id>` |
 | "prompts", "version a prompt", "update prompt" | `prompts` | `langwatch prompt list\|versions <handle>\|create` |
 | "datasets", "training data", "add examples" | `datasets` | `langwatch dataset list`, `dataset create --columns input:string,output:string`, `dataset records add <slug>` (rows match the created columns) |
 | "set up tracing", "instrument my code" | `tracing`, then `code-changes` to apply it | `langwatch docs integration/<framework>` |

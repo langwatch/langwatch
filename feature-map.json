@@ -1805,6 +1805,8 @@
       "evaluate-multimodal": "Evaluate multimodal agents (images, audio, PDFs)",
       "generate-rag-dataset": "Generate synthetic evaluation dataset from your RAG knowledge base",
       "test-compliance": "Test that your agent stays observational in regulated domains",
+      "red-team": "Write and run one red-team test against your agent, system prompt leakage by default",
+      "red-team-owasp": "Cover the OWASP Top 10 for LLM apps: red-team tests for seven categories, code review for the rest",
       "find-traces": "Find the traces a description names: drive the Trace Explorer or answer with cards, trying every form a concept can take"
     }
   }
