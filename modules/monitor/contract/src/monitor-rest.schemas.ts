@@ -64,6 +64,11 @@ const monitorRestResponseSchemaDefinition = z.object({
   threadIdleTimeout: z.number().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  autoPausedAt: z
+    .string()
+    .nullable()
+    .describe("When the monitor paused itself because its evaluations mostly failed."),
+  autoPausedReason: z.string().nullable().describe("Why the monitor paused itself."),
   platformUrl: z.string().url(),
 });
 export interface MonitorRestResponseSchema extends Named<

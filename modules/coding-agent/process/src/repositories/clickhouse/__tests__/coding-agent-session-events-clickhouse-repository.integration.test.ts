@@ -77,6 +77,7 @@ function eventRecord(
     toolResultBytes: 0,
     promptChars: 0,
     totalTokens: 0,
+    aiUnits: 0,
     repositoryHost: "",
     repositoryOwner: "",
     repositoryName: "",
@@ -203,6 +204,7 @@ describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepos
           cacheReadTokens: 30,
           cacheCreationTokens: 40,
           costUsd: 1.5,
+          aiUnits: 1.25,
         }),
         eventRecord({
           sessionId: sharedSession,
@@ -214,6 +216,7 @@ describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepos
           cacheReadTokens: 3,
           cacheCreationTokens: 4,
           costUsd: 0.5,
+          aiUnits: 0.75,
         }),
         eventRecord({
           sessionId: sharedSession,
@@ -281,6 +284,18 @@ describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepos
       });
 
       expect(totals).toEqual([]);
+    });
+
+    /** @scenario "A model's AI units are summed from its per-call rows" */
+    it("sums each model's AI units, and a model whose calls reported none totals zero", async () => {
+      const totals = await repository.sumTokensByModelPerSession({
+        tenantIds: [tenantId],
+        sessionIds: [sharedSession],
+        fromMs: baseMs - 60_000,
+      });
+
+      expect(totals.find((row) => row.model === "claude-fable-5")?.aiUnits).toBeCloseTo(2);
+      expect(totals.find((row) => row.model === "gpt-5-mini")?.aiUnits).toBe(0);
     });
 
     /** @scenario "Only model calls count toward the per-model totals" */

@@ -32,7 +32,7 @@ Feature: A deploy fills LangWatchQL's key map with every project's key
   @unit
   Scenario: The reconvergence check fills the key-map rows a project lacks
     Given a project was stored without the project-created fact, as the dev seed stores one
-    When the first reconvergence check runs, the first a day after the last ask, or one whose converge repaired a missing key map
+    When the first reconvergence check runs, the first a day after the last ask, or one whose converge repaired a missing key map, even where another object failed
     Then the fill runs and writes the project's missing row
     And no fill runs while the key map is still missing
     And a failed fill is logged, the check still probes, and the check is delivered again with backoff until a fill succeeds, for less than a day

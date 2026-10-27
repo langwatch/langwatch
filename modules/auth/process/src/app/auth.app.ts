@@ -863,7 +863,7 @@ export class AuthModule implements AuthApiContract {
 
   validateProjectAuthToken(input: {
     token: string | undefined;
-    forwardedFor: string | undefined;
+    callerAddress: string | null;
   }): Promise<{ projectSlug: string }> {
     return this.#projectTokens.validateProjectAuthToken(input);
   }

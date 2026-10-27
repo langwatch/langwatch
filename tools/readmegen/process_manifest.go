@@ -60,16 +60,18 @@ type RestRoute struct {
 
 // RestFamily is one `defineRestRouter(...)` chain.
 type RestFamily struct {
-	Name       string      `json:"name"`
-	Namespace  Scalar      `json:"namespace"`
-	Version    Scalar      `json:"version"`
-	Addressing string      `json:"addressing"`
-	V1Twin     bool        `json:"v1Twin"`
-	Generation string      `json:"generation"`
-	Credential string      `json:"credential"`
-	Deprecated bool        `json:"deprecated"`
-	Routes     []RestRoute `json:"routes"`
-	At         Location    `json:"at"`
+	Name      string `json:"name"`
+	Namespace Scalar `json:"namespace"`
+	Version   Scalar `json:"version"`
+	// SupersededAt is set by `.withSupersededAt`: the family keeps only its own dates.
+	SupersededAt *Scalar     `json:"supersededAt"`
+	Addressing   string      `json:"addressing"`
+	V1Twin       bool        `json:"v1Twin"`
+	Generation   string      `json:"generation"`
+	Credential   string      `json:"credential"`
+	Deprecated   bool        `json:"deprecated"`
+	Routes       []RestRoute `json:"routes"`
+	At           Location    `json:"at"`
 }
 
 // TrpcProcedure is one contract procedure joined with its router half by name.

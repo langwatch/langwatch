@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { bindRestCredential, projectCredentialOfRequest } from "@langwatch/api/rest";
+import {
+  bindRestCredential,
+  callerAddressOfRequest,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
 import type {
   GovernanceRestApi,
   MePersonalCredential,
@@ -70,6 +74,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
       bindRestCredential("cli_token", () => app.cliTokenDoor),
     ])
     .provideMiddlewareContext({
+      callerAddress: callerAddressOfRequest,
       governanceRestCaller: (request) => {
         const credential = projectCredentialOfRequest(request);
 
