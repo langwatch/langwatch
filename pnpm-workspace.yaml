@@ -271,6 +271,7 @@ allowBuilds:
 overrides:
   '@ai-sdk/provider-utils@>=4.0.0-beta.10 <4.0.33': '>=4.0.33 <5'
   '@aws-sdk/xml-builder>fast-xml-parser': ^5.7.0
+  '@azure/identity>@azure/msal-node': '>=7.1.0 <8'
   '@better-auth/utils': 0.5.0
   '@elastic/elasticsearch': '-'
   '@fastify/busboy@<3.2.2': '>=3.2.2 <4'
@@ -287,7 +288,6 @@ overrides:
   '@opensearch-project/opensearch': '-'
   '@opentelemetry/core@<2.8.0': '>=2.8.0'
   '@opentelemetry/exporter-prometheus@<0.217.0': '>=0.217.0'
-  '@azure/identity>@azure/msal-node': '>=7.1.0 <8'
   '@opentelemetry/propagator-jaeger@<2.9.0': '>=2.9.0'
   '@opentelemetry/sdk-node@<0.217.0': '>=0.217.0'
   '@tiptap/core@<3.30.4': '>=3.30.4 <4'
