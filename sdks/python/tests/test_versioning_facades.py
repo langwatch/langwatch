@@ -43,8 +43,8 @@ class Recorder:
         return httpx.Response(200, json={"id": "row_1", "data": [], "labels": []})
 
 
+# @scenario "The Python SDK reads an agent at a label and moves its labels"
 def test_agents_read_at_a_label_and_move_labels():
-    # @scenario "The Python SDK reads an agent at a label and moves its labels"
     recorder = Recorder()
     agents = AgentsFacade(FakeRestClient(recorder.handler))  # type: ignore[arg-type]
 
@@ -63,8 +63,8 @@ def test_agents_read_at_a_label_and_move_labels():
     ]
 
 
+# @scenario "The Python SDK reads an evaluator at a label and moves its labels"
 def test_evaluators_read_at_a_label_and_move_labels():
-    # @scenario "The Python SDK reads an evaluator at a label and moves its labels"
     recorder = Recorder()
     evaluators = EvaluatorApiService(FakeRestClient(recorder.handler))  # type: ignore[arg-type]
 
