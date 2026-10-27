@@ -3,6 +3,21 @@ import type { StoredObjectsCreateUploadOutput } from "@langwatch/stored-object-c
 
 import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-evaluation.schemas.ts";
 import type { DatasetLimits } from "./dataset-limits.ts";
+import type {
+  CompareDatasetVersionInput,
+  DatasetVersion,
+  DatasetVersionAuthor,
+  DatasetVersionComparison,
+  DatasetVersionContent,
+  DatasetVersionLookupInput,
+  DatasetVersionPage,
+  DatasetVersionPageInput,
+  DatasetVersionRestored,
+  DatasetVersionRunLink,
+  FindRunDatasetVersionsInput,
+  ListDatasetVersionsInput,
+  SaveDatasetVersionInput,
+} from "./dataset-version.ts";
 import type { DatasetApiDeleteInput } from "./dataset.schemas.ts";
 import type {
   AppendStoredObjectToDatasetInput,
@@ -44,6 +59,9 @@ import type {
   UpsertDatasetInput,
 } from "./dataset.ts";
 
+/** Who made a change, when the transport could tell; the autosave names them as its author. */
+type EditedBy = { editedBy?: DatasetVersionAuthor };
+
 /**
  * What the install-wide usage report counts here (ADR-156, section 10): how
  * many were made, since `since` where one is given, and when the first was.
@@ -76,14 +94,16 @@ export type BatchEvaluationEntry = Readonly<{
 
 /** Callable capability exposed by the composed Dataset application. */
 export interface DatasetApi {
-  upsertDataset: (input: {
-    projectId: string;
-    datasetId?: string;
-    slugOrId?: string;
-    name?: string;
-    columnTypes?: DatasetColumns;
-    datasetRecords?: UpsertDatasetInput["datasetRecords"];
-  }) => Promise<Dataset>;
+  upsertDataset: (
+    input: {
+      projectId: string;
+      datasetId?: string;
+      slugOrId?: string;
+      name?: string;
+      columnTypes?: DatasetColumns;
+      datasetRecords?: UpsertDatasetInput["datasetRecords"];
+    } & EditedBy,
+  ) => Promise<Dataset>;
   validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult>;
   findNextAvailableName(input: DatasetNameInput): Promise<string>;
   listDatasets: (input: ListDatasetsInput) => Promise<DatasetListResult>;
@@ -133,20 +153,22 @@ export interface DatasetApi {
   findDatasetPage(input: DatasetPageInput): Promise<DatasetPage | null>;
   getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead>;
   listRecords: (input: DatasetPageInput) => Promise<DatasetRecordPage>;
-  batchCreateRecords: (input: CreateDatasetRecordsInput) => Promise<DatasetRecord[]>;
+  batchCreateRecords: (input: CreateDatasetRecordsInput & EditedBy) => Promise<DatasetRecord[]>;
   upsertRecord(
-    input: UpdateDatasetRecordInput & { recordId: string },
+    input: UpdateDatasetRecordInput & { recordId: string } & EditedBy,
   ): Promise<DatasetRecordMutationResult>;
-  deleteRecords: (input: DeleteDatasetRecordsInput) => Promise<{ count: number }>;
+  deleteRecords: (input: DeleteDatasetRecordsInput & EditedBy) => Promise<{ count: number }>;
   /** Entries removed by id, refused with a 404 when none matched. */
-  deleteMatchingRecords: (input: DeleteDatasetRecordsInput) => Promise<{ deletedCount: number }>;
+  deleteMatchingRecords: (
+    input: DeleteDatasetRecordsInput & EditedBy,
+  ) => Promise<{ deletedCount: number }>;
   /** Deprecated with the multipart upload routes; retires in the next release (ADR-158 §8). */
   createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<CreateDatasetFromUploadResult>;
   /** Deprecated with the multipart upload routes; retires in the next release (ADR-158 §8). */
   uploadToExistingDataset(
-    input: UploadExistingDatasetInput,
+    input: UploadExistingDatasetInput & EditedBy,
   ): Promise<{ datasetId: string; recordsCreated: number }>;
   createDatasetFromStoredObject(
     input: CreateDatasetFromStoredObjectInput,
@@ -154,7 +176,7 @@ export interface DatasetApi {
   /** Deprecated with `POST /api/dataset/attachments`; retires in the next release (ADR-158 §8). */
   storeAttachmentUpload(input: StoreDatasetAttachmentUploadInput): Promise<StoredDatasetAttachment>;
   appendStoredObjectToDataset(
-    input: AppendStoredObjectToDatasetInput,
+    input: AppendStoredObjectToDatasetInput & EditedBy,
   ): Promise<DatasetImportAppended>;
   retryNormalize(input: RetryNormalizeInput): Promise<UploadProcessing>;
   getByIds(input: { projectId: string; datasetIds: string[] }): Promise<Dataset[]>;
@@ -181,6 +203,36 @@ export interface DatasetApi {
   listStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]>;
   /** The usage report's figures for these projects. */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount>;
+
+  // Versions (spec: modules/dataset/specs/dataset-versioning.feature).
+  /** Every version of the dataset, newest first. */
+  listVersions(input: ListDatasetVersionsInput): Promise<DatasetVersion[]>;
+  /** The current content saved by hand, optionally named; unchanged content names the latest. */
+  saveVersion(input: SaveDatasetVersionInput & EditedBy): Promise<DatasetVersion>;
+  getVersionPage(input: DatasetVersionPageInput): Promise<DatasetVersionPage>;
+  compareVersion(input: CompareDatasetVersionInput): Promise<DatasetVersionComparison>;
+  /** Writes a version's content back as a new version; history is never rewritten. */
+  restoreVersion(input: DatasetVersionLookupInput & EditedBy): Promise<DatasetVersionRestored>;
+  /** Keeps a version out of retention because an experiment names it. */
+  pinVersion(input: DatasetVersionLookupInput): Promise<DatasetVersion>;
+  /** The version a run reads: the pinned one, or the current content saved as a version. */
+  resolveVersionForRun(input: {
+    projectId: string;
+    datasetId: string;
+    version?: number;
+    by: DatasetVersionAuthor;
+  }): Promise<DatasetVersion>;
+  /** Every row of one version. */
+  readVersion(input: DatasetVersionLookupInput): Promise<DatasetVersionContent>;
+  /** Records the version each dataset of a run was read at; such a version is never thinned. */
+  linkRunVersions(input: {
+    projectId: string;
+    runId: string;
+    experimentId?: string | null;
+    versions: readonly { datasetId: string; versionId: string }[];
+  }): Promise<void>;
+  /** The dataset versions these runs read. */
+  findRunVersions(input: FindRunDatasetVersionsInput): Promise<DatasetVersionRunLink[]>;
 }
 
 export const DatasetApi = moduleApi<DatasetApi>()("dataset");

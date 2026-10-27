@@ -2245,6 +2245,48 @@ model DatasetRecord {
   @@index([projectId, datasetId])
 }
 
+/// One immutable snapshot of a dataset's columns and rows; the rows are JSONL chunks in object storage.
+model DatasetVersion {
+  id                  String    @id
+  projectId           String
+  datasetId           String
+  version             Int
+  /// A name given by hand; a named version is never thinned by retention.
+  name                String?
+  /// "autosave", "manual", "experiment_run", "restore" or "initial".
+  trigger             String
+  /// SHA-256 over the columns and the rows in order; equal content saves no new version.
+  contentHash         String
+  columnTypes         Json
+  rowCount            Int
+  sizeBytes           BigInt
+  chunkCount          Int
+  restoredFromVersion Int?
+  authorId            String?
+  /// "user", "api_key" or "system": who saved the version when authorId is null.
+  authorKind          String?
+  /// Set when an experiment pins this version; a pinned version is never thinned.
+  pinnedAt            DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@unique([datasetId, version])
+  @@index([projectId, datasetId])
+}
+
+/// An experiment run that read one dataset version; a version a run read is never thinned.
+model DatasetVersionRun {
+  id           String   @id
+  projectId    String
+  datasetId    String
+  versionId    String
+  runId        String
+  experimentId String?
+  createdAt    DateTime @default(now())
+
+  @@unique([projectId, runId, datasetId])
+  @@index([versionId])
+}
+
 /// Who sees a dashboard, named as the prompt scope is, with one more level.
 enum DashboardScope {
   /// Its author alone: "Only me".

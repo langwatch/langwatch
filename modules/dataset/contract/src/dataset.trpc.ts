@@ -9,6 +9,20 @@ import { z } from "zod";
 
 import { datasetLimitsSchema } from "./dataset-limits.ts";
 import {
+  DATASET_VERSION_SAVED_EVENT_TYPE,
+  compareDatasetVersionInputSchema,
+  datasetVersionComparisonSchema,
+  datasetVersionLookupInputSchema,
+  datasetVersionPageInputSchema,
+  datasetVersionPageSchema,
+  datasetVersionRestoredSchema,
+  datasetVersionRunLinkSchema,
+  datasetVersionSchema,
+  findRunDatasetVersionsInputSchema,
+  listDatasetVersionsInputSchema,
+  saveDatasetVersionInputSchema,
+} from "./dataset-version.ts";
+import {
   datasetApiCopyInputSchema,
   datasetApiDatasetInputSchema,
   datasetApiDeleteInputSchema,
@@ -116,4 +130,39 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .mutation("retryNormalize")
   .withInput(retryNormalizeInputSchema)
   .withOutput(uploadProcessingSchema)
+
+  /** The dataset's versions, newest first. */
+  .query("versions", { invalidatedBy: [DATASET_VERSION_SAVED_EVENT_TYPE] })
+  .withInput(listDatasetVersionsInputSchema)
+  .withOutput(z.array(datasetVersionSchema))
+
+  /** The current content saved as a version by hand, with an optional name. */
+  .mutation("saveVersion")
+  .withInput(saveDatasetVersionInputSchema)
+  .withOutput(datasetVersionSchema)
+
+  /** One page of a version's rows. */
+  .query("versionPage")
+  .withInput(datasetVersionPageInputSchema)
+  .withOutput(datasetVersionPageSchema)
+
+  /** What changed between a version and the current content, or another version. */
+  .query("compareVersion")
+  .withInput(compareDatasetVersionInputSchema)
+  .withOutput(datasetVersionComparisonSchema)
+
+  /** A version's content written back as a new version. */
+  .mutation("restoreVersion")
+  .withInput(datasetVersionLookupInputSchema)
+  .withOutput(datasetVersionRestoredSchema)
+
+  /** A version an experiment names, kept out of retention. */
+  .mutation("pinVersion")
+  .withInput(datasetVersionLookupInputSchema)
+  .withOutput(datasetVersionSchema)
+
+  /** The dataset versions these experiment runs read. */
+  .query("runVersions")
+  .withInput(findRunDatasetVersionsInputSchema)
+  .withOutput(z.array(datasetVersionRunLinkSchema))
   .build();

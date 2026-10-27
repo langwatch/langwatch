@@ -125,6 +125,13 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "dataset:create-first-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Saves version 1 of every dataset that has no version history yet."
+  },
+  {
     "id": "evaluation:fill-id-indexes",
     "kind": "data",
     "mode": "background",

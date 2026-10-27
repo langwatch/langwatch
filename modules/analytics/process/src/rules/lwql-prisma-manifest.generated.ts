@@ -727,6 +727,33 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly DatasetVersion: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly datasetId: "String";
+    readonly version: "Int";
+    readonly name: "String?";
+    readonly trigger: "String";
+    readonly contentHash: "String";
+    readonly columnTypes: "Json";
+    readonly rowCount: "Int";
+    readonly sizeBytes: "BigInt";
+    readonly chunkCount: "Int";
+    readonly restoredFromVersion: "Int?";
+    readonly authorId: "String?";
+    readonly authorKind: "String?";
+    readonly pinnedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+  };
+  readonly DatasetVersionRun: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly datasetId: "String";
+    readonly versionId: "String";
+    readonly runId: "String";
+    readonly experimentId: "String?";
+    readonly createdAt: "DateTime";
+  };
   readonly Dashboard: {
     readonly id: "String";
     readonly projectId: "String";

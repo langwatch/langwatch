@@ -52,21 +52,43 @@ import {
   type UpdateDatasetRecordInput,
   type UploadExistingDatasetInput,
   type UpsertDatasetInput,
+  type CompareDatasetVersionInput,
+  type DatasetVersion,
+  type DatasetVersionAuthor,
+  type DatasetVersionComparison,
+  type DatasetVersionContent,
+  type DatasetVersionLookupInput,
+  type DatasetVersionPage,
+  type DatasetVersionPageInput,
+  type DatasetVersionRestored,
+  type DatasetVersionRunLink,
+  type DatasetVersionSavedEventData,
+  type FindRunDatasetVersionsInput,
+  type ListDatasetVersionsInput,
+  type SaveDatasetVersionInput,
+  SYSTEM_DATASET_VERSION_AUTHOR,
 } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   StoredObjectApi,
   type StoredObjectsCreateUploadOutput,
 } from "@langwatch/stored-object-contract";
+import { nowInstant } from "@langwatch/time";
+import type { MigrationStepRun } from "@langwatch/upgrade/step";
 
 import {
   buildDatasetNormalizationPipeline,
   type DatasetNormalizationDefinition,
 } from "../eventing/dataset-normalization.pipeline.ts";
+import {
+  buildDatasetVersionsPipeline,
+  type DatasetVersionsDefinition,
+} from "../eventing/dataset-versions.pipeline.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
@@ -77,10 +99,46 @@ import { DatasetNormalizeService } from "../services/dataset-normalize.service.t
 import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
 import { DatasetSingleFileService } from "../services/dataset-single-file.service.ts";
 import { DatasetUploadService } from "../services/dataset-upload.service.ts";
+import { DatasetVersionBackfillService } from "../services/dataset-version-backfill.service.ts";
+import { DatasetVersionRetentionService } from "../services/dataset-version-retention.service.ts";
+import { DatasetVersionService } from "../services/dataset-version.service.ts";
 import { DatasetService } from "../services/dataset.service.ts";
 
 /** The KSUID resource a new dataset record's id is minted under. */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
+/** The KSUID resource a dataset version's id is minted under. */
+const DATASET_VERSION_KSUID_RESOURCE = "datasetversion";
+
+const logger = createLogger("langwatch:dataset:app");
+
+/**
+ * An edit inside this window of the last recorded one is not recorded again:
+ * the autosave still waits for the whole quiet period after the last record,
+ * and the snapshot reads the content as it is then.
+ */
+const EDIT_NOTE_WINDOW_MS = 30_000;
+const EDIT_NOTE_MEMORY = 10_000;
+
+/** Who made a change, when the transport could tell; an unattributed edit is the system's. */
+type EditedBy = { editedBy?: DatasetVersionAuthor };
+
+/** The command senders the versions pipeline hands the app once it is registered. */
+type DatasetVersionCommands = {
+  recordContentEdit: {
+    send(input: {
+      tenantId: string;
+      occurredAt: number;
+      projectId: string;
+      datasetId: string;
+      editedBy: DatasetVersionAuthor;
+    }): Promise<unknown>;
+  };
+  recordVersionSaved: {
+    send(
+      input: DatasetVersionSavedEventData & { tenantId: string; occurredAt: number },
+    ): Promise<unknown>;
+  };
+};
 
 type DatasetSetup = FeatureSetup<
   typeof DatasetModule.dependencies,
@@ -125,9 +183,18 @@ export class DatasetModule implements DatasetApi {
   #requestBounds: DatasetRequestBoundsService;
   #normalization: DatasetNormalizeService;
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
+  readonly #repositories: DatasetRepositories;
   #count: DatasetRepositories["count"];
   #permissions: AuthzApi;
   readonly #publicBaseUrl: string | undefined;
+  #versions: DatasetVersionService;
+  #versionRetention: DatasetVersionRetentionService;
+  #versionBackfill: DatasetVersionBackfillService;
+  #recordContentEdit: DatasetVersionCommands["recordContentEdit"] | null = null;
+  /** Datasets this process has seen holding a version, so an edit skips the first-version check. */
+  readonly #versioned = new Set<string>();
+  /** When this process last recorded an edit of each dataset, to send at most one per window. */
+  readonly #lastEditNotedAt = new Map<string, number>();
 
   private constructor(
     repositories: DatasetRepositories,
@@ -135,6 +202,7 @@ export class DatasetModule implements DatasetApi {
     config: DatasetServerConfig,
   ) {
     const chunks = repositories.chunks;
+    this.#repositories = repositories;
 
     this.#requestBounds = DatasetRequestBoundsService.create({
       entitlement: dependencies.entitlement,
@@ -190,6 +258,34 @@ export class DatasetModule implements DatasetApi {
       inlineAttachments,
     });
 
+    this.#versions = DatasetVersionService.create({
+      versions: repositories.versions,
+      versionContent: repositories.versionContent,
+      content: repositories.content,
+      chunks,
+      records: repositories.records,
+      lookup: (input) => this.#datasets.getBySlugOrId(input),
+      readSingleFile: async (dataset) => {
+        const read = await this.#datasets.getDatasetWithRecords({
+          slugOrId: dataset.id,
+          projectId: dataset.projectId,
+          limitMb: null,
+        });
+        return read.records.map((record) => ({ id: record.id, entry: record.entry }));
+      },
+      generateId: () => generate(DATASET_VERSION_KSUID_RESOURCE).toString(),
+    });
+    this.#versionRetention = DatasetVersionRetentionService.create({
+      versions: repositories.versions,
+      service: this.#versions,
+    });
+    this.#versionBackfill = DatasetVersionBackfillService.create({
+      datasets: repositories.datasets,
+      versions: repositories.versions,
+      service: this.#versions,
+      projects: dependencies.projects,
+    });
+
     this.#batchEvaluations = repositories.batchEvaluations;
     this.#count = repositories.count;
     this.#permissions = dependencies.permissions;
@@ -205,7 +301,20 @@ export class DatasetModule implements DatasetApi {
   /** Partial upsert completion (dataset fact, not transport-specific): patch
    * backs up to existing row, or refuse.
    */
-  async upsertDataset(input: DatasetUpsertInput): Promise<Dataset> {
+  async upsertDataset(input: DatasetUpsertInput & EditedBy): Promise<Dataset> {
+    const target = input.datasetId ?? input.slugOrId;
+    if (target === undefined) {
+      const created = await this.#upsertDataset(input);
+      await this.#noteEdit({ dataset: created, editedBy: input.editedBy });
+      return created;
+    }
+    return this.#edited(
+      { projectId: input.projectId, slugOrId: target, editedBy: input.editedBy },
+      () => this.#upsertDataset(input),
+    );
+  }
+
+  async #upsertDataset(input: DatasetUpsertInput): Promise<Dataset> {
     const replacing = input.slugOrId
       ? await this.#datasets.getBySlugOrId({
           projectId: input.projectId,
@@ -324,8 +433,10 @@ export class DatasetModule implements DatasetApi {
   }
 
   /** Entries removed by id, refused when none matched. */
-  deleteMatchingRecords(input: DeleteDatasetRecordsInput): Promise<{ deletedCount: number }> {
-    return this.#datasets.deleteMatchingRecords(input);
+  deleteMatchingRecords(
+    input: DeleteDatasetRecordsInput & EditedBy,
+  ): Promise<{ deletedCount: number }> {
+    return this.#edited(input, () => this.#datasets.deleteMatchingRecords(withoutAuthor(input)));
   }
 
   /** Restores a dataset the caller just archived. */
@@ -334,8 +445,10 @@ export class DatasetModule implements DatasetApi {
   }
 
   /** The same dataset in another project, records and all. */
-  copyDataset(input: CopyDatasetInput): Promise<Dataset> {
-    return this.#datasets.copyDataset(input);
+  async copyDataset(input: CopyDatasetInput): Promise<Dataset> {
+    const copied = await this.#datasets.copyDataset(input);
+    await this.#noteEdit({ dataset: copied });
+    return copied;
   }
 
   /**
@@ -358,11 +471,13 @@ export class DatasetModule implements DatasetApi {
       });
     }
 
-    return this.#datasets.copyDataset({
+    const copied = await this.#datasets.copyDataset({
       sourceDatasetId: input.sourceDatasetId,
       sourceProjectId: input.sourceProjectId,
       targetProjectId: input.targetProjectId,
     });
+    await this.#noteEdit({ dataset: copied, editedBy: { kind: "user", id: input.actorId } });
+    return copied;
   }
 
   // ── Records ──────────────────────────────────────────────────────────────
@@ -410,36 +525,45 @@ export class DatasetModule implements DatasetApi {
   }
 
   /** New entries appended to a dataset. */
-  batchCreateRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
-    return this.#datasets.batchCreateRecords(input);
+  batchCreateRecords(input: CreateDatasetRecordsInput & EditedBy): Promise<DatasetRecord[]> {
+    return this.#edited(input, () => this.#datasets.batchCreateRecords(withoutAuthor(input)));
   }
 
   /** One entry replaced, or created, by id. */
   upsertRecord(
-    input: UpdateDatasetRecordInput & { recordId: string },
+    input: UpdateDatasetRecordInput & { recordId: string } & EditedBy,
   ): Promise<DatasetRecordMutationResult> {
-    return this.#datasets.upsertRecord(input);
+    return this.#edited(input, () => this.#datasets.upsertRecord(withoutAuthor(input)));
   }
 
   /** Entries removed by id. */
-  deleteRecords(input: DeleteDatasetRecordsInput): Promise<{ count: number }> {
-    return this.#datasets.deleteRecords(input);
+  deleteRecords(input: DeleteDatasetRecordsInput & EditedBy): Promise<{ count: number }> {
+    return this.#edited(input, () => this.#datasets.deleteRecords(withoutAuthor(input)));
   }
 
   // ── Uploads ──────────────────────────────────────────────────────────────
 
   /** A brand-new dataset from an uploaded file. */
-  createDatasetFromUpload(
+  async createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<CreateDatasetFromUploadResult> {
-    return this.#datasets.createDatasetFromUpload(input);
+    const created = await this.#datasets.createDatasetFromUpload(input);
+    await this.#recordEdit({
+      projectId: input.projectId,
+      datasetId: created.id,
+      editedBy: SYSTEM_DATASET_VERSION_AUTHOR,
+    });
+    return created;
   }
 
   /** More rows for a dataset that already exists, from an uploaded file. */
   uploadToExistingDataset(
-    input: UploadExistingDatasetInput,
+    input: UploadExistingDatasetInput & EditedBy,
   ): Promise<{ datasetId: string; recordsCreated: number }> {
-    return this.#datasets.uploadToExistingDataset(input);
+    return this.#edited(
+      { projectId: input.projectId, slugOrId: input.slugOrId, editedBy: input.editedBy },
+      () => this.#datasets.uploadToExistingDataset(withoutAuthor(input)),
+    );
   }
 
   /** Deprecated with `POST /api/dataset/attachments`: a posted file stored as an attachment. */
@@ -458,9 +582,12 @@ export class DatasetModule implements DatasetApi {
 
   /** A confirmed `dataset_import` file's rows appended to an existing dataset. */
   appendStoredObjectToDataset(
-    input: AppendStoredObjectToDatasetInput,
+    input: AppendStoredObjectToDatasetInput & EditedBy,
   ): Promise<DatasetImportAppended> {
-    return this.#datasets.appendStoredObjectToDataset(input);
+    return this.#edited(
+      { projectId: input.projectId, slugOrId: input.slugOrId, editedBy: input.editedBy },
+      () => this.#datasets.appendStoredObjectToDataset(withoutAuthor(input)),
+    );
   }
 
   /** Re-runs normalization for a failed or stuck dataset. */
@@ -507,9 +634,237 @@ export class DatasetModule implements DatasetApi {
     return datasetPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
   }
 
+  // ── Versions ─────────────────────────────────────────────────────────────
+
+  /** Every version of the dataset, newest first. */
+  listVersions(input: ListDatasetVersionsInput): Promise<DatasetVersion[]> {
+    return this.#versions.list(input);
+  }
+
+  /** The current content saved by hand, optionally named; unchanged content names the latest. */
+  async saveVersion(input: SaveDatasetVersionInput & EditedBy): Promise<DatasetVersion> {
+    const saved = await this.#versions.snapshot({
+      projectId: input.projectId,
+      datasetId: input.datasetId,
+      trigger: "manual",
+      by: input.editedBy ?? SYSTEM_DATASET_VERSION_AUTHOR,
+      ...(input.name !== undefined ? { name: input.name } : {}),
+    });
+    this.#versioned.add(saved.version.datasetId);
+    return saved.version;
+  }
+
+  getVersionPage(input: DatasetVersionPageInput): Promise<DatasetVersionPage> {
+    return this.#versions.page(input);
+  }
+
+  compareVersion(input: CompareDatasetVersionInput): Promise<DatasetVersionComparison> {
+    return this.#versions.compare(input);
+  }
+
+  restoreVersion(input: DatasetVersionLookupInput & EditedBy): Promise<DatasetVersionRestored> {
+    return this.#versions.restore({
+      projectId: input.projectId,
+      datasetId: input.datasetId,
+      version: input.version,
+      by: input.editedBy ?? SYSTEM_DATASET_VERSION_AUTHOR,
+    });
+  }
+
+  /** Keeps a version out of retention because an experiment names it. */
+  pinVersion(input: DatasetVersionLookupInput): Promise<DatasetVersion> {
+    return this.#versions.pin(input);
+  }
+
+  /**
+   * The version an experiment run reads: the one it pinned, or the current
+   * content saved as a version (the latest one when nothing changed).
+   */
+  async resolveVersionForRun(input: {
+    projectId: string;
+    datasetId: string;
+    version?: number;
+    by: DatasetVersionAuthor;
+  }): Promise<DatasetVersion> {
+    if (input.version !== undefined) {
+      return this.#versions.get({ ...input, version: input.version });
+    }
+    const saved = await this.#versions.snapshot({
+      projectId: input.projectId,
+      datasetId: input.datasetId,
+      trigger: "experiment_run",
+      by: input.by,
+    });
+    this.#versioned.add(saved.version.datasetId);
+    return saved.version;
+  }
+
+  /** Every row of one version, for a run that reads them all. */
+  async readVersion(input: DatasetVersionLookupInput): Promise<DatasetVersionContent> {
+    const version = await this.#versions.get(input);
+    return { version, rows: await this.#versions.readRows(version) };
+  }
+
+  /** Records the version each dataset of a run was read at; such a version is never thinned. */
+  linkRunVersions(input: {
+    projectId: string;
+    runId: string;
+    experimentId?: string | null;
+    versions: readonly { datasetId: string; versionId: string }[];
+  }): Promise<void> {
+    return this.#repositories.versions.linkRun({
+      projectId: input.projectId,
+      runId: input.runId,
+      experimentId: input.experimentId ?? null,
+      versions: input.versions,
+    });
+  }
+
+  findRunVersions(input: FindRunDatasetVersionsInput): Promise<DatasetVersionRunLink[]> {
+    return this.#repositories.versions.findRunLinks(input);
+  }
+
+  /** The autosave a quiet dataset gets; a dataset archived meanwhile is skipped. */
+  async autosaveVersion(input: {
+    projectId: string;
+    datasetId: string;
+    editedBy: DatasetVersionAuthor;
+  }): Promise<void> {
+    try {
+      await this.#versions.snapshot({
+        projectId: input.projectId,
+        datasetId: input.datasetId,
+        trigger: "autosave",
+        by: input.editedBy,
+      });
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) return;
+      throw error;
+    }
+  }
+
+  /** Thins every dataset's old version history. */
+  async sweepVersionRetention(input: {
+    nowMs: number;
+  }): Promise<{ datasets: number; thinned: number }> {
+    return this.#versionRetention.sweep(input);
+  }
+
+  /** The versions pipeline `dataset_versions` registers. */
+  versionsPipeline(): DatasetVersionsDefinition {
+    return buildDatasetVersionsPipeline({
+      autosave: (input) => this.autosaveVersion(input),
+      sweepVersionRetention: async (input) => {
+        await this.sweepVersionRetention(input);
+      },
+    });
+  }
+
+  connectVersions(commands: DatasetVersionCommands): void {
+    this.#recordContentEdit = commands.recordContentEdit;
+    this.#versions.connect(async (data) => {
+      await commands.recordVersionSaved.send({
+        ...data,
+        tenantId: data.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+      });
+    });
+  }
+
+  /** The `dataset:create-first-versions` background step's run. */
+  firstVersionsRun(): MigrationStepRun {
+    return (args) => this.#versionBackfill.runStep(args);
+  }
+
+  /**
+   * Runs an edit: first gives a dataset with no history its version 1 of the
+   * content before the edit, then records the edit for the autosave.
+   */
+  async #edited<T>(
+    input: { projectId: string; slugOrId: string } & EditedBy,
+    mutate: () => Promise<T>,
+  ): Promise<T> {
+    const dataset = await this.#datasets.getBySlugOrId({
+      projectId: input.projectId,
+      slugOrId: input.slugOrId,
+    });
+    await this.#ensureFirstVersion(dataset);
+    const result = await mutate();
+    await this.#noteEdit({ dataset, editedBy: input.editedBy });
+    return result;
+  }
+
+  async #ensureFirstVersion(dataset: Dataset): Promise<void> {
+    if (this.#versioned.has(dataset.id) || dataset.status !== "ready") return;
+    try {
+      const has = await this.#repositories.versions.hasAny({
+        projectId: dataset.projectId,
+        datasetId: dataset.id,
+      });
+      if (!has) {
+        await this.#versions.snapshot({
+          projectId: dataset.projectId,
+          datasetId: dataset.id,
+          trigger: "initial",
+          by: SYSTEM_DATASET_VERSION_AUTHOR,
+        });
+      }
+      this.#versioned.add(dataset.id);
+    } catch (error) {
+      logger.warn(
+        { error, projectId: dataset.projectId, datasetId: dataset.id },
+        "Could not save a dataset's first version before an edit; the edit goes ahead",
+      );
+    }
+  }
+
+  async #noteEdit({ dataset, editedBy }: { dataset: Dataset } & EditedBy): Promise<void> {
+    const now = nowInstant().epochMilliseconds;
+    const last = this.#lastEditNotedAt.get(dataset.id);
+    if (last !== undefined && now - last < EDIT_NOTE_WINDOW_MS) return;
+    this.#lastEditNotedAt.set(dataset.id, now);
+    if (this.#lastEditNotedAt.size > EDIT_NOTE_MEMORY) this.#lastEditNotedAt.clear();
+    await this.#recordEdit({
+      projectId: dataset.projectId,
+      datasetId: dataset.id,
+      editedBy: editedBy ?? SYSTEM_DATASET_VERSION_AUTHOR,
+    });
+  }
+
+  async #recordEdit(input: {
+    projectId: string;
+    datasetId: string;
+    editedBy: DatasetVersionAuthor;
+  }): Promise<void> {
+    if (!this.#recordContentEdit) return;
+    try {
+      await this.#recordContentEdit.send({
+        ...input,
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+      });
+    } catch (error) {
+      logger.warn({ error, ...input }, "Could not record a dataset edit for its autosave");
+    }
+  }
+
   /** The command-only pipeline `dataset_normalization` registers. */
   normalizationPipeline(): DatasetNormalizationDefinition {
-    return buildDatasetNormalizationPipeline({ normalize: this.#normalization });
+    return buildDatasetNormalizationPipeline({
+      normalize: {
+        normalize: async (payload) => {
+          const outcome = await this.#normalization.normalize(payload);
+          if (outcome === "ready") {
+            await this.#recordEdit({
+              projectId: payload.projectId,
+              datasetId: payload.datasetId,
+              editedBy: SYSTEM_DATASET_VERSION_AUTHOR,
+            });
+          }
+          return outcome;
+        },
+      },
+    });
   }
 
   /** Imports enqueue onto the registered sender; without one they normalize inline, as on main. */
@@ -615,4 +970,10 @@ export abstract class DatasetContent {
     slug: string;
     columnTypes: Dataset["columnTypes"];
   }): Promise<Dataset>;
+}
+
+/** The input without who made the edit, for the services that do not record it. */
+function withoutAuthor<T extends EditedBy>(input: T): Omit<T, "editedBy"> {
+  const { editedBy: _editedBy, ...rest } = input;
+  return rest;
 }
