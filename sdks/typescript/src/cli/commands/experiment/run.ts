@@ -10,7 +10,7 @@ import { failSpinner } from "../../utils/spinnerError";
 
 export const runExperimentCommand = async (
   slug: string,
-  options: { wait?: boolean; param?: string[] },
+  options: { wait?: boolean; param?: string[]; datasetVersion?: number },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -20,7 +20,10 @@ export const runExperimentCommand = async (
   const spinner = createSpinner(`Starting experiment "${slug}"...`).start();
 
   try {
-    const runResult = await service.startRun(slug, { parameters });
+    const runResult = await service.startRun(slug, {
+      parameters,
+      ...(options.datasetVersion !== undefined ? { datasetVersion: options.datasetVersion } : {}),
+    });
 
     spinner.succeed(
       `Experiment started! Run ID: ${chalk.cyan(runResult.runId)} (${runResult.total} cells)`,

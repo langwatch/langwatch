@@ -106,6 +106,19 @@ describe("runExperimentCommand()", () => {
     });
   });
 
+  describe("when --dataset-version is given", () => {
+    it("starts the run pinned to that dataset version", async () => {
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 10 });
+
+      await runExperimentCommand("quality-check", { datasetVersion: 2 });
+
+      expect(mockStartRun).toHaveBeenCalledWith("quality-check", {
+        parameters: undefined,
+        datasetVersion: 2,
+      });
+    });
+  });
+
   describe("when a --param pair has no equals sign", () => {
     it("refuses the command instead of starting a run", async () => {
       await expect(

@@ -518,6 +518,12 @@ Each command uses the values differently:
 - `experiment run` merges the values into every dataset row. See [Running experiments in CI/CD](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
 - `workflow run` sends the values as entry inputs. They are merged over `--input`, so a `--param` pair wins when both name the same key.
 
+`experiment run` also takes `--dataset-version <n>` to run a saved version of the experiment's dataset instead of its current content:
+
+```bash
+langwatch experiment run <experiment-slug> --dataset-version 1
+```
+
 ### Inspect simulation runs
 
 Every scenario execution produces a **simulation run** you can inspect after the fact, full conversation, judge verdict, reasoning, met/unmet criteria, cost, and duration.

@@ -112,6 +112,8 @@ const datasetReferenceSchemaDefinition = z.object({
   type: z.enum(["inline", "saved"]),
   inline: inlineDatasetSchema.optional(),
   datasetId: z.string().optional(),
+  /** The saved dataset's version a run reads; absent or null runs the latest content. */
+  datasetVersion: z.number().int().positive().nullish(),
   columns: z.array(datasetColumnSchema),
   savedRecords: z.array(savedRecordSchema).optional(),
   savedRecordsCut: z
@@ -133,6 +135,8 @@ export type DatasetReference = {
   type: "inline" | "saved";
   inline?: InlineDataset;
   datasetId?: string;
+  /** The saved dataset's version a run reads; absent or null runs the latest content. */
+  datasetVersion?: number | null;
   columns: DatasetColumn[];
   savedRecords?: SavedRecord[];
   savedRecordsCut?: SavedRecordsCut;

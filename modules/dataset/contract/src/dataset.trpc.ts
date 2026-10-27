@@ -9,7 +9,10 @@ import { z } from "zod";
 
 import { datasetLimitsSchema } from "./dataset-limits.ts";
 import {
+  DATASET_CONTENT_EDITED_EVENT_TYPE,
+  DATASET_VERSION_RESTORED_EVENT_TYPE,
   DATASET_VERSION_SAVED_EVENT_TYPE,
+  datasetVersionHistorySchema,
   compareDatasetVersionInputSchema,
   datasetVersionComparisonSchema,
   datasetVersionLookupInputSchema,
@@ -82,7 +85,9 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .withOutput(z.array(datasetRecordCountSchema))
 
   /** One dataset by id or slug; an archived or missing one reads as null. */
-  .query("getById", { invalidatedBy: [DATASET_NORMALIZATION_SETTLED_EVENT_TYPE] })
+  .query("getById", {
+    invalidatedBy: [DATASET_NORMALIZATION_SETTLED_EVENT_TYPE, DATASET_VERSION_RESTORED_EVENT_TYPE],
+  })
   .withInput(datasetApiDatasetInputSchema)
   .withOutput(datasetWireSchema.nullable())
 
@@ -132,9 +137,11 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .withOutput(uploadProcessingSchema)
 
   /** The dataset's versions, newest first. */
-  .query("versions", { invalidatedBy: [DATASET_VERSION_SAVED_EVENT_TYPE] })
+  .query("versions", {
+    invalidatedBy: [DATASET_VERSION_SAVED_EVENT_TYPE, DATASET_VERSION_RESTORED_EVENT_TYPE],
+  })
   .withInput(listDatasetVersionsInputSchema)
-  .withOutput(z.array(datasetVersionSchema))
+  .withOutput(datasetVersionHistorySchema)
 
   /** The current content saved as a version by hand, with an optional name. */
   .mutation("saveVersion")
@@ -147,7 +154,13 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .withOutput(datasetVersionPageSchema)
 
   /** What changed between a version and the current content, or another version. */
-  .query("compareVersion")
+  .query("compareVersion", {
+    invalidatedBy: [
+      DATASET_CONTENT_EDITED_EVENT_TYPE,
+      DATASET_VERSION_SAVED_EVENT_TYPE,
+      DATASET_VERSION_RESTORED_EVENT_TYPE,
+    ],
+  })
   .withInput(compareDatasetVersionInputSchema)
   .withOutput(datasetVersionComparisonSchema)
 

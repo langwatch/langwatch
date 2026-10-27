@@ -11,6 +11,7 @@ import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
@@ -24,6 +25,14 @@ import { DatasetModule } from "../dataset.app.ts";
 export function createDatasetTestAuthz(permitted = true) {
   return Object.assign(createApiFixture<AuthzApi>(), {
     hasPermission: vi.fn(async () => permitted),
+  });
+}
+
+/** The user directory, naming each user it is asked about "Name of <id>". */
+export function createDatasetTestUsers(): UserApi {
+  return createApiFixture<UserApi>({
+    getProfiles: async ({ userIds }: { userIds: string[] }) =>
+      userIds.map((id) => ({ id, name: `Name of ${id}` }) as never),
   });
 }
 
@@ -139,6 +148,7 @@ export function createDatasetTestApp(
       projects: ProjectApi;
       entitlement: EntitlementApi;
       storedObjects: StoredObjectApi;
+      users: UserApi;
     }>;
   }> = {},
 ): DatasetModule {
@@ -150,6 +160,7 @@ export function createDatasetTestApp(
       entitlement: input.dependencies?.entitlement ?? createDatasetTestEntitlement(),
       storedObjects:
         input.dependencies?.storedObjects ?? createApiFixture<StoredObjectApi>({}, "storedObjects"),
+      users: input.dependencies?.users ?? createDatasetTestUsers(),
     },
     config: {
       publicBaseUrl: input.publicBaseUrl,

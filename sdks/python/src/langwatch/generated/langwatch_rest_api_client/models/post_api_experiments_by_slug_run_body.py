@@ -22,12 +22,14 @@ class PostApiExperimentsBySlugRunBody:
     Attributes:
         data (list[PostApiExperimentsBySlugRunBodyDataItem] | Unset):
         dataset_id (str | Unset):
+        dataset_version (int | Unset):
         parameters (PostApiExperimentsBySlugRunBodyParameters | Unset):
         row_indices (list[int] | Unset):
     """
 
     data: list[PostApiExperimentsBySlugRunBodyDataItem] | Unset = UNSET
     dataset_id: str | Unset = UNSET
+    dataset_version: int | Unset = UNSET
     parameters: PostApiExperimentsBySlugRunBodyParameters | Unset = UNSET
     row_indices: list[int] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -41,6 +43,8 @@ class PostApiExperimentsBySlugRunBody:
                 data.append(data_item)
 
         dataset_id = self.dataset_id
+
+        dataset_version = self.dataset_version
 
         parameters: dict[str, Any] | Unset = UNSET
         if not isinstance(self.parameters, Unset):
@@ -57,6 +61,8 @@ class PostApiExperimentsBySlugRunBody:
             field_dict["data"] = data
         if dataset_id is not UNSET:
             field_dict["dataset_id"] = dataset_id
+        if dataset_version is not UNSET:
+            field_dict["dataset_version"] = dataset_version
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
         if row_indices is not UNSET:
@@ -81,6 +87,8 @@ class PostApiExperimentsBySlugRunBody:
 
         dataset_id = d.pop("dataset_id", UNSET)
 
+        dataset_version = d.pop("dataset_version", UNSET)
+
         _parameters = d.pop("parameters", UNSET)
         parameters: PostApiExperimentsBySlugRunBodyParameters | Unset
         if isinstance(_parameters, Unset):
@@ -93,6 +101,7 @@ class PostApiExperimentsBySlugRunBody:
         post_api_experiments_by_slug_run_body = cls(
             data=data,
             dataset_id=dataset_id,
+            dataset_version=dataset_version,
             parameters=parameters,
             row_indices=row_indices,
         )

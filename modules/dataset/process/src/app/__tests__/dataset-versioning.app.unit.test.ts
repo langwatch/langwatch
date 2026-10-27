@@ -53,7 +53,8 @@ async function createDataset(
 const save = (datasetId: string, name?: string) =>
   app.saveVersion({ projectId: PROJECT, datasetId, editedBy: ALICE, ...(name ? { name } : {}) });
 
-const versionsOf = (datasetId: string) => app.listVersions({ projectId: PROJECT, datasetId });
+const versionsOf = async (datasetId: string) =>
+  (await app.listVersions({ projectId: PROJECT, datasetId })).versions;
 
 const edit = (datasetId: string, recordId: string, input: string) =>
   app.upsertRecord({
@@ -183,7 +184,12 @@ describe("given a dataset with versions 1, 2 and 3", () => {
     const versions = await versionsOf(datasetId);
 
     expect(versions.map((version) => version.version)).toEqual([4, 3, 2, 1]);
-    expect(versions[0]).toMatchObject({ authorId: "user-alice", trigger: "manual", rowCount: 2 });
+    expect(versions[0]).toMatchObject({
+      authorId: "user-alice",
+      authorName: "Name of user-alice",
+      trigger: "manual",
+      rowCount: 2,
+    });
     expect(versions[0]!.createdAt.getTime()).toBeGreaterThan(versions[1]!.createdAt.getTime());
   });
 });
@@ -346,6 +352,32 @@ describe("when a version is restored", () => {
     ]);
   });
 
+  /** @scenario "Restoring a version writes a new version" */
+  it("records the restore so every open read of the dataset refreshes", async () => {
+    const restoredEvents: unknown[] = [];
+    const ignore = { send: async () => undefined };
+    app.connectVersions({
+      recordContentEdit: ignore,
+      recordVersionSaved: ignore,
+      recordVersionRestored: { send: async (input) => void restoredEvents.push(input) },
+    });
+    const datasetId = await createDataset();
+    await save(datasetId);
+    await edit(datasetId, "a", "changed");
+
+    await app.restoreVersion({ projectId: PROJECT, datasetId, version: 1 });
+
+    expect(restoredEvents).toEqual([
+      expect.objectContaining({
+        projectId: PROJECT,
+        datasetId,
+        version: 3,
+        restoredFromVersion: 1,
+        tenantId: PROJECT,
+      }),
+    ]);
+  });
+
   /** @scenario "Restoring a version that holds the current content changes nothing" */
   it("creates nothing when the version is the current content", async () => {
     const datasetId = await createDataset();
@@ -378,6 +410,9 @@ describe("when a version is restored", () => {
     await expect(
       app.restoreVersion({ projectId: PROJECT, datasetId, version: 1 }),
     ).rejects.toMatchObject({ code: "dataset_version_restore_unsupported" });
+    await expect(app.listVersions({ projectId: PROJECT, datasetId })).resolves.toMatchObject({
+      restorable: false,
+    });
   });
 });
 
@@ -582,7 +617,9 @@ describe("given datasets created before versioning", () => {
 
     expect(report).toMatchObject({ created: 1 });
     expect(await versionsOf(datasetId)).toHaveLength(1);
-    expect(await app.listVersions({ projectId: "project-0", datasetId: finished.id })).toEqual([]);
+    expect(
+      (await app.listVersions({ projectId: "project-0", datasetId: finished.id })).versions,
+    ).toEqual([]);
     expect(saved.at(-1)).toMatchObject({ afterProjectId: PROJECT });
   });
 });

@@ -23,6 +23,8 @@ export interface ExperimentRunStartResponse {
 export interface ExperimentRunStartRequest {
   data?: Record<string, unknown>[];
   dataset_id?: string;
+  /** Version of the saved dataset to run; overrides the version the experiment pins. */
+  dataset_version?: number;
   parameters?: Record<string, string | number | boolean>;
   row_indices?: number[];
 }
@@ -33,17 +35,20 @@ export interface ExperimentRunStartRequest {
 export const toRunStartRequest = ({
   data,
   datasetId,
+  datasetVersion,
   parameters,
   rowIndices,
 }: {
   data?: Record<string, unknown>[];
   datasetId?: string;
+  datasetVersion?: number;
   parameters?: Record<string, string | number | boolean>;
   rowIndices?: number[];
 }): ExperimentRunStartRequest | undefined => {
   const body: ExperimentRunStartRequest = {};
   if (data !== undefined) body.data = data;
   if (datasetId !== undefined) body.dataset_id = datasetId;
+  if (datasetVersion !== undefined) body.dataset_version = datasetVersion;
   if (parameters !== undefined) body.parameters = parameters;
   if (rowIndices !== undefined) body.row_indices = rowIndices;
   return Object.keys(body).length > 0 ? body : undefined;
@@ -423,9 +428,13 @@ export class ExperimentsApiService {
     slug: string,
     options: {
       parameters?: Record<string, string | number | boolean>;
+      datasetVersion?: number;
     } = {},
   ): Promise<ExperimentRunStartResponse> {
-    const body = toRunStartRequest({ parameters: options.parameters });
+    const body = toRunStartRequest({
+      parameters: options.parameters,
+      datasetVersion: options.datasetVersion,
+    });
     const { data, error, response } = await this.apiClient.POST("/api/v1/experiments/{slug}/run", {
       params: { path: { slug } },
       ...(body !== undefined ? { body } : {}),

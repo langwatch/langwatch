@@ -7577,6 +7577,9 @@ importers:
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../../packages/upgrade
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))

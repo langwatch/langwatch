@@ -112,6 +112,22 @@ export class DatasetVersionService {
     return this.deps.versions.findAll({ projectId: input.projectId, datasetId: dataset.id });
   }
 
+  /** The versions, newest first, and whether the dataset's layout lets one be restored. */
+  async history(input: {
+    projectId: string;
+    datasetId: string;
+  }): Promise<{ versions: DatasetVersion[]; restorable: boolean }> {
+    const dataset = await this.deps.lookup({
+      projectId: input.projectId,
+      slugOrId: input.datasetId,
+    });
+    const versions = await this.deps.versions.findAll({
+      projectId: input.projectId,
+      datasetId: dataset.id,
+    });
+    return { versions, restorable: !isSingleFileDataset(dataset) };
+  }
+
   async get(input: {
     projectId: string;
     datasetId: string;

@@ -98,7 +98,7 @@ Feature: An evaluation run accepts inline data, a dataset id, or parameters
 
   @unit
   Scenario: A saved dataset that changes while the run reads it is refused instead of run short
-    Given a saved dataset that loses rows after the run starts reading it
+    Given a saved dataset whose version answers fewer rows than it recorded
     When I run the evaluation against that saved dataset
     Then the run is refused as "experiment_dataset_changed_during_read"
 

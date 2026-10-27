@@ -12,6 +12,7 @@ import {
 import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
+import { parseDatasetVersionFlag } from "./utils/datasetVersionFlag";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
 import { trustLocalDevCa } from "./utils/localDevCa";
 import {
@@ -1610,8 +1611,16 @@ function registerExperimentCommands(program: Command): void {
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option(
+        "--dataset-version <n>",
+        "Version of the experiment's saved dataset to run, overriding the version the experiment pins",
+        parseDatasetVersionFlag,
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean; param?: string[] }) => {
+    async (
+      slug: string,
+      options: { wait?: boolean; param?: string[]; datasetVersion?: number },
+    ) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },

@@ -12,7 +12,7 @@ import {
 } from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
-import { datasetVersionSchema } from "./dataset-version.ts";
+import { datasetVersionListItemSchema } from "./dataset-version.ts";
 import {
   appendStoredObjectToDatasetInputSchema,
   createDatasetFromStoredObjectInputSchema,
@@ -330,7 +330,10 @@ const datasetRestNoBodySchemaDefinition = z.object({});
 export interface DatasetRestNoBodySchema extends Named<typeof datasetRestNoBodySchemaDefinition> {}
 export const datasetRestNoBodySchema: DatasetRestNoBodySchema = datasetRestNoBodySchemaDefinition;
 
-const datasetRestVersionListSchemaDefinition = z.object({ data: z.array(datasetVersionSchema) });
+const datasetRestVersionListSchemaDefinition = z.object({
+  data: z.array(datasetVersionListItemSchema),
+  restorable: z.boolean(),
+});
 export interface DatasetRestVersionListSchema extends Named<
   typeof datasetRestVersionListSchemaDefinition
 > {}

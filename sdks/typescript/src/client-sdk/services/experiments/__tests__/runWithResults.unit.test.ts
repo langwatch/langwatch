@@ -169,6 +169,22 @@ describe("ExperimentsFacade.runWithResults", () => {
     });
   });
 
+  describe("given a dataset version is provided", () => {
+    describe("when the run completes", () => {
+      it("posts it as dataset_version", async () => {
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(startResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        const facade = makeFacade();
+        await facade.runWithResults("my-experiment", { datasetVersion: 3, pollInterval: 0 });
+
+        expect(await requestAt(0).clone().json()).toEqual({ dataset_version: 3 });
+      });
+    });
+  });
+
   describe("given no overrides are provided", () => {
     describe("when the run completes", () => {
       it("posts a body-less start request", async () => {

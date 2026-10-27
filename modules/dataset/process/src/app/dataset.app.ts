@@ -62,6 +62,8 @@ import {
   type DatasetVersionPageInput,
   type DatasetVersionRestored,
   type DatasetVersionRunLink,
+  type DatasetVersionHistory,
+  type DatasetVersionRestoredEventData,
   type DatasetVersionSavedEventData,
   type FindRunDatasetVersionsInput,
   type ListDatasetVersionsInput,
@@ -80,6 +82,7 @@ import {
 } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 import type { MigrationStepRun } from "@langwatch/upgrade/step";
+import { UserApi } from "@langwatch/user-contract";
 
 import {
   buildDatasetNormalizationPipeline,
@@ -91,6 +94,7 @@ import {
 } from "../eventing/dataset-versions.pipeline.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
+import { versionAuthorUserIds, withAuthorNames } from "../rules/dataset-version-author.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
 import { DatasetContentService } from "../services/dataset-content.service.ts";
@@ -138,6 +142,11 @@ type DatasetVersionCommands = {
       input: DatasetVersionSavedEventData & { tenantId: string; occurredAt: number },
     ): Promise<unknown>;
   };
+  recordVersionRestored: {
+    send(
+      input: DatasetVersionRestoredEventData & { tenantId: string; occurredAt: number },
+    ): Promise<unknown>;
+  };
 };
 
 type DatasetSetup = FeatureSetup<
@@ -174,6 +183,8 @@ export class DatasetModule implements DatasetApi {
     entitlement: EntitlementApi,
     /** Reads the confirmed files a dataset is imported from (ADR-158 §6). */
     storedObjects: StoredObjectApi,
+    /** Names the people who saved each version in the history. */
+    users: UserApi,
   };
   /** The shared deployment origin; `platformUrl` refuses by name where no `BASE_HOST` was named. */
   static readonly config = datasetConfig;
@@ -191,6 +202,8 @@ export class DatasetModule implements DatasetApi {
   #versionRetention: DatasetVersionRetentionService;
   #versionBackfill: DatasetVersionBackfillService;
   #recordContentEdit: DatasetVersionCommands["recordContentEdit"] | null = null;
+  #recordVersionRestored: DatasetVersionCommands["recordVersionRestored"] | null = null;
+  readonly #users: UserApi;
   /** Datasets this process has seen holding a version, so an edit skips the first-version check. */
   readonly #versioned = new Set<string>();
   /** When this process last recorded an edit of each dataset, to send at most one per window. */
@@ -289,6 +302,7 @@ export class DatasetModule implements DatasetApi {
     this.#batchEvaluations = repositories.batchEvaluations;
     this.#count = repositories.count;
     this.#permissions = dependencies.permissions;
+    this.#users = dependencies.users;
     this.#publicBaseUrl = config.publicBaseUrl;
   }
 
@@ -636,9 +650,15 @@ export class DatasetModule implements DatasetApi {
 
   // ── Versions ─────────────────────────────────────────────────────────────
 
-  /** Every version of the dataset, newest first. */
-  listVersions(input: ListDatasetVersionsInput): Promise<DatasetVersion[]> {
-    return this.#versions.list(input);
+  /** Every version of the dataset, newest first, named by who saved it. */
+  async listVersions(input: ListDatasetVersionsInput): Promise<DatasetVersionHistory> {
+    const { versions, restorable } = await this.#versions.history(input);
+    const userIds = versionAuthorUserIds(versions);
+    const profiles = userIds.length > 0 ? await this.#users.getProfiles({ userIds }) : [];
+    const names = new Map(
+      profiles.flatMap((profile) => (profile.name ? [[profile.id, profile.name] as const] : [])),
+    );
+    return { versions: withAuthorNames({ versions, names }), restorable };
   }
 
   /** The current content saved by hand, optionally named; unchanged content names the latest. */
@@ -662,13 +682,41 @@ export class DatasetModule implements DatasetApi {
     return this.#versions.compare(input);
   }
 
-  restoreVersion(input: DatasetVersionLookupInput & EditedBy): Promise<DatasetVersionRestored> {
-    return this.#versions.restore({
+  async restoreVersion(
+    input: DatasetVersionLookupInput & EditedBy,
+  ): Promise<DatasetVersionRestored> {
+    const restored = await this.#versions.restore({
       projectId: input.projectId,
       datasetId: input.datasetId,
       version: input.version,
       by: input.editedBy ?? SYSTEM_DATASET_VERSION_AUTHOR,
     });
+    if (restored.changed) await this.#recordRestore({ restored, from: input.version });
+    return restored;
+  }
+
+  /** Tells every open read of the dataset that its content was replaced; a failure is logged. */
+  async #recordRestore({
+    restored,
+    from,
+  }: {
+    restored: DatasetVersionRestored;
+    from: number;
+  }): Promise<void> {
+    const { projectId, datasetId, id: versionId, version } = restored.version;
+    try {
+      await this.#recordVersionRestored?.send({
+        projectId,
+        datasetId,
+        versionId,
+        version,
+        restoredFromVersion: from,
+        tenantId: projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+      });
+    } catch (error) {
+      logger.warn({ error, projectId, datasetId }, "Could not record a dataset restore");
+    }
   }
 
   /** Keeps a version out of retention because an experiment names it. */
@@ -762,6 +810,7 @@ export class DatasetModule implements DatasetApi {
 
   connectVersions(commands: DatasetVersionCommands): void {
     this.#recordContentEdit = commands.recordContentEdit;
+    this.#recordVersionRestored = commands.recordVersionRestored;
     this.#versions.connect(async (data) => {
       await commands.recordVersionSaved.send({
         ...data,

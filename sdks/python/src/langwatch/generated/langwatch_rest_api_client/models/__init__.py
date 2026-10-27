@@ -1062,6 +1062,49 @@ from .get_api_dataset_by_slug_or_id_response_200_column_types_item_type import (
 )
 from .get_api_dataset_by_slug_or_id_response_200_data_item import GetApiDatasetBySlugOrIdResponse200DataItem
 from .get_api_dataset_by_slug_or_id_response_200_data_item_entry import GetApiDatasetBySlugOrIdResponse200DataItemEntry
+from .get_api_dataset_by_slug_or_id_versions_by_version_response_200 import (
+    GetApiDatasetBySlugOrIdVersionsByVersionResponse200,
+)
+from .get_api_dataset_by_slug_or_id_versions_by_version_response_200_pagination import (
+    GetApiDatasetBySlugOrIdVersionsByVersionResponse200Pagination,
+)
+from .get_api_dataset_by_slug_or_id_versions_by_version_response_200_rows_item import (
+    GetApiDatasetBySlugOrIdVersionsByVersionResponse200RowsItem,
+)
+from .get_api_dataset_by_slug_or_id_versions_by_version_response_200_rows_item_entry import (
+    GetApiDatasetBySlugOrIdVersionsByVersionResponse200RowsItemEntry,
+)
+from .get_api_dataset_by_slug_or_id_versions_by_version_response_200_version import (
+    GetApiDatasetBySlugOrIdVersionsByVersionResponse200Version,
+)
+from .get_api_dataset_by_slug_or_id_versions_by_version_response_200_version_author_kind_type_0 import (
+    GetApiDatasetBySlugOrIdVersionsByVersionResponse200VersionAuthorKindType0,
+)
+from .get_api_dataset_by_slug_or_id_versions_by_version_response_200_version_column_types_item import (
+    GetApiDatasetBySlugOrIdVersionsByVersionResponse200VersionColumnTypesItem,
+)
+from .get_api_dataset_by_slug_or_id_versions_by_version_response_200_version_column_types_item_type import (
+    GetApiDatasetBySlugOrIdVersionsByVersionResponse200VersionColumnTypesItemType,
+)
+from .get_api_dataset_by_slug_or_id_versions_by_version_response_200_version_trigger import (
+    GetApiDatasetBySlugOrIdVersionsByVersionResponse200VersionTrigger,
+)
+from .get_api_dataset_by_slug_or_id_versions_response_200 import GetApiDatasetBySlugOrIdVersionsResponse200
+from .get_api_dataset_by_slug_or_id_versions_response_200_data_item import (
+    GetApiDatasetBySlugOrIdVersionsResponse200DataItem,
+)
+from .get_api_dataset_by_slug_or_id_versions_response_200_data_item_author_kind_type_0 import (
+    GetApiDatasetBySlugOrIdVersionsResponse200DataItemAuthorKindType0,
+)
+from .get_api_dataset_by_slug_or_id_versions_response_200_data_item_column_types_item import (
+    GetApiDatasetBySlugOrIdVersionsResponse200DataItemColumnTypesItem,
+)
+from .get_api_dataset_by_slug_or_id_versions_response_200_data_item_column_types_item_type import (
+    GetApiDatasetBySlugOrIdVersionsResponse200DataItemColumnTypesItemType,
+)
+from .get_api_dataset_by_slug_or_id_versions_response_200_data_item_trigger import (
+    GetApiDatasetBySlugOrIdVersionsResponse200DataItemTrigger,
+)
 from .get_api_dataset_response_200 import GetApiDatasetResponse200
 from .get_api_dataset_response_200_data_item import GetApiDatasetResponse200DataItem
 from .get_api_dataset_response_200_data_item_column_types_item import GetApiDatasetResponse200DataItemColumnTypesItem
@@ -5431,6 +5474,38 @@ from .post_api_dataset_by_slug_or_id_records_response_201_data_item_entry import
 )
 from .post_api_dataset_by_slug_or_id_upload_body import PostApiDatasetBySlugOrIdUploadBody
 from .post_api_dataset_by_slug_or_id_upload_response_200 import PostApiDatasetBySlugOrIdUploadResponse200
+from .post_api_dataset_by_slug_or_id_versions_body import PostApiDatasetBySlugOrIdVersionsBody
+from .post_api_dataset_by_slug_or_id_versions_by_version_restore_response_200 import (
+    PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200,
+)
+from .post_api_dataset_by_slug_or_id_versions_by_version_restore_response_200_version import (
+    PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200Version,
+)
+from .post_api_dataset_by_slug_or_id_versions_by_version_restore_response_200_version_author_kind_type_0 import (
+    PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200VersionAuthorKindType0,
+)
+from .post_api_dataset_by_slug_or_id_versions_by_version_restore_response_200_version_column_types_item import (
+    PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200VersionColumnTypesItem,
+)
+from .post_api_dataset_by_slug_or_id_versions_by_version_restore_response_200_version_column_types_item_type import (
+    PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200VersionColumnTypesItemType,
+)
+from .post_api_dataset_by_slug_or_id_versions_by_version_restore_response_200_version_trigger import (
+    PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200VersionTrigger,
+)
+from .post_api_dataset_by_slug_or_id_versions_response_200 import PostApiDatasetBySlugOrIdVersionsResponse200
+from .post_api_dataset_by_slug_or_id_versions_response_200_author_kind_type_0 import (
+    PostApiDatasetBySlugOrIdVersionsResponse200AuthorKindType0,
+)
+from .post_api_dataset_by_slug_or_id_versions_response_200_column_types_item import (
+    PostApiDatasetBySlugOrIdVersionsResponse200ColumnTypesItem,
+)
+from .post_api_dataset_by_slug_or_id_versions_response_200_column_types_item_type import (
+    PostApiDatasetBySlugOrIdVersionsResponse200ColumnTypesItemType,
+)
+from .post_api_dataset_by_slug_or_id_versions_response_200_trigger import (
+    PostApiDatasetBySlugOrIdVersionsResponse200Trigger,
+)
 from .post_api_dataset_evaluate_body import PostApiDatasetEvaluateBody
 from .post_api_dataset_evaluate_body_data_type_0 import PostApiDatasetEvaluateBodyDataType0
 from .post_api_dataset_evaluate_body_settings_type_0 import PostApiDatasetEvaluateBodySettingsType0
@@ -9848,6 +9923,21 @@ __all__ = (
     "GetApiDatasetBySlugOrIdResponse200ColumnTypesItemType",
     "GetApiDatasetBySlugOrIdResponse200DataItem",
     "GetApiDatasetBySlugOrIdResponse200DataItemEntry",
+    "GetApiDatasetBySlugOrIdVersionsByVersionResponse200",
+    "GetApiDatasetBySlugOrIdVersionsByVersionResponse200Pagination",
+    "GetApiDatasetBySlugOrIdVersionsByVersionResponse200RowsItem",
+    "GetApiDatasetBySlugOrIdVersionsByVersionResponse200RowsItemEntry",
+    "GetApiDatasetBySlugOrIdVersionsByVersionResponse200Version",
+    "GetApiDatasetBySlugOrIdVersionsByVersionResponse200VersionAuthorKindType0",
+    "GetApiDatasetBySlugOrIdVersionsByVersionResponse200VersionColumnTypesItem",
+    "GetApiDatasetBySlugOrIdVersionsByVersionResponse200VersionColumnTypesItemType",
+    "GetApiDatasetBySlugOrIdVersionsByVersionResponse200VersionTrigger",
+    "GetApiDatasetBySlugOrIdVersionsResponse200",
+    "GetApiDatasetBySlugOrIdVersionsResponse200DataItem",
+    "GetApiDatasetBySlugOrIdVersionsResponse200DataItemAuthorKindType0",
+    "GetApiDatasetBySlugOrIdVersionsResponse200DataItemColumnTypesItem",
+    "GetApiDatasetBySlugOrIdVersionsResponse200DataItemColumnTypesItemType",
+    "GetApiDatasetBySlugOrIdVersionsResponse200DataItemTrigger",
     "GetApiDatasetResponse200",
     "GetApiDatasetResponse200DataItem",
     "GetApiDatasetResponse200DataItemColumnTypesItem",
@@ -12023,6 +12113,18 @@ __all__ = (
     "PostApiDatasetBySlugOrIdRecordsResponse201DataItemEntry",
     "PostApiDatasetBySlugOrIdUploadBody",
     "PostApiDatasetBySlugOrIdUploadResponse200",
+    "PostApiDatasetBySlugOrIdVersionsBody",
+    "PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200",
+    "PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200Version",
+    "PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200VersionAuthorKindType0",
+    "PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200VersionColumnTypesItem",
+    "PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200VersionColumnTypesItemType",
+    "PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse200VersionTrigger",
+    "PostApiDatasetBySlugOrIdVersionsResponse200",
+    "PostApiDatasetBySlugOrIdVersionsResponse200AuthorKindType0",
+    "PostApiDatasetBySlugOrIdVersionsResponse200ColumnTypesItem",
+    "PostApiDatasetBySlugOrIdVersionsResponse200ColumnTypesItemType",
+    "PostApiDatasetBySlugOrIdVersionsResponse200Trigger",
     "PostApiDatasetEvaluateBody",
     "PostApiDatasetEvaluateBodyDataType0",
     "PostApiDatasetEvaluateBodySettingsType0",
