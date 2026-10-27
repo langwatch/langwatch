@@ -85,6 +85,8 @@ export interface CreateFrameBridgeOptions {
   }) => void;
   /** Called once when the watchdog kills the frame. */
   readonly onTeardown: () => void;
+  /** Called on each heartbeat at which the frame has no query open: up, and waiting on nothing. */
+  readonly onIdle?: () => void;
 }
 
 export interface FrameBridge {
@@ -202,6 +204,7 @@ export class FrameBridgeSession implements FrameBridge {
     switch (message?.type) {
       case "lw:heartbeat":
         this.#lastHeartbeatAt = nowInstant().epochMilliseconds;
+        if (this.#activeAborts.size === 0) this.#options.onIdle?.();
         return;
       case "lw:query":
         this.#handleQuery(message.requestId, message.queryName, message.params ?? {});

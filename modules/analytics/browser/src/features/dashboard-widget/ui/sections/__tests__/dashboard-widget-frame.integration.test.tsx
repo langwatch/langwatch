@@ -426,6 +426,19 @@ describe("given a widget on a board whose queries are running", () => {
 
       expect(loadingFace()).toBeNull();
     });
+
+    /** @scenario "A widget with nothing to wait for shows no skeleton" */
+    it("drops the skeleton once the frame is up with no query open", () => {
+      frameRuns(() => new Promise(() => undefined));
+      render(boardWidget({}));
+      expect(loadingFace()).not.toBeNull();
+
+      act(() => {
+        lastFrameProps().onIdle?.();
+      });
+
+      expect(loadingFace()).toBeNull();
+    });
   });
 });
 

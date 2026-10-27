@@ -79,7 +79,7 @@ Feature: A dashboard widget frame shows what its queries report
 
     @integration
     Scenario: A widget with nothing to wait for shows no skeleton
-      Given a widget with no queries, or whose code reported an error
+      Given a widget with no queries, whose code reported an error, or whose frame is up with no query open
       Then the card shows no loading skeleton
 
   Rule: An empty widget says how to get its data

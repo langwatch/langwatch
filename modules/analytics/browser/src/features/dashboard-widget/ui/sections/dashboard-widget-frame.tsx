@@ -12,14 +12,13 @@ import type {
 import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
-import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
 import { useFrameDiagnostic } from "../../../../behavior/use-frame-diagnostic.ts";
 import { useWidgetQueryRecords } from "../../../../behavior/use-widget-query-records.ts";
 import { usePublishWidgetCompleteness } from "../../../../behavior/widget-completeness-sink.ts";
-import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { projectAwaitsFirstTrace, useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
 import { withheldWords } from "../../../../model/dashboard-widget/widget-access.ts";
 import {
@@ -153,10 +152,15 @@ export function DashboardWidgetFrameOverWindow({
   const empty = widgetShowsNoData({ face: face.kind, status: widgetExport.status });
   useEffect(() => onEmptyChange?.(empty), [onEmptyChange, empty]);
 
+  // A frame up with no query open waits on nothing, such as a query behind a tab.
+  const [frameIdle, setFrameIdle] = useState(false);
+  const onFrameIdle = useCallback(() => setFrameIdle(true), []);
+
   // Retry starts the frame over, so every query of the widget runs again.
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => {
     reset();
+    setFrameIdle(false);
     setAttempt((n) => n + 1);
   }, [reset]);
 
@@ -193,7 +197,7 @@ export function DashboardWidgetFrameOverWindow({
     resetKey: definition.code,
   });
   // Until a query answers the frame has nothing to draw; code that reported an error never will.
-  const loading = hasQueries && diagnostic === null && awaitsFirstAnswer(records);
+  const loading = hasQueries && diagnostic === null && !frameIdle && awaitsFirstAnswer(records);
   const slow = useSlowLoading({ loading });
 
   if (!parsed.success) {
@@ -226,6 +230,7 @@ export function DashboardWidgetFrameOverWindow({
           onNavigate={onNavigate}
           maxHeight={maxHeight}
           cover={loading && !cover ? <WidgetLoadingFace slow={slow} /> : undefined}
+          onIdle={onFrameIdle}
         />
       </Box>
       {cover && (
@@ -281,10 +286,7 @@ function NoTrafficFace({
   unit: string;
   onSetUp: (target: NavigableTarget) => void;
 }) {
-  const project = useAnalyticsHost().project();
-  // An aggregate receives no traces of its own (ADR-177), so it is not asked to send any.
-  const awaitsFirstTrace =
-    project !== undefined && !project.hasFirstMessage && !isAggregateProjectKind(project.kind);
+  const awaitsFirstTrace = projectAwaitsFirstTrace(useAnalyticsHost().project());
   const guidance = noTrafficGuidance({ unit, awaitsFirstTrace });
   const action = guidance?.action;
   return (

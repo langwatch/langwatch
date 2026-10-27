@@ -51,6 +51,7 @@ function attach(
     onHeightChange: (px) => events.push({ height: px }),
     onNavigate: (args) => events.push({ navigate: args }),
     onTeardown: () => events.push("teardown"),
+    onIdle: () => events.push("idle"),
   });
   const frameWindow = iframe.contentWindow!;
   frameWindow.postMessage = (message: unknown, target: unknown, transfer?: Transferable[]) => {
@@ -224,6 +225,23 @@ describe("the frame bridge session", () => {
     expect(fromParent).toEqual([
       { type: "lw:dashboard-context-change", dashboardContext: { ...CONTEXT, theme: "dark" } },
     ]);
+  });
+
+  it("tells its caller the frame is idle on a heartbeat with no query open", async () => {
+    let answer: (result: typeof RESULT) => void = () => undefined;
+    const { events, load, send, bridge } = attach(
+      () => new Promise((resolve) => (answer = resolve)),
+    );
+    load();
+    await send({ type: "lw:query", requestId: 1, queryName: "q" });
+    await send({ type: "lw:heartbeat" });
+    expect(events).toEqual([]);
+
+    answer(RESULT);
+    await flush();
+    await send({ type: "lw:heartbeat" });
+    expect(events).toEqual(["idle"]);
+    bridge.dispose();
   });
 
   it("tears the frame down after ten seconds without a heartbeat", () => {

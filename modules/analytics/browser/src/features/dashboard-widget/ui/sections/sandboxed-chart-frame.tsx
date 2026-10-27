@@ -76,6 +76,8 @@ export interface SandboxedChartFrameProps {
   maxHeight?: number;
   /** Drawn over the running frame, such as a loading skeleton; never over its restart notice. */
   cover?: ReactNode;
+  /** The frame is up and has no query open; see `CreateFrameBridgeOptions.onIdle`. */
+  onIdle?: () => void;
 }
 
 // One component wiring the iframe, bridge lifecycle, and render states together.
@@ -89,6 +91,7 @@ export function SandboxedChartFrame({
   onNavigate,
   maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
   cover,
+  onIdle,
 }: SandboxedChartFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [generation, setGeneration] = useState(0);
@@ -126,6 +129,8 @@ export function SandboxedChartFrame({
   onLogRef.current = onLog;
   const onNavigateRef = useRef(onNavigate);
   onNavigateRef.current = onNavigate;
+  const onIdleRef = useRef(onIdle);
+  onIdleRef.current = onIdle;
   const dashboardContextRef = useRef(dashboardContext);
   dashboardContextRef.current = dashboardContext;
   const { theme } = dashboardContext;
@@ -149,6 +154,7 @@ export function SandboxedChartFrame({
       onHeightChange: setHeight,
       onNavigate: (args) => onNavigateRef.current?.(args),
       onTeardown: noteTornDown,
+      onIdle: () => onIdleRef.current?.(),
     });
     bridgeRef.current = bridge;
     noteFrameMounted();

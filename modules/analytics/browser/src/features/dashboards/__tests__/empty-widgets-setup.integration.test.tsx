@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * A board where several widgets show no data offers Langy to set them up, with a draft that
- * names them. Only the sandboxed frame is stood in for, since jsdom cannot run it.
+ * A board where several widgets show no data, in a project that never received a trace, offers
+ * Langy to set them up, with a draft that names them. Only the sandboxed frame is stood in for.
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
@@ -27,14 +27,24 @@ vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
 }));
 
 import { lwqlResult } from "../../../__tests__/lwql-fixtures.ts";
+import type { AnalyticsHostProject } from "../../../model/analytics-host.ts";
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
+import { curatedBoardById } from "../model/curated-boards.ts";
+import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
 const LANGY_OFF = { release_dashboards: true };
+const NEW_PROJECT: AnalyticsHostProject = {
+  id: "proj-1",
+  slug: "test-project",
+  name: "Test Project",
+  hasFirstMessage: false,
+};
+const PROJECT_WITH_TRACES: AnalyticsHostProject = { ...NEW_PROJECT, hasFirstMessage: true };
 const BOARD = {
   ...HOME_BOARD,
   id: "board-1",
@@ -89,12 +99,15 @@ function boardServer({ emptyIds }: { emptyIds: readonly string[] }) {
 async function openBoardWithEmptyWidgets({
   emptyIds,
   flags = LANGY_ON,
+  project = NEW_PROJECT,
 }: {
   emptyIds: readonly string[];
   flags?: Record<string, boolean>;
+  project?: AnalyticsHostProject;
 }) {
   const host = new StubAnalyticsHost({
     flags,
+    project,
     permissions: [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"],
     route: { params: { dashboardId: BOARD.id }, query: {} },
   });
@@ -157,5 +170,53 @@ describe("given a board without Langy where two widgets show no data", () => {
     await openBoardWithEmptyWidgets({ emptyIds: ["w-2", "w-3"], flags: LANGY_OFF });
 
     expect(screen.queryByTestId("empty-widgets-banner")).toBeNull();
+  });
+});
+
+describe("given a board with Langy in a project that has received traces", () => {
+  describe("when two widgets show no data over a quiet period", () => {
+    /** @scenario "AC13d Several empty widgets offer to ask Langy to set them up" */
+    it("offers no setup", async () => {
+      await openBoardWithEmptyWidgets({ emptyIds: ["w-2", "w-3"], project: PROJECT_WITH_TRACES });
+
+      expect(screen.queryByTestId("empty-widgets-banner")).toBeNull();
+    });
+  });
+});
+
+describe("given a From LangWatch board with Langy in a project that never received a trace", () => {
+  /** @scenario "AC13d Several empty widgets offer to ask Langy to set them up" */
+  it("counts each of its empty widgets and offers Langy to set them up", async () => {
+    const board = curatedBoardById("data");
+    if (!board) throw new Error("the data board is gone");
+    renderDashboards({
+      element: <CuratedBoardScreen />,
+      host: new StubAnalyticsHost({
+        flags: LANGY_ON,
+        project: NEW_PROJECT,
+        permissions: [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"],
+        route: { params: { templateId: board.templateId }, query: {} },
+      }),
+      answer: (call) =>
+        call.path === "analytics.lwql.query"
+          ? Promise.resolve(lwqlResult({ rows: [] }))
+          : boardServer({ emptyIds: [] })(call),
+    });
+    for (const frame of await screen.findAllByTestId("sandboxed-frame")) {
+      const props = frames.get(frame);
+      const widget = board.widgets.find(({ definition }) => definition.code === props?.code);
+      if (!props || !widget) throw new Error("a frame matches no widget of the board");
+      for (const { name } of widget.definition.queries) {
+        await act(async () => {
+          await props
+            .executeQuery({ queryName: name, params: {}, signal: new AbortController().signal })
+            .catch(() => undefined);
+        });
+      }
+    }
+
+    expect(screen.getByTestId("empty-widgets-banner")).toHaveTextContent(
+      `${board.widgets.length} widgets on this dashboard have no data yet`,
+    );
   });
 });

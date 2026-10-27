@@ -60,7 +60,8 @@ A board opens with every widget's queries in flight, and a blank card reads as b
 
 - **A skeleton until the first answer.** The frame covers the card with a chart-shaped skeleton
   until any of its queries answers, then the widget draws its own card. A widget with no query,
-  or whose code reported an error, has nothing to wait for and shows none.
+  whose code reported an error, or whose frame is up with no query open (such as a query behind
+  a tab), has nothing to wait for and shows none.
 - **Slow says so.** After 5 seconds (`SLOW_WIDGET_LOADING_MS`) the skeleton says "Still
   loading…".
 - **A refresh keeps the chart.** Once a query answered, a new run never brings the skeleton back.
@@ -78,8 +79,9 @@ An empty card says what is not there and what sends it. The words are in
   LangWatch SDK." A trace field with no words of its own reads "Send <field> on your traces with
   the LangWatch SDK."
 - **Several empty.** When two or more widgets on a board show no data (no traffic, the setup
-  view, or no rows from any query), a board that offers Langy says how many and offers "Ask
-  Langy to set this up", a draft naming them (`boardSetupDraft`).
+  view, or no rows from any query) in a project that never received a trace, a board that offers
+  Langy says how many and offers "Ask Langy to set this up", a draft naming them
+  (`boardSetupDraft`). A quiet period is not a setup step, so a project with traces gets none.
 
 A widget's hand-kept needs (`requirements` in the catalogue) keep only what no query can see,
 such as a judge, a setting or a source to connect. A trace field the query reads is the query's

@@ -204,10 +204,12 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit @integration
   Scenario: AC13d Several empty widgets offer to ask Langy to set them up
     Given a board with Langy enabled and the member may start a conversation
+    And a project that has never received a trace
     When two or more of its widgets show no data
     Then the board says how many widgets have no data and offers "Ask Langy to set this up"
     And it drafts a prompt naming those widgets, ready to send and not sent
-    And with one empty widget, or without Langy, the board offers no such button
+    And with one empty widget, without Langy, or in a project that has received traces, the board offers no such button
+    # A quiet period is not a setup step (AC13)
     # Evidence: a new project's board with the banner and Langy's drafted prompt
 
   @unit
