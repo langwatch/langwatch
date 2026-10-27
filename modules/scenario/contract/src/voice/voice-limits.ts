@@ -38,9 +38,8 @@ export function voiceCallMaxSeconds(env: NodeJS.ProcessEnv): number {
 }
 
 /**
- * Whether a call that ran for `durationMs` reached the call limit, in whole seconds: the browser
- * countdown ends a call once `floor(elapsed / 1000) >= maxCallSeconds`, so the span is a finding
- * the server makes itself rather than trusting a flag in the finish body (#8028).
+ * Whether a call that ran for `durationMs` reached the call limit, by the browser countdown's
+ * whole-second rule: it ends a call once `floor(elapsed / 1000) >= maxCallSeconds`.
  */
 export function callReachedLimit({
   durationMs,

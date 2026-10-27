@@ -50,9 +50,7 @@ export type VoiceCallFinishInput = {
   transcript: BrowserTranscriptTurn[];
   startedAt: number;
   endedAt: number;
-  /** The configured maximum call duration, the same one the mint handed the
-   *  browser as its countdown. Whether the limit ended this call is derived
-   *  from the reported span against it, never read from the body (#8028). */
+  /** The configured maximum call duration, the one the mint handed the browser. */
   maxCallSeconds: number;
   conversationId?: string;
   /** Set for a "Call it myself" run: the scenario the call is scored under
@@ -307,11 +305,8 @@ async function ingestFinishedCall(
     existingAgentId,
   });
 
-  // Whether the limit ended the call is the server's finding, from the span
-  // the finish reports against the configured limit — not a flag the browser
-  // asserts. The span is what the run's own timing is built from, so a call
-  // cannot read as cut without also having run that long, nor hide a cutoff
-  // without also shortening itself (#8028).
+  // The span is client-reported, so a modified client can still shift it; the marker at
+  // least agrees with the run's own timing rather than a separate flag (#8028).
   const isCutAtLimit = callReachedLimit({
     durationMs: Math.max(0, input.endedAt - input.startedAt),
     maxCallSeconds: input.maxCallSeconds,

@@ -9,10 +9,8 @@ export type TalkDispatch = (event: TalkEvent) => void;
 export type TalkRefs = {
   session: { current: VoiceCallSession | null };
   startedAt: { current: number };
-  /** The wall-clock instant the call actually ended, captured once when the
-   *  hang-up/limit fires and reused across disconnect cleanup and any
-   *  name-save retry — so a below-limit manual hang-up is not inflated into a
-   *  cutoff by a slow finish, now that the server derives it from the span. */
+  /** The instant the call ended, frozen once and reused across cleanup and any
+   *  name-save retry, so a slow finish cannot stretch the span the server reads. */
   endedAt: { current: number };
   conversationId: { current: string | undefined };
   /** The signed session token from mint, carried back verbatim to finish. */

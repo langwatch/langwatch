@@ -744,15 +744,9 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   # ---------------------------------------------------------------------------
   # The cutoff marker on a "Call it myself" run is the server's finding (#8028)
   # ---------------------------------------------------------------------------
-  # The finish body carried `isCutAtLimit` and the run wrote it as given, so a
-  # modified browser could mark a normal call as cut or hide a real cutoff. The
-  # marker is now derived on the server from the call's own span — `endedAt -
-  # startedAt` against the configured maximum call duration, the same whole-
-  # second rule the countdown that ends a call at the limit applies — and the
-  # body carries no flag. The span is what the run's own timing is built from,
-  # so a call cannot read as cut without having run that long, nor hide a
-  # cutoff without shortening itself. Simulated runs are untouched: their
-  # marker still comes from the child's timer (8021 AC5).
+  # The marker is `endedAt - startedAt` against the configured maximum call duration, by
+  # the countdown's whole-second rule; the finish body carries no flag. Simulated runs keep
+  # the child's timer (8021 AC5).
 
   # 8028 AC1
   @unit @regression
@@ -767,6 +761,13 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Given a Call it myself finish whose span is at least the maximum call duration
     When the finish is ingested
     Then the written record is marked as cut at the limit
+
+  # 8028 AC2
+  @unit @regression
+  Scenario: A finish body that claims the call was cut carries no flag to the server
+    Given a finish body with isCutAtLimit set to true
+    When the body is parsed
+    Then the parsed finish has no isCutAtLimit field
 
   # ---------------------------------------------------------------------------
   # Every browser voice call writes a trace (3a)

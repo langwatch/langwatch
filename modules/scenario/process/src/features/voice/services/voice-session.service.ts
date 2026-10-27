@@ -214,9 +214,7 @@ export class VoiceSessionService {
       transcript: input.transcript,
       startedAt: input.startedAt,
       endedAt: input.endedAt,
-      // Server-derived: whether the limit ended the call is computed from the
-      // reported span against the configured maximum, never from a body flag
-      // (#8028). This is the same maximum the mint handed the browser.
+      // The cutoff marker is derived from the span against the maximum the mint handed out.
       maxCallSeconds: this.options.maxDurationSeconds,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.conversationId === undefined ? {} : { conversationId: input.conversationId }),
