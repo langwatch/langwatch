@@ -13,8 +13,8 @@ Feature: An experiment can pin the saved dataset version its runs read
   Scenario: The dataset version select lists Latest and every version, newest first
     Given an experiment whose saved dataset has versions 1 and 2, version 2 named "cleaned"
     When I look at the dataset header
-    Then a "Dataset version" select shows "Latest"
-    And it offers "Latest", "Version 2 · cleaned" and "Version 1", in that order
+    Then a "Dataset version" select shows "Latest version"
+    And it offers "Latest version", "Version 2 · cleaned" and "Version 1", in that order
 
   @integration
   Scenario: Choosing a version pins the experiment to it
@@ -25,7 +25,7 @@ Feature: An experiment can pin the saved dataset version its runs read
   @integration
   Scenario: Choosing Latest removes the pin
     Given an experiment pinned to version 1 of its saved dataset
-    When I choose "Latest" in the dataset version select
+    When I choose "Latest version" in the dataset version select
     Then the experiment's saved dataset reference pins no version
 
   @integration
