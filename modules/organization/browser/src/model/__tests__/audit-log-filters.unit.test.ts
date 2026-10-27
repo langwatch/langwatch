@@ -209,6 +209,7 @@ describe("given a project filter picked in one organization", () => {
   });
 
   describe("when the reader has switched organization and stayed on the page", () => {
+    /** @scenario A project filter is forgotten when the organization changes under it */
     it("drops the filter rather than asking for a project the new organization lacks", () => {
       expect(auditProjectFilterFor({ filter, organizationId: "org-beta" })).toBeNull();
     });
