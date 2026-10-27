@@ -165,7 +165,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 - **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.mdx`
 - **Cross-cutting** — `skills/{analytics,datasets}/SKILL.mdx`
 - **Meta** — `skills/level-up/SKILL.mdx` (orchestrates the feature skills)
-- **Recipes** — `skills/recipes/{debug-instrumentation,improve-setup,test-cli-usability,evaluate-multimodal,generate-rag-dataset,test-compliance}`
+- **Recipes** — `skills/recipes/{debug-instrumentation,improve-setup,test-cli-usability,evaluate-multimodal,generate-rag-dataset,test-compliance,red-team,red-team-owasp}`
 
 ### Documentation
 

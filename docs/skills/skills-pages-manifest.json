@@ -138,6 +138,18 @@
         "promptFile": "recipes-test-compliance.docs.txt"
       },
       {
+        "title": "Red team my agent",
+        "skill": "langwatch/skills/recipes/red-team",
+        "slashCommand": "/red-team",
+        "promptFile": "recipes-red-team.docs.txt"
+      },
+      {
+        "title": "Cover the OWASP Top 10 for LLM apps for my agent",
+        "skill": "langwatch/skills/recipes/red-team-owasp",
+        "slashCommand": "/red-team-owasp",
+        "promptFile": "recipes-red-team-owasp.docs.txt"
+      },
+      {
         "title": "Test my CLI is well usable by AI agents",
         "skill": "langwatch/skills/recipes/test-cli-usability",
         "slashCommand": "/test-cli-usability",
