@@ -2631,8 +2631,13 @@ function respond({
     answer = withoutUndeclaredKeys(route.output as z.ZodType, result);
   }
 
-  // A `z.void()` output, a route that declared no answer, or a refused answer
-  // the schema left nothing of.
+  // A refused answer the schema left nothing of keeps the route's own status.
+  if (answer === undefined && !validation.success) {
+    return context.body(null, (route.status ?? 200) as ContentfulStatusCode);
+  }
+
+  // Reachable only for a `z.void()` output: a route that declared no answer
+  // always takes this branch, and every other route never does.
   if (answer === undefined) return context.body(null, route.status ?? 204);
 
   return context.json(answer as never, route.status ?? 200);

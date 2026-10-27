@@ -71,6 +71,25 @@ describe("given a route whose handler answers a shape its output schema refuses"
     expect(JSON.parse(body)).toEqual({});
     expect(body).not.toContain("stored-value");
   });
+
+  it("keeps the declared status with no body when the schema leaves nothing", async () => {
+    const runtime = createRestRuntime({
+      authorization: authorizationPort,
+      identity: { authenticate: () => ({ actor: null, scope: null }) },
+    });
+
+    const app = runtime.mount(things.router(), {
+      // @ts-expect-error the stub answers a list where one thing is declared, on purpose
+      app: () => ({ read: async () => [{ secret: "stored-value" }] }),
+      credential: "public",
+      onError: createErrorHandler(),
+    });
+
+    const response = await app.request("/api/v1/things/one");
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("");
+  });
 });
 
 interface ReportApi {

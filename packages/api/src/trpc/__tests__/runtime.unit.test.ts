@@ -347,6 +347,36 @@ describe("a mounted contract procedure", () => {
       expect(record.fields.validation).toEqual({ expected: "void", received: "object" });
       expect(JSON.stringify(record)).not.toContain("stored-value");
     });
+
+    /** @scenario "A procedure that declares no output and answers a value is logged and answers nothing" */
+    it("still refuses a subscription that declares no output, and logs it", async () => {
+      const { runtime } = harness();
+      const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
+
+      const streams = defineTrpcContract("feed")
+        .subscription("watch")
+        .withInput(z.object({ projectId: z.string() }))
+        .build();
+
+      const declaration = defineTrpcRouter(ReviewApi, streams)
+        .procedure("watch")
+        .withPermission("annotations:view")
+        .handle(async function* () {
+          yield { secret: "stored-value" };
+        } as never)
+        .build();
+
+      const caller = runtime
+        .mount(declaration, () => app)
+        .createCaller({ actor: { id: "reviewer-1" } });
+
+      await expect(caller.watch({ projectId: "project-1" })).rejects.toThrow(
+        /declares no output schema/,
+      );
+      const record = logged[0] as { fields: Record<string, unknown>; message: string };
+      expect(record.fields.endpoint).toBe("feed.watch");
+      expect(JSON.stringify(record)).not.toContain("stored-value");
+    });
   });
 
   describe("given the handler throws", () => {

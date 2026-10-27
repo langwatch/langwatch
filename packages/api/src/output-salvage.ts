@@ -9,8 +9,8 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
 /**
- * The value cut down to what `schema` names. A part the schema accepts is answered as the schema
- * parses it; a part it refuses keeps its own value, with undeclared keys dropped below it.
+ * The value cut down to what `schema` allows. A part the schema accepts is answered as the schema
+ * parses it; below a part it refuses, unnamed keys and refused values are dropped.
  */
 export function withoutUndeclaredKeys(schema: z.ZodType, value: unknown): unknown {
   const parsed = schema.safeParse(value);
@@ -53,7 +53,8 @@ const NOTHING = z.never();
 function salvage(schema: z.ZodType, value: unknown): unknown {
   const inner = innerOf(schema);
 
-  if (inner) return value == null ? value : withoutUndeclaredKeys(inner, value);
+  // Here a null or undefined was already refused, so the wrapper's field is dropped.
+  if (inner) return value == null ? undefined : withoutUndeclaredKeys(inner, value);
 
   if (schema instanceof z.ZodObject) return salvageObject(schema, value);
 

@@ -70,6 +70,16 @@ describe("withoutUndeclaredKeys", () => {
       );
     });
 
+    it("drops a null its optional or defaulted field refuses", () => {
+      const schema = z.object({
+        id: z.string(),
+        count: z.number().default(0),
+        child: z.object({ id: z.string() }).optional(),
+      });
+
+      expect(withoutUndeclaredKeys(schema, { id: 7, count: null, child: null })).toEqual({});
+    });
+
     it("answers nothing when the whole value is the wrong kind", () => {
       expect(withoutUndeclaredKeys(z.object({ id: z.string() }), "secret")).toBeUndefined();
     });
