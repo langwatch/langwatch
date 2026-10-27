@@ -1,5 +1,6 @@
 import { Menu } from "@langwatch/design-system/menu";
 import {
+  Badge,
   Box,
   Button,
   Circle,
@@ -466,6 +467,18 @@ export const TargetHeader = memo(function TargetHeader({
               <Box flexShrink={0}>
                 <VersionBadge version={target.promptVersionNumber} />
               </Box>
+            )}
+            {target.type === "agent" && target.agentLabel && (
+              <Tooltip content={`Runs the agent version deployed as ${target.agentLabel}`}>
+                <Badge
+                  size="xs"
+                  variant="subtle"
+                  flexShrink={0}
+                  data-testid={`target-agent-label-${target.id}`}
+                >
+                  {target.agentLabel}
+                </Badge>
+              </Tooltip>
             )}
             {alertTooltip && (
               <Tooltip

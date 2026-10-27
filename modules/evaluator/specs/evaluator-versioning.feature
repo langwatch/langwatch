@@ -157,6 +157,13 @@ Feature: Evaluator versions and deploy labels
     And "Deploy" opens a dialog with latest, production and staging rows
 
   @integration
+  Scenario: The online evaluation drawer picks the evaluator deploy label
+    Given an online evaluation on an evaluator with "production" on version 1 and latest version 2
+    When the user opens the online evaluation drawer
+    Then the deploy label picker shows "latest" by default
+    And picking "production" saves the online evaluation pinned to "production"
+
+  @integration
   Scenario: The evaluators list shows who created each evaluator
     Given an evaluator created by "Ada" and one created before creators were recorded
     When the evaluators screen lists them

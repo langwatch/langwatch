@@ -606,6 +606,10 @@
     "./column-picker": {
       "types": "./dist/components/layout/column-picker.d.ts",
       "default": "./src/components/layout/column-picker.tsx"
+    },
+    "./deploy-label-select": {
+      "types": "./dist/components/forms/deploy-label-select.d.ts",
+      "default": "./src/components/forms/deploy-label-select.tsx"
     }
   },
   "scripts": {
