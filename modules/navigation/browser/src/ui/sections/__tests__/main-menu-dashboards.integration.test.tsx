@@ -44,7 +44,7 @@ function LentList({ openPath }: SavedDashboardsProps) {
   return <div data-testid="saved-dashboards">Saved dashboards open:{openPath || "none"}</div>;
 }
 
-/** Stands in for analytics' lent starred group, which draws itself only when stars exist. */
+/** Stands in for analytics' lent Dashboards section, which decides itself what it draws. */
 function LentStarred() {
   return <div data-testid="starred-dashboards">Starred dashboards</div>;
 }
@@ -67,7 +67,7 @@ function renderSidebar({
   pathname,
   permissions = ["analytics:view"],
 }: {
-  surface: "llm-ops" | "dashboards" | "gateway" | "settings";
+  surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings";
   pathname: string;
   permissions?: string[];
 }) {
@@ -140,10 +140,17 @@ describe("the LLM Ops sidebar", () => {
   });
 });
 
-describe("the starred dashboards group", () => {
+/** The lent section loads asynchronously, so its absence is only proven after a wait. */
+async function expectNoSection() {
+  await expect(screen.findByTestId("starred-dashboards", {}, { timeout: 300 })).rejects.toThrow(
+    "Unable to find an element",
+  );
+}
+
+describe("the Dashboards section analytics lends", () => {
   describe("given a member who can reach Dashboards, in LLM Ops", () => {
-    /** @scenario "Starred dashboards show in the other products' sidebars" */
-    it("draws analytics' starred group under the product's own pages", async () => {
+    /** @scenario "The LLM Ops sidebar has a Dashboards section listing the pinned dashboards" */
+    it("draws analytics' section under the product's own pages", async () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo" });
 
       expect(await screen.findByTestId("starred-dashboards")).toBeInTheDocument();
@@ -151,32 +158,35 @@ describe("the starred dashboards group", () => {
     });
   });
 
-  describe("given the Gateway sidebar", () => {
-    /** @scenario "Starred dashboards show in the other products' sidebars" */
-    it("draws the starred group there too", async () => {
-      renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
+  describe("given the same member, in Gateway, Governance or Me", () => {
+    /** @scenario "Only the LLM Ops sidebar shows the Dashboards section" */
+    it.each([
+      { surface: "gateway", pathname: "/gateway/virtual-keys" },
+      { surface: "governance", pathname: "/governance" },
+      { surface: "me", pathname: "/me" },
+    ] as const)("draws no section in $surface", async ({ surface, pathname }) => {
+      renderSidebar({ surface, pathname });
 
-      expect(await screen.findByTestId("starred-dashboards")).toBeInTheDocument();
+      await expectNoSection();
     });
   });
 
-  describe("given the Dashboards sidebar", () => {
-    /** @scenario "Starred dashboards show in the other products' sidebars" */
-    it("leaves the stars to the saved-dashboards list", async () => {
+  describe("given the same member, in Dashboards", () => {
+    /** @scenario "Only the LLM Ops sidebar shows the Dashboards section" */
+    it("leaves the boards to the saved-dashboards list", async () => {
       renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
 
-      await screen.findByTestId("saved-dashboards");
-      expect(screen.queryByTestId("starred-dashboards")).toBeNull();
+      expect(await screen.findByTestId("saved-dashboards")).toBeInTheDocument();
+      await expectNoSection();
     });
   });
 
-  describe("given a member who cannot reach Dashboards", () => {
-    /** @scenario "Starred dashboards show in the other products' sidebars" */
-    it("draws no starred group", async () => {
+  describe("given a member who cannot reach Dashboards, in LLM Ops", () => {
+    /** @scenario "The LLM Ops sidebar has a Dashboards section listing the pinned dashboards" */
+    it("draws no section", async () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo", permissions: [] });
 
-      await screen.findByRole("button", { name: "Quick Search" });
-      expect(screen.queryByTestId("starred-dashboards")).toBeNull();
+      await expectNoSection();
     });
   });
 });

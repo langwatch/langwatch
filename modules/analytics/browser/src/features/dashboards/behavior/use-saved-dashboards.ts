@@ -9,6 +9,7 @@ import type { DashboardProject, DashboardScope } from "@langwatch/dashboard-cont
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { dashboardsPath, untitledBoardName } from "../model/boards.ts";
+import { withBlockPickerOpen } from "./use-block-picker-address.ts";
 
 /** One stored board, as the list answers it. */
 export type SavedBoard = {
@@ -56,6 +57,9 @@ function savedBoardOf({
   };
 }
 
+/** How a new board starts: pinned for its maker, and with "Add a widget" open. */
+export type CreateBoardOptions = { pin?: boolean; addWidget?: boolean };
+
 export function useSavedDashboards() {
   const host = useAnalyticsHost();
   const project = host.project();
@@ -68,6 +72,7 @@ export function useSavedDashboards() {
     { enabled: !!projectId },
   );
   const create = analyticsApi.boards.create.useMutation();
+  const star = analyticsApi.boards.star.useMutation();
   const rename = analyticsApi.boards.update.useMutation();
   const remove = analyticsApi.boards.delete.useMutation();
 
@@ -80,13 +85,25 @@ export function useSavedDashboards() {
       utils.boards.listStarred.invalidate({ projectId }),
     ]);
 
-  const createBoard = () => {
+  /**
+   * Makes a blank board and opens it. `pin` stars it in this project for the maker; a failed
+   * pin still opens the board. `addWidget` opens it with "Add a widget" open.
+   */
+  const createBoard = ({ pin = false, addWidget = false }: CreateBoardOptions = {}) => {
     create.mutate(
       { projectId, name: untitledBoardName({ existingCount: boards.length }) },
       {
-        onSuccess: (created) => {
+        onSuccess: async (created) => {
+          if (pin) {
+            await star
+              .mutateAsync({ projectId, star: { kind: "board", dashboardId: created.id } })
+              .catch((error: unknown) =>
+                host.failed({ error, fallbackTitle: "Couldn't pin the dashboard" }),
+              );
+          }
           void refresh();
-          host.navigate(dashboardsPath({ projectSlug, dashboardId: created.id }));
+          const path = dashboardsPath({ projectSlug, dashboardId: created.id });
+          host.navigate(addWidget ? withBlockPickerOpen(path) : path);
         },
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't create the dashboard" }),
       },
@@ -133,7 +150,7 @@ export function useSavedDashboards() {
     /** True until the first list answer arrives, so a board lookup never reads "missing" early. */
     isLoading: list.data === void 0 && !list.isError,
     loadError: list.error,
-    isCreating: create.isPending,
+    isCreating: create.isPending || star.isPending,
     isDeleting: remove.isPending,
     createBoard,
     renameBoard,

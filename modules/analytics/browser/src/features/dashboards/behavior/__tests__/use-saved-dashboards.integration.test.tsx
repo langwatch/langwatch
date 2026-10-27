@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
     updatedAt: new Date("2026-01-02"),
   },
   create: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
+  star: { mutateAsync: vi.fn(), isPending: false },
   rename: { mutate: vi.fn(), isPending: false },
   remove: { mutate: vi.fn(), isPending: false },
   utils: {
@@ -67,6 +68,7 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
         },
       },
       create: { useMutation: () => mocks.create },
+      star: { useMutation: () => mocks.star },
       update: { useMutation: () => mocks.rename },
       delete: { useMutation: () => mocks.remove },
     },

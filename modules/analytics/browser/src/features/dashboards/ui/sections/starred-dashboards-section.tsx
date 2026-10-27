@@ -1,46 +1,67 @@
 /**
- * "Starred dashboards" in the other products' sidebars, lent through `StarredDashboardsToken`
- * (§10.1): the first 7 stars in the member's order, then "All starred (N)" if more. Draws
- * nothing while the stars load, when they fail, or when the member has starred none.
- * @see modules/dashboard/specs/dashboards-v2.feature
+ * The "Dashboards" section in the LLM Ops sidebar, lent through `StarredDashboardsToken`
+ * (§10.1): the dashboards the member pinned to the project (their stars there), the first 7
+ * then "All pinned (N)", and a "+" that makes a pinned dashboard and opens "Add a widget".
+ * @see modules/navigation/specs/product-sidebars.feature
  */
 
 import type { StarredDashboardsProps } from "@langwatch/analytics-client";
-import { Box, Link as ChakraLink, Text, VStack } from "@langwatch/design-system/primitives";
-import { Star } from "lucide-react";
+import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
+import { Box, Link as ChakraLink, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { LayoutDashboard, Plus } from "lucide-react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
+import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useFavourites } from "../../behavior/use-favourites.ts";
+import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { dashboardsPath } from "../../model/boards.ts";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
 import { type StarredLink, starredLinks } from "../../model/sidebar-boards.ts";
+import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 
-/** Rows shown before the rest sit behind "All starred (N)": the sidebar stays short. */
-const STARRED_ELSEWHERE_MAX = 7;
+/** Whether a dashboard made from this section starts pinned to the project for its maker. */
+export const PIN_SIDEBAR_DASHBOARDS_BY_DEFAULT = true;
+
+/** Rows shown before the rest sit behind "All pinned (N)": the sidebar stays short. */
+const PINNED_SHOWN_MAX = 7;
 
 export function StarredDashboardsSection(_props: StarredDashboardsProps) {
   const host = useAnalyticsHost();
   const favourites = useFavourites();
+  const saved = useSavedDashboards();
+  const { mayCreate } = useBoardReader();
   const projectSlug = host.project()?.slug;
-  if (!projectSlug || favourites.isLoading || favourites.loadError) return null;
-  const links = starredLinks({ stars: favourites.stars, curated: CURATED_BOARDS, projectSlug });
-  if (links.length === 0) return null;
-  const shown = links.slice(0, STARRED_ELSEWHERE_MAX);
+  if (!projectSlug) return null;
+  const isLoaded = !favourites.isLoading && !favourites.loadError;
+  const links = isLoaded
+    ? starredLinks({ stars: favourites.stars, curated: CURATED_BOARDS, projectSlug })
+    : [];
+  // A member who may not add one sees the section only for what it lists.
+  if (!mayCreate && links.length === 0) return null;
+  const addDashboard = () =>
+    saved.createBoard({ pin: PIN_SIDEBAR_DASHBOARDS_BY_DEFAULT, addWidget: true });
+  const shown = links.slice(0, PINNED_SHOWN_MAX);
+
   return (
-    <VStack as="section" aria-label="Starred dashboards" align="stretch" gap={0.5} width="full">
-      <Text paddingX={2} marginTop={3} marginBottom={0.5} textStyle="eyebrow" color="fg.subtle">
-        Starred dashboards
-      </Text>
+    <VStack as="section" aria-label="Dashboards" align="stretch" gap={0.5} width="full">
+      {/* The same frame and label as navigation's own groups, so it reads like "Build". */}
+      <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
+        <SidebarSectionLabel label="Dashboards" />
+        {mayCreate && <NewDashboardButton isCreating={saved.isCreating} onCreate={addDashboard} />}
+      </HStack>
       <VStack as="ul" align="stretch" gap={0.5} margin={0} padding={0}>
+        {isLoaded && links.length === 0 && (
+          <AddDashboardRow isCreating={saved.isCreating} onAdd={addDashboard} />
+        )}
         {shown.map((link) => (
-          <StarredRow key={link.key} link={link} />
+          <PinnedRow key={link.key} link={link} />
         ))}
-        {links.length > STARRED_ELSEWHERE_MAX && (
-          <StarredRow
+        {links.length > PINNED_SHOWN_MAX && (
+          <PinnedRow
             link={{
-              key: "all-starred",
-              name: `All starred (${links.length})`,
+              key: "all-pinned",
+              name: `All pinned (${links.length})`,
               href: dashboardsPath({ projectSlug }),
             }}
             isAll
@@ -51,7 +72,39 @@ export function StarredDashboardsSection(_props: StarredDashboardsProps) {
   );
 }
 
-function StarredRow({ link, isAll = false }: { link: StarredLink; isAll?: boolean }) {
+/** The dotted-outline first item while nothing is pinned; it does what the "+" does. */
+function AddDashboardRow({ isCreating, onAdd }: { isCreating: boolean; onAdd: () => void }) {
+  return (
+    <Box as="li" listStyleType="none" width="full">
+      <Box
+        as="button"
+        display="flex"
+        alignItems="center"
+        gap={2}
+        width="full"
+        borderRadius="lg"
+        borderWidth="1px"
+        borderStyle="dashed"
+        borderColor="border.emphasized"
+        paddingX={2}
+        paddingY="3px"
+        textStyle="bodySm"
+        color="fg.subtle"
+        cursor="pointer"
+        _hover={{ color: "fg", background: "border/50" }}
+        aria-disabled={isCreating || void 0}
+        onClick={() => {
+          if (!isCreating) onAdd();
+        }}
+      >
+        <Plus size={14} aria-hidden />
+        Add dashboard
+      </Box>
+    </Box>
+  );
+}
+
+function PinnedRow({ link, isAll = false }: { link: StarredLink; isAll?: boolean }) {
   const host = useAnalyticsHost();
   return (
     <Box as="li" listStyleType="none" width="full">
@@ -75,8 +128,8 @@ function StarredRow({ link, isAll = false }: { link: StarredLink; isAll?: boolea
         }}
       >
         {!isAll && (
-          <Box as="span" display="flex" flexShrink={0} color="yellow.solid">
-            <Star size={14} fill="currentColor" strokeWidth={1.9} aria-hidden />
+          <Box as="span" display="flex" flexShrink={0}>
+            <LayoutDashboard size={14} strokeWidth={1.9} aria-hidden />
           </Box>
         )}
         <Text as="span" truncate minWidth={0}>
