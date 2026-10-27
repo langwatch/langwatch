@@ -55,7 +55,7 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
   .withPermission("evaluations:manage")
   .handle(async ({ app, input, actor }) =>
     app.evaluators().create({
-      caller: evaluatorCallerOf(actor),
+      caller: evaluatorCallerOf({ actor }),
       id: input.id,
       projectId: input.projectId,
       name: input.name,
@@ -71,7 +71,7 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
     app.evaluators().update({
       id: input.id,
       projectId: input.projectId,
-      caller: evaluatorCallerOf(actor),
+      caller: evaluatorCallerOf({ actor }),
       ...(input.commitMessage !== void 0 && { commitMessage: input.commitMessage }),
       data: {
         ...(input.name !== void 0 && { name: input.name }),
@@ -105,7 +105,7 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
     app.evaluators().cascadeArchive({
       id: input.id,
       projectId: input.projectId,
-      caller: evaluatorCallerOf(actor),
+      caller: evaluatorCallerOf({ actor }),
     }),
   )
 
@@ -115,7 +115,7 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
     app.evaluators().archive({
       id: input.id,
       projectId: input.projectId,
-      caller: evaluatorCallerOf(actor),
+      caller: evaluatorCallerOf({ actor }),
     }),
   )
 
@@ -199,7 +199,7 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
   .procedure("assignLabel")
   .withPermission("evaluators:deploy")
   .handle(async ({ app, input, actor }) =>
-    app.evaluators().assignLabel({ ...input, caller: evaluatorCallerOf(actor) }),
+    app.evaluators().assignLabel({ ...input, caller: evaluatorCallerOf({ actor }) }),
   )
 
   .procedure("removeLabel")

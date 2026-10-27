@@ -244,17 +244,18 @@ export function createEvaluatorRest(): Readonly<{
       .keepsRecords()
       .withAudit("evaluators.create")
       .withInput(createEvaluatorInputSchema)
+      .withCredential("project", { key: true })
       .withPermission("evaluations:create")
       .withOutput(evaluatorWireSchema)
       .withDocs({ description: "Create a new evaluator" })
       .withMiddlewareContext(projectRequestContext)
-      .handle(({ app, input, scope, actor }, project) =>
+      .handle(({ app, input, scope, actor, key }, project) =>
         createEvaluator({
           app,
           input,
           project,
           projectId: scope.id,
-          caller: evaluatorCallerOf(actor),
+          caller: evaluatorCallerOf({ actor, key }),
         }),
       )
 
@@ -263,6 +264,7 @@ export function createEvaluatorRest(): Readonly<{
       .withAudit("evaluators.update")
       .withParams(evaluatorIdParamsSchema)
       .withInput(updateEvaluatorInputSchema)
+      .withCredential("project", { key: true })
       .withPermission("evaluations:update")
       .withOutput(evaluatorWireSchema)
       .withDocs({
@@ -270,13 +272,13 @@ export function createEvaluatorRest(): Readonly<{
         responses: badRequest,
       })
       .withMiddlewareContext(projectRequestContext)
-      .handle(({ app, input, scope, actor }, project) =>
+      .handle(({ app, input, scope, actor, key }, project) =>
         updateEvaluator({
           app,
           input,
           project,
           projectId: scope.id,
-          caller: evaluatorCallerOf(actor),
+          caller: evaluatorCallerOf({ actor, key }),
         }),
       )
 
@@ -284,6 +286,7 @@ export function createEvaluatorRest(): Readonly<{
       .delete("/:id", "deleteApiEvaluatorsById")
       .withAudit("evaluators.delete")
       .withParams(evaluatorIdParamsSchema)
+      .withCredential("project", { key: true })
       .withPermission("evaluations:manage")
       .withConfirmation({
         resource: "evaluator",
@@ -296,12 +299,12 @@ export function createEvaluatorRest(): Readonly<{
         description: "Archive (soft-delete) an evaluator",
         responses: notFound,
       })
-      .handle(({ app, input, scope, actor }) =>
+      .handle(({ app, input, scope, actor, key }) =>
         archiveEvaluator({
           app,
           id: input.id,
           projectId: scope.id,
-          caller: evaluatorCallerOf(actor),
+          caller: evaluatorCallerOf({ actor, key }),
         }),
       )
 
@@ -330,19 +333,20 @@ export function createEvaluatorRest(): Readonly<{
       .withAudit("evaluators.assignLabel")
       .withParams(evaluatorLabelRestParamsSchema)
       .withInput(evaluatorLabelRestBodySchema)
+      .withCredential("project", { key: true })
       .withPermission("evaluators:deploy")
       .withOutput(evaluatorLabelResponseSchema)
       .withDocs({
         description: "Point a deploy label, such as production, at one of the evaluator's versions",
         responses: badRequest,
       })
-      .handle(async ({ app, input, scope, actor }) => {
+      .handle(async ({ app, input, scope, actor, key }) => {
         const label = await app.assignLabel({
           projectId: scope.id,
           evaluatorId: input.evaluatorId,
           label: input.label,
           version: input.version,
-          caller: evaluatorCallerOf(actor),
+          caller: evaluatorCallerOf({ actor, key }),
         });
 
         return { label: label.label, version: label.version, versionId: label.versionId };

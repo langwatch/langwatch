@@ -251,15 +251,17 @@ export class EvaluatorVersionService {
       ids: [input.evaluatorId],
     });
     if (labels.length === 0) return;
-    const scope = await this.#deps.permissions.getScope({ projectId: input.projectId });
-    const permitted = await this.#deps.permissions.can({
-      principal:
-        input.caller.type === "user"
-          ? { type: "user", id: input.caller.id }
-          : { type: "apiKey", id: input.caller.id },
-      permission: "evaluators:deploy",
-      scope,
-    });
+    const { caller } = input;
+    const permitted =
+      caller.type !== "unattributed" &&
+      (await this.#deps.permissions.can({
+        principal:
+          caller.type === "user"
+            ? { type: "user", id: caller.id }
+            : { type: "apiKey", id: caller.id },
+        permission: "evaluators:deploy",
+        scope: await this.#deps.permissions.getScope({ projectId: input.projectId }),
+      }));
     if (!permitted) {
       throw new EvaluatorDeployedLabelProtectedError({
         evaluatorId: input.evaluatorId,

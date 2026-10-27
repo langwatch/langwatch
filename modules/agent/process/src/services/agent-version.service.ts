@@ -205,15 +205,17 @@ export class AgentVersionService {
       ids: [input.agentId],
     });
     if (labels.length === 0) return;
-    const scope = await this.#permissions.getScope({ projectId: input.projectId });
-    const permitted = await this.#permissions.can({
-      principal:
-        input.caller.type === "user"
-          ? { type: "user", id: input.caller.id }
-          : { type: "apiKey", id: input.caller.id },
-      permission: "agents:deploy",
-      scope,
-    });
+    const { caller } = input;
+    const permitted =
+      caller.type !== "unattributed" &&
+      (await this.#permissions.can({
+        principal:
+          caller.type === "user"
+            ? { type: "user", id: caller.id }
+            : { type: "apiKey", id: caller.id },
+        permission: "agents:deploy",
+        scope: await this.#permissions.getScope({ projectId: input.projectId }),
+      }));
     if (!permitted) {
       throw new AgentDeployedLabelProtectedError({
         agentId: input.agentId,

@@ -145,16 +145,17 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .keepsRecords()
       .withAudit("agents.create")
       .withInput(createAgentRequestSchema)
+      .withCredential("project", { key: true })
       .withPermission("project:update")
       .withOutput(agentResponseSchema)
       .withStatus(201)
       .withDocs({ summary: "Create an authored agent; connected agents register through the SDK" })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope, actor }, context) => {
+      .handle(async ({ app, input, scope, actor, key }, context) => {
         const created = await app.create({
           ...input,
           projectId: scope.id,
-          caller: agentCallerOf(actor),
+          caller: agentCallerOf({ actor, key }),
         });
         const agent = await app.getById({
           id: created.id,
@@ -191,12 +192,13 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withAudit("agents.update")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
+      .withCredential("project", { key: true })
       .withPermission("project:update")
       .withOutput(agentResponseSchema)
       .withDocs({ summary: "Update an authored agent" })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope, actor }, context) => {
-        await app.update({ ...input, projectId: scope.id, caller: agentCallerOf(actor) });
+      .handle(async ({ app, input, scope, actor, key }, context) => {
+        await app.update({ ...input, projectId: scope.id, caller: agentCallerOf({ actor, key }) });
         const agent = await app.getById({
           id: input.id,
           projectId: scope.id,
@@ -211,12 +213,13 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withAudit("agents.update")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
+      .withCredential("project", { key: true })
       .withPermission("project:update")
       .withOutput(agentResponseSchema)
       .withDocs({ summary: "Update an authored agent; PUT retains partial update semantics" })
       .withMiddlewareContext(projectRequestContext)
-      .handle(async ({ app, input, scope, actor }, context) => {
-        await app.update({ ...input, projectId: scope.id, caller: agentCallerOf(actor) });
+      .handle(async ({ app, input, scope, actor, key }, context) => {
+        await app.update({ ...input, projectId: scope.id, caller: agentCallerOf({ actor, key }) });
         const agent = await app.getById({
           id: input.id,
           projectId: scope.id,
@@ -230,14 +233,15 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withAudit("agents.delete")
       .withoutConfirmation("Langy keys cannot hold project:delete")
       .withParams(agentRestParamsSchema)
+      .withCredential("project", { key: true })
       .withPermission("project:delete")
       .withOutput(archiveResultSchema)
       .withDocs({ summary: "Archive an agent while keeping its runs" })
-      .handle(async ({ app, input, scope, actor }) => {
+      .handle(async ({ app, input, scope, actor, key }) => {
         const agent = await app.archive({
           ...input,
           projectId: scope.id,
-          caller: agentCallerOf(actor),
+          caller: agentCallerOf({ actor, key }),
         });
 
         return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
@@ -264,18 +268,19 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withAudit("agents.assignLabel")
       .withParams(agentLabelRestParamsSchema)
       .withInput(agentLabelRestBodySchema)
+      .withCredential("project", { key: true })
       .withPermission("agents:deploy")
       .withOutput(agentLabelResponseSchema)
       .withDocs({
         summary: "Point a deploy label, such as production, at one of the agent's versions",
       })
-      .handle(async ({ app, input, scope, actor }) => {
+      .handle(async ({ app, input, scope, actor, key }) => {
         const label = await app.assignLabel({
           projectId: scope.id,
           agentId: input.agentId,
           label: input.label,
           version: input.version,
-          caller: agentCallerOf(actor),
+          caller: agentCallerOf({ actor, key }),
         });
 
         return { label: label.label, version: label.version, versionId: label.versionId };
