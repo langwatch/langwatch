@@ -63,7 +63,8 @@ export function launchQuickTunnel({
   }
 
   child.on("error", (error) => events.emit("error", error));
-  child.on("exit", (code, signal) => events.emit("exit", code, signal));
+  // `close`, not `exit`: it waits for both pipes to end, so recentLog() holds the last lines.
+  child.on("close", (code, signal) => events.emit("exit", code, signal));
 
   return {
     stop: () => {
