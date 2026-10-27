@@ -212,7 +212,8 @@ Feature: Scenario tests for skills quality assurance
     Given the fixture "python-support-agent" is copied to a temp directory
     And the skill "red-team-owasp" is loaded
     When Claude Code receives "cover the OWASP Top 10 for LLM apps for my agent"
-    Then the agent writes a red-team test for each of LLM01, LLM02, LLM05, LLM06, LLM07, LLM09 and LLM10 and runs them
+    Then the agent writes a red-team test for each of LLM01, LLM02, LLM06, LLM07, LLM09 and LLM10 and runs them
+    And it tests LLM05 when the reply reaches a sink that can execute it, or reports LLM05 as not applicable with the reason
     And the agent reviews LLM03, LLM04 and LLM08 by reading the code instead of testing them
     And the agent reports a result per OWASP category with evidence
 
