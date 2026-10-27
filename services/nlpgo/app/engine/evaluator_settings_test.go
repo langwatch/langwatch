@@ -174,6 +174,21 @@ func TestEvaluatorSettings_SkipsValuelessParameters(t *testing.T) {
 	assert.EqualValues(t, 64, settings["max_tokens"])
 }
 
+// TestEvaluatorSettings_SkipsNullParameters is the other half of the same
+// claim: a null is as absent as a missing value. No evaluator's settings
+// schema accepts one, so forwarding a null would refuse the whole evaluate
+// call instead of leaving the stored setting standing.
+func TestEvaluatorSettings_SkipsNullParameters(t *testing.T) {
+	settings := evaluatorSettings([]dsl.Field{
+		{Identifier: "settings", Type: "dict", Value: json.RawMessage(`{"model":"openai/gpt-5-mini"}`)},
+		{Identifier: "model", Type: "str", Value: json.RawMessage(`null`)},
+		param(t, "max_tokens", 64),
+	})
+
+	assert.Equal(t, "openai/gpt-5-mini", settings["model"], "a null must not blank the stored setting")
+	assert.EqualValues(t, 64, settings["max_tokens"])
+}
+
 // TestDispatchEvaluator_NodeNameReachesTheEvaluateCall pins the same split one
 // field over: the Studio writes the node's name onto `data.name`, so reading
 // it only off parameters[] sent no name and the evaluation was attributed

@@ -1677,6 +1677,12 @@ func evaluatorSettings(params []dsl.Field) map[string]any {
 		if err := jsonUnmarshalRaw(p.Value, &value); err != nil {
 			continue
 		}
+		// A null is absent too: no evaluator's settings schema accepts
+		// one, so forwarding it would refuse the whole call rather than
+		// leave the stored setting standing.
+		if value == nil {
+			continue
+		}
 		settings[p.Identifier] = value
 	}
 	if len(settings) == 0 {
