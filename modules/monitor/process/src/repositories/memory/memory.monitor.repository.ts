@@ -184,6 +184,9 @@ export class MemoryMonitorRepository implements MonitorRepository {
       sample: input.sample,
       level: input.level ?? "trace",
       threadIdleTimeout: input.threadIdleTimeout ?? null,
+      evaluatorLabel: input.evaluatorLabel ?? null,
+      createdById: input.actorId ?? null,
+      updatedById: input.actorId ?? null,
       createdAt: now,
       updatedAt: now,
     });
@@ -192,7 +195,13 @@ export class MemoryMonitorRepository implements MonitorRepository {
   async createReplica(input: Monitor): Promise<Monitor> {
     const now = toDate(nowInstant());
 
-    return this.#insert({ ...input, ...NOT_AUTO_PAUSED, createdAt: now, updatedAt: now });
+    return this.#insert({
+      ...input,
+      ...NOT_AUTO_PAUSED,
+      updatedById: input.createdById ?? null,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   async update(
@@ -218,6 +227,8 @@ export class MemoryMonitorRepository implements MonitorRepository {
       ...(input.threadIdleTimeout === undefined
         ? {}
         : { threadIdleTimeout: input.threadIdleTimeout }),
+      ...(input.evaluatorLabel === undefined ? {} : { evaluatorLabel: input.evaluatorLabel }),
+      ...(input.actorId === undefined ? {} : { updatedById: input.actorId }),
     });
 
     return this.#asMonitor(row);

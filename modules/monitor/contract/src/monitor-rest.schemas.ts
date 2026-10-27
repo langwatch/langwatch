@@ -69,6 +69,12 @@ const monitorRestResponseSchemaDefinition = z.object({
     .nullable()
     .describe("When the monitor paused itself because its evaluations mostly failed."),
   autoPausedReason: z.string().nullable().describe("Why the monitor paused itself."),
+  evaluatorLabel: z
+    .string()
+    .nullable()
+    .describe("The evaluator deploy label the monitor runs; null runs the latest version."),
+  createdById: z.string().nullable().describe("The user who created the monitor, when recorded."),
+  updatedById: z.string().nullable().describe("The user who changed the monitor last."),
   platformUrl: z.string().url(),
 });
 export interface MonitorRestResponseSchema extends Named<
@@ -89,6 +95,13 @@ const monitorRestCreateInputSchemaDefinition = z.object({
   evaluatorId: z.string().min(1).optional(),
   level: z.enum(["trace", "thread"]).default("trace"),
   threadIdleTimeout: z.number().int().positive().nullable().optional(),
+  evaluatorLabel: z
+    .string()
+    .min(1)
+    .max(64)
+    .nullable()
+    .optional()
+    .describe("Run the evaluator at this deploy label, such as production; null runs the latest."),
 });
 export interface MonitorRestCreateInputSchema extends Named<
   typeof monitorRestCreateInputSchemaDefinition
@@ -108,6 +121,13 @@ const monitorRestUpdateInputSchemaDefinition = z.object({
   evaluatorId: z.string().min(1).nullable().optional(),
   level: z.enum(["trace", "thread"]).optional(),
   threadIdleTimeout: z.number().int().positive().nullable().optional(),
+  evaluatorLabel: z
+    .string()
+    .min(1)
+    .max(64)
+    .nullable()
+    .optional()
+    .describe("Run the evaluator at this deploy label, such as production; null runs the latest."),
 });
 export interface MonitorRestUpdateInputSchema extends Named<
   typeof monitorRestUpdateInputSchemaDefinition

@@ -32,13 +32,15 @@ import {
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
+import type { UserApi } from "@langwatch/user-contract";
 
 import type { MonitorRepository } from "../repositories/monitor.repository.ts";
 
 type MonitorServiceOptions = {
   repository: MonitorRepository;
-  evaluators: Pick<EvaluatorApi, "getById" | "findById">;
+  evaluators: Pick<EvaluatorApi, "getById" | "findById" | "atLabelOrLatest">;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
+  users: Pick<UserApi, "getProfiles">;
   generateId: () => string;
 };
 
@@ -62,8 +64,8 @@ export class MonitorService {
 
   private constructor(private readonly options: MonitorServiceOptions) {}
 
-  getAllForProject(input: { projectId: string }): Promise<MonitorWithEvaluator[]> {
-    return this.options.repository.findAll(input);
+  async getAllForProject(input: { projectId: string }): Promise<MonitorWithEvaluator[]> {
+    return this.withPeople(await this.options.repository.findAll(input));
   }
 
   async findByEvaluator(input: {
@@ -91,15 +93,45 @@ export class MonitorService {
 
     if (!monitor) throw new MonitorNotFoundError(parsed.id);
 
-    return monitor;
+    return this.readable(monitor);
   }
 
   async findById(input: MonitorIdInput): Promise<MonitorWithEvaluator | undefined> {
-    return this.options.repository.findById(monitorIdInputSchema.parse(input));
+    const monitor = await this.options.repository.findById(monitorIdInputSchema.parse(input));
+    return monitor ? this.readable(monitor) : undefined;
   }
 
-  findBySlug(input: { projectId: string; slug: string }): Promise<MonitorWithEvaluator[]> {
-    return this.options.repository.findBySlug(input);
+  async findBySlug(input: { projectId: string; slug: string }): Promise<MonitorWithEvaluator[]> {
+    const monitors = await this.options.repository.findBySlug(input);
+    return Promise.all(monitors.map((monitor) => this.readable(monitor)));
+  }
+
+  /** The monitor as it runs: its evaluator at the pinned label, and who wrote it. */
+  private async readable(monitor: MonitorWithEvaluator): Promise<MonitorWithEvaluator> {
+    const [named = monitor] = await this.withPeople([monitor]);
+    if (!named.evaluator || !named.evaluatorLabel) return named;
+    const evaluator = await this.options.evaluators.atLabelOrLatest({
+      evaluator: named.evaluator,
+      label: named.evaluatorLabel,
+    });
+    return { ...named, evaluator };
+  }
+
+  /** Fills `createdBy` and `updatedBy`; a monitor with no recorded creator keeps null. */
+  private async withPeople<T extends Monitor>(monitors: T[]): Promise<T[]> {
+    const ids = [...new Set(monitors.flatMap((row) => [row.createdById, row.updatedById]))].filter(
+      (id): id is string => typeof id === "string",
+    );
+    const profiles = ids.length ? await this.options.users.getProfiles({ userIds: ids }) : [];
+    const people = new Map(
+      profiles.map((user) => [user.id, { id: user.id, name: user.name ?? user.email }]),
+    );
+    const person = (id: string | null | undefined) => (id ? (people.get(id) ?? null) : null);
+    return monitors.map((row) => ({
+      ...row,
+      createdBy: person(row.createdById),
+      updatedBy: person(row.updatedById),
+    }));
   }
 
   getAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
@@ -288,6 +320,12 @@ export class MonitorService {
       projectId: parsed.targetProjectId,
       experimentId: null,
       evaluatorId: parsed.evaluatorId,
+      // Deploy labels stay with the source evaluator; the copy runs the latest.
+      evaluatorLabel: null,
+      createdById: parsed.actorId ?? null,
+      updatedById: parsed.actorId ?? null,
+      createdBy: undefined,
+      updatedBy: undefined,
       name,
       slug: `${slugify(name)}-${id.slice(-5)}`,
       enabled: false,
