@@ -20,7 +20,7 @@ import {
   AgentVersionNotFoundError,
 } from "@langwatch/agent-contract";
 import { generate } from "@langwatch/ksuid";
-import { nowInstant, toDate } from "@langwatch/time";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import type {
   AgentPresenceInput,
@@ -224,7 +224,7 @@ export class MemoryAgentRepository implements AgentRepository {
     this.#appendVersion({ agent: saved, author: input.author, commitMessage: input.commitMessage });
   }
 
-  async listVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]> {
+  async findVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]> {
     return structuredClone(
       this.#versions
         .filter((row) => row.projectId === input.projectId && row.agentId === input.agentId)
@@ -233,7 +233,7 @@ export class MemoryAgentRepository implements AgentRepository {
   }
 
   async findVersion(input: AgentVersionLookup): Promise<AgentVersionRecord | undefined> {
-    const [found] = (await this.listVersions(input)).filter(
+    const [found] = (await this.findVersions(input)).filter(
       (row) =>
         (input.version === void 0 || row.version === input.version) &&
         (input.versionId === void 0 || row.id === input.versionId),
@@ -250,7 +250,7 @@ export class MemoryAgentRepository implements AgentRepository {
     return numbers;
   }
 
-  async listLabels(input: AgentIdsInput): Promise<AgentLabelRecord[]> {
+  async findLabels(input: AgentIdsInput): Promise<AgentLabelRecord[]> {
     return this.#labels
       .filter((row) => row.projectId === input.projectId && input.ids.includes(row.agentId))
       .flatMap(({ projectId: _projectId, ...row }) => {
@@ -278,7 +278,7 @@ export class MemoryAgentRepository implements AgentRepository {
       agentId: input.agentId,
       label: input.label,
       versionId: version.id,
-      updatedAt: toDate(nowInstant()),
+      updatedAt: nowInstant(),
       updatedById: input.actorId,
     };
     this.#labels = [
@@ -336,7 +336,7 @@ export class MemoryAgentRepository implements AgentRepository {
       commitMessage: null,
       authorId: input.createdById,
       authorKind: input.createdById ? "user" : "system",
-      createdAt: agent.createdAt,
+      createdAt: fromDate(agent.createdAt),
     });
     const stored = this.#agents.get(agent.id);
     if (stored && input.createdById && !stored.createdById) {
@@ -372,7 +372,7 @@ export class MemoryAgentRepository implements AgentRepository {
       commitMessage: input.commitMessage ?? null,
       authorId: input.author?.authorId ?? null,
       authorKind: input.author?.authorKind ?? "system",
-      createdAt: toDate(nowInstant()),
+      createdAt: nowInstant(),
     });
   }
 

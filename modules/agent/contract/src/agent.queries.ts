@@ -149,8 +149,8 @@ export type ConnectedAgentsEnvironmentInput = ConnectedAgentsInput & { environme
 /** One agent as the legacy tRPC reads render it, copy count included. */
 const agentOverviewSchemaDefinition = z.intersection(
   agentWithFieldsSchema,
-  agentResponseSchema
-    .omit({
+  z.object({
+    ...agentResponseSchema.omit({
       id: true,
       name: true,
       type: true,
@@ -162,12 +162,11 @@ const agentOverviewSchemaDefinition = z.intersection(
       labels: true,
       createdBy: true,
       updatedBy: true,
-    })
-    .extend(
-      agentResponseSchema
-        .pick({ version: true, labels: true, createdBy: true, updatedBy: true })
-        .partial().shape,
-    ),
+    }).shape,
+    ...agentResponseSchema
+      .pick({ version: true, labels: true, createdBy: true, updatedBy: true })
+      .partial().shape,
+  }),
 );
 export interface AgentOverviewSchema extends Named<typeof agentOverviewSchemaDefinition> {}
 export const agentOverviewSchema: AgentOverviewSchema = agentOverviewSchemaDefinition;

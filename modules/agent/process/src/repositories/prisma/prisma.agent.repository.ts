@@ -29,7 +29,7 @@ import {
   uniqueConstraintTargets,
 } from "@langwatch/prisma-client/errors";
 import type { Prisma } from "@langwatch/prisma-client/generated";
-import { nowInstant, toDate } from "@langwatch/time";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import type {
@@ -96,6 +96,7 @@ function mapVersionRow(row: VersionRow): AgentVersionRecord {
     type: agentTypeSchema.parse(row.type),
     config: workflowConfigSchema.safeParse(row.config).data ?? {},
     authorKind: agentVersionAuthorKindSchema.safeParse(row.authorKind).data ?? null,
+    createdAt: fromDate(row.createdAt),
   };
 }
 
@@ -431,7 +432,7 @@ export class PrismaAgentRepository
     });
   }
 
-  async listVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]> {
+  async findVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]> {
     const rows = await this.prisma.agentVersion.findMany({
       where: { projectId: input.projectId, agentId: input.agentId },
       orderBy: { version: "desc" },
@@ -464,7 +465,7 @@ export class PrismaAgentRepository
     );
   }
 
-  async listLabels(input: AgentIdsInput): Promise<AgentLabelRecord[]> {
+  async findLabels(input: AgentIdsInput): Promise<AgentLabelRecord[]> {
     if (input.ids.length === 0) return [];
     const labels = await this.prisma.agentVersionLabel.findMany({
       where: { projectId: input.projectId, agentId: { in: input.ids } },
@@ -485,7 +486,7 @@ export class PrismaAgentRepository
               label: label.label,
               versionId: label.versionId,
               version,
-              updatedAt: label.updatedAt,
+              updatedAt: fromDate(label.updatedAt),
               updatedById: label.updatedById,
             },
           ];
@@ -523,7 +524,7 @@ export class PrismaAgentRepository
         label: row.label,
         versionId: row.versionId,
         version: version.version,
-        updatedAt: row.updatedAt,
+        updatedAt: fromDate(row.updatedAt),
         updatedById: row.updatedById,
       };
     });
@@ -596,7 +597,7 @@ export class PrismaAgentRepository
     commitMessage: string | undefined;
     data: Prisma.AgentUncheckedUpdateInput;
   }) {
-    for (let attempt = 1; ; attempt += 1) {
+    for (let attempt = 1; attempt <= VERSION_WRITE_ATTEMPTS; attempt += 1) {
       try {
         return await this.transaction(async (transaction) => {
           const updated = await transaction.agent.update({
@@ -621,6 +622,9 @@ export class PrismaAgentRepository
         return this.#writeError(error, input);
       }
     }
+    throw new Error(
+      `Agent ${input.id} lost the version number race ${VERSION_WRITE_ATTEMPTS} times`,
+    );
   }
 
   async #appendVersion(input: {

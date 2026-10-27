@@ -63,7 +63,7 @@ export type AgentVersionRecord = {
   commitMessage: string | null;
   authorId: string | null;
   authorKind: AgentVersionAuthorKind | null;
-  createdAt: Date;
+  createdAt: Instant;
 };
 
 export type AgentLabelRecord = {
@@ -71,7 +71,7 @@ export type AgentLabelRecord = {
   label: string;
   versionId: string;
   version: number;
-  updatedAt: Date;
+  updatedAt: Instant;
   updatedById: string | null;
 };
 
@@ -114,11 +114,11 @@ export interface AgentRepository {
   touchLastSeenAt(input: AgentPresenceInput): Promise<void>;
 
   /** Newest first. */
-  listVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]>;
+  findVersions(input: { projectId: string; agentId: string }): Promise<AgentVersionRecord[]>;
   findVersion(input: AgentVersionLookup): Promise<AgentVersionRecord | undefined>;
   /** The newest version number of each agent that has any. */
   latestVersionNumbers(input: AgentIdsInput): Promise<Map<string, number>>;
-  listLabels(input: AgentIdsInput): Promise<AgentLabelRecord[]>;
+  findLabels(input: AgentIdsInput): Promise<AgentLabelRecord[]>;
   /** Creates or moves the label; the version must belong to the agent. */
   assignLabel(input: {
     projectId: string;

@@ -5,7 +5,7 @@ import {
   AgentVersionNotFoundError,
   AgentVersionSelectorConflictError,
   AgentVersionUnsupportedError,
-  agentLabelProblem,
+  checkAgentLabel,
   agentSchema,
   parseAgentAddress,
   parseAgentConfig,
@@ -18,6 +18,7 @@ import {
 } from "@langwatch/agent-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { toDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { AgentRepository, AgentVersionRecord } from "../repositories/agent.repository.ts";
@@ -59,8 +60,8 @@ export class AgentVersionService {
     const agent = await this.#repository.getById({ id: input.agentId, projectId: input.projectId });
     if (agent.type === "connected") return { versions: [], labels: [], availableLabels: [] };
     const [versions, labels] = await Promise.all([
-      this.#repository.listVersions(input),
-      this.#repository.listLabels({ projectId: input.projectId, ids: [input.agentId] }),
+      this.#repository.findVersions(input),
+      this.#repository.findLabels({ projectId: input.projectId, ids: [input.agentId] }),
     ]);
     const people = await this.#people(
       versions.flatMap((row) => (row.authorId ? [row.authorId] : [])),
@@ -76,10 +77,14 @@ export class AgentVersionService {
     return {
       versions: versions.map((row): AgentVersion => ({
         ...row,
+        createdAt: toDate(row.createdAt),
         author: row.authorId ? (people.get(row.authorId) ?? null) : null,
         labels: labelsByVersion.get(row.id) ?? [],
       })),
-      labels: labels.map(({ agentId: _agentId, ...label }): AgentLabel => label),
+      labels: labels.map(({ agentId: _agentId, ...label }): AgentLabel => ({
+        ...label,
+        updatedAt: toDate(label.updatedAt),
+      })),
       availableLabels: [...new Set([...AGENT_SEEDED_LABELS, ...labels.map((row) => row.label)])],
     };
   }
@@ -133,8 +138,9 @@ export class AgentVersionService {
     version: number;
     caller?: AgentCaller;
   }): Promise<AgentLabel> {
-    const problem = agentLabelProblem(input.label);
-    if (problem) throw new AgentLabelInvalidError({ label: input.label, reason: problem });
+    const check = checkAgentLabel(input.label);
+    if (!check.valid)
+      throw new AgentLabelInvalidError({ label: input.label, reason: check.reason });
     const agent = await this.#repository.getById({ id: input.agentId, projectId: input.projectId });
     if (agent.type === "connected") throw new AgentVersionUnsupportedError({ agentId: agent.id });
     const row = await this.#repository.findVersion({
@@ -150,7 +156,7 @@ export class AgentVersionService {
       versionId: row.id,
       actorId: input.caller?.type === "user" ? input.caller.id : null,
     });
-    return label;
+    return { ...label, updatedAt: toDate(label.updatedAt) };
   }
 
   async removeLabel(input: { projectId: string; agentId: string; label: string }): Promise<void> {
@@ -169,7 +175,7 @@ export class AgentVersionService {
   > {
     const [numbers, labels] = await Promise.all([
       this.#repository.latestVersionNumbers(input),
-      this.#repository.listLabels(input),
+      this.#repository.findLabels(input),
     ]);
     return new Map(
       input.ids.map((id) => [
@@ -194,7 +200,7 @@ export class AgentVersionService {
     caller?: AgentCaller;
   }): Promise<void> {
     if (!input.caller || input.caller.type === "system") return;
-    const labels = await this.#repository.listLabels({
+    const labels = await this.#repository.findLabels({
       projectId: input.projectId,
       ids: [input.agentId],
     });
@@ -233,23 +239,39 @@ export class AgentVersionService {
     while (!input.signal.aborted) {
       const page = await this.#repository.findUnversioned({ afterId, limit: BACKFILL_PAGE });
       if (page.length === 0) break;
-      for (const agent of page) {
-        scanned += 1;
-        if (input.dryRun) {
-          const versions = await this.#repository.latestVersionNumbers({
-            projectId: agent.projectId,
-            ids: [agent.id],
-          });
-          if (!versions.has(agent.id)) wouldWrite += 1;
-          continue;
-        }
-        const createdById = agent.createdById ?? (await this.#creatorOf(agent));
-        if (await this.#repository.backfillFirstVersion({ agent, createdById })) written += 1;
-      }
+      const done = await this.#backfillPage({ page, dryRun: input.dryRun });
+      scanned += page.length;
+      written += done.written;
+      wouldWrite += done.wouldWrite;
       afterId = page.at(-1)!.id;
       if (!input.dryRun) await input.onPage({ afterId, written, scanned });
     }
     return { written, scanned, wouldWrite };
+  }
+
+  async #backfillPage(input: {
+    page: Agent[];
+    dryRun: boolean;
+  }): Promise<{ written: number; wouldWrite: number }> {
+    let written = 0;
+    let wouldWrite = 0;
+    for (const agent of input.page) {
+      if (input.dryRun) {
+        if (!(await this.#hasVersions(agent))) wouldWrite += 1;
+        continue;
+      }
+      const createdById = agent.createdById ?? (await this.#creatorOf(agent));
+      if (await this.#repository.backfillFirstVersion({ agent, createdById })) written += 1;
+    }
+    return { written, wouldWrite };
+  }
+
+  async #hasVersions(agent: Agent): Promise<boolean> {
+    const numbers = await this.#repository.latestVersionNumbers({
+      projectId: agent.projectId,
+      ids: [agent.id],
+    });
+    return numbers.has(agent.id);
   }
 
   async #creatorOf(agent: Agent): Promise<string | null> {
@@ -282,7 +304,7 @@ export class AgentVersionService {
       return row;
     }
     const [label] = (
-      await this.#repository.listLabels({ projectId: agent.projectId, ids: [agent.id] })
+      await this.#repository.findLabels({ projectId: agent.projectId, ids: [agent.id] })
     ).filter((row) => row.label === input.label);
     const row = label
       ? await this.#repository.findVersion({
