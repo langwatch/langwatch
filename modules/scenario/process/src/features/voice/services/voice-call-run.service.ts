@@ -5,6 +5,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+
 import {
   VoiceAgentNotFoundError,
   type CallRecord,
@@ -162,27 +163,9 @@ function createVoiceCallRunWriter(
       occurredAt: record.endedAt,
     });
 
-    // No results envelope: the verdict is not decided here. The run is
-    // finished SUCCESS with the scenario id named on the event, so the
-    // scenario_evaluations process manager grades the transcript against the
-    // scenario's attached evaluators (AC23): exactly the path a simulated
-    // run's finish takes.
-    await collaborators.simulations.finishRun({
-      tenantId: projectId,
-      scenarioRunId,
-      status: "SUCCESS",
-      scenarioId: scenario.scenarioId,
-      scenarioSetId: scenario.scenarioSetId,
-      batchRunId: scenarioRunId,
-      occurredAt: record.endedAt,
-    });
-
-    // On a re-drive the run's metadata was set by the first attempt's started
-    // event, which is first-wins in the fold — so this attempt's source, audio
-    // and cutoff would be lost. A refresh event carries them onto the run, so a
-    // "browser, no recording" first attempt becomes the "provider, with audio"
-    // the retry actually saw (#8032). Skipped on a first write: the started
-    // event already carries these, and there is nothing to refresh over.
+    // A re-drive's started event is first-wins, so a refresh carries this attempt's
+    // source, audio and cutoff onto the run (#8032). It goes before the finish: a
+    // finished run's retry returns early, so a refresh after it could never be retried.
     if (isRedrive) {
       await collaborators.simulations.refreshMetadata({
         tenantId: projectId,
@@ -204,6 +187,20 @@ function createVoiceCallRunWriter(
         occurredAt: record.endedAt,
       });
     }
+    // No results envelope: the verdict is not decided here. The run is
+    // finished SUCCESS with the scenario id named on the event, so the
+    // scenario_evaluations process manager grades the transcript against the
+    // scenario's attached evaluators (AC23): exactly the path a simulated
+    // run's finish takes.
+    await collaborators.simulations.finishRun({
+      tenantId: projectId,
+      scenarioRunId,
+      status: "SUCCESS",
+      scenarioId: scenario.scenarioId,
+      scenarioSetId: scenario.scenarioSetId,
+      batchRunId: scenarioRunId,
+      occurredAt: record.endedAt,
+    });
   };
 }
 

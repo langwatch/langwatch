@@ -133,13 +133,36 @@ describe("writeVoiceCallRun", () => {
         const refresh = mockRefreshMetadata.mock.calls[0]?.[0] as {
           scenarioRunId: string;
           attemptId: string;
-          metadata: { source: string; audioUrl: string | null; langwatch: { isCutAtLimit: boolean } };
+          metadata: {
+            source: string;
+            audioUrl: string | null;
+            langwatch: { isCutAtLimit: boolean };
+          };
         };
         expect(refresh.scenarioRunId).toBe("run_1");
         expect(refresh.attemptId).toBeTruthy();
         expect(refresh.metadata.source).toBe("provider");
         expect(refresh.metadata.audioUrl).toBe("https://audio.example/run_1.wav");
         expect(refresh.metadata.langwatch.isCutAtLimit).toBe(true);
+      });
+
+      it("refreshes before finishing, so a failed refresh leaves the run retryable", async () => {
+        const refreshFailure = new Error("refresh failed");
+        mockRefreshMetadata.mockRejectedValueOnce(refreshFailure);
+
+        await expect(
+          writeVoiceCallRun({
+            projectId: "project_1",
+            scenarioRunId: "run_1",
+            agentRowId: "agent_1",
+            agentDisplayName: "Support Bot",
+            record: fakeRecord({ source: "provider" }),
+            scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+            turnTraceIds: [],
+            isRedrive: true,
+          }),
+        ).rejects.toBe(refreshFailure);
+        expect(mockFinishRun).not.toHaveBeenCalled();
       });
 
       it("clears a stale audio link when this attempt has no recording", async () => {
