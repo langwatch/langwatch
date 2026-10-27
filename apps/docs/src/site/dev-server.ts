@@ -46,18 +46,23 @@ function send({ response, type, body }: { response: ServerResponse; type: string
 }
 
 /** Generated files the build writes, served live from source: exports, discovery, search, media. */
+type Nav = ReturnType<typeof buildNav>;
+/* One navigation per request: the first middleware builds it and the page renderer reuses it. */
+const requestNav = new WeakMap<IncomingMessage, Nav>();
+
 function serveSource({
   docsRoot,
+  nav,
   pathname,
   response,
   next,
 }: {
   docsRoot: string;
+  nav: Nav;
   pathname: string;
   response: ServerResponse;
   next: Connect.NextFunction;
 }) {
-  const nav = buildNav({ docsRoot });
   const discovered = discoveryFiles({ nav, skills: readAgentSkills() })[pathname.slice(1)];
   if (discovered) {
     const type = DISCOVERY_TYPES[path.extname(pathname)] ?? "text/plain";
@@ -107,13 +112,13 @@ async function serveDocument({
     return next();
   try {
     const slug = url.pathname.replace(/^\/+|\/+$/g, "") || "introduction";
-    const known = Object.hasOwn(buildNav({ docsRoot }).pages, slug);
+    const nav = requestNav.get(request) ?? buildNav({ docsRoot });
+    const known = Object.hasOwn(nav.pages, slug);
     const entry = await server.ssrLoadModule("/src/app/entry-server.tsx");
     const render: typeof renderPage = entry.render;
     const result = await render({ slug: known ? slug : "404" });
     const styled = extractStyles({ html: result.html });
-    const { anchors } = buildNav({ docsRoot });
-    const trail = breadcrumbTrail({ sections: anchors, slug, title: result.title });
+    const trail = breadcrumbTrail({ sections: nav.anchors, slug, title: result.title });
     const head = known
       ? pageHead({ slug, title: result.title, description: result.description, trail })
       : NOT_FOUND_HEAD;
@@ -150,14 +155,16 @@ export function docsDevPlugin({ docsRoot }: { docsRoot: string }): Plugin {
           response.writeHead(400).end("Invalid URL");
           return;
         }
-        const slugs = Object.keys(buildNav({ docsRoot }).pages);
+        const nav = buildNav({ docsRoot });
+        requestNav.set(request, nav);
+        const slugs = Object.keys(nav.pages);
         const redirects = siteRedirects({ docsRoot, slugs });
         const redirect = resolveRedirect({ pathname, search: url.search, redirects });
         if (redirect) {
           response.writeHead(301, { Location: redirect }).end();
           return;
         }
-        serveSource({ docsRoot, pathname, response, next });
+        serveSource({ docsRoot, nav, pathname, response, next });
       });
       server.middlewares.use((request, response, next) =>
         serveDocument({ request, response, next, server, docsRoot }),

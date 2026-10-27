@@ -248,6 +248,18 @@ describe("when access ends", () => {
   });
 
   /** @scenario "End the connection when access ends" */
+  it("clears and revokes the key when the docs navigate to another page", async () => {
+    await connected();
+    await act(async () => document.dispatchEvent(new Event("docs:leaving")));
+    const revoke = fetches.at(-1);
+    expect(revoke?.url).toBe(`${APP}/api/docs-session`);
+    expect(revoke?.init.method).toBe("DELETE");
+    expect(revoke?.init.keepalive).toBe(true);
+    expect(disconnectButton()?.hidden).toBe(true);
+    await act(async () => document.getElementById("try-it-button")?.click());
+  });
+
+  /** @scenario "End the connection when access ends" */
   it("clears the key when it expires", async () => {
     vi.useFakeTimers();
     try {

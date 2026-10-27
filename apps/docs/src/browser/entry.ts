@@ -27,29 +27,43 @@ function prepareControls() {
   });
 }
 
+/** The latest click each loading island owes a replay: one per island, however many clicks. */
+const pendingTriggers = new Map<string, HTMLElement | undefined>();
+
+function islandLoaded({ name, script }: { name: string; script: HTMLScriptElement }) {
+  script.dataset.loaded = "";
+  const pending = pendingTriggers.get(name);
+  pendingTriggers.delete(name);
+  if (pending?.isConnected) pending.click();
+}
+
 export function loadIsland({ name, trigger }: { name: string; trigger?: HTMLElement }) {
-  const replay = () => {
-    if (trigger?.isConnected) trigger.click();
-  };
   const loading = document.querySelector<HTMLScriptElement>(`script[data-island="${name}"]`);
-  /* An island still loading (an idle one, say) replays the click that came first. */
+  /* An island still loading (an idle one, say) replays the latest click once it arrives. */
   if (loading) {
-    if (loading.dataset.loaded === undefined) loading.addEventListener("load", replay);
+    if (loading.dataset.loaded !== undefined || !trigger) return;
+    const waiting = pendingTriggers.has(name);
+    pendingTriggers.set(name, trigger);
+    if (!waiting)
+      loading.addEventListener("load", () => islandLoaded({ name, script: loading }), {
+        once: true,
+      });
     return;
   }
   const source = document.querySelector<HTMLMetaElement>(
     `meta[name="docs-island-${name}"]`,
   )?.content;
   if (!source) return;
+  pendingTriggers.set(name, trigger);
   const script = document.createElement("script");
   script.type = "module";
   script.src = source;
   script.dataset.island = name;
-  script.addEventListener("load", () => {
-    script.dataset.loaded = "";
-    replay();
+  script.addEventListener("load", () => islandLoaded({ name, script }), { once: true });
+  script.addEventListener("error", () => {
+    pendingTriggers.delete(name);
+    script.remove();
   });
-  script.addEventListener("error", () => script.remove());
   document.head.append(script);
 }
 

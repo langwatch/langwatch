@@ -29,6 +29,9 @@ export const apiKeyServerConfig = Config.define(() => ({
 
 export type ApiKeyServerConfig = ConfigOf<typeof apiKeyServerConfig>;
 
+/** The one exact-origin check the consent page and the API host share. */
+export { isExactOrigin, isRegisteredDocsOrigin } from "@langwatch/config";
+
 /** Every origin the consent page may hand a docs session to, this deployment's own included. */
 export function docsOriginsOf(config: ApiKeyServerConfig | undefined): readonly string[] {
   return registeredDocsOrigins({

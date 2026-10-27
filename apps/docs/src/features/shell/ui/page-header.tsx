@@ -1,27 +1,11 @@
 import { Badge, Box, Button, Flex, Heading, Text } from "@langwatch/design-system/primitives";
-import { Check, Copy } from "lucide-react";
+import { Copy } from "lucide-react";
 
-import { useCopy } from "../../../lib/clipboard.ts";
-import { sitePath } from "../../../lib/site-path.ts";
 import type { ContextualOption } from "../../navigation/model.ts";
 import { PageMenu } from "./page-menu.tsx";
 
-async function readMarkdown({ slug }: { slug: string }): Promise<string> {
-  const response = await fetch(sitePath({ path: `/${slug}.md` }));
-  if (!response.ok) throw new Error("markdown unavailable");
-  return response.text();
-}
-
-function CopyPageMenu({
-  slug,
-  title,
-  actions,
-}: {
-  slug: string;
-  title: string;
-  actions: ContextualOption[];
-}) {
-  const { state, copy, ready } = useCopy();
+function CopyPageMenu({ slug, actions }: { slug: string; actions: ContextualOption[] }) {
+  /* Prerendered and never hydrated: the copy island (shell/browser/copy.ts) enables and runs it. */
   const menu = actions.filter((action) => action !== "copy");
   return (
     <Flex alignItems="center" gap="2">
@@ -40,23 +24,11 @@ function CopyPageMenu({
             data-docs-page-copy={slug}
             aria-keyshortcuts="Alt+Shift+C"
             title="Copy page as Markdown (Alt+Shift+C)"
-            disabled={!ready}
+            disabled
             borderEndRadius={menu.length ? "0" : undefined}
-            onClick={() =>
-              copy({
-                text: () =>
-                  readMarkdown({ slug }).catch(
-                    () => document.querySelector("article")?.innerText ?? "",
-                  ),
-              })
-            }
           >
-            {state === "copied" ? (
-              <Check size={14} aria-hidden="true" />
-            ) : (
-              <Copy size={14} aria-hidden="true" />
-            )}
-            {state === "copied" ? "Copied" : "Copy page"}
+            <Copy size={14} aria-hidden="true" />
+            Copy page
           </Button>
         ) : null}
         {menu.length ? (
@@ -65,14 +37,7 @@ function CopyPageMenu({
           </Box>
         ) : null}
       </Flex>
-      {state === "failed" ? (
-        <Text as="output" fontSize="13px" color="red.fg">
-          Could not copy. Select the Markdown instead.
-        </Text>
-      ) : null}
-      <output className="docs-sr-only" aria-live="polite">
-        {state === "copied" ? `Copied ${title}` : ""}
-      </output>
+      <output className="docs-sr-only" aria-live="polite" />
     </Flex>
   );
 }
@@ -141,7 +106,7 @@ export function PageHeader({
           </Flex>
           {slug !== "404" && actions.length ? (
             <Box className="docs-page-actions">
-              <CopyPageMenu slug={slug} title={title} actions={actions} />
+              <CopyPageMenu slug={slug} actions={actions} />
             </Box>
           ) : null}
         </Flex>

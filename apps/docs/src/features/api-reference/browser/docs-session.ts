@@ -116,9 +116,12 @@ export async function disconnect(): Promise<"revoked" | "local"> {
   }
 }
 
-/* Closing or reloading the tab revokes the key on the way out; it expires anyway. */
-addEventListener("pagehide", () => {
+/* Leaving the page, by closing the tab or by the docs' own navigation, revokes the key on the
+   way out; it expires anyway. */
+function leave() {
   const key = session;
   clear();
   if (key) revokeRequest({ key, keepalive: true }).catch(() => {});
-});
+}
+addEventListener("pagehide", leave);
+document.addEventListener("docs:leaving", leave);

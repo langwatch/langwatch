@@ -6,6 +6,8 @@ import {
   DOCS_SESSION_MESSAGE_TYPE,
   DOCS_SESSION_MESSAGE_VERSION,
   DOCS_SESSION_STATE_PATTERN,
+  isExactOrigin,
+  isRegisteredDocsOrigin,
   type DocsSessionKeyMinted,
   type DocsSessionMessage,
 } from "@langwatch/api-key-contract";
@@ -21,19 +23,6 @@ export type DocsConnectRequest =
   | Readonly<{ kind: "valid"; origin: string; state: string }>
   | Readonly<{ kind: "refused"; reason: DocsConnectRefusal }>;
 
-/** The origin exactly as a browser reports one, or null for anything else. */
-function exactOriginOf(value: string): string | null {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    if (url.hostname.includes("*")) return null;
-
-    return url.origin === value ? value : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Reads `origin` and `state`; an origin is answered only when it is registered exactly. */
 export function readDocsConnectRequest({
   query,
@@ -42,12 +31,14 @@ export function readDocsConnectRequest({
   query: Readonly<Record<string, string | undefined>>;
   registered: readonly string[];
 }): DocsConnectRequest {
-  const origin = exactOriginOf(query.origin ?? "");
+  const origin = query.origin ?? "";
   const state = query.state ?? "";
-  if (!origin || !DOCS_SESSION_STATE_PATTERN.test(state)) {
+  if (!isExactOrigin(origin) || !DOCS_SESSION_STATE_PATTERN.test(state)) {
     return { kind: "refused", reason: "malformed-request" };
   }
-  if (!registered.includes(origin)) return { kind: "refused", reason: "origin-not-registered" };
+  if (!isRegisteredDocsOrigin({ origin, registered })) {
+    return { kind: "refused", reason: "origin-not-registered" };
+  }
 
   return { kind: "valid", origin, state };
 }
