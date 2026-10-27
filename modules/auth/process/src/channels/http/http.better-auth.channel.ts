@@ -526,9 +526,9 @@ export const createAuthOptions = ({
   database: storage,
 
   /**
-   * The only header BetterAuth's rate limiter (and session IP tracking) reads, with no
-   * trusted proxies so it takes the value as stated: the auth route restates the
-   * platform's resolved caller there (transport/auth.rest.ts).
+   * Read as stated, so safe only because every request reaching `handler` is restamped with
+   * the resolved caller first (requestStatingCaller, services/auth-door.service.ts).
+   * Server-side `api.*` calls skip BetterAuth's rate limiter.
    */
   advanced: {
     ipAddress: {

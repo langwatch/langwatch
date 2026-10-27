@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import { DispatchError, pMapLimited } from "@langwatch/eventing";
 import { refusesRetry } from "@langwatch/group-queue";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, createWarnThrottle } from "@langwatch/observability";
 
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceRepository } from "../../../repositories/automation-settlement-read.repository.ts";
@@ -16,6 +16,7 @@ import type { AutomationSettlementObservability } from "./automation-settlement-
 
 const logger = createLogger("langwatch:automation:settlement-persistence");
 const CONFIRM_CONCURRENCY = 4;
+const REFUSAL_LOG_WINDOW_MS = 60 * 60 * 1000;
 const CLAIM_RETRY_DELAYS_MS = [200, 500];
 
 type PersistenceComposition = {
@@ -40,6 +41,8 @@ type PersistPage = {
 };
 
 export class TriggerSettlementPersistenceService {
+  private readonly refusalLog = createWarnThrottle(REFUSAL_LOG_WINDOW_MS);
+
   private constructor(private readonly composition: PersistenceComposition) {}
 
   static create(composition: PersistenceComposition): TriggerSettlementPersistenceService {
@@ -242,6 +245,11 @@ export class TriggerSettlementPersistenceService {
   private recordTraceFailure(page: PersistPage, traceId: string, error: unknown): void {
     const retryable = !refusesRetry(error);
     if (!retryable && isCustomerConfigurationRefusal(error)) {
+      const suppressedRefusals = this.refusalLog.claim({
+        key: `${page.triggerId}:${error.code}`,
+        now: this.composition.clock.now().epochMilliseconds,
+      });
+      if (suppressedRefusals === undefined) return;
       logger.warn(
         {
           projectId: page.projectId,
@@ -250,6 +258,7 @@ export class TriggerSettlementPersistenceService {
           code: error.code,
           fault: error.fault,
           error: error.message,
+          suppressedRefusals,
         },
         "Persist dispatch refused by the automation's saved configuration; not retrying",
       );

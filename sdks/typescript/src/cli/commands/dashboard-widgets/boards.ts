@@ -1,12 +1,37 @@
 import chalk from "chalk";
 
-import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+import {
+  BoardsApiError,
+  BoardsApiService,
+  type BoardListItem,
+} from "@/client-sdk/services/boards/boards-api.service";
+import {
+  DashboardWidgetsApiService,
+  type DashboardBoard,
+} from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable, sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+
+const isNotFound = (error: unknown): boolean =>
+  (error instanceof BoardsApiError && error.status === 404) ||
+  (error instanceof Error && "httpStatus" in error && error.httpStatus === 404);
+
+/**
+ * /api/v1/dashboards first; it answers 404 while Dashboards is off (or on a server without it),
+ * and only then the project-path list, which answers either way.
+ */
+async function listBoards(): Promise<{ data: (BoardListItem | DashboardBoard)[] }> {
+  try {
+    return await new BoardsApiService().list();
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+    return new DashboardWidgetsApiService().listBoards();
+  }
+}
 
 /**
  * The Dashboards boards a widget can be pinned to; `langwatch dashboard list` lists the
@@ -17,11 +42,10 @@ export const listDashboardWidgetBoardsCommand = async (options?: {
 }): Promise<CommandResult | void> => {
   await resolveCredentials({ project: options?.project });
 
-  const service = new DashboardWidgetsApiService();
   const spinner = createSpinner("Fetching dashboards...").start();
 
   try {
-    const result = await service.listBoards();
+    const result = await listBoards();
     const boards = result.data;
 
     spinner.succeed(`Found ${boards.length} dashboard${boards.length !== 1 ? "s" : ""}`);

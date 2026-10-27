@@ -6,6 +6,7 @@
 import {
   langWatchQLKeyReach,
   MAX_LWQL_LENGTH,
+  type LangWatchQLKeyReach,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
 import {
@@ -45,12 +46,20 @@ export function mountQueryDoor({
   tenant,
   service,
   protections = FULLY_PERMITTED,
+  reach = () => ({ kind: "project", projectId: tenant().id }),
 }: {
   tenant: () => QueryTenant;
   service: () => LangWatchQLService;
   /** What the authenticated key's project lets it see; fully permitted when absent. */
   protections?: LangWatchQLProtections;
-}): { fetch: (path: string, init?: RequestInit) => Promise<Response> } {
+  /** The credential the key door resolves, before the context schema parses it. */
+  reach?: () => LangWatchQLKeyReach;
+}): {
+  fetch: (path: string, init?: RequestInit) => Promise<Response>;
+  /** Every key reach the door handed the application, in order. */
+  reaches: LangWatchQLKeyReach[];
+} {
+  const reaches: LangWatchQLKeyReach[] = [];
   // An API key resolves its organization; the key-reach context below fans it out to the tenant.
   const keyScope = () => ({ tier: "organization" as const, id: `org-of-${tenant().id}` });
 
@@ -65,18 +74,24 @@ export function mountQueryDoor({
 
   // The scope a key resolves to, faked: the one authenticated tenant.
   const queryApi: AnalyticsQueryApi = {
-    runLangWatchQLForKey: ({ sql, parameters, timeWindow, granularitySeconds }) =>
-      service().executeForProjects({
+    runLangWatchQLForKey: ({ reach: asked, sql, parameters, timeWindow, granularitySeconds }) => {
+      reaches.push(asked);
+      return service().executeForProjects({
         projects: [tenant()],
         protections,
         sql,
         ...(parameters ? { parameters } : {}),
         ...(timeWindow ? { timeWindow } : {}),
         ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
-      }),
-    describeLangWatchQLSchemaForKey: async () => service().describeSchema({ protections }),
-    describeQueryReferenceForKey: async () =>
-      buildQueryReference({
+      });
+    },
+    describeLangWatchQLSchemaForKey: async ({ reach: asked }) => {
+      reaches.push(asked);
+      return service().describeSchema({ protections });
+    },
+    describeQueryReferenceForKey: async ({ reach: asked }) => {
+      reaches.push(asked);
+      return buildQueryReference({
         protections,
         lwqlEnabled: true,
         database: LWQL_EXAMPLE_DATABASE,
@@ -88,7 +103,8 @@ export function mountQueryDoor({
           maxExecutionTimeSeconds: 10,
         },
         traceFilterExamples: TRACE_FILTER_EXAMPLES,
-      }),
+      });
+    },
   };
 
   // Reached through the operations-only feature-API proxy, the way the
@@ -104,16 +120,12 @@ export function mountQueryDoor({
     runtime.mount(queryRest.router(), {
       app: () => apis.reference(AnalyticsQueryApi),
       onError: canonicalErrorResponse,
-      middlewareContext: [
-        bindMiddlewareContext(langWatchQLKeyReach, () => ({
-          kind: "project" as const,
-          projectId: tenant().id,
-        })),
-      ],
+      middlewareContext: [bindMiddlewareContext(langWatchQLKeyReach, () => reach())],
     }),
   );
 
   return {
+    reaches,
     fetch: async (path: string, init?: RequestInit) =>
       app.fetch(new Request(`http://api.test${path}`, init)),
   };

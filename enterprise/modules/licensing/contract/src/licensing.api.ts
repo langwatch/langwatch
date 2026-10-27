@@ -1,5 +1,6 @@
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { moduleApi } from "@langwatch/module";
+import type { SelfHostedNotice } from "@langwatch/ops-contract";
 
 import type {
   ActivationCodePage,
@@ -59,6 +60,11 @@ import type {
   SelfHostedInstanceSummary,
   SelfHostedSignal,
 } from "./self-hosted-instance.ts";
+import type {
+  CreateSelfHostedNoticeInput,
+  SelfHostedNoticeView,
+  UpdateSelfHostedNoticeInput,
+} from "./self-hosted-notice.ts";
 import type {
   UpgradeDiagnosticsAvailability,
   UpgradeDiagnosticsDownload,
@@ -316,6 +322,19 @@ export interface LicensingApi {
   findUpgradeDiagnostics(input: { instanceRowId: string }): Promise<UpgradeDiagnosticsReport[]>;
   /** A five-minute link to one report's bundle; an unknown id throws its code. */
   getUpgradeDiagnosticsDownload(input: { id: string }): Promise<UpgradeDiagnosticsDownload>;
+
+  /**
+   * Notices LangWatch staff send self-hosted installs (self-hosted-notices.feature): written and
+   * published in Cloud admin, sent in the usage report reply while published and not expired.
+   * An unknown id throws `not_found`.
+   */
+  findSelfHostedNotices(): Promise<SelfHostedNoticeView[]>;
+  createSelfHostedNotice(input: CreateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
+  updateSelfHostedNotice(input: UpdateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
+  publishSelfHostedNotice(input: { id: string; operatorId: string }): Promise<SelfHostedNoticeView>;
+  withdrawSelfHostedNotice(input: { id: string }): Promise<SelfHostedNoticeView>;
+  /** What an install is sent now: published and not expired, the newest published first. */
+  findPublishedSelfHostedNotices(): Promise<SelfHostedNotice[]>;
 }
 
 /** Re-exported so a peer naming a service does not reach past the api file. */
