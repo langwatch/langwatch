@@ -301,6 +301,8 @@ const targetConfigObjectSchemaDefinition = z.object({
   promptVersionNumber: z.number().optional(),
   localPromptConfig: localPromptConfigSchema.optional(),
   dbAgentId: z.string().optional(),
+  /** The agent deploy label the target runs, such as production; absent runs the latest. */
+  agentLabel: z.string().min(1).max(64).optional(),
   /**
    * The specific agent type (code, signature, workflow, http).
    * Used by DSL adapter to determine which node type to generate.
