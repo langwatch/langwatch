@@ -51,7 +51,7 @@ def get_weather(city: str) -> str:
 
 
 agent = create_agent(
-    model="openai:gpt-5",
+    model="openai:gpt-6-luna",
     tools=[get_weather],
     system_prompt="You are a helpful assistant, that can get the weather.",
 )
