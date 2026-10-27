@@ -29,6 +29,7 @@ describe("given a process whose installed modules bind no API door", () => {
         bundle: void 0,
         instanceAdmin: bearerDoor({ name: "instance-admin", token: void 0 }),
         trustedProxies: void 0,
+        trustCloudflare: false,
         executionProxyBaseUrl: void 0,
         publicBaseUrl: void 0,
         production: false,

@@ -184,6 +184,7 @@ describe("WebSocketHost", () => {
           credential: "project",
           permission: "scenarios:manage",
           keyKinds: ["legacy_project_key"],
+          legacyKeyScopes: ["legacy_project_key_connected_agents"],
         },
         handle: async (
           app: EchoApp,
@@ -232,7 +233,7 @@ describe("WebSocketHost", () => {
       });
     }
 
-    it("asks the door its permission and key kinds, then hands the handler the credential", async () => {
+    it("asks the door its permission, key kinds and legacy key scopes, then hands the handler the credential", async () => {
       const { port, stop } = await serve(true);
       try {
         await expect(
@@ -245,6 +246,7 @@ describe("WebSocketHost", () => {
           permission: "scenarios:manage",
           permissions: ["scenarios:manage"],
           keyKinds: ["legacy_project_key"],
+          legacyKeyScopes: ["legacy_project_key_connected_agents"],
         });
         expect(asked.at(-1)?.request.headers.get("authorization")).toBe("Bearer key");
       } finally {
@@ -273,6 +275,34 @@ describe("WebSocketHost", () => {
       } finally {
         await stop();
       }
+    });
+
+    /** @scenario "A socket naming an unknown scope flag is refused at mount" */
+    it("refuses at mount a legacy key scope the door does not list", () => {
+      const listing: RestIdentity = {
+        ...door,
+        legacyKeyScopes: ["legacy_project_key_connected_agents"],
+      };
+      const typo = WebSocketProtocol.create({
+        path: "/typo",
+        maxPayloadBytes: 1024,
+        middlewareContext: headerContext,
+        headers: { authorization: "authorization" },
+        door: {
+          credential: "project",
+          permission: "scenarios:manage",
+          legacyKeyScopes: ["legacy_project_key_everything"],
+        },
+        handle: async () => {},
+        refuse: async () => {},
+      });
+      const host = WebSocketHost.create().withDoor({
+        identities: { project: listing, organization: listing, api_key: listing },
+      });
+
+      expect(() => host.mount(typo, () => ({ name: "agent" }))).toThrow(
+        /legacy_project_key_everything/,
+      );
     });
   });
 

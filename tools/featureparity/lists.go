@@ -60,6 +60,8 @@ var (
 		"tools/ciguard",
 		"tools/migrationorder",
 		"tools/linkcheck",
+		"tools/chartpush",
+		"tools/matrixseed",
 		"cmd/linkcheck",
 		"cmd/service",
 		"tools/upgradelab",

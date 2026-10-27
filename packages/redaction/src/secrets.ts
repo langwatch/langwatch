@@ -143,7 +143,36 @@ function isKeyShapedBody(body: string): boolean {
   }
   const { lower, upper, digit } = countCharClasses(body);
   if (lower < 2 || upper < 2 || digit < 2) return false;
+  if (isWordSlug(body)) return false;
   return shannonEntropyBits(body) >= SHAPED_TOKEN_MIN_ENTROPY;
+}
+
+const SLUG_MIN_SEGMENTS = 4;
+const SLUG_LETTERS_SEGMENT = /^[A-Za-z]{1,12}$/;
+const SLUG_TAG_SEGMENT = /^[A-Za-z0-9]{1,6}$/;
+const SLUG_WORD_SEGMENT = /^(?:[a-z]{4,}|[A-Z]{4,}|[A-Z][a-z]{3,})$/;
+const SLUG_RANDOM_SEGMENT = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/;
+const SLUG_MAX_RANDOM_SEGMENTS = 1;
+const SLUG_MIN_WORDS = 2;
+
+/**
+ * Whether a body is a model-id-like name (`NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4`), not key
+ * material: four or more short parts, two of them ordinary words, at most one mixing lower, upper
+ * and digit (`Qwen3` passes, `x7Kq2-Lm9Tv` does not).
+ */
+function isWordSlug(body: string): boolean {
+  const segments = body.split(/[-_]/);
+  if (segments.length < SLUG_MIN_SEGMENTS) return false;
+  let words = 0;
+  let randomLooking = 0;
+  for (const segment of segments) {
+    if (!SLUG_LETTERS_SEGMENT.test(segment) && !SLUG_TAG_SEGMENT.test(segment)) {
+      return false;
+    }
+    if (SLUG_WORD_SEGMENT.test(segment)) words += 1;
+    if (SLUG_RANDOM_SEGMENT.test(segment)) randomLooking += 1;
+  }
+  return words >= SLUG_MIN_WORDS && randomLooking <= SLUG_MAX_RANDOM_SEGMENTS;
 }
 
 /**

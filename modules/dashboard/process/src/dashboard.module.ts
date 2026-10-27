@@ -5,11 +5,12 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { DashboardModule } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
 import { widgetSourceOfCredential } from "./rules/dashboard-widget-source.rules.ts";
-import { boardRest } from "./transport/board.rest.ts";
+import { boardProjectRest } from "./transport/board-project.rest.ts";
+import { boardRest, releasedOrRefused } from "./transport/board.rest.ts";
 import { boardTrpcTransport } from "./transport/board.trpc.ts";
 import { dashboardWidgetRest } from "./transport/dashboard-widget.rest.ts";
 import { dashboardWidgetTrpcTransport } from "./transport/dashboard-widget.trpc.ts";
-import { dashboardRest } from "./transport/dashboard.rest.ts";
+import { dashboardRest, dashboardRestBeforeDashboardsApi } from "./transport/dashboard.rest.ts";
 import { dashboardTrpcTransport } from "./transport/dashboard.trpc.ts";
 import { graphRest } from "./transport/graph.rest.ts";
 import { graphTrpcTransport } from "./transport/graph.trpc.ts";
@@ -27,7 +28,10 @@ export const dashboardProcessModule: PublishedProcessModule<
   .withTransports(
     dashboardRest,
     dashboardWidgetRest,
+    // Ahead of boardRest: its dated routes answer before the Dashboards API's `/:dashboardId`.
+    dashboardRestBeforeDashboardsApi,
     boardRest,
+    boardProjectRest,
     graphRest,
     savedWorkbenchChartRest,
     dashboardTrpcTransport,
@@ -58,6 +62,14 @@ export const dashboardProcessModule: PublishedProcessModule<
       app.dashboardWidgetPlatformUrl({
         projectSlug: projectCredentialOfRequest(request).project.slug,
       }),
+    // `release_dashboards` for the key's project, asked on each request: /api/v1/dashboards
+    // answers only while it is on.
+    boardsReleased: async (request, { dependencies }) =>
+      releasedOrRefused(
+        await dependencies.analytics.isDashboardsEnabled({
+          projectId: projectCredentialOfRequest(request).project.id,
+        }),
+      ),
     dashboardWidgetCallerSource: (request) =>
       widgetSourceOfCredential({ credential: projectCredentialOfRequest(request) }),
   });
