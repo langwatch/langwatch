@@ -329,8 +329,9 @@ function isAllowlisted(ctx: ValidationContext, policy: SsrfPolicy): boolean {
 }
 
 /**
- * The allowlist relaxes the private-range refusal only: the name is still
- * resolved, refused if any address is metadata, and pinned to what it resolved to.
+ * The allowlist relaxes the private-range refusal and, for an on-premise host, the `.local` /
+ * `.localhost` one: the name is still resolved, refused if any address is metadata, and pinned
+ * to what it resolved to.
  */
 async function resolveAllowlisted(ctx: ValidationContext): Promise<SsrfAllowlistedResult> {
   logger.info({ url: ctx.logUrl, hostname: ctx.hostname }, "Allowing request to allowlisted host");
