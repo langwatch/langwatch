@@ -1,10 +1,11 @@
 """
-Unit tests for the gpt-5-family temperature normalization applied by
-langevals' litellm patch.
+Unit tests for the temperature normalization applied by langevals' litellm
+patch: the gpt-5 family pinned by name, and any other model pinned once it
+refuses a temperature but its default at runtime.
 
-Exercised at the patch seam (`patch_litellm_params`), which every litellm
-call in langevals flows through, so what is asserted is the request that
-actually leaves langevals. No API keys and no network.
+The name-based pinning is exercised at `patch_litellm_params`; the refusal
+retry drives the patched `litellm.completion` against a stub provider. Both
+assert the request that leaves langevals. No API keys and no network.
 
 Spec: specs/evaluators/langevals-gpt5-temperature-compatibility.feature
 """
