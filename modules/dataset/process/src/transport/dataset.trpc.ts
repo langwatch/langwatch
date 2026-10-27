@@ -7,17 +7,20 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DatasetApi, datasetTrpc } from "@langwatch/dataset-contract";
 
+import { datasetAuthorOf } from "../rules/dataset-version-author.rules.ts";
+
 export const datasetTrpcTransport: TrpcRouterDeclaration<DatasetApi, typeof datasetTrpc> =
   defineTrpcRouter(DatasetApi, datasetTrpc)
     .procedure("upsert")
     .withPermission("datasets:manage")
-    .handle(async ({ app, input }) =>
+    .handle(async ({ app, input, actor }) =>
       app.upsertDataset({
         projectId: input.projectId,
         name: input.name,
         columnTypes: input.columnTypes,
         datasetId: input.datasetId,
         datasetRecords: input.datasetRecords,
+        editedBy: datasetAuthorOf({ actor }),
       }),
     )
 
@@ -75,7 +78,9 @@ export const datasetTrpcTransport: TrpcRouterDeclaration<DatasetApi, typeof data
     .handle(({ app, input }) => app.createDatasetFromStoredObject(input))
     .procedure("appendStoredObject")
     .withPermission("datasets:update")
-    .handle(({ app, input }) => app.appendStoredObjectToDataset(input))
+    .handle(({ app, input, actor }) =>
+      app.appendStoredObjectToDataset({ ...input, editedBy: datasetAuthorOf({ actor }) }),
+    )
     .procedure("getLimits")
     .withPermission("datasets:view")
     .handle(({ app, input }) => app.getLimits({ projectId: input.projectId }))
@@ -85,4 +90,29 @@ export const datasetTrpcTransport: TrpcRouterDeclaration<DatasetApi, typeof data
     .procedure("retryNormalize")
     .withPermission("datasets:manage")
     .handle(({ app, input }) => app.retryNormalize(input))
+    .procedure("versions")
+    .withPermission("datasets:view")
+    .handle(({ app, input }) => app.listVersions(input))
+    .procedure("saveVersion")
+    .withPermission("datasets:update")
+    .handle(({ app, input, actor }) =>
+      app.saveVersion({ ...input, editedBy: datasetAuthorOf({ actor }) }),
+    )
+    .procedure("versionPage")
+    .withPermission("datasets:view")
+    .handle(({ app, input }) => app.getVersionPage(input))
+    .procedure("compareVersion")
+    .withPermission("datasets:view")
+    .handle(({ app, input }) => app.compareVersion(input))
+    .procedure("restoreVersion")
+    .withPermission("datasets:update")
+    .handle(({ app, input, actor }) =>
+      app.restoreVersion({ ...input, editedBy: datasetAuthorOf({ actor }) }),
+    )
+    .procedure("pinVersion")
+    .withPermission("datasets:update")
+    .handle(({ app, input }) => app.pinVersion(input))
+    .procedure("runVersions")
+    .withPermission("datasets:view")
+    .handle(({ app, input }) => app.findRunVersions(input))
     .build();

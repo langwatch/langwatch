@@ -133,6 +133,30 @@ describe("the dataset REST declaration", () => {
           operation: "deleteApiDatasetBySlugOrIdRecords",
           permission: "datasets:manage",
         },
+        {
+          method: "get",
+          path: "/:slugOrId/versions",
+          operation: "getApiDatasetBySlugOrIdVersions",
+          permission: "datasets:view",
+        },
+        {
+          method: "post",
+          path: "/:slugOrId/versions",
+          operation: "postApiDatasetBySlugOrIdVersions",
+          permission: "datasets:update",
+        },
+        {
+          method: "get",
+          path: "/:slugOrId/versions/:version",
+          operation: "getApiDatasetBySlugOrIdVersionsByVersion",
+          permission: "datasets:view",
+        },
+        {
+          method: "post",
+          path: "/:slugOrId/versions/:version/restore",
+          operation: "postApiDatasetBySlugOrIdVersionsByVersionRestore",
+          permission: "datasets:update",
+        },
       ]);
     });
 
@@ -313,6 +337,7 @@ describe("the dataset REST declaration", () => {
         projectId: "project-1",
         recordId: "record-1",
         updatedRecord: { input: "hi" },
+        editedBy: { kind: "system", id: null },
       });
     });
 
