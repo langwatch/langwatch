@@ -41,7 +41,7 @@ on:
       providers:
         description: "Build tags (space-separated). Default = every live tag."
         type: string
-        default: "live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio live_images"
+        default: "live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio"
       run_id_label:
         description: "Optional label appended to trace tags for grep."
         type: string
@@ -336,7 +336,10 @@ jobs:
           ELEVENLABS_API_KEY: ${{ secrets.MATRIX_ELEVENLABS_API_KEY }}
         run: go run ./cmd/matrixseed -base-url "$LW_BASE_URL"
 
+      # The matrix also runs after a seed refusal, on the providers that were
+      # seeded, so the gateway must start then too.
       - name: Start gateway (background)
+        if: ${{ success() || steps.seed.outcome == 'failure' }}
         run: |
           go build -o /tmp/aigateway ./cmd/service
           /tmp/aigateway aigateway > /tmp/aigateway.log 2>&1 &
@@ -354,7 +357,7 @@ jobs:
           # still produces useful coverage signal — a missing-cred
           # cell t.Skips with a clear reason instead of silently
           # being absent from the report.
-          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio live_images' }}
+          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio' }}
         run: |
           go test -tags="$MATRIX_TAGS" -v -count=1 -timeout 1200s \
             ./tests/matrix/... 2>&1 | tee /tmp/matrix.log

@@ -26,12 +26,15 @@ func (c *client) as(token string) *client {
 	return &next
 }
 
-// route is one call: its name for errors, its path, body and promised status.
+// route is one call: its method, path, body and promised status.
 type route struct {
-	name, path string
-	body       any
-	want       int
+	method, path string
+	body         any
+	want         int
 }
+
+// label names the call in errors.
+func (r route) label() string { return r.method + " " + r.path }
 
 // RefusedError is a route answering anything but the status it promises.
 type RefusedError struct {
@@ -64,7 +67,7 @@ type project struct {
 // provisionOrganization is the one route that exists before any organization.
 func (c *client) provisionOrganization(ctx context.Context, name string) (organization, error) {
 	var out organization
-	err := c.call(ctx, route{name: "POST /api/v1/organizations", path: "/api/v1/organizations",
+	err := c.call(ctx, route{method: http.MethodPost, path: "/api/v1/organizations",
 		body: map[string]any{"name": name, "adminApiKeyName": name + " seed"}, want: http.StatusCreated}, &out)
 	if err == nil && (out.Team.ID == "" || out.AdminAPIKey.Token == "") {
 		err = fmt.Errorf("POST /api/v1/organizations answered without a team or an admin key")
@@ -74,7 +77,7 @@ func (c *client) provisionOrganization(ctx context.Context, name string) (organi
 
 func (c *client) createProject(ctx context.Context, teamID, name string) (project, error) {
 	var out project
-	err := c.call(ctx, route{name: "POST /api/v1/projects", path: "/api/v1/projects",
+	err := c.call(ctx, route{method: http.MethodPost, path: "/api/v1/projects",
 		body: map[string]any{"name": name, "teamId": teamID, "language": "other", "framework": "other"},
 		want: http.StatusCreated}, &out)
 	if err == nil && (out.ID == "" || out.ServiceAPIKey == "") {
@@ -90,7 +93,7 @@ func (c *client) putModelProvider(ctx context.Context, provider string, keys map
 		Provider string  `json:"provider"`
 	}
 	call := "PUT /api/v1/model-providers/" + provider
-	if err := c.call(ctx, route{name: call, path: "/api/v1/model-providers/" + provider,
+	if err := c.call(ctx, route{method: http.MethodPut, path: "/api/v1/model-providers/" + provider,
 		body: map[string]any{"enabled": true, "customKeys": keys}, want: http.StatusOK}, &out); err != nil {
 		return "", err
 	}
@@ -112,7 +115,7 @@ func (c *client) createVirtualKey(ctx context.Context, name, modelProviderID str
 		"description": "Minted by the gateway-matrix seed for this run only",
 		"config":      map[string]any{"providersAllowed": []string{modelProviderID}},
 	}
-	if err := c.call(ctx, route{name: "POST /api/gateway/v1/virtual-keys", path: "/api/gateway/v1/virtual-keys",
+	if err := c.call(ctx, route{method: http.MethodPost, path: "/api/gateway/v1/virtual-keys",
 		body: body, want: http.StatusCreated}, &out); err != nil {
 		return "", err
 	}
@@ -127,15 +130,14 @@ func (c *client) call(ctx context.Context, r route, out any) error {
 	if err != nil {
 		return err
 	}
-	name := r.name
-	method, _, _ := strings.Cut(name, " ")
-	req, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(c.base, "/")+r.path, bytes.NewReader(payload))
+	name := r.label()
+	req, err := http.NewRequestWithContext(ctx, r.method, strings.TrimRight(c.base, "/")+r.path, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/json")
-	if method == http.MethodPost {
+	if r.method == http.MethodPost {
 		req.Header.Set("Idempotency-Key", idempotencyKey())
 	}
 	resp, err := c.http.Do(req)

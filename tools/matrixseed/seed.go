@@ -16,8 +16,6 @@ type Options struct {
 	InstanceAdminKey string
 	// Env supplies the provider credentials.
 	Env Getenv
-	// HTTP defaults to a client with a 30 second timeout.
-	HTTP *http.Client
 }
 
 // Export is one variable the seed hands the matrix step.
@@ -55,11 +53,7 @@ func Run(ctx context.Context, opts Options) (Result, error) {
 	if opts.InstanceAdminKey == "" {
 		return Result{}, errors.New("no instance administrator key: set LANGWATCH_INSTANCE_ADMIN_API_KEY on the api and the seed")
 	}
-	httpClient := opts.HTTP
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 30 * time.Second}
-	}
-	c := &client{base: opts.BaseURL, http: httpClient}
+	c := &client{base: opts.BaseURL, http: &http.Client{Timeout: 30 * time.Second}}
 
 	org, err := c.as(opts.InstanceAdminKey).provisionOrganization(ctx, "Gateway matrix")
 	if err != nil {
