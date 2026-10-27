@@ -33,11 +33,11 @@ function isSchemaBehind(message: string): boolean {
   return message.toLowerCase().includes("does not exist") && SCHEMA_BEHIND_SUBJECT.test(message);
 }
 
-const HANDLED_CONFLICT_MESSAGE = /Unique constraint failed|write conflict or a deadlock/i;
+const CONFLICT_RACE_MESSAGE = /Unique constraint failed|write conflict or a deadlock/i;
 
-/** P2002/P2034 races callers catch and retry; a real failure still logs at error via the caller. */
-function isHandledConflict(message: string): boolean {
-  return HANDLED_CONFLICT_MESSAGE.test(message);
+/** P2002/P2034 wording: a write race. The event cannot tell whether the caller retried it. */
+function isConflictRace(message: string): boolean {
+  return CONFLICT_RACE_MESSAGE.test(message);
 }
 
 /** A query event carries `query` where a log event carries `message`. */
@@ -57,12 +57,12 @@ export function forwardPrismaEvent({
 }): void {
   const message = prismaEventMessage(event);
   const loggerLevel =
-    level === "error" && (isSchemaBehind(message) || isHandledConflict(message))
+    level === "error" && (isSchemaBehind(message) || isConflictRace(message))
       ? "warn"
       : prismaLoggerLevel(level);
   logger[loggerLevel](
     { target: event.target, message, timestamp: event.timestamp },
-    PRISMA_EVENT_MESSAGE[level],
+    PRISMA_EVENT_MESSAGE[loggerLevel === "warn" ? "warn" : level],
   );
 }
 
