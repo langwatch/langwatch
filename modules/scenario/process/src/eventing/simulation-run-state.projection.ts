@@ -370,7 +370,7 @@ export class SimulationRunStateFoldProjection
   }
 
   /**
-   * Merges a later attempt's metadata over the stored JSON (#8032): top-level keys are replaced,
+   * Merges a later attempt's metadata over the stored JSON: top-level keys are replaced,
    * the reserved `langwatch` namespace is deep-merged, and `secretParameters` is stripped.
    */
   static withRefreshedMetadata({

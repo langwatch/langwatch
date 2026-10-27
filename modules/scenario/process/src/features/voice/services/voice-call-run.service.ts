@@ -163,24 +163,18 @@ function createVoiceCallRunWriter(
     });
 
     // A re-drive's started event is first-wins, so a refresh carries this attempt's
-    // source, audio and cutoff onto the run (#8032). It goes before the finish: a
+    // source, audio and cutoff onto the run. It goes before the finish: a
     // finished run's retry returns early, so a refresh after it could never be retried.
     if (isRedrive) {
       await collaborators.simulations.refreshMetadata({
         tenantId: projectId,
         scenarioRunId,
-        // Each re-drive is its own attempt. The end time is the same on every
-        // re-drive of this call, so it cannot tell two attempts apart; this id
-        // does, so a later re-drive with different recording metadata is not
-        // deduped away as a copy of the first.
-        attemptId: generate("scenario").toString(),
+        // Re-drives share the end time, so only this id keeps their refreshes apart.
+        attemptId: generate("voiceattempt").toString(),
         metadata: {
           source: record.source,
           langwatch: { isCutAtLimit: record.isCutAtLimit },
-          // Always carry audioUrl, as null when this attempt has no recording:
-          // a first attempt that had audio then a retry that does not must
-          // clear the stale link, else the run keeps offering a Play control
-          // for a recording that is no longer there (#8032).
+          // null, not omitted, so a retry without a recording clears a stale link.
           audioUrl: record.audioUrl ?? null,
         },
         occurredAt: record.endedAt,

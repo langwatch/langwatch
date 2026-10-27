@@ -113,13 +113,11 @@ const RecordCutAtLimitCommand = defineCommand({
 export const RefreshMetadataCommand = defineCommand({
   commandType: "lw.simulation_run.refresh_metadata",
   eventType: "lw.simulation_run.metadata_refreshed",
-  eventVersion: "2026-09-18",
+  eventVersion: "2026-10-27",
   aggregateType: "simulation_run",
   schema: simulationRunMetadataRefreshedEventDataSchema,
   aggregateId: (d) => d.scenarioRunId,
-  // Keyed on the attempt, not the run or occurredAt: both are identical across re-drives of one
-  // call and would dedupe the very retry this event lands (#8032). A retry of the same attempt
-  // re-sends its attemptId and still dedupes.
+  // Keyed on the attempt: run id and occurredAt are identical across re-drives of one call.
   idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:refreshMetadata:${d.attemptId}`,
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,

@@ -436,14 +436,14 @@ export type SimulationRunCutAtLimitRecordedEvent = z.infer<
 >;
 
 /**
- * MetadataRefreshed: a later attempt's metadata merged over the run's (#8032), since the started
+ * MetadataRefreshed: a later attempt's metadata merged over the run's, since the started
  * event is first-wins. `attemptId` is the idempotency identity; `occurredAt` cannot be, as every
  * re-drive of one call shares the same end time.
  */
 const simulationRunMetadataRefreshedEventDataSchemaDefinition = z.object({
   scenarioRunId: z.string(),
   attemptId: z.string().min(1),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
 });
 export interface SimulationRunMetadataRefreshedEventDataSchema extends Named<
   typeof simulationRunMetadataRefreshedEventDataSchemaDefinition

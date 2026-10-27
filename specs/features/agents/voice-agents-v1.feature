@@ -670,12 +670,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then the run completes with no duplicate messages
 
   # 8032 AC1
-  # A re-drive's second started event is first-wins in the fold (and deduped by
-  # a per-run idempotency key in production), so it cannot carry the second
-  # attempt's metadata. The retry emits a metadata_refresh event instead, which
-  # the fold merges over the run's top-level metadata: a "browser, no recording"
-  # first attempt becomes the "provider, with audio" the retry saw (#8032), so
-  # findExistingRun reads the right source and audio back on any later retry.
+  # started is first-wins and deduped per run; the refresh event carries the retry's metadata.
   @unit @regression
   Scenario: A re-driven finish refreshes the run's metadata to the second attempt
     Given a run started with a first attempt's metadata
@@ -690,10 +685,8 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then the run stays finished and takes the refreshed metadata
 
   # 8032 AC3
-  # The refresh always carries audioUrl, as null when this attempt has no
-  # recording, so the fold overwrites a stale url rather than keeping the key
-  # the refresh omitted: a first attempt that had audio then a retry that does
-  # not must lose the Play link, not keep offering a recording that is gone.
+  # The refresh always carries audioUrl, null when the attempt has no recording,
+  # so the fold clears a stale link instead of keeping the omitted key.
   @unit @regression
   Scenario: A re-drive that lost its recording clears the run's audio link
     Given a run whose first attempt carried a recording url
@@ -701,15 +694,12 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then the run's audio url is cleared while its other refreshed fields win
 
   # 8032 AC4
-  # Every re-drive of one finished call carries the same end time, so the
-  # refresh cannot be keyed on it: two re-drives with different recording
-  # metadata would share an idempotency key and the event log would keep only
-  # the first. Each re-drive names its own attempt; a retry of that same
-  # attempt still dedupes, and at one end time the attempt written last wins.
+  # Re-drives share the call's end time, so the refresh is keyed on its attempt:
+  # a retry of one attempt dedupes, and the attempt accepted last wins.
   @unit @regression
   Scenario: Two re-drives at the same end time each keep their own refresh
     Given two re-drives of one finished call with different recording metadata
-    When the run's event log is replayed and deduped by idempotency key
+    When the run's event log is replayed, deduped and ordered as a refold does
     Then both refreshes survive and the later re-drive's recording is the run's
 
   # ---------------------------------------------------------------------------

@@ -441,9 +441,8 @@ async function finishVoiceSession(
     record,
     turnTraceIds,
     scenario: scenarioContext,
-    // A half-written run already present means this is the retry completing it
-    // (#7973 AC2): its metadata reaches the run through a refresh event, since
-    // the first attempt's started event is first-wins in the fold (#8032).
+    // A half-written run already present means this is the retry completing it; its
+    // metadata reaches the run through a refresh event, as started is first-wins.
     isRedrive: Boolean(existing),
   });
 
