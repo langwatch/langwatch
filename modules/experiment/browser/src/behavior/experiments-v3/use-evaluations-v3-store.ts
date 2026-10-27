@@ -22,6 +22,10 @@ import { temporal } from "zundo";
 import { create, type StateCreator, type StoreApi } from "zustand";
 
 import {
+  withoutMappingsToMissingColumns,
+  withRenamedColumnMappings,
+} from "../../model/experiments-v3/stale-column-mappings.ts";
+import {
   createInitialState,
   type EvaluationsV3Actions,
   type EvaluationsV3State,
@@ -270,6 +274,26 @@ const datasetSelectionSlice = (set: StoreSet): DatasetSelectionActions => ({
   },
 });
 
+/** The targets and evaluators without dataset mappings to a column `datasetId` lacks. */
+const withoutStaleMappings = ({
+  state,
+  datasetId,
+  targetId,
+}: {
+  state: EvaluationsV3State;
+  datasetId: string;
+  targetId?: string | undefined;
+}): Pick<EvaluationsV3State, "targets" | "evaluators"> => {
+  const dataset = state.datasets.find((d) => d.id === datasetId);
+  if (!dataset) return { targets: state.targets, evaluators: state.evaluators };
+  return withoutMappingsToMissingColumns({
+    wiring: state,
+    datasetId,
+    columnNames: new Set(dataset.columns.map((c) => c.name)),
+    ...(targetId !== undefined ? { targetId } : {}),
+  });
+};
+
 /** Inline dataset cell/column actions (scoped to a dataset). */
 type DatasetCellsActions = Pick<
   EvaluationsV3Actions,
@@ -277,6 +301,7 @@ type DatasetCellsActions = Pick<
   | "addColumn"
   | "removeColumn"
   | "renameColumn"
+  | "removeMappingsToMissingColumns"
   | "updateColumnType"
   | "getRowCount"
   | "getCellValue"
@@ -318,13 +343,33 @@ const datasetCellsSlice = (set: StoreSet, get: StoreGet): DatasetCellsActions =>
   },
 
   removeColumn: (datasetId, columnId) => {
-    set((state) => withoutInlineColumn({ state, datasetId, columnId }));
+    set((state) => {
+      const edited = { ...state, ...withoutInlineColumn({ state, datasetId, columnId }) };
+      return { ...edited, ...withoutStaleMappings({ state: edited, datasetId }) };
+    });
   },
 
   renameColumn: (datasetId, columnId, newName) => {
-    set((state) =>
-      withInlineColumnEdit({ state, datasetId, columnId, edit: (c) => ({ ...c, name: newName }) }),
-    );
+    set((state) => {
+      const from = state.datasets
+        .find((d) => d.id === datasetId)
+        ?.columns.find((c) => c.id === columnId)?.name;
+      const edited = withInlineColumnEdit({
+        state,
+        datasetId,
+        columnId,
+        edit: (c) => ({ ...c, name: newName }),
+      });
+      if (from === undefined || from === newName) return edited;
+      return {
+        ...edited,
+        ...withRenamedColumnMappings({ wiring: state, datasetId, from, to: newName }),
+      };
+    });
+  },
+
+  removeMappingsToMissingColumns: ({ datasetId, targetId }) => {
+    set((state) => withoutStaleMappings({ state, datasetId, targetId }));
   },
 
   updateColumnType: (datasetId, columnId, type) => {

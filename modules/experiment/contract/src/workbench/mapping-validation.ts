@@ -527,7 +527,23 @@ export const getEvaluatorMissingMappings = (
   evaluator: EvaluatorConfig,
   datasetId: string,
   targetId: string,
-): EvaluatorValidationResult => {
+): EvaluatorValidationResult => evaluatorMappingGaps({ evaluator, datasetId, targetId });
+
+/**
+ * Validates `evaluator`'s mappings against `datasetId`/`targetId`; with `datasets`,
+ * a field reading a column that dataset lacks is a `column_not_in_dataset` gap.
+ */
+export const evaluatorMappingGaps = ({
+  evaluator,
+  datasetId,
+  targetId,
+  datasets,
+}: {
+  evaluator: EvaluatorConfig;
+  datasetId: string;
+  targetId: string;
+  datasets?: MappingValidationOptions["datasets"];
+}): EvaluatorValidationResult => {
   const missingMappings: MissingMapping[] = [];
   const targetMappings = evaluator.mappings[datasetId]?.[targetId] ?? {};
 
@@ -594,14 +610,25 @@ export const getEvaluatorMissingMappings = (
       fieldId: input.identifier,
       fieldName: input.identifier,
       isRequired: true,
+      reason: "unmapped",
     });
   }
 
+  const missingColumns = mappingsToMissingColumns({
+    fieldIds: evaluator.inputs.map((input) => input.identifier),
+    datasetMappings: targetMappings,
+    dataset: datasets?.find((candidate) => candidate.id === datasetId),
+  });
+  missingMappings.push(...missingColumns);
+
   // Invalid if:
-  // 1. Any required field is missing, OR
+  // 1. Any required field is missing or reads a column the dataset lacks, OR
   // 2. ALL fields are empty (must have at least one mapping)
   const allFieldsCount = evaluator.inputs.length;
-  const isValid = missingRequiredCount === 0 && (allFieldsCount === 0 || hasAnyMapping);
+  const isValid =
+    missingRequiredCount === 0 &&
+    missingColumns.length === 0 &&
+    (allFieldsCount === 0 || hasAnyMapping);
 
   return {
     isValid,
@@ -658,7 +685,12 @@ export const validateWorkbench = ({
 
     // Check all evaluators for this target (evaluators apply to all targets)
     for (const evaluator of evaluators) {
-      const evalValidation = getEvaluatorMissingMappings(evaluator, activeDatasetId, target.id);
+      const evalValidation = evaluatorMappingGaps({
+        evaluator,
+        datasetId: activeDatasetId,
+        targetId: target.id,
+        ...(datasets ? { datasets } : {}),
+      });
       if (!evalValidation.isValid) {
         return {
           isValid: false,

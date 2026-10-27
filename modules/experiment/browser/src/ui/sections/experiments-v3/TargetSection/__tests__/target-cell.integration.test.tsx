@@ -72,7 +72,7 @@ vi.mock("../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts", ()
 // Mock mappingValidation so we control which evaluators flag as
 // hasMissingMappings without touching the real DSL logic.
 vi.mock("@langwatch/experiment-contract/mapping-validation", () => ({
-  evaluatorHasMissingMappings: vi.fn(() => false),
+  evaluatorMappingGaps: vi.fn(() => ({ isValid: true, missingMappings: [] })),
 }));
 
 // Replace the chip with a minimal stub that exposes onEdit as a plain button.

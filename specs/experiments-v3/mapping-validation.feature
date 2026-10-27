@@ -225,3 +225,52 @@ Feature: Mapping Validation and Missing Mapping Detection
     Given I have a runner with "environment" mapped to a column the dataset does not have
     When I open the runner's drawer
     Then the mapping for "environment" says the column is not in the dataset
+
+  @unit
+  Scenario: An evaluator mapping to a column the dataset does not have is reported as a missing column
+    Given I have an evaluator with "expected_output" mapped to the dataset column "golden"
+    And the active dataset has no "golden" column
+    Then "expected_output" is reported as mapped to a column that is not in the dataset
+    And the run button opens the evaluator's mappings instead of running
+
+  @integration
+  Scenario: The prompt editor's mapping names a column the dataset does not have
+    Given I have a prompt runner with "question" mapped to a column the dataset does not have
+    When I open the prompt editor
+    Then the mapping for "question" says the column is not in the dataset
+
+  # ============================================================================
+  # Stale mappings
+  # ============================================================================
+  #
+  # A mapping goes stale when its column is deleted or renamed. Edits made in
+  # the workbench keep the mappings in step; a workbench saved with a stale
+  # mapping says which one it is and clears it in one click.
+
+  @unit
+  Scenario: Deleting a dataset column removes the mappings that read it
+    Given a runner and an evaluator with fields mapped to the dataset column "environment"
+    When I delete the "environment" column
+    Then neither keeps a mapping to "environment"
+    And their mappings to other columns are kept
+
+  @unit
+  Scenario: Renaming a dataset column keeps the mappings that read it
+    Given a runner and an evaluator with fields mapped to the dataset column "environment"
+    When I rename the "environment" column to "env"
+    Then both map those fields to "env"
+
+  @unit
+  Scenario: Removing a column in the columns editor removes the mappings that read it
+    Given a runner with "environment" mapped to the dataset column "environment"
+    When I save the columns editor without the "environment" column
+    Then the runner keeps no mapping to "environment"
+
+  @integration
+  Scenario: The column header names a stale mapping and clears it in one click
+    Given a saved workbench whose runner maps "plan" to the column "environment"
+    And the active dataset has no "environment" column
+    Then the runner header warns that "plan" reads "environment", which is not in the dataset
+    When I choose "Remove mappings to missing columns" in the runner menu
+    Then "plan" is unmapped
+    And the warning is gone
