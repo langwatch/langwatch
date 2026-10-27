@@ -150,8 +150,6 @@ jobs:
               - "charts/langyagent/**"
               - "charts/lib/**"
               - ".github/workflows/langwatch-chart.yml"
-      - "tools/chartheap/**"
-      - "cmd/chartheap/**"
               - "infra/docker/Dockerfile"
               - "infra/docker/Dockerfile.go_service"
               - "infra/clickhouse-serverless/**"
