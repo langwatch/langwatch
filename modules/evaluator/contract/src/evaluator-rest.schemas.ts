@@ -1,6 +1,8 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { evaluatorLabelSchema, evaluatorVersionSchema } from "./evaluator-version.ts";
+import { evaluatorPersonViewSchema } from "./evaluator.ts";
 import { AVAILABLE_EVALUATORS } from "./evaluators.ts";
 
 const evaluatorWireFieldSchema = z.object({
@@ -24,6 +26,27 @@ const evaluatorWireSchemaDefinition = z.object({
   outputFields: z.array(evaluatorWireFieldSchema),
   workflowName: z.string().optional(),
   workflowIcon: z.string().optional(),
+  version: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .describe(
+      "The version this response shows: the latest, unless a label or a version was asked for.",
+    ),
+  labels: z
+    .array(z.object({ label: z.string(), version: z.number().int().positive() }))
+    .describe(
+      "The deploy labels the evaluator carries, such as production, and the version each points at.",
+    ),
+  createdBy: evaluatorPersonViewSchema
+    .nullable()
+    .describe(
+      "The user who created the evaluator. Null when an API key created it, or it predates creators being recorded.",
+    ),
+  updatedBy: evaluatorPersonViewSchema
+    .nullable()
+    .describe("The user who changed the evaluator last. Null when an API key changed it."),
   platformUrl: z.string().url(),
 });
 export interface EvaluatorWireSchema extends Named<typeof evaluatorWireSchemaDefinition> {}
@@ -67,6 +90,12 @@ const apiResponseEvaluatorSchemaDefinition = z.object({
   outputFields: z.array(evaluatorWireFieldSchema),
   workflowName: z.string().optional(),
   workflowIcon: z.string().optional(),
+  version: z.number().int().positive().nullable().default(null),
+  labels: z
+    .array(z.object({ label: z.string(), version: z.number().int().positive() }))
+    .default([]),
+  createdBy: evaluatorPersonViewSchema.nullable().default(null),
+  updatedBy: evaluatorPersonViewSchema.nullable().default(null),
 });
 export interface ApiResponseEvaluatorSchema extends Named<
   typeof apiResponseEvaluatorSchemaDefinition
@@ -116,9 +145,89 @@ export const createEvaluatorInputSchema: CreateEvaluatorInputSchema =
 const updateEvaluatorInputSchemaDefinition = z.object({
   name: z.string().min(1).max(255).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
+  commitMessage: z
+    .string()
+    .max(500)
+    .optional()
+    .describe("A note kept on the version this update appends."),
 });
 export interface UpdateEvaluatorInputSchema extends Named<
   typeof updateEvaluatorInputSchemaDefinition
 > {}
 export const updateEvaluatorInputSchema: UpdateEvaluatorInputSchema =
   updateEvaluatorInputSchemaDefinition;
+
+/** `?label=` or `?version=` on a single read; the `idOrSlug:label` address is the shorthand. */
+const evaluatorRestGetQuerySchemaDefinition = z.object({
+  label: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .describe("A deploy label, for example production. Omit both to read the latest version."),
+  version: z.coerce.number().int().positive().optional().describe("A version number."),
+});
+export interface EvaluatorRestGetQuerySchema extends Named<
+  typeof evaluatorRestGetQuerySchemaDefinition
+> {}
+export const evaluatorRestGetQuerySchema: EvaluatorRestGetQuerySchema =
+  evaluatorRestGetQuerySchemaDefinition;
+
+const evaluatorVersionsRestParamsSchemaDefinition = z.object({
+  evaluatorId: z.string().min(1).describe("The evaluator id."),
+});
+export interface EvaluatorVersionsRestParamsSchema extends Named<
+  typeof evaluatorVersionsRestParamsSchemaDefinition
+> {}
+export const evaluatorVersionsRestParamsSchema: EvaluatorVersionsRestParamsSchema =
+  evaluatorVersionsRestParamsSchemaDefinition;
+
+const evaluatorLabelRestParamsSchemaDefinition = z.object({
+  evaluatorId: z.string().min(1).describe("The evaluator id."),
+  label: z.string().min(1).max(64).describe("The deploy label, for example production."),
+});
+export interface EvaluatorLabelRestParamsSchema extends Named<
+  typeof evaluatorLabelRestParamsSchemaDefinition
+> {}
+export const evaluatorLabelRestParamsSchema: EvaluatorLabelRestParamsSchema =
+  evaluatorLabelRestParamsSchemaDefinition;
+
+const evaluatorLabelRestBodySchemaDefinition = z.object({
+  version: z.number().int().positive().describe("The version number the label points at."),
+});
+export interface EvaluatorLabelRestBodySchema extends Named<
+  typeof evaluatorLabelRestBodySchemaDefinition
+> {}
+export const evaluatorLabelRestBodySchema: EvaluatorLabelRestBodySchema =
+  evaluatorLabelRestBodySchemaDefinition;
+
+const evaluatorVersionListResponseSchemaDefinition = z.object({
+  data: z.array(evaluatorVersionSchema),
+  labels: z.array(evaluatorLabelSchema.pick({ label: true, version: true })),
+});
+export interface EvaluatorVersionListResponseSchema extends Named<
+  typeof evaluatorVersionListResponseSchemaDefinition
+> {}
+export const evaluatorVersionListResponseSchema: EvaluatorVersionListResponseSchema =
+  evaluatorVersionListResponseSchemaDefinition;
+
+const evaluatorLabelResponseSchemaDefinition = evaluatorLabelSchema.pick({
+  label: true,
+  version: true,
+  versionId: true,
+});
+export interface EvaluatorLabelResponseSchema extends Named<
+  typeof evaluatorLabelResponseSchemaDefinition
+> {}
+export const evaluatorLabelResponseSchema: EvaluatorLabelResponseSchema =
+  evaluatorLabelResponseSchemaDefinition;
+
+const evaluatorLabelRemovedSchemaDefinition = z.object({
+  label: z.string(),
+  removed: z.literal(true),
+});
+export interface EvaluatorLabelRemovedSchema extends Named<
+  typeof evaluatorLabelRemovedSchemaDefinition
+> {}
+export const evaluatorLabelRemovedSchema: EvaluatorLabelRemovedSchema =
+  evaluatorLabelRemovedSchemaDefinition;

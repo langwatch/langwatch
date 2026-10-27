@@ -67,6 +67,8 @@ const evaluatorApiUpdateInputSchemaDefinition = z.object({
   type: evaluatorTypeSchema.optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   workflowId: z.string().nullable().optional(),
+  /** Kept on the version this update appends. */
+  commitMessage: z.string().max(500).optional(),
 });
 export interface EvaluatorApiUpdateInputSchema extends Named<
   typeof evaluatorApiUpdateInputSchemaDefinition

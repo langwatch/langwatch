@@ -35,6 +35,13 @@ import {
   type NativeEvaluatorExecutionInput,
   type ResolvedEvaluatorExecution,
   type SingleEvaluationResult,
+  type AssignEvaluatorLabelInput,
+  type EvaluatorCaller,
+  type EvaluatorLabel,
+  type EvaluatorVersions,
+  type EvaluatorVersionSelector,
+  type RemoveEvaluatorLabelInput,
+  parseEvaluatorAddress,
 } from "@langwatch/evaluator-contract";
 import { preconditionMatchInputSchema } from "@langwatch/evaluator-contract/evaluation-types";
 import { ValidationError } from "@langwatch/handled-error";
@@ -62,6 +69,7 @@ import {
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
 import { EvaluatorLinkedRowsService } from "../services/evaluator-linked-rows.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
+import { EvaluatorVersionService } from "../services/evaluator-version.service.ts";
 import { EvaluatorWorkflowArchiveService } from "../services/evaluator-workflow-archive.service.ts";
 import { EvaluatorWorkflowPublicationService } from "../services/evaluator-workflow-publication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
@@ -101,6 +109,7 @@ type EvaluatorSetup = FeatureSetup<
 /** What the app is built from, once the setup has assembled it. */
 type EvaluatorAppParts = Readonly<{
   evaluators: EvaluatorRuntimeService;
+  versions: EvaluatorVersionService;
   modelProviders: ModelProviderApi;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
@@ -144,7 +153,14 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
    */
   static createWithGraph(setup: EvaluatorSetup, graph: EvaluatorGraph): EvaluatorModule {
     const { dependencies, repositories, config } = setup;
+    const versions = EvaluatorVersionService.create({
+      repository: repositories.evaluators,
+      users: dependencies.users,
+      permissions: dependencies.permissions,
+      auditLog: dependencies.auditLog,
+    });
     const evaluators = EvaluatorRuntimeService.create({
+      versions,
       repository: repositories.evaluators,
       workflows: dependencies.workflows,
       history: EvaluatorHistoryService.create({
@@ -163,6 +179,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
 
     return new EvaluatorModule({
       evaluators,
+      versions,
       creationCaps,
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
@@ -244,8 +261,11 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   }
 
   /** Every evaluator in the project, with its computed input fields. */
-  getAllWithFields(input: { projectId: string }): Promise<EvaluatorWithFields[]> {
-    return this.#dependencies.evaluators.getAllWithFields(input);
+  async getAllWithFields(input: { projectId: string }): Promise<EvaluatorWithFields[]> {
+    return this.#enrich({
+      projectId: input.projectId,
+      evaluators: await this.#dependencies.evaluators.getAllWithFields(input),
+    });
   }
 
   /** One evaluator with its computed fields, or undefined. */
@@ -253,7 +273,8 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     id: string;
     projectId: string;
   }): Promise<EvaluatorWithFields | undefined> {
-    const [evaluator] = await this.#dependencies.evaluators.findByIdWithFields(input);
+    const found = await this.#dependencies.evaluators.findByIdWithFields(input);
+    const [evaluator] = await this.#enrich({ projectId: input.projectId, evaluators: found });
     return evaluator;
   }
 
@@ -268,9 +289,63 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     return evaluator;
   }
 
-  /** One evaluator. */
-  getById(input: { id: string; projectId: string }): Promise<Evaluator> {
-    return this.#dependencies.evaluators.getById(input);
+  /** One evaluator, at a label or a version when one is asked for. */
+  async getById(
+    input: { id: string; projectId: string } & EvaluatorVersionSelector,
+  ): Promise<Evaluator> {
+    const { evaluator, version } = await this.#dependencies.versions.resolve({
+      projectId: input.projectId,
+      address: input.id,
+      bySlug: false,
+      label: input.label,
+      version: input.version,
+    });
+    const [enriched] = await this.#enrich({ projectId: input.projectId, evaluators: [evaluator] });
+    return { ...enriched!, version };
+  }
+
+  /** Every version of the evaluator, newest first, with the labels on each. */
+  listVersions(input: { evaluatorId: string; projectId: string }): Promise<EvaluatorVersions> {
+    return this.#dependencies.versions.listVersions(input);
+  }
+
+  /** Points a deploy label at one of the evaluator's versions. */
+  assignLabel(
+    input: AssignEvaluatorLabelInput & { caller?: EvaluatorCaller },
+  ): Promise<EvaluatorLabel> {
+    return this.#dependencies.versions.assignLabel(input);
+  }
+
+  removeLabel(input: RemoveEvaluatorLabelInput): Promise<void> {
+    return this.#dependencies.versions.removeLabel(input);
+  }
+
+  /** The evaluator at a label, or the latest when the label points nowhere (a monitor's pin). */
+  atLabelOrLatest(input: { evaluator: Evaluator; label: string }): Promise<Evaluator> {
+    return this.#dependencies.versions.atLabelOrLatest(input);
+  }
+
+  /** The latest version, the labels and the people behind each row. */
+  async #enrich<T extends Evaluator>(input: { projectId: string; evaluators: T[] }): Promise<T[]> {
+    if (input.evaluators.length === 0) return [];
+    const summaries = await this.#dependencies.versions.summaries({
+      projectId: input.projectId,
+      ids: input.evaluators.map((evaluator) => evaluator.id),
+    });
+    const people = await this.#dependencies.versions.peopleNamed(
+      input.evaluators.flatMap((evaluator) =>
+        [evaluator.createdById, evaluator.updatedById].filter(
+          (id): id is string => typeof id === "string",
+        ),
+      ),
+    );
+    return input.evaluators.map((evaluator) => ({
+      ...evaluator,
+      version: summaries.get(evaluator.id)?.version ?? null,
+      labels: summaries.get(evaluator.id)?.labels ?? [],
+      createdBy: evaluator.createdById ? (people.get(evaluator.createdById) ?? null) : null,
+      updatedBy: evaluator.updatedById ? (people.get(evaluator.updatedById) ?? null) : null,
+    }));
   }
 
   /** One evaluator by its project-unique slug, or undefined. */
@@ -289,10 +364,16 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
    * feature's rule, not the REST door's — reimplementing it there could
    * answer differently for a slug that looks like an id.
    */
-  async findByIdOrSlugWithFields(input: {
-    idOrSlug: string;
-    projectId: string;
-  }): Promise<EvaluatorWithFields | undefined> {
+  async findByIdOrSlugWithFields(
+    input: {
+      idOrSlug: string;
+      projectId: string;
+    } & EvaluatorVersionSelector,
+  ): Promise<EvaluatorWithFields | undefined> {
+    const address = parseEvaluatorAddress(input.idOrSlug);
+    if (address.hadSuffix || input.label !== void 0 || input.version !== void 0) {
+      return this.#atVersionWithFields({ ...input, address: input.idOrSlug });
+    }
     const byId = await this.findByIdWithFields({
       id: input.idOrSlug,
       projectId: input.projectId,
@@ -305,10 +386,22 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     });
     if (!bySlug) return void 0;
 
-    return this.#dependencies.evaluators.getByIdWithFields({
-      id: bySlug.id,
+    return this.findByIdWithFields({ id: bySlug.id, projectId: input.projectId });
+  }
+
+  async #atVersionWithFields(
+    input: { address: string; projectId: string } & EvaluatorVersionSelector,
+  ): Promise<EvaluatorWithFields> {
+    const { evaluator, version } = await this.#dependencies.versions.resolve({
       projectId: input.projectId,
+      address: input.address,
+      bySlug: true,
+      label: input.label,
+      version: input.version,
     });
+    const withFields = await this.#dependencies.evaluators.enrichWithFields(evaluator);
+    const [enriched] = await this.#enrich({ projectId: input.projectId, evaluators: [withFields] });
+    return { ...enriched!, version };
   }
 
   /** The evaluator already assigned to this workflow, if there is one. */
@@ -406,6 +499,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     name: string;
     config: EvaluatorConfig;
     id?: string;
+    caller?: EvaluatorCaller;
   }): Promise<Evaluator> {
     await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
     const [resolvedDefault, resolvedEmbedding] = await Promise.all([
@@ -422,6 +516,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       name: input.name,
       type: "evaluator",
       config: input.config,
+      caller: input.caller,
       resolved: {
         defaultModel: resolvedDefault.model,
         embeddingsModel: resolvedEmbedding?.model ?? null,
@@ -444,18 +539,37 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     return this.#dependencies.evaluators.update(input);
   }
 
-  /** Soft-deletes an evaluator. */
-  archive(input: { id: string; projectId: string }): Promise<Evaluator> {
-    return this.#dependencies.evaluators.archive(input);
+  /** Soft-deletes an evaluator; a labelled one needs `evaluators:deploy` of the caller. */
+  async archive(input: {
+    id: string;
+    projectId: string;
+    caller?: EvaluatorCaller;
+  }): Promise<Evaluator> {
+    await this.#dependencies.versions.assertDeletable({
+      projectId: input.projectId,
+      evaluatorId: input.id,
+      caller: input.caller,
+    });
+    return this.#dependencies.evaluators.archive({ id: input.id, projectId: input.projectId });
   }
 
   /**
    * Archives the evaluator and its linked workflow, then records `lw.evaluator.deleted`:
    * monitor removes the monitors that ran it from its own side, after a lag (R7).
    */
-  async cascadeArchive(input: { id: string; projectId: string }): Promise<EvaluatorCascadeArchive> {
-    const evaluator = await this.#dependencies.evaluators.getById(input);
-    const archivedEvaluator = await this.#dependencies.evaluators.archive(input);
+  async cascadeArchive(input: {
+    id: string;
+    projectId: string;
+    caller?: EvaluatorCaller;
+  }): Promise<EvaluatorCascadeArchive> {
+    const scope = { id: input.id, projectId: input.projectId };
+    const evaluator = await this.#dependencies.evaluators.getById(scope);
+    await this.#dependencies.versions.assertDeletable({
+      projectId: input.projectId,
+      evaluatorId: input.id,
+      caller: input.caller,
+    });
+    const archivedEvaluator = await this.#dependencies.evaluators.archive(scope);
     const archivedWorkflow = evaluator.workflowId
       ? await this.#dependencies.graph.archiveLinkedWorkflow({
           workflowId: evaluator.workflowId,

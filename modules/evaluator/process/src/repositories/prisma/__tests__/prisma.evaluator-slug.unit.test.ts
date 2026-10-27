@@ -39,7 +39,16 @@ function fakeDatabase(overrides: EvaluatorDelegate = {}): {
     },
     ...overrides,
   };
-  return { database: prismaDouble({ evaluator }), created };
+  const evaluatorVersion = {
+    findFirst: async () => null,
+    create: async (args: { data: Record<string, unknown> }) => args.data,
+  };
+  const transactionClient = prismaDouble({ evaluator, evaluatorVersion });
+  const database = prismaDouble({
+    evaluator,
+    $transaction: (run: (client: PrismaClient) => Promise<unknown>) => run(transactionClient),
+  });
+  return { database, created };
 }
 
 const persistInput = (overrides: { id?: string; projectId?: string; name: string }) => ({

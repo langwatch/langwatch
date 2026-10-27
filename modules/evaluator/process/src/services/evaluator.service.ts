@@ -26,6 +26,7 @@ import {
   type EvaluatorCopy,
   type SingleEvaluationResult,
   type NativeEvaluatorExecutionInput,
+  evaluatorWriteAuthorOf,
 } from "@langwatch/evaluator-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -35,6 +36,7 @@ import { EvaluatorCodeService } from "./evaluator-code.service.ts";
 import { EvaluatorExecutionService } from "./evaluator-execution.service.ts";
 import type { EvaluatorHistoryService } from "./evaluator-history.service.ts";
 import { EvaluatorNativeService } from "./evaluator-native.service.ts";
+import type { EvaluatorVersionService } from "./evaluator-version.service.ts";
 
 type EvaluatorServiceOptions = {
   repository: EvaluatorRepository;
@@ -44,6 +46,8 @@ type EvaluatorServiceOptions = {
   fallbackModels?: { defaultModel: string; embeddingsModel: string };
   codeExecution: EvaluatorCodeExecution;
   generateId: (kind: string) => string;
+  /** Resolves `slug:label` addresses for execution; without it the address is read bare. */
+  versions?: EvaluatorVersionService;
 };
 
 function evaluatorResultFieldType(identifier: string): string {
@@ -217,7 +221,12 @@ export class EvaluatorService {
       }
     }
 
-    return this.options.repository.create({ ...input, type: parsed.data, config });
+    return this.options.repository.create({
+      ...input,
+      type: parsed.data,
+      config,
+      author: evaluatorWriteAuthorOf(input.caller),
+    });
   }
 
   async createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator> {
@@ -260,7 +269,13 @@ export class EvaluatorService {
       });
     }
 
-    return this.options.repository.update(input);
+    return this.options.repository.update({
+      id: input.id,
+      projectId: input.projectId,
+      data: input.data,
+      commitMessage: input.commitMessage,
+      author: evaluatorWriteAuthorOf(input.caller),
+    });
   }
 
   async archive(input: { id: string; projectId: string }): Promise<Evaluator> {
@@ -269,7 +284,7 @@ export class EvaluatorService {
     return this.options.repository.archive(input);
   }
 
-  private async enrichWithFields(evaluator: Evaluator): Promise<EvaluatorWithFields> {
+  async enrichWithFields(evaluator: Evaluator): Promise<EvaluatorWithFields> {
     if (evaluator.type === "workflow" && evaluator.workflowId) {
       const workflow = await this.options.workflows.getFields({
         workflowId: evaluator.workflowId,
@@ -365,6 +380,7 @@ export class EvaluatorService {
           projectId: copy.projectId,
           name: source.name,
           config: config.success ? config.data : {},
+          commitMessage: "Pushed from the source evaluator",
         }),
       ),
     );
@@ -387,6 +403,7 @@ export class EvaluatorService {
       projectId: input.projectId,
       name: source.name,
       config: config.success ? config.data : {},
+      commitMessage: "Synced from the source evaluator",
     });
 
     return { ok: true };

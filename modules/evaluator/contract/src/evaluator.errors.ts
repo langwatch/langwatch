@@ -165,3 +165,73 @@ export class EvaluatorSourcePermissionDeniedError extends HandledError {
     this.name = "EvaluatorSourcePermissionDeniedError";
   }
 }
+
+/** A label or a version an evaluator read asked for that the evaluator does not have. */
+export class EvaluatorVersionNotFoundError extends HandledError {
+  declare readonly code: "evaluator_version_not_found";
+
+  constructor({
+    evaluatorId,
+    label,
+    version,
+  }: {
+    evaluatorId: string;
+    label?: string;
+    version?: number;
+  }) {
+    super(
+      "evaluator_version_not_found",
+      label
+        ? `Evaluator "${evaluatorId}" has no version labelled "${label}".`
+        : `Evaluator "${evaluatorId}" has no version ${version ?? ""}.`.replace(" .", "."),
+      {
+        httpStatus: 404,
+        fault: "customer",
+        meta: { evaluatorId, ...(label ? { label } : {}), ...(version ? { version } : {}) },
+      },
+    );
+    this.name = "EvaluatorVersionNotFoundError";
+  }
+}
+
+/** A label name the deploy rules refuse (prompt tag rules: lowercase, not a number, not latest). */
+export class EvaluatorLabelInvalidError extends HandledError {
+  declare readonly code: "evaluator_label_invalid";
+
+  constructor({ label, reason }: { label: string; reason: string }) {
+    super("evaluator_label_invalid", `Invalid label "${label}". ${reason}`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { label, reason },
+    });
+    this.name = "EvaluatorLabelInvalidError";
+  }
+}
+
+/** A read named a label and a version at once, in the address or beside it. */
+export class EvaluatorVersionSelectorConflictError extends HandledError {
+  declare readonly code: "evaluator_version_selector_conflict";
+
+  constructor() {
+    super(
+      "evaluator_version_selector_conflict",
+      "Ask for one label, one version, or neither for the latest.",
+      { httpStatus: 400, fault: "customer", meta: {} },
+    );
+    this.name = "EvaluatorVersionSelectorConflictError";
+  }
+}
+
+/** Deleting an evaluator a deploy label points at needs `evaluators:deploy`. */
+export class EvaluatorDeployedLabelProtectedError extends HandledError {
+  declare readonly code: "evaluator_deployed_label_protected";
+
+  constructor({ evaluatorId, labels }: { evaluatorId: string; labels: string[] }) {
+    super(
+      "evaluator_deployed_label_protected",
+      `Evaluator "${evaluatorId}" is deployed as ${labels.join(", ")}; deleting it needs the evaluators:deploy permission.`,
+      { httpStatus: 403, fault: "customer", meta: { evaluatorId, labels } },
+    );
+    this.name = "EvaluatorDeployedLabelProtectedError";
+  }
+}

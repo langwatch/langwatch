@@ -8,6 +8,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "agent:backfill-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "agent",
+    "description": "Records version 1 of every agent written before versions existed, with its creator from the audit log.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "analytics:fill-lwql-project-keys",
     "kind": "data",
     "mode": "background",
@@ -139,6 +147,14 @@
     "owner": "evaluation",
     "description": "Fills the second id index of evaluation runs (by trace id) from older rows, then marks it ready on each ClickHouse target.",
     "needsOldWritersGone": false
+  },
+  {
+    "id": "evaluator:backfill-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "evaluator",
+    "description": "Records version 1 of every evaluator written before versions existed, with its creator from the audit log.",
+    "needsOldWritersGone": true
   },
   {
     "id": "experiment:fill-id-indexes",
