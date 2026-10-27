@@ -826,7 +826,7 @@ Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:157`
 Answers at `/api/v1/analytics/reports`.
 
 ```typescript
-// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:236
+// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:239
 interface Body {
   name: string;
 }
@@ -850,7 +850,7 @@ Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:172`
 Answers at `/api/v1/analytics/reports/reorder`.
 
 ```typescript
-// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:245
+// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:248
 interface Body {
   dashboardIds: string[];
 }
@@ -869,7 +869,7 @@ Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:192`.
 Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-// Params: reportRestParamsSchema, ../contract/src/dashboard.ts:257
+// Params: reportRestParamsSchema, ../contract/src/dashboard.ts:260
 interface Params {
   reportId: string;
 }
@@ -885,8 +885,8 @@ Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:210`
 Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:257
-type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:236
+type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:260
+type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:239
 type Response = z.infer<typeof dashboardResponseSchema>; // ../contract/src/dashboard.responses.ts:98
 ```
 
@@ -899,7 +899,7 @@ Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:230`
 Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:257
+type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:260
 type Response = z.infer<typeof dashboardDeletedResponseSchema>; // ../contract/src/dashboard.responses.ts:120
 ```
 
@@ -1203,14 +1203,14 @@ type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.r
 
 // boards.scopeImpact
 type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:26
-// Output: dashboardScopeImpactSchema, ../contract/src/dashboard.ts:137
+// Output: dashboardScopeImpactSchema, ../contract/src/dashboard.ts:140
 interface Output {
   otherStars: number;
 }
 
 // boards.scopeProjects
 type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:26
-// Output: dashboardScopeProjectsSchema, ../contract/src/dashboard.ts:148
+// Output: dashboardScopeProjectsSchema, ../contract/src/dashboard.ts:151
 interface Output {
   ownerProject: {
     id: string;
@@ -1436,7 +1436,7 @@ type Output = {
 
 // dashboards.sourcePresence
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/dashboard.trpc.ts:17
-// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:227
+// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:230
 interface Output {
   traces: "present" | "absent" | "failed";
   scenarios: "present" | "absent" | "failed";
