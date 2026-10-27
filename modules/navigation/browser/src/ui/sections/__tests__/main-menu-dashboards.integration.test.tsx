@@ -68,12 +68,14 @@ function renderSidebar({
   permissions = ["analytics:view"],
   dashboardsFlag = true,
   dashboardsLoading = false,
+  organizationLoading = false,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "settings";
   pathname: string;
   permissions?: string[];
   dashboardsFlag?: boolean;
   dashboardsLoading?: boolean;
+  organizationLoading?: boolean;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
@@ -82,6 +84,7 @@ function renderSidebar({
         project: PROJECT,
         pathname,
         permissions,
+        isLoading: organizationLoading,
         flags: { release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading } },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
       }}
@@ -158,6 +161,33 @@ describe("the LLM Ops sidebar", () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo", dashboardsLoading: true });
 
       expect(screen.queryByRole("link", { name: "Analytics" })).toBeNull();
+    });
+
+    /** @scenario "AC3k The Analytics entry waits for the Dashboards answer" */
+    it("waits for the flag alone, not for the organization to load", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", organizationLoading: true });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+        "href",
+        "/demo/dashboards",
+      );
+    });
+
+    /** @scenario "AC3m The Analytics entry is not marked active on a legacy analytics page when it leads to Dashboards" */
+    it("is not marked active on a legacy analytics page when it leads to Dashboards", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo/analytics" });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).not.toHaveAttribute("aria-current");
+    });
+
+    /** @scenario "AC3n The Analytics entry is marked active on a legacy analytics page when it leads to analytics" */
+    it("is marked active on a legacy analytics page when it leads to analytics", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo/analytics", dashboardsFlag: false });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
     });
 
     /** @scenario "AC3h The Analytics entry opens analytics when Dashboards is out of reach" */

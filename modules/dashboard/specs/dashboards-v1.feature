@@ -98,6 +98,35 @@ Feature: Dashboards v1
     When the member looks at the LLM Ops sidebar
     Then the Analytics entry is not shown yet
 
+  @integration
+  Scenario: AC3l Opening Dashboards from the Analytics entry makes Dashboards the remembered product
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens /[project]/dashboards from the Analytics entry
+    And later opens the root address
+    Then they land on /[project]/dashboards
+
+  @integration
+  Scenario: AC3m The Analytics entry is not marked active on a legacy analytics page when it leads to Dashboards
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens a legacy analytics page
+    Then the Analytics entry is not marked active
+
+  @integration
+  Scenario: AC3n The Analytics entry is marked active on a legacy analytics page when it leads to analytics
+    Given the release_dashboards flag is off for the project
+    When the member opens a legacy analytics page
+    Then the Analytics entry is marked active
+
+  @integration
+  Scenario: AC3o A custom graph that cannot be opened still carries the legacy banner
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    And a custom graph was saved in a shape the chart builder cannot open
+    When the member opens that graph
+    Then a warning banner at the top says it is the legacy view
+
   # ---------------------------------------------------------------------------
   # Agent Flight Deck
   # ---------------------------------------------------------------------------

@@ -1580,7 +1580,12 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   if (!stored.data?.graph) return null;
   const graph = customGraphInputSchema.safeParse(stored.data.graph);
   if (!graph.success) {
-    return <Box padding={8}>This chart was saved in a shape the chart builder cannot open.</Box>;
+    return (
+      <>
+        <LegacyAnalyticsBanner />
+        <Box padding={8}>This chart was saved in a shape the chart builder cannot open.</Box>
+      </>
+    );
   }
 
   const alert = formAlertOf(stored.data?.alert);

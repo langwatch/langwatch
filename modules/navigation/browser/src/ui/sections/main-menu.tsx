@@ -50,7 +50,9 @@ export const MainMenuSections = function MainMenuSections({
     { enabled: !!project?.id && navigation.test },
   );
   const codingAgentLinks = useCodingAgentLinks();
-  const { reachableProducts, isLoading: productsLoading } = useReachableProducts();
+  const { reachableProducts } = useReachableProducts();
+  // Only this flag decides where the entry leads; other loads must not hold it.
+  const dashboardsFlagLoading = host.featureFlag(FrontendFlags.release_dashboards).isLoading;
 
   const sectionProps = { showExpanded, project, pathname };
 
@@ -73,7 +75,7 @@ export const MainMenuSections = function MainMenuSections({
         codingAgentLinks={codingAgentLinks}
         showAnalytics={navigation.analytics}
         analyticsLeadsToDashboards={reachableProducts.includes("dashboards")}
-        analyticsSettled={!productsLoading}
+        analyticsSettled={!dashboardsFlagLoading}
         showOnlineEvaluations={navigation.onlineEvaluations}
       />
       {navigation.test && (
@@ -142,7 +144,8 @@ function ObserveSection({
           icon={featureIcons.analytics.icon}
           label={projectNavItems.analytics.title}
           project={project}
-          isActive={pathname.includes("/analytics")}
+          // Dashboards draws its own sidebar: an entry leading there is never active on /analytics.
+          isActive={!analyticsLeadsToDashboards && pathname.includes("/analytics")}
           showLabel={showExpanded}
         />
       )}
