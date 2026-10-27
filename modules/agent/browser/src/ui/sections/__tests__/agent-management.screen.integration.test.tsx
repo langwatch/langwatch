@@ -9,6 +9,8 @@ import type {
   Agent,
   AgentCopy,
   AgentHistoryEntry,
+  AgentLabel,
+  AgentVersions,
   AgentWithFields,
   AgentOverview,
   RelatedAgentEntities,
@@ -75,6 +77,39 @@ const history: AgentHistoryEntry[] = [
     user: { id: "user_1", name: "Ada", email: "ada@example.test" },
   },
 ];
+
+function versionRow(version: number, commitMessage: string | null) {
+  return {
+    id: `version_${version}`,
+    agentId: "agent_1",
+    projectId: "project_1",
+    version,
+    name: "HTTP agent",
+    type: "http" as const,
+    config: {},
+    workflowId: null,
+    commitMessage,
+    authorId: "user_1",
+    authorKind: "user" as const,
+    author: { id: "user_1", name: "Ada", email: "ada@example.test" },
+    createdAt: new Date(`2026-01-0${version}T00:00:00.000Z`),
+    labels: version === 1 ? ["production"] : [],
+  };
+}
+
+const versions: AgentVersions = {
+  versions: [versionRow(2, "Point at the new endpoint"), versionRow(1, null)],
+  labels: [
+    {
+      label: "production",
+      versionId: "version_1",
+      version: 1,
+      updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+      updatedById: "user_1",
+    },
+  ],
+  availableLabels: ["production", "staging"],
+};
 
 const invalidateAgents = vi.fn(async () => undefined);
 const invalidateLimit = vi.fn(async () => undefined);
@@ -188,6 +223,27 @@ class TestAgentBrowser implements AgentClient {
   getHistory(input: unknown): Promise<AgentHistoryEntry[]> {
     this.historyRead.push(input);
     return Promise.resolve(history);
+  }
+
+  readonly labelsAssigned: unknown[] = [];
+
+  listVersions(): Promise<AgentVersions> {
+    return Promise.resolve(versions);
+  }
+
+  assignLabel(input: { label: string; version: number }): Promise<AgentLabel> {
+    this.labelsAssigned.push(input);
+    return Promise.resolve({
+      label: input.label,
+      version: input.version,
+      versionId: `version_${input.version}`,
+      updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+      updatedById: "user_1",
+    });
+  }
+
+  removeLabel(): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -462,6 +518,32 @@ describe("given the agents page", () => {
       await user.click(screen.getByRole("button", { name: /close/i }));
 
       expect(host.setQueryCalls).toEqual([{ history: void 0 }]);
+    });
+  });
+
+  describe("when an agent's history lists its versions", () => {
+    /** @scenario "The history drawer shows versions and opens the deploy dialog" */
+    it("shows each version with its labels and deploys staging to a version", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { browser } = await mountScreen({ history: "agent_1" });
+
+      const list = await screen.findByTestId("agent-versions");
+      expect(within(list).getByText("v2")).toBeInTheDocument();
+      expect(within(list).getByText("Point at the new endpoint")).toBeInTheDocument();
+      expect(within(list).getByText("production")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Deploy" }));
+      const dialog = await screen.findByRole("dialog", { name: /deploy http agent/i });
+      const [, staging] = within(dialog).getAllByRole("combobox");
+      await user.click(staging!);
+      await user.click(await screen.findByRole("option", { name: /v2/ }));
+      await user.click(within(dialog).getByTestId("agent-deploy-save"));
+
+      await waitFor(() => {
+        expect(browser.labelsAssigned).toEqual([
+          { projectId: "project_1", agentId: "agent_1", label: "staging", version: 2 },
+        ]);
+      });
     });
   });
 
