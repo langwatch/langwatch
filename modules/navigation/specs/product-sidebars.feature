@@ -226,10 +226,14 @@ Feature: Product sidebars
     And a member who may not create dashboards and has pinned none sees no Dashboards section
 
   @integration
-  Scenario: A double click or a failed pin leaves exactly one dashboard
+  Scenario: A double click leaves exactly one dashboard
     Given I may create dashboards in this project
     When I press the "+" or the "Add dashboard" item twice in quick succession
     Then one dashboard is made, and the control ignores the second press while it is made
+
+  @integration
+  Scenario: A failed pin leaves exactly one dashboard
+    Given I may create dashboards in this project
     When the pin fails after the dashboard is made
     Then that one dashboard still exists, opens with "Add a widget" open, and I see "Couldn't pin the dashboard"
 
@@ -246,9 +250,3 @@ Feature: Product sidebars
     Given I may not create dashboards in this project
     When I am in LLM Ops
     Then the sidebar reads my pinned dashboards and nothing else about dashboards
-
-  @integration
-  Scenario: A member who may create but not edit dashboards gets the new dashboard without Add a widget
-    Given I may create dashboards in this project but not edit them
-    When I press the "+" at the right of the "Dashboards" title
-    Then a new dashboard is made and pinned, and it opens without "Add a widget" open

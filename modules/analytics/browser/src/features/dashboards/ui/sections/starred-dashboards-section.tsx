@@ -48,12 +48,10 @@ export function StarredDashboardsSection(_props: StarredDashboardsProps) {
 
 function WithCreate({ children }: { children: (create: CreateControls) => ReactNode }) {
   const saved = useSavedDashboards();
-  // "Add a widget" is an edit, so a create-only member gets the board without it.
-  const { mayEdit } = useBoardReader();
   return children({
     isCreating: saved.isCreating,
     // Pinned on creation; drop `pin` to stop pinning.
-    onAdd: () => saved.createBoard({ pin: true, addWidget: mayEdit }),
+    onAdd: () => saved.createBoard({ pin: true, addWidget: true }),
   });
 }
 

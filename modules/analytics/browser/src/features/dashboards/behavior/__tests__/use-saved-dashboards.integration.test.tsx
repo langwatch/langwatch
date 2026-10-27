@@ -100,7 +100,7 @@ describe("given a member creates a board", () => {
 });
 
 describe("given the pin fails after the board is made", () => {
-  /** @scenario "A double click or a failed pin leaves exactly one dashboard" */
+  /** @scenario "A failed pin leaves exactly one dashboard" */
   it("tells the member, and the created board still opens with Add a widget", async () => {
     const error = new Error("pin down");
     mocks.create.mutate.mockImplementationOnce(

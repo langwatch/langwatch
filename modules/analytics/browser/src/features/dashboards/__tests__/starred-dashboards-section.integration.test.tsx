@@ -152,24 +152,8 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
     });
   });
 
-  describe("given a member who may create but not edit dashboards", () => {
-    /** @scenario "A member who may create but not edit dashboards gets the new dashboard without Add a widget" */
-    it("makes and opens the board without Add a widget", async () => {
-      const user = userEvent.setup();
-      const { host, calls } = renderSection({
-        stars: [{ kind: "board", dashboard: LATENCY }],
-        permissions: [...VIEWER, "analytics:create"],
-      });
-
-      await user.click((await section()).getByRole("button", { name: "New dashboard" }));
-
-      await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-new"]));
-      expect(inputsTo(calls, "boards.create")).toHaveLength(1);
-    });
-  });
-
   describe("when the member presses the '+' twice in a row", () => {
-    /** @scenario "A double click or a failed pin leaves exactly one dashboard" */
+    /** @scenario "A double click leaves exactly one dashboard" */
     it("makes one board, however fast the clicks come", async () => {
       const { host, calls } = renderSection({ stars: [{ kind: "board", dashboard: LATENCY }] });
       const plus = (await section()).getByRole("button", { name: "New dashboard" });
@@ -184,7 +168,7 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
   });
 
   describe("when the member double clicks Add dashboard", () => {
-    /** @scenario "A double click or a failed pin leaves exactly one dashboard" */
+    /** @scenario "A double click leaves exactly one dashboard" */
     it("makes one board", async () => {
       const user = userEvent.setup();
       let release = () => {};
@@ -201,7 +185,7 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
   });
 
   describe("when the pin fails after the board is made", () => {
-    /** @scenario "A double click or a failed pin leaves exactly one dashboard" */
+    /** @scenario "A failed pin leaves exactly one dashboard" */
     it("keeps the one board, opens it with Add a widget, and tells the member", async () => {
       const user = userEvent.setup();
       const { host, calls } = renderSection({ stars: [], pinFails: true });
