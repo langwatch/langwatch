@@ -189,3 +189,39 @@ Feature: Mapping Validation and Missing Mapping Detection
     And its saved template has not loaded yet
     Then no variable is reported as a missing required mapping
     And the experiment can run
+
+  # ============================================================================
+  # Empty column vs missing column
+  # ============================================================================
+  #
+  # An empty column is a real column whose cells hold no text yet; the run
+  # sends it as empty text. A mapping naming a column the dataset does not
+  # have reads nothing, so it is reported as a missing column, not as unmapped.
+
+  @unit
+  Scenario: A mapping to a column that is empty in every row is valid
+    Given I have a runner with input field "environment"
+    And "environment" is mapped to the dataset column "environment"
+    And no row has a value in "environment"
+    Then "environment" is not reported as missing
+
+  @unit
+  Scenario: A mapping to a column the dataset does not have is reported as a missing column
+    Given I have a runner with input field "environment"
+    And "environment" is mapped to the dataset column "environment"
+    And the active dataset has no "environment" column
+    Then "environment" is reported as mapped to a column that is not in the dataset
+    And the run button opens the runner's drawer instead of running
+
+  @unit
+  Scenario: A connected agent parameter mapped to a missing column is reported without blocking
+    Given I have a connected agent runner whose optional parameter "plan" is mapped to the column "environment"
+    And the active dataset has no "environment" column
+    Then "plan" is reported as mapped to a column that is not in the dataset
+    And the run is not blocked, because the agent's own default applies
+
+  @integration
+  Scenario: The mapping names a column the dataset does not have
+    Given I have a runner with "environment" mapped to a column the dataset does not have
+    When I open the runner's drawer
+    Then the mapping for "environment" says the column is not in the dataset

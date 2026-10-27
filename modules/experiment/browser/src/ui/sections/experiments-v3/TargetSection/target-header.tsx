@@ -283,9 +283,11 @@ export const TargetHeader = memo(function TargetHeader({
 
   // Check if there are missing mappings for the active dataset
   const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
+  const datasets = useEvaluationsV3Store((state) => state.datasets);
   const promptTemplateFields = usePromptTemplateFields();
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId, {
     promptTemplateFields,
+    datasets,
   });
 
   // Glows this column's header when a pairwise verdict's variant name was
