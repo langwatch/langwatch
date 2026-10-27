@@ -235,13 +235,9 @@ describe("clickHouseFilterConditions", () => {
       ["evaluations.score", ["0"], "eval-1"],
       ["evaluations.score", ["invalid", "NaN"], "eval-1"],
       ["evaluations.score", ["0.9", "0.5"], "eval-1"],
-      // Number("0.6x") is NaN — the same parser the in-memory matcher uses, so
-      // the preview and the trigger cannot disagree on a non-numeric bound
-      // (#8170). parseFloat("0.6x") would have yielded 0.6 and matched here.
       ["evaluations.score", ["0.6x", "0.9"], "eval-1"],
-      // Number("") is 0 — a blank bound must be rejected explicitly, not
-      // treated as a 0 boundary.
       ["evaluations.score", ["", "0.9"], "eval-1"],
+      ["evaluations.score", ["0x0", "0x1"], "eval-1"],
     ] as const)(
       "when evaluations.score is given %j with key=%s, it returns the no-match guard",
       (field, values, key) => {
@@ -261,16 +257,6 @@ describe("clickHouseFilterConditions", () => {
       expect(result.sql).toContain("es.Score <= {f0_max:Float64}");
       expect(result.params.f0_min).toBe(0.5);
       expect(result.params.f0_max).toBe(0.9);
-    });
-
-    it("parses a hex-literal bound the same way the matcher does (agreement, not divergence)", () => {
-      // The whole point of using Number over parseFloat is that both paths
-      // read the same value: Number("0x1") is 1 in both the matcher and here,
-      // whereas parseFloat("0x1") was 0 — the mismatch this fix removes.
-      const builder = clickHouseFilterConditions["evaluations.score"];
-      const result = builder!({ values: ["0x0", "0x1"], paramId: "f0", key: "eval-1" });
-      expect(result.params.f0_min).toBe(0);
-      expect(result.params.f0_max).toBe(1);
     });
 
     it("when events.metrics.value is given an invalid range, it returns the no-match guard", () => {
