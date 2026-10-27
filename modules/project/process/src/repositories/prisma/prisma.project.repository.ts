@@ -40,7 +40,12 @@ import {
 } from "@langwatch/project-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
+import {
+  isLegacyKeyRevoked,
+  REVOKED_LEGACY_KEY_PREFIX,
+} from "../../rules/legacy-project-key.rules.ts";
 import type {
+  LiveLegacyProjectKey,
   ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
@@ -822,6 +827,35 @@ export class PrismaProjectRepository
       select: { legacyApiKeyLastUsedAt: true },
     });
     return row?.legacyApiKeyLastUsedAt ? fromDate(row.legacyApiKeyLastUsedAt) : null;
+  }
+
+  /**
+   * Ordered by name so the screen's rows do not reshuffle between reads. The
+   * stored-prefix filter is a narrowing only: every row is still put to the
+   * rule, which is the one place that decides what a revoked key looks like.
+   */
+  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyProjectKey[]> {
+    const projects = await this.prisma.project.findMany({
+      where: {
+        archivedAt: null,
+        team: { organizationId: input.organizationId },
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        apiKey: { not: { startsWith: REVOKED_LEGACY_KEY_PREFIX } },
+      },
+      select: { id: true, name: true, slug: true, apiKey: true, legacyApiKeyLastUsedAt: true },
+      orderBy: { name: "asc" },
+    });
+
+    return projects
+      .filter((project) => !isLegacyKeyRevoked(project.apiKey))
+      .map((project) => ({
+        projectId: project.id,
+        projectName: project.name,
+        projectSlug: project.slug,
+        lastUsedAt: project.legacyApiKeyLastUsedAt
+          ? fromDate(project.legacyApiKeyLastUsedAt)
+          : null,
+      }));
   }
 
   async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {

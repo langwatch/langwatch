@@ -42,7 +42,10 @@ import {
 } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { ProjectRepository } from "../repositories/project.repository.ts";
+import type {
+  LiveLegacyProjectKey,
+  ProjectRepository,
+} from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
 import { isLegacyKeyRevoked } from "../rules/legacy-project-key.rules.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
@@ -474,6 +477,10 @@ export class ProjectService {
 
   findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null> {
     return this.repository.findLegacyApiKeyLastUsedAt(input);
+  }
+
+  findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyProjectKey[]> {
+    return this.repository.findLiveLegacyKeys(input);
   }
 
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {

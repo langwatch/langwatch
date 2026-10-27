@@ -106,6 +106,37 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And it stays until the legacy key is revoked
 
     @integration
+    Scenario: Every project in the organisation with a live legacy key gets its own row
+      Given project "alpha" and project "beta" both still have a live legacy key
+      When "ada" opens the API keys
+      Then a "Project key" row is listed for project "alpha" and one for project "beta"
+      And each row is scoped to its own project and carries its own Revoke
+
+    @integration
+    Scenario: Revoking one project's legacy key leaves the other project's row and the banner
+      Given project "alpha" and project "beta" both still have a live legacy key
+      And "ada" revoked the legacy key of project "alpha"
+      When "ada" opens the API keys
+      Then no "Project key" row is listed for project "alpha"
+      And a "Project key" row is listed for project "beta"
+      And the warning banner is still shown
+
+    @integration
+    Scenario: The banner goes once no project in the organisation holds a live legacy key
+      Given project "alpha" and project "beta" both still have a live legacy key
+      And "ada" revoked the legacy key of both projects
+      When "ada" opens the API keys
+      Then no "Project key" row is listed
+      And no warning banner is shown
+
+    @integration
+    Scenario: A reader only sees the legacy rows of the projects they can manage
+      Given project "alpha" and project "beta" both still have a live legacy key
+      And "max" can manage project "beta" only
+      When "max" opens the API keys
+      Then a "Project key" row is listed for project "beta" only
+
+    @integration
     Scenario: The banner's button revokes and replaces the legacy key
       Given project "alpha" still has a live legacy key
       When "ada" clicks "Revoke and replace" on the banner

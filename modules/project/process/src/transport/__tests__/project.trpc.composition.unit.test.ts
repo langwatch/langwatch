@@ -189,6 +189,7 @@ function mount(options: Parameters<typeof application>[0] = {}) {
     archiveOtherProject: (input) => app.archiveOtherProject(input),
     revokeProjectApiKey: (input) => app.revokeProjectApiKey(input),
     getLegacyKeyStatus: (input) => app.getLegacyKeyStatus(input),
+    legacyKeys: (input) => app.legacyKeys(input),
     updateAggregateRule: (input) => app.updateAggregateRule(input),
     aggregateMemberCandidates: (input) => app.aggregateMemberCandidates(input),
   };

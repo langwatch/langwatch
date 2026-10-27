@@ -38,7 +38,9 @@ import {
 } from "@langwatch/project-contract";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
+import { isLegacyKeyRevoked } from "../../rules/legacy-project-key.rules.ts";
 import type {
+  LiveLegacyProjectKey,
   ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
@@ -659,6 +661,25 @@ export class MemoryProjectRepository implements ProjectRepository {
 
   async findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null> {
     return this.#database.findLegacyKeyUse(input.projectId) ?? null;
+  }
+
+  async findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyProjectKey[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          this.#database.isInOrganization(project, input.organizationId) &&
+          !isLegacyKeyRevoked(project.apiKey),
+      )
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((project) => ({
+        projectId: project.id,
+        projectName: project.name,
+        projectSlug: project.slug,
+        lastUsedAt: this.#database.findLegacyKeyUse(project.id) ?? null,
+      }));
   }
 
   /** Answers false for a project this memory holds no live row for, as the fenced UPDATE does. */

@@ -2,6 +2,7 @@ import { PROJECT_KIND, ProjectNotFoundError, type Team } from "@langwatch/projec
 import { fromDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { REVOKED_LEGACY_KEY_PREFIX } from "../../../rules/legacy-project-key.rules.ts";
 import { ProjectCredentialsService } from "../../../services/project-credentials.service.ts";
 import { MemoryProjectDatabase } from "../memory.project.database.ts";
 import { MemoryProjectRepository } from "../memory.project.repository.ts";
@@ -98,6 +99,43 @@ describe("MemoryProjectRepository", () => {
         onboardingVariant: null,
         organizationCreatedAt: fromDate(new Date("2026-01-01T00:00:00.000Z")),
       });
+    });
+  });
+
+  describe("given several projects in the organization", () => {
+    it("names only the live ones whose legacy key still authenticates, by name", async () => {
+      const { repository } = seeded();
+      await repository.create({ ...creation, id: "project_live", name: "Beta", slug: "beta" });
+      await repository.create({
+        ...creation,
+        id: "project_revoked",
+        name: "Alpha",
+        slug: "alpha",
+        apiKey: `${REVOKED_LEGACY_KEY_PREFIX}1`,
+      });
+      await repository.create({
+        ...creation,
+        id: "project_archived",
+        name: "Gamma",
+        slug: "gamma",
+      });
+      await repository.archive({ id: "project_archived", organizationId: ORGANIZATION_ID });
+      await repository.markLegacyApiKeyUsed({
+        projectId: "project_live",
+        at: fromDate(new Date("2026-10-25T12:00:00.000Z")),
+      });
+
+      expect(await repository.findLiveLegacyKeys({ organizationId: ORGANIZATION_ID })).toEqual([
+        {
+          projectId: "project_live",
+          projectName: "Beta",
+          projectSlug: "beta",
+          lastUsedAt: fromDate(new Date("2026-10-25T12:00:00.000Z")),
+        },
+      ]);
+      expect(await repository.findLiveLegacyKeys({ organizationId: "organization_other" })).toEqual(
+        [],
+      );
     });
   });
 

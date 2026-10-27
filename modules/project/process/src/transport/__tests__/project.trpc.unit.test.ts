@@ -51,6 +51,7 @@ function mount({
   const application = createApiFixture<ProjectApi>(projects, "ProjectApi");
   const requests = ProjectRequestService.create({
     projects: application,
+    findLegacyKeys: async () => [],
     probePermission: probe,
   });
 
@@ -63,6 +64,7 @@ function mount({
   }));
   const browser: ProjectBrowserApi = {
     projects: () => application,
+    legacyKeys: (input) => requests.findLegacyKeys(input),
     revokeProjectApiKey,
     getLegacyKeyStatus,
     probePermission: probe,
@@ -104,6 +106,7 @@ describe("the project tRPC namespace", () => {
         "create",
         "getHasFirstMessage",
         "getLegacyKeyStatus",
+        "legacyKeys",
         "revokeProjectApiKey",
         "update",
         "updateAggregateRule",

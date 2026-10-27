@@ -24,6 +24,7 @@ import {
   type ArchivedProject,
   type Project,
   type ProjectIdentity,
+  type ProjectLegacyKey,
   type ProjectLegacyKeyStatus,
   type ProjectWithTeam,
   type PaginatedProjects,
@@ -131,6 +132,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #aggregateReads: ProjectRepository;
   readonly #requests = ProjectRequestService.create({
     projects: this,
+    findLegacyKeys: (input) => this.#operations.findLegacyKeys(input),
     probePermission: (input) => this.probePermission(input),
   });
   private constructor({
@@ -285,6 +287,13 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     by: Readonly<{ id: string }>;
   }): Promise<{ alreadyArchived: boolean }> {
     return this.#requests.archiveOtherProject(input);
+  }
+
+  legacyKeys(input: {
+    organizationId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<ProjectLegacyKey[]> {
+    return this.#requests.findLegacyKeys(input);
   }
 
   getLegacyKeyStatus(input: { projectId: string }): Promise<ProjectLegacyKeyStatus> {

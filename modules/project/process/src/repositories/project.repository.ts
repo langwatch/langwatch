@@ -30,6 +30,14 @@ import type {
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
+/** A live project whose legacy `apiKey` still authenticates; never the key itself. */
+export type LiveLegacyProjectKey = Readonly<{
+  projectId: string;
+  projectName: string;
+  projectSlug: string;
+  lastUsedAt: Instant | null;
+}>;
+
 export type TouchCodingAgentActivityInput = {
   projectId: string;
   at: Instant;
@@ -158,6 +166,8 @@ export interface ProjectRepository {
   markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void>;
   /** When the legacy key last authenticated, or nothing when no use was stamped. */
   findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null>;
+  /** Every live non-governance project in the organisation whose legacy key still authenticates. */
+  findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyProjectKey[]>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
   /** Creates a team's personal project once and answers its id; a second call creates nothing. */
