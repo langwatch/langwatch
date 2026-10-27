@@ -114,14 +114,13 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     dashboardId: board.id,
     stored: board.description,
   });
+  const { range } = useBoardRange();
+  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
   const origins = useBoardOrigins({
     dashboardId: board.id,
     stored: board.excludedOrigins,
-    // A refused save runs the board again with the stored value it fell back to.
     onFailed: () => autoRefresh.refreshNow(),
   });
-  const { range } = useBoardRange();
-  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
   const { grain, period, setRange, setGrain } = useBoardPeriod({
     refreshedAt: autoRefresh.refreshedAt,
     excludedOrigins: origins.excludedOrigins,

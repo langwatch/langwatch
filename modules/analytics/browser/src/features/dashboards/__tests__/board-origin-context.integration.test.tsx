@@ -76,9 +76,12 @@ const WIDGET = {
 
 /**
  * One stored board with one widget, and a query door that answers no rows; calls are kept.
- * `boards.update` stores the origins it is sent, as the server does.
+ * `boards.update` stores the origins it is sent, as the server does, unless it refuses.
  */
-function boardServer({ excludedOrigins = null }: { excludedOrigins?: string[] | null } = {}) {
+function boardServer({
+  excludedOrigins = null,
+  refusesUpdate = false,
+}: { excludedOrigins?: string[] | null; refusesUpdate?: boolean } = {}) {
   const calls: UiProcedureCall[] = [];
   const stored = { ...BOARD, excludedOrigins };
   const answer = (call: UiProcedureCall): Promise<unknown> => {
@@ -87,6 +90,7 @@ function boardServer({ excludedOrigins = null }: { excludedOrigins?: string[] | 
       case "boards.getAll":
         return Promise.resolve([{ ...stored }]);
       case "boards.update": {
+        if (refusesUpdate) return Promise.reject(new Error("The dashboard could not be saved."));
         const next = (call.input as { excludedOrigins?: string[] | null }).excludedOrigins;
         if (next !== undefined) stored.excludedOrigins = next;
         return Promise.resolve({ ...stored });
@@ -174,12 +178,14 @@ function openBoard({
   isPersonal = false,
   excludedOrigins = null,
   permissions = MEMBER,
+  refusesUpdate = false,
 }: {
   isPersonal?: boolean;
   excludedOrigins?: string[] | null;
   permissions?: readonly string[];
+  refusesUpdate?: boolean;
 } = {}) {
-  const server = boardServer({ excludedOrigins });
+  const server = boardServer({ excludedOrigins, refusesUpdate });
   const host = new AddressedHost({
     flags: FLAGS,
     permissions,
@@ -187,7 +193,7 @@ function openBoard({
     route: { params: { dashboardId: BOARD.id }, query: {} },
   });
   renderDashboards({ element: <AddressedBoard host={host} />, host, answer: server.answer });
-  return server;
+  return { ...server, host };
 }
 
 describe("given a member opens a stored board", () => {
@@ -311,6 +317,24 @@ describe("given a stored board's Langy traces setting", () => {
         { projectId: PROJECT.id, dashboardId: BOARD.id, excludedOrigins: [] },
       ]);
       expect(server.runs().map((run) => run.excludeOrigins)).toEqual([["langy"], []]);
+    });
+  });
+
+  describe("when the save of a member's pick is refused", () => {
+    /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
+    it("shows Left out again, runs the widget again with langy left out and reports it", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = openBoard({ refusesUpdate: true });
+      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+      await user.click(await screen.findByRole("button", { name: "Langy traces: Left out" }));
+      await user.click(await screen.findByRole("menuitemradio", { name: "Included" }));
+      await vi.waitFor(() => expect(server.host.failures).toHaveLength(1));
+      await screen.findByRole("button", { name: "Langy traces: Left out" });
+      await frameRuns({ frame: screen.getByTestId("sandboxed-frame"), queryName: "main" });
+
+      expect(server.host.failures[0]?.fallbackTitle).toBe("Couldn't save the Langy setting");
+      expect(server.runs().at(-1)?.excludeOrigins).toEqual(["langy"]);
     });
   });
 
