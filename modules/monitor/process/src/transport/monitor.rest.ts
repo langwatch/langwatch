@@ -27,6 +27,8 @@ import {
 } from "@langwatch/monitor-contract";
 import { z } from "zod";
 
+import { monitorDrawerPath } from "../rules/monitor-auto-pause.rules.ts";
+
 const notFound = documentedResponses({ 404: badRequestSchema });
 
 /**
@@ -67,9 +69,11 @@ function monitorWire(params: {
     threadIdleTimeout: monitor.threadIdleTimeout,
     createdAt: monitor.createdAt.toISOString(),
     updatedAt: monitor.updatedAt.toISOString(),
+    autoPausedAt: monitor.autoPausedAt ? monitor.autoPausedAt.toISOString() : null,
+    autoPausedReason: monitor.autoPausedReason ?? null,
     platformUrl: params.app.platformUrl({
       projectSlug: params.projectSlug,
-      path: `/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitor.id}`,
+      path: monitorDrawerPath(monitor.id),
     }),
   };
 }

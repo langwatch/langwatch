@@ -18,19 +18,22 @@ Monitors: the checks that run an evaluator over incoming traces, their definitio
 
 | Kind           | Name                        | Declared at                                                       |
 | -------------- | --------------------------- | ----------------------------------------------------------------- |
-| Postgres table | `Monitor`                   | `process/src/repositories/prisma/prisma.monitor.repository.ts:69` |
+| Postgres table | `Monitor`                   | `process/src/repositories/prisma/prisma.monitor.repository.ts:77` |
 | Config         | `publicBaseUrl` (BASE_HOST) | `contract/src/monitor.config.ts:5`                                |
 
 Anything else monitor needs belongs to another module and is reached through its `*Api`.
 
 ## Peers (static dependencies)
 
-| Name           | Token            | Module                                    |
-| -------------- | ---------------- | ----------------------------------------- |
-| `evaluators`   | `EvaluatorApi`   | [evaluator](../evaluator/README.md)       |
-| `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |
-| `permissions`  | `AuthzApi`       | [authz](../authz/README.md)               |
-| `workflows`    | `WorkflowApi`    | [workflow](../workflow/README.md)         |
+| Name            | Token                 | Module                                    |
+| --------------- | --------------------- | ----------------------------------------- |
+| `evaluators`    | `EvaluatorApi`        | [evaluator](../evaluator/README.md)       |
+| `featureFlags`  | `FeatureFlagApi`      | [feature-flag](../feature-flag/README.md) |
+| `notifications` | `NotificationService` | [notification](../notification/README.md) |
+| `permissions`   | `AuthzApi`            | [authz](../authz/README.md)               |
+| `projects`      | `ProjectApi`          | [project](../project/README.md)           |
+| `users`         | `UserApi`             | [user](../user/README.md)                 |
+| `workflows`     | `WorkflowApi`         | [workflow](../workflow/README.md)         |
 
 ## Who depends on monitor
 

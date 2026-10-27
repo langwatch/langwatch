@@ -2844,6 +2844,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       RepositoryOwner: "inherit",
       RepositoryName: "inherit",
       Branch: "inherit",
+      AiUnits: "omit",
     },
   }),
   coding_tool_results: defineTableCatalogue({

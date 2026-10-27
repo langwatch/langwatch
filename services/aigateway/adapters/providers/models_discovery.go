@@ -111,13 +111,14 @@ const anthropicModelsAPIVersion = "2023-06-01"
 // prefixes IDs with "models/"; Groq nests its OpenAI surface under
 // /openai; the rest serve a stock /v1/models.
 var hostedModelCatalogs = map[domain.ProviderID]catalogProbe{
-	domain.ProviderOpenAI:    {modelsURL: "https://api.openai.com/v1/models"},
-	domain.ProviderAnthropic: {modelsURL: "https://api.anthropic.com/v1/models?limit=1000", headers: map[string]string{"anthropic-version": anthropicModelsAPIVersion}},
-	domain.ProviderGemini:    {modelsURL: "https://generativelanguage.googleapis.com/v1beta/openai/models", stripIDPrefix: "models/"},
-	domain.ProviderGroq:      {modelsURL: "https://api.groq.com/openai/v1/models"},
-	domain.ProviderXAI:       {modelsURL: "https://api.x.ai/v1/models"},
-	domain.ProviderCerebras:  {modelsURL: "https://api.cerebras.ai/v1/models"},
-	domain.ProviderDeepSeek:  {modelsURL: deepseekBaseURL + "/v1/models"},
+	domain.ProviderOpenAI:     {modelsURL: "https://api.openai.com/v1/models"},
+	domain.ProviderAnthropic:  {modelsURL: "https://api.anthropic.com/v1/models?limit=1000", headers: map[string]string{"anthropic-version": anthropicModelsAPIVersion}},
+	domain.ProviderGemini:     {modelsURL: "https://generativelanguage.googleapis.com/v1beta/openai/models", stripIDPrefix: "models/"},
+	domain.ProviderGroq:       {modelsURL: "https://api.groq.com/openai/v1/models"},
+	domain.ProviderXAI:        {modelsURL: "https://api.x.ai/v1/models"},
+	domain.ProviderCerebras:   {modelsURL: "https://api.cerebras.ai/v1/models"},
+	domain.ProviderDeepSeek:   {modelsURL: deepseekBaseURL + "/v1/models"},
+	domain.ProviderDoubleword: {modelsURL: doublewordBaseURL + "/v1/models"},
 }
 
 // newModelsDiscoveryClient builds the HTTP client discovery probes use.

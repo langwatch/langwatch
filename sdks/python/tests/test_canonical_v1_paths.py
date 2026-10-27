@@ -134,4 +134,4 @@ def test_dashboard_list_requests_the_canonical_address() -> None:
     result: Dict[str, Any] = facade.list()
 
     assert result == {"dashboards": []}
-    assert calls == [("GET", "/api/v1/dashboards")]
+    assert calls == [("GET", "/api/v1/analytics/reports")]
