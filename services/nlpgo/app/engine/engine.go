@@ -1628,11 +1628,18 @@ func paramAnyMap(params []dsl.Field, name string) map[string]any {
 }
 
 // evaluatorReservedParams are the identifiers runEvaluator reads off an
-// evaluator node's parameters[] in its own right. Nothing else on that
-// list is ever read, so everything else is one flattened setting.
+// evaluator node's parameters[] in its own right and that no evaluator
+// declares as a setting of its own. Nothing else on that list is ever
+// read, so everything else is one flattened setting.
+//
+// `name` is deliberately absent. runEvaluator does read it, as the
+// evaluator's display name, but the two competitor evaluators also
+// declare a `name` setting holding the company being defended, and that
+// is the only place the panel writes it. Forwarding it as a setting
+// costs the other evaluators nothing: their settings schemas are
+// non-strict, so the parse drops the key.
 var evaluatorReservedParams = map[string]struct{}{
 	"evaluator": {},
-	"name":      {},
 	"settings":  {},
 }
 

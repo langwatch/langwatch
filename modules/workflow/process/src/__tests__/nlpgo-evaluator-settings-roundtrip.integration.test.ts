@@ -124,6 +124,29 @@ const inlineEvaluatorNode = (): Component => ({
   parameters: settingsAsParameters(CANVAS_SETTINGS),
 });
 
+/** The company a competitor evaluator defends, as the panel wrote it. */
+const COMPETITOR_SLUG = "langevals/competitor_llm";
+const COMPETITOR_SETTINGS = {
+  model: "openai/gpt-5-mini",
+  name: "ACME Corp",
+  description: "We sell widgets",
+};
+
+/**
+ * A competitor evaluator. Its settings schema declares `name` as the company
+ * being defended, and `mergeEvaluatorLocalConfig` writes every setting to the
+ * flattened parameter of the same identifier, so this is the only parameter
+ * that is both read in its own right and a setting.
+ */
+const competitorEvaluatorNode = (): Component => ({
+  cls: "LangWatchEvaluator",
+  name: "Competitor judge",
+  evaluator: COMPETITOR_SLUG,
+  inputs: [{ identifier: "output", type: "str" }],
+  outputs: [{ identifier: "passed", type: "bool" }],
+  localConfig: { name: "Competitor judge", settings: COMPETITOR_SETTINGS },
+});
+
 const EDGES = [
   {
     id: "e1",
@@ -240,6 +263,28 @@ describe.skipIf(!hasGo())("the inline evaluator settings round trip", () => {
         const call = await runAndCaptureEvaluateCall(dispatched);
         expect(call.path).toBe(`/api/evaluations/${INLINE_EVALUATOR_SLUG}/evaluate`);
         expect(call.body.settings).toEqual(CANVAS_SETTINGS);
+      }, 120_000);
+    });
+  });
+
+  describe("given a node pointing at a competitor evaluator naming a company to defend", () => {
+    describe("when the studio dispatches the run to the engine", () => {
+      /** @scenario "A competitor evaluator dispatches the company name the panel showed" */
+      it("calls the evaluator with that company among its settings", async () => {
+        const dispatched = mergeLocalConfigsIntoDsl(canvasNodes(competitorEvaluatorNode()));
+
+        // The only place the company can travel: the sender writes every
+        // setting to a flattened parameter and emits no other `name`.
+        const judge = dispatched.find((node) => node.id === "judge");
+        expect(judge?.data.parameters).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ identifier: "name", value: "ACME Corp" }),
+          ]),
+        );
+
+        const call = await runAndCaptureEvaluateCall(dispatched);
+        expect(call.path).toBe(`/api/evaluations/${COMPETITOR_SLUG}/evaluate`);
+        expect(call.body.settings).toEqual(COMPETITOR_SETTINGS);
       }, 120_000);
     });
   });

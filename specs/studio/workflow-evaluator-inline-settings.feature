@@ -28,3 +28,14 @@ Feature: Inline evaluator settings survive the Studio to engine dispatch
     When the Studio dispatches the run to the engine
     Then the evaluate call targets the slug's path
     And the evaluate call carries every setting the panel showed
+
+  # The dispatch reads a handful of identifiers off the node's parameters in
+  # their own right. One of them, `name`, is also a setting the two competitor
+  # evaluators declare, holding the company being defended, and the panel has
+  # nowhere else to write it. Treating the identifier as reserved would run
+  # those two on the schema default instead of the canvas value.
+  @integration
+  Scenario: A competitor evaluator dispatches the company name the panel showed
+    Given the node references a competitor evaluator naming a company to defend
+    When the Studio dispatches the run to the engine
+    Then the evaluate call carries that company among its settings

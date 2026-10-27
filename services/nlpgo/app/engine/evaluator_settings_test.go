@@ -136,10 +136,11 @@ func TestDispatchEvaluator_LegacySettingsDictStillWorks(t *testing.T) {
 	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
 	assert.EqualValues(t, 128, settings["max_tokens"])
 
-	// The dispatch identifiers are not settings: they are read in their own
-	// right and must not reach the evaluator's merge.
+	// The slug the call is routed by is not a setting: it is read in its
+	// own right and would be a nonsense key in the evaluator's merge. The
+	// name is both, which TestDispatchEvaluator_NameTravelsAsBothFieldAndSetting
+	// covers.
 	assert.NotContains(t, settings, "evaluator")
-	assert.NotContains(t, settings, "name")
 	assert.Equal(t, "is-answer-correct", body["name"])
 }
 
@@ -198,21 +199,44 @@ func TestEvaluatorSettings_SkipsNullParameters(t *testing.T) {
 	assert.EqualValues(t, 64, settings["max_tokens"])
 }
 
-// TestDispatchEvaluator_NameIsNotASetting is the hazard the assembly adds:
-// settings now come from parameters[], so a reserved identifier left in that
-// slice would travel as a setting. The per-evaluator schemas are not strict,
-// so the endpoint's parse would quietly drop it rather than refuse the call,
-// which is why the exclusion is pinned here instead. The name keeps going out
-// as the body's own field, as it always did.
-func TestDispatchEvaluator_NameIsNotASetting(t *testing.T) {
+// TestDispatchEvaluator_NameTravelsAsBothFieldAndSetting pins the one
+// identifier the body reads in its own right and an evaluator may still
+// declare as a setting. `langevals/competitor_llm` and
+// `langevals/competitor_llm_function_call` both declare a `name` setting
+// holding the company being defended, and the panel writes it to the same
+// flattened parameter the body's name field is read from, so excluding it
+// from settings would run those two on the schema default instead of the
+// canvas value. Forwarding it costs the other evaluators nothing: their
+// settings schemas are non-strict, so the endpoint's parse drops the key.
+func TestDispatchEvaluator_NameTravelsAsBothFieldAndSetting(t *testing.T) {
 	body := dispatchEvaluatorBody(t, []dsl.Field{
-		{Identifier: "name", Type: "str", Value: json.RawMessage(`"is-answer-correct"`)},
+		{Identifier: "name", Type: "str", Value: json.RawMessage(`"ACME Corp"`)},
 		param(t, "model", "openai/gpt-5-mini"),
 	})
 
-	assert.Equal(t, "is-answer-correct", body["name"])
+	assert.Equal(t, "ACME Corp", body["name"], "the body's own name field is unchanged")
 	settings, ok := body["settings"].(map[string]any)
 	require.True(t, ok, "settings missing from the outbound body: %v", body)
-	assert.NotContains(t, settings, "name")
+	assert.Equal(t, "ACME Corp", settings["name"], "a competitor evaluator reads the company off settings.name")
+	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
+}
+
+// TestDispatchEvaluator_EvaluatorAndSettingsStayReserved covers the two
+// identifiers that are read in their own right and that no evaluator
+// declares: the slug the call is routed by and the legacy dict the
+// flattened entries overlay. Either one echoed back as a setting would be
+// a nonsense key rather than a dropped one.
+func TestDispatchEvaluator_EvaluatorAndSettingsStayReserved(t *testing.T) {
+	body := dispatchEvaluatorBody(t, []dsl.Field{
+		param(t, "evaluator", "langevals/competitor_llm"),
+		{Identifier: "settings", Type: "json", Value: json.RawMessage(`{"max_tokens":128}`)},
+		param(t, "model", "openai/gpt-5-mini"),
+	})
+
+	settings, ok := body["settings"].(map[string]any)
+	require.True(t, ok, "settings missing from the outbound body: %v", body)
+	assert.NotContains(t, settings, "evaluator")
+	assert.NotContains(t, settings, "settings")
+	assert.Equal(t, float64(128), settings["max_tokens"], "the legacy dict is still the base layer")
 	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
 }
