@@ -237,6 +237,6 @@ func TestDispatchEvaluator_EvaluatorAndSettingsStayReserved(t *testing.T) {
 	require.True(t, ok, "settings missing from the outbound body: %v", body)
 	assert.NotContains(t, settings, "evaluator")
 	assert.NotContains(t, settings, "settings")
-	assert.Equal(t, float64(128), settings["max_tokens"], "the legacy dict is still the base layer")
+	assert.EqualValues(t, 128, settings["max_tokens"], "the legacy dict is still the base layer")
 	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
 }
