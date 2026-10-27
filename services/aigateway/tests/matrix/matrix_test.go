@@ -181,15 +181,31 @@ func chatBody_ToolCalling(model string) []byte {
 	})
 }
 
-// chatBody_StructuredOutputs asks for a JSON-shaped response.
+// chatBody_StructuredOutputs asks for a strict json_schema: json_object has
+// no enforcing mode on Bedrock, so the gateway refuses it there by design.
 func chatBody_StructuredOutputs(model string) []byte {
 	return mustJSON(map[string]any{
 		"model": model,
 		"messages": []map[string]any{
-			{"role": "system", "content": "Reply ONLY with a compact JSON object {\"city\": string, \"country\": string}."},
+			{"role": "system", "content": "Reply with the city and its country."},
 			{"role": "user", "content": "Paris"},
 		},
-		"response_format":   map[string]any{"type": "json_object"},
+		"response_format": map[string]any{
+			"type": "json_schema",
+			"json_schema": map[string]any{
+				"name":   "place",
+				"strict": true,
+				"schema": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"city":    map[string]any{"type": "string"},
+						"country": map[string]any{"type": "string"},
+					},
+					"required":             []string{"city", "country"},
+					"additionalProperties": false,
+				},
+			},
+		},
 		maxTokensKey(model): 64,
 	})
 }
