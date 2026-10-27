@@ -114,7 +114,8 @@ func (v *Validator) Validate(ctx context.Context, raw string) (Destination, erro
 		return Destination{}, refusal(msgMetadataHost)
 	}
 	allowlisted := v.isAllowlisted(dest.Hostname)
-	if !(allowlisted && isOnPremiseDomain(dest.Hostname)) && isBlockedCloudDomain(dest.Hostname) {
+	onPremiseAllowed := allowlisted && isOnPremiseDomain(dest.Hostname)
+	if !onPremiseAllowed && isBlockedCloudDomain(dest.Hostname) {
 		return Destination{}, refusal(msgCloudDomain)
 	}
 	if allowlisted {
