@@ -264,7 +264,7 @@ platformUrl(input: { projectSlug: string; agentId: string; agentType: string }):
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/agent-connect.rest.ts:106` |
+| Declared at | `src/transport/agent-connect.rest.ts:110` |
 | Base URL    | `/api/v1/agents`                          |
 | Addressing  | v1-only                                   |
 | Credential  | project                                   |
@@ -273,13 +273,13 @@ platformUrl(input: { projectSlug: string; agentId: string; agentType: string }):
 
 Register this process's agents
 
-Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:113`.
+Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:117`.
 
 Answers at `/api/v1/agents/connect/register`.
 
 ```typescript
 type Body = z.infer<typeof agentConnectRegisterInputSchema>; // ../contract/src/connected-agent.connection.ts:72
-// Response: inline, src/transport/agent-connect.rest.ts:119
+// Response: inline, src/transport/agent-connect.rest.ts:123
 type Response = unknown;
 ```
 
@@ -287,7 +287,7 @@ type Response = unknown;
 
 Wait for call and cancel frames while refreshing this instance's presence
 
-Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:145`.
+Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:149`.
 
 Answers at `/api/v1/agents/connect/poll`.
 
@@ -296,7 +296,7 @@ Answers at `/api/v1/agents/connect/poll`.
 interface Query {
   inFlight?: string;
 }
-// Response: inline, src/transport/agent-connect.rest.ts:149
+// Response: inline, src/transport/agent-connect.rest.ts:153
 type Response = unknown;
 ```
 
@@ -304,13 +304,13 @@ type Response = unknown;
 
 Accept this instance's acknowledgements, results and deregistration
 
-Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:171`.
+Permission `scenarios:manage`. Credential `project`. Declared at `src/transport/agent-connect.rest.ts:175`.
 
 Answers at `/api/v1/agents/connect/frames`.
 
 ```typescript
 type Body = z.infer<typeof agentConnectFramesInputSchema>; // ../contract/src/connected-agent.connection.ts:112
-// Response: inline, src/transport/agent-connect.rest.ts:177
+// Response: inline, src/transport/agent-connect.rest.ts:181
 type Response = unknown;
 ```
 
@@ -658,7 +658,7 @@ type Output = {
 
 | Protocol  | Paths                    | Prefixes | Declared at                            |
 | --------- | ------------------------ | -------- | -------------------------------------- |
-| websocket | `/api/v1/agents/connect` | –        | `src/transport/agent-connect.ws.ts:23` |
+| websocket | `/api/v1/agents/connect` | –        | `src/transport/agent-connect.ws.ts:24` |
 
 ## Workers
 

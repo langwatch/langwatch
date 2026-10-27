@@ -1125,7 +1125,7 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version |
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
-| DeepSeek, xAI, Cerebras, Groq, Voyage AI | API key |
+| DeepSeek, Doubleword, xAI, Cerebras, Groq, Voyage AI | API key |
 | ElevenLabs | API key, optional webhook secret. See [Voice Agents](/agent-testing/voice-agents#before-you-start) for the key permissions it needs |
 | Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
 | Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
@@ -8137,7 +8137,7 @@ The prefix is removed before the request leaves. A provider never receives `open
 
 ## Provider families
 
-`openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `xai`, `groq`, `cerebras`, `deepseek`, `voyage`, `elevenlabs`, `cloudflare`, `custom`, `openai_codex`.
+`openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `xai`, `groq`, `cerebras`, `deepseek`, `doubleword`, `voyage`, `elevenlabs`, `cloudflare`, `custom`, `openai_codex`.
 
 The alternative spellings that SDKs emit are accepted too: `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex`, `google_gemini`. The family is case-insensitive, so `OpenAI/gpt-5-mini` works.
 
@@ -8561,7 +8561,7 @@ The gateway translates between wire formats where the provider differs. For exam
 <CardGroup cols={2}>
   <Card title="Providers" icon="plug" href="/ai-gateway/providers/overview">
     OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Vertex AI, Gemini, xAI, Groq, Cerebras, DeepSeek,
-    Voyage AI, ElevenLabs, custom endpoints.
+    Doubleword, Voyage AI, ElevenLabs, custom endpoints.
   </Card>
   <Card title="Coding Agents" icon="terminal" href="/coding-agents/overview">
     Claude Code, Codex, Gemini CLI, OpenCode, Cursor and Aider through the gateway.
@@ -9224,6 +9224,62 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 ---
 
+# FILE: ./ai-gateway/providers/doubleword.mdx
+
+---
+title: Doubleword
+description: Add a Doubleword API key under Settings, Model Providers and call Doubleword's hosted open-weight models through the LangWatch AI Gateway.
+sidebarTitle: Doubleword
+---
+
+## Add the credential
+
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Doubleword**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
+
+| Field | Value |
+|---|---|
+| `DOUBLEWORD_API_KEY` | A Doubleword API key from [app.doubleword.ai/api-keys](https://app.doubleword.ai/api-keys). |
+
+Create the key for inference (the "realtime" purpose). Doubleword refuses model calls made with a key whose purpose is "platform", with HTTP 403.
+
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+The gateway calls `https://api.doubleword.ai` as an OpenAI-compatible endpoint.
+
+## Model names
+
+Write `doubleword/<model>`. Doubleword model ids keep the vendor slash and casing Doubleword uses, for example `doubleword/deepseek-ai/DeepSeek-V4.1-Flash`, `doubleword/Qwen/Qwen3-Embedding-8B` or `doubleword/openai/gpt-oss-120b`. Only the first segment names the provider, and the rest is sent to Doubleword as is.
+
+Always keep the `doubleword/` prefix. A bare `openai/gpt-oss-120b` names the OpenAI provider, not Doubleword.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "doubleword/deepseek-ai/DeepSeek-V4.1-Flash",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `POST /v1/embeddings` | Yes, with a Doubleword embeddings model such as `doubleword/Qwen/Qwen3-Embedding-8B` |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | No, rejected with HTTP 400. Image traffic needs a direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. See [Images](/ai-gateway/api/images) |
+| `GET /v1/models` | Yes, from the Doubleword catalog |
+
+## Cost
+
+LangWatch prices Doubleword calls at Doubleword's realtime rates. Batch and async rates are not used, because the gateway sends realtime requests.
+
+---
+
 # FILE: ./ai-gateway/providers/elevenlabs.mdx
 
 ---
@@ -9652,6 +9708,7 @@ Model names are `provider/model`. The provider segment is the id in the first co
 | [Groq](/ai-gateway/providers/groq)                                         | `groq`         | API key                                       | Chat, Messages, models                                                                 |
 | [Cerebras](/ai-gateway/providers/cerebras)                                 | `cerebras`     | API key                                       | Chat, Messages, models                                                                 |
 | [DeepSeek](/ai-gateway/providers/deepseek)                                 | `deepseek`     | API key                                       | Chat, Messages, models                                                                 |
+| [Doubleword](/ai-gateway/providers/doubleword)                             | `doubleword`   | API key                                       | Chat, Messages, embeddings, models                                                     |
 | [Voyage AI](/ai-gateway/providers/voyage)                                  | `voyage`       | API key                                       | Embeddings only                                                                        |
 | [ElevenLabs](/ai-gateway/providers/elevenlabs)                             | `elevenlabs`   | API key, optional base URL and webhook secret | Speech, transcription, ElevenLabs native                                               |
 | [OpenAI account](/ai-gateway/providers/openai-account)                     | `openai_codex` | Sign in with a ChatGPT account                | Responses, Messages                                                                    |
@@ -16843,12 +16900,12 @@ Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One r
 
 Open a session and the **Usage** tab prices it. Read the **Cache health** block first: cache reads and cache writes decide a large share of a coding agent's bill.
 
-| Stat                | Why it costs you                                                                                                                                |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Peak context**    | The most tokens the session carried into one call. Every later call pays to keep that context alive.                                            |
-| **Cache misses**    | Calls that rebuilt the context instead of reading it. A cache write costs more per token than a read, so a miss pays twice for the same tokens. |
-| **Context reused**  | Tokens served from cache, billed at a fraction of fresh input.                                                                                  |
-| **Context rebuilt** | Tokens spent writing the cache again.                                                                                                           |
+| Stat                | Why it costs you                                                                                                                                                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Peak context**    | The most tokens the session carried into one call. Every later call pays to keep that context alive.                                                                                                                                                                                                    |
+| **Cache misses**    | Model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write). A session's first call is never a miss. A cache write costs more per token than a read, so a miss pays twice for the same tokens. |
+| **Context reused**  | Tokens served from cache, billed at a fraction of fresh input.                                                                                                                                                                                                                                          |
+| **Context rebuilt** | Tokens spent writing the cache again.                                                                                                                                                                                                                                                                   |
 
 <Frame caption="Session detail with the Cache health section. This session compacted twice, missed its cache three times, and re-sent 393k tokens on its biggest rebuild.">
   ![Claude Code session cost detail](/images/coding-agents/session-detail.png)
@@ -17420,7 +17477,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+Personal coding-agent usage needs `langwatch login --device` on a laptop; a project key in `LANGWATCH_API_KEY` stands in for that login only for its own project. A team or application project needs `--project <slug>` on the read commands, which a project key refuses for any project but its own, so reaching one still needs `langwatch login --device`.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -17788,7 +17845,7 @@ This skill answers one question with the user's own data: at what context size d
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on the read commands when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -17832,7 +17889,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input, counted only once the session already holds cached context. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write), whatever the call itself read from the cache. This is the rule the LangWatch session detail counts as a cache miss. A call whose previous call held nothing in the cache is never counted, so the first cache-creating call of a session builds the cache rather than rebuilding it: it pays for the context once, as a setup cost. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -18121,6 +18178,8 @@ Each one has two ways to set it up:
 - `langwatch copilot` or `langwatch code` starts the tool and sets up the connection on the first run. Use it on a machine you work on.
 - `langwatch instrument copilot` or `langwatch instrument code` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
 
+`langwatch instrument` always installs the hook file that links each session to its repository and pull request. The wrapper installs it only when you keep the plain command reporting, and a run that takes the gateway route writes no hook file. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
+
 ## Before you start
 
 - Install the GitHub Copilot command-line tool, Visual Studio Code, or both.
@@ -18175,6 +18234,8 @@ Each command writes a function of the same name in your shell start file, which 
 
 For `code`, LangWatch also removes the same settings from the Visual Studio Code integrated terminal configuration. The editor keeps the key, and the terminals inside it do not.
 
+Both commands also write the LangWatch hook file in your Copilot hooks folder, which reports the repository and branch of each session. See [Link sessions to their pull requests](#link-sessions-to-their-pull-requests).
+
 ### Choose where the telemetry goes
 
 Pass one scope flag, and one only:
@@ -18196,7 +18257,7 @@ The wrapper accepts the same flags: `langwatch copilot --project acme-app` pins 
 langwatch logout
 ```
 
-This deletes every connection the command-line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool, the Copilot hook file included.
 
 ## The GitHub Copilot app
 
@@ -18208,18 +18269,44 @@ langwatch copilot-app connect
 
 This mints an ingest key and installs a small agent that starts with your session, so every app session is captured without a wrapper. Add `--tokens-only` to collect the usage numbers and no content.
 
+<Note>
+  Not yet available: session rows and pull request cost for the GitHub Copilot app. Its turns
+  arrive as traces.
+</Note>
+
 ## What you get in LangWatch
 
 Open your personal page at `/me`, or open the project you pinned Copilot to.
 
-- **[Sessions](/coding-agents/sessions)**: one row per Copilot session, with the context it carried and how long it worked.
+- **[Sessions](/coding-agents/sessions)**: one row per Copilot conversation, from the command-line tool and from Copilot Chat in Visual Studio Code alike, with the models it used, its tokens, its token cost and the tools it ran.
+- **Repository and branch**: with the [hook file](#link-sessions-to-their-pull-requests) installed, each row shows the repository and branch the session worked on, and the pull requests that branch maps to.
+- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it, with the tokens of each model.
 - **Traces**: one trace per turn, with the model, the tokens and the timing of each step.
-- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it.
 - **Content**: the prompt of each turn and the response of the model.
 
-Copilot reports the number of premium requests a turn used, not an amount of money, so a Copilot trace carries a request count where a pay-per-token trace carries a cost.
+Microsoft Copilot Studio agents are a separate product and never appear as coding sessions. See [Copilot Studio](/ai-governance/ingestion-sources/copilot-studio) for those.
+
+### How Copilot cost is counted
+
+LangWatch prices each model call from its tokens at the model's list price, because Copilot reports no amount of money. That token cost is the dollar figure on sessions and pull requests, and it is not a figure from your Copilot bill.
+
+Copilot also reports AI units on each model call, its own usage count. On a pull request, AI units appear as their own count and never enter the dollar total. A model with no price shows its tokens and an unknown cost, not zero.
 
 Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Link sessions to their pull requests
+
+LangWatch reads the repository and branch of a Copilot session from a hook file, not from Copilot's telemetry. `langwatch instrument copilot` and `langwatch instrument code` write it to `~/.copilot/hooks/langwatch.json`, or to `$COPILOT_HOME/hooks/langwatch.json` when you set `COPILOT_HOME`. `langwatch ingest install copilot_cli` writes the same file.
+
+`langwatch copilot` and `langwatch code` write it on the run where you answer yes to keeping the plain command reporting, and later runs put it back if it is missing. A run that takes the gateway route asks no such question, so it writes no hook file.
+
+The file runs `langwatch ingest hook copilot` on two Copilot events: `sessionStart`, and `agentStop` at the end of every turn. The command reads the `origin` remote, the current branch and the worktree of the session's directory, and sends them to the same destination as the session's telemetry. With GitHub connected, LangWatch maps that branch to its pull requests. See [Repository and PR attribution](/coding-agents/repository-and-pr-attribution).
+
+LangWatch writes only `langwatch.json` and never opens your other hook files in that folder. A `langwatch.json` that LangWatch did not write is left as it is. `langwatch logout` deletes the file.
+
+Each entry in the file holds the same command for `bash` and for `powershell`, so the hook runs on macOS, Linux and Windows.
+
+The hook needs `langwatch` on your PATH. Copilot runs the command by name, so install the command-line tool with `npm install -g langwatch`, not through `npx` alone.
 
 ## Content and privacy
 
@@ -18260,6 +18347,15 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
   `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` is `false` in your environment. Remove it, or
   set it to `true`, and start the tool again.
 </Accordion>
+
+  <Accordion title="Copilot sessions show no repository or pull request">
+    Check that `~/.copilot/hooks/langwatch.json` exists, or the same file under `$COPILOT_HOME/hooks/`. If it does not, run `langwatch instrument copilot` or `langwatch instrument code`. Then check that `langwatch --version` works in a new terminal, since the hook runs the command by name.
+
+    For Copilot Chat, check which harness the chat session runs on. A Copilot session loads the hook file from the folder above whatever the editor settings say. A Local session runs hook files only while the `chat.useHooks` setting is on. To see whether the hook ran, open the agent debug logs from the chat view.
+
+    A session that worked outside any git checkout, or on a branch with no pull request, has no pull request to show.
+
+  </Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
     Run `langwatch instrument copilot --project <id-or-slug>` to move it to a team project, or `langwatch instrument copilot --personal` to move it back to your own.
@@ -18368,6 +18464,10 @@ langwatch instrument claude --key ik-lw-...
 langwatch instrument codex --key ik-lw-...
 ```
 
+GitHub Copilot CLI is different: `langwatch instrument copilot` writes a shell function to your shell's startup file, which a non-interactive bash or zsh shell, such as a CI step or a service, does not load. On those machines, export the Copilot settings in the job or the image instead.
+
+`langwatch ingest install copilot_cli --env-only` prints those settings, but it needs a signed-in device, so run it on a machine where you are signed in and copy the lines, as [Bake it into an image](#bake-it-into-an-image) shows. With an ingest key alone, write the same lines by hand from [Manual OpenTelemetry setup](/coding-agents/github-copilot-cli#manual-opentelemetry-setup).
+
 The command reads the same value from the environment, which is how you keep the key out of shell history and provisioning scripts:
 
 ```bash
@@ -18408,7 +18508,9 @@ For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent,
 
 ## Bake it into an image
 
-`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`. Add `--json` for machine-readable output.
+`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.
+
+`--env-only` also skips the hooks that report each session's repository and branch. For `copilot_cli`, that is the file `~/.copilot/hooks/langwatch.json`, and without it Copilot sessions reach no pull request. Run the command without `--env-only` to write it. See [GitHub Copilot](/coding-agents/github-copilot-cli#link-sessions-to-their-pull-requests).
 
 ## Roll out to a managed fleet
 
@@ -19303,7 +19405,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -19345,7 +19447,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if whoami reports "Not logged in" or that field is missing, ask the user which project id to use.
 
 If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
@@ -19721,7 +19823,7 @@ One row per session, over the last 90 days. Every column sorts; a third click on
 | Column                 | What it shows                                                                                                                            |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | **Session**            | The session's title, lifted from the agent's own generated conversation title.                                                           |
-| **Agent**              | Which assistant ran it: Claude Code, Codex, Copilot, Gemini CLI, OpenCode.                                                               |
+| **Agent**              | Which assistant ran it: Claude Code, Codex, GitHub Copilot, Gemini CLI, OpenCode.                                                        |
 | **Last update**        | When the session last did anything.                                                                                                      |
 | **Context**            | Peak context: the most tokens the session carried into a single model call.                                                              |
 | **Compactions**        | How many times the agent compacted its conversation to fit the context window, and under it, how many times it rebuilt the prompt cache. |
@@ -19737,12 +19839,12 @@ Click a row to open the session. The **Usage** tab opens on the totals: cost, mo
 
 The **Cache health** section is where the money goes:
 
-| Stat                | What it tells you                                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Peak context**    | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions.                          |
-| **Cache misses**    | Model calls that re-created most of the context instead of reading it from cache. A cache write costs more per token than a read, so each miss pays twice for the same tokens. |
-| **Context reused**  | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input.                                                                               |
-| **Context rebuilt** | Tokens spent writing the cache again, summed across the session.                                                                                                               |
+| Stat                | What it tells you                                                                                                                                                                                                                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Peak context**    | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions.                                                                                                                                                      |
+| **Cache misses**    | Model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write). A session's first call is never a miss. A cache write costs more per token than a read, so each miss pays twice for the same tokens. |
+| **Context reused**  | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input.                                                                                                                                                                                                           |
+| **Context rebuilt** | Tokens spent writing the cache again, summed across the session.                                                                                                                                                                                                                                           |
 
 The detail also shows the biggest single rebuild: how many tokens one model call re-sent instead of reusing from cache.
 
@@ -55753,7 +55855,7 @@ This skill answers one question with the user's own data: at what context size d
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on the read commands when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -55797,7 +55899,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input, counted only once the session already holds cached context. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls that wrote 1,000 tokens or more to the cache, and at least half as many as the call before them held in it (that call's cache read plus its cache write), whatever the call itself read from the cache. This is the rule the LangWatch session detail counts as a cache miss. A call whose previous call held nothing in the cache is never counted, so the first cache-creating call of a session builds the cache rather than rebuilding it: it pays for the context once, as a setup cost. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -55890,7 +55992,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+Personal coding-agent usage needs `langwatch login --device` on a laptop; a project key in `LANGWATCH_API_KEY` stands in for that login only for its own project. A team or application project needs `--project <slug>` on the read commands, which a project key refuses for any project but its own, so reaching one still needs `langwatch login --device`.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -56040,7 +56142,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -56082,7 +56184,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if whoami reports "Not logged in" or that field is missing, ask the user which project id to use.
 
 If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
@@ -60158,6 +60260,26 @@ langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to 
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
+## Boards
+
+A board is the page widgets live on. **Use an existing board** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new board, or none fits and they agree.
+
+```bash
+langwatch dashboards list -f json                          # ids, names, widget counts
+langwatch dashboards get <dashboardId> -f json
+langwatch dashboards create "<name>" -f json               # empty board; prints platformUrl
+langwatch dashboards update <dashboardId> --name "<name>"  # rename; or --description / --clear-description
+langwatch dashboards delete <dashboardId>                  # removes the board and its widgets
+langwatch dashboards widgets list <dashboardId> -f json
+langwatch dashboards widgets create <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
+langwatch dashboards widgets update <dashboardId> <widgetId> --code-file widget.tsx --queries-file queries.json
+langwatch dashboards widgets delete <dashboardId> <widgetId>
+```
+
+- **Never pick a board for the user.** When more than one board fits, ask with the `question` tool (a choices card): one option per board from `langwatch dashboards list`, its id in `ref`.
+- **Confirm before any delete** of a board or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a board takes its widgets with it.
+- Boards need Dashboards switched on for the project. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
+
 ## Worked example: bar chart of daily trace counts
 
 `widget.tsx`:
@@ -62701,6 +62823,7 @@ Langy runs on the model providers your project has enabled. Every provider excep
 | xAI              | API key                                              |                                                                                                                                       |
 | Cerebras         | API key                                              |                                                                                                                                       |
 | Groq             | API key                                              |                                                                                                                                       |
+| Doubleword       | API key                                              | Open-weight models such as DeepSeek, Qwen, GLM and gpt-oss.                                                                           |
 | Voyage           | API key                                              | Embeddings.                                                                                                                           |
 | Custom (LiteLLM) | API key or endpoint                                  | Any provider reachable through LiteLLM.                                                                                               |
 
@@ -64040,7 +64163,8 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `BLOCK_LOCAL_HTTP_CALLS`  | `true` blocks user-configured outbound HTTP calls to private IPs, localhost and hostnames that resolve to private IPs. Cloud metadata addresses are always blocked                                                               | `false` |
 | `ALLOWED_PROXY_HOSTS`     | Comma-separated hostnames still allowed when `BLOCK_LOCAL_HTTP_CALLS=true`                                                                                                                                                       | -       |
-| `TRUSTED_PROXY_ADDRESSES` | Comma-separated addresses or IPv4 CIDR ranges of the proxies allowed to set `X-Forwarded-For`. Sign-in rate limits key on the client IP read from it. Unset, the header is read only from private, loopback and link-local peers | -       |
+| `TRUSTED_PROXY_ADDRESSES` | Comma-separated addresses or IPv4/IPv6 CIDR ranges of the proxies in front of the app. A forwarding header is read only from a socket peer inside this set, and the caller is the rightmost `X-Forwarded-For` hop outside it. Unset, no header is read and the socket peer is the caller. An entry that is not an address or range stops the app from starting. The Helm chart defaults to the private and loopback ranges | -       |
+| `TRUST_CLOUDFLARE_CLIENT_IP` | `true` reads the caller from `CF-Connecting-IP`, only from a peer inside `TRUSTED_PROXY_ADDRESSES` (set it to Cloudflare's published ranges). The header must hold a single valid IP; otherwise the caller comes from `X-Forwarded-For`. The app refuses to start with this on and no trusted proxy addresses | `false` |
 | `SSO_TRUSTED_IDP_ORIGINS` | Comma or whitespace separated origins of identity providers inside a private network. Without an entry here, sign-in refuses a provider whose address is not publicly routable                                                   | -       |
 
 ## Services
@@ -65531,6 +65655,7 @@ LangWatch keeps a received bundle for 30 days, in the EU (Frankfurt), and then d
 | `DISABLE_USAGE_STATS=true` | Environment, or `app.telemetry.usage.enabled: false` in the chart | The usage report as a whole. No report leaves the install |
 | Usage counts and onboarding dates | **Settings, Checkup** | The optional category: usage counts, onboarding dates, email domains, model provider names. The report keeps the release, the counts of organizations and projects, and the sign-in method |
 | Hostname | **Settings, Checkup** | The `hostname` field alone. It names your own network, so it has a switch of its own |
+| `DISABLE_LANGWATCH_NOTICES=true` | Environment | The notices LangWatch sends back with the usage report reply, such as a new release or a security fix, shown on **Ops, Upgrades**. The report itself is still sent |
 | Upgrade diagnostics | **Settings, Checkup**, or `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true` | The automatic sending of a failed upgrade step's [diagnostics](#upgrade-diagnostics). It is not part of the usage report, and an admin can still send them from the step |
 
 `LANGWATCH_CONNECT_DISABLED=true` is one more switch, for an audit that has to prove absence rather than derive it from the license. With it set the install opens no connection to LangWatch for any reason, see [To LangWatch](#to-langwatch).
@@ -65808,7 +65933,7 @@ Docker Compose starts the following services:
 | `langevals`     | `langwatch/langevals:latest`            | 5562      | Evaluators, guardrails      |
 | `postgres`      | `postgres:16`                           | 5432      | Control plane database      |
 | `redis`         | `redis:alpine`                          | -         | Job queue, caching          |
-| `clickhouse`    | `langwatch/clickhouse-serverless:0.2.0` | 8123      | Trace and analytics storage |
+| `clickhouse`    | `langwatch/clickhouse-serverless:0.4.0` | 8123      | Trace and analytics storage |
 
 Services with no host port bind no port on the host's interfaces, so they do not answer on `localhost` and are not reachable from another machine. `langwatch_nlp` listens on 5561 inside the Docker network, which is what `LANGWATCH_NLP_SERVICE` points the app and the workers at. A process on the Docker host itself can still reach a container directly on its own network address, so treat this as removing an exposed entry point, not as a network boundary.
 
@@ -70349,7 +70474,7 @@ Add the ClickHouse service to your `compose.yml`:
 ```yaml
 services:
   clickhouse:
-    image: langwatch/clickhouse-serverless:0.2.0
+    image: langwatch/clickhouse-serverless:0.4.0
     environment:
       CLICKHOUSE_PASSWORD: langwatch
     ports:
@@ -72053,73 +72178,6 @@ description: "Read what a coding agent session did and what it cost. Walk one se
 Both authenticate with a project API key and read under the project's [data privacy policy](/platform/data-privacy): an API key resolves as a public viewer, so it reads what the policy captures and never what it restricts or drops.
 
 The same data renders in the product on the [sessions](/coding-agents/sessions) and [pull requests](/coding-agents/pull-requests) views, and over the command line as `langwatch session events <sessionId>` and `langwatch trace transcript <traceId>`.
-
----
-
-# FILE: ./api-reference/dashboards/create-dashboards.mdx
-
----
-title: "Create a new dashboard"
-openapi: "POST /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/delete-dashboards.mdx
-
----
-title: "Delete a dashboard and its graphs"
-openapi: "DELETE /api/v1/dashboards/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/get-dashboards.mdx
-
----
-title: "Get a dashboard by its id, including its graphs"
-openapi: "GET /api/v1/dashboards/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/list-dashboards.mdx
-
----
-title: "List Dashboards"
-openapi: "GET /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/overview.mdx
-
----
-title: "Overview"
-description: "Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs."
----
-
-## Intro
-
-Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.
-
----
-
-# FILE: ./api-reference/dashboards/put-update-reorder-reorder.mdx
-
----
-title: "Update Reorder"
-openapi: "PUT /api/v1/dashboards/reorder"
----
-
----
-
-# FILE: ./api-reference/dashboards/update-dashboards.mdx
-
----
-title: "Rename a dashboard"
-openapi: "PATCH /api/v1/dashboards/{id}"
----
 
 ---
 
@@ -74625,6 +74683,17 @@ Project API keys (`X-Auth-Token`) cannot be used here, because they lack organiz
 | `GET`    | `/api/v1/projects/{id}/api-key`            | Get the project's API key                                    |
 | `POST`   | `/api/v1/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
 
+## Dashboards boards
+
+These routes read the boards of the Dashboards area in one project. Unlike the routes above, they take the project API key in the `X-Auth-Token` header, not an organization key.
+
+| Method | Path                                                      | Description                                            |
+| ------ | --------------------------------------------------------- | ------------------------------------------------------ |
+| `GET`  | `/api/v1/projects/{projectId}/analytics/boards`           | List the project's boards, each with its `widgetCount` |
+| `GET`  | `/api/v1/projects/{projectId}/analytics/boards/{boardId}` | Get one board                                          |
+
+A board in another project answers `404`.
+
 ## Moving a Project to Another Team
 
 You can move a project to a different team by including `teamId` in the `PATCH` request:
@@ -75349,6 +75418,73 @@ A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LI
 ---
 title: "Run a LangWatchQL query"
 openapi: "POST /api/v1/query"
+---
+
+---
+
+# FILE: ./api-reference/reports/create-reports.mdx
+
+---
+title: "Create a new dashboard"
+openapi: "POST /api/v1/analytics/reports"
+---
+
+---
+
+# FILE: ./api-reference/reports/delete-reports.mdx
+
+---
+title: "Delete a dashboard and its graphs"
+openapi: "DELETE /api/v1/analytics/reports/{reportId}"
+---
+
+---
+
+# FILE: ./api-reference/reports/get-reports.mdx
+
+---
+title: "Get a dashboard by its id, including its graphs"
+openapi: "GET /api/v1/analytics/reports/{reportId}"
+---
+
+---
+
+# FILE: ./api-reference/reports/list-reports.mdx
+
+---
+title: "List Reports"
+openapi: "GET /api/v1/analytics/reports"
+---
+
+---
+
+# FILE: ./api-reference/reports/overview.mdx
+
+---
+title: "Overview"
+description: "Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs."
+---
+
+## Intro
+
+Manage the Analytics Reports dashboards. Create, reorder, and organize dashboards with custom graphs.
+
+---
+
+# FILE: ./api-reference/reports/update-reorder.mdx
+
+---
+title: "Update Reorder"
+openapi: "PUT /api/v1/analytics/reports/reorder"
+---
+
+---
+
+# FILE: ./api-reference/reports/update-reports.mdx
+
+---
+title: "Rename a dashboard"
+openapi: "PATCH /api/v1/analytics/reports/{reportId}"
 ---
 
 ---

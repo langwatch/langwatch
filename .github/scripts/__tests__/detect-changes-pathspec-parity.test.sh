@@ -127,7 +127,8 @@ test_every_pull_request_caller() {
   git -C "$REPO_ROOT" ls-files -z | tr '\0' '\n' | grep -v '[\"\\]' >"$tracked"
   printf '%s\n' "$LOOK_ALIKES" >>"$tracked"
   local callers=0
-  for workflow in $(grep -lE '^  pull_request(_target)?:' "$REPO_ROOT"/.github/workflows/*.y*ml); do
+  # workflow_call: pr.yml calls these for every pull request.
+  for workflow in $(grep -lE '^  (pull_request(_target)?|workflow_call):' "$REPO_ROOT"/.github/workflows/*.y*ml); do
     filters="$(by_sha filters_as_json <"$workflow" | jq -r '
       .jobs[].steps[]? | select(.uses == "./.github/actions/detect-changes") | .with.filters')"
     [ -n "$filters" ] || continue

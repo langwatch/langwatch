@@ -16,6 +16,7 @@ export { propsFormSchema, renderMailTemplate } from "./templates/registry.ts";
 export type { MailFixture, MailTemplate } from "./templates/registry.ts";
 export { expressive } from "./templates/email-layout.tsx";
 export type { UpgradeAlertEmailProps } from "./templates/upgrade-alert-email.tsx";
+export type { MonitorAutoPausedEmailProps } from "./templates/monitor-auto-paused-email.tsx";
 export { ReactEmailMailRenderer } from "./adapters/react-email.render.adapter.ts";
 export {
   renderTriggerDigestEmail,

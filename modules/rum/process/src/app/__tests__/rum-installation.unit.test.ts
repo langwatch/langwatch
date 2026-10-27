@@ -38,7 +38,7 @@ function sentTo(collector: ReturnType<typeof stubCollector>) {
   };
 }
 
-const report = { body: exportWith(1), session: "s", forwardedFor: undefined };
+const report = { body: exportWith(1), session: "s", callerAddress: null };
 
 const deprecations = () =>
   logged.warn.mock.calls.filter(([, message]) => String(message).includes("deprecated"));

@@ -100,8 +100,8 @@ func LeanCheckout(repoRoot string) ([]string, error) {
 			continue
 		}
 
-		for _, step := range steps {
-			problems = append(problems, leanCheckoutStep(step)...)
+		for i := range steps {
+			problems = append(problems, leanCheckoutStep(steps[i])...)
 		}
 	}
 
