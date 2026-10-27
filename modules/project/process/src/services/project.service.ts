@@ -447,11 +447,6 @@ export class ProjectService {
     return this.repository.searchByQuery(input);
   }
 
-  /**
-   * Kept on the `tryGet*` spelling because the dying abstract contract still
-   * declares it; the `find*` name a nullable answer earns lives on `ProjectApi`
-   * and on the repository below.
-   */
   findTraceSharingConfig(projectId: string): Promise<TraceSharingConfig | null> {
     return this.repository.findTraceSharingConfig(projectId);
   }
