@@ -48,7 +48,9 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the answer is 403, as on main
       And no key is revealed or rotated
 
-  Rule: a legacy project key keeps working until it is revoked, and nobody can find it
+  Rule: a legacy project key keeps working until it is revoked, and no page reveals it
+    # Beyond ingestion it works only while its project is on the full-access
+    # allowlist (modules/auth/specs/legacy-project-key-scope.feature).
 
     @integration
     Scenario: A legacy project key still authenticates
@@ -56,9 +58,9 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       When a trace is sent with that key in X-Auth-Token
       Then the key resolves to project "alpha"
 
-    # Alex 2026-10-09: keys created on main keep main's access.
+    # Alex 2026-10-09: keys created on main keep main's access, while their project is on the allowlist.
     @unit
-    Scenario: A legacy project key reads its own project's traces
+    Scenario: A legacy project key on the full-access allowlist reads its own project's traces
       Given project "alpha" holds the legacy key "sk-lw-<48 characters>" on the project itself
       When a trace search is sent with that key
       Then the traces of project "alpha" are read on an own-only proof
@@ -87,10 +89,34 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And the row holds a hash of the key and a masked hint, never the key itself
 
     @integration
-    Scenario: The legacy key is not listed on the keys page
+    Scenario: The legacy key is listed as a row an admin can revoke
+      Given project "alpha" still has a live legacy key
       When "ada" opens the API keys of project "alpha"
-      Then no row shows the legacy project key
-      And no control copies or rotates it
+      Then a row "Project key" with a "Legacy" badge is listed, scoped to project "alpha"
+      And it shows when the key was last used
+      And its only action is Revoke
+      And no control copies it or hands out a new legacy key
+
+    @integration
+    Scenario: A banner tells an admin that legacy project keys are going away
+      Given project "alpha" still has a live legacy key
+      When "ada" opens the API keys of project "alpha"
+      Then a warning banner titled "Legacy project keys are going away" says to use personal access tokens instead
+      And it offers "Revoke and replace"
+      And it stays until the legacy key is revoked
+
+    @integration
+    Scenario: The banner's button revokes and replaces the legacy key
+      Given project "alpha" still has a live legacy key
+      When "ada" clicks "Revoke and replace" on the banner
+      Then the same confirmation as the legacy row's Revoke opens
+
+    @integration
+    Scenario: The legacy key status answers when the key was last used
+      Given the legacy key of project "alpha" authenticated a request
+      When the legacy key status of project "alpha" is read
+      Then it answers present with the time of that use
+      And once the key is revoked it answers absent with no time
 
     @integration
     Scenario: A revoked legacy key is refused
@@ -99,53 +125,84 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And a trace sent with the old key is refused
 
     @integration
-    Scenario: A banner tells an admin that legacy project keys are going away
-      Given project "alpha" still has a live legacy key
-      When "ada" opens the API keys of project "alpha"
-      Then a warning banner titled "Legacy project keys are going away" says to use personal access tokens instead
-      And the banner offers no action
-
-    @integration
-    Scenario: A reader who cannot manage the project sees no banner and no error
+    Scenario: A reader who cannot manage the project sees no legacy row and no error
       Given project "alpha" still has a live legacy key
       When "max" opens the API keys of project "alpha"
       Then the legacy key status is not read
-      And no banner and no error is shown
+      And no legacy row and no error is shown
 
     @integration
-    Scenario: A project that never had a legacy key shows no banner
+    Scenario: A project that never had a legacy key shows no legacy row
       Given project "gamma" was created after project keys were retired, so it never had a legacy key
       When "ada" opens the API keys of project "gamma"
       Then the legacy key status answers absent
-      And no banner is shown
+      And no legacy row is shown
 
-    @unimplemented
-    Scenario: The banner offers to revoke the project key
-      Given project "alpha" still has a live legacy key
-      When "ada" opens the API keys of project "alpha"
-      Then the banner says that once revoked the key stops working for good and cannot be restored
-      And the banner offers "Revoke project key..."
+    @integration
+    Scenario: Revoking the legacy key says an API key takes its place
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      Then a dialog "Revoke the legacy project key?" says the key stops working within seconds
+      And it says they next create a new API key for project "alpha", shown once
 
-    @unimplemented
-    Scenario: Revoking the project key takes two confirmations
-      Given "ada" chose "Revoke project key..."
-      Then a dialog "Revoke the project key?" offers Cancel and Continue
-      When she chooses Continue
-      Then a second step asks her to type the project name to confirm
-      And "Revoke for good" stays disabled until she types the project name exactly
+    @integration
+    Scenario: Revoke waits until the reader's roles are known
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      And the page has not yet read their roles
+      Then the dialog's Revoke is unavailable
 
-    @unimplemented
-    Scenario: A name that does not match keeps the revoke disabled
-      Given "ada" is on the second step of revoking the project key of "alpha"
-      When she types "alph"
-      Then "Revoke for good" is disabled
+    @integration
+    Scenario: Revoke says so when the reader's roles could not be read
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      And the page could not read their roles
+      Then the dialog's Revoke is unavailable and says their access could not be checked
 
-    @unimplemented
-    Scenario: A revoked project key hides the banner
-      Given "ada" typed the exact project name on the second step
-      When she chooses "Revoke for good"
-      Then a toast says "Project key revoked"
-      And the banner is gone
+    @integration
+    Scenario: Confirming the legacy key revoke revokes it and opens the create drawer filled in
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      When they confirm
+      Then the legacy key of project "alpha" is revoked
+      And a toast says "Legacy project key revoked"
+      And the legacy key row and the banner are gone
+      And the create drawer opens with the name "Project API Key", full access to project "alpha" and no expiry
+      And the drawer warns that the legacy key no longer works and the project has no key until one is created
+      And no API key is created yet
+
+    @integration
+    Scenario: Revoking the legacy key swaps it for an API key
+      Given "ada" confirmed Revoke on the legacy key row of project "alpha"
+      When they create the key from the drawer
+      Then a service API key "Project API Key" is created with full access to project "alpha" and no expiry
+      And its token is shown once
+
+    @integration
+    Scenario: A failed revoke keeps the legacy key and opens no drawer
+      Given "ada" chose Revoke on the legacy key row of project "alpha"
+      When they confirm and the revoke fails
+      Then an error says the legacy key could not be revoked
+      And the legacy key row stays and no drawer opens
+      And the confirm stays open so they can try again
+
+    @integration
+    Scenario: A failed create after the revoke keeps the drawer open
+      Given "ada" confirmed Revoke on the legacy key row of project "alpha"
+      When the new API key cannot be created from the drawer
+      Then an error says the key could not be created
+      And the drawer stays open so they can try again
+
+    @integration
+    Scenario: A project admin's swap gets a personal key with their role
+      Given "pat" administers the team that owns project "alpha" but not the organization
+      When "pat" confirms Revoke on the legacy key row of project "alpha" and creates the key from the drawer
+      Then the legacy key of project "alpha" is revoked
+      And a personal API key with the Admin role on project "alpha" is created
+
+    @integration
+    Scenario: A swap whose new key could not send traces keeps the legacy key
+      Given a reader who can manage project "alpha" holds no role on it that sends traces
+      When they confirm Revoke on the legacy key row of project "alpha"
+      Then the create drawer does not open and no API key is created
+      And the legacy key of project "alpha" is not revoked
+      And an error says their role cannot create a key that sends traces
 
     @unit
     Scenario: A new project gets no customer-facing project key

@@ -50,6 +50,7 @@ const origUserprofile = process.env.USERPROFILE;
 const origShell = process.env.SHELL;
 const origTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
 const origEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+const origCopilotHome = process.env.COPILOT_HOME;
 
 const otelVars: Record<string, string> = {
   OTEL_TRACES_EXPORTER: "otlp",
@@ -83,6 +84,8 @@ beforeEach(() => {
   process.env.USERPROFILE = tmpHome;
   process.env.SHELL = "/bin/zsh";
   delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  // The Copilot hook folder follows COPILOT_HOME first; never write into a real one.
+  delete process.env.COPILOT_HOME;
   Object.defineProperty(process.stdin, "isTTY", {
     value: true,
     configurable: true,
@@ -104,6 +107,8 @@ afterEach(() => {
   } else {
     process.env.OTEL_EXPORTER_OTLP_ENDPOINT = origEndpoint;
   }
+  if (origCopilotHome === undefined) delete process.env.COPILOT_HOME;
+  else process.env.COPILOT_HOME = origCopilotHome;
   if (origTtyDescriptor) {
     Object.defineProperty(process.stdin, "isTTY", origTtyDescriptor);
   }
@@ -448,6 +453,112 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         expect(lastPrompts).toHaveLength(0);
         expect(saveConfigMock).not.toHaveBeenCalled();
         expect(fs.readFileSync(rcFile, "utf8")).toBe(installed);
+      });
+    });
+  });
+
+  describe("when the tool launches a Copilot surface (`copilot` or `code`)", () => {
+    function copilotHookFilePath(): string {
+      return path.join(tmpHome, ".copilot", "hooks", "langwatch.json");
+    }
+
+    describe.each(["copilot", "code"])("and the user answers 'y' to `%s`", (tool) => {
+      beforeEach(async () => {
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
+        await maybeOfferIngestionShellRcPersist({ cfg: cfg(), tool, vars: otelVars });
+      });
+
+      /** @scenario "Starting Copilot through the wrapper writes the LangWatch hook file" */
+      it("writes the LangWatch hook file beside the scoped function", () => {
+        const written = JSON.parse(fs.readFileSync(copilotHookFilePath(), "utf8"));
+        expect(Object.keys(written.hooks)).toEqual(["sessionStart", "agentStop"]);
+        expect(written.hooks.sessionStart[0].bash).toBe("langwatch ingest hook copilot");
+        expect(fs.readFileSync(path.join(tmpHome, ".zshrc"), "utf8")).toContain(`${tool}() {`);
+      });
+
+      it("names the hook file in the question the answer was given to", () => {
+        expect(lastPrompts).toHaveLength(1);
+        expect(lastPrompts[0]).toContain("~/.copilot/hooks/langwatch.json");
+      });
+    });
+
+    describe("and the user answers 'n'", () => {
+      /** @scenario "Declining the wrapper's offer writes no Copilot hook file" */
+      it("writes no hook file", async () => {
+        answers.push("n");
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
+        await maybeOfferIngestionShellRcPersist({ cfg: cfg(), tool: "copilot", vars: otelVars });
+        expect(fs.existsSync(copilotHookFilePath())).toBe(false);
+      });
+    });
+
+    describe("and the scoped function already targets this endpoint", () => {
+      /** @scenario "A device that persisted Copilot capture earlier still gets the hook file" */
+      it("writes the hook file without asking again", async () => {
+        const {
+          buildScopedToolFunction,
+          maybeOfferIngestionShellRcPersist,
+          persistBlockToRc,
+          toolMarkers,
+        } = await import("../shell-rc.js");
+        persistBlockToRc(
+          "zsh",
+          buildScopedToolFunction("copilot", otelVars, "zsh"),
+          toolMarkers("copilot"),
+        );
+        // No answer queued: a fired prompt would read "" and count as a yes.
+        await maybeOfferIngestionShellRcPersist({ cfg: cfg(), tool: "copilot", vars: otelVars });
+        expect(lastPrompts).toHaveLength(0);
+        expect(fs.existsSync(copilotHookFilePath())).toBe(true);
+      });
+    });
+
+    describe("and somebody else's file that runs the LangWatch hook sits at the hook file's path", () => {
+      const foreign = `${JSON.stringify({
+        hooks: {
+          sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+          preToolUse: [{ bash: "echo guard" }],
+        },
+      })}\n`;
+
+      /** @scenario "A user's langwatch.json that runs the LangWatch hook is not reported as turning linking off" */
+      it("leaves the file alone and never says repository linking is off", async () => {
+        fs.mkdirSync(path.dirname(copilotHookFilePath()), { recursive: true });
+        fs.writeFileSync(copilotHookFilePath(), foreign);
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
+        await maybeOfferIngestionShellRcPersist({ cfg: cfg(), tool: "copilot", vars: otelVars });
+
+        expect(lastPrompts[0]).not.toContain("langwatch.json");
+        expect(fs.readFileSync(copilotHookFilePath(), "utf8")).toBe(foreign);
+        expect(logged()).not.toContain("will not report their repository or branch");
+      });
+    });
+
+    describe("and somebody else's file already sits at the hook file's path", () => {
+      const foreign = `${JSON.stringify({
+        hooks: {
+          sessionStart: [{ bash: "echo mine" }],
+          preToolUse: [{ bash: "echo guard" }],
+        },
+      })}\n`;
+
+      beforeEach(async () => {
+        fs.mkdirSync(path.dirname(copilotHookFilePath()), { recursive: true });
+        fs.writeFileSync(copilotHookFilePath(), foreign);
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
+        await maybeOfferIngestionShellRcPersist({ cfg: cfg(), tool: "copilot", vars: otelVars });
+      });
+
+      /** @scenario "The wrapper's offer never promises a hook file it will not write" */
+      it("asks without naming the hook file, leaves the file alone and says linking is off", () => {
+        expect(lastPrompts).toHaveLength(1);
+        expect(lastPrompts[0]).not.toContain("langwatch.json");
+        expect(fs.readFileSync(copilotHookFilePath(), "utf8")).toBe(foreign);
+        expect(logged()).toContain("~/.copilot/hooks/langwatch.json is not a LangWatch file");
+        expect(logged()).toContain("will not report their repository or branch");
       });
     });
   });

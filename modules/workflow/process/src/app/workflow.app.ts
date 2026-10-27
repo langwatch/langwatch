@@ -350,6 +350,7 @@ function composeEngine(setup: WorkflowSetup): WorkflowEngine {
     cache: setup.repositories.nlpLambdaArns,
     resolver: engine.resolver,
     imageUri: engine.imageUri,
+    imageOrder: engine.imageOrder,
     configFingerprint: engine.configFingerprint,
     logger,
   });

@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from .triggers import TriggersFacade
     from .workflows import WorkflowsFacade
     from .dashboards import DashboardsFacade
+    from .boards import BoardsFacade
     from .annotations import AnnotationsFacade
     from .graphs import GraphsFacade
     from .model_providers import ModelProvidersFacade
@@ -84,6 +85,7 @@ if TYPE_CHECKING:
     triggers: TriggersFacade
     workflows: WorkflowsFacade
     dashboards: DashboardsFacade
+    boards: BoardsFacade
     annotations: AnnotationsFacade
     graphs: GraphsFacade
     model_providers: ModelProvidersFacade
@@ -133,6 +135,7 @@ _LAZY_FACADES = {
     "triggers": (".triggers", "TriggersFacade"),
     "workflows": (".workflows", "WorkflowsFacade"),
     "dashboards": (".dashboards", "DashboardsFacade"),
+    "boards": (".boards", "BoardsFacade"),
     "annotations": (".annotations", "AnnotationsFacade"),
     "graphs": (".graphs", "GraphsFacade"),
     "model_providers": (".model_providers", "ModelProvidersFacade"),
@@ -276,6 +279,7 @@ __all__ = [
     "triggers",
     "workflows",
     "dashboards",
+    "boards",
     "annotations",
     "graphs",
     "model_providers",

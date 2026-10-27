@@ -80,6 +80,10 @@ func addressesOf(route *RestRoute, family *RestFamily) []restAddress {
 			documented bool
 		}{{"/" + family.Version.Value + suffix, false}, {"/latest" + suffix, false}}, relative...)
 	}
+	// A superseded family leaves latest and the bare path to its successor.
+	if family.Addressing == "dated" && family.SupersededAt != nil {
+		relative = relative[:1]
+	}
 	base := basePathOf(family)
 	addresses := make([]restAddress, 0, len(relative))
 	for _, item := range relative {

@@ -23,9 +23,16 @@ import {
   type MonitorWithEvaluator,
   type MonitorUsageCount,
 } from "@langwatch/monitor-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import type { MonitorRepository } from "../monitor.repository.ts";
+
+/** Switching a monitor on clears a pause it recorded itself. */
+const NOT_AUTO_PAUSED = { autoPausedAt: null, autoPausedReason: null } as const;
+
+function clearedWhenEnabled(enabled: boolean | undefined) {
+  return enabled === true ? NOT_AUTO_PAUSED : {};
+}
 
 /** A stored row: the monitor, plus the evaluator name a listing reads off it. */
 type StoredMonitor = Monitor & { evaluator: MonitorWithEvaluator["evaluator"] };
@@ -134,8 +141,26 @@ export class MemoryMonitorRepository implements MonitorRepository {
 
   async setEnabled(input: MonitorToggleInput): Promise<void> {
     const row = this.#require(input);
-    row.enabled = input.enabled;
+    Object.assign(row, { enabled: input.enabled, ...clearedWhenEnabled(input.enabled) });
     row.updatedAt = toDate(nowInstant());
+  }
+
+  async autoPause(input: {
+    id: string;
+    projectId: string;
+    revision: Instant;
+    pausedAt: Instant;
+    reason: string;
+  }): Promise<boolean> {
+    const row = this.#find(input);
+    if (!row?.enabled || row.updatedAt.getTime() !== input.revision.epochMilliseconds) return false;
+    Object.assign(row, {
+      enabled: false,
+      autoPausedAt: toDate(input.pausedAt),
+      autoPausedReason: input.reason,
+      updatedAt: toDate(nowInstant()),
+    });
+    return true;
   }
 
   async create(
@@ -167,7 +192,7 @@ export class MemoryMonitorRepository implements MonitorRepository {
   async createReplica(input: Monitor): Promise<Monitor> {
     const now = toDate(nowInstant());
 
-    return this.#insert({ ...input, createdAt: now, updatedAt: now });
+    return this.#insert({ ...input, ...NOT_AUTO_PAUSED, createdAt: now, updatedAt: now });
   }
 
   async update(
@@ -185,7 +210,9 @@ export class MemoryMonitorRepository implements MonitorRepository {
       executionMode: input.executionMode,
       slug: input.slug,
       updatedAt: toDate(nowInstant()),
-      ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+      ...(input.enabled === undefined
+        ? {}
+        : { enabled: input.enabled, ...clearedWhenEnabled(input.enabled) }),
       ...(input.evaluatorId === undefined ? {} : { evaluatorId: input.evaluatorId }),
       ...(input.level === undefined ? {} : { level: input.level }),
       ...(input.threadIdleTimeout === undefined
@@ -224,6 +251,7 @@ export class MemoryMonitorRepository implements MonitorRepository {
       sample: input.sample,
       enabled: input.enabled,
       executionMode: input.executionMode,
+      ...clearedWhenEnabled(input.enabled),
     };
 
     const existing = this.#rows.find(
