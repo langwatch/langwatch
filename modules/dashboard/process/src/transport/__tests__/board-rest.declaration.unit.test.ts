@@ -78,14 +78,14 @@ describe("given the Analytics Reports boards family", () => {
   });
 
   /** @scenario "AC199r Split: the Reports boards answer at /api/v1/analytics/reports" */
-  it("carries no deprecation, and neither does the project-path family", () => {
-    expect([declaration.deprecated, boardProjectRest.router().deprecated]).toEqual([
-      undefined,
+  it("is deprecated in favour of /api/v1/dashboards, and the project-path family is not", () => {
+    expect([declaration.deprecated?.successor, boardProjectRest.router().deprecated]).toEqual([
+      "/api/v1/dashboards",
       undefined,
     ]);
     expect(routesOf(boardProjectRest.router())).toEqual([
       ["get", "/api/v1/projects/:projectId/analytics/boards", "analytics:view"],
-      ["get", "/api/v1/projects/:projectId/analytics/boards/:boardId", "analytics:view"],
+      ["get", "/api/v1/projects/:projectId/analytics/boards/:dashboardId", "analytics:view"],
     ]);
   });
 });

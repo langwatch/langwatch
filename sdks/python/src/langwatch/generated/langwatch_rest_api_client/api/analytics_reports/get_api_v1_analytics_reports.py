@@ -50,7 +50,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiV1AnalyticsReportsResponse200]:
-    """List all dashboards for the project with graph counts
+    """List all dashboards for the project with graph counts The Analytics Reports boards API is
+    deprecated; use the Dashboards API at /api/v1/dashboards
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -73,7 +74,8 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> GetApiV1AnalyticsReportsResponse200 | None:
-    """List all dashboards for the project with graph counts
+    """List all dashboards for the project with graph counts The Analytics Reports boards API is
+    deprecated; use the Dashboards API at /api/v1/dashboards
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -92,7 +94,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetApiV1AnalyticsReportsResponse200]:
-    """List all dashboards for the project with graph counts
+    """List all dashboards for the project with graph counts The Analytics Reports boards API is
+    deprecated; use the Dashboards API at /api/v1/dashboards
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -113,7 +116,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> GetApiV1AnalyticsReportsResponse200 | None:
-    """List all dashboards for the project with graph counts
+    """List all dashboards for the project with graph counts The Analytics Reports boards API is
+    deprecated; use the Dashboards API at /api/v1/dashboards
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

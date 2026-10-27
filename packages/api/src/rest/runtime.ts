@@ -414,6 +414,10 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
         for (const scope of scopes) app.use(scope, middleware);
       }
 
+      // Ahead of every bare route and guard, so a refusal or a 404 there says so too.
+      const successor = declaration.bareDeprecated ? canonicalV1Path(basePath) : null;
+      if (successor) app.use(`${basePath}/*`, deprecatedAlias({ successor }));
+
       // Ahead of the routes: a date no route names is the version, never a `/:id` it matches.
       if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, contexts });
 
@@ -2938,9 +2942,6 @@ function dateFallback<Api>({
     const requested = versionAsked(context, routePath);
 
     if (!isDateVersion(requested) || requested < declaration.version) return undefined;
-    if (declaration.supersededAt !== void 0 && requested >= declaration.supersededAt) {
-      return undefined;
-    }
 
     // The guard is mounted under both prefixes, so the base to strip comes
     // from the route that matched rather than from the family's bare path.

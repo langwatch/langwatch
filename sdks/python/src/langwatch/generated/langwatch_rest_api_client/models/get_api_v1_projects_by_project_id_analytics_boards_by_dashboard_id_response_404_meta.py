@@ -6,11 +6,11 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta")
+T = TypeVar("T", bound="GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse404Meta")
 
 
 @_attrs_define
-class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta:
+class GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse404Meta:
     """ """
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -25,10 +25,10 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_meta = cls()
+        get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_404_meta = cls()
 
-        get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_meta.additional_properties = d
-        return get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_meta
+        get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_404_meta.additional_properties = d
+        return get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_404_meta
 
     @property
     def additional_keys(self) -> list[str]:

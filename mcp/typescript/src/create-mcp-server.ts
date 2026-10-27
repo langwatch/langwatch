@@ -1400,8 +1400,8 @@ function registerDashboardTools(server: McpServer): void {
     },
     withToolLogging("platform_rename_dashboard", async (params) => {
       requireApiKey();
-      const { renameDashboard } = await import("./langwatch-api-dashboards.ts");
-      const result = await renameDashboard(params.id, { name: params.name });
+      const { renameAnalyticsReport } = await import("./langwatch-api-dashboards.ts");
+      const result = await renameAnalyticsReport(params.id, { name: params.name });
       return {
         content: [
           {

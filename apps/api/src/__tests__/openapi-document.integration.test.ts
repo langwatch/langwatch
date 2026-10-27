@@ -140,6 +140,30 @@ describe("the OpenAPI document generated from the installed declarations", () =>
     });
   });
 
+  /** @scenario "AC199r Split: the Reports boards answer at /api/v1/analytics/reports" */
+  it("marks every Reports boards operation deprecated, and not the timeseries query", () => {
+    const { paths } = generated as OpenApiDocument;
+    const deprecated = (path: string) =>
+      METHODS.flatMap((method) => {
+        const operation = paths[path]?.[method] as { deprecated?: boolean } | undefined;
+        return operation ? [operation.deprecated === true] : [];
+      });
+
+    expect({
+      timeseries: deprecated("/api/v1/analytics"),
+      reports: deprecated("/api/v1/analytics/reports"),
+      reorder: deprecated("/api/v1/analytics/reports/reorder"),
+      report: deprecated("/api/v1/analytics/reports/{reportId}"),
+      dashboards: deprecated("/api/v1/dashboards"),
+    }).toEqual({
+      timeseries: [false],
+      reports: [true, true],
+      reorder: [true],
+      report: [true, true, true],
+      dashboards: [false, false],
+    });
+  });
+
   // Across every family the api installs, not only the host test's own.
   /** @scenario "A header leaves a path the dated family does not serve to the route that does" */
   it("pins X-API-Version only for routes of dated families", () => {
@@ -153,7 +177,7 @@ describe("the OpenAPI document generated from the installed declarations", () =>
         for (const route of declaration.routes) {
           const asked = (path: string) => ({ method: route.method, path: sample(path) });
           if (declaration.addressing === "literal") literal.push(JSON.stringify(asked(route.path)));
-          if (declaration.addressing === "dated" && !declaration.supersededAt) {
+          if (declaration.addressing === "dated") {
             const suffix = route.path === "/" ? "" : route.path;
             dated.push(JSON.stringify(asked(`${basePathOf(declaration)}${suffix}`)));
           }

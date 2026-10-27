@@ -8,11 +8,11 @@ from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Trace")
+T = TypeVar("T", bound="GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse403Trace")
 
 
 @_attrs_define
-class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Trace:
+class GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse403Trace:
     """
     Attributes:
         trace_id (str | Unset):
@@ -61,15 +61,15 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Trace:
 
         logs_url = d.pop("logsUrl", UNSET)
 
-        get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_trace = cls(
+        get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_403_trace = cls(
             trace_id=trace_id,
             span_id=span_id,
             trace_url=trace_url,
             logs_url=logs_url,
         )
 
-        get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_trace.additional_properties = d
-        return get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_trace
+        get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_403_trace.additional_properties = d
+        return get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_403_trace
 
     @property
     def additional_keys(self) -> list[str]:

@@ -580,7 +580,7 @@ describe("given the Reports boards at /api/v1/analytics/reports", () => {
         renamed: "Spend",
         deleted: { id, name: "Spend" },
         dashboardsBoard: { status: 404, code: "dashboard_not_found" },
-        headers: answers.map(() => [null, null, null]),
+        headers: answers.map(() => ["true", '</api/v1/dashboards>; rel="successor-version"', null]),
       });
     }
   });

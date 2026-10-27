@@ -28,7 +28,7 @@ const BOARD_TAGS = ["Analytics / LangWatchQL"];
 /** A missing id, another project's board and an Analytics Reports board alike. */
 const boardNotFoundResponse: Record<404, RouteResponse> = {
   404: {
-    description: "No Dashboards board with this id in this project",
+    description: "No dashboard with this id in this project",
     content: { "application/json": { schema: resolver(apiErrorSchema) } },
   },
 };
@@ -51,13 +51,13 @@ export const boardProjectRest = defineRestRouter(DashboardApi)
   .withPermission("analytics:view")
   .withOutput(boardListSchema)
   .withDocs({
-    summary: "List Dashboards boards",
+    summary: "List dashboards",
     description:
-      "Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports boards are listed by /api/v1/analytics/reports instead.",
+      "Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports are listed by /api/v1/analytics/reports instead.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
-      200: { description: "The project's Dashboards boards" },
+      200: { description: "The project's dashboards" },
     },
   })
   .handle(async ({ app, scope, actor }) => {
@@ -77,29 +77,29 @@ export const boardProjectRest = defineRestRouter(DashboardApi)
   })
 
   .get(
-    "/api/v1/projects/:projectId/analytics/boards/:boardId",
-    "getApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId",
+    "/api/v1/projects/:projectId/analytics/boards/:dashboardId",
+    "getApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId",
   )
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(boardParamsSchema)
   .withPermission("analytics:view")
   .withOutput(boardResourceSchema)
   .withDocs({
-    summary: "Get a Dashboards board",
+    summary: "Get a dashboard",
     description:
-      "Returns one board of the Dashboards area. A board saved in another project, or one only Analytics Reports holds, is reported as not found.",
+      "Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only Analytics Reports holds, is reported as not found.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
       ...boardNotFoundResponse,
-      200: { description: "The Dashboards board" },
+      200: { description: "The dashboard" },
     },
   })
   .handle(async ({ app, input, scope, actor }) => {
     const projectId = scope.id;
     const board = await app.getBoard({
       projectId,
-      dashboardId: input.boardId,
+      dashboardId: input.dashboardId,
       ...viewerOfActor({ actor }),
     });
     const links = await app.getBoardLinks({ projectId, dashboardIds: [board.id] });

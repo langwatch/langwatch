@@ -4,7 +4,7 @@
  * deletes the widget it just created.
  */
 
-import { createBoardWidget } from "../langwatch-api-boards.js";
+import { createWidgetOnDashboard } from "../langwatch-api-boards.js";
 import {
   assignDashboardWidgetToDashboard,
   createDashboardWidget,
@@ -30,8 +30,8 @@ export async function handleAddDashboardWidget(params: AddDashboardWidgetParams)
   const queries = normalizeDashboardWidgetQueries({ queries: params.queries });
 
   const widget = (await isOnBoardRoutes({ dashboardId: params.dashboardId }))
-    ? await createBoardWidget({
-        boardId: params.dashboardId,
+    ? await createWidgetOnDashboard({
+        dashboardId: params.dashboardId,
         name: params.name,
         code: params.code,
         queries,

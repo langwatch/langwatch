@@ -3,7 +3,7 @@
  * the id `add_dashboard_widget` and `update_dashboard_widget` take.
  */
 
-import { listBoards, listProjectBoards } from "../langwatch-api-boards.js";
+import { listDashboards, listProjectDashboards } from "../langwatch-api-boards.js";
 import { getCurrentProject } from "../langwatch-api-projects.js";
 import { LangWatchApiError } from "../langwatch-api.js";
 
@@ -13,11 +13,11 @@ import { LangWatchApiError } from "../langwatch-api.js";
  */
 async function boardsOfProject() {
   try {
-    return await listBoards();
+    return await listDashboards();
   } catch (error) {
     if (!(error instanceof LangWatchApiError && error.status === 404)) throw error;
     const project = await getCurrentProject();
-    return listProjectBoards({ projectId: project.id });
+    return listProjectDashboards({ projectId: project.id });
   }
 }
 

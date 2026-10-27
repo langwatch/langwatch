@@ -80,7 +80,7 @@ describe("listDashboardWidgetBoardsCommand()", () => {
       return { list: mockListBoards } as unknown as BoardsApiService;
     });
     vi.mocked(DashboardWidgetsApiService).mockImplementation(function () {
-      return { listBoards: mockListProjectBoards } as unknown as DashboardWidgetsApiService;
+      return { listDashboards: mockListProjectBoards } as unknown as DashboardWidgetsApiService;
     });
     consoleSpy = vi.spyOn(console, "log").mockImplementation(noop);
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);

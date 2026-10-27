@@ -12,13 +12,13 @@ import type { paths } from "@/internal/generated/openapi/api-client";
 export type DashboardWidget =
   paths["/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
-/** A Dashboards board a widget can be added to, as the boards list answers it. */
-export type DashboardBoard =
+/** A dashboard a widget can be added to, as the dashboards list answers it. */
+export type DashboardListItem =
   paths["/api/v1/projects/{projectId}/analytics/boards"]["get"]["responses"]["200"]["content"]["application/json"]["data"][number];
 
-/** One Dashboards board, as the board route answers it. */
-export type DashboardBoardDetail =
-  paths["/api/v1/projects/{projectId}/analytics/boards/{boardId}"]["get"]["responses"]["200"]["content"]["application/json"];
+/** One dashboard, as the dashboard route answers it. */
+export type Dashboard =
+  paths["/api/v1/projects/{projectId}/analytics/boards/{dashboardId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 /** One named LangWatchQL query a widget may run, as a create/update submits it. */
 export type DashboardWidgetQueryInput =
@@ -188,26 +188,26 @@ export class DashboardWidgetsApiService {
     return data as unknown as DashboardWidget;
   }
 
-  /** The Dashboards boards a widget can be added to; an Analytics Reports board is not one. */
-  async listBoards(): Promise<{ data: DashboardBoard[] }> {
+  /** The dashboards a widget can be added to; an Analytics Report is not one. */
+  async listDashboards(): Promise<{ data: DashboardListItem[] }> {
     const projectId = this.projectId("list dashboards");
     const { data, error, response } = await this.apiClient.GET(
       "/api/v1/projects/{projectId}/analytics/boards",
       { params: { path: { projectId } } },
     );
     if (error) this.handleApiError({ operation: "list dashboards", error, response });
-    return data as unknown as { data: DashboardBoard[] };
+    return data as unknown as { data: DashboardListItem[] };
   }
 
-  /** One Dashboards board by id; an Analytics Reports board answers 404. */
-  async getBoard(id: string): Promise<DashboardBoardDetail> {
+  /** One dashboard by id; an Analytics Report answers 404. */
+  async getDashboard(id: string): Promise<Dashboard> {
     const projectId = await this.projectIdOrKeyProject(`get dashboard "${id}"`);
     const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/projects/{projectId}/analytics/boards/{boardId}",
-      { params: { path: { projectId, boardId: id } } },
+      "/api/v1/projects/{projectId}/analytics/boards/{dashboardId}",
+      { params: { path: { projectId, dashboardId: id } } },
     );
     if (error) this.handleApiError({ operation: `get dashboard "${id}"`, error, response });
-    return data as unknown as DashboardBoardDetail;
+    return data as unknown as Dashboard;
   }
 
   /** Adds a widget to a dashboard at the next free row, keeping its size. */

@@ -7,7 +7,7 @@ import {
 } from "@/client-sdk/services/boards/boards-api.service";
 import {
   DashboardWidgetsApiService,
-  type DashboardBoard,
+  type DashboardListItem,
 } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
@@ -24,12 +24,12 @@ const isNotFound = (error: unknown): boolean =>
  * /api/v1/dashboards first; it answers 404 while Dashboards is off (or on a server without it),
  * and only then the project-path list, which answers either way.
  */
-async function listBoards(): Promise<{ data: (BoardListItem | DashboardBoard)[] }> {
+async function listBoards(): Promise<{ data: (BoardListItem | DashboardListItem)[] }> {
   try {
     return await new BoardsApiService().list();
   } catch (error) {
     if (!isNotFound(error)) throw error;
-    return new DashboardWidgetsApiService().listBoards();
+    return new DashboardWidgetsApiService().listDashboards();
   }
 }
 

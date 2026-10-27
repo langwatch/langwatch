@@ -1,4 +1,4 @@
-import { getBoard, getProjectBoard } from "../langwatch-api-boards.js";
+import { getDashboard, getProjectDashboard } from "../langwatch-api-boards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
 
 const isNotFound = (error: unknown) => error instanceof LangWatchApiError && error.status === 404;
@@ -10,7 +10,7 @@ const isNotFound = (error: unknown) => error instanceof LangWatchApiError && err
  */
 export async function isOnBoardRoutes({ dashboardId }: { dashboardId: string }): Promise<boolean> {
   try {
-    await getBoard({ boardId: dashboardId });
+    await getDashboard({ dashboardId });
     return true;
   } catch (error) {
     if (isNotFound(error)) return false;
@@ -30,7 +30,7 @@ export async function assertProjectDashboardExists({
   dashboardId: string;
 }): Promise<void> {
   try {
-    await getProjectBoard({ projectId, boardId: dashboardId });
+    await getProjectDashboard({ projectId, dashboardId });
   } catch (error) {
     if (isNotFound(error)) {
       throw new Error(

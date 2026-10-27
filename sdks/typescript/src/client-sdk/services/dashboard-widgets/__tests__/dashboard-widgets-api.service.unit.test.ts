@@ -29,7 +29,7 @@ describe("DashboardWidgetsApiService", () => {
         projectId: "project_1",
       });
 
-      const { data } = await service.listBoards();
+      const { data } = await service.listDashboards();
 
       expect(data).toEqual([board]);
       expect(GET).toHaveBeenCalledWith("/api/v1/projects/{projectId}/analytics/boards", {
@@ -38,7 +38,7 @@ describe("DashboardWidgetsApiService", () => {
     });
   });
 
-  describe("getBoard()", () => {
+  describe("getDashboard()", () => {
     it("reads one board by its id on the project route", async () => {
       const GET = vi.fn().mockResolvedValue({ data: { id: "board_1" }, error: undefined });
       const service = new DashboardWidgetsApiService({
@@ -46,11 +46,14 @@ describe("DashboardWidgetsApiService", () => {
         projectId: "project_1",
       });
 
-      await service.getBoard("board_1");
+      await service.getDashboard("board_1");
 
-      expect(GET).toHaveBeenCalledWith("/api/v1/projects/{projectId}/analytics/boards/{boardId}", {
-        params: { path: { projectId: "project_1", boardId: "board_1" } },
-      });
+      expect(GET).toHaveBeenCalledWith(
+        "/api/v1/projects/{projectId}/analytics/boards/{dashboardId}",
+        {
+          params: { path: { projectId: "project_1", dashboardId: "board_1" } },
+        },
+      );
     });
 
     describe("when only an API key is set", () => {
@@ -66,13 +69,13 @@ describe("DashboardWidgetsApiService", () => {
           .mockResolvedValueOnce({ data: { id: "key_project" } })
           .mockResolvedValueOnce({ data: { id: "board_1" } });
 
-        await service(GET).getBoard("board_1");
+        await service(GET).getDashboard("board_1");
 
         expect(GET).toHaveBeenNthCalledWith(1, "/api/v1/me/project");
         expect(GET).toHaveBeenNthCalledWith(
           2,
-          "/api/v1/projects/{projectId}/analytics/boards/{boardId}",
-          { params: { path: { projectId: "key_project", boardId: "board_1" } } },
+          "/api/v1/projects/{projectId}/analytics/boards/{dashboardId}",
+          { params: { path: { projectId: "key_project", dashboardId: "board_1" } } },
         );
       });
     });

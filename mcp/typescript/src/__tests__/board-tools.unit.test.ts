@@ -6,16 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { initConfig } from "../config.ts";
 import {
-  createBoard,
-  createBoardWidget,
-  deleteBoard,
-  deleteBoardWidget,
-  getBoard,
-  getBoardWidget,
-  listBoards,
-  listBoardWidgets,
-  updateBoard,
-  updateBoardWidget,
+  createDashboard,
+  createWidgetOnDashboard,
+  deleteDashboard,
+  deleteWidgetOnDashboard,
+  getDashboard,
+  getWidgetOnDashboard,
+  listDashboards,
+  listWidgetsOnDashboard,
+  updateDashboard,
+  updateWidgetOnDashboard,
 } from "../langwatch-api-boards.js";
 import {
   handleCreateDashboardBoard,
@@ -78,16 +78,16 @@ describe("given the board client", () => {
   it("calls /api/v1/dashboards with no project id in the path, with each verb and body", async () => {
     const calls = stubFetch({ answer: ({ method }) => (method === "DELETE" ? null : board) });
 
-    await listBoards();
-    await getBoard({ boardId: "b_1" });
-    await createBoard({ name: "Usage" });
-    await updateBoard({ boardId: "b_1", description: null });
-    await deleteBoard({ boardId: "b_1" });
-    await listBoardWidgets({ boardId: "b_1" });
-    await createBoardWidget({ boardId: "b_1", name: "Traces", code: "x", queries: [] });
-    await getBoardWidget({ boardId: "b_1", widgetId: "w_1" });
-    await updateBoardWidget({ boardId: "b_1", widgetId: "w_1", name: "P95" });
-    await deleteBoardWidget({ boardId: "b_1", widgetId: "w_1" });
+    await listDashboards();
+    await getDashboard({ dashboardId: "b_1" });
+    await createDashboard({ name: "Usage" });
+    await updateDashboard({ dashboardId: "b_1", description: null });
+    await deleteDashboard({ dashboardId: "b_1" });
+    await listWidgetsOnDashboard({ dashboardId: "b_1" });
+    await createWidgetOnDashboard({ dashboardId: "b_1", name: "Traces", code: "x", queries: [] });
+    await getWidgetOnDashboard({ dashboardId: "b_1", widgetId: "w_1" });
+    await updateWidgetOnDashboard({ dashboardId: "b_1", widgetId: "w_1", name: "P95" });
+    await deleteWidgetOnDashboard({ dashboardId: "b_1", widgetId: "w_1" });
 
     expect(calls).toEqual([
       { method: "GET", url: "/api/v1/dashboards", body: undefined },

@@ -5,11 +5,11 @@ import type {
 import { makeRequest } from "./langwatch-api.js";
 
 /**
- * A board in the Dashboards area, at `/api/v1/dashboards`; the project comes from the API key
+ * A dashboard in the Dashboards area, at `/api/v1/dashboards`; the project comes from the API key
  * (`modules/dashboard/contract/src/board-rest.schemas.ts`). Every route answers 404 while
  * Dashboards is off for the key's project. Analytics Reports live at `/api/v1/analytics/reports`.
  */
-export interface Board {
+export interface Dashboard {
   id: string;
   name: string;
   description: string | null;
@@ -20,131 +20,140 @@ export interface Board {
   platformUrl: string;
 }
 
-export interface BoardListItem extends Board {
+export interface DashboardListItem extends Dashboard {
   widgetCount: number;
 }
 
-const boardPath = (boardId: string) => `/api/v1/dashboards/${encodeURIComponent(boardId)}`;
-const widgetPath = (boardId: string, widgetId: string) =>
-  `${boardPath(boardId)}/widgets/${encodeURIComponent(widgetId)}`;
+const dashboardPath = (dashboardId: string) =>
+  `/api/v1/dashboards/${encodeURIComponent(dashboardId)}`;
+const widgetPath = (dashboardId: string, widgetId: string) =>
+  `${dashboardPath(dashboardId)}/widgets/${encodeURIComponent(widgetId)}`;
 
-/** The key's project's Dashboards boards, each with how many widgets it holds. */
-export async function listBoards(): Promise<{ data: BoardListItem[] }> {
-  return makeRequest("GET", "/api/v1/dashboards") as Promise<{ data: BoardListItem[] }>;
+/** The key's project's dashboards, each with how many widgets it holds. */
+export async function listDashboards(): Promise<{ data: DashboardListItem[] }> {
+  return makeRequest("GET", "/api/v1/dashboards") as Promise<{ data: DashboardListItem[] }>;
 }
 
 /** The same list at the deprecated project path, which answers while Dashboards is off too. */
-export async function listProjectBoards({
+export async function listProjectDashboards({
   projectId,
 }: {
   projectId: string;
-}): Promise<{ data: BoardListItem[] }> {
+}): Promise<{ data: DashboardListItem[] }> {
   return makeRequest(
     "GET",
     `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/boards`,
-  ) as Promise<{ data: BoardListItem[] }>;
+  ) as Promise<{ data: DashboardListItem[] }>;
 }
 
-/** One board at the deprecated project path, which answers while Dashboards is off too. */
-export async function getProjectBoard({
+/** One dashboard at the deprecated project path, which answers while Dashboards is off too. */
+export async function getProjectDashboard({
   projectId,
-  boardId,
+  dashboardId,
 }: {
   projectId: string;
-  boardId: string;
-}): Promise<Board> {
+  dashboardId: string;
+}): Promise<Dashboard> {
   return makeRequest(
     "GET",
-    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/boards/${encodeURIComponent(boardId)}`,
-  ) as Promise<Board>;
+    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/boards/${encodeURIComponent(dashboardId)}`,
+  ) as Promise<Dashboard>;
 }
 
-/** Reads one Dashboards board; a board in another project, or only in Reports, answers 404. */
-export async function getBoard({ boardId }: { boardId: string }): Promise<Board> {
-  return makeRequest("GET", boardPath(boardId)) as Promise<Board>;
+/** Reads one dashboard; a dashboard in another project, or only in Reports, answers 404. */
+export async function getDashboard({ dashboardId }: { dashboardId: string }): Promise<Dashboard> {
+  return makeRequest("GET", dashboardPath(dashboardId)) as Promise<Dashboard>;
 }
 
-export async function createBoard({ name }: { name: string }): Promise<Board> {
-  return makeRequest("POST", "/api/v1/dashboards", { name }) as Promise<Board>;
+export async function createDashboard({ name }: { name: string }): Promise<Dashboard> {
+  return makeRequest("POST", "/api/v1/dashboards", { name }) as Promise<Dashboard>;
 }
 
 /** A field left out keeps its value; a `null` description clears it. */
-export async function updateBoard({
-  boardId,
+export async function updateDashboard({
+  dashboardId,
   ...changes
 }: {
-  boardId: string;
+  dashboardId: string;
   name?: string;
   description?: string | null;
-}): Promise<Board> {
-  return makeRequest("PATCH", boardPath(boardId), changes) as Promise<Board>;
+}): Promise<Dashboard> {
+  return makeRequest("PATCH", dashboardPath(dashboardId), changes) as Promise<Dashboard>;
 }
 
-/** Deletes the board with the widgets on it. */
-export async function deleteBoard({
-  boardId,
+/** Deletes the dashboard with the widgets on it. */
+export async function deleteDashboard({
+  dashboardId,
 }: {
-  boardId: string;
+  dashboardId: string;
 }): Promise<{ id: string; name: string }> {
-  return makeRequest("DELETE", boardPath(boardId)) as Promise<{ id: string; name: string }>;
+  return makeRequest("DELETE", dashboardPath(dashboardId)) as Promise<{ id: string; name: string }>;
 }
 
-export async function listBoardWidgets({
-  boardId,
+export async function listWidgetsOnDashboard({
+  dashboardId,
 }: {
-  boardId: string;
+  dashboardId: string;
 }): Promise<{ data: DashboardWidget[] }> {
-  return makeRequest("GET", `${boardPath(boardId)}/widgets`) as Promise<{
+  return makeRequest("GET", `${dashboardPath(dashboardId)}/widgets`) as Promise<{
     data: DashboardWidget[];
   }>;
 }
 
-/** Saves a widget placed on this board at the next free row. */
-export async function createBoardWidget({
-  boardId,
+/** Saves a widget placed on this dashboard at the next free row. */
+export async function createWidgetOnDashboard({
+  dashboardId,
   ...data
 }: {
-  boardId: string;
+  dashboardId: string;
   name: string;
   code: string;
   queries: DashboardWidgetQueryInput[];
   description?: string;
 }): Promise<DashboardWidget> {
-  return makeRequest("POST", `${boardPath(boardId)}/widgets`, data) as Promise<DashboardWidget>;
+  return makeRequest(
+    "POST",
+    `${dashboardPath(dashboardId)}/widgets`,
+    data,
+  ) as Promise<DashboardWidget>;
 }
 
-/** A widget on any other board answers 404. */
-export async function getBoardWidget({
-  boardId,
+/** A widget on any other dashboard answers 404. */
+export async function getWidgetOnDashboard({
+  dashboardId,
   widgetId,
 }: {
-  boardId: string;
+  dashboardId: string;
   widgetId: string;
 }): Promise<DashboardWidget> {
-  return makeRequest("GET", widgetPath(boardId, widgetId)) as Promise<DashboardWidget>;
+  return makeRequest("GET", widgetPath(dashboardId, widgetId)) as Promise<DashboardWidget>;
 }
 
-export async function updateBoardWidget({
-  boardId,
+export async function updateWidgetOnDashboard({
+  dashboardId,
   widgetId,
   ...changes
 }: {
-  boardId: string;
+  dashboardId: string;
   widgetId: string;
   name?: string;
   code?: string;
   queries?: DashboardWidgetQueryInput[];
   description?: string;
 }): Promise<DashboardWidget> {
-  return makeRequest("PATCH", widgetPath(boardId, widgetId), changes) as Promise<DashboardWidget>;
+  return makeRequest(
+    "PATCH",
+    widgetPath(dashboardId, widgetId),
+    changes,
+  ) as Promise<DashboardWidget>;
 }
 
-export async function deleteBoardWidget({
-  boardId,
+export async function deleteWidgetOnDashboard({
+  dashboardId,
   widgetId,
 }: {
-  boardId: string;
+  dashboardId: string;
   widgetId: string;
 }): Promise<void> {
-  await makeRequest("DELETE", widgetPath(boardId, widgetId));
+  await makeRequest("DELETE", widgetPath(dashboardId, widgetId));
 }

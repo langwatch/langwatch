@@ -6,38 +6,38 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_fault import (
-    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault,
+from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_400_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Fault,
 )
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_meta import (
-        GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta,
+    from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_400_meta import (
+        GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Meta,
     )
-    from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_trace import (
-        GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace,
+    from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_400_trace import (
+        GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Trace,
     )
 
 
-T = TypeVar("T", bound="GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400")
+T = TypeVar("T", bound="GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400")
 
 
 @_attrs_define
-class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400:
+class GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400:
     """
     Attributes:
         type_ (str):
         code (str):
         message (str):
         retryable (bool):
-        meta (GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta | Unset):
+        meta (GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Meta | Unset):
         trace_id (str | Unset):
         span_id (str | Unset):
-        trace (GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace | Unset):
+        trace (GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Trace | Unset):
         tips (list[str] | Unset):
         docs_url (str | Unset):
-        fault (GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault | Unset):
+        fault (GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Fault | Unset):
         reasons (list[Any] | Unset):
     """
 
@@ -45,13 +45,13 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400:
     code: str
     message: str
     retryable: bool
-    meta: GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta | Unset = UNSET
+    meta: GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Meta | Unset = UNSET
     trace_id: str | Unset = UNSET
     span_id: str | Unset = UNSET
-    trace: GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace | Unset = UNSET
+    trace: GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Trace | Unset = UNSET
     tips: list[str] | Unset = UNSET
     docs_url: str | Unset = UNSET
-    fault: GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault | Unset = UNSET
+    fault: GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Fault | Unset = UNSET
     reasons: list[Any] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -121,11 +121,11 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_meta import (
-            GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta,
+        from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_400_meta import (
+            GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Meta,
         )
-        from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_trace import (
-            GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace,
+        from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_400_trace import (
+            GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Trace,
         )
 
         d = dict(src_dict)
@@ -138,37 +138,37 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400:
         retryable = d.pop("retryable")
 
         _meta = d.pop("meta", UNSET)
-        meta: GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta | Unset
+        meta: GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Meta | Unset
         if isinstance(_meta, Unset):
             meta = UNSET
         else:
-            meta = GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta.from_dict(_meta)
+            meta = GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Meta.from_dict(_meta)
 
         trace_id = d.pop("trace_id", UNSET)
 
         span_id = d.pop("span_id", UNSET)
 
         _trace = d.pop("trace", UNSET)
-        trace: GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace | Unset
+        trace: GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Trace | Unset
         if isinstance(_trace, Unset):
             trace = UNSET
         else:
-            trace = GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace.from_dict(_trace)
+            trace = GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Trace.from_dict(_trace)
 
         tips = cast(list[str], d.pop("tips", UNSET))
 
         docs_url = d.pop("docs_url", UNSET)
 
         _fault = d.pop("fault", UNSET)
-        fault: GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault | Unset
+        fault: GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Fault | Unset
         if isinstance(_fault, Unset):
             fault = UNSET
         else:
-            fault = GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault(_fault)
+            fault = GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse400Fault(_fault)
 
         reasons = cast(list[Any], d.pop("reasons", UNSET))
 
-        get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400 = cls(
+        get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_400 = cls(
             type_=type_,
             code=code,
             message=message,
@@ -183,8 +183,8 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400:
             reasons=reasons,
         )
 
-        get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400.additional_properties = d
-        return get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400
+        get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_400.additional_properties = d
+        return get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_400
 
     @property
     def additional_keys(self) -> list[str]:

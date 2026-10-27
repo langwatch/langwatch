@@ -34,7 +34,7 @@ export const getDashboardCommand = async (id: string): Promise<CommandResult | v
       // The Reports API never holds a Dashboards board, so its 404 is not final.
       if (!isNotFound(error)) throw error;
       try {
-        return { ...(await new DashboardWidgetsApiService().getBoard(id)), graphs: [] };
+        return { ...(await new DashboardWidgetsApiService().getDashboard(id)), graphs: [] };
       } catch (boardError) {
         // Only the board route's own 404 means "neither area holds it".
         throw isNotFound(boardError) ? error : boardError;

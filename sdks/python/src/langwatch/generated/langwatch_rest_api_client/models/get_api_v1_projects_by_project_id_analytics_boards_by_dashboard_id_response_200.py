@@ -5,21 +5,21 @@ from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
-from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200_scope import (
-    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope,
+from ..models.get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_200_scope import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse200Scope,
 )
 
-T = TypeVar("T", bound="GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200")
+T = TypeVar("T", bound="GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse200")
 
 
 @_attrs_define
-class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200:
+class GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse200:
     """
     Attributes:
         id (str):
         name (str):
         description (None | str):
-        scope (GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope):
+        scope (GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse200Scope):
         created_by_id (None | str):
         created_at (str):
         updated_at (str):
@@ -29,7 +29,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200:
     id: str
     name: str
     description: None | str
-    scope: GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope
+    scope: GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse200Scope
     created_by_id: None | str
     created_at: str
     updated_at: str
@@ -85,7 +85,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200:
 
         description = _parse_description(d.pop("description"))
 
-        scope = GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope(d.pop("scope"))
+        scope = GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse200Scope(d.pop("scope"))
 
         def _parse_created_by_id(data: object) -> None | str:
             if data is None:
@@ -100,7 +100,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200:
 
         platform_url = d.pop("platformUrl")
 
-        get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200 = cls(
+        get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_200 = cls(
             id=id,
             name=name,
             description=description,
@@ -111,4 +111,4 @@ class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200:
             platform_url=platform_url,
         )
 
-        return get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200
+        return get_api_v1_projects_by_project_id_analytics_boards_by_dashboard_id_response_200

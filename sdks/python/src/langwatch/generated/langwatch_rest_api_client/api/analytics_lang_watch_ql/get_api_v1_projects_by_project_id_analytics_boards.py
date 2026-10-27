@@ -109,11 +109,11 @@ def sync_detailed(
     | GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403
     | GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500
 ]:
-    """List Dashboards boards
+    """List dashboards
 
-     Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a
-    board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics
-    Reports boards are listed by /api/v1/analytics/reports instead.
+     Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a
+    dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it.
+    Analytics Reports are listed by /api/v1/analytics/reports instead.
 
     Args:
         project_id (str):
@@ -149,11 +149,11 @@ def sync(
     | GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500
     | None
 ):
-    """List Dashboards boards
+    """List dashboards
 
-     Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a
-    board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics
-    Reports boards are listed by /api/v1/analytics/reports instead.
+     Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a
+    dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it.
+    Analytics Reports are listed by /api/v1/analytics/reports instead.
 
     Args:
         project_id (str):
@@ -183,11 +183,11 @@ async def asyncio_detailed(
     | GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403
     | GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500
 ]:
-    """List Dashboards boards
+    """List dashboards
 
-     Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a
-    board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics
-    Reports boards are listed by /api/v1/analytics/reports instead.
+     Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a
+    dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it.
+    Analytics Reports are listed by /api/v1/analytics/reports instead.
 
     Args:
         project_id (str):
@@ -221,11 +221,11 @@ async def asyncio(
     | GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500
     | None
 ):
-    """List Dashboards boards
+    """List dashboards
 
-     Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a
-    board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics
-    Reports boards are listed by /api/v1/analytics/reports instead.
+     Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a
+    dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it.
+    Analytics Reports are listed by /api/v1/analytics/reports instead.
 
     Args:
         project_id (str):

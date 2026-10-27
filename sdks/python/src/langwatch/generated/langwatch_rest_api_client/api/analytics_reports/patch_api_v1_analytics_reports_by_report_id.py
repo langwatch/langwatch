@@ -68,7 +68,8 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PatchApiV1AnalyticsReportsByReportIdBody,
 ) -> Response[PatchApiV1AnalyticsReportsByReportIdResponse200]:
-    """Rename a dashboard
+    """Rename a dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at
+    /api/v1/dashboards
 
     Args:
         report_id (str):
@@ -100,7 +101,8 @@ def sync(
     client: AuthenticatedClient,
     body: PatchApiV1AnalyticsReportsByReportIdBody,
 ) -> PatchApiV1AnalyticsReportsByReportIdResponse200 | None:
-    """Rename a dashboard
+    """Rename a dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at
+    /api/v1/dashboards
 
     Args:
         report_id (str):
@@ -127,7 +129,8 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PatchApiV1AnalyticsReportsByReportIdBody,
 ) -> Response[PatchApiV1AnalyticsReportsByReportIdResponse200]:
-    """Rename a dashboard
+    """Rename a dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at
+    /api/v1/dashboards
 
     Args:
         report_id (str):
@@ -157,7 +160,8 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PatchApiV1AnalyticsReportsByReportIdBody,
 ) -> PatchApiV1AnalyticsReportsByReportIdResponse200 | None:
-    """Rename a dashboard
+    """Rename a dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at
+    /api/v1/dashboards
 
     Args:
         report_id (str):

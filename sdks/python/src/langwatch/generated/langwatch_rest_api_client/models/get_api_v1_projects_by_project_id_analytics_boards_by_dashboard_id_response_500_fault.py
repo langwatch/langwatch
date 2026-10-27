@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault(str, Enum):
+class GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse500Fault(str, Enum):
     CUSTOMER = "customer"
     PLATFORM = "platform"
     PRESUMED_PLATFORM = "presumed_platform"

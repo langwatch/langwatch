@@ -1,4 +1,4 @@
-import { listDashboards as apiListDashboards } from "../langwatch-api-dashboards.ts";
+import { listAnalyticsReports as apiListDashboards } from "../langwatch-api-dashboards.ts";
 
 export async function handleListDashboards(): Promise<string> {
   const result = await apiListDashboards();

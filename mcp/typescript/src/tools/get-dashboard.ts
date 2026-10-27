@@ -1,13 +1,11 @@
-import { getBoard } from "../langwatch-api-boards.js";
-import { getDashboard as apiGetDashboard } from "../langwatch-api-dashboards.ts";
-import { getCurrentProject } from "../langwatch-api-projects.js";
+import { getDashboard } from "../langwatch-api-boards.js";
+import { getAnalyticsReport } from "../langwatch-api-dashboards.ts";
 import { LangWatchApiError } from "../langwatch-api.js";
 
 /** A Dashboards board has no Reports graphs; this renders what the board route answers. */
 async function describeBoardOrThrow({ id, notFound }: { id: string; notFound: unknown }) {
-  const project = await getCurrentProject();
   try {
-    const board = await getBoard({ projectId: project.id, boardId: id });
+    const board = await getDashboard({ dashboardId: id });
     return [
       `# ${board.name}\n`,
       `**ID**: ${board.id}`,
@@ -25,7 +23,7 @@ async function describeBoardOrThrow({ id, notFound }: { id: string; notFound: un
 export async function handleGetDashboard(params: { id: string }): Promise<string> {
   let dashboard;
   try {
-    dashboard = await apiGetDashboard(params.id);
+    dashboard = await getAnalyticsReport(params.id);
   } catch (error) {
     // The Reports API never holds a Dashboards board, so its 404 is not final.
     if (error instanceof LangWatchApiError && error.status === 404) {

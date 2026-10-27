@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { initConfig } from "../config.ts";
-import { listDashboards } from "../langwatch-api-dashboards.ts";
+import { listAnalyticsReports } from "../langwatch-api-dashboards.ts";
 
 const SERVER_SRC = resolve(__dirname, "..");
 
@@ -86,7 +86,7 @@ describe("given the request paths the MCP server builds", () => {
         .mockResolvedValue(new Response(JSON.stringify({ dashboards: [] }), { status: 200 }));
       globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
-      await listDashboards();
+      await listAnalyticsReports();
 
       expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://app.example.com/api/v1/analytics/reports");
     });

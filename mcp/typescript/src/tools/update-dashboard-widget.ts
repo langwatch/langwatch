@@ -4,7 +4,7 @@
  * Spec: modules/dashboard/specs/dashboard-widget-mcp.feature
  */
 
-import { getBoardWidget, updateBoardWidget } from "../langwatch-api-boards.js";
+import { getWidgetOnDashboard, updateWidgetOnDashboard } from "../langwatch-api-boards.js";
 import {
   type DashboardWidget,
   getDashboardWidget,
@@ -53,8 +53,8 @@ export async function handleUpdateDashboardWidget(
 
   let widget: DashboardWidget;
   if (await isOnBoardRoutes({ dashboardId })) {
-    const current = await getWidgetOnDashboard({ widgetId, dashboardId });
-    widget = await updateBoardWidget({ boardId: dashboardId, widgetId: current.id, ...changes });
+    const current = await widgetOnDashboardOrRefused({ widgetId, dashboardId });
+    widget = await updateWidgetOnDashboard({ dashboardId, widgetId: current.id, ...changes });
   } else {
     const project = await getCurrentProject();
     await assertProjectDashboardExists({ projectId: project.id, dashboardId });
@@ -78,7 +78,7 @@ export async function handleUpdateDashboardWidget(
 }
 
 /** The widget, refused by id when it is not on this dashboard (the board route answers 404). */
-async function getWidgetOnDashboard({
+async function widgetOnDashboardOrRefused({
   widgetId,
   dashboardId,
 }: {
@@ -86,7 +86,7 @@ async function getWidgetOnDashboard({
   dashboardId: string;
 }): Promise<DashboardWidget> {
   try {
-    return await getBoardWidget({ boardId: dashboardId, widgetId });
+    return await getWidgetOnDashboard({ dashboardId, widgetId });
   } catch (error) {
     if (error instanceof LangWatchApiError && error.status === 404) {
       throw new Error(

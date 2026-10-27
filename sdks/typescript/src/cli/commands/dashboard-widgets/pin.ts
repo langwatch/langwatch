@@ -1,7 +1,7 @@
 import chalk from "chalk";
 
 import {
-  type DashboardBoard,
+  type DashboardListItem,
   DashboardWidgetsApiError,
   DashboardWidgetsApiService,
 } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
@@ -57,8 +57,8 @@ async function resolveDashboardRef({
 }: {
   widgets: DashboardWidgetsApiService;
   ref: string;
-}): Promise<DashboardBoard> {
-  const { data } = await widgets.listBoards();
+}): Promise<DashboardListItem> {
+  const { data } = await widgets.listDashboards();
   const byId = data.find((d) => d.id === ref);
   if (byId) return byId;
 

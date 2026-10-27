@@ -264,10 +264,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all dashboards for the project with graph counts */
+        /**
+         * @deprecated
+         * @description List all dashboards for the project with graph counts The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         */
         get: operations["getApiV1AnalyticsReports"];
         put?: never;
-        /** @description Create a new dashboard */
+        /**
+         * @deprecated
+         * @description Create a new dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         */
         post: operations["postApiV1AnalyticsReports"];
         delete?: never;
         options?: never;
@@ -282,15 +288,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get a dashboard by its id, including its graphs */
+        /**
+         * @deprecated
+         * @description Get a dashboard by its id, including its graphs The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         */
         get: operations["getApiV1AnalyticsReportsByReportId"];
         put?: never;
         post?: never;
-        /** @description Delete a dashboard and its graphs (hard delete, cascade) */
+        /**
+         * @deprecated
+         * @description Delete a dashboard and its graphs (hard delete, cascade) The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         */
         delete: operations["deleteApiV1AnalyticsReportsByReportId"];
         options?: never;
         head?: never;
-        /** @description Rename a dashboard */
+        /**
+         * @deprecated
+         * @description Rename a dashboard The Analytics Reports boards API is deprecated; use the Dashboards API at /api/v1/dashboards
+         */
         patch: operations["patchApiV1AnalyticsReportsByReportId"];
         trace?: never;
     };
@@ -374,14 +389,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List boards
-         * @description Lists the Dashboards boards of the key's project, each with how many widgets it holds.
+         * List dashboards
+         * @description Lists the dashboards of the key's project, each with how many widgets it holds.
          */
         get: operations["getApiDashboards"];
         put?: never;
         /**
-         * Create a board
-         * @description Creates an empty Dashboards board in the key's project. Add widgets to it with POST /api/v1/dashboards/{dashboardId}/widgets.
+         * Create a dashboard
+         * @description Creates an empty dashboard in the key's project. Add widgets to it with POST /api/v1/dashboards/{dashboardId}/widgets.
          */
         post: operations["postApiDashboards"];
         delete?: never;
@@ -398,22 +413,22 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a board
-         * @description Returns one Dashboards board.
+         * Get a dashboard
+         * @description Returns one dashboard.
          */
         get: operations["getApiDashboardsByDashboardId"];
         put?: never;
         post?: never;
         /**
-         * Delete a board
-         * @description Deletes a board together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted board's id and name.
+         * Delete a dashboard
+         * @description Deletes a dashboard together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted dashboard's id and name.
          */
         delete: operations["deleteApiDashboardsByDashboardId"];
         options?: never;
         head?: never;
         /**
-         * Update a board
-         * @description Changes a board's name or description; a field the body leaves out keeps its value, and a null description clears it.
+         * Update a dashboard
+         * @description Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null description clears it.
          */
         patch: operations["patchApiDashboardsByDashboardId"];
         trace?: never;
@@ -426,14 +441,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List a board's widgets
-         * @description Lists the widgets on one board, each with its React source and named queries.
+         * List a dashboard's widgets
+         * @description Lists the widgets on one dashboard, each with its React source and named queries.
          */
         get: operations["getApiDashboardsByDashboardIdWidgets"];
         put?: never;
         /**
-         * Create a widget on a board
-         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this board at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.
+         * Create a widget on a dashboard
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.
          */
         post: operations["postApiDashboardsByDashboardIdWidgets"];
         delete?: never;
@@ -450,21 +465,21 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a widget on a board
-         * @description Returns one widget on this board with its React source and named queries.
+         * Get a widget on a dashboard
+         * @description Returns one widget on this dashboard with its React source and named queries.
          */
         get: operations["getApiDashboardsByDashboardIdWidgetsByWidgetId"];
         put?: never;
         post?: never;
         /**
-         * Delete a widget on a board
-         * @description Deletes one widget on this board. Answers 204 with no body.
+         * Delete a widget on a dashboard
+         * @description Deletes one widget on this dashboard. Answers 204 with no body.
          */
         delete: operations["deleteApiDashboardsByDashboardIdWidgetsByWidgetId"];
         options?: never;
         head?: never;
         /**
-         * Update a widget on a board
+         * Update a widget on a dashboard
          * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.
          */
         patch: operations["patchApiDashboardsByDashboardIdWidgetsByWidgetId"];
@@ -478,8 +493,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Dashboards boards
-         * @description Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports boards are listed by /api/v1/analytics/reports instead.
+         * List dashboards
+         * @description Lists this project's dashboards in the Dashboards area, each with how many widgets it holds. Pass a dashboard's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports are listed by /api/v1/analytics/reports instead.
          */
         get: operations["getApiV1ProjectsByProjectIdAnalyticsBoards"];
         put?: never;
@@ -490,7 +505,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{projectId}/analytics/boards/{boardId}": {
+    "/api/v1/projects/{projectId}/analytics/boards/{dashboardId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -498,10 +513,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a Dashboards board
-         * @description Returns one board of the Dashboards area. A board saved in another project, or one only Analytics Reports holds, is reported as not found.
+         * Get a dashboard
+         * @description Returns one dashboard of the Dashboards area. A dashboard saved in another project, or one only Analytics Reports holds, is reported as not found.
          */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId"];
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6392,7 +6407,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No dashboard widget with this id, or no Dashboards board with this id, in this project. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            /** @description No dashboard widget with this id, or no dashboard with this id, in this project. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6463,7 +6478,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The project's boards */
+            /** @description The project's dashboards */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6622,7 +6637,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The board was created */
+            /** @description The dashboard was created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -6774,7 +6789,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The board */
+            /** @description The dashboard */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6883,7 +6898,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6956,7 +6971,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The board was deleted */
+            /** @description The dashboard was deleted */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7058,7 +7073,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7138,7 +7153,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The updated board */
+            /** @description The updated dashboard */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7247,7 +7262,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7320,7 +7335,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The board's widgets */
+            /** @description The dashboard's widgets */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7462,7 +7477,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7568,7 +7583,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The widget was saved on the board */
+            /** @description The widget was saved on the dashboard */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -7708,7 +7723,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No Dashboards board with this id for this key. A board made by POST /api/v1/analytics/reports is an Analytics Reports board and is not found here. */
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7922,7 +7937,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No Dashboards board with this id, or no widget with this id on that board */
+            /** @description No dashboard with this id, or no widget with this id on that dashboard */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -8102,7 +8117,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No Dashboards board with this id, or no widget with this id on that board */
+            /** @description No dashboard with this id, or no widget with this id on that dashboard */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -8348,7 +8363,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No Dashboards board with this id, or no widget with this id on that board */
+            /** @description No dashboard with this id, or no widget with this id on that dashboard */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -8421,7 +8436,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The project's Dashboards boards */
+            /** @description The project's dashboards */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8565,19 +8580,19 @@ export interface operations {
             };
         };
     };
-    getApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId: {
+    getApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 projectId: string;
-                boardId: string;
+                dashboardId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The Dashboards board */
+            /** @description The dashboard */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8589,6 +8604,7 @@ export interface operations {
                         description: string | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+                        createdById: string | null;
                         createdAt: string;
                         updatedAt: string;
                         platformUrl: string;
@@ -8685,7 +8701,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No Dashboards board with this id in this project */
+            /** @description No dashboard with this id in this project */
             404: {
                 headers: {
                     [name: string]: unknown;

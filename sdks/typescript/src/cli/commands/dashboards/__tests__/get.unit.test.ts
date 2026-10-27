@@ -41,7 +41,7 @@ const notFound = () => new DashboardsApiError("Dashboard not found", "get", unde
 
 describe("getDashboardCommand()", () => {
   const reportsGet = vi.fn();
-  const getBoard = vi.fn();
+  const getDashboard = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,7 +49,7 @@ describe("getDashboardCommand()", () => {
       return { get: reportsGet } as unknown as DashboardsApiService;
     });
     vi.mocked(DashboardWidgetsApiService).mockImplementation(function () {
-      return { getBoard } as unknown as DashboardWidgetsApiService;
+      return { getDashboard } as unknown as DashboardWidgetsApiService;
     });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new Error(`process.exit(${code})`);
@@ -61,11 +61,11 @@ describe("getDashboardCommand()", () => {
     /** @scenario "AC8c An agent reads a Dashboards board by its id" */
     it("answers with the Dashboards board", async () => {
       reportsGet.mockRejectedValue(notFound());
-      getBoard.mockResolvedValue(board);
+      getDashboard.mockResolvedValue(board);
 
       const result = await getDashboardCommand("dashboard_v2");
 
-      expect(getBoard).toHaveBeenCalledWith("dashboard_v2");
+      expect(getDashboard).toHaveBeenCalledWith("dashboard_v2");
       expect(result).toMatchObject({ data: { id: "dashboard_v2", name: "Ops board" } });
     });
   });
@@ -73,7 +73,7 @@ describe("getDashboardCommand()", () => {
   describe("when neither area holds the id", () => {
     it("fails with the Reports error", async () => {
       reportsGet.mockRejectedValue(notFound());
-      getBoard.mockRejectedValue(notFound());
+      getDashboard.mockRejectedValue(notFound());
 
       await expect(getDashboardCommand("missing")).rejects.toThrow("process.exit(1)");
     });
@@ -82,7 +82,7 @@ describe("getDashboardCommand()", () => {
   describe("when the board route fails for another reason", () => {
     it("surfaces that error, not the Reports not found", async () => {
       reportsGet.mockRejectedValue(notFound());
-      getBoard.mockRejectedValue(
+      getDashboard.mockRejectedValue(
         new DashboardsApiError("board route exploded", "get", undefined, 500),
       );
 
@@ -96,7 +96,7 @@ describe("getDashboardCommand()", () => {
       reportsGet.mockRejectedValue(new DashboardsApiError("boom", "get", undefined, 500));
 
       await expect(getDashboardCommand("x")).rejects.toThrow("process.exit(1)");
-      expect(getBoard).not.toHaveBeenCalled();
+      expect(getDashboard).not.toHaveBeenCalled();
     });
   });
 
@@ -106,7 +106,7 @@ describe("getDashboardCommand()", () => {
 
       await getDashboardCommand("dashboard_v2");
 
-      expect(getBoard).not.toHaveBeenCalled();
+      expect(getDashboard).not.toHaveBeenCalled();
     });
   });
 });

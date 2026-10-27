@@ -1495,7 +1495,7 @@
               "api-reference/projects/get-project",
               "api-reference/projects/get-api-key",
               "api-reference/projects/list-dashboards-boards",
-              "api-reference/projects/get-a-dashboards-board",
+              "api-reference/projects/get-a-dashboard",
               "api-reference/projects/update-project",
               "api-reference/projects/regenerate-api-key",
               "api-reference/projects/archive-project"

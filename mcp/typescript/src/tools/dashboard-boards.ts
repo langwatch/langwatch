@@ -5,16 +5,16 @@
  */
 
 import {
-  type Board,
-  createBoard,
-  deleteBoard,
-  deleteBoardWidget,
-  getBoard,
-  listBoardWidgets,
-  updateBoard,
+  type Dashboard,
+  createDashboard,
+  deleteDashboard,
+  deleteWidgetOnDashboard,
+  getDashboard,
+  listWidgetsOnDashboard,
+  updateDashboard,
 } from "../langwatch-api-boards.js";
 
-function describeBoard(board: Board): string[] {
+function describeBoard(board: Dashboard): string[] {
   return [
     `**Name**: ${board.name}`,
     `**ID**: ${board.id}`,
@@ -25,12 +25,12 @@ function describeBoard(board: Board): string[] {
 }
 
 export async function handleGetDashboardBoard({ boardId }: { boardId: string }): Promise<string> {
-  const board = await getBoard({ boardId });
+  const board = await getDashboard({ dashboardId: boardId });
   return [`# ${board.name}\n`, ...describeBoard(board)].join("\n");
 }
 
 export async function handleCreateDashboardBoard({ name }: { name: string }): Promise<string> {
-  const board = await createBoard({ name });
+  const board = await createDashboard({ name });
   return [
     "Board created.\n",
     ...describeBoard(board),
@@ -51,8 +51,8 @@ export async function handleRenameDashboardBoard({
   if (name === undefined && description === undefined) {
     throw new Error("Provide at least one of name or description to change.");
   }
-  const board = await updateBoard({
-    boardId,
+  const board = await updateDashboard({
+    dashboardId: boardId,
     ...(name === undefined ? {} : { name }),
     ...(description === undefined ? {} : { description }),
   });
@@ -64,12 +64,12 @@ export async function handleDeleteDashboardBoard({
 }: {
   boardId: string;
 }): Promise<string> {
-  const deleted = await deleteBoard({ boardId });
+  const deleted = await deleteDashboard({ dashboardId: boardId });
   return `Board "${deleted.name}" deleted with its widgets (ID: ${deleted.id}).`;
 }
 
 export async function handleListBoardWidgets({ boardId }: { boardId: string }): Promise<string> {
-  const { data: widgets } = await listBoardWidgets({ boardId });
+  const { data: widgets } = await listWidgetsOnDashboard({ dashboardId: boardId });
   if (widgets.length === 0) return `Board "${boardId}" has no widgets.`;
 
   return [
@@ -90,6 +90,6 @@ export async function handleDeleteDashboardWidget({
   boardId: string;
   widgetId: string;
 }): Promise<string> {
-  await deleteBoardWidget({ boardId, widgetId });
+  await deleteWidgetOnDashboard({ dashboardId: boardId, widgetId });
   return `Widget "${widgetId}" deleted from board "${boardId}".`;
 }
