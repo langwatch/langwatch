@@ -34,7 +34,6 @@ let issuer: string;
 let signingKey: KeyObject;
 let wrongSigningKey: KeyObject;
 let publicJwk: JsonWebKey & { alg: string; kid: string; use: string };
-let publishesSigningKeys = true;
 
 const json = (response: ServerResponse, value: unknown) => {
   response.writeHead(200, { "content-type": "application/json" });
@@ -96,7 +95,7 @@ const startIdentityProvider = async (): Promise<void> => {
         authorization_endpoint: `${issuer}/authorize`,
         token_endpoint: `${issuer}/token`,
         userinfo_endpoint: `${issuer}/userinfo`,
-        ...(publishesSigningKeys ? { jwks_uri: `${issuer}/jwks` } : {}),
+        jwks_uri: `${issuer}/jwks`,
         id_token_signing_alg_values_supported: ["RS256"],
         token_endpoint_auth_methods_supported: ["client_secret_post"],
       });
@@ -262,32 +261,6 @@ describe("the Auth0 provider this deployment builds", () => {
     expect(response.headers.get("location")).toContain("error=unable_to_get_user_info");
     expect(db.account).toHaveLength(0);
     expect(db.session).toHaveLength(0);
-  });
-
-  /** @scenario Auth0 with no signing keys to verify with is refused at startup, and only Auth0 */
-  it("refuses Auth0 at startup when discovery publishes no signing keys, and only Auth0", async () => {
-    publishesSigningKeys = false;
-    try {
-      const { auth, db, loggedErrors } = buildHarness();
-
-      const started = await auth.handler(
-        new Request(`${BASE_URL}/api/auth/sign-in/social`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ provider: "auth0", disableRedirect: true }),
-        }),
-      );
-
-      expect(started.ok).toBe(false);
-      expect(await started.text()).not.toContain("/authorize");
-      expect(loggedErrors.join("\n")).toContain('"auth0": requires verified ID tokens');
-      expect(db.account).toHaveLength(0);
-      expect(db.session).toHaveLength(0);
-      const session = await auth.handler(new Request(`${BASE_URL}/api/auth/get-session`));
-      expect(session.status).toBe(200);
-    } finally {
-      publishesSigningKeys = true;
-    }
   });
 
   /** @scenario Invalid callback state reaches no account or session write */

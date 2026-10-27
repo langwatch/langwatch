@@ -8,13 +8,32 @@
 import { createSign, generateKeyPairSync, type KeyObject, randomUUID } from "node:crypto";
 import { createServer, type Server, type ServerResponse } from "node:http";
 
+import type * as Observability from "@langwatch/observability";
+import type * as TestHarness from "@langwatch/test-harness";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { okta } from "better-auth/plugins/generic-oauth";
-import { afterEach, describe, expect, it } from "vitest";
+import { auth0, type GenericOAuthConfig, okta } from "better-auth/plugins/generic-oauth";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { resilientGenericOAuth } from "../http.resilient-generic-oauth.channel.ts";
+
+const wrapperLog = vi.hoisted(() => ({
+  loggerName: "langwatch:better-auth:generic-oauth",
+  lines: [] as { providerId?: unknown; reason?: unknown; [field: string]: unknown }[],
+}));
+
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const original = await importOriginal<typeof Observability>();
+  const harness = await vi.importActual<typeof TestHarness>("@langwatch/test-harness");
+  const captured = harness.createTestLogger();
+  wrapperLog.lines = captured.lines;
+  return {
+    ...original,
+    createLogger: (name: string, options?: Parameters<typeof original.createLogger>[1]) =>
+      name === wrapperLog.loggerName ? captured.logger : original.createLogger(name, options),
+  };
+});
 
 type MemoryDb = Record<string, Record<string, unknown>[]>;
 
@@ -145,12 +164,15 @@ const startIdentityProvider = async ({
 const buildAuth = ({
   issuerPort,
   retryDelaysMs = [],
+  alongside = [],
 }: {
   issuerPort: number;
   retryDelaysMs?: number[];
+  alongside?: GenericOAuthConfig[];
 }) => {
   const db: MemoryDb = { user: [], session: [], account: [], verification: [] };
-  const config = [
+  const betterAuthLog: string[] = [];
+  const config: GenericOAuthConfig[] = [
     {
       ...okta({
         clientId: CLIENT_ID,
@@ -159,11 +181,14 @@ const buildAuth = ({
       }),
       requireIdTokenVerification: true,
     },
+    ...alongside,
   ];
   const auth = betterAuth({
     baseURL: BASE_URL,
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter(db),
+    // Collected, not printed: the test harness's console guard fails a test that prints.
+    logger: { log: (level, message) => betterAuthLog.push(`${level}: ${message}`) },
     emailAndPassword: { enabled: true },
     account: { accountLinking: { enabled: true } },
     plugins: [resilientGenericOAuth({ config, retryDelaysMs })],
@@ -171,14 +196,31 @@ const buildAuth = ({
   return { auth, db, config };
 };
 
-const startOktaSignIn = (auth: ReturnType<typeof buildAuth>["auth"]) =>
+const startSignIn = ({
+  auth,
+  provider,
+}: {
+  auth: ReturnType<typeof buildAuth>["auth"];
+  provider: string;
+}) =>
   auth.handler(
     new Request(`${BASE_URL}/api/auth/sign-in/social`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "okta", disableRedirect: true }),
+      body: JSON.stringify({ provider, disableRedirect: true }),
     }),
   );
+
+const startOktaSignIn = (auth: ReturnType<typeof buildAuth>["auth"]) =>
+  startSignIn({ auth, provider: "okta" });
+
+/** Auth0 as the deployment configures it: verified ID tokens required, legacy callback path. */
+const auth0RequiringVerifiedTokens = (port: number): GenericOAuthConfig => ({
+  ...auth0({ clientId: CLIENT_ID, clientSecret: "auth0-secret", domain: "tenant.eu.auth0.com" }),
+  discoveryUrl: `http://127.0.0.1:${port}/.well-known/openid-configuration`,
+  redirectURI: `${BASE_URL}/api/auth/callback/auth0`,
+  requireIdTokenVerification: true,
+});
 
 const signUpWithPassword = (auth: ReturnType<typeof buildAuth>["auth"]) =>
   auth.handler(
@@ -267,6 +309,54 @@ describe("given Okta requires verified ID tokens", () => {
       const context = await auth.$context;
       expect(context.socialProviders.map((p) => p.id)).not.toContain("okta");
       expect((await startOktaSignIn(auth)).status).toBe(404);
+    });
+  });
+});
+
+describe("given Auth0 requires verified ID tokens beside an Okta that publishes its keys", () => {
+  describe("when Auth0's discovery answers without a signing key set", () => {
+    /** @scenario "Auth0 with no signing keys to verify with is refused at startup, and only Auth0" */
+    it("leaves only Auth0 unmounted, refuses its callback before any write, and keeps the rest answering", async () => {
+      const oktaPort = await closedPort();
+      const oktaIdp = await startIdentityProvider({ port: oktaPort, publishJwks: true });
+      const auth0Port = await closedPort();
+      await startIdentityProvider({ port: auth0Port, publishJwks: false });
+      wrapperLog.lines.length = 0;
+      const { auth, db } = buildAuth({
+        issuerPort: oktaPort,
+        alongside: [auth0RequiringVerifiedTokens(auth0Port)],
+      });
+
+      // A state this deployment really issued (through Okta), carried to Auth0's callback.
+      const started = await startOktaSignIn(auth);
+      expect(started.status).toBe(200);
+      const authorizationUrl = new URL(authorizationResponseSchema.parse(await started.json()).url);
+      const code = `code-${randomUUID()}`;
+      oktaIdp.nonces.set(code, authorizationUrl.searchParams.get("nonce") ?? "");
+      const callback = new URL(`${BASE_URL}/api/auth/callback/auth0`);
+      callback.searchParams.set("code", code);
+      callback.searchParams.set("state", authorizationUrl.searchParams.get("state") ?? "");
+      const cookie = started.headers
+        .getSetCookie()
+        .map((value) => value.split(";", 1)[0])
+        .join("; ");
+      const response = await auth.handler(
+        new Request(callback, { headers: { cookie }, redirect: "manual" }),
+      );
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toContain("error=oauth_provider_not_found");
+      expect(db.user ?? []).toHaveLength(0);
+      expect(db.account ?? []).toHaveLength(0);
+      expect(db.session ?? []).toHaveLength(0);
+
+      const mounted = (await auth.$context).socialProviders.map((provider) => provider.id);
+      expect(mounted).toContain("okta");
+      expect(mounted).not.toContain("auth0");
+      const refusal = wrapperLog.lines.find((line) => line.providerId === "auth0");
+      expect(String(refusal?.reason)).toContain('"auth0": requires verified ID tokens');
+      expect((await startSignIn({ auth, provider: "auth0" })).status).toBe(404);
+      expect((await signUpWithPassword(auth)).status).toBe(200);
     });
   });
 });
