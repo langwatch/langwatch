@@ -259,7 +259,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
     });
 
     describe("when resolved", () => {
-      it("getFromEventLog is called exactly once (resolution attempted)", async () => {
+      it("the event_log is read exactly once (resolution attempted)", async () => {
         const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
@@ -322,7 +322,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
     });
 
     describe("when resolved with any caller opts", () => {
-      it("getFromEventLog is called 0 times", async () => {
+      it("the event_log is read 0 times", async () => {
         const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
@@ -406,7 +406,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
   });
 
   // --- BlobNotFoundError ---
-  describe("given getFromEventLog throws BlobNotFoundError", () => {
+  describe("given the event_log read throws BlobNotFoundError", () => {
     function blobNotFoundStore(): TraceBlobStoreService {
       return blobStoreReading(async () => {
         throw new BlobNotFoundError("evt-fail", attrKey, "proj-1");
@@ -468,7 +468,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
   });
 
   // --- BlobFieldNotFoundError ---
-  describe("given getFromEventLog throws BlobFieldNotFoundError", () => {
+  describe("given the event_log read throws BlobFieldNotFoundError", () => {
     function blobFieldNotFoundStore(): TraceBlobStoreService {
       return blobStoreReading(async () => {
         throw new BlobFieldNotFoundError("evt-fail", attrKey);
@@ -516,7 +516,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
   });
 
   // --- CH-unconfigured (generic Error: "ClickHouseClient not configured") ---
-  describe("given getFromEventLog throws because ClickHouseClient is not configured", () => {
+  describe("given the event_log read throws because ClickHouseClient is not configured", () => {
     describe("when resolved", () => {
       it("does not throw", async () => {
         const logger = createMockLogger();

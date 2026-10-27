@@ -194,7 +194,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces()", () =
         expect(result.resolvedSpans[0]).toBe(spanClean);
       });
 
-      it("calls TraceBlobStoreService.getFromEventLog zero times", async () => {
+      it("reads the event_log zero times", async () => {
         const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
@@ -226,7 +226,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces()", () =
     });
   });
 
-  describe("given a missing event_log row (TraceBlobStoreService.getFromEventLog throws BlobNotFoundError)", () => {
+  describe("given a missing event_log row (the event_log read throws BlobNotFoundError)", () => {
     const spanWithRef = makeSpan({
       traceId: "trace-1",
       spanId: "span-1",

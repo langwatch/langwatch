@@ -20,6 +20,9 @@ export const OFFLOAD_RECALL_CONCURRENCY = 25;
  */
 export const OFFLOAD_RECALL_TRACE_BUDGET_BYTES = 32 * 1024 * 1024;
 
+/** Offloaded bytes one recall may bring back across all its traces: a page of heavy traces. */
+export const OFFLOAD_RECALL_TOTAL_BUDGET_BYTES = 256 * 1024 * 1024;
+
 export type OffloadRecallOutcome = { ok: true; value: string } | { ok: false; error: unknown };
 
 /** The event was read, but it carries no such field: a corrupted event or a stale reference. */
@@ -62,41 +65,52 @@ export abstract class TracePayloadReaderRepository {
 
   /**
    * Offloaded fields for every full-value read path (ADR-022): one read per event, a bounded pool,
-   * a per-trace byte budget past which previews stay. Never throws: each reference answers, keyed
-   * by `offloadedFieldKey`, with its value or the error that kept its preview.
+   * byte budgets per trace and per recall past which previews stay. Never throws: each reference
+   * answers, keyed by `offloadedFieldKey`, with its value or the error that kept its preview.
    */
   async recall({
     tenantId,
     references,
     concurrency = OFFLOAD_RECALL_CONCURRENCY,
     traceBudgetBytes = OFFLOAD_RECALL_TRACE_BUDGET_BYTES,
+    totalBudgetBytes = OFFLOAD_RECALL_TOTAL_BUDGET_BYTES,
   }: {
     tenantId: string;
     references: readonly OffloadedFieldReference[];
     concurrency?: number;
     traceBudgetBytes?: number;
+    totalBudgetBytes?: number;
   }): Promise<Map<string, OffloadRecallOutcome>> {
     const reads = TracePayloadReaderRepository.groupByEvent(references);
     const outcomes = new Map<string, OffloadRecallOutcome>();
     const spentByTrace = new Map<string, number>();
+    let spentTotal = 0;
     const overBudget = new Set<string>();
 
+    // The budget a trace has run out of, or null while it may still read. Checked before a read
+    // starts and again when it lands: reads in flight together all start under budget, so one
+    // landing after the budget is spent is dropped rather than kept.
+    const spentBudget = (traceId: string): number | null => {
+      if ((spentByTrace.get(traceId) ?? 0) >= traceBudgetBytes) return traceBudgetBytes;
+      if (spentTotal >= totalBudgetBytes) return totalBudgetBytes;
+      return null;
+    };
+    const keepPreviews = (read: EventRead, budgetBytes: number): void => {
+      TracePayloadReaderRepository.settleAll(read, outcomes, {
+        ok: false,
+        error: new TraceOffloadBudgetExceededError(read.traceId, budgetBytes),
+      });
+      if (overBudget.has(read.traceId)) return;
+      overBudget.add(read.traceId);
+      logger.warn(
+        { tenantId, traceId: read.traceId, budgetBytes, spentTotalBytes: spentTotal },
+        "Offload recall budget spent; the rest of this trace's offloaded fields keep their previews",
+      );
+    };
+
     const readOne = async (read: EventRead): Promise<void> => {
-      const spent = spentByTrace.get(read.traceId) ?? 0;
-      if (spent >= traceBudgetBytes) {
-        TracePayloadReaderRepository.settleAll(read, outcomes, {
-          ok: false,
-          error: new TraceOffloadBudgetExceededError(read.traceId, traceBudgetBytes),
-        });
-        if (!overBudget.has(read.traceId)) {
-          overBudget.add(read.traceId);
-          logger.warn(
-            { tenantId, traceId: read.traceId, budgetBytes: traceBudgetBytes, spentBytes: spent },
-            "Trace spent its offload recall budget; the rest of its offloaded fields keep their previews",
-          );
-        }
-        return;
-      }
+      const before = spentBudget(read.traceId);
+      if (before !== null) return keepPreviews(read, before);
 
       let values: ReadonlyMap<string, string>;
       try {
@@ -111,21 +125,12 @@ export abstract class TracePayloadReaderRepository {
         return;
       }
 
-      let bytes = 0;
-      for (const field of read.fields) {
-        const key = offloadedFieldKey({ traceId: read.traceId, eventId: read.eventId, field });
-        const value = values.get(field);
-        if (value === undefined) {
-          outcomes.set(key, {
-            ok: false,
-            error: new TraceEventPayloadFieldNotFoundError(read.eventId, field),
-          });
-          continue;
-        }
-        bytes += Buffer.byteLength(value, "utf8");
-        outcomes.set(key, { ok: true, value });
-      }
+      const after = spentBudget(read.traceId);
+      if (after !== null) return keepPreviews(read, after);
+
+      const bytes = TracePayloadReaderRepository.settleValues(read, values, outcomes);
       spentByTrace.set(read.traceId, (spentByTrace.get(read.traceId) ?? 0) + bytes);
+      spentTotal += bytes;
     };
 
     await TracePayloadReaderRepository.inPool([...reads.values()], concurrency, readOne);
@@ -147,6 +152,27 @@ export abstract class TracePayloadReaderRepository {
       }
     }
     return reads;
+  }
+
+  /** Each field's value, or why the event lacked it; answers the bytes the values hold. */
+  private static settleValues(
+    read: EventRead,
+    values: ReadonlyMap<string, string>,
+    outcomes: Map<string, OffloadRecallOutcome>,
+  ): number {
+    let bytes = 0;
+    for (const field of read.fields) {
+      const key = offloadedFieldKey({ traceId: read.traceId, eventId: read.eventId, field });
+      const value = values.get(field);
+      if (value === undefined) {
+        const error = new TraceEventPayloadFieldNotFoundError(read.eventId, field);
+        outcomes.set(key, { ok: false, error });
+        continue;
+      }
+      bytes += Buffer.byteLength(value, "utf8");
+      outcomes.set(key, { ok: true, value });
+    }
+    return bytes;
   }
 
   private static settleAll(

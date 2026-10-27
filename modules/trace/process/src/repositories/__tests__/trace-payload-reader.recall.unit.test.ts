@@ -220,6 +220,63 @@ describe("TracePayloadReaderRepository.recall", () => {
     });
   });
 
+  describe("given reads of one trace in flight together", () => {
+    describe("when the first to land spends the trace's budget", () => {
+      it("keeps that read and drops the ones landing after it", async () => {
+        const events = Object.fromEntries(
+          ["e1", "e2", "e3", "e4"].map((eventId) => [eventId, { a: "x".repeat(10) }]),
+        );
+        const reader = new FakePayloadReader(events, { delayMs: 5 });
+
+        const outcomes = await reader.recall({
+          tenantId: "project-1",
+          references: Object.keys(events).map((eventId) => ref("t1", eventId, "a")),
+          concurrency: 4,
+          traceBudgetBytes: 10,
+        });
+
+        expect(reader.peakInFlight).toBe(4);
+        const answers = [...outcomes.values()];
+        expect(answers.filter((outcome) => outcome.ok)).toHaveLength(1);
+        const dropped = answers.filter((outcome) => !outcome.ok);
+        expect(dropped).toHaveLength(3);
+        for (const outcome of dropped) {
+          expect(!outcome.ok && outcome.error).toBeInstanceOf(TraceOffloadBudgetExceededError);
+        }
+      });
+    });
+  });
+
+  describe("given several traces in one recall", () => {
+    describe("when the recall's total budget is spent by the first trace", () => {
+      it("keeps the previews of the next trace without reading it", async () => {
+        const reader = new FakePayloadReader({
+          e1: { a: "x".repeat(10) },
+          e2: { a: "y".repeat(10) },
+        });
+
+        const outcomes = await reader.recall({
+          tenantId: "project-1",
+          references: [ref("t1", "e1", "a"), ref("t2", "e2", "a")],
+          concurrency: 1,
+          traceBudgetBytes: 100,
+          totalBudgetBytes: 10,
+        });
+
+        expect(reader.reads.map((read) => read.eventId)).toEqual(["e1"]);
+        expect(outcomes.get(offloadedFieldKey(ref("t1", "e1", "a")))).toEqual({
+          ok: true,
+          value: "x".repeat(10),
+        });
+        const second = outcomes.get(offloadedFieldKey(ref("t2", "e2", "a")));
+        expect(second?.ok).toBe(false);
+        expect(second && !second.ok && second.error).toBeInstanceOf(
+          TraceOffloadBudgetExceededError,
+        );
+      });
+    });
+  });
+
   describe("given reads that cannot be served", () => {
     describe("when the event lacks a requested field", () => {
       it("answers field-not-found for that field and the value for the rest", async () => {
