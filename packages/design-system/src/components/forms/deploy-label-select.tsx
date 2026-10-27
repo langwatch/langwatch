@@ -6,10 +6,10 @@ import * as React from "react";
 import { Select } from "./select.tsx";
 
 /** The pseudo-label that always follows the newest version. */
-export const DEPLOY_LABEL_LATEST = "latest";
+const DEPLOY_LABEL_LATEST = "latest";
 
 /** A deploy label the picker offers, and the version it points at. */
-export interface DeployLabelOption {
+interface DeployLabelOption {
   label: string;
   version: number;
 }
