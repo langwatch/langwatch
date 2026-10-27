@@ -249,6 +249,7 @@ describe("TracePayloadReaderRepository.recall", () => {
 
   describe("given several traces in one recall", () => {
     describe("when the recall's total budget is spent by the first trace", () => {
+      /** @scenario "A recall past its total budget keeps the previews of the traces it has not reached" */
       it("keeps the previews of the next trace without reading it", async () => {
         const reader = new FakePayloadReader({
           e1: { a: "x".repeat(10) },

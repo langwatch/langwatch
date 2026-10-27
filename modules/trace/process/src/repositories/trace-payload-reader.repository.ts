@@ -1,3 +1,4 @@
+import { pMapLimited } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 import {
@@ -133,7 +134,11 @@ export abstract class TracePayloadReaderRepository {
       spentTotal += bytes;
     };
 
-    await TracePayloadReaderRepository.inPool([...reads.values()], concurrency, readOne);
+    await pMapLimited({
+      items: [...reads.values()],
+      fn: readOne,
+      concurrency: Math.max(1, concurrency),
+    });
     return outcomes;
   }
 
@@ -186,24 +191,5 @@ export abstract class TracePayloadReaderRepository {
         outcome,
       );
     }
-  }
-
-  /** At most `concurrency` operations in flight, taken in input order. */
-  private static async inPool<Item>(
-    items: readonly Item[],
-    concurrency: number,
-    operation: (item: Item) => Promise<void>,
-  ): Promise<void> {
-    let next = 0;
-    const lanes = Array.from(
-      { length: Math.min(Math.max(1, concurrency), items.length) },
-      async () => {
-        while (next < items.length) {
-          const item = items[next++] as Item;
-          await operation(item);
-        }
-      },
-    );
-    await Promise.all(lanes);
   }
 }

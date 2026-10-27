@@ -5,7 +5,8 @@ Feature: An offloaded trace field reads whole through eventing's event read seat
   that event through the one-event read seat the process hands its registry
   (Q209, 2026-10-06), never through a query of its own over the event log, and
   asks only for events of its own trace aggregate. Where no event can be read
-  the read raises and the caller keeps the preview.
+  that field's recall answers a failure, never raising, and the caller keeps the
+  preview.
 
   @unit
   Scenario: An offloaded field is read whole from its own trace event
@@ -18,13 +19,13 @@ Feature: An offloaded trace field reads whole through eventing's event read seat
   Scenario: An event the seat cannot answer keeps the preview
     Given the event read seat cannot find the event, as outside its window
     When the trace read recalls the field
-    Then the recall raises and the caller serves the preview
+    Then the event read fails and the caller serves the preview
 
   @unit
   Scenario: A process on memory stores keeps the preview
     Given the trace repositories are selected on the memory tier
     When the trace read recalls an offloaded field
-    Then the recall raises and the caller serves the preview
+    Then the recall answers that field as failed and the caller serves the preview
 
   Rule: A read brings a trace's offloaded fields back without exhausting the worker
 
@@ -46,5 +47,12 @@ Feature: An offloaded trace field reads whole through eventing's event read seat
       When the trace read recalls them
       Then the fields read before the budget ran out are served whole
       And the rest keep their previews without being read
-      And another trace in the same read is not affected
+      And another trace in the same read is not held to this trace's budget
       And the read does not fail
+
+    @unit
+    Scenario: A recall past its total budget keeps the previews of the traces it has not reached
+      Given a read of several traces whose offloaded values exceed the recall's total budget
+      When the trace read recalls them
+      Then the traces read before the total budget ran out are served whole
+      And the later traces keep their previews without being read

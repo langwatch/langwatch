@@ -206,10 +206,9 @@ export class TraceBlobStoreService {
 
   /**
    * Recalls offloaded fields from the trace events that recorded them (ADR-022 read path), tenant
-   * first: one read per event, bounded, within a per-trace budget. Arrow property (not a prototype
-   * method) so a test mock can assert on it unbound-safely.
+   * first: one read per event, bounded, within a per-trace budget.
    */
-  recallFromEventLog = async ({
+  async recallFromEventLog({
     tenantId,
     references,
     concurrency,
@@ -217,7 +216,7 @@ export class TraceBlobStoreService {
     tenantId: string;
     references: readonly OffloadedFieldReference[];
     concurrency?: number;
-  }): Promise<Map<string, OffloadRecallOutcome>> => {
+  }): Promise<Map<string, OffloadRecallOutcome>> {
     if (!this.payloads) {
       // Every field keeps its preview, each answering why, as a failed read would.
       const error = new Error(
@@ -229,7 +228,7 @@ export class TraceBlobStoreService {
     }
 
     return this.payloads.recall({ tenantId, references, ...(concurrency ? { concurrency } : {}) });
-  };
+  }
 
   /**
    * Location is re-derived from projectId/traceId/spanId (queue-authenticated), never spoolRef,
