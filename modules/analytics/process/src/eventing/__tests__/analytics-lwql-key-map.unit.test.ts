@@ -26,6 +26,7 @@ import { z } from "zod";
 
 import type { LwqlKeyMapRow } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import { LwqlKeyMapRepository } from "../../repositories/langwatch-ql-key-map.repository.ts";
+import { MemoryLwqlUnconfirmedSinceRepository } from "../../repositories/memory/memory.langwatch-ql-unconfirmed-since.repository.ts";
 import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 import { LwqlKeyMapService } from "../../services/langwatch-ql-key-map.service.ts";
 import { buildLwqlReconvergence } from "../analytics-lwql-reconvergence.pipeline.ts";
@@ -127,6 +128,7 @@ describe("analytics' key-map reaction to a created project", () => {
       });
       eventing.register(
         buildLwqlReconvergence({
+          unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
           app: {
             probeLwqlAccessModelOwner: async () => "none",
             convergeLwqlAccessModel: async () => void 0,

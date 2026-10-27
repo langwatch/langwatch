@@ -13,6 +13,9 @@ export const MCP_IDENTITY_HEADERS: Record<string, string> = {
   "X-LangWatch-SDK-Version": packageJson.version,
 };
 
+/** The dated API version every request names (specs/api-reference/client-api-version.feature). */
+export const LANGWATCH_API_VERSION = "2026-10-26";
+
 /** Names the hosted MCP server's calls apart from a local server's. */
 export const HOSTED_MCP_HEADER = "X-LangWatch-MCP-Host";
 
@@ -278,6 +281,7 @@ export async function makeRequest(
   const url = config.endpoint + path;
   const headers: Record<string, string> = {
     ...MCP_IDENTITY_HEADERS,
+    "X-API-Version": LANGWATCH_API_VERSION,
     "X-Auth-Token": requireApiKey(),
   };
   if (config.projectId) {

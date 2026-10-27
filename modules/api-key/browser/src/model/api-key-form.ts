@@ -4,7 +4,10 @@
  * and a `model` module must not import a component library.
  */
 
+import type { ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
 import { Temporal, nowInstant, toDate, toEpochMs, type Instant } from "@langwatch/time";
+
+import type { PermissionMode } from "./api-key-permissions.ts";
 
 /** The preset before the creator has chosen: neither a duration nor "never". */
 export const EXPIRATION_UNCHOSEN = "";
@@ -66,3 +69,17 @@ export function earliestCustomExpiration(now: Instant = nowInstant()): string {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
+
+/** What the create drawer, or the legacy key swap, sends to `apiKey.create`. */
+export type CreateApiKeyInput = {
+  name: string;
+  description: string;
+  expiresAt: Instant | undefined;
+  permissionMode: PermissionMode;
+  keyType: "personal" | "service";
+  assignedToUserId?: string;
+  scopeType: string;
+  scopeId: string;
+  permissions?: string[];
+  bindings: ApiKeyTrpcGrant[];
+};

@@ -195,6 +195,7 @@ export const APP_ERROR_CODES = [
   "dashboard_widget_definition_refused",
   "dashboard_widget_not_found",
   "dashboards_not_enabled",
+  "dashboards_not_released",
   "data_privacy_config_invalid",
   "data_privacy_department_scope_unavailable",
   "data_privacy_scope_outside_organization",

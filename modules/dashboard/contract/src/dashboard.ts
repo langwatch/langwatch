@@ -206,7 +206,7 @@ export const dashboardSourcePresenceSchema: DashboardSourcePresenceSchema =
   dashboardSourcePresenceSchemaDefinition;
 export type DashboardSourcePresence = z.infer<typeof dashboardSourcePresenceSchema>;
 
-// -- what `/api/dashboards` accepts ------------------------------------------
+// -- what `/api/v1/analytics/reports` accepts ------------------------------
 
 const dashboardRestNameSchemaDefinition = z.object({
   name: z.string().min(1, "name is required").max(255),
@@ -229,3 +229,8 @@ export interface DashboardRestParamsSchema extends Named<
 > {}
 export const dashboardRestParamsSchema: DashboardRestParamsSchema =
   dashboardRestParamsSchemaDefinition;
+
+/** `/api/v1/analytics/reports/:reportId`: a Reports dashboard named for what it is there. */
+const reportRestParamsSchemaDefinition = z.object({ reportId: z.string().min(1) });
+export interface ReportRestParamsSchema extends Named<typeof reportRestParamsSchemaDefinition> {}
+export const reportRestParamsSchema: ReportRestParamsSchema = reportRestParamsSchemaDefinition;

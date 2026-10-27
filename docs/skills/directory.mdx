@@ -3214,7 +3214,7 @@ This skill answers one question with the user's own data: at what context size d
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on the read commands when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -3351,7 +3351,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Personal coding-agent usage needs `langwatch login --device`; a team or application project needs `--project <slug>` on the read commands.
+Personal coding-agent usage needs `langwatch login --device` on a laptop; a project key in `LANGWATCH_API_KEY` stands in for that login only for its own project. A team or application project needs `--project <slug>` on the read commands, which a project key refuses for any project but its own, so reaching one still needs `langwatch login --device`.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -3501,7 +3501,7 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. `langwatch login --device` signs this machine in; add `--project <slug>` on every read command when the sessions live in a team project instead.
+Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command when the sessions live in a team project instead.
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
 
@@ -3543,7 +3543,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if whoami reports "Not logged in" or that field is missing, ask the user which project id to use.
 
 If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
@@ -7618,6 +7618,26 @@ langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to 
 **Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board from `langwatch dashboard-widget boards` with its id in `ref`. Never choose a board for the user.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
+
+## Boards
+
+A board is the page widgets live on. **Use an existing board** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new board, or none fits and they agree.
+
+```bash
+langwatch dashboards list -f json                          # ids, names, widget counts
+langwatch dashboards get <dashboardId> -f json
+langwatch dashboards create "<name>" -f json               # empty board; prints platformUrl
+langwatch dashboards update <dashboardId> --name "<name>"  # rename; or --description / --clear-description
+langwatch dashboards delete <dashboardId>                  # removes the board and its widgets
+langwatch dashboards widgets list <dashboardId> -f json
+langwatch dashboards widgets create <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
+langwatch dashboards widgets update <dashboardId> <widgetId> --code-file widget.tsx --queries-file queries.json
+langwatch dashboards widgets delete <dashboardId> <widgetId>
+```
+
+- **Never pick a board for the user.** When more than one board fits, ask with the `question` tool (a choices card): one option per board from `langwatch dashboards list`, its id in `ref`.
+- **Confirm before any delete** of a board or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a board takes its widgets with it.
+- Boards need Dashboards switched on for the project. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
 
 ## Worked example: bar chart of daily trace counts
 
