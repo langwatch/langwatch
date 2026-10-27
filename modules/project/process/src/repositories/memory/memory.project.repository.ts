@@ -2,6 +2,7 @@ import type { PersonalFeatures } from "@langwatch/organization-contract";
 import {
   NEVER_LANDED_ON_PROJECT_KINDS,
   NON_DESTINATION_PROJECT_KINDS,
+  UNMANAGED_PROJECT_KEY_KINDS,
   aggregateRuleSchema,
   type AggregateMemberCandidate,
   type AggregateRule,
@@ -669,11 +670,11 @@ export class MemoryProjectRepository implements ProjectRepository {
       .filter(
         (project) =>
           project.archivedAt === null &&
-          project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          !UNMANAGED_PROJECT_KEY_KINDS.includes(project.kind) &&
           this.#database.isInOrganization(project, input.organizationId) &&
           !isLegacyKeyRevoked(project.apiKey),
       )
-      .sort((left, right) => left.name.localeCompare(right.name))
+      .toSorted((left, right) => left.name.localeCompare(right.name))
       .map((project) => ({
         projectId: project.id,
         projectName: project.name,

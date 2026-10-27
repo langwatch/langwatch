@@ -137,6 +137,28 @@ describe("MemoryProjectRepository", () => {
         [],
       );
     });
+
+    it("names no project whose key nobody manages: an aggregate or an internal kind", async () => {
+      const { database, repository } = seeded();
+      const aggregate = await repository.create({
+        ...creation,
+        id: "project_aggregate",
+        name: "Aggregate",
+        slug: "aggregate",
+      });
+      database.putProject({ ...aggregate, kind: PROJECT_KIND.AGGREGATE });
+      await repository.createInternalOrFindWinner({
+        id: "project_checkup",
+        name: "Checkup",
+        slug: "checkup",
+        apiKey: "sk-lw-checkup",
+        teamId: TEAM_ID,
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+        framework: "internal",
+      });
+
+      expect(await repository.findLiveLegacyKeys({ organizationId: ORGANIZATION_ID })).toEqual([]);
+    });
   });
 
   describe("when a project is archived", () => {

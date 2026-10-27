@@ -52,9 +52,8 @@ export class ProjectRequestService {
   }
 
   /**
-   * The API keys screen is organisation-wide, so its answer is too: every
-   * project with a live legacy key the caller may manage, and no row for one
-   * they may not. Which projects those are is only known once they are read,
+   * The screen is organisation-wide, so its answer is too: a row only for a
+   * project the caller may manage. Which those are is known only once read,
    * which is why the standing is asked here and not on the route.
    */
   async findLegacyKeys({

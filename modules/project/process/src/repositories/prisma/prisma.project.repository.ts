@@ -6,6 +6,7 @@ import {
   NEVER_LANDED_ON_PROJECT_KINDS,
   NON_DESTINATION_PROJECT_KINDS,
   PROJECT_KIND,
+  UNMANAGED_PROJECT_KEY_KINDS,
   ProjectNotFoundError,
   aggregateRuleSchema,
   type AggregateMemberCandidate,
@@ -839,7 +840,7 @@ export class PrismaProjectRepository
       where: {
         archivedAt: null,
         team: { organizationId: input.organizationId },
-        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        kind: { notIn: [...UNMANAGED_PROJECT_KEY_KINDS] },
         apiKey: { not: { startsWith: REVOKED_LEGACY_KEY_PREFIX } },
       },
       select: { id: true, name: true, slug: true, apiKey: true, legacyApiKeyLastUsedAt: true },

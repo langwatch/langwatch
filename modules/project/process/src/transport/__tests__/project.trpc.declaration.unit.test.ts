@@ -97,7 +97,8 @@ describe("the project tRPC declarations", () => {
         },
         "project.getHasFirstMessage": { kind: "permission", permission: "project:view" },
         "project.getLegacyKeyStatus": { kind: "permission", permission: "project:manage" },
-        // Organisation-wide read, judged per project: the rows the caller cannot manage are dropped.
+        // Organisation-wide read, judged per project: rows the caller cannot
+        // manage are dropped.
         "project.legacyKeys": {
           kind: "service-authorized",
           reason: expect.any(String),
