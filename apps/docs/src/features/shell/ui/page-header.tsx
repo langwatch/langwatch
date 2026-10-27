@@ -36,8 +36,9 @@ function CopyPageMenu({ slug, actions }: { slug: string; actions: ContextualOpti
             <PageMenu slug={slug} actions={actions} />
           </Box>
         ) : null}
+        {/* Beside the button, where the copy island looks for it to announce the copy. */}
+        <output className="docs-sr-only" aria-live="polite" />
       </Flex>
-      <output className="docs-sr-only" aria-live="polite" />
     </Flex>
   );
 }
