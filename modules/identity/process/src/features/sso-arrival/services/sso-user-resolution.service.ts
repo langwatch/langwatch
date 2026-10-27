@@ -20,21 +20,17 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { issuerForProviderId } from "../../../rules/better-auth-account-queries.rules.ts";
 import type { IdentityLinkProposalWrites } from "../../../rules/identity-writes.rules.ts";
 import type { SsoConnectionReadRepository } from "../../sso-connection/repositories/sso-connection.repository.ts";
 import type {
   SsoRegistrantReadRepository,
   SsoResolutionCandidate,
 } from "../../sso-connection/repositories/sso-registrant.repository.ts";
+import { isStoredUnderAnotherIssuer } from "../rules/sso-subject-issuer.rules.ts";
 
 const CONTINUE = { action: "continue" } as const;
 const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
 const logger = createLogger("langwatch:identity:sso-user-resolution");
-
-/** One issuer spelt with and without its trailing slash is still one issuer. */
-const withoutTrailingSlash = (issuer: string): string =>
-  issuer.endsWith("/") ? issuer.slice(0, -1) : issuer;
 
 interface SsoUserResolutionServiceDeps {
   /** Identity's own person rows: `User`, `Account`, `Identifier`, credentials. */
@@ -68,9 +64,14 @@ export class SsoUserResolutionService {
     const connection = await this.deps.connections.getConnection({
       connectionId: input.providerId,
     });
-    if (await this.isStoredUnderAnotherIssuer(input)) {
+    const { providerId, accountKey } = input;
+    const storedIssuers = await this.deps.people.findSubjectIssuers({
+      connectionId: providerId,
+      accountId: accountKey.accountId,
+    });
+    if (isStoredUnderAnotherIssuer({ storedIssuers, providerId, issuer: accountKey.issuer })) {
       logger.warn(
-        { providerId: input.providerId, issuer: input.accountKey.issuer },
+        { providerId, issuer: accountKey.issuer },
         "Refused a single sign-on subject whose account row was stored under another issuer",
       );
       return REFUSE;
@@ -80,24 +81,6 @@ export class SsoUserResolutionService {
       await this.recordLinkAttempt({ connection, input, userId: resolution.userId });
     }
     return resolution;
-  }
-
-  /**
-   * The library finds a row by (connection, subject) alone, so a subject another issuer minted
-   * would sign in as that row's person (ADR-189). A row with no issuer, or this connection's
-   * own synthetic namespace, predates the real issuer and names no other one.
-   */
-  private async isStoredUnderAnotherIssuer(input: SsoUserResolutionInput): Promise<boolean> {
-    const stored = await this.deps.people.findSubjectIssuers({
-      connectionId: input.providerId,
-      accountId: input.accountKey.accountId,
-    });
-    const ownNamespace = issuerForProviderId(input.providerId);
-    const asserted = withoutTrailingSlash(input.accountKey.issuer);
-    return stored.some(
-      (issuer) =>
-        issuer !== null && issuer !== ownNamespace && withoutTrailingSlash(issuer) !== asserted,
-    );
   }
 
   private async chooseResolution({

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 /** The one claim read from a Microsoft ID token: its tenant's own issuer. */
 const tenantIssuerClaimsSchema = z.looseObject({ iss: z.string().min(1) });
+/** Our additional `issuer` field, which Better Auth's account type does not carry. */
+const statedIssuerSchema = z.looseObject({ issuer: z.string().min(1) });
 
 /**
  * The issuer namespace an account row carries (ADR-189): the connection's own issuer, else the
@@ -27,17 +29,18 @@ export function providerAccountIssuer({
  * subject, else a Microsoft ID token's tenant issuer, else the provider's stored namespace.
  */
 export function accountIssuerOf({
-  statedIssuer,
+  account,
   assertedIssuers,
   providerId,
   idToken,
 }: {
-  statedIssuer: unknown;
+  account: unknown;
   assertedIssuers: readonly string[];
   providerId: string;
   idToken: unknown;
 }): string {
-  if (typeof statedIssuer === "string" && statedIssuer.length > 0) return statedIssuer;
+  const stated = statedIssuerSchema.safeParse(account);
+  if (stated.success) return stated.data.issuer;
   const [assertedIssuer] = assertedIssuers;
   if (assertedIssuer) return assertedIssuer;
   const [tenantIssuer] = providerId === "microsoft" ? tenantIssuersOf({ idToken }) : [];

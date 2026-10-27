@@ -1299,15 +1299,15 @@ function betterAuthCredentialAccounts(
       await (await context()).internalAdapter.updateAccount(accountId, { password: passwordHash });
     },
     linkPassword: async ({ userId, passwordHash }) => {
-      await (
-        await context()
-      ).internalAdapter.linkAccount({
+      // issuer is our additional field, which Better Auth's types do not carry (ADR-189).
+      const account = {
         userId,
         providerId: "credential",
         issuer: providerAccountIssuer({ connectionIssuer: undefined, provider: "credential" }),
         accountId: userId,
         password: passwordHash,
-      });
+      };
+      await (await context()).internalAdapter.linkAccount(account);
     },
     deleteAccount: async ({ accountId }) => {
       await (await context()).internalAdapter.deleteAccount(accountId);

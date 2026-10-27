@@ -25,7 +25,7 @@ describe("accountIssuerOf", () => {
       ["oidc", "local:oauth:oidc"],
     ])("stamps a %s row with %s", (providerId, expected) => {
       const issuer = accountIssuerOf({
-        statedIssuer: undefined,
+        account: {},
         assertedIssuers: [],
         providerId,
         idToken: idTokenWith({ iss: DISCOVERED_ISSUER, sub: "sam" }),
@@ -39,7 +39,7 @@ describe("accountIssuerOf", () => {
     /** @scenario A Microsoft account row carries its tenant's issuer */
     it("stamps the tenant issuer its ID token states", () => {
       const issuer = accountIssuerOf({
-        statedIssuer: undefined,
+        account: {},
         assertedIssuers: [],
         providerId: "microsoft",
         idToken: idTokenWith({ iss: TENANT_ISSUER, sub: "sam" }),
@@ -56,7 +56,7 @@ describe("accountIssuerOf", () => {
     ])("falls back to the stored namespace for %s", (_name, idToken) => {
       expect(
         accountIssuerOf({
-          statedIssuer: undefined,
+          account: {},
           assertedIssuers: [],
           providerId: "microsoft",
           idToken,
@@ -69,7 +69,7 @@ describe("accountIssuerOf", () => {
     /** @scenario A single sign-on account row carries the issuer its assertion was verified under */
     it("stamps the issuer it was verified under", () => {
       const issuer = accountIssuerOf({
-        statedIssuer: undefined,
+        account: {},
         assertedIssuers: ["https://idp.acme.test"],
         providerId: "conn_acme",
         idToken: undefined,
@@ -82,7 +82,7 @@ describe("accountIssuerOf", () => {
   describe("when the row already states an issuer", () => {
     it("keeps it, as a confirmed link proposal writes it", () => {
       const issuer = accountIssuerOf({
-        statedIssuer: "https://idp.acme.test",
+        account: { issuer: "https://idp.acme.test" },
         assertedIssuers: [],
         providerId: "conn_acme",
         idToken: undefined,

@@ -731,7 +731,7 @@ export const createAuthOptions = ({
           recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
           // ADR-189: Better Auth keys the row by (providerId, accountId) and writes no issuer.
           const issuer = accountIssuerOf({
-            statedIssuer: account.issuer,
+            account,
             assertedIssuers: sessionClaims.evidence.findAssertedIssuers({
               providerId: account.providerId,
               providerAccountId: account.accountId,
