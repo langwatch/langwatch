@@ -395,7 +395,9 @@ REST.
 
 ### Names that changed
 
-`client.boards` and `langwatch.boards` are now `client.dashboards` and
-`langwatch.dashboards`; the CLI's `dashboards`, `dashboard-widget` and
-`analytics-reports` groups are now `langwatch dashboard` (widgets under
-`langwatch dashboard widget`) and `langwatch analytics-report`.
+`langwatch dashboard` now manages the new Dashboards (widgets under
+`langwatch dashboard widget`); it used to manage the old Analytics Reports,
+which are now `langwatch analytics-report`. The `dashboards` and
+`dashboard-widget` CLI groups, `client.boards`, `langwatch.boards`,
+`BoardsFacade` and `DashboardWidgetsApiService` are removed, with no alias:
+use `client.dashboards` and `langwatch.dashboards`.

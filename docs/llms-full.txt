@@ -42237,11 +42237,12 @@ REST.
 
 ### Names that changed
 
-`client.boards` and `langwatch.boards` are now `client.dashboards` and
-`langwatch.dashboards`; the CLI's `dashboards`, `dashboard-widget` and
-`analytics-reports` groups are now `langwatch dashboard` (widgets under
-`langwatch dashboard widget`) and `langwatch analytics-report`.
-
+`langwatch dashboard` now manages the new Dashboards (widgets under
+`langwatch dashboard widget`); it used to manage the old Analytics Reports,
+which are now `langwatch analytics-report`. The `dashboards` and
+`dashboard-widget` CLI groups, `client.boards`, `langwatch.boards`,
+`BoardsFacade` and `DashboardWidgetsApiService` are removed, with no alias:
+use `client.dashboards` and `langwatch.dashboards`.
 ---
 
 # FILE: ./features/embedded-analytics.mdx
@@ -60202,7 +60203,7 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
 
-Every `langwatch dashboard` command runs against whatever project `LANGWATCH_PROJECT_ID` names in the environment. That variable is normally already set for you — do not invent a `langwatch project ...` command to look it up (there isn't one; `langwatch projects list` is the read command, plural). Only pass `--project <slug-or-id>` on a command yourself when you need to target a *different* project than the one already in scope. If a command fails with "No project is in scope", set `LANGWATCH_PROJECT_ID` or pass `--project` — do not retry the same call unchanged.
+The `langwatch dashboard` commands use the project of your API key. Only `langwatch dashboard widget schema` also reads `LANGWATCH_PROJECT_ID` and accepts `--project <slug-or-id>`; pass `--project` there only when you need a *different* project than the one in scope. Do not invent a `langwatch project ...` command to look the project up (there isn't one; `langwatch projects list` is the read command, plural).
 
 ## Step 1: Discover the schema before writing any SQL
 
