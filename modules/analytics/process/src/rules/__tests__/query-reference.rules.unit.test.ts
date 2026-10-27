@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { validateLangWatchQL } from "../../langwatch-ql/__tests__/lwql-validate.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { DEFAULT_LWQL_DATABASE } from "../../services/langwatch-ql.service.ts";
-import { LWQL_EXAMPLE_DATABASE, LWQL_EXAMPLES } from "../langwatch-ql-examples.rules.ts";
+import { LWQL_EXAMPLES } from "../langwatch-ql-examples.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 import { buildQueryReference } from "../query-reference.rules.ts";
 
@@ -29,7 +29,7 @@ const EVERYTHING_HELD: LangWatchQLProtections = {
 };
 
 const EMPTY_SCHEMA: LangWatchQLSchema = {
-  database: LWQL_EXAMPLE_DATABASE,
+  database: DEFAULT_LWQL_DATABASE,
   functions: [],
   views: [],
   appFunctions: [],
@@ -46,7 +46,6 @@ function build(overrides: Partial<Parameters<typeof buildQueryReference>[0]> = {
   return buildQueryReference({
     protections: EVERYTHING_HELD,
     lwqlEnabled: true,
-    database: LWQL_EXAMPLE_DATABASE,
     schema: EMPTY_SCHEMA,
     limits: LIMITS,
     traceFilterExamples: [],
@@ -128,10 +127,10 @@ describe("the query reference", () => {
   /** @scenario 'Every example is runnable as published' */
   it("publishes only statements the validator admits, with every bound parameter declared", () => {
     const policy = {
-      allowedTables: LWQL_VIEW_CATALOG.map((view) => `${LWQL_EXAMPLE_DATABASE}.${view.name}`),
+      allowedTables: LWQL_VIEW_CATALOG.map((view) => `lw_analytics.${view.name}`),
       gatedColumns: [] as readonly string[],
       heldPermissions: ["input", "output", "costs"] as readonly string[],
-      defaultDatabase: LWQL_EXAMPLE_DATABASE,
+      defaultDatabase: "lw_analytics",
     };
 
     for (const example of LWQL_EXAMPLES) {
@@ -197,18 +196,14 @@ describe("the query reference", () => {
     expect(reference.lwql.endpoints.length).toBeGreaterThan(0);
   });
 
-  /** @scenario 'Examples name the database this deployment serves' */
-  it("names the database this deployment serves in every published statement", () => {
-    const elsewhere = build({ database: "lw_analytics" });
+  /** @scenario 'Examples name views without a database' */
+  it("writes every published statement with bare view names", () => {
+    const views = LWQL_VIEW_CATALOG.map((view) => view.name).join("|");
+    const qualified = new RegExp(`\\b\\w+\\.(${views})\\b`);
 
-    for (const example of elsewhere.examples.filter((example) => example.language === "lwql")) {
-      expect(example.text).not.toMatch(new RegExp(`(?<![\\w])${LWQL_EXAMPLE_DATABASE}\\.`));
-      expect(example.text).toContain("lw_analytics.");
+    for (const example of build().examples.filter((example) => example.language === "lwql")) {
+      expect(example.text, example.id).not.toMatch(qualified);
     }
-  });
-
-  it("writes its examples against the database the deployment defaults to", () => {
-    expect(LWQL_EXAMPLE_DATABASE).toBe(DEFAULT_LWQL_DATABASE);
   });
 
   it("publishes no example calling an app-side function yet", () => {
@@ -231,18 +226,6 @@ describe("the query reference", () => {
       "lwql.cost-by-model",
       "lwql.keyset-export",
     ]);
-  });
-
-  /** @scenario 'Examples name the database this deployment serves' */
-  it("leaves the filter examples alone, which name no database", () => {
-    const elsewhere = build({
-      database: "lwql_test_db",
-      traceFilterExamples: TRACE_FILTER_EXAMPLES,
-    });
-    const filters = elsewhere.examples.filter((example) => example.language === "trace-filter");
-
-    expect(filters.length).toBeGreaterThan(0);
-    for (const example of filters) expect(example.text).not.toContain("lwql_test_db");
   });
 });
 

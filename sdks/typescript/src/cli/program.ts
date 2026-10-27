@@ -3087,7 +3087,7 @@ function registerQueryCommands(program: Command): void {
       .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
       .option("--limit <n>", "Rows to keep from the result")
       .option(
-        "--format <format>",
+        "-f, --format <format>",
         "table (default), json, jsonl (one object per row, JSON columns parsed back) or csv",
         "table",
       )

@@ -136,7 +136,7 @@ technical safeguards map cleanly onto the open-core split:
 - **§164.312(b) Audit controls**: Apache 2.0 event_log @ 49d retention
 - **§164.316(b)(2)(i) 6-year documentation retention**: Enterprise extended retention policies (multi-year windows)
 - **§164.312(c)(1) Integrity**: Enterprise tamper-evidence (post-GA follow-up)
-- **§164.312(d) Authentication**: Apache 2.0 SSO (env-configured) + Personal IDE keys
+- **§164.312(d) Authentication**: Apache 2.0 email and password and passkey sign-in + Personal IDE keys; Enterprise SSO (env-configured or per organization)
 - **§164.312(e) Transmission security**: Apache 2.0 (TLS at gateway + dataplane)
 
 **HIPAA-most-uses**: covered entities with PHI in LLM traces should
@@ -185,8 +185,11 @@ free to run and free to modify:
 - **Custom roles via `CustomRolePermissions` JSON** is Enterprise. The
   default 5-role RBAC catalog (ADMIN, MEMBER, EXTERNAL + per-resource
   view/manage actions) is Apache 2.0.
-- **SCIM provisioning** is Enterprise. Apache 2.0 customers can still
-  use SSO (Okta, Auth0, Azure AD, AWS Cognito, OneLogin) for sign-in.
+- **SSO and SCIM provisioning** are Enterprise. An Apache 2.0
+  deployment signs people in with email and password, and passkeys. Setting
+  `AUTH_PROVIDER` and the Okta, Auth0, Azure AD, AWS Cognito or OneLogin
+  variables without a license leaves the deployment in email mode. See
+  [SSO requires a license](/self-hosting/licensing#sso-requires-a-license).
 
 ## Migrating from Apache 2.0 to Enterprise
 
@@ -200,7 +203,7 @@ RoleBinding entries, AiToolCatalogEntry rows, is unchanged.
 For the upgrade path:
 
 1. Provision your Enterprise license (contact sales).
-2. Set `LANGWATCH_LICENSE` (or equivalent, see your contract) in your
+2. Set `LANGWATCH_LICENSE_KEY` (or equivalent, see your contract) in your
    self-hosted env.
 3. Restart the control-plane pod, `pnpm dev` (no migration needed).
 4. The previously-gated surfaces become available immediately. Existing

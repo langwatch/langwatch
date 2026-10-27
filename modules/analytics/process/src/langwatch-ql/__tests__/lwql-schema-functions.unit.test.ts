@@ -52,11 +52,11 @@ describe("given the PostgreSQL-resident half of the catalog", () => {
       });
       const byName = new Map(schema.views.map((view) => [view.name, view]));
       const columnNamesOf = (view: string) =>
-        byName.get(`analytics.${view}`)?.columns.map((column) => column.name) ?? [];
+        byName.get(view)?.columns.map((column) => column.name) ?? [];
 
       expect(LWQL_POSTGRES_CATALOG.length).toBeGreaterThan(0);
       for (const view of LWQL_POSTGRES_CATALOG) {
-        expect(byName.has(`analytics.${view.name}`), view.name).toBe(true);
+        expect(byName.has(view.name), view.name).toBe(true);
       }
       expect(columnNamesOf("topics")).toEqual(
         expect.arrayContaining(["TopicId", "TopicName", "TenantId"]),

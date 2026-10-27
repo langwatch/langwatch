@@ -25,8 +25,8 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 ```sql
 SELECT
   TraceId,
-  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
-FROM analytics.trace_metrics
+  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?', 0.5) AS refused
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId
 ```
@@ -97,7 +97,7 @@ Every judgement is also a row in the `judgments` analytics dataset, so a later q
 
 ```sql
 SELECT j.Label AS verdict, count() AS traces
-FROM analytics.judgments AS j
+FROM judgments AS j
 WHERE j.RunId = {run:String} AND j.CreatedAt >= subtractDays(now(), 7)
 GROUP BY verdict
 ORDER BY traces DESC

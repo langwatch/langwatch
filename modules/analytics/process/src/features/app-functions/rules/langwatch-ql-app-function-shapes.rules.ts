@@ -84,8 +84,8 @@ export interface LangWatchQLAppFunctionDefinition {
    * returning captured content is as restricted as a column holding it.
    */
   readonly gates: readonly LwqlGate[];
-  /** A runnable statement, built with the deployment's LangWatchQL database. */
-  readonly example: (database: string) => string;
+  /** A runnable statement, naming views bare. */
+  readonly example: () => string;
 }
 
 /**
@@ -114,7 +114,7 @@ export const LWQL_THREAD_KEY_PARAMETER: LangWatchQLAppFunctionParameter = {
   name: "thread_key",
   role: "key",
   type: "string",
-  description: "The conversation id, as `analytics.trace_metrics.ConversationId` reports it.",
+  description: "The conversation id, as `trace_metrics.ConversationId` reports it.",
 };
 
 export const LWQL_TRACE_KEY_PARAMETER: LangWatchQLAppFunctionParameter = {
@@ -125,18 +125,10 @@ export const LWQL_TRACE_KEY_PARAMETER: LangWatchQLAppFunctionParameter = {
 };
 
 /** A thread-keyed example statement, which every thread function publishes. */
-export function lwqlThreadExample({
-  database,
-  call,
-  alias,
-}: {
-  database: string;
-  call: string;
-  alias: string;
-}): string {
+export function lwqlThreadExample({ call, alias }: { call: string; alias: string }): string {
   return (
     `SELECT ConversationId, ${call} AS ${alias}\n` +
-    `FROM ${database}.trace_metrics\n` +
+    `FROM trace_metrics\n` +
     `WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\n` +
     `GROUP BY ConversationId\n` +
     `ORDER BY ConversationId\n` +
@@ -145,18 +137,10 @@ export function lwqlThreadExample({
 }
 
 /** A trace-keyed example statement. */
-export function lwqlTraceExample({
-  database,
-  call,
-  alias,
-}: {
-  database: string;
-  call: string;
-  alias: string;
-}): string {
+export function lwqlTraceExample({ call, alias }: { call: string; alias: string }): string {
   return (
     `SELECT TraceId, ${call} AS ${alias}\n` +
-    `FROM ${database}.traces\n` +
+    `FROM traces\n` +
     `WHERE OccurredAt >= subtractDays(now(), 1)\n` +
     `ORDER BY OccurredAt DESC\n` +
     `LIMIT 20`

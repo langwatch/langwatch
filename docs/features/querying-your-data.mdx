@@ -79,7 +79,7 @@ the offending field and the fields that exist.
 
 ```bash
 langwatch query "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 7)
 GROUP BY day ORDER BY day"
 ```
@@ -108,12 +108,14 @@ langwatch query --sql-file export.sql --format jsonl --out train.jsonl
 
 The query endpoint has no cursor of its own, so a result larger than one
 response pages through a predicate you write. Declare the two cursor parameters,
-order by the same two columns, and `--page-by keyset` rebinds them between pages
-without changing a character of your statement.
+order by the same two columns, and alias those columns `after_ts` and `after_id`
+in the `SELECT`: `--page-by keyset` reads the next page's cursor from them and
+rebinds the parameters between pages without changing a character of your
+statement.
 
 ```sql
-SELECT TraceId, OccurredAt, CapturedInput, CapturedOutput
-FROM analytics.traces
+SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
 ORDER BY OccurredAt, TraceId

@@ -19,7 +19,6 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { Hono } from "hono";
 
-import { LWQL_EXAMPLE_DATABASE } from "../../rules/langwatch-ql-examples.rules.ts";
 import { buildQueryReference } from "../../rules/query-reference.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import type { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
@@ -94,7 +93,6 @@ export function mountQueryDoor({
       return buildQueryReference({
         protections,
         lwqlEnabled: true,
-        database: LWQL_EXAMPLE_DATABASE,
         schema: service().describeSchema({ protections }),
         limits: {
           maxStatementLength: MAX_LWQL_LENGTH,

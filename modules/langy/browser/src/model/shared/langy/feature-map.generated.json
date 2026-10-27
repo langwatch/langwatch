@@ -117,7 +117,7 @@
                 "query examples"
               ],
               "hints": {
-                "query run": "langwatch query \"SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day ORDER BY day\" -f json",
+                "query run": "langwatch query \"SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day ORDER BY day\" -f json",
                 "query schema": "langwatch query schema -f json",
                 "query reference": "langwatch query reference -f json",
                 "query examples": "langwatch query examples --tag cost"
