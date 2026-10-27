@@ -30,8 +30,8 @@ const things = defineRestRouter(ThingApi)
   .build();
 
 describe("given a route whose handler answers a shape its output schema refuses", () => {
-  /** @scenario "A procedure whose answer breaks its output schema refuses rather than answering" */
-  it("answers an internal error and never the handler's value", async () => {
+  /** @scenario "A procedure whose answer breaks its output schema is logged and still answered" */
+  it("answers the handler's value without the keys the schema does not name", async () => {
     const runtime = createRestRuntime({
       authorization: authorizationPort,
       identity: { authenticate: () => ({ actor: null, scope: null }) },
@@ -47,7 +47,8 @@ describe("given a route whose handler answers a shape its output schema refuses"
     const response = await app.request("/api/v1/things/one");
     const body = await response.text();
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
+    expect(JSON.parse(body)).toEqual({ id: 7 });
     expect(body).not.toContain("stored-value");
   });
 });

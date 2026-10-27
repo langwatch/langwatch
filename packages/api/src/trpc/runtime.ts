@@ -88,6 +88,7 @@ import {
 } from "../access/input-permission.ts";
 import { promoteStoreFailure } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import {
   auditScopeId,
   auditScopeIds,
@@ -1675,7 +1676,8 @@ async function authorized<TContext extends object>({
 
 /**
  * Parses an answer with its declared schema. One the schema refuses is logged
- * and raised as a plain Error (a 500); the raw value is never sent.
+ * and still answered, with every key the schema does not name dropped: a shape
+ * drift is not worth a 500, and the raw value is never sent.
  */
 function validateDeclaredOutput({
   procedure,
@@ -1699,7 +1701,7 @@ function validateDeclaredOutput({
     "tRPC handler response did not match its declared output schema",
   );
 
-  throw new Error(`tRPC ${procedure} answered a value its declared output schema refuses`);
+  return withoutUndeclaredKeys(schema, value);
 }
 
 /**
@@ -1746,7 +1748,7 @@ function guardOutput({
     validateDeclaredOutput({ procedure, schema: output, value: await invoke(opts) });
 }
 
-/** A procedure that declared no output answers nothing; any value is a 500 (Alex, 2026-10-01). */
+/** A procedure that declared no output answers nothing; a value is logged, then dropped. */
 function voidOutput({ procedure, value }: { procedure: string; value: unknown }): unknown {
   if (value === undefined) return value;
 
@@ -1759,7 +1761,7 @@ function voidOutput({ procedure, value }: { procedure: string; value: unknown })
     "tRPC handler response did not match its declared output schema",
   );
 
-  throw new Error(`tRPC ${procedure} answered a value but declares no output schema`);
+  return undefined;
 }
 
 /** The handler's own arguments, and the middleware context that follows them. */

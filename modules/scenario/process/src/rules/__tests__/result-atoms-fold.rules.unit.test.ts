@@ -1,8 +1,7 @@
 /**
- * The atoms the read folds are the atoms the Results tab's output schema accepts.
- * TypeScript accepts a value with more fields than the schema's type, so a field the
- * fold adds and the strict schema does not name typechecks and still fails the
- * response at run time (`scenarios.getResultAtoms`, 2026-10-27).
+ * The atoms the read folds are the atoms the Results tab's output schema accepts. TypeScript
+ * accepts a value with more fields than the schema's type, so a field the fold adds and the
+ * strict schema does not name typechecks and still fails at run time (2026-10-27).
  */
 
 import { resultAtomsPageSchema, ScenarioRunStatus } from "@langwatch/scenario-contract";

@@ -292,25 +292,26 @@ describe("a mounted contract procedure", () => {
   });
 
   describe("given the handler answers a shape its declaration refuses", () => {
-    /** @scenario "A procedure whose answer breaks its output schema refuses rather than answering" */
-    it("logs the procedure and the issue path, never the body, and refuses the caller", async () => {
+    /** @scenario "A procedure whose answer breaks its output schema is logged and still answered" */
+    it("logs the procedure and the issue path, never the body, and answers without undeclared keys", async () => {
       const { runtime } = harness();
       const app: ReviewApi = { read: async ({ id }) => ({ id, comment: "read" }) };
 
       const declaration = reviewRouter({
-        getById: (async () => ({ id: "annotation-1", comment: 7 })) as never,
+        getById: (async () => ({
+          id: "annotation-1",
+          comment: 7,
+          secret: "stored-value",
+        })) as never,
       });
 
       const caller = runtime
         .mount(declaration, () => app)
         .createCaller({ actor: { id: "reviewer-1" } });
 
-      const refusal = await onTheWire(
-        caller.getById({ projectId: "project-1", id: "annotation-1" }),
-      );
+      const answer = await caller.getById({ projectId: "project-1", id: "annotation-1" });
 
-      expect(refusal.data.error).toBeNull();
-      expect(JSON.stringify(refusal)).not.toContain("annotation-1");
+      expect(answer).toEqual({ id: "annotation-1", comment: 7 });
       const record = logged[0] as { fields: Record<string, unknown>; message: string };
       expect(record.fields.endpoint).toBe("review.getById");
       expect(record.fields.protocol).toBe("trpc");
@@ -321,6 +322,7 @@ describe("a mounted contract procedure", () => {
       });
 
       expect(JSON.stringify(record)).not.toContain("annotation-1");
+      expect(JSON.stringify(record)).not.toContain("stored-value");
     });
   });
 

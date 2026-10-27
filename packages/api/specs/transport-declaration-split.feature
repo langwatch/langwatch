@@ -81,12 +81,13 @@ Feature: Transport declaration split
     And the feature's server and contract value-import no runtime
 
   @unit
-  Scenario: A procedure whose answer breaks its output schema refuses rather than answering
+  Scenario: A procedure whose answer breaks its output schema is logged and still answered
     Given a procedure or a REST route whose handler answers a shape its output schema refuses
     When the caller asks for it
-    Then the failure is logged with the procedure name, the issue path and request metadata
+    Then the failure is logged as an error with the procedure name, the issue path and request metadata
     And the log carries no response contents
-    And the caller receives an internal error and never the handler's answer
+    And the caller receives the handler's answer rather than an internal error
+    And the answer carries no key the output schema does not name
 
   @unit @typecheck
   Scenario: The browser derives its client from the contract
