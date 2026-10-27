@@ -182,6 +182,39 @@ Feature: Dataset version history
     When the sweep runs
     Then the version row and its stored chunks are both removed
 
+  # --- Deletion ---
+
+  @unit
+  Scenario: An archived dataset keeps its history while it can be restored
+    Given a dataset with versions, archived 10 days ago
+    When the retention sweep runs
+    Then its versions are still there
+
+  @unit
+  Scenario: A dataset archived for 30 days loses its history
+    Given a dataset with versions, archived 30 days ago
+    When the retention sweep runs
+    Then every version, its stored chunks and its run links are removed
+
+  @unit
+  Scenario: A dataset that no longer exists loses its history
+    Given versions of a dataset that was deleted
+    When the retention sweep runs
+    Then every version and its stored chunks are removed
+
+  @unit
+  Scenario: Datasets in a project archived for 30 days lose their history
+    Given a project archived 30 days ago whose dataset has versions
+    When the retention sweep runs
+    Then every version of that dataset and its stored chunks are removed
+
+  @unit
+  Scenario: An erased user is cleared from the versions they saved
+    Given versions saved by a user in two projects
+    When the user is erased
+    Then those versions no longer name the user
+    And the history shows them as saved by a former member
+
   # --- Existing datasets ---
 
   @unit

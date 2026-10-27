@@ -59,7 +59,8 @@ export function versionAuthorLabel({
   currentUserId: string | undefined;
 }): string {
   if (authorKind === "api_key") return "API key";
-  if (authorKind !== "user" || !authorId) return "System";
+  if (authorKind !== "user") return "System";
+  if (!authorId) return "Former member";
   if (authorId === currentUserId) return "You";
   return authorName ?? "A team member";
 }

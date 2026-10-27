@@ -8,6 +8,7 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import { USER_ERASED_EVENT_TYPE, userErasedPayloadSchema } from "@langwatch/identity-contract";
 import type { z } from "zod";
 
 import type { DatasetModule } from "../app/dataset.app.ts";
@@ -42,7 +43,7 @@ import {
 
 const DATASET_VERSIONS_PIPELINE_NAME = "dataset_versions";
 
-/** What the pipeline needs of the app: the autosave and the retention sweep. */
+/** What the pipeline needs of the app: the autosave, the retention sweep and erasure. */
 export type DatasetVersionWork = {
   autosave(input: {
     projectId: string;
@@ -50,6 +51,7 @@ export type DatasetVersionWork = {
     editedBy: DatasetVersionAuthor;
   }): Promise<void>;
   sweepVersionRetention(input: { nowMs: number }): Promise<void>;
+  forgetVersionAuthor(input: { userId: string }): Promise<void>;
 };
 
 export type DatasetVersionsDefinition = StaticPipelineDefinition<
@@ -70,9 +72,9 @@ export type DatasetVersionsDefinition = StaticPipelineDefinition<
 >;
 
 /**
- * Dataset versions (spec modules/dataset/specs/dataset-versioning.feature): edits
- * are recorded as facts, the autosave process saves a version once they go
- * quiet, and a scheduled sweep thins old history.
+ * Dataset versions (spec modules/dataset/specs/dataset-versioning.feature): edits are
+ * recorded as facts, the autosave saves a version once they go quiet, a scheduled sweep
+ * thins old history, and an erased user is cleared from the versions they saved.
  */
 export function buildDatasetVersionsPipeline(work: DatasetVersionWork): DatasetVersionsDefinition {
   return definePipeline({
@@ -107,6 +109,11 @@ export function buildDatasetVersionsPipeline(work: DatasetVersionWork): DatasetV
         })
         .outbox({ maxAttempts: 3, concurrency: 1, batchSize: 1, leaseDurationMs: 15 * 60 * 1000 }),
     )
+    .withPeerSubscriber("datasetVersionUserErased", {
+      eventType: USER_ERASED_EVENT_TYPE,
+      data: userErasedPayloadSchema,
+      handle: ({ userId }) => work.forgetVersionAuthor({ userId }),
+    })
     .build();
 }
 

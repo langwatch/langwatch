@@ -1,14 +1,14 @@
 /**
  * @vitest-environment node
  * Dataset versions over the memory twins: saving, reading, comparing,
- * restoring, experiment runs, retention and the first-version step.
+ * restoring, experiment runs, retention, deletion and the first-version step.
  */
 import type { DatasetVersionAuthor } from "@langwatch/dataset-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { MigrationStepReport } from "@langwatch/upgrade/step";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
 import { MemoryDatasetVersionRepository } from "../../repositories/memory/memory.dataset-version.repository.ts";
@@ -537,6 +537,109 @@ describe("when the retention sweep runs", () => {
         index: 0,
       }),
     ).rejects.toBeInstanceOf(Error);
+  });
+});
+
+describe("given a dataset whose history may be retired", () => {
+  const chunkOf = (datasetId: string, versionId: string) =>
+    repositories.versionContent.readChunk({ projectId: PROJECT, datasetId, versionId, index: 0 });
+
+  async function datasetWithRunVersion() {
+    const datasetId = await createDataset();
+    const version = await save(datasetId, "Named");
+    await app.linkRunVersions({
+      projectId: PROJECT,
+      runId: "run-1",
+      versions: [{ datasetId, versionId: version.id }],
+    });
+    clock += 2 * DAY_MS;
+    return { datasetId, version };
+  }
+
+  const archive = async (datasetId: string, daysAgo: number) => {
+    const dataset = await repositories.datasets.findById({ id: datasetId, projectId: PROJECT });
+    await repositories.datasets.archive({
+      id: datasetId,
+      projectId: PROJECT,
+      slug: `${dataset!.slug}-archived`,
+      archivedAt: Temporal.Instant.fromEpochMilliseconds(clock - daysAgo * DAY_MS),
+    });
+  };
+
+  /** @scenario "An archived dataset keeps its history while it can be restored" */
+  it("keeps the history of a dataset archived 10 days ago", async () => {
+    const { datasetId } = await datasetWithRunVersion();
+    await archive(datasetId, 10);
+
+    const summary = await app.sweepVersionRetention({ nowMs: clock });
+
+    expect(summary.purged).toBe(0);
+    expect(await repositories.versions.findAll({ projectId: PROJECT, datasetId })).toHaveLength(1);
+  });
+
+  /** @scenario "A dataset archived for 30 days loses its history" */
+  it("removes the versions, chunks and run links of a dataset archived 30 days ago", async () => {
+    const { datasetId, version } = await datasetWithRunVersion();
+    await archive(datasetId, 30);
+
+    const summary = await app.sweepVersionRetention({ nowMs: clock });
+
+    expect(summary.purged).toBe(1);
+    expect(await repositories.versions.findAll({ projectId: PROJECT, datasetId })).toEqual([]);
+    expect(await app.findRunVersions({ projectId: PROJECT, runIds: ["run-1"] })).toEqual([]);
+    await expect(chunkOf(datasetId, version.id)).rejects.toBeInstanceOf(Error);
+  });
+
+  /** @scenario "A dataset that no longer exists loses its history" */
+  it("removes the versions and chunks of a dataset that is gone", async () => {
+    const { datasetId, version } = await datasetWithRunVersion();
+    vi.spyOn(repositories.datasets, "findById").mockResolvedValue(null);
+
+    const summary = await app.sweepVersionRetention({ nowMs: clock });
+
+    expect(summary.purged).toBe(1);
+    expect(await repositories.versions.findAll({ projectId: PROJECT, datasetId })).toEqual([]);
+    await expect(chunkOf(datasetId, version.id)).rejects.toBeInstanceOf(Error);
+  });
+
+  /** @scenario "Datasets in a project archived for 30 days lose their history" */
+  it("removes the history of every dataset in a project archived 30 days ago", async () => {
+    const projects = createDatasetTestProjects();
+    boot(projects);
+    const { datasetId, version } = await datasetWithRunVersion();
+    vi.spyOn(projects, "findById").mockResolvedValue({
+      archivedAt: new Date(clock - 30 * DAY_MS),
+    } as Awaited<ReturnType<ProjectApi["findById"]>>);
+
+    const summary = await app.sweepVersionRetention({ nowMs: clock });
+
+    expect(summary.purged).toBe(1);
+    expect(await repositories.versions.findAll({ projectId: PROJECT, datasetId })).toEqual([]);
+    await expect(chunkOf(datasetId, version.id)).rejects.toBeInstanceOf(Error);
+  });
+});
+
+describe("when a user who saved versions is erased", () => {
+  /** @scenario "An erased user is cleared from the versions they saved" */
+  it("clears the user from their versions and keeps the versions", async () => {
+    const datasetId = await createDataset();
+    await save(datasetId);
+    await edit(datasetId, "a", "changed");
+    await app.saveVersion({
+      projectId: PROJECT,
+      datasetId,
+      name: "By the platform",
+      editedBy: { kind: "system", id: null },
+    });
+
+    const forgotten = await app.forgetVersionAuthor({ userId: ALICE.id! });
+
+    expect(forgotten).toBe(1);
+    const versions = await versionsOf(datasetId);
+    expect(versions.map((version) => [version.authorKind, version.authorId])).toEqual([
+      ["system", null],
+      ["user", null],
+    ]);
   });
 });
 

@@ -261,6 +261,17 @@ export class DatasetVersionService {
     });
   }
 
+  /** Removes every version of one dataset, with its stored rows and run links. */
+  async purgeDataset(input: { projectId: string; datasetId: string }): Promise<number> {
+    const versions = await this.deps.versions.findAll(input);
+    return this.remove({ projectId: input.projectId, versions });
+  }
+
+  /** Clears an erased user from every version they saved; the versions stay. */
+  forgetAuthor(input: { userId: string }): Promise<number> {
+    return this.deps.versions.forgetAuthor(input);
+  }
+
   async #readyDataset(input: { projectId: string; datasetId: string }): Promise<Dataset> {
     const dataset = await this.deps.lookup({
       projectId: input.projectId,

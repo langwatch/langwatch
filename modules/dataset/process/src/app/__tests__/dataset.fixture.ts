@@ -39,6 +39,9 @@ export function createDatasetTestUsers(): UserApi {
 export function createDatasetTestProjects(organizationId = "organization-1"): ProjectApi {
   return Object.assign(createApiFixture<ProjectApi>(), {
     getOrganizationId: vi.fn(async () => organizationId),
+    findById: vi.fn(
+      async () => ({ archivedAt: null }) as Awaited<ReturnType<ProjectApi["findById"]>>,
+    ),
   });
 }
 

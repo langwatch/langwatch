@@ -19,6 +19,8 @@ const WEEK_MS = 7 * DAY_MS;
 export const DATASET_VERSION_KEEP_ALL_MS = DAY_MS;
 /** Past the first day, one a day is kept until this age; past it, one a week. */
 export const DATASET_VERSION_KEEP_DAILY_MS = DAY_MS + 30 * DAY_MS;
+/** How long an archived dataset keeps its history, so an undone archive still has it. */
+export const DATASET_VERSION_ARCHIVED_KEEP_MS = 30 * DAY_MS;
 /** 1970-01-01 is a Thursday; weeks are counted from the Monday after it. */
 const FIRST_MONDAY_MS = 4 * DAY_MS;
 
