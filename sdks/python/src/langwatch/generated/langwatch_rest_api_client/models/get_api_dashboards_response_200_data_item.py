@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from dateutil.parser import isoparse
+
+from ..models.get_api_dashboards_response_200_data_item_scope import GetApiDashboardsResponse200DataItemScope
 
 T = TypeVar("T", bound="GetApiDashboardsResponse200DataItem")
 
@@ -16,35 +16,45 @@ class GetApiDashboardsResponse200DataItem:
     Attributes:
         id (str):
         name (str):
-        order (int):
-        created_at (datetime.datetime):
-        updated_at (datetime.datetime):
+        description (None | str):
+        scope (GetApiDashboardsResponse200DataItemScope):
+        created_by_id (None | str):
+        created_at (str):
+        updated_at (str):
         platform_url (str):
-        graph_count (int):
+        widget_count (int):
     """
 
     id: str
     name: str
-    order: int
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
+    description: None | str
+    scope: GetApiDashboardsResponse200DataItemScope
+    created_by_id: None | str
+    created_at: str
+    updated_at: str
     platform_url: str
-    graph_count: int
+    widget_count: int
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
 
         name = self.name
 
-        order = self.order
+        description: None | str
+        description = self.description
 
-        created_at = self.created_at.isoformat()
+        scope = self.scope.value
 
-        updated_at = self.updated_at.isoformat()
+        created_by_id: None | str
+        created_by_id = self.created_by_id
+
+        created_at = self.created_at
+
+        updated_at = self.updated_at
 
         platform_url = self.platform_url
 
-        graph_count = self.graph_count
+        widget_count = self.widget_count
 
         field_dict: dict[str, Any] = {}
 
@@ -52,11 +62,13 @@ class GetApiDashboardsResponse200DataItem:
             {
                 "id": id,
                 "name": name,
-                "order": order,
+                "description": description,
+                "scope": scope,
+                "createdById": created_by_id,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
                 "platformUrl": platform_url,
-                "graphCount": graph_count,
+                "widgetCount": widget_count,
             }
         )
 
@@ -69,24 +81,40 @@ class GetApiDashboardsResponse200DataItem:
 
         name = d.pop("name")
 
-        order = d.pop("order")
+        def _parse_description(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
 
-        created_at = isoparse(d.pop("createdAt"))
+        description = _parse_description(d.pop("description"))
 
-        updated_at = isoparse(d.pop("updatedAt"))
+        scope = GetApiDashboardsResponse200DataItemScope(d.pop("scope"))
+
+        def _parse_created_by_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        created_by_id = _parse_created_by_id(d.pop("createdById"))
+
+        created_at = d.pop("createdAt")
+
+        updated_at = d.pop("updatedAt")
 
         platform_url = d.pop("platformUrl")
 
-        graph_count = d.pop("graphCount")
+        widget_count = d.pop("widgetCount")
 
         get_api_dashboards_response_200_data_item = cls(
             id=id,
             name=name,
-            order=order,
+            description=description,
+            scope=scope,
+            created_by_id=created_by_id,
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
-            graph_count=graph_count,
+            widget_count=widget_count,
         )
 
         return get_api_dashboards_response_200_data_item
