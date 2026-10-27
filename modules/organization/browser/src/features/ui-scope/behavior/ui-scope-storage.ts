@@ -103,7 +103,7 @@ export function broadcastUiScopeWrite(key: string): void {
 }
 
 /**
- * The remembered scope, re-read on every document write — cached against
+ * The remembered scope, re-read on every write in this document, cached against
  * the raw strings so React sees a stable value; a fresh object every
  * read would make `useSyncExternalStore` re-render forever.
  */
@@ -127,13 +127,10 @@ class UiScopeMemoryStore {
     return this.cached;
   };
 
+  /** This document's writes only: following another tab's made two tabs overwrite each other. */
   subscribe = (listener: () => void): (() => void) => {
-    window.addEventListener("storage", listener);
     window.addEventListener(SAME_DOCUMENT_STORAGE_EVENT, listener);
-    return () => {
-      window.removeEventListener("storage", listener);
-      window.removeEventListener(SAME_DOCUMENT_STORAGE_EVENT, listener);
-    };
+    return () => window.removeEventListener(SAME_DOCUMENT_STORAGE_EVENT, listener);
   };
 }
 
