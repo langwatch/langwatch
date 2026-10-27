@@ -22,7 +22,7 @@ const projectId = `${namespace}-project`;
 const teamId = `${namespace}-team`;
 const organizationId = `${namespace}-organization`;
 const agentId = `${namespace}-agent`;
-const author = { authorId: null, authorKind: "api_key" } as const;
+const userAuthor = { authorId: "user_versions_ada", authorKind: "user" } as const;
 
 function configAt(prompt: string) {
   return parseAgentConfig("signature", {
@@ -83,7 +83,7 @@ describe.skipIf(!databaseUrl)("Prisma agent versions", () => {
       name: "Support bot",
       type: "signature",
       config: configAt("v1"),
-      author,
+      author: userAuthor,
     });
     await repository.update({
       id: agentId,
@@ -91,8 +91,16 @@ describe.skipIf(!databaseUrl)("Prisma agent versions", () => {
       type: "signature",
       config: configAt("v2"),
       commitMessage: "Use the new endpoint",
-      author,
+      author: userAuthor,
     });
+
+    const head = await repository.getById({ id: agentId, projectId });
+    expect([head.createdById, head.updatedById]).toEqual([
+      "user_versions_ada",
+      "user_versions_ada",
+    ]);
+    const [listed] = await repository.findAll({ projectId });
+    expect(listed?.createdById).toBe("user_versions_ada");
 
     const versions = await repository.findVersions({ projectId, agentId });
     expect(versions.map((row) => [row.version, row.commitMessage])).toEqual([
