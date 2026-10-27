@@ -94,7 +94,7 @@ const SCOPE_SCENARIO_FLAG_HELP =
  * eating argv until the next flag.
  */
 const TARGET_FLAG_HELP =
-  "What to run against, written <type>:<referenceId>, for example connected:support-agent. The types are connected, http, code, prompt and workflow. connected:<name> runs the agent in development, or in the one other environment it is online in; connected:<name>@<environment> names the environment, for example connected:support-agent@production, and connected:<id> names the agent by id. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example connected:support-agent?model=gpt-5, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
+  "What to run against, written <type>:<referenceId>, for example connected:support-agent. The types are connected, http, code, prompt and workflow. connected:<name> runs the agent in development, or in the one other environment it is online in; connected:<name>@<environment> names the environment, for example connected:support-agent@production, and connected:<id> names the agent by id. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example connected:support-agent?model=gpt-6-sol, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
 
 const RUN_NAME_FLAG_HELP =
   "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";
@@ -2279,7 +2279,7 @@ function registerModelProviderCommands(program: Command): void {
       .description("Configure a model provider (e.g. openai, anthropic)")
       .option("--enabled <boolean>", "Enable or disable the provider", (v) => v === "true")
       .option("--api-key <key>", "API key for the provider")
-      .option("--default-model <model>", "Default model to use (e.g. gpt-5-mini)")
+      .option("--default-model <model>", "Default model to use (e.g. gpt-6-luna)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       provider: string,

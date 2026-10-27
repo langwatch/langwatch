@@ -76,7 +76,7 @@ async function handleUserMessage(message: string, context: UserContext): Promise
       console.log("");
 
       const result = await generateText({
-        model: openai("gpt-4o-mini"),
+        model: openai("gpt-6-luna"),
         messages: [
           {
             role: "system",
