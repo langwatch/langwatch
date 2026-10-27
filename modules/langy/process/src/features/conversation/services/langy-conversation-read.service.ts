@@ -17,7 +17,6 @@ import {
   LangyConversationNotFoundError,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 
 import type { LangyConversationProcessingEvent } from "../../../eventing/langy-conversation-state.projection.ts";
 import type {
@@ -37,7 +36,10 @@ import {
   pickLatestControlRequest,
   type LatestControlRequestReading,
 } from "../../../rules/langy-local-control-request-state.rules.ts";
-import type { LangyConversationEventsReader } from "./langy-conversation.service.ts";
+import type {
+  LangyConversationEventsReader,
+  LangyConversationRuntime,
+} from "./langy-conversation.service.ts";
 
 /**
  * Hard ceiling on one tail response — a conversation's whole event set is
@@ -54,15 +56,15 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 const DISPATCH_LAG_ATTEMPTS = 12;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
- * Lookback for the evidence read: well past the dispatch budget, so every in-flight
- * create is caught, yet bounded so a long FOREIGN conversation costs no more than an
- * absent id (no timing oracle, CWE-208). Older conversations exit at the grace.
+ * Lookback for the event-log evidence read: well past the dispatch budget, so an
+ * in-flight create is caught, yet bounded so a long FOREIGN conversation costs no
+ * more than an absent id (no timing oracle, CWE-208).
  */
 const DISPATCH_EVIDENCE_WINDOW_MS = 5 * 60 * 1000;
 /**
- * No-evidence attempts before giving up. Non-zero because the queued append trails
- * the accept; one shared exit for absent, foreign, archived ids and reader outages,
- * so an invisible id never answers on a different clock than a missing one.
+ * No-evidence attempts before giving up. Non-zero because the admission receipt and
+ * the queued append both trail the send; one shared exit for absent, foreign and
+ * archived ids, so an invisible id never answers on a different clock than a missing one.
  */
 const DISPATCH_EVIDENCE_GRACE_ATTEMPTS = 3;
 
@@ -104,6 +106,7 @@ type LangyConversationReadOptions = {
   repository: LangyConversationRepository;
   events: LangyConversationEventsReader | null;
   turnStates: StateProjectionStore<LangyConversationTurnData> | null;
+  runtime: Pick<LangyConversationRuntime, "now">;
 };
 
 export class LangyConversationReadService {
@@ -114,8 +117,8 @@ export class LangyConversationReadService {
   private constructor(private readonly deps: LangyConversationReadOptions) {}
 
   /**
-   * Visibility read tolerant of the async fold. Log evidence that the caller will see
-   * the row extends the wait to the full budget; every other miss exits at one shared
+   * Visibility read tolerant of the async fold. Evidence that the caller will see the
+   * row extends the wait to the full budget; every other miss exits at one shared
    * grace (no existence oracle). The answer always comes from the retried read.
    */
   private async findVisibleToleratingDispatchLag({
@@ -141,12 +144,17 @@ export class LangyConversationReadService {
         return row;
       }
 
-      // Short-circuits once the log has said wait: evidence is not re-read
-      // every beat after, only the projection is. Re-asked until then because
-      // commands are queued — the event append can trail the accept by a beat,
-      // so "nothing on the log yet" early on means "too soon to tell".
+      // Re-asked every beat until it says wait: the receipt lands on the same
+      // send we are waiting for, so "no evidence yet" early on means "too soon
+      // to tell". The log is consulted once, at the grace exit, for every id.
       waitOutFullBudget =
-        waitOutFullBudget || (await this.dispatchInFlightEvidence({ id, projectId, userId }));
+        waitOutFullBudget ||
+        (await this.dispatchInFlightEvidence({
+          id,
+          projectId,
+          userId,
+          consultLog: attempt === DISPATCH_EVIDENCE_GRACE_ATTEMPTS,
+        }));
       if (!waitOutFullBudget && attempt >= DISPATCH_EVIDENCE_GRACE_ATTEMPTS) {
         return null;
       }
@@ -162,26 +170,31 @@ export class LangyConversationReadService {
   }
 
   /**
-   * Whether a projection miss is worth waiting out, read from the event log the fold
-   * consumes. Empty log, no reader, or a failed read all mean "no evidence": only
-   * evidence ESTABLISHING visibility may extend the wait (else a CWE-208 timing signal).
+   * Whether a projection miss is worth waiting out. The sender's indexed admission
+   * receipt decides; the event log only adds the case it cannot see, a non-owner
+   * reading a just-shared conversation. No reader or a failed read keeps the receipt's answer.
    */
   private async dispatchInFlightEvidence({
     id,
     projectId,
     userId,
+    consultLog,
   }: {
     id: string;
     projectId: string;
     userId: string;
+    consultLog: boolean;
   }): Promise<boolean> {
-    if (!this.deps.events) return false;
+    const admitted = await this.deps.repository
+      .hasAdmittedTurn({ projectId, conversationId: id, userId })
+      .catch(() => false);
+    if (admitted || !consultLog || !this.deps.events) return admitted;
     try {
       const events = await this.deps.events.getEventsOccurredSince({
         aggregateId: id,
         context: { tenantId: createTenantId(projectId) },
         aggregateType: "langy_conversation",
-        occurredAtFromMs: Math.max(0, nowInstant().epochMilliseconds - DISPATCH_EVIDENCE_WINDOW_MS),
+        occurredAtFromMs: Math.max(0, this.deps.runtime.now() - DISPATCH_EVIDENCE_WINDOW_MS),
       });
       return events.length > 0 && eventLogSaysVisible(events, userId);
     } catch (error) {
@@ -191,9 +204,9 @@ export class LangyConversationReadService {
           conversationId: id,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Event-log evidence read failed during the dispatch window — treating as no evidence (short grace)",
+        "Event-log evidence read failed during the dispatch window — keeping the admission receipt's answer",
       );
-      return false;
+      return admitted;
     }
   }
 

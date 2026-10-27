@@ -52,12 +52,29 @@ export interface LangyMessagesResult {
   error: unknown;
 }
 
+/** How often a conversation this tab just minted is re-read until its first data lands. */
+const UNCONFIRMED_POLL_MS = 1_000;
+
+/**
+ * Self-stopping poll for a freshly minted conversation (#7987): its first read races the
+ * async fold and 404s, a 404 is never retried, and nothing else re-asks. Stops on the
+ * first data, whose success confirms the conversation and drops the flag.
+ */
+export function langyMessagesPollInterval(data: unknown, unconfirmed: boolean): number | false {
+  return !data && unconfirmed ? UNCONFIRMED_POLL_MS : false;
+}
+
 /**
  * HEAVY, on-demand message history for one conversation (`langy.messages`), refreshed by the
  * turn's read hints (`langy.trpc.ts`). Notifications never depend on it: the server sends them.
  */
 export function useLangyMessages(conversationId: string | null): LangyMessagesResult {
   const { project } = useOrganizationTeamProject();
+  // Keyed on THIS hook's conversation, not the store's active one: the poll follows
+  // the query it drives, and the two ids diverge mid-switch.
+  const unconfirmed = useLangyStore(
+    (s) => !!conversationId && s.unconfirmedConversations[conversationId] === true,
+  );
 
   const query = api.langy.messages.useQuery(
     {
@@ -69,6 +86,7 @@ export function useLangyMessages(conversationId: string | null): LangyMessagesRe
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       placeholderData: keepPreviousData,
+      refetchInterval: (query) => langyMessagesPollInterval(query.state.data, unconfirmed),
     },
   );
 

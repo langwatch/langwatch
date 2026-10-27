@@ -85,7 +85,7 @@ export class LangyConversationService {
     this.finalParts = finalParts;
     this.runtime = runtime;
     this.turnOrder = turnOrder;
-    this.reads = LangyConversationReadService.create({ repository, events, turnStates });
+    this.reads = LangyConversationReadService.create({ repository, events, turnStates, runtime });
     this.turns = LangyConversationTurnService.create({
       repository,
       commands,
