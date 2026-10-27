@@ -30,7 +30,10 @@ import {
 
 import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
 import type { TraceBlobStoreService } from "../../../features/media/services/trace-blob-store.service.ts";
-import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
+import {
+  blobStoreResolving,
+  eventLogReads,
+} from "../../__tests__/support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -203,7 +206,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces()", () =
           logger,
         });
 
-        expect(blobSvc.getFromEventLog).not.toHaveBeenCalled();
+        expect(eventLogReads(blobSvc)).not.toHaveBeenCalled();
       });
 
       it("anyResolved is false", async () => {

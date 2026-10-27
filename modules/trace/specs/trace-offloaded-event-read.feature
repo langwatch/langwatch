@@ -25,3 +25,26 @@ Feature: An offloaded trace field reads whole through eventing's event read seat
     Given the trace repositories are selected on the memory tier
     When the trace read recalls an offloaded field
     Then the recall raises and the caller serves the preview
+
+  Rule: A read brings a trace's offloaded fields back without exhausting the worker
+
+    @unit
+    Scenario: Several offloaded fields of one span event are recalled with one read of it
+      Given a span event that recorded both an offloaded input and an offloaded output
+      When the trace read recalls both fields
+      Then the event is read once and both full values are served
+
+    @unit
+    Scenario: A recall keeps a bounded number of event reads in flight
+      Given a trace with more offloaded span events than the recall's concurrency
+      When the trace read recalls them
+      Then no more event reads than the concurrency are in flight at once
+
+    @unit
+    Scenario: A trace past its recall budget keeps the previews of the rest
+      Given a trace whose offloaded values exceed the per-trace recall budget
+      When the trace read recalls them
+      Then the fields read before the budget ran out are served whole
+      And the rest keep their previews without being read
+      And another trace in the same read is not affected
+      And the read does not fail

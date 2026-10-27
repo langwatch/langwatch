@@ -1,12 +1,19 @@
 import type { Logger } from "@langwatch/observability";
 
 import type { TraceLegacySpool } from "../../../channels/trace-legacy-spool.channel.ts";
-import type { TracePayloadReaderRepository } from "../../../repositories/trace-payload-reader.repository.ts";
+import type {
+  OffloadRecallOutcome,
+  TracePayloadReaderRepository,
+} from "../../../repositories/trace-payload-reader.repository.ts";
 import type {
   TraceSpoolDestinationKind,
   TraceSpoolObjectAddress,
   TraceSpoolObjectsRepository,
 } from "../../../repositories/trace-spool-objects.repository.ts";
+import {
+  type OffloadedFieldReference,
+  offloadedFieldKey,
+} from "../../../rules/trace-offload-recall.rules.ts";
 import { TraceStreamBufferService } from "../../../services/trace-stream-buffer.service.ts";
 import {
   assertLegacySpoolKeyBelongsTo,
@@ -38,7 +45,7 @@ export interface SpoolStorage {
 }
 
 /**
- * Thrown by `TraceBlobStoreService.getFromEventLog` when the requested row is not found or
+ * Thrown by an offloaded-field read when the requested row is not found or
  * the TenantId predicate returns no rows (including cross-tenant attempts).
  * ADR-022: TenantId in the WHERE clause structurally blocks cross-tenant reads.
  */
@@ -54,7 +61,7 @@ export class BlobNotFoundError extends Error {
 }
 
 /**
- * Thrown by `TraceBlobStoreService.getFromEventLog` when the requested `field` is not
+ * Thrown by an offloaded-field read when the requested `field` is not
  * present in the EventPayload. Indicates a corrupted event or a stale ref.
  */
 export class BlobFieldNotFoundError extends Error {
@@ -198,28 +205,30 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Fetches an offloaded field from the trace event that recorded it (ADR-022 read path), through
-   * trace's payload reader, tenant first. Arrow property (not a prototype method) so a test mock
-   * can assert on it unbound-safely.
+   * Recalls offloaded fields from the trace events that recorded them (ADR-022 read path), tenant
+   * first: one read per event, bounded, within a per-trace budget. Arrow property (not a prototype
+   * method) so a test mock can assert on it unbound-safely.
    */
-  getFromEventLog = async ({
-    eventId,
-    field,
+  recallFromEventLog = async ({
     tenantId,
-    aggregateId,
+    references,
+    concurrency,
   }: {
-    eventId: string;
-    field: string;
     tenantId: string;
-    aggregateId: string;
-  }): Promise<string> => {
+    references: readonly OffloadedFieldReference[];
+    concurrency?: number;
+  }): Promise<Map<string, OffloadRecallOutcome>> => {
     if (!this.payloads) {
-      throw new Error(
+      // Every field keeps its preview, each answering why, as a failed read would.
+      const error = new Error(
         "No trace payload reader configured: cannot read an offloaded field (ADR-022)",
+      );
+      return new Map(
+        references.map((reference) => [offloadedFieldKey(reference), { ok: false, error }]),
       );
     }
 
-    return this.payloads.read({ tenantId, traceId: aggregateId, eventId, field });
+    return this.payloads.recall({ tenantId, references, ...(concurrency ? { concurrency } : {}) });
   };
 
   /**

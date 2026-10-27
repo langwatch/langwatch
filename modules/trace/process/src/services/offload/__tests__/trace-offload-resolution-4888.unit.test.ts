@@ -39,6 +39,7 @@ import {
   BlobNotFoundError,
 } from "../../../features/media/services/trace-blob-store.service.ts";
 import {
+  eventLogReads,
   blobStoreReading,
   blobStoreResolving,
   blobStoreWithoutClickHouse,
@@ -270,7 +271,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
           logger,
         });
 
-        expect(blobSvc.getFromEventLog).toHaveBeenCalledTimes(1);
+        expect(eventLogReads(blobSvc)).toHaveBeenCalledTimes(1);
       });
 
       it("no key with prefix 'langwatch.reserved.' remains in returned span attributes", async () => {
@@ -333,7 +334,7 @@ describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC
           logger,
         });
 
-        expect(blobSvc.getFromEventLog).toHaveBeenCalledTimes(0);
+        expect(eventLogReads(blobSvc)).toHaveBeenCalledTimes(0);
       });
 
       it("returns spans unchanged (same object reference)", async () => {
