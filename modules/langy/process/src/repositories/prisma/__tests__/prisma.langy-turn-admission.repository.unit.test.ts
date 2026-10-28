@@ -39,18 +39,33 @@ function emptyTransactionClient() {
   });
 }
 
+/** A transaction client where a racing send of the same turn already wrote its receipt. */
+function racedTransactionClient(status: "committed" | "preparing") {
+  return prismaDouble({
+    langyTurnRequest: {
+      findUnique: vi.fn().mockResolvedValue({
+        id: "receipt-racing",
+        conversationId: CLAIM_INPUT.conversationId,
+        turnId: CLAIM_INPUT.turnId,
+        status,
+        leaseExpiresAt: new Date(Date.now() + 60_000),
+      }),
+    },
+  });
+}
+
 /**
  * A fake database whose transactions fail with the given errors, then run the
- * admission body against an empty transaction client.
+ * admission body against the given transaction client.
  */
-function fakeDatabase(failures: unknown[]) {
+function fakeDatabase(failures: unknown[], tx = emptyTransactionClient()) {
   let calls = 0;
   const database = prismaDouble({
-    $transaction: async (callback: (tx: unknown) => Promise<unknown>) => {
+    $transaction: vi.fn(async (callback) => {
       calls += 1;
       if (calls <= failures.length) throw failures[calls - 1];
-      return callback(emptyTransactionClient());
-    },
+      return callback(tx);
+    }),
   });
   return { database, calls: () => calls };
 }
@@ -71,13 +86,36 @@ function uniqueKeyClash(): Error {
 
 describe("PrismaLangyTurnAdmissionRepository.claim", () => {
   describe("given the first attempt hits a unique-key clash", () => {
-    /** @scenario A racing send that created the receipt first does not fail my send */
-    it("retries and returns the claim from the second attempt", async () => {
-      const { database, calls } = fakeDatabase([uniqueKeyClash()]);
-      const repository = PrismaLangyTurnAdmissionRepository.create(database);
+    describe("when the racing send has already committed", () => {
+      /** @scenario A send that clashes with an already committed copy replays it */
+      it("retries and replays the committed send", async () => {
+        const { database, calls } = fakeDatabase(
+          [uniqueKeyClash()],
+          racedTransactionClient("committed"),
+        );
+        const repository = PrismaLangyTurnAdmissionRepository.create(database);
 
-      await expect(repository.claim(CLAIM_INPUT)).resolves.toMatchObject(CLAIMED);
-      expect(calls()).toBe(2);
+        await expect(repository.claim(CLAIM_INPUT)).resolves.toEqual({
+          kind: "replay",
+          conversationId: CLAIM_INPUT.conversationId,
+          turnId: CLAIM_INPUT.turnId,
+        });
+        expect(calls()).toBe(2);
+      });
+    });
+
+    describe("when the racing send is still preparing", () => {
+      /** @scenario A send that clashes with a copy still being prepared is held as pending */
+      it("retries and answers pending", async () => {
+        const { database, calls } = fakeDatabase(
+          [uniqueKeyClash()],
+          racedTransactionClient("preparing"),
+        );
+        const repository = PrismaLangyTurnAdmissionRepository.create(database);
+
+        await expect(repository.claim(CLAIM_INPUT)).resolves.toEqual({ kind: "pending" });
+        expect(calls()).toBe(2);
+      });
     });
   });
 
