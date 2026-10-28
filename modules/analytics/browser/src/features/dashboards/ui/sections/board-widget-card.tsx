@@ -44,6 +44,7 @@ export function BoardWidgetCard({
   onEdit,
   onDuplicate,
   onDelete,
+  onEmptyChange,
 }: {
   widget: BoardWidget;
   projectId: string;
@@ -61,6 +62,8 @@ export function BoardWidgetCard({
   onEdit?: (input: { withLangy: boolean }) => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
+  /** Told whether the card shows none of the widget's data. */
+  onEmptyChange?: (empty: boolean) => void;
 }) {
   const host = useAnalyticsHost();
   const clipboard = useWidgetClipboard({ dashboardId });
@@ -127,6 +130,7 @@ export function BoardWidgetCard({
         excludeOrigins={excludeOrigins}
         onFaceChange={setFace}
         onExportChange={csvExport.onExportChange}
+        onEmptyChange={onEmptyChange}
         {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
       />
     </WidgetCardShell>

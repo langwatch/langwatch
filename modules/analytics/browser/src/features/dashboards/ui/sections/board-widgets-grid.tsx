@@ -24,6 +24,7 @@ export function BoardWidgetsGrid({
   onDuplicate,
   onDelete,
   onPlacementsCommit,
+  onEmptyChange,
 }: {
   projectId: string;
   projectSlug: string;
@@ -39,6 +40,8 @@ export function BoardWidgetsGrid({
   onDuplicate?: (widget: BoardWidget) => void;
   onDelete?: (widget: BoardWidget) => void;
   onPlacementsCommit?: (placements: ChartGridPlacement[]) => void;
+  /** Told whether each widget shows none of its data. */
+  onEmptyChange?: (input: { widget: BoardWidget; empty: boolean }) => void;
 }) {
   const byId = new Map(widgets.map((widget) => [widget.id, widget]));
 
@@ -64,6 +67,7 @@ export function BoardWidgetsGrid({
             onEdit={onEdit && (({ withLangy }) => onEdit({ widget, withLangy }))}
             onDuplicate={onDuplicate && (() => onDuplicate(widget))}
             onDelete={onDelete && (() => onDelete(widget))}
+            onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}
           />
         );
       }}

@@ -198,6 +198,25 @@ describe("given a widget whose compiled module has a default export", () => {
     }
   });
 
+  describe("when the widget mounts", () => {
+    /** @scenario "A widget whose code is still loading keeps its skeleton" */
+    it("tells the shim its code has mounted once the widget's own effects ran", async () => {
+      const { rendered, win } = await mountDefaultExport(() => null);
+      const mounted = vi.fn();
+      win.__lwAuthorMounted = mounted;
+      const effects: (() => void)[] = [];
+      (win.React as Record<string, unknown>).useEffect = (effect: () => void) =>
+        effects.push(effect);
+
+      const boundary = rendered[0] as { children: { type: () => unknown }[] };
+      boundary.children[1]?.type();
+      expect(mounted).not.toHaveBeenCalled();
+      for (const effect of effects) effect();
+
+      expect(mounted).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when the module has no default export at all", () => {
     it("shows the No default export panel and mounts nothing", async () => {
       const { rendered, panel } = await mountDefaultExport(undefined);
