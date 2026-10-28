@@ -26,11 +26,18 @@ export const PARK_RECONCILE_MAX_DRAIN = 1000;
 export const RECONCILE_INTERVAL_MS = 2000;
 
 /**
- * How often dispatch looks again at a group a worker holds: the claim and every heartbeat put
- * its ready score this far out, never the active key's whole TTL, so a dead owner's claim is
- * reclaimed within a beacon lifetime plus this (specs/claimed-job-recovery.feature).
+ * How soon dispatch looks again at a held group it found due: a heartbeat that ran late, or an
+ * owner whose beacon is missing. The claim and each heartbeat put a held group half its active
+ * TTL out, past the next heartbeat, so a running group stays out of the due window.
  */
 export const CLAIM_RECHECK_MS = 30_000;
+
+/**
+ * A missing beacon is acted on only when seen again this long after it was first seen: twice the
+ * beacon refresh, so an owner back from a Redis outage republishes in between and keeps its claim
+ * (specs/claimed-job-recovery.feature).
+ */
+export const CLAIM_GONE_CONFIRM_MS = 60_000;
 
 /** How far back a listed run's jobless group that stays (a failure, say) goes in its candidates. */
 const SETTLED_CANDIDATE_DELAY_MS = 3_600_000;
@@ -677,12 +684,25 @@ local function gqReleaseClaimMarker(claimKey, workerId, claimToken)
 end
 
 -- The held claim's owner is gone: the marker is this very claim's (its token is the claimed
--- record's) and its owner publishes no beacon at all. Alive or retired owners are still running.
-local function gqClaimOwnerGone(keyPrefix, groupId, claimedKey)
-  local marker = redis.call("HMGET", keyPrefix .. "group:" .. groupId .. ":claim", "owner", "token")
+-- record's) and its owner has published no beacon at all at two looks CLAIM_GONE_CONFIRM_MS
+-- apart. The first look only records the suspicion; an alive or retired owner clears it.
+local function gqClaimOwnerGone(keyPrefix, groupId, claimedKey, nowMs)
+  local claimKey = keyPrefix .. "group:" .. groupId .. ":claim"
+  local marker = redis.call("HMGET", claimKey, "owner", "token")
   if not marker[1] or not marker[2] or marker[2] == "" then return false end
   if redis.call("HGET", claimedKey, "token") ~= marker[2] then return false end
-  return redis.call("EXISTS", keyPrefix .. "worker:" .. marker[1]) == 0
+  local suspectKey = claimKey .. ":suspect"
+  if redis.call("EXISTS", keyPrefix .. "worker:" .. marker[1]) == 1 then
+    redis.call("DEL", suspectKey)
+    return false
+  end
+  local seen = marker[2] .. "|"
+  local suspect = redis.call("GET", suspectKey)
+  if suspect and string.sub(suspect, 1, #seen) == seen then
+    return nowMs - (tonumber(string.sub(suspect, #seen + 1)) or nowMs) >= ${CLAIM_GONE_CONFIRM_MS}
+  end
+  redis.call("SET", suspectKey, seen .. nowMs, "PX", ${CLAIM_GONE_CONFIRM_MS * 10})
+  return false
 end
 `;
 
@@ -1266,14 +1286,14 @@ local function scanBatch(effCap, bypassPark, dispatched)
         end
         removedAllowed = removedAllowed + 1
       end
-      -- A held group comes up every CLAIM_RECHECK_MS, ahead of the cap and pause checks, which
-      -- must never park a group a worker is running. Its owner gone, the active key and the dead
-      -- claim's tenant slot go and the recovery below puts its jobs back; otherwise it comes up
-      -- again at the recheck or when the active key lapses, whichever is first (a retry's hold).
+      -- A held group that came due (a late heartbeat, a dead owner) is checked ahead of the cap
+      -- and pause checks, which must never park a running group. Its owner gone, the active key
+      -- and the dead claim's tenant slot go and the recovery below puts its jobs back; else it is
+      -- looked at again at the recheck or when the active key lapses (a retry's hold), if sooner.
       local heldMs = groupDue and redis.call("PTTL", keyPrefix .. "group:" .. groupId .. ":active") or -2
       if heldMs > 0 then
-        if gqClaimOwnerGone(keyPrefix, groupId, keyPrefix .. "group:" .. groupId .. ":claimed") then
-          redis.call("DEL", keyPrefix .. "group:" .. groupId .. ":active")
+        if gqClaimOwnerGone(keyPrefix, groupId, keyPrefix .. "group:" .. groupId .. ":claimed", nowMs) then
+          redis.call("DEL", keyPrefix .. "group:" .. groupId .. ":active", keyPrefix .. "group:" .. groupId .. ":claim:suspect")
           local heldTenant = parkTenantOf(groupId)
           tenantActiveRemove(keyPrefix .. "tenant_active_z:", heldTenant, groupId)
           tenantCapCache[heldTenant] = nil
@@ -1413,8 +1433,9 @@ local function scanBatch(effCap, bypassPark, dispatched)
               redis.call("DECR", totalPendingKey)
               redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-              -- Held: out of the due window until the owner's liveness is next checked.
-              redis.call("ZADD", readyKey, math.min(activeUntil, nowMs + ${CLAIM_RECHECK_MS}), groupId)
+              -- Held: half the active TTL out, past the first heartbeat, so a live claim never comes
+              -- due while a dead owner's does, long before its active key lapses.
+              redis.call("ZADD", readyKey, nowMs + activeTtlSec * 500, groupId)
               if restrictedDispatch then
                 redis.call("ZADD", allowedGroupsKey, nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS}, groupId)
               end
@@ -1798,7 +1819,7 @@ if gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   -- while this heartbeat was in flight, the group has been removed and we must not
   -- reinsert it (would violate "blocked => not in ready").
   if redis.call("ZSCORE", readyKey, groupId) then
-    redis.call("ZADD", readyKey, math.min(nowMs + activeTtlSec * 1000, nowMs + ${CLAIM_RECHECK_MS}), groupId)
+    redis.call("ZADD", readyKey, nowMs + activeTtlSec * 500, groupId)
   end
   if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
     local slashPos = string.find(groupId, "/", 1, true)

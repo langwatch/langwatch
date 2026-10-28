@@ -3,7 +3,12 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { CLAIM_RECHECK_MS, type DispatchResult, GroupStagingScripts } from "../scripts.ts";
+import {
+  CLAIM_GONE_CONFIRM_MS,
+  CLAIM_RECHECK_MS,
+  type DispatchResult,
+  GroupStagingScripts,
+} from "../scripts.ts";
 
 const SUITE = "{test/gqreclaim/";
 const LONG_ACTIVE_TTL_SEC = 300;
@@ -41,6 +46,7 @@ function freshQueue() {
     activeKey: `${keyPrefix}group:${group}:active`,
     claimedKey: `${keyPrefix}group:${group}:claimed`,
     markerKey: `${keyPrefix}group:${group}:claim`,
+    suspectKey: `${keyPrefix}group:${group}:claim:suspect`,
     beaconKey: (workerId: string) => `${keyPrefix}worker:${workerId}`,
     readyScore: async () => Number(await redis.zscore(`${keyPrefix}ready`, group)),
     parked: async () => redis.zscore(`${keyPrefix}parked:t1`, group),
@@ -72,14 +78,16 @@ function freshQueue() {
   };
 }
 
-/** A dispatch after the held group's recheck time, with the active key far from lapsing. */
-const AFTER_RECHECK_MS = CLAIM_RECHECK_MS + 1_000;
+/** The first dispatch a held group comes due for, with the active key far from lapsing. */
+const HELD_DUE_MS = LONG_ACTIVE_TTL_SEC * 500 + 1_000;
+/** A dispatch far enough after the first to confirm a missing beacon. */
+const CONFIRMED_MS = HELD_DUE_MS + CLAIM_GONE_CONFIRM_MS + 1_000;
 
 describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
   describe("given a worker that claims a job with its beacon alive and then dies", () => {
-    describe("when the group comes up while its active key still has most of its life", () => {
+    describe("when the group comes up twice, a confirmation apart, while its active key still has most of its life", () => {
       /** @scenario "A group whose worker's beacon is gone is reclaimed before its active key lapses" */
-      it("claims the job again at once, counts one death and frees the dead claim's tenant slot", async () => {
+      it("leaves it at the first look, then claims the job again, counts one death and frees the dead claim's tenant slot", async () => {
         const q = freshQueue();
         const now = Date.now();
         await q.stage("job-1", now - 1_000);
@@ -90,9 +98,12 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
 
         await redis.del(q.beaconKey("worker-that-dies"));
         await q.alive("live-worker");
+        const firstLook = await q.claim({ nowMs: now + HELD_DUE_MS, workerId: "live-worker" });
+        expect(firstLook).toBeUndefined();
+        expect(await redis.get(q.activeKey)).toBe("job-1");
         // The tenant cap is one, and the dead claim holds that slot: only freeing it lets the
         // reclaimed group be claimed again in the same dispatch rather than parked.
-        const second = await q.claim({ nowMs: now + AFTER_RECHECK_MS, workerId: "live-worker" });
+        const second = await q.claim({ nowMs: now + CONFIRMED_MS, workerId: "live-worker" });
 
         expect(second?.stagedJobId).toBe("job-1");
         expect(second?.claimToken).not.toBe(first?.claimToken);
@@ -114,7 +125,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         const held = await q.claim({ nowMs: now, workerId: "live-owner" });
         await q.alive("other-worker");
 
-        const dispatchedAt = now + AFTER_RECHECK_MS;
+        const dispatchedAt = now + HELD_DUE_MS;
         const again = await q.claim({ nowMs: dispatchedAt, workerId: "other-worker" });
 
         expect(again).toBeUndefined();
@@ -139,7 +150,8 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         const held = await q.claim({ nowMs: now, workerId: "retiring-worker" });
         await redis.set(q.beaconKey("retiring-worker"), "retired", "EX", 600);
 
-        const again = await q.claim({ nowMs: now + AFTER_RECHECK_MS });
+        await q.claim({ nowMs: now + HELD_DUE_MS });
+        const again = await q.claim({ nowMs: now + CONFIRMED_MS });
 
         expect(again).toBeUndefined();
         expect(await redis.get(q.activeKey)).toBe("job-1");
@@ -163,7 +175,8 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         });
         const held = await q.claim({ nowMs: now });
 
-        const again = await q.claim({ nowMs: now + AFTER_RECHECK_MS });
+        await q.claim({ nowMs: now + HELD_DUE_MS });
+        const again = await q.claim({ nowMs: now + CONFIRMED_MS });
 
         expect(again).toBeUndefined();
         expect(await redis.get(q.activeKey)).toBe("job-1");
@@ -172,15 +185,64 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
     });
   });
 
-  describe("given a worker that claims a group with a long active key", () => {
-    describe("when it claims the group and when its heartbeat refreshes the claim", () => {
-      /** @scenario "A held group comes up for dispatch within the recheck interval" */
-      it("puts the group's next look no later than the recheck interval out, not the active key's", async () => {
+  describe("given a worker whose beacon lapsed while Redis was unreachable", () => {
+    describe("when its beacon is back by the time the group comes up again", () => {
+      /** @scenario "A worker whose beacon lapses for a moment keeps its claim" */
+      it("keeps the claim and forgets the missing beacon, so a later lapse starts the confirmation over", async () => {
         const q = freshQueue();
         const now = Date.now();
         await q.stage("job-1", now - 1_000);
+        await q.alive("cut-off-worker");
+        const held = await q.claim({ nowMs: now, workerId: "cut-off-worker" });
+        await redis.del(q.beaconKey("cut-off-worker"));
+        await q.claim({ nowMs: now + HELD_DUE_MS });
+        expect(await redis.exists(q.suspectKey)).toBe(1);
+
+        await q.alive("cut-off-worker");
+        await q.claim({ nowMs: now + CONFIRMED_MS });
+        expect(await redis.exists(q.suspectKey)).toBe(0);
+        await redis.del(q.beaconKey("cut-off-worker"));
+        const again = await q.claim({ nowMs: now + CONFIRMED_MS + CLAIM_RECHECK_MS + 1_000 });
+
+        expect(again).toBeUndefined();
+        expect(await redis.get(q.activeKey)).toBe("job-1");
+        expect(await redis.hget(q.claimedKey, "token")).toBe(held?.claimToken);
+        expect(await redis.hget(q.markerKey, "deaths")).toBe("0");
+      });
+    });
+  });
+
+  describe("given a missing beacon recorded against an earlier claim of the group", () => {
+    describe("when a newer claim whose owner is gone first comes up for dispatch", () => {
+      /** @scenario "A missing beacon seen during an earlier claim does not count toward a newer one" */
+      it("keeps the newer claim, since its own confirmation has not started", async () => {
+        const q = freshQueue();
+        const now = Date.now();
+        await q.stage("job-1", now - 1_000);
+        await redis.set(q.suspectKey, `an-earlier-claim|${now - 10 * CLAIM_GONE_CONFIRM_MS}`);
+        await q.alive("worker-that-dies");
+        const held = await q.claim({ nowMs: now, workerId: "worker-that-dies" });
+        await redis.del(q.beaconKey("worker-that-dies"));
+
+        const again = await q.claim({ nowMs: now + HELD_DUE_MS });
+
+        expect(again).toBeUndefined();
+        expect(await redis.hget(q.claimedKey, "token")).toBe(held?.claimToken);
+        expect(await redis.get(q.suspectKey)).toBe(`${held?.claimToken}|${now + HELD_DUE_MS}`);
+      });
+    });
+  });
+
+  describe("given a worker that claims a group with a long active key", () => {
+    describe("when it claims the group and when its heartbeat refreshes the claim", () => {
+      /** @scenario "A held group comes up for dispatch after its next heartbeat, not when its active key lapses" */
+      it("puts the group's next look half the active key's life out: past the heartbeat at a third", async () => {
+        const q = freshQueue();
+        const now = Date.now();
+        const halfLifeMs = LONG_ACTIVE_TTL_SEC * 500;
+        await q.stage("job-1", now - 1_000);
         const held = await q.claim({ nowMs: now });
-        expect(await q.readyScore()).toBeLessThanOrEqual(now + CLAIM_RECHECK_MS);
+        expect(await q.readyScore()).toBe(now + halfLifeMs);
 
         const refreshedAt = Date.now();
         const refreshed = await q.scripts.refreshActiveKey({
@@ -192,8 +254,8 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
 
         expect(refreshed).toBe(true);
         expect(await redis.ttl(q.activeKey)).toBeGreaterThan(LONG_ACTIVE_TTL_SEC - 5);
-        expect(await q.readyScore()).toBeLessThanOrEqual(Date.now() + CLAIM_RECHECK_MS);
-        expect(await q.readyScore()).toBeGreaterThanOrEqual(refreshedAt);
+        expect(await q.readyScore()).toBeGreaterThanOrEqual(refreshedAt + halfLifeMs);
+        expect(await q.readyScore()).toBeLessThanOrEqual(Date.now() + halfLifeMs);
       });
     });
   });

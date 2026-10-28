@@ -2986,7 +2986,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
             workerId: this.workerId,
             error: err instanceof Error ? err.message : String(err),
           },
-          "Failed to publish worker liveness beacon; the poison guard may read this worker as dead if this persists",
+          "Failed to publish worker liveness beacon; if this persists, dispatch reclaims this worker's claims and the poison guard counts them as deaths",
         );
       }
     };

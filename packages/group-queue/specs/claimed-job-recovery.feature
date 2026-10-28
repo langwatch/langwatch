@@ -144,20 +144,21 @@ Feature: GroupQueue brings back a job whose worker died while running it
     Then it treats the group as in flight until the claimed record is gone
 
   Rule: A worker that is gone loses its claim when its beacon does, not when its active key does
-    The active key outlives a dead worker by up to its whole TTL, and the poison guard counts a
-    death the moment the owner's beacon is missing. A claimed group comes up for dispatch every
-    recheck interval while it is held; the scan then reclaims it if the claim marker for that very
-    claim names an owner with no beacon at all. An owner that is alive or retired keeps its claim
-    until the active key lapses, since a retiring worker is still draining. A live owner stalled
-    longer than the beacon's lifetime loses its claim too: at-least-once delivery runs the job
-    again, and the stalled owner's outcome is refused as a lost claim.
+    The active key outlives a dead worker by up to its whole TTL. The claim and each heartbeat put
+    a held group half the active TTL out, past the next heartbeat, so a live claim never comes due
+    but a dead owner's does. The scan reclaims it only if the claim marker for that very claim names
+    an owner with no beacon at two looks a confirmation interval apart, so a beacon lost to a short
+    Redis outage costs nothing. An alive or retired owner keeps its claim until the active key
+    lapses, since a retiring worker is still draining. A live owner stalled past the beacon's
+    lifetime loses its claim: the job runs again and its outcome is refused as a lost claim.
 
     @integration
     Scenario: A group whose worker's beacon is gone is reclaimed before its active key lapses
       Given a worker that claims a job with its beacon alive and then dies
       When its beacon is gone while its active key still has most of its life left
-      And the group comes up for dispatch
-      Then a live worker runs the job again without waiting for the active key
+      And the group comes up for dispatch, and again a confirmation interval later
+      Then the first look leaves the claim alone
+      And a live worker runs the job again at the second, without waiting for the active key
       And the death is counted once by the poison guard
       And the dead claim no longer counts against its tenant's in-flight cap
 
@@ -182,7 +183,22 @@ Feature: GroupQueue brings back a job whose worker died while running it
       Then the newer claim keeps its active key
 
     @integration
-    Scenario: A held group comes up for dispatch within the recheck interval
+    Scenario: A worker whose beacon lapses for a moment keeps its claim
+      Given a worker whose beacon lapsed while Redis was unreachable
+      And the group came up for dispatch while the beacon was missing
+      When its beacon is back by the time the group comes up again
+      Then the claim keeps its active key, claimed record and death count
+      And a later lapse of its beacon starts the confirmation over
+
+    @integration
+    Scenario: A missing beacon seen during an earlier claim does not count toward a newer one
+      Given a missing beacon recorded against an earlier claim of the group
+      And a newer claim whose worker's beacon is gone
+      When the group first comes up for dispatch
+      Then the newer claim keeps its active key
+
+    @integration
+    Scenario: A held group comes up for dispatch after its next heartbeat, not when its active key lapses
       Given a worker that claims a group with a long active key
       When it claims the group, and again when its heartbeat refreshes the claim
-      Then the group's ready score is no later than the recheck interval from then
+      Then the group's ready score is half the active key's life from then
