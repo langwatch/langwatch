@@ -54,7 +54,7 @@ const codeOf = (call: Promise<unknown>) =>
 
 describe("BoardService", () => {
   describe("given a member creates a board", () => {
-    /** @scenario "AC156 No board is starred unless the member stars it" */
+    /** @scenario "AC156 No board is pinned unless the member pins it" */
     it("stars it for nobody, the creator included", async () => {
       const { service, stars } = serviceWith();
 
@@ -78,7 +78,7 @@ describe("BoardService", () => {
     const myDashboard = (service: BoardService) =>
       service.createBoard({ projectId: PROJECT, name: MY_DASHBOARD_NAME, createdById: "member-1" });
 
-    /** @scenario "AC160b A member with no My dashboard gets one made, starred for them" */
+    /** @scenario "AC160b A member with no My dashboard gets one made, pinned for them" */
     it("stars it for its maker and for nobody else", async () => {
       const { service, stars } = serviceWith();
 
@@ -93,7 +93,7 @@ describe("BoardService", () => {
       }).toEqual({ maker: [created.id], other: [], listed: [true] });
     });
 
-    /** @scenario "AC160c A member who unstars My dashboard keeps it unstarred" */
+    /** @scenario "AC160c A member who unpins My dashboard keeps it unpinned" */
     it("keeps it unstarred once its maker unstars it", async () => {
       const { service, stars } = serviceWith();
       const created = await myDashboard(service);

@@ -131,12 +131,12 @@ const inputsTo = (calls: UiProcedureCall[], path: string) =>
 
 describe("the Dashboards sidebar", () => {
   describe("given the member's boards, stars and the From LangWatch boards", () => {
-    /** @scenario "AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order" */
+    /** @scenario "AC161 The sidebar lists Your dashboards, Pinned and From LangWatch in order" */
     it("shows the groups in the prototype's order, each board once", async () => {
       renderSection();
 
       expect(await namesIn("Your dashboards")).toEqual(["My dashboard", "Costs", "Weekly review"]);
-      expect(await namesIn("Starred dashboards")).toEqual(["Latency", "Release check"]);
+      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Release check"]);
       expect(await namesIn("From LangWatch")).toEqual([
         "Can I trust my numbers?",
         "Where my agent breaks",
@@ -145,7 +145,7 @@ describe("the Dashboards sidebar", () => {
       expect(screen.queryByText("All dashboards")).toBeNull();
     });
 
-    /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name" */
+    /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unpinned boards by name" */
     it("lists another member's My dashboard once its author widened it, after the member's own", async () => {
       renderSection({ boards: [...BOARDS, THEIRS] });
 
@@ -158,7 +158,7 @@ describe("the Dashboards sidebar", () => {
       ]);
     });
 
-    /** @scenario "AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order" */
+    /** @scenario "AC161 The sidebar lists Your dashboards, Pinned and From LangWatch in order" */
     it("links a From LangWatch board to its live address and marks the open one", async () => {
       renderSection({ openPath: "curated/data" });
 
@@ -171,18 +171,18 @@ describe("the Dashboards sidebar", () => {
   });
 
   describe("given the member has no stars", () => {
-    /** @scenario "AC161c Starred shows only when the member has stars, in their own order" */
-    it("shows no Starred group", async () => {
+    /** @scenario "AC161c Pinned shows only when the member has stars, in their own order" */
+    it("shows no Pinned group", async () => {
       renderSection({ stars: [] });
 
       await listNamed("Your dashboards");
-      expect(screen.queryByText("Starred")).toBeNull();
+      expect(screen.queryByText("Pinned")).toBeNull();
       expect(await namesIn("From LangWatch")).toHaveLength(3);
     });
   });
 
   describe("when the stars fail to load", () => {
-    /** @scenario "AC161c Starred shows only when the member has stars, in their own order" */
+    /** @scenario "AC161c Pinned shows only when the member has stars, in their own order" */
     it("shows a one-line error with Retry and keeps the + to make a board", async () => {
       renderSection({ listFails: true });
 
@@ -253,7 +253,7 @@ describe("the Dashboards sidebar", () => {
         .getAllByRole("listitem")
         .find((item) => item.textContent?.includes("Can I trust my numbers?"));
 
-      await user.click(within(data!).getByRole("button", { name: "Star dashboard" }));
+      await user.click(within(data!).getByRole("button", { name: "Pin dashboard" }));
 
       await waitFor(() =>
         expect(inputsTo(calls, "boards.star")).toEqual([
@@ -266,9 +266,9 @@ describe("the Dashboards sidebar", () => {
     /** @scenario "AC165 A star can point at a From LangWatch board" */
     it("unstars a starred board", async () => {
       const { user, calls } = renderSection();
-      const starred = within(await listNamed("Starred dashboards"));
+      const starred = within(await listNamed("Pinned dashboards"));
 
-      await user.click(starred.getAllByRole("button", { name: "Unstar dashboard" })[0]!);
+      await user.click(starred.getAllByRole("button", { name: "Unpin dashboard" })[0]!);
 
       await waitFor(() =>
         expect(inputsTo(calls, "boards.unstar")).toEqual([
@@ -280,13 +280,13 @@ describe("the Dashboards sidebar", () => {
 
   describe("when the member opens a board's menu", () => {
     /** @scenario "AC107 Sidebar menu: each board offers its actions in order" */
-    it("offers Star, Rename, Duplicate and Delete on a team board", async () => {
+    it("offers Pin, Rename, Duplicate and Delete on a team board", async () => {
       const { user } = renderSection();
 
       await user.click(await screen.findByRole("button", { name: "Actions for Weekly review" }));
       await screen.findByRole("menuitem", { name: "Delete" });
 
-      expect(menuItemNames()).toEqual(["Star", "Rename", "Duplicate", "Delete"]);
+      expect(menuItemNames()).toEqual(["Pin", "Rename", "Duplicate", "Delete"]);
       expect(screen.queryByRole("menuitem", { name: "Share" })).toBeNull();
     });
 
@@ -326,17 +326,17 @@ describe("the Dashboards sidebar", () => {
     });
 
     /** @scenario "AC107 Sidebar menu: each board offers its actions in order" */
-    it("offers Unstar, Move up, Move down then Duplicate to edit on a starred template", async () => {
+    it("offers Unpin, Move up, Move down then Duplicate to edit on a starred template", async () => {
       const { user } = renderSection();
-      const starred = within(await listNamed("Starred dashboards"));
+      const starred = within(await listNamed("Pinned dashboards"));
 
       await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
       await screen.findByRole("menuitem", { name: "Duplicate to edit" });
 
-      expect(menuItemNames()).toEqual(["Unstar", "Move up", "Move down", "Duplicate to edit"]);
+      expect(menuItemNames()).toEqual(["Unpin", "Move up", "Move down", "Duplicate to edit"]);
     });
 
-    /** @scenario "AC107b Sidebar menu: reorder is bounded by the Starred list's ends" */
+    /** @scenario "AC107b Sidebar menu: reorder is bounded by the Pinned list's ends" */
     it("disables Move up on the first star and Move down on the last", async () => {
       const { user } = renderSection();
 
@@ -359,7 +359,7 @@ describe("the Dashboards sidebar", () => {
     /** @scenario "AC155 Move up and Move down reorder the member's stars" */
     it("swaps a star with the one above and saves the order, boards and templates alike", async () => {
       const { user, calls } = renderSection();
-      const starred = within(await listNamed("Starred dashboards"));
+      const starred = within(await listNamed("Pinned dashboards"));
 
       await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
       await user.click(await screen.findByRole("menuitem", { name: "Move Release check up" }));
@@ -382,8 +382,8 @@ describe("the Dashboards sidebar", () => {
       const { user, calls } = renderSection({
         stars: [{ kind: "board", dashboard: MINE }, ...STARS],
       });
-      const starred = within(await listNamed("Starred dashboards"));
-      expect(await namesIn("Starred dashboards")).toEqual(["Latency", "Release check"]);
+      const starred = within(await listNamed("Pinned dashboards"));
+      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Release check"]);
 
       await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
       await user.click(await screen.findByRole("menuitem", { name: "Move Release check up" }));

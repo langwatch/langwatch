@@ -120,7 +120,7 @@ describe("given the pin fails after the board is made", () => {
 });
 
 describe("given the project has boards", () => {
-  /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name" */
+  /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unpinned boards by name" */
   it("lists each with its star, scope and last change", () => {
     const { result } = renderHook(() => useSavedDashboards());
 

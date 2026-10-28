@@ -168,7 +168,7 @@ export function scopeConfirmWords({
     loss.teammates &&
       `It leaves the Dashboards list of everyone else in ${names.project}. Anyone who has it open is told it is not available the next time it loads.`,
     otherStars > 0 &&
-      `${otherPeople(otherStars)} starred it. Their stars are kept, and come back if you widen the scope again.`,
+      `${otherPeople(otherStars)} pinned it. Their pins are kept, and come back if you widen the scope again.`,
   ];
   return {
     title:

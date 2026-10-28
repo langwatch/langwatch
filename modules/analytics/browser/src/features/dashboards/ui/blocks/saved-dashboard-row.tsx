@@ -140,7 +140,7 @@ function StarItems({ name, actions }: { name: string; actions: StarActions }) {
     <>
       <Menu.Item value="star" onClick={actions.onToggleStar}>
         <MenuRow icon={actions.isStarred ? <StarOff size={13} /> : <Star size={13} />}>
-          {actions.isStarred ? "Unstar" : "Star"}
+          {actions.isStarred ? "Unpin" : "Pin"}
         </MenuRow>
       </Menu.Item>
       {actions.move && (

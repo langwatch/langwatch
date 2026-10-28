@@ -727,23 +727,23 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @integration
   Scenario: AC107 Sidebar menu: each board offers its actions in order
     Given a member opens the "⋮" menu of a board in the sidebar
-    Then they see Star or Unstar, then Move up and Move down when it is starred,
+    Then they see Pin or Unpin, then Move up and Move down when it is pinned,
       a separator, Rename, Duplicate, a separator and Delete, each with its icon
     And Delete is in red
-    And a From LangWatch board offers Star or Unstar, the moves when starred, and "Duplicate to edit"
+    And a From LangWatch board offers Pin or Unpin, the moves when pinned, and "Duplicate to edit"
     And there is no Share action anywhere; who sees a board is its scope (AC178)
 
   @integration
-  Scenario: AC107b Sidebar menu: reorder is bounded by the Starred list's ends
-    Given a member opens the "⋮" menu of the first starred board
+  Scenario: AC107b Sidebar menu: reorder is bounded by the Pinned list's ends
+    Given a member opens the "⋮" menu of the first pinned board
     Then Move up is disabled
-    When they open the "⋮" menu of the last starred board
+    When they open the "⋮" menu of the last pinned board
     Then Move down is disabled
 
   @integration
   Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
     When the member picks Duplicate on a board
-    Then a new board named "<name> copy" is made, starred by nobody
+    Then a new board named "<name> copy" is made, pinned by nobody
     And every widget on the board is copied to it at the same place
     And the new board opens
     # Decision: no server procedure copies a board; the browser repeats the create and widget writes
@@ -754,29 +754,29 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC155 Move up and Move down reorder the member's stars
-    Given the member has several starred boards, some of them From LangWatch boards
+    Given the member has several pinned boards, some of them From LangWatch boards
     When the member picks Move up on a board in the sidebar
     Then that board swaps with the one above it and the new order is saved
 
   @unit @integration
   Scenario: AC155b Stars the section does not show keep their place in the star order
-    Given the member's star order holds a star the Starred section does not show, such as My dashboard
-    When the member moves a board in the Starred section
+    Given the member's star order holds a star the Pinned section does not show, such as My dashboard
+    When the member moves a board in the Pinned section
     Then only the two boards that swapped change place
     And the star it does not show keeps its position in the saved order
 
   @unit
-  Scenario: AC156 No board is starred unless the member stars it
+  Scenario: AC156 No board is pinned unless the member pins it
     Given a member creates a board, duplicates one, or adds one from a template
     When the board is made
-    Then it is starred for nobody, its creator included
-    # My dashboard is the one exception: it starts starred for its maker (AC160b)
+    Then it is pinned for nobody, its creator included
+    # My dashboard is the one exception: it starts pinned for its maker (AC160b)
     # The LLM Ops sidebar's "+" stars its new board for its maker (product-sidebars.feature)
 
   @unit
   Scenario: AC157 Stars are per member
     Given one member stars a board
-    When another member lists their starred boards
+    When another member lists their pinned boards
     Then that board is not among them
 
   # ---------------------------------------------------------------------------
@@ -800,7 +800,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC171 Scope: an Only me board exists for its author alone
     Given a board its author set to Only me
     When another member of the project, or a project credential, lists the boards or the
-      starred boards, opens the board by its id, renames, deletes, stars or copies it,
+      pinned boards, opens the board by its id, renames, deletes, stars or copies it,
       or reads, adds, edits, moves or deletes a widget on it
     Then every one of these answers as it does for a board that does not exist
     And the author lists it, opens it and edits it as before
@@ -841,9 +841,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC176 Scope: a narrower scope keeps other members' stars
-    Given a board other members starred
+    Given a board other members pinned
     When its author sets it to Only me
-    Then it leaves the other members' starred lists
+    Then it leaves the other members' pinned lists
     And their stars come back when the author widens the scope again
     And a star on an Organization board is one star: it shows in every project that lists the board
 
@@ -868,15 +868,15 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC179 Scope change: it asks first only when someone loses the board
-    When the author sets a board to Only me that other members starred
-    Then a confirmation says how many other people starred it before anything changes
+    When the author sets a board to Only me that other members pinned
+    Then a confirmation says how many other people pinned it before anything changes
     When the author lowers a board from Organization to Project or Only me
     Then a confirmation says the other projects will no longer see it
     And cancelling either leaves the scope as it was
 
   @unit @integration
   Scenario: AC180 Scope change: any other change is made at once and offers Undo
-    When the author widens a board, or sets a board nobody else starred to Only me
+    When the author widens a board, or sets a board nobody else pinned to Only me
     Then the scope changes at once, with no confirmation
     And a note names the new audience and offers "Undo", which puts the scope back
 
@@ -885,7 +885,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then an Only me board carries a small lock by its name and an Organization board a building
     And a Project board carries no mark
     And the Organization boards other projects own sit in their own group "From <organization>",
-      by name, after Starred and before From LangWatch, unless the member starred them
+      by name, after Pinned and before From LangWatch, unless the member pinned them
     And with no such board there is no such group
 
   @unit @integration
@@ -950,7 +950,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC188 Scope: an Organization board of an archived project is listed nowhere
     Given an Organization board whose project was archived
     When a member of another project of the organization lists the boards, opens it by its id
-      or reads their starred boards
+      or reads their pinned boards
     Then it is in none of them, and their star on it is kept but not listed
     And the archived project still reaches its own board
 
@@ -996,7 +996,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a board that holds only charts made in Analytics Reports
     And a board that holds only widgets
     And a mixed board that holds widgets and a saved workbench chart
-    When a member lists the boards or reads their starred boards in the Dashboards area
+    When a member lists the boards or reads their pinned boards in the Dashboards area
     Then the board made in Analytics Reports is in neither list
     And opened by its Dashboards address it is not available, so no delete is offered there
     And the widgets board and the mixed board are listed, read from DashboardsV2
@@ -1073,11 +1073,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And dashboards leaves out that board, and lists a mixed board once
 
   @unit
-  Scenario: AC199i Split: a board made in Analytics Reports is not starred and not Only me
+  Scenario: AC199i Split: a board made in Analytics Reports is not pinned and not Only me
     Given Dashboards is switched on for the project
     When a member makes a board in Analytics Reports, named "My dashboard" or not
     Then it is made at the scope Project with no star
-    And only a board made in the Dashboards area starts starred and at Only me (AC160b, AC170)
+    And only a board made in the Dashboards area starts pinned and at Only me (AC160b, AC170)
 
   @unit
   Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds
@@ -1133,7 +1133,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC199o Split: a member's REST create follows the board scope rules
     Given a member signed in with analytics:create
     When they create a board named "My dashboard" at /api/v1/dashboards
-    Then they are recorded as its author, it is at Only me and it is starred for them
+    Then they are recorded as its author, it is at Only me and it is pinned for them
 
   @integration
   Scenario: AC199p Split: a board's widgets are a sub-resource of the board
@@ -1263,39 +1263,39 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And there is no All dashboards page
 
   @integration
-  Scenario: AC160b A member with no My dashboard gets one made, starred for them
+  Scenario: AC160b A member with no My dashboard gets one made, pinned for them
     Given a member with no board named "My dashboard"
     When they open /[project]/dashboards
     Then one "My dashboard" is made for them and opens
-    And it is in their Starred list, stored as their star, and in nobody else's
+    And it is in their Pinned list, stored as their star, and in nobody else's
     And its scope is Only me, so the server lists it for nobody else (AC170, AC171)
     # Existing members' My dashboards get the same star once, by migration: favourites had not
-    # shipped, so none of them could have unstarred one
+    # shipped, so none of them could have unpinned one
 
   @unit
-  Scenario: AC160c A member who unstars My dashboard keeps it unstarred
-    Given a member's My dashboard is starred
-    When they unstar it
-    Then it stays unstarred, also after they open Dashboards again
+  Scenario: AC160c A member who unpins My dashboard keeps it unpinned
+    Given a member's My dashboard is pinned
+    When they unpin it
+    Then it stays unpinned, also after they open Dashboards again
 
   @unit @integration
-  Scenario: AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order
+  Scenario: AC161 The sidebar lists Your dashboards, Pinned and From LangWatch in order
     When the member looks at the Dashboards sidebar
-    Then they see "Your dashboards" with a "+", then Starred, then From LangWatch
+    Then they see "Your dashboards" with a "+", then Pinned, then From LangWatch
     And From LangWatch holds Release check, "Can I trust my numbers?" and Where my agent breaks
     And the sidebar has no Browse templates item; a new board offers the templates
 
   @unit @integration
-  Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name
+  Scenario: AC161b Your dashboards: My dashboard first, then the team's unpinned boards by name
     Then the member's My dashboard comes first
-    And the project's other boards follow by name, leaving out starred ones
+    And the project's other boards follow by name, leaving out pinned ones
     And another member's My dashboard is listed only once its author widened its scope (AC175)
 
   @unit @integration
-  Scenario: AC161c Starred shows only when the member has stars, in their own order
-    Given the member has starred boards and From LangWatch boards
-    Then Starred lists each once, in the member's order, and they leave their own group
-    And with no stars there is no Starred group
+  Scenario: AC161c Pinned shows only when the member has stars, in their own order
+    Given the member has pinned boards and From LangWatch boards
+    Then Pinned lists each once, in the member's order, and they leave their own group
+    And with no stars there is no Pinned group
 
   @integration
   Scenario: AC162 The '+' on Your dashboards makes a blank board at once
@@ -1326,7 +1326,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit @integration
   Scenario: AC165 A star can point at a From LangWatch board
     When the member stars a From LangWatch board
-    Then it is listed under Starred and is kept for them per project
+    Then it is listed under Pinned and is kept for them per project
     And a star names either a stored board or a template, never both
 
   @integration
@@ -1818,13 +1818,13 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 110-113: "Widget description: the description moves from the stored code to an info tip on the card" → Scenario: AC110 Widget description: a built widget carries its description, not in its code; Scenario: AC111 Widget description: the card shows the description behind an info icon; Scenario: AC112 Widget description: a widget without a description has no info icon; Scenario: AC113 Widget description: the description is stored and kept when the code is edited
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
   # AC 107c-107e: "Templates library: cards like the prototype" (changed by langwatch/tasks#911 on 2026-10-07: compact cards with no labels, so AC107e is gone; the finder's own scenarios are in dashboards-finder.feature) → Scenario: AC107c Templates library: each card reads like the prototype's; Scenario: AC107d Templates library: a card previews the template's real board
-  # AC 107-109: "Sidebar menu" (changed by langwatch/tasks#911: stars replace sharing and the default board; Share and Set as default are gone, Move up/down added) → Scenario: AC107 Sidebar menu: each board offers its actions in order; Scenario: AC107b Sidebar menu: reorder is bounded by the Starred list's ends; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
-  # AC 150-159: "Dashboards page and favourites" (changed by langwatch/tasks#911: the All dashboards page is gone, nothing but My dashboard is starred automatically) → Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC155b Stars the section does not show keep their place in the star order; Scenario: AC156 No board is starred unless the member stars it; Scenario: AC157 Stars are per member (AC159 "No sharing control appears anywhere" is retired by AC170-186)
+  # AC 107-109: "Sidebar menu" (changed by langwatch/tasks#911: stars replace sharing and the default board; Share and Set as default are gone, Move up/down added) → Scenario: AC107 Sidebar menu: each board offers its actions in order; Scenario: AC107b Sidebar menu: reorder is bounded by the Pinned list's ends; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
+  # AC 150-159: "Dashboards page and favourites" (changed by langwatch/tasks#911: the All dashboards page is gone, nothing but My dashboard is pinned automatically) → Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC155b Stars the section does not show keep their place in the star order; Scenario: AC156 No board is pinned unless the member pins it; Scenario: AC157 Stars are per member (AC159 "No sharing control appears anywhere" is retired by AC170-186)
   # AC 170-186: "Board scope: Only me, Project, Organization" (owner decisions, 2026-10-09) → Scenario: AC170 Scope: a new board starts at Project and My dashboard at Only me; Scenario: AC171 Scope: an Only me board exists for its author alone; Scenario: AC172 Scope: an Organization board is listed in every project of its organization; Scenario: AC173 Scope: an Organization board is read-only outside the project that owns it; Scenario: AC174 Scope: only the author changes a board's scope; Scenario: AC175 Scope: any board can be set to Only me, My dashboard like any other; Scenario: AC176 Scope: a narrower scope keeps other members' stars; Scenario: AC177 Scope control: the board header shows the scope beside the title; Scenario: AC178 Scope control: the sidebar menu offers the same three choices; Scenario: AC179 Scope change: it asks first only when someone loses the board; Scenario: AC180 Scope change: any other change is made at once and offers Undo; Scenario: AC181 Sidebar: scope marks and the organization's group; Scenario: AC182 Organization board: the Project chip says whose data it shows; Scenario: AC183 A board the reader may not open is not available; Scenario: AC184 View-only: a board the reader cannot edit offers no edit control; Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy; Scenario: AC186 Scope: the migration keeps today's audience
   # AC 187-189: "Board scope: what the access-control review closed" (2026-10-09: automation reads, archived projects, projects with Dashboards off) → Scenario: AC187 Scope: an alert or a scheduled report reads nothing from an Only me board; Scenario: AC188 Scope: an Organization board of an archived project is listed nowhere; Scenario: AC189 Scope: board scope reaches only a project where Dashboards is switched on
   # AC 196-197: "Board scope over REST: a key stands where its person does" (owner, 2026-10-10) → Scenario: AC196 Scope: a key that names a person reads and writes as that person over REST; Scenario: AC197 Scope: a key that names no person stands where a project credential does
-  # AC 199: "Dashboards and Analytics Reports keep their boards apart" (changed on 2026-10-15: Dashboards v2 moves onto DashboardsV2 and DashboardWidget) → Scenario: AC199 Split: Dashboards and Analytics Reports each list and open only their own boards; Scenario: AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart; Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports; Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged; Scenario: AC199e Split: each existing board lands in Dashboards, Reports or both by what it holds; Scenario: AC199f Split: a copied board and widget keep their ids; Scenario: AC199h Split: the LangWatchQL views leave out the stale copies; Scenario: AC199i Split: a board made in Analytics Reports is not starred and not Only me; Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds; Scenario: AC199k Split: a saved workbench chart is placed only on a Reports board; Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards; Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden; Scenario: AC199n Split: the public API creates, renames and deletes Dashboards boards; Scenario: AC199o Split: a member's REST create follows the board scope rules; Scenario: AC199p Split: a board's widgets are a sub-resource of the board; Scenario: AC199q Split: /api/v1/dashboards is not there while Dashboards is off; Scenario: Split: /api/v1/dashboards stays shut when the Dashboards flag cannot be read; Scenario: AC199r Split: the Reports boards answer at /api/v1/analytics/reports; Scenario: AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards; Scenario: AC199t The MCP widget tools use only the board routes; Scenario: AC199u Split: /api/v1/dashboards answers by the API version the caller names; Scenario: AC199v Split: /api/dashboards answers as /api/v1/dashboards, deprecated; Scenario: AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports; Scenario: AC199x Names: the CLI has one dashboard tree and no old command names; Scenario: AC199y Names: the project-path dashboards read answers at /analytics/dashboards; Scenario: AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports
-  # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911; changed on 2026-10-08: My dashboard starts starred) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, starred for them; Scenario: AC160c A member who unstars My dashboard keeps it unstarred; Scenario: AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name; Scenario: AC161c Starred shows only when the member has stars, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A star can point at a From LangWatch board
+  # AC 199: "Dashboards and Analytics Reports keep their boards apart" (changed on 2026-10-15: Dashboards v2 moves onto DashboardsV2 and DashboardWidget) → Scenario: AC199 Split: Dashboards and Analytics Reports each list and open only their own boards; Scenario: AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart; Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports; Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged; Scenario: AC199e Split: each existing board lands in Dashboards, Reports or both by what it holds; Scenario: AC199f Split: a copied board and widget keep their ids; Scenario: AC199h Split: the LangWatchQL views leave out the stale copies; Scenario: AC199i Split: a board made in Analytics Reports is not pinned and not Only me; Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds; Scenario: AC199k Split: a saved workbench chart is placed only on a Reports board; Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards; Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden; Scenario: AC199n Split: the public API creates, renames and deletes Dashboards boards; Scenario: AC199o Split: a member's REST create follows the board scope rules; Scenario: AC199p Split: a board's widgets are a sub-resource of the board; Scenario: AC199q Split: /api/v1/dashboards is not there while Dashboards is off; Scenario: Split: /api/v1/dashboards stays shut when the Dashboards flag cannot be read; Scenario: AC199r Split: the Reports boards answer at /api/v1/analytics/reports; Scenario: AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards; Scenario: AC199t The MCP widget tools use only the board routes; Scenario: AC199u Split: /api/v1/dashboards answers by the API version the caller names; Scenario: AC199v Split: /api/dashboards answers as /api/v1/dashboards, deprecated; Scenario: AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports; Scenario: AC199x Names: the CLI has one dashboard tree and no old command names; Scenario: AC199y Names: the project-path dashboards read answers at /analytics/dashboards; Scenario: AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports
+  # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911; changed on 2026-10-08: My dashboard starts pinned) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, pinned for them; Scenario: AC160c A member who unpins My dashboard keeps it unpinned; Scenario: AC161 The sidebar lists Your dashboards, Pinned and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unpinned boards by name; Scenario: AC161c Pinned shows only when the member has stars, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A star can point at a From LangWatch board
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
   # AC 130-138: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for

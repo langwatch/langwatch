@@ -43,7 +43,7 @@ const SHARED = [shared("s-2", "Spend by team"), shared("s-1", "Quality")];
 
 describe("sidebarGroups", () => {
   describe("given no stars", () => {
-    /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name" */
+    /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unpinned boards by name" */
     it("puts My dashboard first and the team's boards by name, a widened My dashboard of another member among them", () => {
       const groups = sidebarGroups({
         boards: BOARDS,
@@ -64,8 +64,8 @@ describe("sidebarGroups", () => {
   });
 
   describe("given stars on a board and on a From LangWatch board", () => {
-    /** @scenario "AC161c Starred shows only when the member has stars, in their own order" */
-    it("lists them once, under Starred, in the member's order", () => {
+    /** @scenario "AC161c Pinned shows only when the member has stars, in their own order" */
+    it("lists them once, under Pinned, in the member's order", () => {
       const groups = sidebarGroups({
         boards: BOARDS,
         stars: [
@@ -114,7 +114,7 @@ describe("sidebarGroups with the organization's boards", () => {
     });
 
     /** @scenario "AC181 Sidebar: scope marks and the organization's group" */
-    it("moves one the member starred to Starred, keeping the name of the project that owns it", () => {
+    it("moves one the member starred to Pinned, keeping the name of the project that owns it", () => {
       const [spend] = SHARED;
       const groups = sidebarGroups({
         boards: BOARDS,

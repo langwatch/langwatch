@@ -29,7 +29,7 @@ Feature: Dashboards v1
   Scenario: AC3 Sidebar matches the reference
     Given the release_dashboards flag is on for the project
     When the member looks at the Dashboards product sidebar
-    Then they see "Your dashboards" with My dashboard first, then Starred when they have stars,
+    Then they see "Your dashboards" with My dashboard first, then Pinned when they have stars,
       then From LangWatch, each board with a menu
     And the sidebar shows nothing else besides Quick Search
 
@@ -210,7 +210,7 @@ Feature: Dashboards v1
   @e2e
   Scenario: AC10 Blank board matches the reference
     Given a member creates a new dashboard
-    Then every member of the project sees it, and it is starred by nobody
+    Then every member of the project sees it, and it is pinned by nobody
     When it opens
     Then they see "Add a description"
     And they see the one empty board view: the ask bar, suggested questions and the templates
@@ -413,14 +413,14 @@ Feature: Dashboards v1
 
   @unit
   Scenario: AC26 Deleting a board removes it from every member's stars
-    Given a board starred by several members
+    Given a board pinned by several members
     When a member with analytics:delete deletes it
-    Then the board is gone from every member's starred list
+    Then the board is gone from every member's pinned list
 
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing" (changed again by langwatch/tasks#911: /dashboards lands on My dashboard) -> dashboards-v2.feature Scenario: AC160 The dashboards area lands on My dashboard
-  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Starred, From LangWatch; no Browse templates item) -> Scenario: AC3 Sidebar matches the reference
+  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Pinned, From LangWatch; no Browse templates item) -> Scenario: AC3 Sidebar matches the reference
   # AC 3b: "The Analytics entry leads to Dashboards" -> Scenario: AC3b The Analytics entry opens Dashboards when the project can reach them
   # AC 3c: "Legacy analytics offers Dashboards" -> Scenario: AC3c The legacy Analytics page offers Dashboards when the flag is on
   # AC 3d: "Flag off shows no banner" -> Scenario: AC3d The legacy Analytics page shows no banner when the flag is off

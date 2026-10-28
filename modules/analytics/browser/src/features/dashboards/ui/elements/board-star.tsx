@@ -12,7 +12,7 @@ export function BoardStar({
   onToggle: () => void;
   size?: number;
 }) {
-  const label = isStarred ? "Unstar dashboard" : "Star dashboard";
+  const label = isStarred ? "Unpin dashboard" : "Pin dashboard";
   return (
     <IconButton
       variant="ghost"
