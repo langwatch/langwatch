@@ -148,7 +148,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       And ALLOWED_PROXY_HOSTS names " Agent.Corp.Local. "
       When the NLP service's HTTP block connects to "agent.corp.local" or "AGENT.corp.local."
       Then the validation passes
-      And an entry that carries a port matches no hostname
+      And an entry that carries a port, or is blank or a lone dot, matches no hostname
 
   # ============================================================================
   # On-premise hosts — blocked by default, allowlistable per host
@@ -250,6 +250,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       Given BLOCK_LOCAL_HTTP_CALLS is "false"
       When the NLP service's HTTP block validates "http://metadata.google.internal./computeMetadata/v1/"
       Then the validation fails with an SSRF block error, whatever the name resolves to
+      And a hostname that still ends in a dot after one is dropped is refused without a lookup
 
     @unit
     Scenario: A bracketed IPv6 metadata literal is refused with local calls allowed

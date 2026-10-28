@@ -174,6 +174,20 @@ func TestSSRF_TrailingDotDoesNotHideAMetadataName(t *testing.T) {
 	require.ErrorIs(t, httpblock.CheckURL("http://metadata.google.internal./computeMetadata/v1/", opts), httpblock.ErrSSRFBlocked)
 	_, err := httpblock.SafeDialer(opts)(context.Background(), "tcp", "metadata.google.internal.:80")
 	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+	require.ErrorIs(t, httpblock.CheckURL("http://metadata../", opts), httpblock.ErrSSRFBlocked,
+		"a doubled trailing dot is refused, not resolved")
+}
+
+// @scenario "The HTTP block matches an allowlist entry whatever its case, spaces or trailing dot"
+func TestSSRF_ABlankOrDotEntryMatchesNothing(t *testing.T) {
+	opts := httpblock.SSRFOptions{
+		AllowedHosts: []string{".", "  "},
+		Resolver: func(string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		},
+	}
+	require.ErrorIs(t, httpblock.CheckURL("http://./", opts), httpblock.ErrSSRFBlocked)
+	require.ErrorIs(t, httpblock.CheckURL("http://agent.corp.local/", opts), httpblock.ErrSSRFBlocked)
 }
 
 func TestSSRF_AlwaysBlocksMetadataEvenIfAllowed(t *testing.T) {

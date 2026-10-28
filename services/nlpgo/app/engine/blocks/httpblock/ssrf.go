@@ -258,7 +258,9 @@ func normaliseHost(host string) string {
 // lists. Returns (allow, deny) — both false means "needs IP-level
 // check". Pulled out so CheckURL and SafeDialer apply the same rules.
 func hostPolicy(host string, opts SSRFOptions) (allow, deny bool) {
-	if host == "" {
+	// A name still ending in a dot once one is dropped (`metadata..`) is never
+	// a real host, and would slip past the exact-name lists below.
+	if host == "" || strings.HasSuffix(host, ".") {
 		return false, true
 	}
 	if _, ok := metadataHosts[host]; ok {
