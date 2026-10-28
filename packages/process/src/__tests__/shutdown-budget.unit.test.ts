@@ -47,6 +47,7 @@ function numberFrom({
 const helpers = read("charts", "langwatch", "templates", "_helpers.tpl");
 const suite = read("charts", "langwatch", "tests", "workers-shutdown.sh");
 const values = read("charts", "langwatch", "values.yaml");
+const appDeployment = read("charts", "langwatch", "templates", "app", "deployment.yaml");
 const queue = read("packages", "group-queue", "src", "groupQueue.ts");
 
 /** Seconds above the drain at which the chart renders the process deadline. */
@@ -62,6 +63,15 @@ const chartGraceMarginSeconds = numberFrom({
   pattern: /\$required := add \$drain (\d+)/,
   label: "chart required grace",
 });
+
+/** The app's preStop sleep when unset, and the seconds the grace must leave above it and the drain. */
+const appPreStopPattern = /min (\d+) \(sub \$grace \(add \$appDrain (\d+)\)\)/;
+const appPreStopDefaultSeconds = numberFrom({
+  source: appDeployment,
+  pattern: appPreStopPattern,
+  label: "app preStop default",
+});
+const appPreStopMarginSeconds = Number(appPreStopPattern.exec(appDeployment)?.[2]);
 
 const suiteDrainSeconds = numberFrom({
   source: suite,
@@ -145,10 +155,14 @@ describe("the shutdown budget", () => {
       /** @scenario "The chart is sized for the same production drain the code uses" */
       it.each(componentValues)(
         "sizes the $component pod for the queue's default drain",
-        ({ drainSeconds, graceSeconds }) => {
+        ({ component, drainSeconds, graceSeconds }) => {
           expect(drainSeconds * 1000).toBe(queueDefaultDrainMs);
           expect(drainSeconds).toBe(suiteDrainSeconds);
-          expect(graceSeconds).toBe(drainSeconds + chartGraceMarginSeconds);
+          const drainFloor = drainSeconds + chartGraceMarginSeconds;
+          const preStopFloor = appPreStopDefaultSeconds + drainSeconds + appPreStopMarginSeconds;
+          expect(graceSeconds).toBe(
+            component === "app" ? Math.max(drainFloor, preStopFloor) : drainFloor,
+          );
           expect(deadlineFor(queueDefaultDrainMs)).toBe(
             (drainSeconds + chartDeadlineMarginSeconds) * 1000,
           );
