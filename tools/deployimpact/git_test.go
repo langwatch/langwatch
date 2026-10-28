@@ -17,7 +17,7 @@ func repo(t *testing.T) (dir string, base string, head string) {
 	t.Helper()
 	dir = t.TempDir()
 	run := func(args ...string) string {
-		cmd := exec.CommandContext(context.Background(), "git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd := exec.CommandContext(context.Background(), "git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)...) //nolint:gosec // G204: fixed git subcommands from this test
 		cmd.Dir = dir
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
@@ -34,7 +34,7 @@ func repo(t *testing.T) (dir string, base string, head string) {
 	run("commit", "-q", "-m", "base")
 	base = run("rev-parse", "HEAD")
 	write(valuesFile, "app:\n  port: 2\n")
-	require.NoError(t, os.Remove(filepath.Join(dir, "apps/api/Dockerfile")))
+	require.NoError(t, os.Remove(filepath.Join(dir, "apps", "api", "Dockerfile")))
 	write("charts/langwatch/templates/a b.yaml", "kind: x\n")
 	run("add", "-A")
 	run("commit", "-q", "-m", "head")
