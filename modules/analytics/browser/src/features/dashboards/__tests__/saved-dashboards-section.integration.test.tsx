@@ -171,7 +171,7 @@ describe("the Dashboards sidebar", () => {
   });
 
   describe("given the member has no stars", () => {
-    /** @scenario "AC161c Pinned shows only when the member has stars, in their own order" */
+    /** @scenario "AC161c Pinned shows only when the member has pins, in their own order" */
     it("shows no Pinned group", async () => {
       renderSection({ stars: [] });
 
@@ -182,7 +182,7 @@ describe("the Dashboards sidebar", () => {
   });
 
   describe("when the stars fail to load", () => {
-    /** @scenario "AC161c Pinned shows only when the member has stars, in their own order" */
+    /** @scenario "AC161c Pinned shows only when the member has pins, in their own order" */
     it("shows a one-line error with Retry and keeps the + to make a board", async () => {
       renderSection({ listFails: true });
 
@@ -246,7 +246,7 @@ describe("the Dashboards sidebar", () => {
   });
 
   describe("when the member stars and unstars from the row's star", () => {
-    /** @scenario "AC165 A star can point at a From LangWatch board" */
+    /** @scenario "AC165 A pin can point at a From LangWatch board" */
     it("stars a From LangWatch board by its template id", async () => {
       const { user, calls, host } = renderSection();
       const data = within(await listNamed("From LangWatch"))
@@ -263,7 +263,7 @@ describe("the Dashboards sidebar", () => {
       expect(host.navigations).toEqual([]);
     });
 
-    /** @scenario "AC165 A star can point at a From LangWatch board" */
+    /** @scenario "AC165 A pin can point at a From LangWatch board" */
     it("unstars a starred board", async () => {
       const { user, calls } = renderSection();
       const starred = within(await listNamed("Pinned dashboards"));
@@ -356,7 +356,7 @@ describe("the Dashboards sidebar", () => {
       ).toHaveAttribute("aria-disabled", "true");
     });
 
-    /** @scenario "AC155 Move up and Move down reorder the member's stars" */
+    /** @scenario "AC155 Move up and Move down reorder the member's pins" */
     it("swaps a star with the one above and saves the order, boards and templates alike", async () => {
       const { user, calls } = renderSection();
       const starred = within(await listNamed("Pinned dashboards"));
@@ -377,7 +377,7 @@ describe("the Dashboards sidebar", () => {
       );
     });
 
-    /** @scenario "AC155b Stars the section does not show keep their place in the star order" */
+    /** @scenario "AC155b Pins the section does not show keep their place in the pin order" */
     it("keeps a hidden My dashboard first in the saved order when a shown star moves", async () => {
       const { user, calls } = renderSection({
         stars: [{ kind: "board", dashboard: MINE }, ...STARS],

@@ -64,7 +64,7 @@ describe("sidebarGroups", () => {
   });
 
   describe("given stars on a board and on a From LangWatch board", () => {
-    /** @scenario "AC161c Pinned shows only when the member has stars, in their own order" */
+    /** @scenario "AC161c Pinned shows only when the member has pins, in their own order" */
     it("lists them once, under Pinned, in the member's order", () => {
       const groups = sidebarGroups({
         boards: BOARDS,
@@ -165,7 +165,7 @@ describe("sidebarGroups with the organization's boards", () => {
 });
 
 describe("sameStar", () => {
-  /** @scenario "AC165 A star can point at a From LangWatch board" */
+  /** @scenario "AC165 A pin can point at a From LangWatch board" */
   it("tells a board star from a template star with the same id", () => {
     expect(
       sameStar({ kind: "template", templateId: "x" }, { kind: "template", templateId: "x" }),
@@ -207,14 +207,14 @@ describe("swapShownStars", () => {
   const fresh = { kind: "board", dashboardId: "new" } as const;
 
   describe("given a star the section does not show", () => {
-    /** @scenario "AC155b Stars the section does not show keep their place in the star order" */
+    /** @scenario "AC155b Pins the section does not show keep their place in the pin order" */
     it("keeps it at its index while the two shown stars swap", () => {
       expect(
         swapShownStars({ all: [mine, shop, fresh], shown: [shop, fresh], from: 1, to: 0 }),
       ).toEqual([mine, fresh, shop]);
     });
 
-    /** @scenario "AC155b Stars the section does not show keep their place in the star order" */
+    /** @scenario "AC155b Pins the section does not show keep their place in the pin order" */
     it("keeps it between the two shown stars that swap", () => {
       expect(
         swapShownStars({ all: [shop, mine, fresh], shown: [shop, fresh], from: 0, to: 1 }),
@@ -222,7 +222,7 @@ describe("swapShownStars", () => {
     });
   });
 
-  /** @scenario "AC155 Move up and Move down reorder the member's stars" */
+  /** @scenario "AC155 Move up and Move down reorder the member's pins" */
   it("answers null past either end", () => {
     expect(
       swapShownStars({ all: [shop, fresh], shown: [shop, fresh], from: 0, to: -1 }),

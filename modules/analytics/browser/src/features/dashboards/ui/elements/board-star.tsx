@@ -1,4 +1,4 @@
-/** The star that toggles a board in the member's favourites. Presentational. */
+/** The pin that toggles a board in the member's Pinned list. Presentational. */
 
 import { IconButton } from "@langwatch/design-system/primitives";
 import { Pin } from "lucide-react";

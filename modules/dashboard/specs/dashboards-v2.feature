@@ -753,17 +753,17 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # ---------------------------------------------------------------------------
 
   @unit @integration
-  Scenario: AC155 Move up and Move down reorder the member's stars
+  Scenario: AC155 Move up and Move down reorder the member's pins
     Given the member has several pinned boards, some of them From LangWatch boards
     When the member picks Move up on a board in the sidebar
     Then that board swaps with the one above it and the new order is saved
 
   @unit @integration
-  Scenario: AC155b Stars the section does not show keep their place in the star order
-    Given the member's star order holds a star the Pinned section does not show, such as My dashboard
+  Scenario: AC155b Pins the section does not show keep their place in the pin order
+    Given the member's pin order holds a pin the Pinned section does not show, such as My dashboard
     When the member moves a board in the Pinned section
     Then only the two boards that swapped change place
-    And the star it does not show keeps its position in the saved order
+    And the pin it does not show keeps its position in the saved order
 
   @unit
   Scenario: AC156 No board is pinned unless the member pins it
@@ -774,7 +774,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # The LLM Ops sidebar's "+" pins its new board for its maker (product-sidebars.feature)
 
   @unit
-  Scenario: AC157 Stars are per member
+  Scenario: AC157 Pins are per member
     Given one member pins a board
     When another member lists their pinned boards
     Then that board is not among them
@@ -840,7 +840,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And they can set their My dashboard to Project or Organization, and back to Only me
 
   @unit
-  Scenario: AC176 Scope: a narrower scope keeps other members' stars
+  Scenario: AC176 Scope: a narrower scope keeps other members' pins
     Given a board other members pinned
     When its author sets it to Only me
     Then it leaves the other members' pinned lists
@@ -951,7 +951,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given an Organization board whose project was archived
     When a member of another project of the organization lists the boards, opens it by its id
       or reads their pinned boards
-    Then it is in none of them, and their star on it is kept but not listed
+    Then it is in none of them, and their pin on it is kept but not listed
     And the archived project still reaches its own board
 
   @unit
@@ -1076,7 +1076,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC199i Split: a board made in Analytics Reports is not pinned and not Only me
     Given Dashboards is switched on for the project
     When a member makes a board in Analytics Reports, named "My dashboard" or not
-    Then it is made at the scope Project with no star
+    Then it is made at the scope Project with no pin
     And only a board made in the Dashboards area starts pinned and at Only me (AC160b, AC170)
 
   @unit
@@ -1292,10 +1292,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And another member's My dashboard is listed only once its author widened its scope (AC175)
 
   @unit @integration
-  Scenario: AC161c Pinned shows only when the member has stars, in their own order
+  Scenario: AC161c Pinned shows only when the member has pins, in their own order
     Given the member has pinned boards and From LangWatch boards
     Then Pinned lists each once, in the member's order, and they leave their own group
-    And with no stars there is no Pinned group
+    And with no pins there is no Pinned group
 
   @integration
   Scenario: AC162 The '+' on Your dashboards makes a blank board at once
@@ -1324,10 +1324,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Owner list, 2026-10-08; the prototype uses the same words
 
   @unit @integration
-  Scenario: AC165 A star can point at a From LangWatch board
-    When the member stars a From LangWatch board
+  Scenario: AC165 A pin can point at a From LangWatch board
+    When the member pins a From LangWatch board
     Then it is listed under Pinned and is kept for them per project
-    And a star names either a stored board or a template, never both
+    And a pin names either a stored board or a template, never both
 
   @integration
   Scenario: Boards: every board has the ask bar
@@ -1358,8 +1358,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Owner, 2026-10-08: the bar opens the modal; it is not a search of its own
 
   @integration
-  Scenario: Boards: no star or pencil by the board title
-    Then the board title has no star and no rename pencil; both live in the sidebar menu
+  Scenario: Boards: no pin or pencil by the board title
+    Then the board title has no pin and no rename pencil; both live in the sidebar menu
 
   @integration
   Scenario: Boards: My dashboard has no description placeholder

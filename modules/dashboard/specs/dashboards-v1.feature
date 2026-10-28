@@ -29,7 +29,7 @@ Feature: Dashboards v1
   Scenario: AC3 Sidebar matches the reference
     Given the release_dashboards flag is on for the project
     When the member looks at the Dashboards product sidebar
-    Then they see "Your dashboards" with My dashboard first, then Pinned when they have stars,
+    Then they see "Your dashboards" with My dashboard first, then Pinned when they have pins,
       then From LangWatch, each board with a menu
     And the sidebar shows nothing else besides Quick Search
 
@@ -412,7 +412,7 @@ Feature: Dashboards v1
     Then the server accepts each write
 
   @unit
-  Scenario: AC26 Deleting a board removes it from every member's stars
+  Scenario: AC26 Deleting a board removes it from every member's pins
     Given a board pinned by several members
     When a member with analytics:delete deletes it
     Then the board is gone from every member's pinned list
