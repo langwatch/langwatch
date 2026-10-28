@@ -23,17 +23,22 @@ function fakeWindow({
 }) {
   const listeners = new Map<string, ((event?: unknown) => void)[]>();
   const stored = { value: consent };
-  const appended: { src: string; async: boolean }[] = [];
+  const appended: { src: string; async: boolean; onload?: () => void }[] = [];
   const idle: (() => void)[] = [];
   const doc = {
     readyState: ready,
     querySelector: () => (id ? { content: id } : null),
     createElement: () => ({ src: "", async: false }),
-    head: { append: (script: { src: string; async: boolean }) => appended.push(script) },
+    head: {
+      append: (script: { src: string; async: boolean; onload?: () => void }) =>
+        appended.push(script),
+    },
   };
   const win = {
     document: doc,
     location: { hostname: host, origin: `https://${host}` },
+    fbq: undefined as { queue: unknown[][] } | undefined,
+    Reo: undefined as { init: (options: { clientID: string }) => void } | undefined,
     posthog: undefined as (unknown[] & { _i?: [string, object, string][] }) | undefined,
     localStorage: {
       getItem: (key: string) => {
@@ -67,9 +72,11 @@ describe("the tag manager loader", () => {
       fire("pointerdown");
       fire("keydown");
       idle.forEach((callback) => callback());
-      expect(appended).toEqual([
+      expect(appended.map(({ src, async }) => ({ src, async }))).toEqual([
         { src: "https://www.googletagmanager.com/gtm.js?id=GTM-KJ4S6Z9C", async: true },
         { src: "https://langwatch.ai/ingest/static/array.js", async: true },
+        { src: "https://connect.facebook.net/en_US/fbevents.js", async: true },
+        { src: "https://static.reo.dev/a4d64a7a8ea3125/reo.js", async: true },
       ]);
       expect(win.dataLayer).toEqual([
         TAG_RESTRICTIONS,
@@ -85,7 +92,7 @@ describe("the tag manager loader", () => {
       fire("load");
       expect(appended).toEqual([]);
       idle.forEach((callback) => callback());
-      expect(appended).toHaveLength(2);
+      expect(appended).toHaveLength(4);
     });
   });
 
@@ -135,7 +142,7 @@ describe("the tag manager loader", () => {
       fire("pointerdown");
       fire("storage", { key: "lw-cookie-consent" });
       idle.forEach((callback) => callback());
-      expect(appended).toHaveLength(2);
+      expect(appended).toHaveLength(4);
     });
   });
 
@@ -169,7 +176,9 @@ describe("the tag manager loader", () => {
       startTagManager({ win: win as never });
       fire("pointerdown");
 
-      expect(appended.at(-1)?.src).toBe("https://langwatch.ai/ingest/static/array.js");
+      expect(appended.map(({ src }) => src)).toContain(
+        "https://langwatch.ai/ingest/static/array.js",
+      );
       const [[key, config, name] = []] = win.posthog?._i ?? [];
       expect(key).toMatch(/^phc_/);
       expect(name).toBe("posthog");
@@ -189,7 +198,38 @@ describe("the tag manager loader", () => {
       startTagManager({ win: win as never });
       fire("pointerdown");
       expect(win.posthog).toBe(existing);
-      expect(appended).toHaveLength(1);
+      expect(appended.map(({ src }) => src)).not.toContain(
+        "https://langwatch.ai/ingest/static/array.js",
+      );
+    });
+  });
+
+  describe("when the tag manager starts the tags the docs refuse to run as custom HTML", () => {
+    /** @scenario "Load the Meta pixel and Reo.dev from the page, not from the tag manager" */
+    it("queues Meta's pixel start and a page view, and starts Reo.dev once its script loads", () => {
+      const { win, appended, fire } = fakeWindow({ id: "GTM-KJ4S6Z9C" });
+      startTagManager({ win: win as never });
+      fire("pointerdown");
+
+      expect(win.fbq?.queue).toEqual([
+        ["init", "2744447795854475"],
+        ["track", "PageView"],
+      ]);
+      const reo = appended.find(({ src }) => src.startsWith("https://static.reo.dev/"));
+      const started: { clientID: string }[] = [];
+      win.Reo = { init: (options) => started.push(options) };
+      reo?.onload?.();
+      expect(started).toEqual([{ clientID: "a4d64a7a8ea3125" }]);
+    });
+
+    /** @scenario "Load the Meta pixel and Reo.dev from the page, not from the tag manager" */
+    it("loads neither before the reader accepted cookies", () => {
+      const { win, appended, fire, idle } = fakeWindow({ id: "GTM-KJ4S6Z9C", consent: null });
+      startTagManager({ win: win as never });
+      fire("pointerdown");
+      idle.forEach((callback) => callback());
+      expect(appended).toEqual([]);
+      expect(win.fbq).toBeUndefined();
     });
   });
 });

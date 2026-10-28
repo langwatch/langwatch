@@ -78,6 +78,13 @@ Feature: docs.json stays the single source of truth for both documentation sites
     And a page that already started PostHog is left as it is
 
   @unit
+  Scenario: Load the Meta pixel and Reo.dev from the page, not from the tag manager
+    Given the container runs the Meta pixel and Reo.dev as custom HTML, which the docs refuse
+    When the tag manager loads on a production page
+    Then the page loads the Meta pixel, with a page view, and Reo.dev itself
+    And neither loads before the reader accepted cookies
+
+  @unit
   Scenario: Mark deprecated pages
     Given a page's frontmatter marks it deprecated or gives it a tag
     When the page is rendered

@@ -1,4 +1,5 @@
 import { loadPostHog } from "./posthog.ts";
+import { loadMetaPixel, loadReo } from "./vendor-tags.ts";
 
 const INTERACTIONS = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
@@ -61,6 +62,8 @@ export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
     script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(id)}`;
     win.document.head.append(script);
     loadPostHog({ win });
+    loadMetaPixel({ win });
+    loadReo({ win });
   };
   for (const name of INTERACTIONS) win.addEventListener(name, start, { once: true, passive: true });
   const idle = () =>

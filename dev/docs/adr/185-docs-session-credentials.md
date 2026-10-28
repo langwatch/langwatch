@@ -177,7 +177,8 @@ holds it. What fixes it is that the token never enters the docs page.
   against it.
 - The docs' Tag Manager refuses Custom HTML and custom JavaScript tags before the container
   loads, so publishing a tag cannot add arbitrary code there; vendor tags run as gallery
-  templates, each limited to the hosts it declares. It loads only after the reader accepted
-  cookies.
+  templates, each limited to the hosts it declares. The Meta pixel and Reo.dev, which the
+  container runs as Custom HTML, are loaded by the page itself instead. All of it loads only
+  after the reader accepted cookies.
 - Supersedes steps 4 to 6 of the Flow, and the XSS consequence above for the docs' origin. An
   XSS on the app's origin still takes the key.
