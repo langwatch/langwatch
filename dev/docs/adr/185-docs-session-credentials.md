@@ -172,7 +172,12 @@ holds it. What fixes it is that the token never enters the docs page.
 - A tag or any other script on the docs' origin can no longer read or copy a docs session key.
 - While the frame is connected, such a script can still ask it for reads and see the answers
   the page shows. It cannot change anything without the reader pressing Send in the frame.
-  A script that also restyles the frame could trick that press; the frame ignores a press that
-  comes too soon after the confirmation appears, and does not otherwise defend against it.
+  A script that also restyles the frame could trick that press; the frame counts only a press
+  that begins after a short delay, never focuses Send itself, and does not otherwise defend
+  against it.
+- The docs' Tag Manager refuses Custom HTML and custom JavaScript tags before the container
+  loads, so publishing a tag cannot add arbitrary code there; vendor tags run as gallery
+  templates, each limited to the hosts it declares. It loads only after the reader accepted
+  cookies.
 - Supersedes steps 4 to 6 of the Flow, and the XSS consequence above for the docs' origin. An
   XSS on the app's origin still takes the key.

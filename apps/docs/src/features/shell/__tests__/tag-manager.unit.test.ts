@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { postHogConfig } from "../browser/posthog.ts";
 import {
   analyticsConsented,
   startTagManager,
@@ -32,7 +33,8 @@ function fakeWindow({
   };
   const win = {
     document: doc,
-    location: { hostname: host },
+    location: { hostname: host, origin: `https://${host}` },
+    posthog: undefined as (unknown[] & { _i?: [string, object, string][] }) | undefined,
     localStorage: {
       getItem: (key: string) => {
         if (stored.value === "throws") throw new Error("SecurityError");
@@ -67,6 +69,7 @@ describe("the tag manager loader", () => {
       idle.forEach((callback) => callback());
       expect(appended).toEqual([
         { src: "https://www.googletagmanager.com/gtm.js?id=GTM-KJ4S6Z9C", async: true },
+        { src: "https://langwatch.ai/ingest/static/array.js", async: true },
       ]);
       expect(win.dataLayer).toEqual([
         TAG_RESTRICTIONS,
@@ -82,7 +85,7 @@ describe("the tag manager loader", () => {
       fire("load");
       expect(appended).toEqual([]);
       idle.forEach((callback) => callback());
-      expect(appended).toHaveLength(1);
+      expect(appended).toHaveLength(2);
     });
   });
 
@@ -114,6 +117,7 @@ describe("the tag manager loader", () => {
       idle.forEach((callback) => callback());
       expect(appended).toEqual([]);
       expect(win.dataLayer).toBeUndefined();
+      expect(win.posthog).toBeUndefined();
     });
 
     /** @scenario "Load the tag manager only after the reader accepted cookies" */
@@ -131,7 +135,7 @@ describe("the tag manager loader", () => {
       fire("pointerdown");
       fire("storage", { key: "lw-cookie-consent" });
       idle.forEach((callback) => callback());
-      expect(appended).toHaveLength(1);
+      expect(appended).toHaveLength(2);
     });
   });
 
@@ -146,25 +150,46 @@ describe("the tag manager loader", () => {
   });
 
   describe("when the container loads", () => {
-    /** @scenario "Let the tag manager run only Google's own tags" */
-    it("restricts it to Google's tags before the container starts", () => {
+    /** @scenario "Refuse arbitrary code from the tag manager" */
+    it("refuses Custom HTML and custom JavaScript before the container starts", () => {
       const { win, fire } = fakeWindow({ id: "GTM-KJ4S6Z9C" });
       startTagManager({ win: win as never });
       fire("pointerdown");
 
       const [restrictions, start] = win.dataLayer ?? [];
       expect(start).toMatchObject({ event: "gtm.js" });
-      expect(restrictions).toEqual({
-        "gtm.allowlist": ["google"],
-        "gtm.blocklist": expect.arrayContaining([
-          "customScripts",
-          "html",
-          "sandboxedScripts",
-          "nonGoogleScripts",
-          "nonGoogleIframes",
-          "nonGooglePixels",
-        ]),
+      expect(restrictions).toEqual({ "gtm.blocklist": ["html", "customScripts"] });
+    });
+  });
+
+  describe("when the tag manager starts", () => {
+    /** @scenario "Load PostHog with the tag manager, through the site's own proxy" */
+    it("queues PostHog's start for its loader and loads it from the proxy, without recordings", () => {
+      const { win, appended, fire } = fakeWindow({ id: "GTM-KJ4S6Z9C" });
+      startTagManager({ win: win as never });
+      fire("pointerdown");
+
+      expect(appended.at(-1)?.src).toBe("https://langwatch.ai/ingest/static/array.js");
+      const [[key, config, name] = []] = win.posthog?._i ?? [];
+      expect(key).toMatch(/^phc_/);
+      expect(name).toBe("posthog");
+      expect(config).toEqual(postHogConfig({ origin: "https://langwatch.ai" }));
+      expect(config).toMatchObject({
+        api_host: "https://langwatch.ai/ingest",
+        capture_pageview: "history_change",
+        disable_session_recording: true,
       });
+    });
+
+    /** @scenario "Load PostHog with the tag manager, through the site's own proxy" */
+    it("leaves a PostHog the page already has alone", () => {
+      const { win, appended, fire } = fakeWindow({ id: "GTM-KJ4S6Z9C" });
+      const existing: unknown[] = [];
+      win.posthog = existing;
+      startTagManager({ win: win as never });
+      fire("pointerdown");
+      expect(win.posthog).toBe(existing);
+      expect(appended).toHaveLength(1);
     });
   });
 });

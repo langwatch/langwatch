@@ -64,11 +64,18 @@ Feature: docs.json stays the single source of truth for both documentation sites
     Then the tag loads as on any production page
 
   @unit
-  Scenario: Let the tag manager run only Google's own tags
+  Scenario: Refuse arbitrary code from the tag manager
     Given docs.json names a Google Tag Manager container
     When the container loads
-    Then the page has already limited it to Google's own tags
-    And it refuses custom HTML, custom JavaScript and any non-Google script, frame or pixel, whatever the container publishes
+    Then the page has already refused custom HTML and custom JavaScript tags, whatever the container publishes
+    And Google's tags and the gallery templates for other vendors still run
+
+  @unit
+  Scenario: Load PostHog with the tag manager, through the site's own proxy
+    Given the tag manager loads on a production page
+    Then PostHog loads with it, from langwatch.ai's own analytics proxy rather than a PostHog host
+    And it records a pageview for every page the reader opens, and never records the session
+    And a page that already started PostHog is left as it is
 
   @unit
   Scenario: Mark deprecated pages

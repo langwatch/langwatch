@@ -1,3 +1,5 @@
+import { loadPostHog } from "./posthog.ts";
+
 const INTERACTIONS = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
 
@@ -5,22 +7,11 @@ const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
 const CONSENT_STORAGE_KEY = "lw-cookie-consent";
 
 /*
- * Set by the page before the container loads, so publishing cannot widen it: Google's own
- * tags only, never Custom HTML, custom JavaScript, script-injecting templates or a non-Google
- * script, frame or pixel. Blocked classes win over allowed ones.
+ * Set by the page before the container loads, so publishing cannot widen it: no Custom HTML and
+ * no custom JavaScript, which run any code at all. Google's tags and the gallery templates for
+ * other vendors, each limited to the hosts it declares, still run.
  */
-export const TAG_RESTRICTIONS = {
-  "gtm.allowlist": ["google"],
-  "gtm.blocklist": [
-    "customScripts",
-    "html",
-    "sandboxedScripts",
-    "nonGoogleScripts",
-    "nonGoogleIframes",
-    "nonGooglePixels",
-    "customPixels",
-  ],
-} as const;
+export const TAG_RESTRICTIONS = { "gtm.blocklist": ["html", "customScripts"] } as const;
 
 type TagWindow = Window & { dataLayer?: unknown[] };
 
@@ -40,8 +31,8 @@ export function tagManagerId({ doc, host }: { doc: Document; host: string }) {
 }
 
 /**
- * Adds Google Tag Manager once, when the reader first interacts or the page is idle, and only
- * after they accepted cookies. Accepting in another tab starts it here too.
+ * Adds Google Tag Manager and PostHog once, when the reader first interacts or the page is idle,
+ * and only after they accepted cookies. Accepting in another tab starts them here too.
  */
 export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
   const id = tagManagerId({ doc: win.document, host: win.location.hostname });
@@ -69,6 +60,7 @@ export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(id)}`;
     win.document.head.append(script);
+    loadPostHog({ win });
   };
   for (const name of INTERACTIONS) win.addEventListener(name, start, { once: true, passive: true });
   const idle = () =>
