@@ -131,4 +131,28 @@ describe("given the dashboard widget REST family", () => {
       expect(read.json.definition.queries).toEqual(queries);
     });
   });
+
+  describe("when a widget's stored Langy traces setting is cleared with null", () => {
+    /** @scenario "AC200j Langy setting: the API and the CLI read and write a widget's setting" */
+    it("removes it, and an update that names none keeps what is stored", async () => {
+      const key = mountKey();
+      const queries = queryDeclaring({ name: "limit", type: "number", default: 10 });
+      const created = await key.create({
+        name: "Traces",
+        code: CODE,
+        queries,
+        excludedOrigins: [],
+      });
+
+      const renamed = await key.update(created.json.id, { name: "Renamed" });
+      const kept = await key.read(created.json.id);
+      const cleared = await key.update(created.json.id, { excludedOrigins: null });
+      const read = await key.read(created.json.id);
+
+      expect(renamed.status).toBe(200);
+      expect(kept.json.definition.excludedOrigins).toEqual([]);
+      expect(cleared.status).toBe(200);
+      expect(read.json.definition).not.toHaveProperty("excludedOrigins");
+    });
+  });
 });

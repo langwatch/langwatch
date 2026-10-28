@@ -60338,10 +60338,10 @@ Creating (and updating) validates the queries file's shape and the widget's JS/T
 
 Every widget has a **Langy traces** setting, part of its queries: whether it counts the user's own conversations with Langy (traces with origin `langy`). Pass it with the widget:
 
-- `--langy-traces left-out` (the default): the widget counts the user's agent only. Use this for cost, volume, latency, errors and quality.
+- `--langy-traces left-out`: the widget counts the user's agent only. Use this for cost, volume, latency, errors and quality.
 - `--langy-traces included`: the widget also counts conversations with Langy. **Always use it when the widget reads Langy's own traces**: queries on `TraceName = 'langy.turn'`, on `Origin = 'langy'`, or about Langy's failed or refused requests. Left out, such a widget is always empty.
 
-When the request names a widget's current setting, keep it unless the widget reads Langy's own traces or the user asks to change it. A widget saved without the flag follows its dashboard, which leaves Langy out (or, in a personal project, includes it).
+When the request names a widget's current setting, keep it unless the widget reads Langy's own traces or the user asks to change it. Leaving the flag out on `add` makes the widget follow its dashboard's setting, which leaves Langy out (or, in a personal project, includes it). Leaving it out on `update` keeps the widget's stored setting. `left-out` and `included` each set an explicit value.
 
 ## Dashboards and their widgets
 

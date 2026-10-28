@@ -256,8 +256,8 @@ type BorrowedProcedures = {
           name?: string;
           code: string;
           queries: unknown[];
-          /** Kept as stored when absent. */
-          excludedOrigins?: string[];
+          /** Kept as stored when absent; null clears it. */
+          excludedOrigins?: string[] | null;
         };
         output: { success: true };
       };

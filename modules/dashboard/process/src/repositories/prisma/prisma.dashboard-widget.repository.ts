@@ -3,6 +3,7 @@ import {
   DashboardWidgetDefinitionInvalidError,
   DASHBOARD_SRCDOC_CHART_KIND,
   type DashboardWidgetDefinitionInput,
+  type DashboardWidgetDefinitionUpdate,
 } from "@langwatch/analytics-contract";
 import {
   CHART_GRID_DEFAULT_COL_SPAN,
@@ -141,7 +142,7 @@ export class PrismaDashboardWidgetRepository
   }: {
     id: string;
     projectId: string;
-    input: { name?: string } & Partial<DashboardWidgetDefinitionInput>;
+    input: { name?: string } & DashboardWidgetDefinitionUpdate;
   }): Promise<DashboardWidgetRow> {
     await this.transaction(async (tx) => {
       const data: Prisma.DashboardWidgetUpdateManyMutationInput = {};
@@ -180,7 +181,7 @@ export class PrismaDashboardWidgetRepository
     tx: Pick<Prisma.TransactionClient, "dashboardWidget">;
     id: string;
     projectId: string;
-    input: Partial<DashboardWidgetDefinitionInput>;
+    input: DashboardWidgetDefinitionUpdate;
   }): Promise<Prisma.DashboardWidgetUpdateManyMutationInput["definition"]> {
     const current = await tx.dashboardWidget.findFirst({ where: { id, projectId } });
     if (!current) throw new DashboardWidgetNotFoundError();
@@ -193,7 +194,11 @@ export class PrismaDashboardWidgetRepository
     const description = input.description ?? definition.description;
     const prompt = input.prompt ?? definition.prompt;
     const source = input.source ?? definition.source;
-    const excludedOrigins = input.excludedOrigins ?? definition.excludedOrigins;
+    // null clears the stored list, so the widget follows its board again.
+    const excludedOrigins =
+      input.excludedOrigins === null
+        ? undefined
+        : (input.excludedOrigins ?? definition.excludedOrigins);
     return graphOf({
       code: input.code ?? definition.code,
       queries: input.queries ?? definition.queries,

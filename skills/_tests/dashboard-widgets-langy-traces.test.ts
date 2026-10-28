@@ -22,7 +22,8 @@ describe("the dashboard-widgets skill", () => {
     const rendered = renderedSkill();
 
     expect(rendered).toContain("### Langy traces");
-    expect(rendered).toContain("`--langy-traces left-out` (the default)");
+    expect(rendered).toContain("`--langy-traces left-out`: the widget counts");
+    expect(rendered).toContain("Leaving it out on `update` keeps the widget's stored setting");
     expect(rendered).toContain("`--langy-traces included`");
     expect(rendered).toContain("Always use it when the widget reads Langy's own traces");
     expect(rendered).toContain("`TraceName = 'langy.turn'`");

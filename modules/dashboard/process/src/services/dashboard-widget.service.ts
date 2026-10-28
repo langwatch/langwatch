@@ -7,6 +7,7 @@ import {
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
+  dashboardWidgetExcludedOriginsSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import {
   DASHBOARD_WIDGET_KSUID_RESOURCE,
@@ -16,6 +17,7 @@ import {
   type DashboardViewer,
 } from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
+import { z } from "zod";
 
 import type {
   DashboardWidgetRow,
@@ -34,8 +36,14 @@ type Viewed = Readonly<{ viewer?: DashboardViewer }>;
 /** A widget addressed under one board's path: on any other board, or none, it is not found. */
 type OnBoard = Readonly<{ onDashboardId?: string }>;
 
-/** An update's code and queries, each optional; the repository merges them into the stored half. */
-const definitionUpdateSchema = dashboardWidgetDefinitionSchema.partial();
+/**
+ * An update's fields, each optional; the repository merges them into the stored half.
+ * `excludedOrigins: null` clears the stored list.
+ */
+const definitionUpdateSchema = z.object({
+  ...dashboardWidgetDefinitionSchema.partial().shape,
+  excludedOrigins: dashboardWidgetExcludedOriginsSchema.nullable().optional(),
+});
 
 /**
  * Every widget operation first asks analytics whether the project may use widgets. A

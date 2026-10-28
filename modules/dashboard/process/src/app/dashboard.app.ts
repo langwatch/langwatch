@@ -9,6 +9,7 @@ import {
   type AnalyticsApi as AnalyticsApiContract,
   type DashboardWidget,
   type DashboardWidgetDefinitionInput,
+  type DashboardWidgetDefinitionUpdate,
   type LangWatchQLBudgetOverflowMode,
   type LangWatchQLCaller,
   type LangWatchQLProtections,
@@ -644,7 +645,7 @@ export class DashboardModule implements DashboardApi {
       onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
-    } & Partial<DashboardWidgetDefinitionInput>,
+    } & DashboardWidgetDefinitionUpdate,
   ): Promise<DashboardWidget> {
     return this.#widgets.updateWidget({
       projectId: input.projectId,

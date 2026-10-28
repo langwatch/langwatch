@@ -39,7 +39,8 @@ const updateDashboardWidgetSchemaDefinition = z
     queries: dashboardWidgetQueriesSchema.optional(),
     description: dashboardWidgetDescriptionSchema.optional(),
     source: dashboardWidgetSourceSchema.optional(),
-    excludedOrigins: dashboardWidgetExcludedOriginsSchema.optional(),
+    /** `null` clears it, so the widget follows its board again. */
+    excludedOrigins: dashboardWidgetExcludedOriginsSchema.nullable().optional(),
   })
   // A PATCH naming nothing is a mistake worth reporting; a field it leaves out keeps its value.
   .refine(

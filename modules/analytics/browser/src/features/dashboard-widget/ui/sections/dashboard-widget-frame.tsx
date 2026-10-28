@@ -107,8 +107,13 @@ export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWi
   const parsed = dashboardWidgetDefinitionSchema.safeParse(props.graph);
   const queries = parsed.success ? JSON.stringify(parsed.data.queries) : "";
   const origins = (props.excludeOrigins ?? []).join(",");
-  return <WidgetFrameOverWindow key={`${props.id}:${queries}:${origins}`} {...props} />;
+  return (
+    <WidgetFrameOverWindow key={`${props.id}:${queries}:${origins}`} {...props} parsed={parsed} />
+  );
 }
+
+/** The outcome of reading a row's graph, parsed once by the caller. */
+type ParsedDefinition = ReturnType<typeof dashboardWidgetDefinitionSchema.safeParse>;
 
 /**
  * `granularitySeconds`, when given, is the step the reserved parameters carry.
@@ -116,7 +121,6 @@ export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWi
  */
 function WidgetFrameOverWindow({
   id,
-  graph,
   projectId,
   projectSlug,
   maxHeight,
@@ -129,7 +133,8 @@ function WidgetFrameOverWindow({
   onFaceChange,
   onExportChange,
   onEmptyChange,
-}: DashboardWidgetFrameOverWindowProps) {
+  parsed,
+}: DashboardWidgetFrameOverWindowProps & { readonly parsed: ParsedDefinition }) {
   const { colorMode } = useColorMode();
   const refreshedAt = useDashboardRefreshedAt();
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
@@ -137,7 +142,6 @@ function WidgetFrameOverWindow({
   // A row this build never wrote — an old shape, a hand-edited one — fails
   // safeParse and degrades to an empty file with no queries rather than
   // crashing the grid.
-  const parsed = dashboardWidgetDefinitionSchema.safeParse(graph);
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
   const { executeQuery: runQuery, params: hostParams } = useDashboardWidgetExecutor(

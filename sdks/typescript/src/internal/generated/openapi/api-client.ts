@@ -6838,7 +6838,7 @@ export interface operations {
                         /** @constant */
                         kind: "api";
                     };
-                    excludedOrigins?: string[];
+                    excludedOrigins?: string[] | null;
                 };
             };
         };

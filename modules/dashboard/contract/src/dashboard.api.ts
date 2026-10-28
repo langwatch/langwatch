@@ -1,6 +1,7 @@
 import type {
   DashboardWidget,
   DashboardWidgetDefinitionInput,
+  DashboardWidgetDefinitionUpdate,
   LangWatchQLBudgetOverflowMode,
   LangWatchQLProtections,
   LangWatchQLQueryResult,
@@ -259,7 +260,7 @@ export interface DashboardApi {
       onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
-    } & Partial<DashboardWidgetDefinitionInput>,
+    } & DashboardWidgetDefinitionUpdate,
   ): Promise<DashboardWidget>;
   assignDashboardWidgetToDashboard(input: {
     projectId: string;

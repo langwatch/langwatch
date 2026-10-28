@@ -108,7 +108,11 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
     const description = input.input.description ?? definition.data.description;
     const prompt = input.input.prompt ?? definition.data.prompt;
     const source = input.input.source ?? definition.data.source;
-    const excludedOrigins = input.input.excludedOrigins ?? definition.data.excludedOrigins;
+    // null clears the stored list, so the widget follows its board again.
+    const excludedOrigins =
+      input.input.excludedOrigins === null
+        ? undefined
+        : (input.input.excludedOrigins ?? definition.data.excludedOrigins);
     const updated: DashboardWidgetRow = {
       ...current,
       ...(input.input.name === undefined ? {} : { name: input.input.name }),

@@ -142,7 +142,8 @@ export function useBoardWidgets({
               name,
               code: definition.code,
               queries: definition.queries,
-              excludedOrigins: definition.excludedOrigins,
+              // null clears a setting the widget did not store before: it follows its board.
+              excludedOrigins: definition.excludedOrigins ?? null,
             }),
           ),
         );

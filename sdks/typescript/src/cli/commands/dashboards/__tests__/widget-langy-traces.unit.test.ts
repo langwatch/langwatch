@@ -69,4 +69,11 @@ describe("--langy-traces", () => {
     expect(resolveLangyTraces(undefined)).toBeUndefined();
     expect(() => resolveLangyTraces("sometimes")).toThrow(WidgetInputError);
   });
+
+  it.each(["toString", "constructor", "__proto__"])(
+    "refuses %s with the friendly error, not a TypeError",
+    (flag) => {
+      expect(() => resolveLangyTraces(flag)).toThrow(WidgetInputError);
+    },
+  );
 });

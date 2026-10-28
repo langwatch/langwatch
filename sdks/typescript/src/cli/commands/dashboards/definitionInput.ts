@@ -27,7 +27,8 @@ const LANGY_TRACES: Readonly<Record<string, string[]>> = {
  */
 export const resolveLangyTraces = (flag: string | undefined): string[] | undefined => {
   if (flag === undefined) return undefined;
-  const origins = LANGY_TRACES[flag];
+  // Own keys only: "toString" or "__proto__" must not resolve to an inherited member.
+  const origins = Object.hasOwn(LANGY_TRACES, flag) ? LANGY_TRACES[flag] : undefined;
   if (!origins) {
     throw new WidgetInputError('--langy-traces takes "included" or "left-out"');
   }

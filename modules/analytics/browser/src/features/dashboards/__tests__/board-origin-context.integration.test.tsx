@@ -7,6 +7,7 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { act, cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useState } from "react";
@@ -138,16 +139,18 @@ function boardServer({
           name?: string;
           code: string;
           queries: { name: string; sql: string }[];
-          excludedOrigins?: string[];
+          excludedOrigins?: string[] | null;
         };
         const widget = storedWidgets.find((candidate) => candidate.id === id);
         if (widget) {
           widget.name = name ?? widget.name;
+          const { excludedOrigins: held, ...rest } = widget.graph;
+          const kept = origins === undefined ? held : (origins ?? undefined);
           widget.graph = {
-            ...widget.graph,
+            ...rest,
             code,
             queries,
-            ...(origins === undefined ? {} : { excludedOrigins: origins }),
+            ...(kept === undefined ? {} : { excludedOrigins: kept }),
           };
         }
         return Promise.resolve({ success: true });
@@ -239,7 +242,10 @@ async function frameRuns({ frame, queryName }: { frame: Element; queryName: stri
   return answer;
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  toaster.remove();
+});
 
 /** The card's frame of the widget drawing `code`, outside the editor. */
 function cardFrame(code: string): Element {
@@ -296,7 +302,16 @@ function openBoard({
     project: { ...PROJECT, isPersonal },
     route: { params: { dashboardId: BOARD.id }, query },
   });
-  renderDashboards({ element: <AddressedBoard host={host} />, host, answer: server.answer });
+  renderDashboards({
+    element: (
+      <>
+        <AddressedBoard host={host} />
+        <Toaster />
+      </>
+    ),
+    host,
+    answer: server.answer,
+  });
   return { ...server, host };
 }
 
@@ -465,6 +480,49 @@ describe("given a widget's Langy traces setting", () => {
         expect.objectContaining({ id: WIDGET.id, excludedOrigins: [] }),
       ]);
       expect(server.runs().map((run) => run.excludeOrigins)).toEqual([[], ["langy"]]);
+    });
+  });
+
+  describe("when a member saves only the Langy setting and presses Undo", () => {
+    /** @scenario "AC200k Langy setting: Undo puts the setting back, including back to none" */
+    it("clears a setting the widget did not store, and restores one it did", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = openBoard({ excludedOrigins: ["langy"] });
+      await screen.findByTestId("sandboxed-frame");
+      const drawer = await openEditor(user);
+      await user.click(within(drawer).getByRole("radio", { name: "Included" }));
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
+
+      await user.click(await screen.findByRole("button", { name: "Undo" }));
+      await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
+
+      expect(server.updates()[1]).toEqual(
+        expect.objectContaining({ id: WIDGET.id, excludedOrigins: null }),
+      );
+      await vi.waitFor(async () => {
+        const reopened = await openEditor(user);
+        expect(pickedLangyTraces(reopened)).toBe("Left out");
+      });
+    });
+
+    it("writes the stored list back when the widget had one", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = openBoard({
+        widgets: [{ ...WIDGET, graph: { ...GRAPH, excludedOrigins: [] } }],
+      });
+      await screen.findByTestId("sandboxed-frame");
+      const drawer = await openEditor(user);
+      await user.click(within(drawer).getByRole("radio", { name: "Left out" }));
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
+
+      await user.click(await screen.findByRole("button", { name: "Undo" }));
+      await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
+
+      expect(server.updates()[1]).toEqual(
+        expect.objectContaining({ id: WIDGET.id, excludedOrigins: [] }),
+      );
     });
   });
 

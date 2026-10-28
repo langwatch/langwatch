@@ -32704,13 +32704,20 @@
                     ]
                   },
                   "excludedOrigins": {
-                    "maxItems": 20,
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 64
-                    }
+                    "anyOf": [
+                      {
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "minProperties": 1
@@ -39372,13 +39379,20 @@
                     ]
                   },
                   "excludedOrigins": {
-                    "maxItems": 20,
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 64
-                    }
+                    "anyOf": [
+                      {
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "minProperties": 1

@@ -1798,6 +1798,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And on a board that stores no list, the widget runs with the board's default
     # Order: the widget's own setting, else the board's stored list, else the default
 
+  @unit @integration
+  Scenario: AC200k Langy setting: Undo puts the setting back, including back to none
+    Given a member saved a widget with only its "Langy traces" setting changed
+    When they press Undo
+    Then the widget has the setting it had before the save
+    And a widget that stored none stores none again, so it follows its board
+    # The API clears the stored setting with "excludedOrigins": null on update
+
   @integration
   Scenario: AC200g Langy setting: changing it runs the preview again
     Given a member is editing a widget that leaves Langy's conversations out
@@ -1828,6 +1836,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When it adds a widget with "excludedOrigins": []
     Then the widget reads back "excludedOrigins": []
     And an update that does not name "excludedOrigins" keeps the stored value
+    And an update that sends "excludedOrigins": null removes it, so the widget follows its board again
     And `langwatch dashboard widget add` and `update` send it with `--langy-traces included` or `left-out`
 
   # ---------------------------------------------------------------------------
@@ -1937,5 +1946,5 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
   # AC 190-195: "Dashboards show your agent, not Langy's work for you" (owner, 2026-10-09) → Scenario: AC190 Langy: every widget on a board leaves out Langy's conversations by default; Scenario: AC191 Langy: a widget's own origin filter keeps its meaning; Scenario: AC192 Langy: data that is Langy's own is not filtered; Scenario: AC193 Langy: the origins a board leaves out are a list a board parameter can set later; Scenario: AC194 Langy: a query run outside a board is not scoped; Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
   # AC 198: "A personal project's boards show Langy" (owner, 2026-10-10) → Scenario: AC198 Langy: a board in a personal project shows Langy's conversations
-  # AC 200: "A widget's Langy traces setting" (owner, 2026-10-27; moved from the board header to the widget editor, owner, 2026-10-28) → Scenario: AC200 Langy setting: the widget editor shows the setting a widget runs with; Scenario: AC200b Langy setting: a widget saved as Included runs with no origin left out; Scenario: AC200c Langy setting: picking Left out stores langy as the origin a widget leaves out; Scenario: AC200d Langy setting: only a member who can edit the board sees the setting; Scenario: AC200e Langy setting: the API reads and sets the origins a board leaves out; Scenario: AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default; Scenario: AC200g Langy setting: changing it runs the preview again; Scenario: AC200h Langy setting: a From LangWatch board's widgets keep the board's rule; Scenario: AC200i Langy setting: Langy writes the setting with the widgets it builds; Scenario: AC200j Langy setting: the API and the CLI read and write a widget's setting
+  # AC 200: "A widget's Langy traces setting" (owner, 2026-10-27; moved from the board header to the widget editor, owner, 2026-10-28) → Scenario: AC200 Langy setting: the widget editor shows the setting a widget runs with; Scenario: AC200b Langy setting: a widget saved as Included runs with no origin left out; Scenario: AC200c Langy setting: picking Left out stores langy as the origin a widget leaves out; Scenario: AC200d Langy setting: only a member who can edit the board sees the setting; Scenario: AC200e Langy setting: the API reads and sets the origins a board leaves out; Scenario: AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default; Scenario: AC200g Langy setting: changing it runs the preview again; Scenario: AC200h Langy setting: a From LangWatch board's widgets keep the board's rule; Scenario: AC200i Langy setting: Langy writes the setting with the widgets it builds; Scenario: AC200j Langy setting: the API and the CLI read and write a widget's setting; Scenario: AC200k Langy setting: Undo puts the setting back, including back to none
   # AC 201: "A custom widget reads what its query asks for" (owner, 2026-10-28) → Scenario: AC201 Widget data: a widget set to Included reads Langy's turns, the gateway-stored ones included; Scenario: AC201b Widget data: a widget left at the default leaves Langy's turns out; Scenario: AC201e Widget data: a board's explicit setting applies to widgets with no own value; Scenario: AC201c Widget data: every run is bound to the period and grain the board shows; Scenario: AC201d Widget data: a changed query never shows an earlier answer
