@@ -14,19 +14,22 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 )
 
-// plainBody hides WriterTo on the request body. The SDK closes that body
+// readOnlyBodyTransport hides WriterTo on the request body. The SDK closes that body
 // once response headers arrive, and its WriteTo then returns io.EOF as an error
 // where Read returns it as a clean end. Go's transport still drains the body
 // after sending it, so a server that answers at once makes it tear the
 // connection down mid-stream (langwatch/tasks#1016).
-type plainBody struct{ http.RoundTripper }
+type readOnlyBodyTransport struct{ http.RoundTripper }
 
-// RoundTrip sends req with its body wrapped so only Read and Close are visible.
-func (p plainBody) RoundTrip(req *http.Request) (*http.Response, error) {
+// RoundTrip sends a clone of req whose body shows only Read and Close; req is
+// left as the SDK built it.
+func (t readOnlyBodyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Body != nil {
-		req.Body = struct{ io.ReadCloser }{req.Body}
+		body := req.Body
+		req = req.Clone(req.Context())
+		req.Body = struct{ io.ReadCloser }{body}
 	}
-	return p.RoundTripper.RoundTrip(req)
+	return t.RoundTripper.RoundTrip(req)
 }
 
 // bedrockClient is the real AWS SDK pointed at llmsim, signing with throwaway keys.
@@ -36,7 +39,7 @@ func bedrockClient(t *testing.T) *bedrockruntime.Client {
 	return bedrockruntime.New(bedrockruntime.Options{
 		Region:       "us-east-1",
 		BaseEndpoint: aws.String(srv.URL),
-		HTTPClient:   &http.Client{Transport: plainBody{http.DefaultTransport}},
+		HTTPClient:   &http.Client{Transport: readOnlyBodyTransport{http.DefaultTransport}},
 		Credentials:  credentials.NewStaticCredentialsProvider("AKIDLLMSIM", "not-a-secret", ""),
 	})
 }
