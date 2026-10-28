@@ -148,4 +148,29 @@ describe("the evaluator history drawer", () => {
       }),
     );
   });
+
+  /** @scenario "A failed label save shows the registered error and reads the labels again" */
+  it("shows the registered copy for a refused label and reads the labels again", async () => {
+    calls.assignLabel.mockRejectedValueOnce({
+      code: "evaluator_version_not_found",
+      httpStatus: 404,
+      meta: {},
+    });
+    calls.invalidateVersions.mockClear();
+    renderWithEvaluatorHost(
+      <EvaluatorHistoryPanel evaluatorId="eval_1" evaluatorName="Answer relevancy" />,
+    );
+    await screen.findByTestId("evaluator-versions");
+    await userEvent.click(screen.getByRole("button", { name: "Deploy" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getAllByRole("combobox")[1]!);
+    await userEvent.click(await screen.findByRole("option", { name: /v2/ }));
+    await userEvent.click(screen.getByTestId("evaluator-deploy-save"));
+
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toMatch(/^That evaluator version doesn't exist/);
+    expect(alert.textContent).not.toContain("evaluator_version_not_found");
+    expect(calls.invalidateVersions).toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
 });

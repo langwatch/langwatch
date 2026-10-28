@@ -1,13 +1,28 @@
-import type { WireOf } from "@langwatch/api/web";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import type { EvaluatorVersion } from "@langwatch/evaluator-contract";
-import { toEpochMs } from "@langwatch/time";
+"use client";
 
-/** Every saved version of an evaluator, newest first, with the deploy labels it carries. */
-export function EvaluatorVersionList({ versions }: { versions: WireOf<EvaluatorVersion>[] }) {
+import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
+
+/** One saved version as the list shows it; the owning module words the date. */
+export interface VersionListItem {
+  id: string;
+  version: number;
+  labels: readonly string[];
+  commitMessage: string | null;
+  /** The user who wrote it; null for an API key or LangWatch itself. */
+  author: { name: string | null; email: string | null } | null;
+  authorKind: string | null;
+  createdAtLabel: string;
+}
+
+export interface VersionListProps {
+  versions: readonly VersionListItem[];
+  "data-testid"?: string;
+}
+
+/** Every saved version, newest first, with the deploy labels it carries. */
+export function VersionList({ versions, "data-testid": testId }: VersionListProps) {
   return (
-    <VStack align="stretch" gap={2} data-testid="evaluator-versions">
+    <VStack align="stretch" gap={2} data-testid={testId}>
       <Text fontWeight="semibold" fontSize="sm">
         Versions
       </Text>
@@ -38,7 +53,7 @@ export function EvaluatorVersionList({ versions }: { versions: WireOf<EvaluatorV
             </Text>
           )}
           <Text color="fg.muted" fontSize="xs">
-            {authorOf(row)} · {formatTimeAgo(toEpochMs(row.createdAt))}
+            {authorOf(row)} · {row.createdAtLabel}
           </Text>
         </VStack>
       ))}
@@ -46,7 +61,7 @@ export function EvaluatorVersionList({ versions }: { versions: WireOf<EvaluatorV
   );
 }
 
-function authorOf(row: WireOf<EvaluatorVersion>): string {
+function authorOf(row: VersionListItem): string {
   if (row.author) return row.author.name ?? row.author.email ?? "Unknown user";
   return row.authorKind === "api_key" ? "API key" : "LangWatch";
 }

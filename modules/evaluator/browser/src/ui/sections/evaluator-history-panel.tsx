@@ -5,10 +5,13 @@
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { DeployLabelsDialog } from "@langwatch/design-system/deploy-labels-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { VersionList } from "@langwatch/design-system/version-list";
 import { evaluatorClient } from "@langwatch/evaluator-client";
+import { checkEvaluatorLabel } from "@langwatch/evaluator-contract";
 import { toEpochMs } from "@langwatch/time";
 import {
   ArrowUp,
@@ -25,8 +28,6 @@ import { useState } from "react";
 
 import { useEvaluatorVersions } from "../../behavior/use-evaluator-versions.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
-import { EvaluatorDeployDialog } from "../blocks/evaluator-deploy-dialog.tsx";
-import { EvaluatorVersionList } from "../blocks/evaluator-version-list.tsx";
 
 const ACTION_META = {
   "evaluators.create": { label: "Created", icon: CheckSquare },
@@ -81,12 +82,23 @@ export function EvaluatorHistoryPanel({
         ? { headerAction: { label: "Deploy", onClick: () => setDeployOpen(true) } }
         : {})}
     >
-      {hasVersions && <EvaluatorVersionList versions={versions.versions} />}
-      <EvaluatorDeployDialog
+      {hasVersions && (
+        <VersionList
+          data-testid="evaluator-versions"
+          versions={versions.versions.map((row) => ({
+            ...row,
+            createdAtLabel: formatTimeAgo(toEpochMs(row.createdAt)) ?? "",
+          }))}
+        />
+      )}
+      <DeployLabelsDialog
         open={deployOpen}
         onClose={() => setDeployOpen(false)}
-        evaluatorName={evaluatorName}
+        entityName={evaluatorName}
+        entityNoun="evaluator"
         state={versions}
+        checkLabel={checkEvaluatorLabel}
+        testIdPrefix="evaluator-deploy"
       />
       {hasVersions && (
         <Text fontWeight="semibold" fontSize="sm" paddingTop={4} paddingBottom={2}>

@@ -226,12 +226,21 @@ class TestAgentBrowser implements AgentClient {
   }
 
   readonly labelsAssigned: unknown[] = [];
+  versionsRead = 0;
+  /** A handled error the next label assignment rejects with, once. */
+  assignRefusal: unknown = null;
 
   listVersions(): Promise<AgentVersions> {
+    this.versionsRead += 1;
     return Promise.resolve(versions);
   }
 
   assignLabel(input: { label: string; version: number }): Promise<AgentLabel> {
+    if (this.assignRefusal) {
+      const refusal = this.assignRefusal;
+      this.assignRefusal = null;
+      return Promise.reject(refusal);
+    }
     this.labelsAssigned.push(input);
     return Promise.resolve({
       label: input.label,
@@ -544,6 +553,28 @@ describe("given the agents page", () => {
           { projectId: "project_1", agentId: "agent_1", label: "staging", version: 2 },
         ]);
       });
+    });
+
+    /** @scenario "A failed label save shows the registered error and reads the labels again" */
+    it("shows the registered copy for a refused label and reads the labels again", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { browser } = await mountScreen({ history: "agent_1" });
+      browser.assignRefusal = { code: "agent_version_not_found", httpStatus: 404, meta: {} };
+
+      await screen.findByTestId("agent-versions");
+      await user.click(screen.getByRole("button", { name: "Deploy" }));
+      const dialog = await screen.findByRole("dialog", { name: /deploy http agent/i });
+      const readsBefore = browser.versionsRead;
+      const [, staging] = within(dialog).getAllByRole("combobox");
+      await user.click(staging!);
+      await user.click(await screen.findByRole("option", { name: /v2/ }));
+      await user.click(within(dialog).getByTestId("agent-deploy-save"));
+
+      const alert = await within(dialog).findByRole("alert");
+      expect(alert.textContent).toMatch(/^That agent version doesn't exist/);
+      expect(alert.textContent).not.toContain("agent_version_not_found");
+      await waitFor(() => expect(browser.versionsRead).toBeGreaterThan(readsBefore));
+      expect(screen.getByRole("dialog", { name: /deploy http agent/i })).toBeInTheDocument();
     });
 
     /** @scenario "The deploy dialog adds a custom label and refuses a reserved one" */

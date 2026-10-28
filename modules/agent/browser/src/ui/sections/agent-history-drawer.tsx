@@ -1,8 +1,11 @@
-import type { AgentHistoryEntry, AgentVersion } from "@langwatch/agent-contract";
+import type { AgentHistoryEntry } from "@langwatch/agent-contract";
+import { checkAgentLabel } from "@langwatch/agent-contract";
+import { DeployLabelsDialog } from "@langwatch/design-system/deploy-labels-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { VersionList } from "@langwatch/design-system/version-list";
 import {
   ArrowUp,
   Bot,
@@ -19,7 +22,6 @@ import { useEffect, useState } from "react";
 
 import { useAgentVersions } from "../../behavior/use-agent-versions.ts";
 import type { AgentClient } from "../../model/agent-client.ts";
-import { AgentDeployDialog } from "../blocks/agent-deploy-dialog.tsx";
 
 const ACTION_META = {
   "agents.create": { label: "Created", icon: Bot },
@@ -82,13 +84,22 @@ export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
         : {})}
     >
       {versions.versions.length > 0 && (
-        <VersionList versions={versions.versions} formatCreatedAt={props.formatCreatedAt} />
+        <VersionList
+          data-testid="agent-versions"
+          versions={versions.versions.map((row) => ({
+            ...row,
+            createdAtLabel: props.formatCreatedAt(row.createdAt),
+          }))}
+        />
       )}
-      <AgentDeployDialog
+      <DeployLabelsDialog
         open={deployOpen}
         onClose={() => setDeployOpen(false)}
-        agentName={props.agentName}
+        entityName={props.agentName}
+        entityNoun="agent"
         state={versions}
+        checkLabel={checkAgentLabel}
+        testIdPrefix="agent-deploy"
       />
       {versions.versions.length > 0 && (
         <Text fontWeight="semibold" fontSize="sm" paddingTop={4} paddingBottom={2}>
@@ -125,60 +136,6 @@ export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
       )}
     </Drawer>
   );
-}
-
-function VersionList({
-  versions,
-  formatCreatedAt,
-}: {
-  versions: AgentVersion[];
-  formatCreatedAt: (createdAt: AgentVersion["createdAt"]) => string;
-}) {
-  return (
-    <VStack align="stretch" gap={2} data-testid="agent-versions">
-      <Text fontWeight="semibold" fontSize="sm">
-        Versions
-      </Text>
-      {versions.map((row) => (
-        <HStack
-          key={row.id}
-          justify="space-between"
-          align="start"
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          paddingX={3}
-          paddingY={2}
-        >
-          <VStack align="start" gap={0} minWidth={0}>
-            <HStack gap={2}>
-              <Text fontFamily="mono" fontSize="sm" fontWeight="semibold">
-                v{row.version}
-              </Text>
-              {row.labels.map((label) => (
-                <Badge key={label} size="xs" variant="subtle" colorPalette="green">
-                  {label}
-                </Badge>
-              ))}
-            </HStack>
-            {row.commitMessage && (
-              <Text fontSize="sm" truncate maxWidth="100%">
-                {row.commitMessage}
-              </Text>
-            )}
-            <Text color="fg.muted" fontSize="xs">
-              {authorOf(row)} · {formatCreatedAt(row.createdAt)}
-            </Text>
-          </VStack>
-        </HStack>
-      ))}
-    </VStack>
-  );
-}
-
-function authorOf(row: AgentVersion): string {
-  if (row.author) return row.author.name ?? row.author.email ?? "Unknown user";
-  return row.authorKind === "api_key" ? "API key" : "LangWatch";
 }
 
 function HistoryEntry({

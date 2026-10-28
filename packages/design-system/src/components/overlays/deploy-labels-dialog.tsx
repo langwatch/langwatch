@@ -1,23 +1,53 @@
-import { checkAgentLabel } from "@langwatch/agent-contract";
-import { Dialog } from "@langwatch/design-system/dialog";
+"use client";
+
 import {
   Box,
-  Button,
   createListCollection,
   HStack,
   IconButton,
   Input,
   Text,
   VStack,
-} from "@langwatch/design-system/primitives";
-import { Select } from "@langwatch/design-system/select";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+} from "@chakra-ui/react";
 import { Info, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { useAgentVersions } from "../../behavior/use-agent-versions.ts";
+import { Button } from "../forms/button.tsx";
+import { Select } from "../forms/select.tsx";
+import { Dialog } from "./dialog.tsx";
+import { Tooltip } from "./tooltip.tsx";
 
-type AgentVersionsState = ReturnType<typeof useAgentVersions>;
+/** Whether a label name may be assigned, and why not. */
+export type DeployLabelCheck = { valid: true } | { valid: false; reason: string };
+
+/** The label edits the dialog reads and writes; the owning module saves them. */
+export interface DeployLabelsState {
+  versions: readonly { version: number; commitMessage: string | null }[];
+  latestVersion: number | null;
+  labels: readonly string[];
+  /** The version each label points at; null when unassigned. */
+  selections: Readonly<Record<string, number | null>>;
+  isSaving: boolean;
+  saveError: string | null;
+  select: (label: string, version: number | null) => void;
+  addLabel: (label: string) => void;
+  resetSelections: () => void;
+  /** True when every label change landed. */
+  save: () => Promise<boolean>;
+}
+
+export interface DeployLabelsDialogProps {
+  open: boolean;
+  onClose: () => void;
+  /** The agent or evaluator name the title names. */
+  entityName: string;
+  /** "agent" or "evaluator", for the copy. */
+  entityNoun: string;
+  state: DeployLabelsState;
+  checkLabel: (label: string) => DeployLabelCheck;
+  /** Prefix for the save button, label trigger and version item test ids. */
+  testIdPrefix: string;
+}
 
 const ROW_BOX = {
   borderWidth: "1px",
@@ -54,7 +84,15 @@ function VersionText({ version, message }: { version: number; message: string | 
   );
 }
 
-function LabelRow({ state, label }: { state: AgentVersionsState; label: string }) {
+function LabelRow({
+  state,
+  label,
+  testIdPrefix,
+}: {
+  state: DeployLabelsState;
+  label: string;
+  testIdPrefix: string;
+}) {
   const items = useMemo(
     () =>
       state.versions.map((row) => ({
@@ -91,7 +129,7 @@ function LabelRow({ state, label }: { state: AgentVersionsState; label: string }
             }}
             aria-label={`${label} version`}
           >
-            <Select.Trigger clearable data-testid={`agent-deploy-label-trigger-${label}`}>
+            <Select.Trigger clearable data-testid={`${testIdPrefix}-label-trigger-${label}`}>
               <Select.ValueText placeholder="Select version">
                 {(picked) => {
                   const item = picked[0] as (typeof items)[number] | undefined;
@@ -108,7 +146,7 @@ function LabelRow({ state, label }: { state: AgentVersionsState; label: string }
                 <Select.Item
                   key={item.value}
                   item={item}
-                  data-testid={`agent-deploy-label-${label}-version-${item.version}`}
+                  data-testid={`${testIdPrefix}-label-${label}-version-${item.version}`}
                 >
                   <VersionText version={item.version} message={item.message} />
                 </Select.Item>
@@ -133,14 +171,16 @@ function LabelRow({ state, label }: { state: AgentVersionsState; label: string }
 /** `name` is null while the add button shows; the dialog leaves Escape to the open input. */
 function AddLabel({
   state,
+  checkLabel,
   name,
   setName,
 }: {
-  state: AgentVersionsState;
+  state: DeployLabelsState;
+  checkLabel: (label: string) => DeployLabelCheck;
   name: string | null;
   setName: (name: string | null) => void;
 }) {
-  const check = name ? checkAgentLabel(name) : null;
+  const check = name ? checkLabel(name) : null;
   if (name === null) {
     return (
       <Button variant="ghost" size="sm" alignSelf="flex-start" onClick={() => setName("")}>
@@ -183,17 +223,15 @@ function AddLabel({
 }
 
 /** Points deploy labels at versions; `latest` always follows the newest one. */
-export function AgentDeployDialog({
+export function DeployLabelsDialog({
   open,
   onClose,
-  agentName,
+  entityName,
+  entityNoun,
   state,
-}: {
-  open: boolean;
-  onClose: () => void;
-  agentName: string;
-  state: AgentVersionsState;
-}) {
+  checkLabel,
+  testIdPrefix,
+}: DeployLabelsDialogProps) {
   const [newLabel, setNewLabel] = useState<string | null>(null);
   const close = () => {
     setNewLabel(null);
@@ -205,18 +243,18 @@ export function AgentDeployDialog({
       open={open}
       onClose={close}
       closeOnEscape={newLabel === null}
-      title={`Deploy ${agentName}`}
+      title={`Deploy ${entityName}`}
       primaryAction={{
         label: "Save",
         loading: state.isSaving,
         onClick: () => void state.save().then((saved) => saved && onClose()),
-        "data-testid": "agent-deploy-save",
+        "data-testid": `${testIdPrefix}-save`,
       }}
     >
       <VStack align="stretch" gap={4}>
         <Text fontSize="sm" color="fg.muted">
-          Labels pin the version that experiments, the SDK and the API run. Ask for an agent with
-          its label, such as production, to get that version instead of the latest.
+          Labels pin the version that experiments, the SDK and the API run. Ask for an {entityNoun}{" "}
+          with its label, such as production, to get that version instead of the latest.
         </Text>
         <VStack align="stretch" gap={3}>
           <Box {...ROW_BOX}>
@@ -240,9 +278,9 @@ export function AgentDeployDialog({
             </HStack>
           </Box>
           {state.labels.map((label) => (
-            <LabelRow key={label} state={state} label={label} />
+            <LabelRow key={label} state={state} label={label} testIdPrefix={testIdPrefix} />
           ))}
-          <AddLabel state={state} name={newLabel} setName={setNewLabel} />
+          <AddLabel state={state} checkLabel={checkLabel} name={newLabel} setName={setNewLabel} />
           {state.saveError && (
             <Text fontSize="sm" color="red.fg" role="alert">
               {state.saveError}
