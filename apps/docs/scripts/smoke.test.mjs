@@ -79,7 +79,10 @@ async function checkVariant({ browser, base, width, mode }) {
     permissions: ["clipboard-read", "clipboard-write"],
   });
   try {
-    await context.addInitScript((theme) => localStorage.setItem("theme", theme), mode);
+    /* Top frame only: the aborted session frame is an error page whose storage access throws. */
+    await context.addInitScript((theme) => {
+      if (window.top === window) localStorage.setItem("theme", theme);
+    }, mode);
     const page = await context.newPage();
     page.setDefaultTimeout(15_000);
     const errors = [];
