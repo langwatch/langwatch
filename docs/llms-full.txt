@@ -42243,8 +42243,7 @@ curl "https://app.langwatch.ai/api/v1/dashboards" \
 </CodeGroup>
 
 A widget has its verbs under `widget`: `langwatch dashboard widget
-list|get|add|update|delete <dashboardId> [<widgetId>]`, with
-`--langy-traces included|left-out` on `add` and `update`, and
+list|get|add|update|delete <dashboardId> [<widgetId>]`, and
 `createWidget`, `getWidget`, `updateWidget` and `deleteWidget` in the
 TypeScript SDK (`create_widget`, `get_widget`, `update_widget` and
 `delete_widget` in Python).
