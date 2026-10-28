@@ -45,6 +45,7 @@ function numberFrom({
 }
 
 const helpers = read("charts", "langwatch", "templates", "_helpers.tpl");
+const appDeployment = read("charts", "langwatch", "templates", "app", "deployment.yaml");
 const suite = read("charts", "langwatch", "tests", "workers-shutdown.sh");
 const values = read("charts", "langwatch", "values.yaml");
 const queue = read("packages", "group-queue", "src", "groupQueue.ts");
@@ -61,6 +62,18 @@ const chartGraceMarginSeconds = numberFrom({
   source: helpers,
   pattern: /\$required := add \$drain (\d+)/,
   label: "chart required grace",
+});
+
+/** The preStop sleep an unpinned app gets, and the seconds the chart keeps above preStop + drain. */
+const chartPreStopDefaultSeconds = numberFrom({
+  source: appDeployment,
+  pattern: /\$preStop = min (\d+) \(sub \$grace/,
+  label: "chart app preStop default",
+});
+const chartPreStopMarginSeconds = numberFrom({
+  source: appDeployment,
+  pattern: /\$withPreStop := add \$preStop \$appDrain (\d+)/,
+  label: "chart app preStop margin",
 });
 
 const suiteDrainSeconds = numberFrom({
@@ -140,6 +153,19 @@ describe("the shutdown budget", () => {
     });
   });
 
+  describe("given the app sleeps in preStop before SIGTERM", () => {
+    describe("when its grace period is compared with the chart's preStop floor", () => {
+      /** @scenario "The chart is sized for the same production drain the code uses" */
+      it("covers the default preStop sleep, the drain and the preStop margin", () => {
+        const app = componentValues[0]!;
+
+        expect(app.graceSeconds).toBeGreaterThanOrEqual(
+          chartPreStopDefaultSeconds + app.drainSeconds + chartPreStopMarginSeconds,
+        );
+      });
+    });
+  });
+
   describe("given the resolved production drain budget", () => {
     describe("when it is compared with the drain the chart and its suite declare", () => {
       /** @scenario "The chart is sized for the same production drain the code uses" */
@@ -148,7 +174,7 @@ describe("the shutdown budget", () => {
         ({ drainSeconds, graceSeconds }) => {
           expect(drainSeconds * 1000).toBe(queueDefaultDrainMs);
           expect(drainSeconds).toBe(suiteDrainSeconds);
-          expect(graceSeconds).toBe(drainSeconds + chartGraceMarginSeconds);
+          expect(graceSeconds).toBeGreaterThanOrEqual(drainSeconds + chartGraceMarginSeconds);
           expect(deadlineFor(queueDefaultDrainMs)).toBe(
             (drainSeconds + chartDeadlineMarginSeconds) * 1000,
           );
