@@ -179,7 +179,7 @@ How it works: this is `instant_eval_judgments`. It exists. Pages are inserted in
 - Consequences
   - Cost: the same as today. The drawer read adds one query per opened trace.
   - ClickHouse load: low for writes. A lookup by trace alone is not a prefix of the order key, so the drawer read may cost more (see section 6).
-  - Trace details UI: new section. The trace module must not call `InstantEvalApi`: `modules/instant-eval/process/src/app/instant-eval.app.ts:41` already uses `TraceApi`, so that would be a peer cycle, which the architecture check refuses. Instead, add `instant_eval_judgments` to the `shared` list in `packages/architecture-enforcer/src/policies/persistence/clickhouse-table-ownership.ts` with reader trace. Then read it from a trace repository, the way `modules/trace/process/src/repositories/clickhouse/trace-instant-eval-runs.repository.ts` reads `instant_eval_runs` (already shared).
+  - Trace details UI: new section. A plain read of another module's table is a query operation on its owner's `*Api` (`dev/docs/ARCHITECTURE.md` section 7, "A ClickHouse table has one owner"). So instant-eval adds a judgments-by-trace query to `InstantEvalApi`, and trace calls it through a channel bound to that token (section 3, "A channel may be bound to another module's `*Api` token"). A binding is not a peer and makes no peer-cycle edge, so it is allowed although instant-eval already depends on `TraceApi` (`modules/instant-eval/process/src/app/instant-eval.app.ts:41`). Rejected: declaring `instant_eval_judgments` shared in `packages/architecture-enforcer/src/policies/persistence/clickhouse-table-ownership.ts`, since the record keeps shares for analytics tables.
   - Langy's answer: "A run is saved and shows on each trace."
   - Migration: none for the table. The drawer join fix is a `TraceId` bloom-filter skip index in a goose migration with `IF NOT EXISTS`, materialised as a background step. This is unmeasured.
 
@@ -240,7 +240,7 @@ How it works: a lasting or alerting eval becomes a monitor whose judge model is 
 | Backfills old traces                   | No                     | Only if run over old traces                                       | Yes                                       | Yes, by a run                          | No                                                                       |
 | Exploration cost                       | Free inside the window | Costly: a write per verdict                                       | Free, stores nothing                      | Free, stores nothing                   | Not for exploration                                                      |
 
-Row note for volumes: the storing options hold the same 1,000,000 rows. B writes 1,000,000 events plus fold and analytics rows, one by one. C and D write the same rows in 200 bulk inserts (1,000 inserts of 1,000 rows at page size 100).
+Row note for volumes: the storing options hold the same 1,000,000 rows. B writes 1,000,000 events plus fold and analytics rows, one by one. C and D write the same rows in bulk: 200 inserts of 5,000 rows at page size 500, or 1,000 inserts of 1,000 rows at page size 100.
 
 ## 4. How others do it
 
@@ -328,7 +328,7 @@ Other open decisions (judgment retention, pricing of runs) go to the build PLAN,
 
 ### What a build PLAN needs
 
-- A trace-drawer read. Add `instant_eval_judgments` to the `shared` list in `packages/architecture-enforcer/src/policies/persistence/clickhouse-table-ownership.ts` with reader trace, and read it from a trace repository. Do not call `InstantEvalApi` from trace (peer cycle).
+- A trace-drawer read: a judgments-by-trace query on `InstantEvalApi`, called from a trace channel bound to that token (ARCHITECTURE.md sections 3 and 7). Not a shared-table read and not a peer dependency.
 - A check that a dashboard widget can or cannot call `eval()` today (the inferred claim).
 - Only if Drew picks scheduled runs: a scheduled run concept and a widget-to-run binding.
 - A decision on retention for judgments.
