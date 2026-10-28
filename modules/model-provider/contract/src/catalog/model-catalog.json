@@ -1,7 +1,151 @@
 {
-  "updatedAt": "2026-10-24T19:33:47.733Z",
-  "modelCount": 531,
+  "updatedAt": "2026-10-27T14:29:55.311Z",
+  "modelCount": 532,
   "models": {
+    "openai/gpt-6.1-terra-pro": {
+      "id": "openai/gpt-6.1-terra-pro",
+      "name": "OpenAI: GPT-6.1 Terra Pro",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.000001,
+        "outputCostPerToken": 0.000005,
+        "inputCacheReadPerToken": 5e-8,
+        "inputCacheWritePerToken": 0.00000125,
+        "webSearchCostPerQuery": 0.01
+      },
+      "contextLength": 1050000,
+      "maxCompletionTokens": 128000,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file->text",
+      "mode": "chat",
+      "description": "GPT-6.1 Terra Pro is the same underlying model as , served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. **Cost note:** pro mode spends far more...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/gpt-6.1-terra-pro:batch": {
+      "id": "openai/gpt-6.1-terra-pro:batch",
+      "name": "OpenAI: GPT-6.1 Terra Pro (batch)",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 5e-7,
+        "outputCostPerToken": 0.0000025,
+        "inputCacheReadPerToken": 2.5e-8,
+        "inputCacheWritePerToken": 6.25e-7,
+        "webSearchCostPerQuery": 0.01
+      },
+      "contextLength": 1050000,
+      "maxCompletionTokens": 128000,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file->text",
+      "mode": "chat",
+      "description": "GPT-6.1 Terra Pro is the same underlying model as , served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. **Cost note:** pro mode spends far more...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/gpt-6.1-terra": {
+      "id": "openai/gpt-6.1-terra",
+      "name": "OpenAI: GPT-6.1 Terra",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.000001,
+        "outputCostPerToken": 0.000005,
+        "inputCacheReadPerToken": 5e-8,
+        "inputCacheWritePerToken": 0.00000125,
+        "webSearchCostPerQuery": 0.01
+      },
+      "contextLength": 1050000,
+      "maxCompletionTokens": 128000,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "defaultParameters": {},
+      "modality": "text+image+file->text",
+      "mode": "chat",
+      "description": "GPT-6.1 Terra is the mid-tier model in OpenAI's GPT-6.1 series, priced below GPT-6.1 Sol. It is suited for everyday agentic, coding, and writing work, is particularly strong at understanding screenshots...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/gpt-6.1-terra:batch": {
+      "id": "openai/gpt-6.1-terra:batch",
+      "name": "OpenAI: GPT-6.1 Terra (batch)",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 5e-7,
+        "outputCostPerToken": 0.0000025,
+        "inputCacheReadPerToken": 2.5e-8,
+        "inputCacheWritePerToken": 6.25e-7,
+        "webSearchCostPerQuery": 0.01
+      },
+      "contextLength": 1050000,
+      "maxCompletionTokens": 128000,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "defaultParameters": {},
+      "modality": "text+image+file->text",
+      "mode": "chat",
+      "description": "GPT-6.1 Terra is the mid-tier model in OpenAI's GPT-6.1 series, priced below GPT-6.1 Sol. It is suited for everyday agentic, coding, and writing work, is particularly strong at understanding screenshots...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "moonshotai/kimi-k3.1-pro": {
       "id": "moonshotai/kimi-k3.1-pro",
       "name": "MoonshotAI: Kimi K3.1 Pro",
@@ -16,6 +160,7 @@
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
+        "logprobs",
         "max_tokens",
         "presence_penalty",
         "reasoning",
@@ -24,7 +169,8 @@
         "stop",
         "structured_outputs",
         "tool_choice",
-        "tools"
+        "tools",
+        "top_logprobs"
       ],
       "defaultParameters": {
         "topP": 0.95
@@ -1823,7 +1969,7 @@
       "defaultParameters": {},
       "modality": "text->text",
       "mode": "chat",
-      "description": "Switchyard is an open-source model router that switches between multiple models to optimize the cost of requests. By default it will use OpenRouter market data to select the most popular...",
+      "description": "Switchyard is an open-source model routing system that switches between multiple models to optimize the cost of requests. By default it will use OpenRouter market data to select the most...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -2117,9 +2263,9 @@
       "name": "DeepSeek: DeepSeek Pro Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 1.188e-7,
+        "inputCostPerToken": 1.259e-7,
         "outputCostPerToken": 0.000008,
-        "inputCacheReadPerToken": 1.2e-7
+        "inputCacheReadPerToken": 1.3e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 393216,
@@ -2162,9 +2308,9 @@
       "name": "DeepSeek: DeepSeek Flash Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 2e-8,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 1.5e-8
+        "inputCostPerToken": 1.7e-8,
+        "outputCostPerToken": 6e-7,
+        "inputCacheReadPerToken": 1e-9
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -2346,17 +2492,16 @@
       "name": "OpenAI: GPT Terra Latest",
       "provider": "~openai",
       "pricing": {
-        "inputCostPerToken": 0.000002,
-        "outputCostPerToken": 0.000012,
-        "inputCacheReadPerToken": 2e-7,
-        "inputCacheWritePerToken": 0.0000025,
+        "inputCostPerToken": 0.000001,
+        "outputCostPerToken": 0.000005,
+        "inputCacheReadPerToken": 5e-8,
+        "inputCacheWritePerToken": 0.00000125,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 1050000,
       "maxCompletionTokens": 128000,
       "supportedParameters": [
         "include_reasoning",
-        "max_completion_tokens",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -2367,11 +2512,7 @@
         "tools",
         "verbosity"
       ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
+      "defaultParameters": {},
       "modality": "text+image+file->text",
       "mode": "chat",
       "description": "This model always redirects to the latest model in the GPT Terra family.",
@@ -2531,12 +2672,12 @@
       "name": "DeepSeek: DeepSeek V4.1 Flash",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 2e-8,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 1.5e-8
+        "inputCostPerToken": 1.4e-7,
+        "outputCostPerToken": 4.2e-7,
+        "inputCacheReadPerToken": 4.2e-9
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 943718,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3174,9 +3315,9 @@
       "name": "Tencent: Hy4 preview",
       "provider": "tencent",
       "pricing": {
-        "inputCostPerToken": 7.506e-7,
-        "outputCostPerToken": 0.0000022509,
-        "inputCacheReadPerToken": 3.78e-8
+        "inputCostPerToken": 8.34e-7,
+        "outputCostPerToken": 0.000002501,
+        "inputCacheReadPerToken": 4.2e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 64000,
@@ -3218,8 +3359,8 @@
       "name": "Z.ai: GLM Flash Latest",
       "provider": "~z-ai",
       "pricing": {
-        "inputCostPerToken": 5.07e-8,
-        "outputCostPerToken": 7.02e-8,
+        "inputCostPerToken": 3.13e-8,
+        "outputCostPerToken": 1.046e-7,
         "inputCacheReadPerToken": 3e-8
       },
       "contextLength": 1048576,
@@ -3517,12 +3658,12 @@
       "name": "Z.ai: GLM Latest",
       "provider": "~z-ai",
       "pricing": {
-        "inputCostPerToken": 7.5e-8,
-        "outputCostPerToken": 0.000004295,
-        "inputCacheReadPerToken": 7.5e-8
+        "inputCostPerToken": 6.99e-8,
+        "outputCostPerToken": 0.0000014,
+        "inputCacheReadPerToken": 6.89e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3590,9 +3731,9 @@
       "name": "Z.ai: GLM 5.3",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 9.08e-8,
-        "outputCostPerToken": 0.00000161,
-        "inputCacheReadPerToken": 8.97e-8
+        "inputCostPerToken": 6.99e-8,
+        "outputCostPerToken": 0.0000014,
+        "inputCacheReadPerToken": 6.89e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -4003,6 +4144,49 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "liquid/lfm-2.5-2.6b": {
+      "id": "liquid/lfm-2.5-2.6b",
+      "name": "LiquidAI: LFM2.5-2.6B",
+      "provider": "liquid",
+      "pricing": {
+        "inputCostPerToken": 3.5e-7,
+        "outputCostPerToken": 5e-7,
+        "inputCacheReadPerToken": 4e-8
+      },
+      "contextLength": 128000,
+      "maxCompletionTokens": 8192,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logprobs",
+        "max_completion_tokens",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 0.1
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "LFM2.5-2.6B is a compact reasoning model from Liquid AI. It is suited for agent workflows, data extraction, RAG, and long-context processing. Liquid advises against using it for agentic coding or...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "nvidia/nemotron-3.5-lightning": {
       "id": "nvidia/nemotron-3.5-lightning",
       "name": "NVIDIA: Nemotron 3.5 Lightning",
@@ -4193,8 +4377,8 @@
       "provider": "~deepseek",
       "pricing": {
         "inputCostPerToken": 4.22e-8,
-        "outputCostPerToken": 1.763e-7,
-        "inputCacheReadPerToken": 2.7e-8
+        "outputCostPerToken": 1.694e-7,
+        "inputCacheReadPerToken": 2.8e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -4236,12 +4420,12 @@
       "name": "DeepSeek: DeepSeek V4 Flash 0731",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 4.444e-8,
-        "outputCostPerToken": 1.3332e-7,
-        "inputCacheReadPerToken": 1.414e-9
+        "inputCostPerToken": 1.19e-7,
+        "outputCostPerToken": 2.38e-7,
+        "inputCacheReadPerToken": 2.38e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -4817,9 +5001,9 @@
       "name": "MoonshotAI: Kimi K3",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 2.39e-7,
-        "outputCostPerToken": 0.0000108,
-        "inputCacheReadPerToken": 2.1e-7
+        "inputCostPerToken": 1.79e-7,
+        "outputCostPerToken": 0.00002,
+        "inputCacheReadPerToken": 1.69e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -5537,9 +5721,9 @@
       "name": "Tencent: Hy3",
       "provider": "tencent",
       "pricing": {
-        "inputCostPerToken": 8.25e-8,
-        "outputCostPerToken": 3.3e-7,
-        "inputCacheReadPerToken": 2.0625e-8
+        "inputCostPerToken": 1.32e-7,
+        "outputCostPerToken": 5.28e-7,
+        "inputCacheReadPerToken": 3.3e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 128000,
@@ -5909,8 +6093,8 @@
       "name": "MoonshotAI: Kimi K2.7 Code",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 6.712e-7,
-        "outputCostPerToken": 0.00000335,
+        "inputCostPerToken": 5.6e-7,
+        "outputCostPerToken": 0.0000031,
         "inputCacheReadPerToken": 1.5e-7
       },
       "contextLength": 262144,
@@ -7024,9 +7208,9 @@
       "name": "MoonshotAI: Kimi Latest",
       "provider": "~moonshotai",
       "pricing": {
-        "inputCostPerToken": 1.9e-7,
-        "outputCostPerToken": 0.00000894,
-        "inputCacheReadPerToken": 1.9e-7
+        "inputCostPerToken": 1.79e-7,
+        "outputCostPerToken": 0.00002,
+        "inputCacheReadPerToken": 1.69e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -7267,12 +7451,11 @@
       "name": "Qwen: Qwen3.6 27B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 2.5e-7,
-        "outputCostPerToken": 0.000002,
-        "inputCacheReadPerToken": 2.5e-8
+        "inputCostPerToken": 3.2e-7,
+        "outputCostPerToken": 0.0000032
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 81920,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -7510,7 +7693,7 @@
         "inputCacheReadPerToken": 6e-9
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 943717,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -7584,12 +7767,12 @@
       "name": "Xiaomi: MiMo-V2.5-Pro",
       "provider": "xiaomi",
       "pricing": {
-        "inputCostPerToken": 3.045e-7,
-        "outputCostPerToken": 6.09e-7,
-        "inputCacheReadPerToken": 2.8e-9
+        "inputCostPerToken": 4.8e-7,
+        "outputCostPerToken": 0.0000018,
+        "inputCacheReadPerToken": 9.6e-8
       },
       "contextLength": 1050000,
-      "maxCompletionTokens": 945000,
+      "maxCompletionTokens": 235929,
       "supportedParameters": [
         "include_reasoning",
         "logprobs",
@@ -7622,12 +7805,12 @@
       "name": "Xiaomi: MiMo-V2.5",
       "provider": "xiaomi",
       "pricing": {
-        "inputCostPerToken": 1.19e-7,
-        "outputCostPerToken": 2.38e-7,
-        "inputCacheReadPerToken": 2.55e-9
+        "inputCostPerToken": 4e-7,
+        "outputCostPerToken": 0.000002,
+        "inputCacheReadPerToken": 8e-8
       },
       "contextLength": 1050000,
-      "maxCompletionTokens": 945000,
+      "maxCompletionTokens": 65536,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -7916,12 +8099,12 @@
       "name": "Z.ai: GLM 5.1",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 0.0000014,
-        "outputCostPerToken": 0.0000044,
-        "inputCacheReadPerToken": 2.6e-7
+        "inputCostPerToken": 9.66e-7,
+        "outputCostPerToken": 0.000003036,
+        "inputCacheReadPerToken": 1.794e-7
       },
       "contextLength": 204800,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 128000,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -7961,9 +8144,9 @@
       "name": "Google: Gemma 4 26B A4B ",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 6.75e-8,
-        "outputCostPerToken": 2.25e-7,
-        "inputCacheReadPerToken": 3.75e-8
+        "inputCostPerToken": 9e-8,
+        "outputCostPerToken": 3e-7,
+        "inputCacheReadPerToken": 5e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 235929,
@@ -7972,6 +8155,7 @@
         "include_reasoning",
         "logit_bias",
         "logprobs",
+        "max_completion_tokens",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -8117,40 +8301,6 @@
       "mode": "chat",
       "description": "GLM-5V-Turbo is Z.ai’s first native multimodal agent foundation model, built for vision-based coding and agent-driven tasks. It natively handles image, video, and text inputs, excels at long-horizon planning, complex coding,...",
       "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "arcee-ai/trinity-large-thinking": {
-      "id": "arcee-ai/trinity-large-thinking",
-      "name": "Arcee AI: Trinity Large Thinking",
-      "provider": "arcee-ai",
-      "pricing": {
-        "inputCostPerToken": 2.5e-7,
-        "outputCostPerToken": 8e-7,
-        "inputCacheReadPerToken": 6e-8
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 80000,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.3,
-        "topP": 0.8,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Trinity Large Thinking is a powerful open source reasoning model from the team at Arcee AI. It shows strong performance in PinchBench, agentic workloads, and reasoning tasks. Launch video: https://youtu.be/Gc82AXLa0Rg?si=4RLn6WBz33qT--B7...",
-      "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -8550,46 +8700,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "mistralai/mistral-small-2603:batch": {
-      "id": "mistralai/mistral-small-2603:batch",
-      "name": "Mistral: Mistral Small 4 (batch)",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 7.5e-8,
-        "outputCostPerToken": 3e-7,
-        "inputCacheReadPerToken": 7.5e-9
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 209715,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "reasoning_effort",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "Mistral Small 4 is the next major release in the Mistral Small family, unifying the capabilities of several flagship Mistral models into a single system. It combines strong reasoning from...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "z-ai/glm-5-turbo": {
       "id": "z-ai/glm-5-turbo",
       "name": "Z.ai: GLM 5 Turbo",
@@ -8723,6 +8833,7 @@
         "include_reasoning",
         "logit_bias",
         "logprobs",
+        "max_completion_tokens",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -9115,12 +9226,11 @@
       "name": "Qwen: Qwen3.5-27B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 2.7e-7,
-        "outputCostPerToken": 0.00000216,
-        "inputCacheReadPerToken": 2.7e-7
+        "inputCostPerToken": 2.6e-7,
+        "outputCostPerToken": 0.0000026
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 81920,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -9160,8 +9270,8 @@
       "name": "Qwen: Qwen3.5-122B-A10B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 4e-7,
-        "outputCostPerToken": 0.0000032
+        "inputCostPerToken": 2.6e-7,
+        "outputCostPerToken": 0.00000208
       },
       "contextLength": 262144,
       "maxCompletionTokens": 65536,
@@ -10480,7 +10590,8 @@
       "provider": "nvidia",
       "pricing": {
         "inputCostPerToken": 6e-8,
-        "outputCostPerToken": 2.4e-7
+        "outputCostPerToken": 2.4e-7,
+        "inputCacheReadPerToken": 1.2e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 235929,
@@ -11019,43 +11130,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "mistralai/ministral-8b-2512:batch": {
-      "id": "mistralai/ministral-8b-2512:batch",
-      "name": "Mistral: Ministral 3 8B 2512 (batch)",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 7.5e-8,
-        "outputCostPerToken": 7.5e-8,
-        "inputCacheReadPerToken": 7.5e-9
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 209715,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.3,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "A balanced model in the Ministral 3 family, Ministral 3 8B is a powerful, efficient tiny language model with vision capabilities.",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "mistralai/ministral-3b-2512": {
       "id": "mistralai/ministral-3b-2512",
       "name": "Mistral: Ministral 3 3B 2512",
@@ -11101,43 +11175,6 @@
         "inputCostPerToken": 5e-7,
         "outputCostPerToken": 0.0000015,
         "inputCacheReadPerToken": 5e-8
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 209715,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.0645,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Mistral Large 3 2512 is Mistral’s most capable model to date, featuring a sparse mixture-of-experts architecture with 41B active parameters (675B total), and released under the Apache 2.0 license.",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "mistralai/mistral-large-2512:batch": {
-      "id": "mistralai/mistral-large-2512:batch",
-      "name": "Mistral: Mistral Large 3 2512 (batch)",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 2.5e-7,
-        "outputCostPerToken": 7.5e-7,
-        "inputCacheReadPerToken": 2.5e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 209715,
@@ -11735,45 +11772,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "MiniMax-M2 is a compact, high-efficiency large language model optimized for end-to-end coding and agentic workflows. With 10 billion activated parameters (230 billion total), it delivers near-frontier intelligence across general reasoning,...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "ibm-granite/granite-4.0-h-micro": {
-      "id": "ibm-granite/granite-4.0-h-micro",
-      "name": "IBM: Granite 4.0 Micro",
-      "provider": "ibm-granite",
-      "pricing": {
-        "inputCostPerToken": 1.7e-8,
-        "outputCostPerToken": 1.12e-7
-      },
-      "contextLength": 131000,
-      "maxCompletionTokens": 117900,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "temperature",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Granite-4.0-H-Micro is a 3B parameter from the Granite 4 family of models. These models are the latest in a series of models released by IBM. They are fine-tuned for long...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -12668,7 +12666,8 @@
       "provider": "nousresearch",
       "pricing": {
         "inputCostPerToken": 0.000001,
-        "outputCostPerToken": 0.000003
+        "outputCostPerToken": 0.000003,
+        "inputCacheReadPerToken": 2e-7
       },
       "contextLength": 131072,
       "maxCompletionTokens": 117964,
@@ -12745,41 +12744,6 @@
         "inputCostPerToken": 4e-7,
         "outputCostPerToken": 0.000002,
         "inputCacheReadPerToken": 4e-8
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": 104857,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.3
-      },
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "Mistral Medium 3.1 is an updated version of Mistral Medium 3, which is a high-performance enterprise-grade language model designed to deliver frontier-level capabilities at significantly reduced operational cost. It balances...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "mistralai/mistral-medium-3.1:batch": {
-      "id": "mistralai/mistral-medium-3.1:batch",
-      "name": "Mistral: Mistral Medium 3.1 (batch)",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 2e-8
       },
       "contextLength": 131072,
       "maxCompletionTokens": 104857,
@@ -13419,42 +13383,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "mistralai/codestral-2508:batch": {
-      "id": "mistralai/codestral-2508:batch",
-      "name": "Mistral: Codestral 2508 (batch)",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 4.5e-7,
-        "inputCacheReadPerToken": 1.5e-8
-      },
-      "contextLength": 256000,
-      "maxCompletionTokens": 204800,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "prediction",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.3
-      },
-      "modality": "text+file->text",
-      "mode": "chat",
-      "description": "Mistral's cutting-edge language model for coding released end of July 2025. Codestral specializes in low-latency, high-frequency tasks such as fill-in-the-middle (FIM), code correction and test generation. [Blog Post](https://mistral.ai/news/codestral-25-08)",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "qwen/qwen3-coder-30b-a3b-instruct": {
       "id": "qwen/qwen3-coder-30b-a3b-instruct",
       "name": "Qwen: Qwen3 Coder 30B A3B Instruct",
@@ -13491,8 +13419,9 @@
       "name": "Qwen: Qwen3 30B A3B Instruct 2507",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 9e-8,
-        "outputCostPerToken": 3e-7
+        "inputCostPerToken": 1e-7,
+        "outputCostPerToken": 3e-7,
+        "inputCacheReadPerToken": 1e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 235929,
@@ -14759,11 +14688,11 @@
       "pricing": {
         "inputCostPerToken": 1e-7,
         "outputCostPerToken": 4e-7,
-        "inputCacheReadPerToken": 2.5e-8,
+        "inputCacheReadPerToken": 3e-8,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 1047576,
-      "maxCompletionTokens": 32768,
+      "maxCompletionTokens": 942818,
       "supportedParameters": [
         "max_completion_tokens",
         "max_tokens",
@@ -15002,12 +14931,11 @@
       "name": "Google: Gemma 3 4B",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 4e-8,
-        "outputCostPerToken": 5e-8,
-        "inputCacheReadPerToken": 2e-8
+        "inputCostPerToken": 5e-8,
+        "outputCostPerToken": 1e-7
       },
       "contextLength": 131072,
-      "maxCompletionTokens": 117964,
+      "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -16151,11 +16079,11 @@
       "name": "Meta: Llama 3.2 3B Instruct",
       "provider": "meta-llama",
       "pricing": {
-        "inputCostPerToken": 5.09e-8,
-        "outputCostPerToken": 3.35e-7
+        "inputCostPerToken": 5e-8,
+        "outputCostPerToken": 3.3e-7
       },
       "contextLength": 131072,
-      "maxCompletionTokens": 72000,
+      "maxCompletionTokens": 117964,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -17233,6 +17161,67 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader general knowledge and advanced reasoning...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "amazon/titan-embed-image-v1": {
+      "id": "amazon/titan-embed-image-v1",
+      "name": "Amazon: Titan Multimodal Embeddings G1",
+      "provider": "amazon",
+      "pricing": {
+        "inputCostPerToken": 8e-7,
+        "outputCostPerToken": 0,
+        "imageCostPerToken": 0.00006
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text+image->embeddings",
+      "mode": "embedding",
+      "description": "Amazon Titan Multimodal Embeddings G1 embeds text, images, or text and image together into a shared vector space for multimodal search and recommendation. Images are sent as base64 (up to...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "amazon/titan-embed-text-v1": {
+      "id": "amazon/titan-embed-text-v1",
+      "name": "Amazon: Titan Embeddings G1 - Text",
+      "provider": "amazon",
+      "pricing": {
+        "inputCostPerToken": 1e-7,
+        "outputCostPerToken": 0
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->embeddings",
+      "mode": "embedding",
+      "description": "Amazon Titan Embeddings G1 - Text is the first-generation Titan text embedding model. It accepts up to 8,192 tokens per input and returns fixed 1,536-dimension vectors; the `dimensions` parameter is...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "amazon/titan-embed-text-v2": {
+      "id": "amazon/titan-embed-text-v2",
+      "name": "Amazon: Titan Text Embeddings V2",
+      "provider": "amazon",
+      "pricing": {
+        "inputCostPerToken": 2e-8,
+        "outputCostPerToken": 0
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->embeddings",
+      "mode": "embedding",
+      "description": "Amazon Titan Text Embeddings V2 is a text embedding model for retrieval, search, and clustering. It accepts up to 8,192 tokens per input and returns normalized vectors of 1,024 dimensions...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,

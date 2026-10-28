@@ -113,7 +113,6 @@
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^5.0.1",
     "chalk": "catalog:",
-    "cloudflared": "0.7.1",
     "commander": "catalog:",
     "dotenv": "catalog:",
     "dotenv-cli": "^11.0.0",

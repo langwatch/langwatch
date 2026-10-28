@@ -50,7 +50,7 @@ import { HumanMessage } from "@langchain/core/messages";
 setupObservability({ serviceName: "<project_name>" });
 
 async function main(message: string): Promise<string> {
-  const chatModel = new ChatOpenAI({ model: "gpt-5" }).withConfig({
+  const chatModel = new ChatOpenAI({ model: "gpt-6-luna" }).withConfig({
     callbacks: [new LangWatchCallbackHandler()],
   });
 

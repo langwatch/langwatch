@@ -477,8 +477,8 @@ A target may also carry the parameter values it alone runs with, written as a qu
 
 ```bash
 langwatch run-plan run --test-suite "Checkout" \
-  --target 'http:agent_abc123?model=gpt-5' \
-  --target 'http:agent_abc123?model=gpt-5-mini' \
+  --target 'http:agent_abc123?model=gpt-6-sol' \
+  --target 'http:agent_abc123?model=gpt-6-luna' \
   --name "Checkout model comparison" --wait
 
 langwatch run-plan run --all \
@@ -493,8 +493,8 @@ A target value wins over the same name given with `--param`, so `--param` carrie
 ```bash
 langwatch test-suite run "Checkout" \
   --param account_tier=platinum \
-  --target 'http:agent_abc123?model=gpt-5' \
-  --target 'http:agent_abc123?model=gpt-5-mini'
+  --target 'http:agent_abc123?model=gpt-6-sol' \
+  --target 'http:agent_abc123?model=gpt-6-luna'
 ```
 
 Both targets run with `account_tier=platinum`, and each one with its own `model`.
@@ -506,7 +506,7 @@ Every run command accepts a repeatable `--param key=value`. A parameter is a con
 ```bash
 langwatch test-suite run <test-suite-id> --target http:<agent-id> --param account_tier=platinum --param region=eu-central
 langwatch scenario run <scenario-id> --target http:<agent-id> --param account_tier=platinum
-langwatch experiment run <experiment-slug> --param model=gpt-5-mini
+langwatch experiment run <experiment-slug> --param model=gpt-6-luna
 langwatch workflow run <workflow-id> --input '{"question":"where is my order?"}' --param region=eu-central
 ```
 

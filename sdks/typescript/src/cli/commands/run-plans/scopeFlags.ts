@@ -150,7 +150,7 @@ function parseTargetParameters({
 }): Record<string, RunParameterValue> {
   if (query === "") {
     rejectTarget(
-      `invalid target "${target}": the question mark carries no parameters. Write it as ${target}model=gpt-5, or leave the question mark out.`,
+      `invalid target "${target}": the question mark carries no parameters. Write it as ${target}model=gpt-6-luna, or leave the question mark out.`,
     );
   }
   // A Map, not an object literal: assigning `__proto__` on a literal runs the

@@ -1417,6 +1417,22 @@
             ]
           },
           {
+            "group": "Dashboards",
+            "pages": [
+              "api-reference/dashboards/overview",
+              "api-reference/dashboards/list-dashboards",
+              "api-reference/dashboards/create-a-dashboard",
+              "api-reference/dashboards/get-a-dashboard",
+              "api-reference/dashboards/list-a-dashboard-s-widgets",
+              "api-reference/dashboards/get-a-widget-on-a-dashboard",
+              "api-reference/dashboards/update-a-dashboard",
+              "api-reference/dashboards/update-a-widget-on-a-dashboard",
+              "api-reference/dashboards/create-a-widget-on-a-dashboard",
+              "api-reference/dashboards/delete-a-dashboard",
+              "api-reference/dashboards/delete-a-widget-on-a-dashboard"
+            ]
+          },
+          {
             "group": "Reports",
             "pages": [
               "api-reference/reports/overview",
@@ -1496,11 +1512,17 @@
               "api-reference/projects/get-api-key",
               "api-reference/projects/list-dashboards-boards",
               "api-reference/projects/get-a-dashboard-boards",
+              "api-reference/projects/list-dashboard-widgets",
+              "api-reference/projects/get-a-dashboard-widget",
               "api-reference/projects/list-dashboards",
               "api-reference/projects/get-a-dashboard",
               "api-reference/projects/update-project",
+              "api-reference/projects/update-a-dashboard-widget",
               "api-reference/projects/regenerate-api-key",
-              "api-reference/projects/archive-project"
+              "api-reference/projects/create-a-dashboard-widget",
+              "api-reference/projects/add-a-dashboard-widget-to-a-dashboard",
+              "api-reference/projects/archive-project",
+              "api-reference/projects/delete-a-dashboard-widget"
             ]
           },
           {
@@ -1754,7 +1776,7 @@
       "destination": "/api-reference/projects/get-a-dashboard"
     },
     {
-      "source": "/ci/cache/busted/1793101108",
+      "source": "/ci/cache/busted/1793122734",
       "destination": "/introduction"
     },
     {

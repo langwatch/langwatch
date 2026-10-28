@@ -15,8 +15,8 @@ import {
   boardPeriodGranularity,
   type BoardPeriodGrain,
   type BoardPeriodRange,
+  boardExcludedOrigins,
   boardWindowEnd,
-  defaultBoardExcludedOrigins,
   parseBoardPeriodGrain,
   parseBoardPeriodRange,
 } from "../model/board-period.ts";
@@ -41,8 +41,17 @@ export function useBoardRange() {
   };
 }
 
-/** `refreshedAt` is the board's auto-refresh clock; each move re-ends a fixed range at now. */
-export function useBoardPeriod({ refreshedAt }: { refreshedAt?: number } = {}) {
+/**
+ * `refreshedAt` is the board's auto-refresh clock; each move re-ends a fixed range at now.
+ * `excludedOrigins` is what a stored board keeps; absent or null, the board's default (AC200).
+ */
+export function useBoardPeriod({
+  refreshedAt,
+  excludedOrigins = null,
+}: {
+  refreshedAt?: number;
+  excludedOrigins?: readonly string[] | null;
+} = {}) {
   const host = useAnalyticsHost();
   const board = useBoardRange();
   const { range, grain } = board;
@@ -66,9 +75,9 @@ export function useBoardPeriod({ refreshedAt }: { refreshedAt?: number } = {}) {
       periodStart,
       periodEnd,
       granularitySeconds: boardPeriodGranularity({ grain, periodStart, periodEnd }),
-      excludeOrigins: defaultBoardExcludedOrigins({ isPersonalProject }),
+      excludeOrigins: boardExcludedOrigins({ stored: excludedOrigins, isPersonalProject }),
     }),
-    [grain, periodStart, periodEnd, isPersonalProject],
+    [grain, periodStart, periodEnd, isPersonalProject, excludedOrigins],
   );
 
   return { ...board, period };

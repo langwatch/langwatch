@@ -36,9 +36,12 @@ Only the tRPC `analytics.lwql.query` door accepts the field. `POST /api/v1/query
 what it is sent. The Dashboards board composes the context it runs every query with in one place
 (`BoardQueryContext`, read by `useBoardPeriod`) and sets `excludeOrigins` to `["langy"]` by
 default. In a personal project the default is the empty list: Langy's conversations are the data
-there (owner, 2026-10-10; `defaultBoardExcludedOrigins`, dashboards-v2 AC198). The built-in
-Source parameter planned for the board header shows that default and sets the list; until it
-lands the default is not visible on the board.
+there (owner, 2026-10-10; `defaultBoardExcludedOrigins`, dashboards-v2 AC198). A stored board
+keeps its own list in `DashboardsV2.excludedOrigins`; null keeps that default, so a board nobody
+changed behaves as before. The "Langy traces" setting in the board header shows the list as Left
+out or Included, and a member who may edit the board changes it (`boardExcludedOrigins`,
+dashboards-v2 AC200). `boards.update` and `PATCH /api/v1/dashboards/{dashboardId}` set it; `[]`
+includes Langy's traces and `null` restores the default. A From LangWatch board keeps the default.
 
 ## Rationale / Trade-offs
 

@@ -100,7 +100,7 @@ curl -sS https://gateway.acme.com/v1/models \
 
 | Cause                                                          | Fix                                                                                          |
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| The model has no provider prefix and no prefix rule matches it | Write `provider/model`, for example `openai/gpt-5-mini` or `anthropic/claude-sonnet-4-5`     |
+| The model has no provider prefix and no prefix rule matches it | Write `provider/model`, for example `openai/gpt-6-luna` or `anthropic/claude-sonnet-4-5`     |
 | The first segment is not a provider the key can reach          | Use a provider id from the list above, or a routing handle defined on the key's provider row |
 | An Azure deployment name is not in the deployment map          | Add the deployment name on the provider credential, or send `azure/<deployment name>`        |
 
