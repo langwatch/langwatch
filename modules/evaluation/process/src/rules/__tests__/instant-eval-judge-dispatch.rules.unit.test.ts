@@ -135,7 +135,7 @@ describe("instantEvalJudgeOf", () => {
   });
 
   describe("given a judge whose model only looks like a decision model", () => {
-    /** @scenario "A judge on a chat model still runs as it does today" */
+    /** @scenario "A judge on an id the decision model catalogue does not hold runs as it does today" */
     it("answers nothing for an id the catalogue does not hold", () => {
       expect(
         instantEvalJudgeOf({

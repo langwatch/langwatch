@@ -645,7 +645,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the judge runs on the project's column
 
     @unit
-    Scenario: A judge on a chat model still runs as it does today
-      Given an LLM judge whose model is a chat model
+    Scenario: A judge on an id the decision model catalogue does not hold runs as it does today
+      Given an LLM judge whose model reads like a decision model the catalogue does not hold
       When the evaluation runs
       Then Instant Evals do not answer it
