@@ -2274,14 +2274,6 @@
       "destination": "/skills/directory"
     },
     {
-      "source": "/api-reference/dashboards/overview",
-      "destination": "/api-reference/reports/overview"
-    },
-    {
-      "source": "/api-reference/dashboards/list-dashboards",
-      "destination": "/api-reference/reports/list-reports"
-    },
-    {
       "source": "/api-reference/dashboards/create-dashboards",
       "destination": "/api-reference/reports/create-reports"
     },
