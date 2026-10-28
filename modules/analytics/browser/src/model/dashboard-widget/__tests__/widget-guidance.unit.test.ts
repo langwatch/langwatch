@@ -31,6 +31,21 @@ describe("missingFieldGuidance", () => {
     });
   });
 
+  describe("given a column LangWatch derives", () => {
+    /** @scenario "An empty widget names what sends its data" */
+    it("says there is nothing to send for the satisfaction score", () => {
+      const line = missingFieldGuidance({
+        field: "SatisfactionScore",
+        label: "satisfaction score",
+        unit: "traces",
+      });
+      expect(line).toBe(
+        "LangWatch works out satisfaction scores from your traces; there is nothing to send.",
+      );
+      expect(line).not.toContain("SDK");
+    });
+  });
+
   describe("given a trace field with no words of its own", () => {
     /** @scenario "An empty widget names what sends its data" */
     it("says to send it on the traces with the SDK", () => {

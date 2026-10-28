@@ -28,6 +28,8 @@ const FIELD_GUIDANCE: Readonly<Record<string, string>> = {
   CustomerId: `Send customer_id in the trace metadata ${SDK}.`,
   TopicId: "Topics come from LangWatch's topic clustering over your traces.",
   SubTopicId: "Topics come from LangWatch's topic clustering over your traces.",
+  SatisfactionScore:
+    "LangWatch works out satisfaction scores from your traces; there is nothing to send.",
 };
 
 /** Units other than traces, by the words the completeness report counts in. */
