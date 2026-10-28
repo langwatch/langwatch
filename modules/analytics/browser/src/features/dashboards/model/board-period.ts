@@ -108,12 +108,43 @@ export function queriesReadOnlyRollups({ sqls }: { sqls: readonly string[] }): b
 
 const ORIGIN_FILTER = /(?<!\bNOT\s*\(?\s*)\bOrigin\s*(?:==?\s*'[^']*'|\s+IN\s*\([^)]*\))/gi;
 
-/** Whether every query pins `Origin` with `=` or `IN`, never to Langy's: the board pick is moot. */
+const COMMENTS = /\/\*[\s\S]*?\*\/|--[^\n]*/g;
+const WHERE = /\b(?:PRE)?WHERE\b/gi;
+const CLAUSE_END = /\b(?:GROUP\s+BY|ORDER\s+BY|LIMIT|HAVING|UNION|SETTINGS)\b/i;
+const NOT_A_CALL = /(?:\W|^)(?:IN|AND|OR|NOT|WHERE|PREWHERE)\s*$/i;
+
+/** Blanks everything inside a function call's parentheses; plain grouping and `IN (...)` stay. */
+function blankCallArguments({ code }: { code: string }): string {
+  const calls: boolean[] = [];
+  let out = "";
+  for (let at = 0; at < code.length; at++) {
+    const char = code[at] ?? "";
+    const before = code.slice(0, at);
+    if (char === "(") calls.push(/\w\s*$/.test(before) && !NOT_A_CALL.test(before));
+    out += calls.includes(true) ? " " : char;
+    if (char === ")") calls.pop();
+  }
+  return out;
+}
+
+/** The filter text of each WHERE clause, up to the next clause. */
+function filterClauses({ sql }: { sql: string }): string[] {
+  const code = blankCallArguments({ code: sql.replace(COMMENTS, " ") });
+  return [...code.matchAll(WHERE)].map((where) => {
+    const rest = code.slice((where.index ?? 0) + where[0].length);
+    return rest.slice(0, rest.search(CLAUSE_END) >= 0 ? rest.search(CLAUSE_END) : undefined);
+  });
+}
+
+/**
+ * Whether every query pins `Origin` with `=` or `IN` in a WHERE filter, never to Langy's: the
+ * board pick is moot. A comparison inside a call (`multiIf`, `if`) is a label, not a filter.
+ */
 export function queriesPinOriginsWithoutLangy({ sqls }: { sqls: readonly string[] }): boolean {
   return (
     sqls.length > 0 &&
     sqls.every((sql) => {
-      const pins = [...sql.replace(/--[^\n]*/g, "").matchAll(ORIGIN_FILTER)];
+      const pins = filterClauses({ sql }).flatMap((clause) => [...clause.matchAll(ORIGIN_FILTER)]);
       return pins.length > 0 && pins.every(([pin]) => !pin.includes(`'${LANGY_TRACE_ORIGIN}'`));
     })
   );

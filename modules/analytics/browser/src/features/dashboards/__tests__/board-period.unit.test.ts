@@ -258,7 +258,11 @@ describe("queriesPinOriginsWithoutLangy", () => {
     ["an IN list", ["SELECT 1 FROM traces WHERE Origin IN ('', 'application')"]],
     ["an equality", ["SELECT 1 FROM traces WHERE origin = 'evaluation'"]],
     ["the catalogue's cost per call", [COST_PER_CALL_SQL]],
-    ["the catalogue's spend by source", [SPEND_BY_SOURCE_SQL]],
+    [
+      "a WHERE pin beside multiIf labels",
+      ["SELECT multiIf(Origin = 'a', 'x', 'y') FROM t WHERE (Origin IN ('b') AND x > 1)"],
+    ],
+    ["a pin after a function in the filter", ["SELECT 1 WHERE toDate(t) > 1 AND Origin = 'a'"]],
     ["a literal that differs in case", ["SELECT 1 WHERE Origin IN ('a', 'Langy')"]],
     ["every query pinning", ["SELECT 1 WHERE Origin = 'a'", "SELECT 2 WHERE Origin IN ('b')"]],
   ])("is true for %s", (_name, sqls) => {
@@ -275,6 +279,10 @@ describe("queriesPinOriginsWithoutLangy", () => {
     ["a NOT IN", ["SELECT 1 WHERE Origin NOT IN ('application')"]],
     ["a query with no pin among pinned ones", ["SELECT 1 WHERE Origin = 'a'", "SELECT 2"]],
     ["a pin named only in a comment", ["SELECT 1 FROM traces -- WHERE Origin = 'a'"]],
+    ["a pin named only in a block comment", ["SELECT 1 FROM t /* WHERE Origin = 'a' */"]],
+    ["the catalogue's spend by source", [SPEND_BY_SOURCE_SQL]],
+    ["labels in multiIf only", ["SELECT multiIf(Origin = 'a', 'x', 'y') FROM t"]],
+    ["a pin inside if() in the select list", ["SELECT if(Origin = 'a', 1, 2) FROM t"]],
   ])("is false for %s", (_name, sqls) => {
     expect(pinned(...sqls)).toBe(false);
   });
