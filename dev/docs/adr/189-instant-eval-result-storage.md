@@ -66,14 +66,14 @@ A write-back path exists. The trace collector accepts an `evaluations` array. Ea
 
 ### 1.7 Summary
 
-| Use                                      | Stored?  | Where                                                         | On trace details? | On dashboards?                                 |
-| ---------------------------------------- | -------- | ------------------------------------------------------------- | ----------------- | ---------------------------------------------- |
-| Monitor (online eval)                    | Yes      | `evaluation_runs` (49 days by default, plus per-project days) | Yes               | Yes, built-in eval charts                      |
-| Monitor with the instant evals judge     | Yes      | `evaluation_runs`                                             | Yes               | Yes, built-in eval charts                      |
-| Sync `eval()` in LWQL                    | No       | In memory for the call only                                   | No                | Possible by inference, judges on every refresh |
-| Instant Eval run (search bar, CLI, REST) | Yes      | `instant_eval_runs` and `instant_eval_judgments` (indefinite) | No                | Only by reading `analytics.judgments` in LWQL  |
-| Langy                                    | As a run | Same as a run                                                 | No                | Same as a run                                  |
-| Collector `evaluations` array            | Yes      | `evaluation_runs`                                             | Yes               | Yes                                            |
+| Use                                      | Stored?  | Where                                                                          | On trace details? | On dashboards?                                 |
+| ---------------------------------------- | -------- | ------------------------------------------------------------------------------ | ----------------- | ---------------------------------------------- |
+| Monitor (online eval)                    | Yes      | `evaluation_runs` (the project's trace retention, or 49 days when none is set) | Yes               | Yes, built-in eval charts                      |
+| Monitor with the instant evals judge     | Yes      | `evaluation_runs`                                                              | Yes               | Yes, built-in eval charts                      |
+| Sync `eval()` in LWQL                    | No       | In memory for the call only                                                    | No                | Possible by inference, judges on every refresh |
+| Instant Eval run (search bar, CLI, REST) | Yes      | `instant_eval_runs` and `instant_eval_judgments` (indefinite)                  | No                | Only by reading `analytics.judgments` in LWQL  |
+| Langy                                    | As a run | Same as a run                                                                  | No                | Same as a run                                  |
+| Collector `evaluations` array            | Yes      | `evaluation_runs`                                                              | Yes               | Yes                                            |
 
 ## 2. Use cases and volumes
 
@@ -92,7 +92,7 @@ A write-back path exists. The trace collector accepts an `evaluations` array. Ea
 | `LWQL_APP_FUNCTION_KEY_CAPS`        | trace 1,000; span 1,000; text 1,000; thread 200 keys per sync `eval()`. Over the cap is a refusal, not a truncation.            | `modules/analytics/process/src/features/app-functions/rules/langwatch-ql-app-function-shapes.rules.ts:96-103`   |
 | `LWQL_MAX_RESULT_ROWS`              | 10,000                                                                                                                          | `modules/analytics/contract/src/features/lwql/langwatch-ql-limits.ts:19`                                        |
 | `LWQL_MAX_RESULT_BYTES`             | 8,000,000                                                                                                                       | same file, line 22                                                                                              |
-| LWQL statement time and concurrency | 10 s per statement; 10 concurrent queries per user                                                                              | same file, `DEFAULT_LWQL_RESOURCE_LIMITS`, lines 61-65 (`langwatch-ql-limits.ts:61-65`)                         |
+| LWQL statement time and concurrency | 10 s per statement; 10 concurrent queries per user                                                                              | same file, `DEFAULT_LWQL_RESOURCE_LIMITS`, lines 61-65                                                          |
 | `INSTANT_EVAL_QUERY_TOKEN_BUDGET`   | 4,000,000 input tokens per sync query                                                                                           | `modules/instant-eval/contract/src/instant-eval.config.ts:21-24`                                                |
 | `INSTANT_EVAL_DEFAULT_ROW_CAP`      | 10,000 rows per run: the most a free plan gets                                                                                  | `modules/instant-eval/contract/src/instant-eval-limits.ts:10`                                                   |
 | `INSTANT_EVAL_MAX_ROW_CAP`          | 100,000 rows per run: the most a paid plan gets. The gate is `isFree ? INSTANT_EVAL_DEFAULT_ROW_CAP : INSTANT_EVAL_MAX_ROW_CAP` | `modules/instant-eval/process/src/rules/instant-eval-caps.rules.ts:15`; values in `instant-eval-limits.ts:13`   |
@@ -151,7 +151,7 @@ How it works: each verdict becomes a `lw.evaluation.reported` event on the trace
 - Cons
   - One event and one fold row per verdict. A 100,000 row run with 10 questions makes 1,000,000 of each.
   - Ad-hoc exploration runs mix into monitor charts and into the `evaluations.passed` filters. A person who asked a one-off question changes the numbers that an alert reads.
-  - Retention does not match. `evaluation_runs` keeps 49 days by default and the project days. Judgments are kept without limit today.
+  - Retention does not match. `evaluation_runs` keeps the project's trace retention, or 49 days when none is set. Judgments are kept without limit today.
   - A dedup key is needed. A rerun of the same question on the same trace must replace the old verdict, not add a second one. `evaluation_runs` is keyed by `EvaluationId`, so each run needs a stable id per trace and question.
   - It changes the meaning of "monitor result". A verdict with no monitor and no SDK report behind it has nothing to link to.
 - Consequences
@@ -202,7 +202,7 @@ How it works: use a different answer for each use.
   - A monitor has no backfill, so a current dashboard number over old traces needs a run.
 - Consequences
   - Cost: judge cost is paid once per run or once per new trace, not per refresh.
-  - ClickHouse load: low for runs; as any monitor for monitors.
+  - ClickHouse load: low for runs; for monitors, the same as any monitor (Option E).
   - Trace details UI: shows judgments from runs (after the drawer read ships), labelled as an Instant Eval run, and monitor results as today.
   - Langy's answer: see section 5.
   - Migration: no change to existing runs or monitors.
@@ -221,24 +221,24 @@ How it works: a lasting or alerting eval becomes a monitor whose judge model is 
   - A per-call spend and an event per verdict.
 - Consequences
   - Cost: judge cost for each new trace, metered as in ADR-174.
-  - ClickHouse load: events and fold rows per verdict, as for any monitor.
+  - ClickHouse load: events, fold rows and analytics rows per verdict, as for any monitor (same write pattern as B).
   - Trace details UI: no change. Monitor cards already show.
   - Langy's answer: "To keep a number current, set up a monitor with the instant evals judge."
   - Migration: none.
 
 ### Comparison
 
-|                                        | A: Cache only          | B: Write back                                                     | C: Own table                              | D: Split by use                        | E: Monitor                      |
-| -------------------------------------- | ---------------------- | ----------------------------------------------------------------- | ----------------------------------------- | -------------------------------------- | ------------------------------- |
-| Survives the session                   | No                     | Yes                                                               | Yes                                       | Yes, for runs and monitors             | Yes                             |
-| On trace details                       | No                     | Yes, at once                                                      | Needs a drawer read                       | Needs a drawer read for runs           | Yes, today                      |
-| Dashboards                             | No                     | Yes, but mixes with monitors                                      | Needs a run binding                       | Monitor for current numbers            | Yes, built-in eval charts       |
-| ClickHouse load for 1,000,000 verdicts | None                   | 1,000,000 events plus fold and analytics rows, written one by one | 200 bulk inserts (1,000 at page size 100) | Same as C for runs; as E for monitors  | 1,000,000 events plus fold rows |
-| Ad-hoc runs pollute monitor charts     | No                     | Yes                                                               | No                                        | No                                     | No, a monitor is deliberate     |
-| Retention                              | None                   | Project trace retention                                           | Indefinite                                | Runs indefinite; monitors follow trace | Project trace retention         |
-| New work                               | Small                  | Medium (source field, dedup)                                      | Medium (drawer read)                      | Medium (drawer read)                   | None                            |
-| Backfills old traces                   | No                     | Only if run over old traces                                       | Yes                                       | Yes, by a run                          | No                              |
-| Exploration cost                       | Free inside the window | Costly: a write per verdict                                       | Free, stores nothing                      | Free, stores nothing                   | Not for exploration             |
+|                                        | A: Cache only          | B: Write back                                                     | C: Own table                              | D: Split by use                        | E: Monitor                                                               |
+| -------------------------------------- | ---------------------- | ----------------------------------------------------------------- | ----------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------ |
+| Survives the session                   | No                     | Yes                                                               | Yes                                       | Yes, for runs and monitors             | Yes                                                                      |
+| On trace details                       | No                     | Yes, at once                                                      | Needs a drawer read                       | Needs a drawer read for runs           | Yes, today                                                               |
+| Dashboards                             | No                     | Yes, but mixes with monitors                                      | Needs a run binding                       | Monitor for current numbers            | Yes, built-in eval charts                                                |
+| ClickHouse load for 1,000,000 verdicts | None                   | 1,000,000 events plus fold and analytics rows, written one by one | 200 bulk inserts (1,000 at page size 100) | Same as C for runs; as E for monitors  | 1,000,000 events plus fold and analytics rows, written one by one (as B) |
+| Ad-hoc runs pollute monitor charts     | No                     | Yes                                                               | No                                        | No                                     | No, a monitor is deliberate                                              |
+| Retention                              | None                   | Project trace retention                                           | Indefinite                                | Runs indefinite; monitors follow trace | Project trace retention                                                  |
+| New work                               | Small                  | Medium (source field, dedup)                                      | Medium (drawer read)                      | Medium (drawer read)                   | None                                                                     |
+| Backfills old traces                   | No                     | Only if run over old traces                                       | Yes                                       | Yes, by a run                          | No                                                                       |
+| Exploration cost                       | Free inside the window | Costly: a write per verdict                                       | Free, stores nothing                      | Free, stores nothing                   | Not for exploration                                                      |
 
 Row note for volumes: the storing options hold the same 1,000,000 rows. B writes 1,000,000 events plus fold and analytics rows, one by one. C and D write the same rows in 200 bulk inserts (1,000 inserts of 1,000 rows at page size 100).
 
