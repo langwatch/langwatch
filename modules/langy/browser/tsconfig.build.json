@@ -24,11 +24,7 @@
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
-      "ignoredDependencies": [
-        "@langwatch/project-contract",
-        "@langwatch/skills",
-        "@langwatch/vitest-config"
-      ]
+      "ignoredDependencies": ["@langwatch/skills", "@langwatch/vitest-config"]
     }
   },
   "references": [
@@ -58,6 +54,9 @@
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"

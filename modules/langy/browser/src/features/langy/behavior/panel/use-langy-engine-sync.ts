@@ -62,33 +62,33 @@ export function useLangyEngineHistorySync({
   activeConversationId,
   historyMessages,
   isFetchingHistory,
-  applyHistoryToEngine,
+  loadStoredHistory,
 }: {
   activeConversationId: string | null;
   historyMessages: HistoryMessages;
   isFetchingHistory: boolean;
-  applyHistoryToEngine: (messages: HistoryMessages) => void;
+  loadStoredHistory: (messages: HistoryMessages) => void;
 }) {
   const historyLoadConversationId = useLangyStore((s) => s.historyLoadConversationId);
   const consumeHistoryLoad = useLangyStore((s) => s.consumeHistoryLoad);
   useEffect(() => {
     if (!historyLoadConversationId || historyLoadConversationId !== activeConversationId) return;
     if (isFetchingHistory) return;
-    applyHistoryToEngine(historyMessages);
+    loadStoredHistory(historyMessages);
     consumeHistoryLoad();
   }, [
     historyLoadConversationId,
     activeConversationId,
     isFetchingHistory,
     historyMessages,
-    applyHistoryToEngine,
+    loadStoredHistory,
     consumeHistoryLoad,
   ]);
 
   // Fires only on the transition to null, so a first send is never wiped.
   useEffect(() => {
-    if (activeConversationId === null) applyHistoryToEngine([]);
-  }, [activeConversationId, applyHistoryToEngine]);
+    if (activeConversationId === null) loadStoredHistory([]);
+  }, [activeConversationId, loadStoredHistory]);
 }
 
 /** Foreign-turn re-hydration: a turn another tab ran lands in this engine from the record. */

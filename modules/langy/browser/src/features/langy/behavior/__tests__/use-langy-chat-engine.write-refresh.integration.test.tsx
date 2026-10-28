@@ -3,7 +3,7 @@
  * @see specs/langy/langy-dashboard-widget-refresh.feature
  * @vitest-environment jsdom
  */
-import type { LangyMessageDto } from "@langwatch/langy-contract";
+import type { LangyMessageDto, LangyTurnProjectionState } from "@langwatch/langy-contract";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -45,6 +45,12 @@ vi.mock("../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import {
+  useLangyEngineHistorySync,
+  useLangyForeignTurnRehydration,
+} from "../panel/use-langy-engine-sync.ts";
+import { useLangyOutlivedTurnError } from "../panel/use-langy-turn-failure.ts";
 import { useLangyChatEngine } from "../use-langy-chat-engine.ts";
 
 const transport = {} as Parameters<typeof useLangyChatEngine>[0]["transport"];
@@ -157,7 +163,7 @@ describe("useLangyChatEngine write refresh", () => {
     /** @scenario "Loading a stored conversation does not refresh its old writes" */
     it("does not invalidate for the writes already in its history", () => {
       const { result, rerender } = renderHook(() => useLangyChatEngine({ transport }));
-      act(() => result.current.applyHistoryToEngine([storedWrite]));
+      act(() => result.current.loadStoredHistory([storedWrite]));
       rerender();
 
       expect(chatMessages).toHaveLength(1);
@@ -166,7 +172,7 @@ describe("useLangyChatEngine write refresh", () => {
 
     it("still invalidates for a write that settles after it", () => {
       const { result, rerender } = renderHook(() => useLangyChatEngine({ transport }));
-      act(() => result.current.applyHistoryToEngine([storedWrite]));
+      act(() => result.current.loadStoredHistory([storedWrite]));
       rerender();
       chatMessages = [
         ...chatMessages,
@@ -183,11 +189,115 @@ describe("useLangyChatEngine write refresh", () => {
         createdAtMs: 0,
       };
       const { result, rerender } = renderHook(() => useLangyChatEngine({ transport }));
-      act(() => result.current.applyHistoryToEngine([runningWrite]));
+      act(() => result.current.loadStoredHistory([runningWrite]));
       rerender();
       chatMessages = [toolMessage({ command: "langwatch evaluator create b" })];
       rerender();
 
+      expect(invalidatedRouters).toEqual(["evaluators"]);
+    });
+  });
+
+  describe("when history reaches the engine from the record", () => {
+    const conversationId = "conv-1";
+    const recorded = (message: ReturnType<typeof toolMessage>): LangyMessageDto => ({
+      ...message,
+      createdAtMs: 0,
+    });
+    const oldWrite = recorded(
+      toolMessage({ command: "langwatch scenario create --name Old", id: "old-call" }),
+    );
+    const laterWrite = recorded(
+      toolMessage({ command: "langwatch evaluator create b", id: "later-call" }),
+    );
+
+    /** The panel's wiring: a conversation the user opens, then turns another tab ran. */
+    const useOpenedConversation = ({ history }: { history: LangyMessageDto[] }) => {
+      const engine = useLangyChatEngine({ transport });
+      const sync = {
+        activeConversationId: conversationId,
+        historyMessages: history,
+        isFetchingHistory: false,
+      };
+      useLangyEngineHistorySync({ ...sync, loadStoredHistory: engine.loadStoredHistory });
+      useLangyForeignTurnRehydration({
+        ...sync,
+        isBusy: false,
+        engineMessageCount: engine.messages.length,
+        applyHistoryToEngine: engine.applyHistoryToEngine,
+      });
+      return engine;
+    };
+
+    beforeEach(() => {
+      useLangyStore.setState({ historyLoadConversationId: conversationId });
+    });
+
+    /** @scenario "Loading a stored conversation does not refresh its old writes" */
+    it("does not invalidate for the writes in a conversation the user opens", () => {
+      const { rerender } = renderHook(useOpenedConversation, {
+        initialProps: { history: [oldWrite] },
+      });
+      rerender({ history: [oldWrite] });
+
+      expect(chatMessages).toHaveLength(1);
+      expect(invalidatedRouters).toEqual([]);
+    });
+
+    /** @scenario "A write a turn in another tab made refreshes this tab's lists" */
+    it("invalidates for a write a foreign turn brings in, and only for that one", () => {
+      const { rerender } = renderHook(useOpenedConversation, {
+        initialProps: { history: [oldWrite] },
+      });
+      rerender({ history: [oldWrite] });
+      rerender({ history: [oldWrite, laterWrite] });
+      rerender({ history: [oldWrite, laterWrite] });
+
+      expect(chatMessages).toHaveLength(2);
+      expect(invalidatedRouters).toEqual(["evaluators"]);
+    });
+
+    /** @scenario "A write a dropped stream never showed refreshes when the record restores it" */
+    it("invalidates for a write a failure-recovery reload brings in", () => {
+      const completion = { acceptedAt: 2_000, eventId: "evt-2" };
+      const projection = (status: string): LangyTurnProjectionState => ({
+        turnId: "turn-9",
+        cursor: completion,
+        turn: { Status: status } as LangyTurnProjectionState["turn"],
+      });
+      useLangyStore.setState({
+        historyLoadConversationId: null,
+        activeTurnId: "turn-9",
+        turnProjection: projection("running"),
+      });
+      const streamDropped = new Error("stream dropped");
+      type TranscriptRead = {
+        transcript: LangyMessageDto[];
+        transcriptCursor: typeof completion | null;
+      };
+      const useRecoveringTurn = ({ transcript, transcriptCursor }: TranscriptRead) => {
+        const engine = useLangyChatEngine({ transport });
+        useLangyOutlivedTurnError({
+          error: streamDropped,
+          transcriptMessages: transcript,
+          transcriptCursor,
+          isFetchingTranscript: false,
+          clearError: engine.clearError,
+          applyHistoryToEngine: engine.applyHistoryToEngine,
+        });
+        return engine;
+      };
+      const noTranscript: TranscriptRead = {
+        transcript: [],
+        transcriptCursor: null,
+      };
+      const { rerender } = renderHook(useRecoveringTurn, { initialProps: noTranscript });
+
+      act(() => useLangyStore.setState({ turnProjection: projection("completed") }));
+      rerender({ transcript: [laterWrite], transcriptCursor: completion });
+      rerender({ transcript: [laterWrite], transcriptCursor: completion });
+
+      expect(chatMessages).toHaveLength(1);
       expect(invalidatedRouters).toEqual(["evaluators"]);
     });
   });

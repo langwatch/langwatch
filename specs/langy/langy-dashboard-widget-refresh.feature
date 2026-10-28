@@ -68,9 +68,24 @@ Feature: Dashboard refresh after a Langy turn
   @unit
   Scenario: Loading a stored conversation does not refresh its old writes
     Given a stored conversation holds a "langwatch scenario create" call that returned long ago
-    When the conversation is loaded into the panel
+    When the user opens the conversation in the panel
     Then no query is invalidated
     And a write that returns after the load still refreshes its lists
+
+  @integration
+  Scenario: A write a turn in another tab made refreshes this tab's lists
+    Given the user has a conversation open in the panel
+    And a turn in another tab ran "langwatch evaluator create" in that conversation
+    When the panel brings that turn in from the record
+    Then the evaluators queries are invalidated
+    And the writes the conversation already held are not refreshed again
+
+  @integration
+  Scenario: A write a dropped stream never showed refreshes when the record restores it
+    Given a Langy turn's stream dropped before its "langwatch evaluator create" call reached the panel
+    And the turn went on to complete
+    When the panel reloads the turn's answer from the record
+    Then the evaluators queries are invalidated
 
   @unit
   Scenario: Every resource in the capability catalogue is mapped or declared unrefreshed

@@ -77,17 +77,13 @@ export function useLangyChatEngine({
   const setMessagesRef = useRef(setMessages);
   setMessagesRef.current = setMessages;
 
-  const applyHistoryToEngine = useCallback(
+  const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
+    setMessagesRef.current(toEngineHistory(history));
+  }, []);
+
+  const loadStoredHistory = useCallback(
     (history: LangyMessageDto[]) => {
-      const uiMessages = history
-        .filter(isLangyTranscriptMessage)
-        // `recorded` marks a message off the durable fold: a card fence still in its
-        // TEXT is one the relay decided was not a block (ADR-060 §1). Its `parts`
-        // were stored VERBATIM off the stream and re-enter the engine checked.
-        .map((m) =>
-          toEngineMessage({ id: m.id, role: m.role, parts: m.parts, metadata: { recorded: true } }),
-        );
-      // Writes already in a stored history landed long ago; only calls settling from here refresh.
+      const uiMessages = toEngineHistory(history);
       markCallsSeen(uiMessages);
       setMessagesRef.current(uiMessages);
     },
@@ -123,7 +119,16 @@ export function useLangyChatEngine({
      * The stream writes into a new assistant message, or the last one when it already is one.
      */
     resumeStream,
+    /**
+     * Put a history read from the record into the engine. Writes in it that this tab has not
+     * refreshed yet still refresh: a turn another tab ran, or one a dropped stream never showed.
+     */
     applyHistoryToEngine,
+    /**
+     * Open a stored conversation the user picked. Its writes landed long ago, so they refresh
+     * nothing; only calls that settle from here on do.
+     */
+    loadStoredHistory,
     resetEngine,
     /**
      * Dismiss the engine's error WITHOUT the rest of a reset — the
@@ -134,10 +139,23 @@ export function useLangyChatEngine({
   };
 }
 
+function toEngineHistory(history: LangyMessageDto[]): UIMessage[] {
+  return (
+    history
+      .filter(isLangyTranscriptMessage)
+      // `recorded` marks a message off the durable fold: a card fence still in its
+      // TEXT is one the relay decided was not a block (ADR-060 §1). Its `parts`
+      // were stored VERBATIM off the stream and re-enter the engine checked.
+      .map((m) =>
+        toEngineMessage({ id: m.id, role: m.role, parts: m.parts, metadata: { recorded: true } }),
+      )
+  );
+}
+
 /**
  * Invalidate the app queries a settled Langy write touched, once per tool call, so an open page
- * shows what Langy made without a reload. Answers the call that marks a hydrated history's calls
- * as already refreshed.
+ * shows what Langy made without a reload. Answers the call that marks the calls of a conversation
+ * the user opens as already refreshed.
  */
 function useRefreshAppListsOnWrite({
   messages,
