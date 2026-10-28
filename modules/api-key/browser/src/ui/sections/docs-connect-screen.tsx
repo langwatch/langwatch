@@ -5,7 +5,8 @@
  */
 
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Stack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Clock3 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useAuthorizeHost } from "../../model/authorize-host.ts";
@@ -15,6 +16,7 @@ import {
   readDocsConnectRequest,
   type DocsConnectRefusal,
 } from "../../model/docs-connect.ts";
+import { StatusCard } from "../blocks/status-card.tsx";
 
 /** Each refusal in words a reader acts on. No key is minted on any of them. */
 const REFUSAL_COPY: Readonly<Record<DocsConnectRefusal, string>> = {
@@ -96,26 +98,59 @@ export default function DocsConnect() {
     <BrandedCardPage>
       <BrandedCard
         title="Connect the docs to LangWatch"
-        intro={`${request.origin} is asking to use your LangWatch account. Allow it?`}
+        intro="The API playground asks to send requests as you."
       >
-        <HStack width="full" justify="space-between">
-          <Text textStyle="body" color="fg.muted">
-            Project
-          </Text>
-          {host.projectSwitcher()}
-        </HStack>
-        <VStack align="stretch" gap={1} data-testid="docs-connect-access">
-          <Text fontSize="sm">It may do anything you can do in this project.</Text>
-          <Text fontSize="sm" color="fg.muted">
-            Access ends after 5 minutes, or sooner when you sign out.
-          </Text>
+        <VStack align="stretch" gap={6}>
+          <VStack align="stretch" gap={2}>
+            <Box
+              bg="bg.subtle"
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="lg"
+              p={4}
+              fontFamily="mono"
+              fontSize="sm"
+              fontWeight="medium"
+              textAlign="center"
+              color="fg"
+              overflowWrap="anywhere"
+            >
+              {new URL(request.origin).host}
+            </Box>
+            <Text textStyle="xs" color="fg.muted" textAlign="center">
+              Allow only if this is the site you opened the playground on.
+            </Text>
+          </VStack>
+          <HStack width="full" justify="space-between">
+            <Text textStyle="sm" color="fg.muted">
+              Project
+            </Text>
+            {host.projectSwitcher()}
+          </HStack>
+          <StatusCard palette="blue" icon={Clock3} title="Access ends after 5 minutes">
+            It may do anything you can do in this project, until then or until you sign out.
+          </StatusCard>
+          <Stack direction={{ base: "column", sm: "row" }} gap={3}>
+            <Button
+              colorPalette="orange"
+              flex={1}
+              onClick={handleAllow}
+              disabled={!projectId || isSubmitting}
+              loading={isSubmitting}
+            >
+              Allow
+            </Button>
+            <Button
+              variant="outline"
+              color="fg.muted"
+              borderColor="border.emphasized"
+              onClick={handleDeny}
+              disabled={isSubmitting}
+            >
+              Deny
+            </Button>
+          </Stack>
         </VStack>
-        <Button onClick={handleAllow} disabled={!projectId || isSubmitting} loading={isSubmitting}>
-          Allow
-        </Button>
-        <Button variant="outline" onClick={handleDeny} disabled={isSubmitting}>
-          Deny
-        </Button>
       </BrandedCard>
     </BrandedCardPage>
   );

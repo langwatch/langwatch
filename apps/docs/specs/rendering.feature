@@ -74,6 +74,12 @@ Feature: Read and navigate the generated documentation
     And no request is sent until the reader chooses Send request
     And missing required values prevent sending
 
+  @unit
+  Scenario: Colour the request body like the docs' code blocks
+    Given a reader edits a JSON request body in Try it
+    Then keys, strings, numbers and literals take the code blocks' light and dark colours as they type
+    And text that is not yet valid JSON is still shown, uncoloured where it cannot be read
+
   @e2e
   Scenario: Start with a coding agent
     Given the reader opens the introduction

@@ -17,6 +17,7 @@ import { docsAppOrigin } from "../../../config.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { paramKey } from "../model/codegen.ts";
 import { sessionCovers } from "../model/docs-session.ts";
+import { JSON_TOKEN_COLOURS, jsonTokens } from "../model/json-tokens.ts";
 import type { Operation, Parameter, Scheme } from "../model/operation.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { Panel } from "./panel.tsx";
@@ -147,41 +148,47 @@ function AuthField({
     >
       <summary>API key · {scheme.type === "apiKey" ? scheme.name : "Authorization"}</summary>
       {docsAppOrigin && sessionCovers({ scheme }) ? <SessionControls /> : null}
-      <Flex gap="2" marginTop="1" data-docs-manual-key="">
-        <Input
-          id="pg-auth"
-          size="sm"
-          type={reveal ? "text" : "password"}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={scheme.type === "apiKey" ? "API key" : "Bearer token"}
-          aria-label={scheme.type === "apiKey" ? `${scheme.name} value` : "Bearer token"}
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          colorPalette="gray"
-          aria-label={reveal ? "Hide key" : "Reveal key"}
-          onClick={() => setReveal((value) => !value)}
-        >
-          {reveal ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          colorPalette="gray"
-          onClick={() => onChange("")}
-        >
-          Clear
-        </Button>
-      </Flex>
-      <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
-        Kept in this tab. Cleared when you reload.
-      </Text>
+      <Box data-docs-manual-key="">
+        <Flex gap="2" marginTop="1">
+          <Input
+            id="pg-auth"
+            size="sm"
+            type={reveal ? "text" : "password"}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={scheme.type === "apiKey" ? "API key" : "Bearer token"}
+            aria-label={scheme.type === "apiKey" ? `${scheme.name} value` : "Bearer token"}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            colorPalette="gray"
+            aria-label={reveal ? "Hide key" : "Reveal key"}
+            onClick={() => setReveal((value) => !value)}
+          >
+            {reveal ? (
+              <EyeOff size={16} aria-hidden="true" />
+            ) : (
+              <Eye size={16} aria-hidden="true" />
+            )}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            colorPalette="gray"
+            onClick={() => onChange("")}
+          >
+            Clear
+          </Button>
+        </Flex>
+        <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
+          Kept in this tab. Cleared when you reload.
+        </Text>
+      </Box>
     </chakra.details>
   );
 }
@@ -234,7 +241,20 @@ function SendActions({
     </Box>
   );
 }
+/* The editor and its coloured copy behind it must lay text out identically. */
+const BODY_TEXT = {
+  fontFamily: "mono",
+  fontSize: "12px",
+  lineHeight: "20px",
+  paddingX: "10px",
+  paddingY: "8px",
+  borderWidth: "1px",
+  borderRadius: "md",
+  letterSpacing: "normal",
+} as const;
+
 function BodyEditor({ body, onChange }: { body: string; onChange: (value: string) => void }) {
+  const mirror = useRef<HTMLPreElement>(null);
   return (
     <Box>
       <chakra.label
@@ -249,18 +269,58 @@ function BodyEditor({ body, onChange }: { body: string; onChange: (value: string
           (application/json)
         </Text>
       </chakra.label>
-      <Textarea
-        id="pg-body"
-        size="sm"
-        rows={Math.min(14, Math.max(4, body.split("\n").length))}
-        fontFamily="mono"
-        fontSize="12px"
-        value={body}
-        spellCheck={false}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      />
+      <Box position="relative">
+        <chakra.pre
+          ref={mirror}
+          aria-hidden="true"
+          className="docs-json"
+          {...BODY_TEXT}
+          position="absolute"
+          inset="0"
+          margin="0"
+          overflow="hidden"
+          pointerEvents="none"
+          borderColor="transparent"
+          whiteSpace="pre-wrap"
+          overflowWrap="anywhere"
+        >
+          {jsonTokens({ text: body }).map((token, index) =>
+            token.kind === "plain" ? (
+              token.text
+            ) : (
+              <span
+                // Tokens never reorder: the index is the token's place in the body.
+                key={index}
+                style={{
+                  ["--sl" as string]: JSON_TOKEN_COLOURS[token.kind].light,
+                  ["--sd" as string]: JSON_TOKEN_COLOURS[token.kind].dark,
+                }}
+              >
+                {token.text}
+              </span>
+            ),
+          )}
+          {/* A trailing newline needs a character after it to take up its line. */}
+          {"\u200b"}
+        </chakra.pre>
+        <Textarea
+          id="pg-body"
+          {...BODY_TEXT}
+          rows={Math.min(14, Math.max(4, body.split("\n").length))}
+          position="relative"
+          background="transparent"
+          color="transparent"
+          css={{ caretColor: "var(--chakra-colors-fg)" }}
+          value={body}
+          spellCheck={false}
+          onScroll={(event) => {
+            if (mirror.current) mirror.current.scrollTop = event.currentTarget.scrollTop;
+          }}
+          onChange={(event) => {
+            onChange(event.target.value);
+          }}
+        />
+      </Box>
     </Box>
   );
 }

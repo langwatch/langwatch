@@ -99,6 +99,7 @@ describe("given the consent page is open", () => {
     renderWithAuthorizeHost(<DocsConnect />, host);
     expect(screen.getByText(/anything you can do in this project/)).toBeInTheDocument();
     expect(screen.getByText(/5 minutes/)).toBeInTheDocument();
+    expect(screen.getByText(new URL(DOCS).host)).toBeInTheDocument();
 
     await press("Allow");
 

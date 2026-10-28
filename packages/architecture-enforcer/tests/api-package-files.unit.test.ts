@@ -40,6 +40,7 @@ const TARGET_FILES = new Set([
   "hosting/session-reader.ts",
   "hosting/api-discovery.ts",
   "hosting/browser-bundle.ts",
+  "hosting/embedded-document.ts",
   "hosting/framed-document.ts",
   "hosting/http-mux.ts",
   "hosting/openapi-document.ts",

@@ -78,25 +78,39 @@ export function buildDocsSessionFrameRefusal(): string {
 }
 
 const FRAME_STYLE = `
-:root { color-scheme: light dark; --ink: #141417; --muted: #5f5f68; --line: #d4d4d8; --paper: #fff; }
+:root {
+  color-scheme: light dark; --ink: #141417; --muted: #5f5f68; --line: #d4d4d8; --paper: #fff;
+  --brand: #f56b1a; --brand-tint: #fef3ec; --live: #16a34a;
+}
 @media (prefers-color-scheme: dark) {
-  :root { --ink: #f4f4f5; --muted: #a1a1aa; --line: #3f3f46; --paper: #141417; }
+  :root {
+    --ink: #f4f4f5; --muted: #a1a1aa; --line: #3f3f46; --paper: #141417;
+    --brand-tint: #2a1c12; --live: #4ade80;
+  }
 }
 html, body { margin: 0; background: transparent; }
 body { font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); }
-main { display: flex; flex-direction: column; gap: 6px; padding: 2px; }
+main { display: flex; flex-direction: column; gap: 8px; padding: 2px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 button {
   font: inherit; font-weight: 500; min-height: 32px; padding: 0 12px; border-radius: 6px;
   border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer;
 }
-button:focus-visible { outline: 2px solid #f56b1a; outline-offset: 2px; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 button:disabled { opacity: 0.6; cursor: default; }
 button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-button.quiet { border-color: transparent; background: transparent; }
+button.small { min-height: 26px; padding: 0 10px; font-size: 12px; margin-left: auto; }
 p { margin: 0; }
-#status { font-size: 12px; color: var(--muted); }
-#confirm { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+#status { flex: 1 1 220px; font-size: 12px; color: var(--muted); }
+#status.live::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px;
+  border-radius: 50%; background: var(--live); vertical-align: 1px;
+}
+#confirm {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 6px;
+  border: 1px solid var(--line); border-left: 3px solid var(--brand); background: var(--brand-tint);
+}
 #confirm code { font: 12px ui-monospace, monospace; }
 [hidden] { display: none !important; }
 `;
@@ -105,16 +119,16 @@ const FRAME_MARKUP = `
 <main>
   <div class="row">
     <button id="connect" type="button">Use my LangWatch account</button>
-    <button id="disconnect" class="quiet" type="button" hidden>Disconnect</button>
+    <p id="status" role="status" aria-live="polite">Or paste an API key below.</p>
+    <button id="disconnect" class="small" type="button" hidden>Disconnect</button>
   </div>
   <div id="confirm" role="group" aria-labelledby="confirm-text" hidden>
     <p id="confirm-text"></p>
     <div class="row">
       <button id="confirm-send" class="primary" type="button">Send</button>
-      <button id="confirm-cancel" class="quiet" type="button">Cancel</button>
+      <button id="confirm-cancel" type="button">Cancel</button>
     </div>
   </div>
-  <p id="status" role="status" aria-live="polite">Or paste an API key below.</p>
 </main>
 `;
 
@@ -175,6 +189,7 @@ const FRAME_RUNTIME = String.raw`function (config) {
     connectButton.hidden = Boolean(session);
     disconnectButton.hidden = !session;
     connectButton.disabled = !embedded || Boolean(waiting);
+    statusLine.classList.toggle("live", Boolean(session));
     statusLine.textContent = session
       ? "Sending as you in " + session.project.name + ". Access ends within " + minutesLeft() + "." + (note ? " " + note : "")
       : note || (embedded ? NOTES.idle : NOTES.notEmbedded);

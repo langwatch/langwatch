@@ -505,6 +505,13 @@ figure > .docs-shot {
 .dark .docs-line span {
   color: color-mix(in srgb, var(--sd) 85%, var(--chakra-colors-fg));
 }
+/* The playground colours the JSON it edits and answers like a code block. */
+.docs-json span {
+  color: color-mix(in srgb, var(--sl) 80%, var(--chakra-colors-fg));
+}
+.dark .docs-json span {
+  color: color-mix(in srgb, var(--sd) 85%, var(--chakra-colors-fg));
+}
 .docs-line[data-highlighted="true"] {
   background: color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent);
   box-shadow: inset 2px 0 0 var(--chakra-colors-accent-solid);
