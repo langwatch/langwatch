@@ -8170,7 +8170,9 @@
             "AgentId",
             "WorkflowId",
             "CopiedFromAgentId",
-            "OwnerUserId"
+            "OwnerUserId",
+            "CreatedById",
+            "UpdatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -8261,6 +8263,22 @@
               "name": "ArchivedAt",
               "type": "Nullable(DateTime64(3))",
               "description": "ArchivedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "CreatedById",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedById",
+              "type": "Nullable(String)",
+              "description": "UpdatedById",
               "unit": null,
               "gates": [],
               "available": true
@@ -10892,7 +10910,9 @@
             "TenantId",
             "EvaluatorId",
             "WorkflowId",
-            "CopiedFromEvaluatorId"
+            "CopiedFromEvaluatorId",
+            "CreatedById",
+            "UpdatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -10967,6 +10987,22 @@
               "name": "ArchivedAt",
               "type": "Nullable(DateTime64(3))",
               "description": "ArchivedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "CreatedById",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedById",
+              "type": "Nullable(String)",
+              "description": "UpdatedById",
               "unit": null,
               "gates": [],
               "available": true
@@ -14528,7 +14564,9 @@
             "TenantId",
             "MonitorId",
             "ExperimentId",
-            "EvaluatorId"
+            "EvaluatorId",
+            "CreatedById",
+            "UpdatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -14693,6 +14731,30 @@
               "gates": [
                 "output"
               ],
+              "available": true
+            },
+            {
+              "name": "EvaluatorLabel",
+              "type": "Nullable(String)",
+              "description": "EvaluatorLabel",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "CreatedById",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedById",
+              "type": "Nullable(String)",
+              "description": "UpdatedById",
+              "unit": null,
+              "gates": [],
               "available": true
             }
           ],
