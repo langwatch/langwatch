@@ -15,7 +15,9 @@ func TestSimulatorLanesUseTheHavenExecutable(t *testing.T) {
 	repo := t.TempDir()
 	home := t.TempDir()
 	executable := filepath.Join(t.TempDir(), "haven's binary $(exit 1)")
-	if err := os.Symlink("/usr/bin/printf", executable); err != nil {
+	// A script, not a symlink to printf: a multicall printf (Rust coreutils)
+	// picks its tool from its own name and refuses this one.
+	if err := os.WriteFile(executable, []byte("#!/bin/sh\nprintf \"$@\"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	o := &Orchestrator{cfg: Config{Home: home, SimulatorArgv: []string{executable, "%s/%s", "simulator"}}, proxy: stubProxy{}}
