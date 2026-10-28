@@ -45,9 +45,16 @@ jobs:
             relevant:
               - 'docs/**'
               - 'apps/docs/**'
+              # Every workspace package `@langwatch/docs-site...` reaches: the
+              # typecheck below is the only one that covers the docs app.
               - 'packages/design-system/**'
+              - 'packages/design-system-internal/**'
+              - 'packages/handled-error/**'
+              - 'packages/observability/**'
               - 'packages/time/**'
               - 'packages/vitest-config/**'
+              - 'sdks/typescript/**'
+              - 'dev/tests/e2e-stack/**'
               - 'packages/oxlint-rules/**'
               - 'packages/architecture-enforcer/oxlint.architecture.jsonc'
               - 'packages/architecture-enforcer/oxlint-plugin.mjs'
