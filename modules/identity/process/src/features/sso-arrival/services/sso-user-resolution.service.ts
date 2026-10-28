@@ -65,6 +65,11 @@ export class SsoUserResolutionService {
       connectionId: input.providerId,
     });
     const { providerId, accountKey } = input;
+    // Its row could only be stamped with a `local:` namespace, refused at its next sign-in.
+    if (!accountKey.issuer) {
+      logger.warn({ providerId }, "Refused a single sign-on subject asserted under no issuer");
+      return REFUSE;
+    }
     const storedIssuers = await this.deps.people.findSubjectIssuers({
       connectionId: providerId,
       accountId: accountKey.accountId,
@@ -72,7 +77,7 @@ export class SsoUserResolutionService {
     if (isStoredUnderAnotherIssuer({ storedIssuers, issuer: accountKey.issuer })) {
       logger.warn(
         { providerId, issuer: accountKey.issuer },
-        "Refused a single sign-on subject whose account row was stored under another issuer",
+        "Refused a single sign-on subject stored under another issuer",
       );
       return REFUSE;
     }

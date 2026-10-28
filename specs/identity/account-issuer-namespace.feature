@@ -41,16 +41,23 @@ Feature: An account row keeps the issuer namespace of whoever asserted its subje
 
   @unit
   Scenario: A connection subject stored under another issuer is refused
-    Given a connection's account row for a subject was stored under one issuer, under no
-      issuer, or under a `local:` namespace
+    Given a connection's account row or live identifier for a subject was stored under one
+      issuer, under no issuer, or under a `local:` namespace
     When another issuer asserts the same subject through that connection
     Then the sign-in is refused as not linked
     And nobody is signed in as the row's person
     And no link proposal is recorded
 
   @unit
+  Scenario: A connection subject asserted under no issuer is refused
+    Given a connection's assertion for a subject names no issuer
+    When the subject signs in through that connection
+    Then the sign-in is refused as not linked
+    And no link proposal is recorded
+
+  @unit
   Scenario: A connection subject stored under its own issuer still signs in
-    Given a connection's account row for a subject stores the asserted issuer, with or
-      without a trailing slash
+    Given a connection's account row or live identifier for a subject stores the asserted
+      issuer, with or without a trailing slash
     When the connection's issuer asserts that subject
     Then the sign-in is not refused for its issuer

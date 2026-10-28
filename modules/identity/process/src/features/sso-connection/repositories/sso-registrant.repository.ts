@@ -21,8 +21,8 @@ export abstract class SsoRegistrantReadRepository {
   }): Promise<string[]>;
 
   /**
-   * The issuers this exact connection subject's rows were stored under, at most two. A row
-   * stored before the column carries none (ADR-189).
+   * The issuers this exact connection subject was stored under: its `Account` rows and its live
+   * `Identifier` rows, at most two of each. The callback can find either (ADR-189).
    */
   abstract findSubjectIssuers(args: {
     connectionId: string;

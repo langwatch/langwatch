@@ -95,12 +95,21 @@ export class PrismaSsoRegistrantReadRepository implements SsoRegistrantReadRepos
     connectionId: string;
     accountId: string;
   }): Promise<(string | null)[]> {
-    const rows = await this.database.account.findMany({
+    const accounts = await this.database.account.findMany({
       where: { provider: connectionId, providerAccountId: accountId },
       select: { issuer: true },
       take: 2,
     });
-    return rows.map((row) => row.issuer);
+    const identifiers = await this.database.identifier.findMany({
+      where: {
+        providerId: connectionId,
+        providerAccountId: accountId,
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+      },
+      select: { issuer: true },
+      take: 2,
+    });
+    return [...accounts, ...identifiers].map((row) => row.issuer);
   }
 
   async findBindingHolderIds({

@@ -67,13 +67,21 @@ export class MemorySsoRegistrantReadRepository implements SsoRegistrantReadRepos
     connectionId: string;
     accountId: string;
   }): Promise<(string | null)[]> {
-    return [...this.store.accounts.values()]
+    const accounts = [...this.store.accounts.values()]
       .flat()
       .filter(
         (account) => account.provider === connectionId && account.providerAccountId === accountId,
       )
-      .slice(0, 2)
-      .map((account) => account.issuer ?? null);
+      .slice(0, 2);
+    const identifiers = [...this.store.identifiers.values()]
+      .filter(
+        (identifier) =>
+          identifier.providerId === connectionId &&
+          identifier.providerAccountId === accountId &&
+          isLiveIdentifierState(identifier.state),
+      )
+      .slice(0, 2);
+    return [...accounts, ...identifiers].map((row) => row.issuer ?? null);
   }
 
   async findUsersByEmail({ email }: { email: string }): Promise<SsoResolutionCandidate[]> {

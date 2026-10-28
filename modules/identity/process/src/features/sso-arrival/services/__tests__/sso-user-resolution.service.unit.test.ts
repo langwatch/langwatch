@@ -839,3 +839,71 @@ describe("given a connection subject that already has an account row", () => {
     });
   });
 });
+
+describe("given a connection subject held by a live identifier with no account row yet", () => {
+  /** The callback reads a finalized person's account from the identifier, not the row. */
+  const heldUnder = ({
+    issuer,
+    state = "VERIFIED",
+  }: {
+    issuer: string | null;
+    state?: IdentifierFact["state"];
+  }) => {
+    const world = createWorld({ confirmed: true });
+    world.store.identifiers.set(
+      "identifier_subject",
+      identifier({
+        identifierId: "identifier_subject",
+        provider: "oidc",
+        accountId: `account-${USER_ID}`,
+        providerId: CONNECTION_ID,
+        issuer,
+        providerAccountId: SUBJECT,
+        state,
+        verifiedAtMs: 1,
+      }),
+    );
+    return world;
+  };
+
+  describe("when another issuer mints the same subject through the connection", () => {
+    /** @scenario A connection subject stored under another issuer is refused */
+    it.each([
+      ["another identity provider's issuer", "https://another-idp.test"],
+      ["no issuer", null],
+      ["the connection's own synthetic namespace", `local:oauth:${CONNECTION_ID}`],
+    ])("refuses an identifier stored with %s", async (_name, issuer) => {
+      const { service, proposals } = heldUnder({ issuer });
+
+      expect(await service.resolveUser(assertion())).toEqual(NOT_LINKED);
+      expect(proposals).toEqual([]);
+    });
+
+    /** @scenario A connection subject asserted under no issuer is refused */
+    it("refuses an assertion that names no issuer, even for a subject nothing holds", async () => {
+      const { service, proposals } = createWorld({ confirmed: true });
+
+      const resolution = await service.resolveUser(
+        assertion({ accountKey: { issuer: "", accountId: SUBJECT } }),
+      );
+
+      expect(resolution).toEqual(NOT_LINKED);
+      expect(proposals).toEqual([]);
+    });
+
+    it("does not count an identifier that was detached", async () => {
+      const { service } = heldUnder({ issuer: "https://another-idp.test", state: "DETACHED" });
+
+      expect(await service.resolveUser(assertion())).not.toEqual(NOT_LINKED);
+    });
+  });
+
+  describe("when the identifier was stored under the issuer that asserts it", () => {
+    /** @scenario A connection subject stored under its own issuer still signs in */
+    it("is not refused for its issuer", async () => {
+      const { service } = heldUnder({ issuer: ISSUER });
+
+      expect(await service.resolveUser(assertion())).not.toEqual(NOT_LINKED);
+    });
+  });
+});
