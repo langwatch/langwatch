@@ -25,6 +25,9 @@ export const PARK_RECONCILE_MAX_DRAIN = 1000;
 /** Reconcile cadence (ms); defines dynamic-cap TTL and claimant window multiples. */
 export const RECONCILE_INTERVAL_MS = 2000;
 
+/** Beacon refresh interval. Three refreshes fit inside {@link WORKER_LIVENESS_TTL_SECONDS}. */
+export const WORKER_LIVENESS_REFRESH_MS = 30_000;
+
 /**
  * How soon dispatch looks again at a held group it found due: a heartbeat that ran late, or an
  * owner whose beacon is missing. The claim and each heartbeat put a held group half its active
@@ -37,7 +40,7 @@ export const CLAIM_RECHECK_MS = 30_000;
  * beacon refresh, so an owner back from a Redis outage republishes in between and keeps its claim
  * (specs/claimed-job-recovery.feature).
  */
-export const CLAIM_GONE_CONFIRM_MS = 60_000;
+export const CLAIM_GONE_CONFIRM_MS = WORKER_LIVENESS_REFRESH_MS * 2;
 
 /** How far back a listed run's jobless group that stays (a failure, say) goes in its candidates. */
 const SETTLED_CANDIDATE_DELAY_MS = 3_600_000;
@@ -2200,9 +2203,6 @@ export const CLAIM_MARKER_TTL_SECONDS = 60 * 60;
  * read as a death — the one piece of evidence that alone CAN park a group.
  */
 export const WORKER_LIVENESS_TTL_SECONDS = 90;
-
-/** Beacon refresh interval. Three refreshes fit inside the TTL above. */
-export const WORKER_LIVENESS_REFRESH_MS = 30_000;
 
 /**
  * How long a graceful shutdown's `retired` tombstone survives. Must outlive the

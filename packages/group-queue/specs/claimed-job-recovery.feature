@@ -170,6 +170,12 @@ Feature: GroupQueue brings back a job whose worker died while running it
       And the group is not parked, and comes up again within the recheck interval
 
     @integration
+    Scenario: A held group whose active key is about to lapse comes up when it lapses
+      Given a worker with its beacon alive whose group is held by a short retry hold
+      When the group comes up for dispatch with less than the recheck interval left on its active key
+      Then the group comes up again when its active key lapses, not a recheck interval later
+
+    @integration
     Scenario: A retired worker's claim waits for its active key
       Given a worker that retired while it still held a claimed group
       When the group comes up for dispatch

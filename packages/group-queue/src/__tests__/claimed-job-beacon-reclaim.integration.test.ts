@@ -152,6 +152,29 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
     });
   });
 
+  describe("given a worker with its beacon alive whose group is held by a short retry hold", () => {
+    describe("when the group comes up with less than the recheck interval left on its active key", () => {
+      /** @scenario "A held group whose active key is about to lapse comes up when it lapses" */
+      it("brings the group up again when its active key lapses, not a recheck interval later", async () => {
+        const q = freshQueue();
+        const now = Date.now();
+        const holdMs = 5_000;
+        await q.stage("job-1", now - 1_000);
+        await q.alive("live-owner");
+        await q.claim({ nowMs: now, workerId: "live-owner" });
+        await redis.pexpire(q.activeKey, holdMs);
+
+        const dispatchedAt = now + HELD_DUE_MS;
+        const again = await q.claim({ nowMs: dispatchedAt });
+
+        expect(again).toBeUndefined();
+        const nextUp = await q.readyScore();
+        expect(nextUp).toBeGreaterThan(dispatchedAt);
+        expect(nextUp).toBeLessThanOrEqual(dispatchedAt + holdMs);
+      });
+    });
+  });
+
   describe("given a worker that retired while it still held a claimed group", () => {
     describe("when the group comes up for dispatch", () => {
       /** @scenario "A retired worker's claim waits for its active key" */

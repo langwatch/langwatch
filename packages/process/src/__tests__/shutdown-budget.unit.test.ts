@@ -65,13 +65,16 @@ const chartGraceMarginSeconds = numberFrom({
 });
 
 /** The app's unset preStop sleep, and the seconds its grace must leave above it and the drain. */
-const appPreStopPattern = /min (\d+) \(sub \$grace \(add \$appDrain (\d+)\)\)/;
 const appPreStopDefaultSeconds = numberFrom({
   source: appDeployment,
-  pattern: appPreStopPattern,
+  pattern: /min (\d+) \(sub \$grace \(add \$appDrain \d+\)\)/,
   label: "app preStop default",
 });
-const appPreStopMarginSeconds = Number(appPreStopPattern.exec(appDeployment)?.[2]);
+const appPreStopMarginSeconds = numberFrom({
+  source: appDeployment,
+  pattern: /\$withPreStop := add \$preStop \$appDrain (\d+)/,
+  label: "app preStop grace margin",
+});
 
 const suiteDrainSeconds = numberFrom({
   source: suite,
