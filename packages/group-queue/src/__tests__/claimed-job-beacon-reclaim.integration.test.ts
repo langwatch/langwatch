@@ -83,6 +83,18 @@ const HELD_DUE_MS = LONG_ACTIVE_TTL_SEC * 500 + 1_000;
 /** A dispatch far enough after the first to confirm a missing beacon. */
 const CONFIRMED_MS = HELD_DUE_MS + CLAIM_GONE_CONFIRM_MS + 1_000;
 
+/** Redis's clock, which the confirmation reads, a confirmation interval back. */
+async function aConfirmationAgo(): Promise<number> {
+  const [sec, micro] = await redis.time();
+  return Number(sec) * 1_000 + Math.floor(Number(micro) / 1_000) - CLAIM_GONE_CONFIRM_MS - 1_000;
+}
+
+/** Moves a recorded suspicion a confirmation interval into the past. */
+async function backdateSuspicion(suspectKey: string): Promise<void> {
+  const token = (await redis.get(suspectKey))?.split("|")[0];
+  await redis.set(suspectKey, `${token}|${await aConfirmationAgo()}`);
+}
+
 describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
   describe("given a worker that claims a job with its beacon alive and then dies", () => {
     describe("when the group comes up twice, a confirmation apart, while its active key still has most of its life", () => {
@@ -101,6 +113,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         const firstLook = await q.claim({ nowMs: now + HELD_DUE_MS, workerId: "live-worker" });
         expect(firstLook).toBeUndefined();
         expect(await redis.get(q.activeKey)).toBe("job-1");
+        await backdateSuspicion(q.suspectKey);
         // The tenant cap is one, and the dead claim holds that slot: only freeing it lets the
         // reclaimed group be claimed again in the same dispatch rather than parked.
         const second = await q.claim({ nowMs: now + CONFIRMED_MS, workerId: "live-worker" });
@@ -151,6 +164,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         await redis.set(q.beaconKey("retiring-worker"), "retired", "EX", 600);
 
         await q.claim({ nowMs: now + HELD_DUE_MS });
+        await redis.set(q.suspectKey, `${held?.claimToken}|${await aConfirmationAgo()}`);
         const again = await q.claim({ nowMs: now + CONFIRMED_MS });
 
         expect(again).toBeUndefined();
@@ -176,6 +190,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         const held = await q.claim({ nowMs: now });
 
         await q.claim({ nowMs: now + HELD_DUE_MS });
+        await redis.set(q.suspectKey, `${held?.claimToken}|${await aConfirmationAgo()}`);
         const again = await q.claim({ nowMs: now + CONFIRMED_MS });
 
         expect(again).toBeUndefined();
@@ -198,6 +213,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         await q.claim({ nowMs: now + HELD_DUE_MS });
         expect(await redis.exists(q.suspectKey)).toBe(1);
 
+        await backdateSuspicion(q.suspectKey);
         await q.alive("cut-off-worker");
         await q.claim({ nowMs: now + CONFIRMED_MS });
         expect(await redis.exists(q.suspectKey)).toBe(0);
@@ -212,6 +228,26 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
     });
   });
 
+  describe("given a held group whose owner's beacon was just found missing", () => {
+    describe("when a worker whose clock runs ten minutes ahead looks at it straight away", () => {
+      /** @scenario "A worker whose clock runs ahead does not confirm a missing beacon early" */
+      it("keeps the claim, since the confirmation reads Redis's clock", async () => {
+        const q = freshQueue();
+        const now = Date.now();
+        await q.stage("job-1", now - 1_000);
+        await q.alive("worker-that-dies");
+        const held = await q.claim({ nowMs: now, workerId: "worker-that-dies" });
+        await redis.del(q.beaconKey("worker-that-dies"));
+        await q.claim({ nowMs: now + HELD_DUE_MS });
+
+        const again = await q.claim({ nowMs: now + HELD_DUE_MS + 10 * 60_000 });
+
+        expect(again).toBeUndefined();
+        expect(await redis.hget(q.claimedKey, "token")).toBe(held?.claimToken);
+      });
+    });
+  });
+
   describe("given a missing beacon recorded against an earlier claim of the group", () => {
     describe("when a newer claim whose owner is gone first comes up for dispatch", () => {
       /** @scenario "A missing beacon seen during an earlier claim does not count toward a newer one" */
@@ -219,7 +255,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         const q = freshQueue();
         const now = Date.now();
         await q.stage("job-1", now - 1_000);
-        await redis.set(q.suspectKey, `an-earlier-claim|${now - 10 * CLAIM_GONE_CONFIRM_MS}`);
+        await redis.set(q.suspectKey, `an-earlier-claim|${await aConfirmationAgo()}`);
         await q.alive("worker-that-dies");
         const held = await q.claim({ nowMs: now, workerId: "worker-that-dies" });
         await redis.del(q.beaconKey("worker-that-dies"));
@@ -228,7 +264,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
 
         expect(again).toBeUndefined();
         expect(await redis.hget(q.claimedKey, "token")).toBe(held?.claimToken);
-        expect(await redis.get(q.suspectKey)).toBe(`${held?.claimToken}|${now + HELD_DUE_MS}`);
+        expect((await redis.get(q.suspectKey))?.split("|")[0]).toBe(held?.claimToken);
       });
     });
   });
@@ -244,6 +280,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         const held = await q.claim({ nowMs: now });
         expect(await q.readyScore()).toBe(now + halfLifeMs);
 
+        await redis.set(q.suspectKey, `${held?.claimToken}|${await aConfirmationAgo()}`);
         const refreshedAt = Date.now();
         const refreshed = await q.scripts.refreshActiveKey({
           groupId: q.group,
@@ -254,6 +291,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
 
         expect(refreshed).toBe(true);
         expect(await redis.ttl(q.activeKey)).toBeGreaterThan(LONG_ACTIVE_TTL_SEC - 5);
+        expect(await redis.exists(q.suspectKey)).toBe(0);
         expect(await q.readyScore()).toBeGreaterThanOrEqual(refreshedAt + halfLifeMs);
         expect(await q.readyScore()).toBeLessThanOrEqual(Date.now() + halfLifeMs);
       });

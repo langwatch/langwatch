@@ -685,8 +685,9 @@ end
 
 -- The held claim's owner is gone: the marker is this very claim's (its token is the claimed
 -- record's) and its owner has published no beacon at all at two looks CLAIM_GONE_CONFIRM_MS
--- apart. The first look only records the suspicion; an alive or retired owner clears it.
-local function gqClaimOwnerGone(keyPrefix, groupId, claimedKey, nowMs)
+-- apart by Redis's clock, not the workers'. The first look only records the suspicion; an alive
+-- or retired owner, or the owner's heartbeat, clears it.
+local function gqClaimOwnerGone(keyPrefix, groupId, claimedKey)
   local claimKey = keyPrefix .. "group:" .. groupId .. ":claim"
   local marker = redis.call("HMGET", claimKey, "owner", "token")
   if not marker[1] or not marker[2] or marker[2] == "" then return false end
@@ -696,12 +697,14 @@ local function gqClaimOwnerGone(keyPrefix, groupId, claimedKey, nowMs)
     redis.call("DEL", suspectKey)
     return false
   end
+  local time = redis.call("TIME")
+  local nowMs = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
   local seen = marker[2] .. "|"
   local suspect = redis.call("GET", suspectKey)
   if suspect and string.sub(suspect, 1, #seen) == seen then
     return nowMs - (tonumber(string.sub(suspect, #seen + 1)) or nowMs) >= ${CLAIM_GONE_CONFIRM_MS}
   end
-  redis.call("SET", suspectKey, seen .. nowMs, "PX", ${CLAIM_GONE_CONFIRM_MS * 10})
+  redis.call("SET", suspectKey, seen .. nowMs, "PX", ${CLAIM_GONE_CONFIRM_MS * 3})
   return false
 end
 `;
@@ -1292,7 +1295,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
       -- looked at again at the recheck or when the active key lapses (a retry's hold), if sooner.
       local heldMs = groupDue and redis.call("PTTL", keyPrefix .. "group:" .. groupId .. ":active") or -2
       if heldMs > 0 then
-        if gqClaimOwnerGone(keyPrefix, groupId, keyPrefix .. "group:" .. groupId .. ":claimed", nowMs) then
+        if gqClaimOwnerGone(keyPrefix, groupId, keyPrefix .. "group:" .. groupId .. ":claimed") then
           redis.call("DEL", keyPrefix .. "group:" .. groupId .. ":active", keyPrefix .. "group:" .. groupId .. ":claim:suspect")
           local heldTenant = parkTenantOf(groupId)
           tenantActiveRemove(keyPrefix .. "tenant_active_z:", heldTenant, groupId)
@@ -1814,6 +1817,7 @@ if gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   -- ":active" suffix) so no extra args are needed.
   local groupBase = string.sub(activeKey, 1, #activeKey - 7)
   refreshGroupKeyTtl(groupBase .. ":jobs", groupBase .. ":data", nowMs)
+  redis.call("DEL", groupBase .. ":claim:suspect")
   -- Refresh ready-zset score so it stays "active" until heartbeat stops or completion.
   -- Only update if the group is currently in ready — if RESTAGE_AND_BLOCK_LUA fired
   -- while this heartbeat was in flight, the group has been removed and we must not

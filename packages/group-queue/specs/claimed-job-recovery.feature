@@ -147,8 +147,8 @@ Feature: GroupQueue brings back a job whose worker died while running it
     The active key outlives a dead worker by up to its whole TTL. The claim and each heartbeat put
     a held group half the active TTL out, past the next heartbeat, so a live claim never comes due
     but a dead owner's does. The scan reclaims it only if the claim marker for that very claim names
-    an owner with no beacon at two looks a confirmation interval apart, so a beacon lost to a short
-    Redis outage costs nothing. An alive or retired owner keeps its claim until the active key
+    an owner with no beacon at two looks a confirmation interval apart by Redis's clock; the owner's
+    heartbeat clears the suspicion, so a beacon lost to a short Redis outage costs nothing. An alive or retired owner keeps its claim until the active key
     lapses, since a retiring worker is still draining. A live owner stalled past the beacon's
     lifetime loses its claim: the job runs again and its outcome is refused as a lost claim.
 
@@ -191,6 +191,12 @@ Feature: GroupQueue brings back a job whose worker died while running it
       And a later lapse of its beacon starts the confirmation over
 
     @integration
+    Scenario: A worker whose clock runs ahead does not confirm a missing beacon early
+      Given a held group whose owner's beacon was just found missing
+      When a worker whose clock runs ten minutes ahead looks at the group straight away
+      Then the claim keeps its active key
+
+    @integration
     Scenario: A missing beacon seen during an earlier claim does not count toward a newer one
       Given a missing beacon recorded against an earlier claim of the group
       And a newer claim whose worker's beacon is gone
@@ -202,3 +208,4 @@ Feature: GroupQueue brings back a job whose worker died while running it
       Given a worker that claims a group with a long active key
       When it claims the group, and again when its heartbeat refreshes the claim
       Then the group's ready score is half the active key's life from then
+      And the heartbeat clears any suspicion that its beacon was missing
