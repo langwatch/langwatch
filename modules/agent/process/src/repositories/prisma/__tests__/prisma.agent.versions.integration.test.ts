@@ -12,6 +12,7 @@ import {
   PrismaTenancyGuardService,
   type PrismaConnection,
 } from "@langwatch/prisma-client";
+import { fromDate } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaAgentRepository } from "../prisma.agent.repository.ts";
@@ -122,6 +123,53 @@ describe.skipIf(!databaseUrl)("Prisma agent versions", () => {
       (await repository.findVersion({ projectId, agentId, version: 1 }))?.config,
     ).toMatchObject({ prompt: "v1" });
     expect(await repository.removeLabel({ projectId, agentId, label: "production" })).toBe(true);
+  });
+
+  /** @scenario "A system config write appends a version too" */
+  it("appends a version when a workflow sync or a credential move writes the config", async () => {
+    const workflowAgentId = `${namespace}-workflow`;
+    const workflowId = `${namespace}-workflow-id`;
+    const created = await repository.create({
+      id: workflowAgentId,
+      projectId,
+      name: "Workflow bot",
+      type: "signature",
+      config: configAt("v1"),
+      workflowId,
+      author: userAuthor,
+    });
+    await repository.updateWorkflowConfig({
+      id: workflowAgentId,
+      projectId,
+      workflowId,
+      config: configAt("v2"),
+    });
+    const head = await repository.getById({ id: workflowAgentId, projectId });
+    expect(
+      await repository.updateConfigIfUnchanged({
+        id: workflowAgentId,
+        projectId,
+        config: configAt("stale"),
+        updatedAt: fromDate(created.updatedAt),
+      }),
+    ).toBe(false);
+    expect(
+      await repository.updateConfigIfUnchanged({
+        id: workflowAgentId,
+        projectId,
+        config: configAt("v3"),
+        updatedAt: fromDate(head.updatedAt),
+      }),
+    ).toBe(true);
+
+    const versions = await repository.findVersions({ projectId, agentId: workflowAgentId });
+    expect(
+      versions.map((row) => [row.version, (row.config as { prompt?: string }).prompt]),
+    ).toEqual([
+      [3, "v3"],
+      [2, "v2"],
+      [1, "v1"],
+    ]);
   });
 
   /** @scenario "Existing agents get version 1 from their current config" */

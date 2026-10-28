@@ -177,7 +177,8 @@ export class MemoryAgentRepository implements AgentRepository {
     ) {
       return Promise.resolve(false);
     }
-    this.#save({ ...agent, config: input.config });
+    const saved = this.#save({ ...agent, config: input.config });
+    this.#appendVersion({ agent: saved, author: undefined, commitMessage: undefined });
 
     return Promise.resolve(true);
   }
@@ -209,6 +210,7 @@ export class MemoryAgentRepository implements AgentRepository {
     Object.assign(updated.config, structuredClone(input.config));
     updated.updatedAt = toDate(nowInstant());
     this.#agents.set(agent.id, updated);
+    this.#appendVersion({ agent: updated, author: undefined, commitMessage: undefined });
   }
 
   async findCopies(sourceAgentId: string): Promise<AgentCopyRecord[]> {
