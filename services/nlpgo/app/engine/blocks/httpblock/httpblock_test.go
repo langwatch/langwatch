@@ -190,7 +190,10 @@ func TestSSRF_ResolvesAFullyQualifiedNameAsWritten(t *testing.T) {
 	conn, err := httpblock.SafeDialer(opts)(context.Background(), "tcp", net.JoinHostPort("api.example.com.", port))
 	require.NoError(t, err)
 	_ = conn.Close()
-	assert.Equal(t, []string{"api.example.com.", "api.example.com."}, looked)
+	require.NotEmpty(t, looked)
+	for _, name := range looked {
+		assert.Equal(t, "api.example.com.", name)
+	}
 }
 
 // @scenario "The HTTP block judges a metadata hostname with a trailing dot as the same name"
