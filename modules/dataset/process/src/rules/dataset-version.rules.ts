@@ -111,15 +111,13 @@ function sortAfterRows({
   return { added, changed, unchanged };
 }
 
-/** What changed from `before` (a version) to `after` (another version or the current content). */
+/** What changed from `before` (a version) to `after` (the current content). */
 export function compareDatasetContents({
   version,
-  against,
   before,
   after,
 }: {
   version: number;
-  against: number | null;
   before: { columns: DatasetColumns; rows: readonly DatasetVersionRow[] };
   after: { columns: DatasetColumns; rows: readonly DatasetVersionRow[] };
 }): DatasetVersionComparison {
@@ -135,7 +133,6 @@ export function compareDatasetContents({
 
   return {
     version,
-    against,
     columns: {
       added: [...afterNames].filter((name) => !beforeNames.has(name)),
       removed: [...beforeNames].filter((name) => !afterNames.has(name)),

@@ -168,8 +168,6 @@ export type DatasetVersionPage = z.infer<typeof datasetVersionPageSchema>;
 
 const compareDatasetVersionInputSchemaDefinition = z.object({
   ...datasetVersionLookupInputSchema.shape,
-  /** The version to compare with; absent compares with the current content. */
-  against: z.number().int().positive().optional(),
 });
 export interface CompareDatasetVersionInputSchema extends Named<
   typeof compareDatasetVersionInputSchemaDefinition
@@ -180,8 +178,6 @@ export type CompareDatasetVersionInput = z.infer<typeof compareDatasetVersionInp
 
 const datasetVersionComparisonSchemaDefinition = z.object({
   version: z.number().int().positive(),
-  /** The version compared with, or null for the current content. */
-  against: z.number().int().positive().nullable(),
   columns: z.object({ added: z.array(z.string()), removed: z.array(z.string()) }),
   counts: z.object({
     added: z.number().int().nonnegative(),

@@ -648,7 +648,7 @@ export function createDatasetRest(): Readonly<{
       .withAudit("dataset.restoreVersion")
       .withParams(datasetRestVersionParamsSchema)
       .withInput(datasetRestNoBodySchema)
-      .withPermission("datasets:update")
+      .withPermission("datasets:manage")
       .withOutput(datasetVersionRestoredSchema)
       .withDocs({
         summary: "Restore a dataset version",

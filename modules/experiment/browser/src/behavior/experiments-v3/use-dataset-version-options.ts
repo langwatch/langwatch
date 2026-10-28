@@ -14,7 +14,7 @@ export function useDatasetVersionOptions({
 }: {
   projectId: string | undefined;
   datasetId: string | undefined;
-}): { versions: DatasetVersionOption[]; isLoading: boolean } {
+}): { versions: DatasetVersionOption[] } {
   const query = datasetClient.dataset.versions.useQuery(
     { projectId: projectId ?? "", datasetId: datasetId ?? "" },
     { enabled: Boolean(projectId) && Boolean(datasetId) },
@@ -28,5 +28,5 @@ export function useDatasetVersionOptions({
     [query.data],
   );
 
-  return { versions, isLoading: query.isLoading };
+  return { versions };
 }

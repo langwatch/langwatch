@@ -6,7 +6,9 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DatasetApi,
   datasetConfig,
+  type EditedBy,
   DatasetNotFoundError,
+  DatasetNotReadyError,
   type DatasetServerConfig,
   type DatasetNormalizePayload,
   type DatasetNormalizationSettledEventData,
@@ -125,9 +127,6 @@ const logger = createLogger("langwatch:dataset:app");
  */
 const EDIT_NOTE_WINDOW_MS = 30_000;
 const EDIT_NOTE_MEMORY = 10_000;
-
-/** Who made a change, when the transport could tell; an unattributed edit is the system's. */
-type EditedBy = { editedBy?: DatasetVersionAuthor };
 
 /** The command senders the versions pipeline hands the app once it is registered. */
 type DatasetVersionCommands = {
@@ -288,6 +287,10 @@ export class DatasetModule implements DatasetApi {
           limitMb: null,
         });
         return read.records.map((record) => ({ id: record.id, entry: record.entry }));
+      },
+      wholeReadBounds: async (projectId) => {
+        const limits = await this.#requestBounds.limits(projectId);
+        return { maxRows: limits.rowsMax, maxBytes: limits.wholeReadBytes };
       },
       generateId: () => generate(DATASET_VERSION_KSUID_RESOURCE).toString(),
     });
@@ -743,7 +746,7 @@ export class DatasetModule implements DatasetApi {
     by: DatasetVersionAuthor;
   }): Promise<DatasetVersion> {
     if (input.version !== undefined) {
-      return this.#versions.get({ ...input, version: input.version });
+      return this.#versions.pin({ ...input, version: input.version });
     }
     const saved = await this.#versions.snapshot({
       projectId: input.projectId,
@@ -758,7 +761,7 @@ export class DatasetModule implements DatasetApi {
   /** Every row of one version, for a run that reads them all. */
   async readVersion(input: DatasetVersionLookupInput): Promise<DatasetVersionContent> {
     const version = await this.#versions.get(input);
-    return { version, rows: await this.#versions.readRows(version) };
+    return { version, rows: await this.#versions.readWhole(version) };
   }
 
   /** Records the version each dataset of a run was read at; such a version is never thinned. */
@@ -794,7 +797,8 @@ export class DatasetModule implements DatasetApi {
         by: input.editedBy,
       });
     } catch (error) {
-      if (error instanceof DatasetNotFoundError) return;
+      // A dataset still importing records a new edit once it is ready, which saves then.
+      if (error instanceof DatasetNotFoundError || error instanceof DatasetNotReadyError) return;
       throw error;
     }
   }

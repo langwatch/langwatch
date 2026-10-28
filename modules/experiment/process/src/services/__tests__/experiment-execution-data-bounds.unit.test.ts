@@ -32,7 +32,7 @@ type Bounds = Partial<Record<RequestBoundKey, number>>;
 const rows = (count: number) => Array.from({ length: count }, (_, index) => ({ row: index }));
 
 /** A saved dataset served the way a run reads one: its head, then the version saved for the run. */
-function savedDataset(entries: Record<string, unknown>[]) {
+function savedDataset(entries: Record<string, unknown>[], { sizeBytes = 0 } = {}) {
   const at = new Date(0);
   const dataset: Dataset = {
     id: DATASET_ID,
@@ -76,7 +76,7 @@ function savedDataset(entries: Record<string, unknown>[]) {
     contentHash: "hash",
     columnTypes: dataset.columnTypes,
     rowCount: entries.length,
-    sizeBytes: 0,
+    sizeBytes,
     chunkCount: 1,
     restoredFromVersion: null,
     authorId: null,
@@ -271,6 +271,18 @@ describe("loadExecutionData bounds", () => {
           httpStatus: 413,
           meta: { maxBytes: 2 * MB },
         });
+      });
+    });
+
+    describe("when the version it reads is recorded as larger than the whole-dataset limit", () => {
+      /** @scenario "A saved dataset version larger than a run holds is refused before its rows are read" */
+      it("refuses on the version's size without reading its rows", async () => {
+        const saved = savedDataset([{ row: 1 }], { sizeBytes: 3 * MB });
+
+        await expect(
+          loadSaved({ datasets: saved.api, bounds: { datasetWholeReadBytes: 2 * MB } }),
+        ).rejects.toMatchObject({ code: "experiment_dataset_too_large_to_run" });
+        expect(saved.versionsRead).toEqual([]);
       });
     });
 

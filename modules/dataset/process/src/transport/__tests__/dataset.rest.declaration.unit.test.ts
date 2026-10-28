@@ -155,7 +155,7 @@ describe("the dataset REST declaration", () => {
           method: "post",
           path: "/:slugOrId/versions/:version/restore",
           operation: "postApiDatasetBySlugOrIdVersionsByVersionRestore",
-          permission: "datasets:update",
+          permission: "datasets:manage",
         },
       ]);
     });

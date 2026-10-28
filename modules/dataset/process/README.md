@@ -750,7 +750,7 @@ type Response = z.infer<typeof datasetVersionPageSchema>; // ../contract/src/dat
 
 Restore a dataset version
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:642`.
+Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:642`.
 
 Answers at `/api/dataset/:slugOrId/versions/:version/restore`, `/api/v1/dataset/:slugOrId/versions/:version/restore`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/versions/:version/restore`, `/api/v1/dataset/2026-08-07/:slugOrId/versions/:version/restore`, `/api/dataset/latest/:slugOrId/versions/:version/restore`, `/api/v1/dataset/latest/:slugOrId/versions/:version/restore`.
 
@@ -758,7 +758,7 @@ Answers at `/api/dataset/:slugOrId/versions/:version/restore`, `/api/v1/dataset/
 type Params = z.infer<typeof datasetRestVersionParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:317
 // Body: datasetRestNoBodySchema, ../contract/src/dataset-rest.schemas.ts:331
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:220
+type Response = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:216
 ```
 
 ## tRPC transport
@@ -882,7 +882,7 @@ Contract `../contract/src/dataset.trpc.ts:61`, router `src/transport/dataset.trp
 | `dataset.saveVersion`            | mutation | Permission `datasets:update` | `saveDatasetVersionInputSchema`            | `datasetVersionSchema`           |
 | `dataset.versionPage`            | query    | Permission `datasets:view`   | `datasetVersionPageInputSchema`            | `datasetVersionPageSchema`       |
 | `dataset.compareVersion`         | query    | Permission `datasets:view`   | `compareDatasetVersionInputSchema`         | `datasetVersionComparisonSchema` |
-| `dataset.restoreVersion`         | mutation | Permission `datasets:update` | `datasetVersionLookupInputSchema`          | `datasetVersionRestoredSchema`   |
+| `dataset.restoreVersion`         | mutation | Permission `datasets:manage` | `datasetVersionLookupInputSchema`          | `datasetVersionRestoredSchema`   |
 | `dataset.pinVersion`             | mutation | Permission `datasets:update` | `datasetVersionLookupInputSchema`          | `datasetVersionSchema`           |
 | `dataset.runVersions`            | query    | Permission `datasets:view`   | `findRunDatasetVersionsInputSchema`        | inline                           |
 
@@ -1054,14 +1054,13 @@ interface Input {
 type Output = z.infer<typeof datasetVersionPageSchema>; // ../contract/src/dataset-version.ts:166
 
 // dataset.compareVersion
-// Input: compareDatasetVersionInputSchema, ../contract/src/dataset-version.ts:178
+// Input: compareDatasetVersionInputSchema, ../contract/src/dataset-version.ts:176
 interface Input {
   projectId: string;
   datasetId: string;
   version: number;
-  against?: number;
 }
-type Output = z.infer<typeof datasetVersionComparisonSchema>; // ../contract/src/dataset-version.ts:208
+type Output = z.infer<typeof datasetVersionComparisonSchema>; // ../contract/src/dataset-version.ts:204
 
 // dataset.restoreVersion
 // Input: datasetVersionLookupInputSchema, ../contract/src/dataset-version.ts:115
@@ -1070,14 +1069,14 @@ interface Input {
   datasetId: string;
   version: number;
 }
-type Output = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:220
+type Output = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:216
 
 // dataset.pinVersion
 type Input = z.infer<typeof datasetVersionLookupInputSchema>; // ../contract/src/dataset-version.ts:115
 type Output = z.infer<typeof datasetVersionSchema>; // ../contract/src/dataset-version.ts:70
 
 // dataset.runVersions
-// Input: findRunDatasetVersionsInputSchema, ../contract/src/dataset-version.ts:245
+// Input: findRunDatasetVersionsInputSchema, ../contract/src/dataset-version.ts:241
 interface Input {
   projectId: string;
   runIds: string[];

@@ -292,6 +292,9 @@ export class ExperimentExecutionDataService {
     if (rowCount > maxRows) {
       throw new ExperimentDatasetTooManyRowsError({ rowCount, maxRows });
     }
+    if (resolved.sizeBytes > maxBytes) {
+      throw new ExperimentDatasetTooLargeToRunError({ maxBytes });
+    }
 
     const content = await services.datasets.readVersion({
       projectId,

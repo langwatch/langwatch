@@ -39,6 +39,8 @@ import { DatasetVersionList } from "../blocks/dataset-version-list.tsx";
 import { DatasetVersionRowsTable } from "../blocks/dataset-version-rows-table.tsx";
 
 const UPDATE_PERMISSION = "datasets:update";
+/** A restore can change the column set, which is administering the dataset. */
+const MANAGE_PERMISSION = "datasets:manage";
 const VERSION_NAME_MAX = 120;
 const ROWS_PAGE_SIZE = 25;
 
@@ -54,6 +56,7 @@ export function DatasetHistoryDrawer({ datasetId, onClose }: UiDatasetHistoryDra
   const projectId = host.project()?.id;
   const scope = { projectId, datasetId };
   const canUpdate = host.hasPermission(UPDATE_PERMISSION);
+  const canManage = host.hasPermission(MANAGE_PERMISSION);
 
   const [view, setView] = useState<HistoryView>({ kind: "list" });
   const [pendingRestore, setPendingRestore] = useState<DatasetVersionListItem | null>(null);
@@ -85,7 +88,7 @@ export function DatasetHistoryDrawer({ datasetId, onClose }: UiDatasetHistoryDra
       version: version.version,
       latestVersion,
       restoreSupported,
-      canUpdate,
+      canManage,
     });
   const authorLabel = (version: DatasetVersionListItem) =>
     versionAuthorLabel({

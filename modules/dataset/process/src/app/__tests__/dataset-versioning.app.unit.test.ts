@@ -15,7 +15,11 @@ import { MemoryDatasetVersionRepository } from "../../repositories/memory/memory
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
 import { StreamingChunkWriterService } from "../../services/dataset-chunk-writer.service.ts";
 import type { DatasetModule } from "../dataset.app.ts";
-import { createDatasetTestApp, createDatasetTestProjects } from "./dataset.fixture.ts";
+import {
+  createDatasetTestApp,
+  createDatasetTestEntitlementWith,
+  createDatasetTestProjects,
+} from "./dataset.fixture.ts";
 
 const PROJECT = "project-1";
 const ALICE: DatasetVersionAuthor = { kind: "user", id: "user-alice" };
@@ -25,14 +29,17 @@ let clock = Date.UTC(2026, 9, 1);
 let repositories: DatasetRepositories;
 let app: DatasetModule;
 
-function boot(projects: ProjectApi = createDatasetTestProjects()) {
+function boot(
+  projects: ProjectApi = createDatasetTestProjects(),
+  entitlement = createDatasetTestEntitlementWith({}),
+) {
   repositories = {
     ...MemoryDatasetRepositories.create(),
     versions: MemoryDatasetVersionRepository.create({
       now: () => Temporal.Instant.fromEpochMilliseconds(clock),
     }),
   };
-  app = createDatasetTestApp({ repositories, dependencies: { projects } });
+  app = createDatasetTestApp({ repositories, dependencies: { projects, entitlement } });
 }
 
 async function createDataset(
@@ -162,6 +169,44 @@ describe("given a dataset whose import is still processing", () => {
 
     await expect(save(datasetId)).rejects.toMatchObject({ code: "dataset_not_ready" });
   });
+
+  /** @scenario "A dataset that is still importing is not snapshotted" */
+  it("lets the autosave pass without a version, so its intent is not retried", async () => {
+    const datasetId = await createDataset();
+    await repositories.content.update({
+      id: datasetId,
+      projectId: PROJECT,
+      data: { status: "processing" },
+    });
+
+    await expect(
+      app.autosaveVersion({ projectId: PROJECT, datasetId, editedBy: ALICE }),
+    ).resolves.toBeUndefined();
+    expect(await repositories.versions.findAll({ projectId: PROJECT, datasetId })).toEqual([]);
+  });
+});
+
+describe("given a version larger than one whole read", () => {
+  /** @scenario "A version larger than one whole read is refused before it is read" */
+  it("refuses to read, compare or restore it with dataset_version_too_large", async () => {
+    boot(createDatasetTestProjects(), createDatasetTestEntitlementWith({ rowsMax: 1 }));
+    const datasetId = await createDataset();
+    await save(datasetId);
+    await edit(datasetId, "a", "changed");
+    const readChunk = vi.spyOn(repositories.versionContent, "readChunk");
+    const lookup = { projectId: PROJECT, datasetId, version: 1 };
+
+    await expect(app.readVersion(lookup)).rejects.toMatchObject({
+      code: "dataset_version_too_large",
+    });
+    await expect(app.compareVersion(lookup)).rejects.toMatchObject({
+      code: "dataset_version_too_large",
+    });
+    await expect(app.restoreVersion({ ...lookup, editedBy: ALICE })).rejects.toMatchObject({
+      code: "dataset_version_too_large",
+    });
+    expect(readChunk).not.toHaveBeenCalled();
+  });
 });
 
 describe("given no dataset by that name", () => {
@@ -258,7 +303,6 @@ describe("when a version is compared with the current content", () => {
     expect(comparison.changed).toEqual([
       { id: "a", before: { input: "first" }, after: { input: "changed" } },
     ]);
-    expect(comparison.against).toBeNull();
   });
 
   /** @scenario "Comparing reports column changes" */
@@ -454,6 +498,25 @@ describe("given an experiment run over a saved dataset", () => {
 
     expect(version.version).toBe(1);
     expect(read.rows.find((row) => row.id === "a")?.entry).toEqual({ input: "first" });
+  });
+
+  /** @scenario "A run pinned to a version keeps it out of retention" */
+  it("marks the version a run pins as pinned", async () => {
+    const datasetId = await createDataset();
+    await save(datasetId);
+    await edit(datasetId, "a", "changed");
+    await save(datasetId);
+
+    const version = await app.resolveVersionForRun({
+      projectId: PROJECT,
+      datasetId,
+      version: 1,
+      by: ALICE,
+    });
+
+    expect(version).toMatchObject({ version: 1, pinned: true });
+    const listed = await versionsOf(datasetId);
+    expect(listed.find((entry) => entry.version === 1)?.pinned).toBe(true);
   });
 
   /** @scenario "Pinning a version the dataset does not have refuses the run" */
@@ -704,6 +767,30 @@ describe("given datasets created before versioning", () => {
     expect(report).toMatchObject({ wouldCreate: 1, dryRun: true });
     expect(saved).toEqual([]);
     expect(await versionsOf(datasetId)).toEqual([]);
+  });
+
+  /** @scenario "The first-version step resumes from its checkpoint" */
+  it("saves no checkpoint past a project that failed, so the retry reaches it", async () => {
+    await app.upsertDataset({
+      projectId: "project-0",
+      name: "fails-once",
+      columnTypes: [{ name: "input", type: "string" }],
+      datasetRecords: [{ id: "a", input: "x" }],
+    });
+    await createDataset();
+    vi.spyOn(repositories.versions, "create").mockRejectedValueOnce(new Error("disk full"));
+    const { saved, checkpoint } = checkpointOf(null);
+
+    await expect(
+      app.firstVersionsRun()({
+        checkpoint,
+        dryRun: false,
+        signal: new AbortController().signal,
+        log: { info: () => undefined, warn: () => undefined },
+      }),
+    ).rejects.toThrow("datasets got no first version");
+
+    expect(saved).toEqual([]);
   });
 
   /** @scenario "The first-version step resumes from its checkpoint" */

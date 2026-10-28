@@ -133,7 +133,7 @@ describe("rowCountLabel", () => {
 });
 
 describe("restoreBlockedReason", () => {
-  const base = { version: 1, latestVersion: 2, restoreSupported: true, canUpdate: true };
+  const base = { version: 1, latestVersion: 2, restoreSupported: true, canManage: true };
 
   it("allows restoring an older version", () => {
     expect(restoreBlockedReason(base)).toBeNull();
@@ -142,7 +142,7 @@ describe("restoreBlockedReason", () => {
   it("explains why the latest version, a legacy dataset or a reader cannot restore", () => {
     expect(restoreBlockedReason({ ...base, version: 2 })).toBe("This is the latest version.");
     expect(restoreBlockedReason({ ...base, restoreSupported: false })).toMatch(/single-file/);
-    expect(restoreBlockedReason({ ...base, canUpdate: false })).toMatch(/permission/);
+    expect(restoreBlockedReason({ ...base, canManage: false })).toMatch(/permission/);
   });
 });
 

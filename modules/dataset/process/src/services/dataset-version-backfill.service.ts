@@ -53,11 +53,10 @@ export class DatasetVersionBackfillService {
       const projects = await this.deps.projects.listAllIds({ after, limit: PROJECT_ID_PAGE_LIMIT });
       for (const projectId of projects.ids) {
         if (signal.aborted) return { ...summary, dryRun };
-        const failedBefore = summary.failed;
         await this.backfillProject({ projectId, dryRun, summary, signal });
         if (signal.aborted) return { ...summary, dryRun };
-        // A failed dataset keeps the cursor before its project, so the retry reaches it.
-        if (!dryRun && summary.failed === failedBefore) {
+        // After any failure the cursor stays put, so the retry reaches every failed project.
+        if (!dryRun && summary.failed === 0) {
           await checkpoint.save({ report: { ...summary, afterProjectId: projectId } });
         }
       }

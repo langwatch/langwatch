@@ -90,6 +90,13 @@ Feature: An evaluation run accepts inline data, a dataset id, or parameters
     And the refusal names the limit and storing images as attachments
 
   @unit
+  Scenario: A saved dataset version larger than a run holds is refused before its rows are read
+    Given the dataset version a run reads is recorded as larger than the whole-dataset limit
+    When I run the evaluation against that saved dataset
+    Then the run is refused as "experiment_dataset_too_large_to_run"
+    And none of the version's rows are read
+
+  @unit
   Scenario: An organization with a raised file limit runs a dataset the default limit refuses
     Given an organization whose whole-dataset limit was raised
     And a saved dataset larger than the default limit and smaller than the raised one

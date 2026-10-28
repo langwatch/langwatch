@@ -2,7 +2,11 @@
  * Reads the rows the workbench board shows for a saved dataset, its current content, so a run
  * over another version writes its cells onto the rows with the same ids.
  */
-import { DATASET_PAGE_LIMIT_MAX, type DatasetApi } from "@langwatch/dataset-contract";
+import {
+  DATASET_PAGE_LIMIT_MAX,
+  type DatasetApi,
+  DatasetPageTooLargeError,
+} from "@langwatch/dataset-contract";
 
 import { boardRowIndicesOf } from "../rules/experiment-board-rows.rules.ts";
 
@@ -28,16 +32,25 @@ export class ExperimentBoardRowsService {
     runRowIds: readonly string[];
   }): Promise<(number | null)[]> {
     const boardRowIds: string[] = [];
+    let limit = DATASET_PAGE_LIMIT_MAX;
+    let page = 1;
     let totalPages = 1;
-    for (let page = 1; page <= totalPages; page++) {
-      const read = await this.datasets.listRecords({
-        projectId,
-        slugOrId: datasetId,
-        page,
-        limit: DATASET_PAGE_LIMIT_MAX,
-      });
+    while (page <= totalPages) {
+      let read;
+      try {
+        read = await this.datasets.listRecords({ projectId, slugOrId: datasetId, page, limit });
+      } catch (error) {
+        // A page too large for one response names a smaller limit and the page that continues.
+        if (!(error instanceof DatasetPageTooLargeError)) throw error;
+        const suggestedLimit = Number(error.meta.suggestedLimit);
+        if (!(suggestedLimit >= 1 && suggestedLimit < limit)) throw error;
+        page = ((page - 1) * limit) / suggestedLimit + 1;
+        limit = suggestedLimit;
+        continue;
+      }
       boardRowIds.push(...read.data.map((record) => record.id));
       totalPages = read.data.length === 0 ? 0 : read.pagination.totalPages;
+      page += 1;
     }
     return boardRowIndicesOf({ runRowIds, boardRowIds });
   }

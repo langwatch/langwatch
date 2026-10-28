@@ -13,7 +13,7 @@ import {
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentWorkbenchReferencesService } from "../experiment-workbench-references.service.ts";
 
@@ -284,6 +284,49 @@ describe("ExperimentWorkbenchReferencesService.assertAllExist", () => {
       const error = await assertAllExist(service, twoPrompts).catch((caught: unknown) => caught);
 
       expect(error).toMatchObject({ meta: { refId: "prompt_2" } });
+    });
+  });
+});
+
+describe("pinDatasetVersions", () => {
+  /** @scenario "Saving an experiment pinned to a dataset version keeps that version" */
+  it("pins each saved dataset's chosen version and leaves the rest alone", async () => {
+    const pinVersion = vi.fn(async () => ({}) as never);
+    const dataset = createApiFixture<DatasetApi>({ pinVersion });
+    const service = ExperimentWorkbenchReferencesService.create({
+      references: {
+        prompts: createApiFixture<PromptApi>(),
+        agents: createApiFixture<AgentApi>(),
+        evaluators: createApiFixture<EvaluatorApi>(),
+        workflows: createApiFixture<WorkflowApi>(),
+        dataset,
+      },
+    });
+    const column = { id: "input", name: "input", type: "string" };
+
+    await service.pinDatasetVersions({
+      projectId: "project_1",
+      state: state({
+        datasets: [
+          {
+            id: "pinned",
+            name: "Pinned",
+            type: "saved",
+            datasetId: "ds_1",
+            datasetVersion: 3,
+            columns: [column],
+          },
+          { id: "latest", name: "Latest", type: "saved", datasetId: "ds_2", columns: [column] },
+          { id: "inline", name: "Inline", type: "inline", columns: [column] },
+        ],
+      } as Partial<PersistedEvaluationsV3State>),
+    });
+
+    expect(pinVersion).toHaveBeenCalledTimes(1);
+    expect(pinVersion).toHaveBeenCalledWith({
+      projectId: "project_1",
+      datasetId: "ds_1",
+      version: 3,
     });
   });
 });
