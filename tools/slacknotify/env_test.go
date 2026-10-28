@@ -16,7 +16,7 @@ func TestWorkflowFileReadsTheFileFromTheRef(t *testing.T) {
 	assert.Empty(t, slacknotify.WorkflowFile(""))
 }
 
-func TestOrGitFallsBackToTheCheckedOutCommit(t *testing.T) {
+func TestACheckoutFallsBackToItsCommit(t *testing.T) {
 	dir := t.TempDir()
 	for _, args := range [][]string{
 		{"init", "-q"},
@@ -25,8 +25,8 @@ func TestOrGitFallsBackToTheCheckedOutCommit(t *testing.T) {
 		require.NoError(t, exec.CommandContext(t.Context(), "git", append([]string{"-C", dir}, args...)...).Run()) //nolint:gosec // G204: fixed git arguments in a test
 	}
 
-	assert.Equal(t, "from the event", slacknotify.OrGit(t.Context(), dir, "from the event", "%s"))
-	assert.Equal(t, "fix: the subject", slacknotify.OrGit(t.Context(), dir, "", "%s"))
-	assert.Equal(t, "Someone", slacknotify.OrGit(t.Context(), dir, "", "%an"))
-	assert.Equal(t, "unknown", slacknotify.OrGit(t.Context(), t.TempDir(), "", "%s"))
+	assert.Equal(t, "from the event", slacknotify.Checkout{Dir: dir}.Or(t.Context(), "from the event", "%s"))
+	assert.Equal(t, "fix: the subject", slacknotify.Checkout{Dir: dir}.Or(t.Context(), "", "%s"))
+	assert.Equal(t, "Someone", slacknotify.Checkout{Dir: dir}.Or(t.Context(), "", "%an"))
+	assert.Equal(t, "unknown", slacknotify.Checkout{Dir: t.TempDir()}.Or(t.Context(), "", "%s"))
 }

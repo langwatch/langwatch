@@ -18,13 +18,16 @@ func WorkflowFile(ref string) string {
 	return path.Base(ref)
 }
 
-// OrGit is value, or else the field of dir's checked-out commit in git log's
+// Checkout is a git working tree, the fallback for commit details.
+type Checkout struct{ Dir string }
+
+// Or is value, or else the field of the checked-out commit in git log's
 // format, so a run without a push event still names its commit.
-func OrGit(ctx context.Context, dir, value, format string) string {
+func (c Checkout) Or(ctx context.Context, value, format string) string {
 	if value != "" {
 		return value
 	}
-	out, err := exec.CommandContext(ctx, "git", "-C", dir, "log", "-1", "--format="+format).Output() //nolint:gosec // G204: the executable is git; dir and format come from the command, not from the event
+	out, err := exec.CommandContext(ctx, "git", "-C", c.Dir, "log", "-1", "--format="+format).Output() //nolint:gosec // G204: the executable is git; dir and format come from the command, not from the event
 	if err != nil {
 		return "unknown"
 	}
