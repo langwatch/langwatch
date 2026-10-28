@@ -226,7 +226,7 @@ describe("editor drafts and starting prompts", () => {
 
 describe("a widget draft on a board that leaves out Langy's conversations", () => {
   /** @scenario "AC200g Langy setting: Langy's board context names the origins the board leaves out" */
-  it("says the board's widgets do not count traces with origin langy", () => {
+  it("names the origins the board leaves out and the rollups that still count them", () => {
     const request = widgetPromptDraft({
       widget: widget({ prompt: PROMPT }),
       board: BOARD,
@@ -234,7 +234,7 @@ describe("a widget draft on a board that leaves out Langy's conversations", () =
     });
 
     expect(request.draft).toContain(
-      "Dashboard leaves out traces with origin langy: its widgets do not count them.",
+      "Dashboard leaves out traces with origin langy: widgets reading per-minute rollups still count them.",
     );
     expect(request.context[0]?.ref).toContain("excluded origins: langy");
   });

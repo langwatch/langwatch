@@ -193,9 +193,8 @@ export function DashboardWidgetFrameOverWindow({
     name: widgetName ?? "this widget",
     onRetry: retry,
     onAskLangyToSetUp,
-    ...(excludeOrigins?.includes(LANGY_TRACE_ORIGIN)
-      ? { langyLeftOut: onIncludeLangy ? { onInclude: onIncludeLangy } : {} }
-      : {}),
+    langyLeftOut: excludeOrigins?.includes(LANGY_TRACE_ORIGIN) ?? false,
+    ...(onIncludeLangy ? { onIncludeLangy } : {}),
   });
 
   // The frame stays mounted under a face, so a new period can bring the chart back.
@@ -230,13 +229,16 @@ function faceInPlaceOfChart({
   onRetry,
   onAskLangyToSetUp,
   langyLeftOut,
+  onIncludeLangy,
 }: {
   face: WidgetFace;
   name: string;
   onRetry: () => void;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   /** Set when the widget's queries leave Langy's traces out. */
-  langyLeftOut?: { onInclude?: () => void };
+  langyLeftOut: boolean;
+  /** Offered on the no-traffic face where the reader may edit the board. */
+  onIncludeLangy?: () => void;
 }) {
   switch (face.kind) {
     case "no_access":
@@ -244,7 +246,13 @@ function faceInPlaceOfChart({
     case "failed":
       return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
     case "no_traffic":
-      return <WidgetNoTrafficFace unit={face.unit} langyLeftOut={langyLeftOut} />;
+      return (
+        <WidgetNoTrafficFace
+          unit={face.unit}
+          langyLeftOut={langyLeftOut}
+          {...(onIncludeLangy ? { onIncludeLangy } : {})}
+        />
+      );
     case "missing":
       return (
         <WidgetSetupFace

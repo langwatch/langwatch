@@ -14,10 +14,13 @@ import { Lock, Plug, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
 export function WidgetNoTrafficFace({
   unit,
   langyLeftOut,
+  onIncludeLangy,
 }: {
   unit: string;
-  /** Set on a board that leaves Langy's traces out; `onInclude` where the reader may edit it. */
-  langyLeftOut?: { onInclude?: () => void };
+  /** True on a board that leaves Langy's traces out. */
+  langyLeftOut: boolean;
+  /** Where the reader may edit the board; shows the Include button. */
+  onIncludeLangy?: () => void;
 }) {
   return (
     <VStack height="full" justify="center" gap={1} paddingX={4}>
@@ -29,8 +32,8 @@ export function WidgetNoTrafficFace({
           Langy traces are left out of this dashboard.
         </Text>
       )}
-      {langyLeftOut?.onInclude && (
-        <Button size="xs" variant="outline" marginTop={1} onClick={langyLeftOut.onInclude}>
+      {langyLeftOut && onIncludeLangy && (
+        <Button size="xs" variant="outline" marginTop={1} onClick={onIncludeLangy}>
           <Sparkles size={13} aria-hidden />
           Include Langy traces
         </Button>
