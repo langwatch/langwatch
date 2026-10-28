@@ -58,6 +58,8 @@ var (
 		"tools/thuishaven",
 		"tools/herrgen",
 		"tools/ciguard",
+		"tools/deployimpact",
+		"tools/operatornotes",
 		"tools/cachesweep",
 		"tools/migrationorder",
 		"tools/linkcheck",

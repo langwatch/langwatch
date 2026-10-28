@@ -12,16 +12,6 @@ Closes #
 
 <!-- Only if the "what" isn't obvious. Explain the mechanism, trade-offs, or why you chose this approach over alternatives. Skip this section for straightforward changes. -->
 
-## Architecture
-
-- [ ] I read the sections of `dev/docs/ARCHITECTURE.md` this change touches, and it follows them.
-
-Sections read: <!-- e.g. §3.4, §10 -->
-
-### Needs a human look
-
-<!-- Anything unusual, outside the usual patterns, a rule bent, a new shape, or a judgement call a reviewer should check. Also: known limitations, follow-on work, edge cases you deliberately chose not to handle. Write "None" if nothing. -->
-
 ## Acceptance criteria
 
 Copy from the issue. Tick each. Link its scenario.

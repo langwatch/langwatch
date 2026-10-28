@@ -260,6 +260,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  "tools/deployimpact",
+  "tools/operatornotes",
   "tools/cachesweep",
   "tools/migrationorder",
   // The README link checker, for the same reason: specs/ci/readme-link-check.feature
