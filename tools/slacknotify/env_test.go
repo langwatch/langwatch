@@ -22,11 +22,11 @@ func TestOrGitFallsBackToTheCheckedOutCommit(t *testing.T) {
 		{"init", "-q"},
 		{"-c", "user.name=Someone", "-c", "user.email=s@example.com", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "fix: the subject\n\nbody"},
 	} {
-		require.NoError(t, exec.Command("git", append([]string{"-C", dir}, args...)...).Run())
+		require.NoError(t, exec.CommandContext(t.Context(), "git", append([]string{"-C", dir}, args...)...).Run()) //nolint:gosec // G204: fixed git arguments in a test
 	}
 
-	assert.Equal(t, "from the event", slacknotify.OrGit(dir, "from the event", "%s"))
-	assert.Equal(t, "fix: the subject", slacknotify.OrGit(dir, "", "%s"))
-	assert.Equal(t, "Someone", slacknotify.OrGit(dir, "", "%an"))
-	assert.Equal(t, "unknown", slacknotify.OrGit(t.TempDir(), "", "%s"))
+	assert.Equal(t, "from the event", slacknotify.OrGit(t.Context(), dir, "from the event", "%s"))
+	assert.Equal(t, "fix: the subject", slacknotify.OrGit(t.Context(), dir, "", "%s"))
+	assert.Equal(t, "Someone", slacknotify.OrGit(t.Context(), dir, "", "%an"))
+	assert.Equal(t, "unknown", slacknotify.OrGit(t.Context(), t.TempDir(), "", "%s"))
 }

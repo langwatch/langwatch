@@ -46,11 +46,11 @@ func main() {
 		Webhook: os.Getenv("SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL"),
 		HTTP:    &http.Client{Timeout: 20 * time.Second},
 	}
-	subject, _, _ := strings.Cut(slacknotify.OrGit(".", os.Getenv("COMMIT_SUBJECT"), "%s"), "\n")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	subject, _, _ := strings.Cut(slacknotify.OrGit(ctx, ".", os.Getenv("COMMIT_SUBJECT"), "%s"), "\n")
 	result, err := n.Notify(ctx, slacknotify.Run{
 		Repository: os.Getenv("GITHUB_REPOSITORY"), Workflow: *workflow, RunID: runID, Job: *job,
-		SHA: os.Getenv("GITHUB_SHA"), Subject: subject, Author: slacknotify.OrGit(".", os.Getenv("COMMIT_AUTHOR"), "%an"),
+		SHA: os.Getenv("GITHUB_SHA"), Subject: subject, Author: slacknotify.OrGit(ctx, ".", os.Getenv("COMMIT_AUTHOR"), "%an"),
 	})
 	cancel()
 	if err != nil {

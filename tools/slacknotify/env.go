@@ -1,6 +1,7 @@
 package slacknotify
 
 import (
+	"context"
 	"os/exec"
 	"path"
 	"strings"
@@ -19,11 +20,11 @@ func WorkflowFile(ref string) string {
 
 // OrGit is value, or else the field of dir's checked-out commit in git log's
 // format, so a run without a push event still names its commit.
-func OrGit(dir, value, format string) string {
+func OrGit(ctx context.Context, dir, value, format string) string {
 	if value != "" {
 		return value
 	}
-	out, err := exec.Command("git", "-C", dir, "log", "-1", "--format="+format).Output() //nolint:gosec // G204: the executable is git; dir and format come from the command, not from the event
+	out, err := exec.CommandContext(ctx, "git", "-C", dir, "log", "-1", "--format="+format).Output() //nolint:gosec // G204: the executable is git; dir and format come from the command, not from the event
 	if err != nil {
 		return "unknown"
 	}
