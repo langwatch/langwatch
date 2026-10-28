@@ -37,6 +37,7 @@ members = [
 constraints = [
     { name = "certifi", specifier = ">=2026.10.19" },
     { name = "datasets", specifier = ">=5.0.1" },
+    { name = "fastmcp-slim", specifier = ">=3.4.10,<4" },
     { name = "fsspec", specifier = ">=2026.6.0" },
     { name = "langgraph-sdk", specifier = ">=0.4.4" },
     { name = "mako", specifier = ">=1.4.2" },
@@ -1160,7 +1161,7 @@ wheels = [
 
 [[package]]
 name = "fastmcp-slim"
-version = "3.4.7"
+version = "3.4.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "platformdirs" },
@@ -1170,14 +1171,15 @@ dependencies = [
     { name = "rich" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/12/ac/7924e803368d0758ee4d6b1259066550df78f58f0f9f8bfebd5a123e957d/fastmcp_slim-3.4.7.tar.gz", hash = "sha256:06b32a358320a7dc2b2ee040ba89ea55ddc20763dff2949f384f7974b13b5d8f", size = 594357, upload-time = "2026-08-10T21:17:28.723Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/35/5f61dc70141df213eddff40bb2b8ccf68b02ecd666da6a1efab7c55b5694/fastmcp_slim-3.4.11.tar.gz", hash = "sha256:50e29b0830fb216aba437f35cfc7dd4bce7451f2f85f8786d6fff3da78d79386", size = 610380, upload-time = "2026-10-20T22:44:12.833Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b4/97/e0e53642cd029a9a7635ae9c548f9f2cc995af5914e487b3df795664e4be/fastmcp_slim-3.4.7-py3-none-any.whl", hash = "sha256:6c931a0089705f3f2935428ef9b2bc74ad94140adc64aab84d116d103e694b3a", size = 769370, upload-time = "2026-08-10T21:17:27.227Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/71/614669d0a0d8dea87dc0dc684650bb36793027fc409197526532f587fcab/fastmcp_slim-3.4.11-py3-none-any.whl", hash = "sha256:24535dd843b3dcb3272b86c88fdf6ada5026c39ec5b56e2426557223c4d2c8bf", size = 785938, upload-time = "2026-10-20T22:44:10.921Z" },
 ]
 
 [package.optional-dependencies]
 client = [
     { name = "authlib" },
+    { name = "certifi" },
     { name = "exceptiongroup" },
     { name = "httpx" },
     { name = "mcp" },
@@ -1187,6 +1189,7 @@ client = [
 ]
 server = [
     { name = "authlib" },
+    { name = "certifi" },
     { name = "cyclopts" },
     { name = "exceptiongroup" },
     { name = "griffelib" },
