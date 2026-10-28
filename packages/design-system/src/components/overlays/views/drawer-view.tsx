@@ -56,6 +56,14 @@ export interface DrawerContentProps extends ChakraDrawer.ContentProps {
   errorScope?: string;
 }
 
+/** A caller's side margin applies on wide screens only; a phone sheet always reaches the edge. */
+function floatMargin(value: ChakraDrawer.ContentProps["marginEnd"]) {
+  if (value == null) return { mdDown: 0 };
+  if (typeof value === "object" && !Array.isArray(value))
+    return Object.assign({}, value, { mdDown: 0 });
+  return { base: value, mdDown: 0 };
+}
+
 export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps>(
   function DrawerContent(
     {
@@ -63,6 +71,9 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
       portalRef,
       offset,
       marginTop,
+      marginStart,
+      marginEnd,
+      marginBottom,
       withErrorBoundary = true,
       errorScope,
       children,
@@ -84,8 +95,8 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
                 // A phone shows every drawer as a full-screen sheet; wider screens float it. The
                 // float margin is zeroed per side so a passed header offset (marginTop) survives.
                 margin={2}
-                marginStart={{ mdDown: 0 }}
-                marginBottom={{ mdDown: 0 }}
+                marginStart={floatMargin(marginStart)}
+                marginBottom={floatMargin(marginBottom)}
                 maxWidth={{ mdDown: "100%" }}
                 pointerEvents="auto"
                 borderRadius={{ base: 0, md: "lg" }}
@@ -93,7 +104,7 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
                   marginTop ??
                   (context.marginTop == null ? { mdDown: 0 } : `${context.marginTop}px`)
                 }
-                marginEnd={inset > 0 ? { base: `${inset}px`, mdDown: 0 } : { mdDown: 0 }}
+                marginEnd={floatMargin(marginEnd ?? (inset > 0 ? `${inset}px` : undefined))}
                 {...contentProps}
               >
                 {contentProps.asChild ? (
