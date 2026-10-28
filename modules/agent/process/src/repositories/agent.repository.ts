@@ -129,7 +129,7 @@ export interface AgentRepository {
   }): Promise<AgentLabelRecord>;
   /** True when a label was removed. */
   removeLabel(input: { projectId: string; agentId: string; label: string }): Promise<boolean>;
-  /** Agents in every project that hold no version yet, by id, for the backfill. */
+  /** A page of every non-connected agent, by id, across projects: the backfill's input. */
   findUnversioned(input: { afterId: string | null; limit: number }): Promise<Agent[]>;
   /** Writes version 1 from the row and its creator when unset; false when one already existed. */
   backfillFirstVersion(input: { agent: Agent; createdById: string | null }): Promise<boolean>;
