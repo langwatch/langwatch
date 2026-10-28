@@ -545,6 +545,37 @@ describe("given the agents page", () => {
         ]);
       });
     });
+
+    /** @scenario "The deploy dialog adds a custom label and refuses a reserved one" */
+    it("adds a custom label, refuses a reserved one and cancels with Escape", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { browser } = await mountScreen({ history: "agent_1" });
+
+      await screen.findByTestId("agent-versions");
+      await user.click(screen.getByRole("button", { name: "Deploy" }));
+      const dialog = await screen.findByRole("dialog", { name: /deploy http agent/i });
+
+      await user.click(within(dialog).getByRole("button", { name: "+ Add label" }));
+      await user.type(within(dialog).getByPlaceholderText(/label name/i), "latest");
+      expect(within(dialog).getByText(/always points at the newest version/)).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+      await user.keyboard("{Escape}");
+      expect(within(dialog).queryByPlaceholderText(/label name/i)).not.toBeInTheDocument();
+
+      await user.click(within(dialog).getByRole("button", { name: "+ Add label" }));
+      await user.type(within(dialog).getByPlaceholderText(/label name/i), "canary{Enter}");
+      expect(within(dialog).getByText("canary")).toBeInTheDocument();
+      const canary = within(dialog).getAllByRole("combobox").at(-1);
+      await user.click(canary!);
+      await user.click(await screen.findByRole("option", { name: /v1/ }));
+      await user.click(within(dialog).getByTestId("agent-deploy-save"));
+
+      await waitFor(() => {
+        expect(browser.labelsAssigned).toEqual([
+          { projectId: "project_1", agentId: "agent_1", label: "canary", version: 1 },
+        ]);
+      });
+    });
   });
 
   describe("when a new agent is started", () => {

@@ -114,4 +114,38 @@ describe("the evaluator history drawer", () => {
     expect(calls.removeLabel).not.toHaveBeenCalled();
     expect(calls.invalidateVersions).toHaveBeenCalled();
   });
+
+  /** @scenario "The deploy dialog adds a custom label and refuses a reserved one" */
+  it("adds a custom label, refuses a reserved one and cancels with Escape", async () => {
+    calls.assignLabel.mockClear();
+    renderWithEvaluatorHost(
+      <EvaluatorHistoryPanel evaluatorId="eval_1" evaluatorName="Answer relevancy" />,
+    );
+    await screen.findByTestId("evaluator-versions");
+    await userEvent.click(screen.getByRole("button", { name: "Deploy" }));
+    const dialog = await screen.findByRole("dialog");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "+ Add label" }));
+    await userEvent.type(within(dialog).getByPlaceholderText(/label name/i), "2");
+    expect(within(dialog).getByText(/numbers pick versions/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+    await userEvent.keyboard("{Escape}");
+    expect(within(dialog).queryByPlaceholderText(/label name/i)).not.toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "+ Add label" }));
+    await userEvent.type(within(dialog).getByPlaceholderText(/label name/i), "canary{Enter}");
+    expect(within(dialog).getByText("canary")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getAllByRole("combobox").at(-1)!);
+    await userEvent.click(await screen.findByRole("option", { name: /v1/ }));
+    await userEvent.click(screen.getByTestId("evaluator-deploy-save"));
+
+    await waitFor(() =>
+      expect(calls.assignLabel).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        evaluatorId: "eval_1",
+        label: "canary",
+        version: 1,
+      }),
+    );
+  });
 });

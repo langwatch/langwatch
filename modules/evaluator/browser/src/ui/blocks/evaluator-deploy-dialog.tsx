@@ -130,8 +130,16 @@ function LabelRow({ state, label }: { state: EvaluatorVersionsState; label: stri
   );
 }
 
-function AddLabel({ state }: { state: EvaluatorVersionsState }) {
-  const [name, setName] = useState<string | null>(null);
+/** `name` is null while the add button shows; the dialog leaves Escape to the open input. */
+function AddLabel({
+  state,
+  name,
+  setName,
+}: {
+  state: EvaluatorVersionsState;
+  name: string | null;
+  setName: (name: string | null) => void;
+}) {
   const check = name ? checkEvaluatorLabel(name) : null;
   if (name === null) {
     return (
@@ -186,7 +194,9 @@ export function EvaluatorDeployDialog({
   evaluatorName: string;
   state: EvaluatorVersionsState;
 }) {
+  const [newLabel, setNewLabel] = useState<string | null>(null);
   const close = () => {
+    setNewLabel(null);
     state.resetSelections();
     onClose();
   };
@@ -194,6 +204,7 @@ export function EvaluatorDeployDialog({
     <Dialog
       open={open}
       onClose={close}
+      closeOnEscape={newLabel === null}
       title={`Deploy ${evaluatorName}`}
       primaryAction={{
         label: "Save",
@@ -231,7 +242,7 @@ export function EvaluatorDeployDialog({
           {state.labels.map((label) => (
             <LabelRow key={label} state={state} label={label} />
           ))}
-          <AddLabel state={state} />
+          <AddLabel state={state} name={newLabel} setName={setNewLabel} />
           {state.saveError && (
             <Text fontSize="sm" color="red.fg" role="alert">
               {state.saveError}
