@@ -257,6 +257,30 @@ describe("given the scope filter", () => {
       expect(screen.getByTestId("filter-this-project")).toBeInTheDocument();
     });
 
+    /** @scenario Reopening the project submenu starts from an empty search */
+    it("empties the search and relists every project when the submenu is reopened", async () => {
+      const { user } = mount();
+      const search = await openProjectSubmenu({ user });
+
+      await user.click(search);
+      await user.keyboard("bill");
+      expect(screen.queryByTestId("filter-project-option-project_3")).not.toBeInTheDocument();
+
+      // Close the submenu only: the parent menu stays open, so the submenu's
+      // state survives and a stale query would come back with it. Escaping the
+      // whole menu would unmount the component and pass either way.
+      await user.hover(screen.getByTestId("filter-all"));
+      await waitFor(() =>
+        expect(screen.queryByTestId("filter-project-search")).not.toBeInTheDocument(),
+      );
+      await user.click(screen.getByTestId("filter-project-submenu"));
+
+      const reopened = await screen.findByTestId("filter-project-search");
+      expect(reopened).toHaveValue("");
+      expect(screen.getByTestId("filter-project-option-project_2")).toBeInTheDocument();
+      expect(screen.getByTestId("filter-project-option-project_3")).toBeInTheDocument();
+    });
+
     /** @scenario Picking another project from the submenu filters to that project */
     it("picks the specific project, which the trigger then names", async () => {
       const { user, picked } = mount();

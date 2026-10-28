@@ -3,6 +3,7 @@
  * renders `type="search"`, whose native Escape and icon geometry jsdom fakes:
  * it reports a zero box for the icon and never clears a search field.
  * @see specs/api-keys/scope-filter.feature
+ * @see packages/design-system/specs/menu-shape.feature
  */
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -63,24 +64,16 @@ describe("the project submenu opened in a real engine", () => {
     expect(drawn.bottom).toBeLessThanOrEqual(field.bottom);
   });
 
-  /** @scenario "Typing in the project search narrows the list by name" */
-  it("narrows the list as the engine delivers the keystrokes", async () => {
-    mount();
-    const search = await openProjectSubmenu();
-
-    await userEvent.fill(search, "bill");
-
-    await expect.poll(() => screen.queryByTestId("filter-project-option-project_2")).not.toBeNull();
-    expect(screen.queryByTestId("filter-project-option-project_3")).toBeNull();
-    expect(document.activeElement).toBe(search);
-  });
-
   /** @scenario "The project search keeps the menu keyboard controls" */
   it("closes the whole menu on Escape, which a search field could have eaten", async () => {
     const { picked } = mount();
     const search = await openProjectSubmenu();
 
     await userEvent.fill(search, "bill");
+    // Narrowing itself is jsdom's to cover; what a real engine adds is that the
+    // keystrokes land in the field rather than in the menu's typeahead.
+    expect(document.activeElement).toBe(search);
+
     await userEvent.keyboard("{Escape}");
 
     // A native search input clears itself on Escape in WebKit-derived engines,
@@ -93,7 +86,7 @@ describe("the project submenu opened in a real engine", () => {
 });
 
 describe("the menu's arrows, drawn by the shared menu", () => {
-  /** @scenario "The submenu arrow matches the menu's other arrow" */
+  /** @scenario "A submenu trigger draws its arrow on the item's right edge" */
   it("draws the submenu arrow at the size and right edge of the other one", async () => {
     mount();
     await userEvent.click(screen.getByTestId("scope-filter"));

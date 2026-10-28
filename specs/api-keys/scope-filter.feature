@@ -98,6 +98,12 @@ Feature: API Keys scope filter
     And "This Project" is still offered
 
   @integration
+  Scenario: Reopening the project submenu starts from an empty search
+    Given I have typed into the project search box
+    When I close the submenu and open it again
+    Then the search box is empty and every project is listed again
+
+  @integration
   Scenario: Picking another project from the submenu filters to that project
     Given I have opened the "This Project" submenu
     When I pick another project from the list
@@ -249,10 +255,6 @@ Feature: API Keys scope filter
     And pressing Enter selects the focused option and closes the menu
     And pressing Escape closes the menu without changing the selection
 
-  # The shared menu draws the arrow on a submenu trigger, so the two
-  # affordances in this one menu cannot drift apart.
-  @integration
-  Scenario: The submenu arrow matches the menu's other arrow
-    Given I have opened the scope filter dropdown
-    Then the "This Project" arrow and the "More Scopes" arrow are the same size
-    And they sit on the same right edge
+  # The arrow on a submenu trigger is the shared menu's, specified in
+  # packages/design-system/specs/menu-shape.feature rather than here: it
+  # governs every nested menu in the product, not just this one.
