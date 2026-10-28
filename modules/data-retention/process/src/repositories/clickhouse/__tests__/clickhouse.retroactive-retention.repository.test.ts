@@ -115,7 +115,9 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     const eventLogCommand = required(
       commands.find((candidate) => candidate.sql.includes("ALTER TABLE event_log")),
     );
-    expect(eventLogCommand.sql).toContain("AggregateType IN ('coding_agent_project_milestone', 'coding_agent_session'");
+    expect(eventLogCommand.sql).toContain(
+      "AggregateType IN ('coding_agent_project_milestone', 'coding_agent_session'",
+    );
     expect(eventLogCommand.sql).not.toContain("AggregateType NOT IN");
     expect(eventLogCommand.sql).toContain("langwatch:event-log-retention-category:traces");
     expect(
@@ -167,7 +169,9 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     const experimentsEventLog = required(
       experiments.commands.find((command) => command.sql.includes("ALTER TABLE event_log")),
     );
-    expect(experimentsEventLog.sql).toContain("AggregateType IN ('dataset_history', 'experiment_run')");
+    expect(experimentsEventLog.sql).toContain(
+      "AggregateType IN ('dataset_history', 'experiment_run')",
+    );
     expect(experimentsEventLog.sql).toContain("langwatch:event-log-retention-category:experiments");
   });
 

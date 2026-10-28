@@ -209,6 +209,25 @@ describe("given a version larger than one whole read", () => {
   });
 });
 
+describe("given current content past one whole read with no recorded counts", () => {
+  /** @scenario "A version larger than one whole read is refused before it is read" */
+  it("refuses the compare with dataset_version_too_large while streaming the rows", async () => {
+    boot(createDatasetTestProjects(), createDatasetTestEntitlementWith({ rowsMax: 2 }));
+    const datasetId = await createDataset();
+    await save(datasetId);
+    await edit(datasetId, "c", "third");
+    await repositories.content.update({
+      id: datasetId,
+      projectId: PROJECT,
+      data: { rowCount: null, sizeBytes: null },
+    });
+
+    await expect(
+      app.compareVersion({ projectId: PROJECT, datasetId, version: 1 }),
+    ).rejects.toMatchObject({ code: "dataset_version_too_large" });
+  });
+});
+
 describe("given no dataset by that name", () => {
   /** @scenario "Saving a version of a missing dataset is refused" */
   it("refuses a save with dataset_not_found", async () => {
