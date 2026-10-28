@@ -245,7 +245,7 @@ describe("the Dashboards sidebar", () => {
     });
   });
 
-  describe("when the member stars and unstars from the row's star", () => {
+  describe("when the member pins and unpins from the row's pin", () => {
     /** @scenario "AC165 A pin can point at a From LangWatch board" */
     it("stars a From LangWatch board by its template id", async () => {
       const { user, calls, host } = renderSection();

@@ -953,7 +953,7 @@ describe("a member's board", () => {
 
   describe("given a member's board", () => {
     /** @scenario "Boards: no pin or pencil by the board title" */
-    it("has no star and no rename pencil by its title", async () => {
+    it("has no pin and no rename pencil by its title", async () => {
       openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
       expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
