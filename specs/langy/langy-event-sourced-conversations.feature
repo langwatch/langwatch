@@ -232,3 +232,19 @@ Feature: Langy conversations are an event-sourced projection
     When I rename it or toggle sharing
     Then a "conversation_metadata_updated" event is recorded
     And the operational projection reflects the new title or sharing state
+
+  # ============================================================================
+  # Turn admission under concurrent sends
+  # ============================================================================
+
+  @unit
+  Scenario: A turn send that loses a write conflict is retried and admitted
+    Given another send races mine and my admission transaction loses a write conflict
+    When the admission is attempted again
+    Then my turn is admitted on the later attempt
+
+  @unit
+  Scenario: A turn send that keeps losing write conflicts is refused as unavailable
+    Given every admission attempt for my send loses a write conflict
+    When the retry limit is reached
+    Then the send is refused with the "langy_agent_unavailable" error
