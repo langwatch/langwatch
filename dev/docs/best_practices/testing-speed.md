@@ -94,7 +94,12 @@ The three levers, in the order they pay:
    It applies to a whole package, and it is safe only where nothing depends on
    a clean module registry.
 2. **`fsModuleCache: true`** - attacks the transform share (24% above). It does
-   nothing on a cold first run; it is a rerun and a second-process win.
+   nothing on a cold first run; it is a rerun and a second-process win. In CI
+   the package-suites job restores `node_modules/.vitest-cache` per shard, only
+   for the same lockfile, manifests and tsconfigs
+   (`specs/ci/package-suites-transform-cache.feature`). A package with no
+   vitest config passes `--fsModuleCache` on its script instead, which
+   `go run ./cmd/ciguard` enforces.
 3. **Import cost itself** - `deps.optimizer` and `server.deps.inline` change how
    a heavy dependency is pre-bundled. Not set by the helper: the optimizer is
    per-dependency tuning, and a wrong entry changes what a test resolves. Reach

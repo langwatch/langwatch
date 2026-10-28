@@ -846,6 +846,37 @@ jobs:
       - name: Adopt the restored suite results index
         run: mkdir -p .nx/suites/data && bash .github/scripts/adopt-nx-cache-index.sh .nx/suites/data
 
+      # Vitest's transformed modules (fsModuleCache), kept between runs so a suite
+      # skips the transform share of its time (specs/ci/package-suites-transform-cache.feature).
+      # Vitest keys each entry by the module's own source, the vitest config and its
+      # plugins, and drops the whole cache when the lockfile changes. It does not key
+      # how an import resolves (package manifests) or what a tsconfig tells the
+      # transform, so a cache is restored only when those are identical too: the
+      # hash is over the blob ids of the lockfile, every package.json and tsconfig.
+      - name: Hash what a cached transform depends on besides its source
+        id: transform-inputs
+        run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the vitest transforms
+        if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vitest-cache
+          key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+
+      - name: Restore the vitest transforms, saving them at the end of the job
+        if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vitest-cache
+          key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+
+      - uses: ./.github/actions/prune-pr-caches
+        with:
+          prefix: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-
+
       - name: Run every workspace package suite
         env:
           NX_CACHE_DIRECTORY: ${{ github.workspace }}/.nx/suites/cache
@@ -873,6 +904,13 @@ jobs:
       - name: Check suites declare what they read outside their package
         if: ${{ !cancelled() }}
         run: node --experimental-strip-types .github/scripts/check-test-reads.ts "$RUNNER_TEMP/test-reads"
+
+      # Keeps the saved transforms small: an entry is written once and only read
+      # after, so one no run has written for a week goes, and the next suite that
+      # needs it writes it again.
+      - name: Drop week-old vitest transforms before they are saved
+        if: ${{ !cancelled() }}
+        run: find node_modules/.vitest-cache -type f -mtime +7 -delete 2>/dev/null || true
 
   lint:
     needs: changes

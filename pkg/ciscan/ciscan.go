@@ -21,7 +21,9 @@ import (
 // Step is one entry in a job's `steps:` list. Only the fields the guards read
 // are modeled; everything else in a workflow is deliberately ignored.
 type Step struct {
+	ID   string            `yaml:"id"`
 	Name string            `yaml:"name"`
+	Run  string            `yaml:"run"`
 	If   string            `yaml:"if"`
 	Uses string            `yaml:"uses"`
 	With map[string]any    `yaml:"with"`
