@@ -4,13 +4,13 @@
 
 **Status:** Proposed
 
-> One line: a quick `eval()` in a query is not saved. A saved run is stored in `instant_eval_judgments`, shows on each trace beside monitor results, and feeds dashboards. Monitors stay as they are. Nothing is written into `evaluation_runs` by default.
+> One line: recommendation: a quick `eval()` stays unsaved; a one-off run stays in `instant_eval_judgments` and gains a trace-drawer read; a dashboard eval that must stay current is a monitor on the instant evals judge. Nothing is mirrored into `evaluation_runs` by default. The one decision for Drew is in section 5.
 
 ## Context
 
 - Issue: https://github.com/langwatch/tasks/issues/986
-- On 2026-10-27, Drew and Rogerio talked in Slack about where instant eval results should be stored. The team has no agreed model. Langy gave different answers to the same question.
-- The thread raised four options. This record names them A to D, describes what each one means in this code base, and recommends one.
+- On 2026-10-27, a Slack discussion found the team has no agreed model for where instant eval results should be stored. Langy gave different answers to the same question.
+- The thread raised four options. This record names them A to D, adds a fifth (E), describes what each one means in this code base, and recommends one.
 - Instant evals are used in three ways: exploring (a person or Langy asks ad-hoc questions), dashboards (the same eval is read many times), and alerts (a monitor judges each new trace). Each use needs a different thing from storage.
 - This record builds on ADR-153 (a run is a judgment job), ADR-174 (the judge call is metered) and ADR-182 (the decision model is a Default models column).
 
@@ -44,7 +44,7 @@ A run is started from the search bar, from the CLI (`langwatch instant-eval run`
 - A run is stored in two tables: `instant_eval_runs` (the definition and the counters) and `instant_eval_judgments` (one row per verdict). See migrations `00098_create_instant_eval_runs.sql` and `00097_create_instant_eval_judgments.sql`.
 - Judgments are `ReplacingMergeTree(UpdatedAt)`, `PARTITION BY toYYYYMM(CreatedAt)`, `ORDER BY (TenantId, RunId, TraceId, SpanId, QuestionId)`. They hold verdict fields only, never the judged text. Retention is indefinite by default.
 - One page (up to 500 rows times the questions) is one bulk insert, made by the page intent (ADR-153 section 4).
-- Two surfaces read judgments today. The Explorer `eval:"question"` chip reads them (`modules/trace/process/src/features/query/rules/trace-query-instant-eval-fields.rules.ts`). The LWQL dataset `analytics.judgments` reads them (`modules/analytics/process/src/rules/lwql-view-catalog.rules.ts:2278`).
+- Two surfaces read judgments today. The Explorer `eval:"question"` chip reads them (`modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts:74`). This is a declared ownership exception in `packages/architecture-enforcer/src/policies/persistence/clickhouse-table-ownership.ts` (the `exceptions` list: reader trace, table `instant_eval_judgments`). The LWQL dataset `analytics.judgments` reads them (`modules/analytics/process/src/rules/lwql-view-catalog.rules.ts:2278`).
 - The trace drawer does not read judgments. Nothing under `trace-drawer` reads them.
 - ADR-153 section 1 deferred an opt-in mirror of judgments into `evaluation_runs`. It was not built.
 
@@ -57,7 +57,7 @@ Langy has no store of its own. It calls `explorer.runInstantEval` (`specs/langy/
 - A dashboard widget is an LWQL statement. It goes through the same `LangWatchQLService` as any query.
 - Nothing seen in the code blocks `eval()` inside a widget. The gate is the `release_instant_evals` flag (`modules/analytics/process/src/rules/lwql-access.rules.ts:16`). If a widget used `eval()`, it would judge synchronously on every refresh, with no cache.
 - This is inferred, not traced end to end. No catalogue widget uses `eval()` today.
-- The built-in eval charts read `evaluation_analytics_rollup`, `evaluation_analytics` and `evaluation_runs`. These hold monitor results only.
+- The built-in eval charts read `evaluation_analytics_rollup`, `evaluation_analytics` and `evaluation_runs`. These hold monitor results and results reported through the collector or REST.
 - A widget could read `analytics.judgments`. Nothing ties a widget to a run.
 
 ### 1.6 Collector write-back
@@ -87,35 +87,35 @@ A write-back path exists. The trace collector accepts an `evaluations` array. Ea
 
 ### 2.2 The real limits
 
-| Constant                            | Value                                                                                                                | File                                                                                                          |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `LWQL_APP_FUNCTION_KEY_CAPS`        | trace 1,000; span 1,000; text 1,000; thread 200 keys per sync `eval()`. Over the cap is a refusal, not a truncation. | `modules/analytics/process/src/features/app-functions/rules/langwatch-ql-app-function-shapes.rules.ts:96-103` |
-| `LWQL_MAX_RESULT_ROWS`              | 10,000                                                                                                               | `modules/analytics/contract/src/features/lwql/langwatch-ql-limits.ts:19`                                      |
-| `LWQL_MAX_RESULT_BYTES`             | 8,000,000                                                                                                            | same file, line 22                                                                                            |
-| LWQL statement time and concurrency | 10 s per statement; 10 concurrent queries per user                                                                   | same file, `DEFAULT_LWQL_RESOURCE_LIMITS`                                                                     |
-| `INSTANT_EVAL_QUERY_TOKEN_BUDGET`   | 4,000,000 input tokens per sync query                                                                                | `modules/instant-eval/contract/src/instant-eval.config.ts`                                                    |
-| `INSTANT_EVAL_DEFAULT_ROW_CAP`      | 10,000 rows per run                                                                                                  | `modules/instant-eval/contract/src/instant-eval-limits.ts:10`                                                 |
-| `INSTANT_EVAL_MAX_ROW_CAP`          | 100,000 rows per run, paid plans                                                                                     | same file, line 13                                                                                            |
-| `INSTANT_EVAL_PAGE_SIZE`            | 500 rows per page (100 when the average text is above 12 KiB)                                                        | `modules/instant-eval/process/src/rules/instant-eval-run-sizing.rules.ts`                                     |
-| `INSTANT_EVAL_JUDGE_CONCURRENCY`    | 128 judge calls in flight                                                                                            | `modules/instant-eval/process/src/services/instant-eval-judge-rows.service.ts:29`                             |
-| Rate limits                         | 300,000 input tokens per second for the deployment; 150,000 per project                                              | `modules/instant-eval-judge/contract/src/instant-eval-judge.config.ts`                                        |
-| `INSTANT_EVAL_FREE_BUDGET_USD`      | 1 USD per organisation that is not billed                                                                            | `modules/instant-eval-judge/contract/src/instant-eval-pricing.ts:68`                                          |
-| Price                               | 0.042 USD per million input tokens, markup 1.3                                                                       | same file, lines 10-11                                                                                        |
-| Classifier input                    | 32,000 state tokens                                                                                                  | `modules/instant-eval-judge/contract/src/instant-eval-judge.api.ts:290`                                       |
-| `INSTANT_EVAL_AUTO_RUN_USD`         | 0.5 USD: above this the search bar asks to confirm                                                                   | `modules/trace/browser/src/ui/sections/explorer/search-bar/use-instant-eval-route.ts:31`                      |
+| Constant                            | Value                                                                                                                           | File                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `LWQL_APP_FUNCTION_KEY_CAPS`        | trace 1,000; span 1,000; text 1,000; thread 200 keys per sync `eval()`. Over the cap is a refusal, not a truncation.            | `modules/analytics/process/src/features/app-functions/rules/langwatch-ql-app-function-shapes.rules.ts:96-103`   |
+| `LWQL_MAX_RESULT_ROWS`              | 10,000                                                                                                                          | `modules/analytics/contract/src/features/lwql/langwatch-ql-limits.ts:19`                                        |
+| `LWQL_MAX_RESULT_BYTES`             | 8,000,000                                                                                                                       | same file, line 22                                                                                              |
+| LWQL statement time and concurrency | 10 s per statement; 10 concurrent queries per user                                                                              | same file, `DEFAULT_LWQL_RESOURCE_LIMITS`, lines 61-65 (`langwatch-ql-limits.ts:61-65`)                         |
+| `INSTANT_EVAL_QUERY_TOKEN_BUDGET`   | 4,000,000 input tokens per sync query                                                                                           | `modules/instant-eval/contract/src/instant-eval.config.ts:21-24`                                                |
+| `INSTANT_EVAL_DEFAULT_ROW_CAP`      | 10,000 rows per run: the most a free plan gets                                                                                  | `modules/instant-eval/contract/src/instant-eval-limits.ts:10`                                                   |
+| `INSTANT_EVAL_MAX_ROW_CAP`          | 100,000 rows per run: the most a paid plan gets. The gate is `isFree ? INSTANT_EVAL_DEFAULT_ROW_CAP : INSTANT_EVAL_MAX_ROW_CAP` | `modules/instant-eval/process/src/rules/instant-eval-caps.rules.ts:15`; values in `instant-eval-limits.ts:13`   |
+| `INSTANT_EVAL_PAGE_SIZE`            | 500 rows per page (100 when the average text is above 12 KiB)                                                                   | `modules/instant-eval/process/src/rules/instant-eval-run-sizing.rules.ts:15` (500), `:18` (100), `:25` (12 KiB) |
+| `INSTANT_EVAL_JUDGE_CONCURRENCY`    | 128 judge calls in flight                                                                                                       | `modules/instant-eval/process/src/services/instant-eval-judge-rows.service.ts:29`                               |
+| Rate limits                         | 300,000 input tokens per second for the deployment; 150,000 per project                                                         | `modules/instant-eval-judge/contract/src/instant-eval-judge.config.ts:22` and `:27`                             |
+| `INSTANT_EVAL_FREE_BUDGET_USD`      | 1 USD per organisation that is not billed                                                                                       | `modules/instant-eval-judge/contract/src/instant-eval-pricing.ts:68`                                            |
+| Price                               | 0.042 USD per million input tokens, markup 1.3                                                                                  | same file, lines 10-11                                                                                          |
+| Classifier input                    | 32,000 state tokens                                                                                                             | `modules/instant-eval-judge/contract/src/instant-eval-judge.api.ts:290`                                         |
+| `INSTANT_EVAL_AUTO_RUN_USD`         | 0.5 USD: above this the search bar asks to confirm                                                                              | `modules/trace/browser/src/ui/sections/explorer/search-bar/use-instant-eval-route.ts:31`                        |
 
 ### 2.3 Worked volumes (derived, not measured)
 
-A verdict is one row per question per judged text. So the row count is rows times questions.
+A verdict is one row per question per judged text. So the row count is rows times questions. All options that store keep the same rows. Only the write pattern differs.
 
-| Run                        | Verdicts  | As `evaluation_runs` write-back          | As `instant_eval_judgments`    |
-| -------------------------- | --------- | ---------------------------------------- | ------------------------------ |
-| 10,000 rows, 3 questions   | 30,000    | 30,000 events and 30,000 fold rows       | 20 bulk inserts of 1,500 rows  |
-| 100,000 rows, 10 questions | 1,000,000 | 1,000,000 events and 1,000,000 fold rows | 200 bulk inserts of 5,000 rows |
+| Run                        | Verdicts  | Stored as events (Option B)                                       | Stored as `instant_eval_judgments` (C, D)      |
+| -------------------------- | --------- | ----------------------------------------------------------------- | ---------------------------------------------- |
+| 10,000 rows, 3 questions   | 30,000    | 30,000 events plus fold and analytics rows, written one by one    | 20 bulk inserts of 1,500 rows                  |
+| 100,000 rows, 10 questions | 1,000,000 | 1,000,000 events plus fold and analytics rows, written one by one | 200 bulk inserts of 5,000 rows (page size 500) |
 
 The arithmetic for the first line: 10,000 rows at 500 rows a page is 20 pages. Each page holds 500 rows times 3 questions, so one insert of 1,500 rows. The second line: 100,000 at 500 is 200 pages, and each page is 500 times 10, so 5,000 rows.
 
-The page size is 500 at best. It drops to 100 for long texts, which makes the page count five times larger and the insert smaller. The shape stays the same: one insert per page, not one event per verdict.
+The page size is 500 at best. It drops to 100 for long texts. The second run then makes 1,000 inserts of 1,000 rows. The rows stored stay the same, and the shape stays the same: one insert per page, not one event per verdict.
 
 ## 3. Options
 
@@ -147,12 +147,13 @@ How it works: each verdict becomes a `lw.evaluation.reported` event on the trace
   - Trace details already show these. No new UI for the drawer.
   - The `evaluations.passed` filter and the built-in eval charts work at once.
   - One store for all evaluation results.
+  - Its retention already follows the project's trace retention.
 - Cons
   - One event and one fold row per verdict. A 100,000 row run with 10 questions makes 1,000,000 of each.
   - Ad-hoc exploration runs mix into monitor charts and into the `evaluations.passed` filters. A person who asked a one-off question changes the numbers that an alert reads.
   - Retention does not match. `evaluation_runs` keeps 49 days by default and the project days. Judgments are kept without limit today.
   - A dedup key is needed. A rerun of the same question on the same trace must replace the old verdict, not add a second one. `evaluation_runs` is keyed by `EvaluationId`, so each run needs a stable id per trace and question.
-  - It changes the meaning of "monitor result". A verdict with no monitor behind it has no monitor to link to.
+  - It changes the meaning of "monitor result". A verdict with no monitor and no SDK report behind it has nothing to link to.
 - Consequences
   - Cost: judge cost is unchanged. Write cost grows with verdicts, not with pages.
   - ClickHouse load: high. Events, fold rows, and the analytics tables all grow per verdict.
@@ -174,50 +175,72 @@ How it works: this is `instant_eval_judgments`. It exists. Pages are inserted in
   - Two stores for evaluation results, with two filter words: `evaluations.passed` and `eval:"question"`.
   - The trace drawer needs new work: a read, and a card that says it is an Instant Eval run.
   - Retention is indefinite, so a judgment can outlive its trace.
-  - Sync `eval()` still stores nothing, so exploration is not covered.
+  - Sync `eval()` still stores nothing.
 - Consequences
   - Cost: the same as today. The drawer read adds one query per opened trace.
   - ClickHouse load: low for writes. A lookup by trace alone is not a prefix of the order key, so the drawer read may cost more (see section 6).
-  - Trace details UI: new section, built in the trace module through the instant-eval module's Api, not its table.
+  - Trace details UI: new section. The trace module must not call `InstantEvalApi`: `modules/instant-eval/process/src/app/instant-eval.app.ts:41` already uses `TraceApi`, so that would be a peer cycle, which the architecture check refuses. Instead, add `instant_eval_judgments` to the `shared` list in `packages/architecture-enforcer/src/policies/persistence/clickhouse-table-ownership.ts` with reader trace. Then read it from a trace repository, the way `modules/trace/process/src/repositories/clickhouse/trace-instant-eval-runs.repository.ts` reads `instant_eval_runs` (already shared).
   - Langy's answer: "A run is saved and shows on each trace."
-  - Migration: probably none for the table. A secondary index or a trace-first projection may be needed for the drawer read.
+  - Migration: none for the table. The drawer join fix is a `TraceId` bloom-filter skip index in a goose migration with `IF NOT EXISTS`, materialised as a background step. This is unmeasured.
 
 ### Option D: Split by use
 
 How it works: use a different answer for each use.
 
 - Sync `eval()` for exploration stores nothing. This is today.
-- Anything that must last (a dashboard, a shared result, a verdict on trace details) is a run, stored as in Option C.
-- An optional B-style mirror into `evaluation_runs` is allowed per run, opt-in, for the cases where a run must drive a filter or an alert.
+- A one-off answer over past traces is a run, stored as in Option C, with a trace-drawer read.
+- A dashboard or alert that must stay current is a monitor on the instant evals judge (Option E).
+- No default mirror into `evaluation_runs`. The ADR-153 mirror stays deferred.
 
 - Pros
   - Each use gets the cost it needs: nothing for exploration, bulk pages for runs, events only when asked.
   - Matches how the products in section 4 work: a separate linked record, not a rewrite of the trace.
-  - Mostly built. The new work is the drawer read and the dashboard binding.
+  - Mostly built. The new work is the drawer read.
   - Gives Langy one clear sentence.
 - Cons
   - Three answers, not one. The team must teach the split.
-  - The dashboard binding is new product work.
-  - The opt-in mirror keeps the dedup and retention questions of Option B, but only for the runs that ask for it.
+  - A monitor has no backfill, so a current dashboard number over old traces needs a run.
 - Consequences
-  - Cost: judge cost is paid once per run, not per refresh.
-  - ClickHouse load: low by default, higher only for mirrored runs.
-  - Trace details UI: shows judgments from runs, labelled as an Instant Eval run.
+  - Cost: judge cost is paid once per run or once per new trace, not per refresh.
+  - ClickHouse load: low for runs; as any monitor for monitors.
+  - Trace details UI: shows judgments from runs (after the drawer read ships), labelled as an Instant Eval run, and monitor results as today.
   - Langy's answer: see section 5.
-  - Migration: no change to existing runs. A mirror flag is added on the run later, if needed.
+  - Migration: no change to existing runs or monitors.
+
+### Option E: A monitor on the instant evals judge
+
+How it works: a lasting or alerting eval becomes a monitor whose judge model is `langwatch/instant-evals`. This exists today (section 1.1).
+
+- Pros
+  - Built today.
+  - Covers new traces as they arrive.
+  - Retention, dedup, the trace drawer, eval charts and alerts already work.
+- Cons
+  - No backfill of old traces.
+  - Results land in `evaluation_runs` beside other monitors.
+  - A per-call spend and an event per verdict.
+- Consequences
+  - Cost: judge cost for each new trace, metered as in ADR-174.
+  - ClickHouse load: events and fold rows per verdict, as for any monitor.
+  - Trace details UI: no change. Monitor cards already show.
+  - Langy's answer: "To keep a number current, set up a monitor with the instant evals judge."
+  - Migration: none.
 
 ### Comparison
 
-|                                        | A: Cache only | B: Write back                | C: Own table               | D: Split by use                            |
-| -------------------------------------- | ------------- | ---------------------------- | -------------------------- | ------------------------------------------ |
-| Survives the session                   | No            | Yes                          | Yes                        | Yes, for runs                              |
-| On trace details                       | No            | Yes, at once                 | Needs a drawer read        | Needs a drawer read                        |
-| Dashboards                             | No            | Yes, but mixes with monitors | Needs a run binding        | Needs a run binding                        |
-| ClickHouse load for 1,000,000 verdicts | None          | 1,000,000 events and rows    | 200 inserts (derived)      | 200 inserts, plus events for mirrored runs |
-| Ad-hoc runs pollute monitor charts     | No            | Yes                          | No                         | No, unless mirrored                        |
-| Retention                              | None          | 49 days or project days      | Indefinite                 | Indefinite, mirror follows monitors        |
-| New work                               | Small         | Medium (source field, dedup) | Medium (drawer, dashboard) | Medium (drawer, dashboard, split)          |
-| Exploration covered                    | Yes           | Costly                       | No                         | Yes                                        |
+|                                        | A: Cache only          | B: Write back                                                     | C: Own table                              | D: Split by use                        | E: Monitor                      |
+| -------------------------------------- | ---------------------- | ----------------------------------------------------------------- | ----------------------------------------- | -------------------------------------- | ------------------------------- |
+| Survives the session                   | No                     | Yes                                                               | Yes                                       | Yes, for runs and monitors             | Yes                             |
+| On trace details                       | No                     | Yes, at once                                                      | Needs a drawer read                       | Needs a drawer read for runs           | Yes, today                      |
+| Dashboards                             | No                     | Yes, but mixes with monitors                                      | Needs a run binding                       | Monitor for current numbers            | Yes, built-in eval charts       |
+| ClickHouse load for 1,000,000 verdicts | None                   | 1,000,000 events plus fold and analytics rows, written one by one | 200 bulk inserts (1,000 at page size 100) | Same as C for runs; as E for monitors  | 1,000,000 events plus fold rows |
+| Ad-hoc runs pollute monitor charts     | No                     | Yes                                                               | No                                        | No                                     | No, a monitor is deliberate     |
+| Retention                              | None                   | Project trace retention                                           | Indefinite                                | Runs indefinite; monitors follow trace | Project trace retention         |
+| New work                               | Small                  | Medium (source field, dedup)                                      | Medium (drawer read)                      | Medium (drawer read)                   | None                            |
+| Backfills old traces                   | No                     | Only if run over old traces                                       | Yes                                       | Yes, by a run                          | No                              |
+| Exploration cost                       | Free inside the window | Costly: a write per verdict                                       | Free, stores nothing                      | Free, stores nothing                   | Not for exploration             |
+
+Row note for volumes: the storing options hold the same 1,000,000 rows. B writes 1,000,000 events plus fold and analytics rows, one by one. C and D write the same rows in 200 bulk inserts (1,000 inserts of 1,000 rows at page size 100).
 
 ## 4. How others do it
 
@@ -225,7 +248,7 @@ These notes come from public documentation read on 2026-10-28. An item marked un
 
 ### Braintrust
 
-- Online scoring writes score spans as children of the scored span: https://www.braintrust.dev/docs/observe/score-online
+- Online scoring: a score span is a child of the scored span for span-scoped rules. Trace- and group-scoped rules add a scoring automation span to the trace: https://www.braintrust.dev/docs/observe/score-online
 - Ad-hoc "Score existing logs": https://www.braintrust.dev/docs/guides/logs/score
 - A span has a `scores` dictionary. A rewrite overwrites the old score: https://www.braintrust.dev/docs/core/logs/write
 - Playground runs are overwritten. "+ Experiment" saves a snapshot. This is the closest thing to an ephemeral mode: https://www.braintrust.dev/docs/evaluate/playgrounds
@@ -255,66 +278,78 @@ These notes come from public documentation read on 2026-10-28. An item marked un
 
 ### The pattern
 
-All four persist results beside the trace. Three of the four keep the result in a separate score or annotation record linked by id. They do not rewrite the trace. None documents a cache-only mode. An ephemeral result exists only as a playground that is overwritten.
+All four persist results beside the trace. Three of the four keep the result in a separate score or annotation record linked by id. Braintrust adds score spans to the trace (as children of the scored span, or as an automation span), but still does not rewrite the scored data. None documents a cache-only mode. An ephemeral result exists only as a playground that is overwritten.
 
 This supports a stored, separate, linked record (Options C and D). It does not support cache-only (Option A) as the whole answer. It also shows that sync exploration and a stored run can sit side by side, as a playground and a saved experiment do.
 
-## 5. Recommendation and the one question
+## 5. Decision (proposed) and the one question
 
-We recommend Option D, built on Option C.
+We recommend Option D, with Option E for what must stay current.
 
-1. Sync `eval()` for exploration stores nothing durable. This is today. A verdict cache is an optimisation, not storage, and can come later.
-2. The definitive store for instant eval results is `instant_eval_judgments`. It stays separate from `evaluation_runs`.
-3. Build the trace-drawer read. A trace then shows its judgments beside the monitor results, labelled as an Instant Eval run.
-4. A dashboard eval is a saved run. A widget reads `analytics.judgments`. It does not call sync `eval()` on each refresh.
-5. There is no default write-back into `evaluation_runs`. The ADR-153 mirror stays opt-in per run, for the case where a run must drive filters or alerts.
-6. Langy gives one answer. It can say: "A quick eval() in a query is not saved. A run is saved, shows on each trace and can feed a dashboard. Monitors are set up ahead and run on new traces."
+1. Exploration is sync `eval()`, unsaved. This is today. A verdict cache (Option A) may come later as an optimisation, not as storage.
+2. A one-off answer over past traces is a run in `instant_eval_judgments`. Build the trace-drawer read, so a trace shows its judgments beside monitor results, labelled as an Instant Eval run.
+3. A dashboard or alert that must stay current is a monitor on the instant evals judge (Option E).
+4. There is no default mirror into `evaluation_runs`. The ADR-153 mirror stays deferred. If it is ever built, mirrored verdicts carry a source field and monitor charts leave them out by default.
+5. Langy gives one answer: "A quick eval() in a query is not saved. A run is saved and can be opened again; after the trace-drawer read ships it also shows on each trace. To keep a number current on a dashboard or an alert, set up a monitor with the instant evals judge."
 
 Why:
 
 - It matches how the other products work: a separate linked record.
-- It is the cheapest for ClickHouse: bulk pages, not one event per verdict.
-- It keeps monitor charts clean.
+- It is the cheapest for ClickHouse: bulk pages for runs, events only for deliberate monitors.
+- It keeps ad-hoc runs out of monitor charts.
 - It is mostly built already.
 
 ### The one question for Drew
 
-Should a dashboard widget that uses an eval be refused sync `eval()` and be required to point at a saved run (re-run on a schedule), or may it call `eval()` live on each refresh, within the 1,000-key cap?
+For a dashboard eval that must stay current, is a monitor on the instant evals judge enough (built today, new traces only), or do we build scheduled runs (new work, can go back over old traces)?
 
-Our recommendation: point at a saved run.
+Our recommendation: a monitor for current numbers; a run for one-off numbers over past traces; no scheduled runs until a customer needs a backfilled live number.
 
-| Answer                             | What it costs                                                                                                                                                                                                                                                                          |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Point at a saved run (recommended) | New product work: a widget-to-run binding and a schedule. Judge cost is paid once per run. Numbers are stable and every viewer sees the same ones. The numbers go stale until the next run.                                                                                            |
-| Call `eval()` live on each refresh | No new work. Judge cost is paid on every refresh by every viewer, with no cache. The cap of 1,000 keys per `eval()` limits the widget to small windows. Two viewers can see different numbers. A busy dashboard can drain the 1 USD free budget of an organisation that is not billed. |
+| Answer                                        | What it costs                                                                                                                                                                           |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Monitor (recommended)                         | No new work. Judge cost per new trace. Numbers are stable and shared. No backfill of old traces.                                                                                        |
+| Scheduled run                                 | New product work: a schedule and a widget-to-run binding. Judge cost per run. Can go back over old traces. Numbers go stale until the next run.                                         |
+| Live `eval()` on each refresh, with no cache  | No new work. Judge cost on every refresh by every viewer. The 1,000-key cap limits the widget to small windows. Two viewers can see different numbers. Can drain the 1 USD free budget. |
+| Live `eval()` with a verdict cache (Option A) | Small build. Judge cost only on new text. Numbers can drift as the cache expires.                                                                                                       |
+
+Other open decisions (judgment retention, pricing of runs) go to the build PLAN, each with a recommendation in section 6.
 
 ## 6. Open risks and what a build PLAN needs
 
 ### Risks
 
-- Retention mismatch. Judgments are kept without limit. Traces follow the project retention. A judgment can outlive its trace, and the drawer would never show it. Someone must decide whether judgments follow trace retention.
-- Drawer join cost. The judgments order key starts with `TenantId, RunId`. A lookup by `TraceId` alone is not a prefix of the key. On a large run, this may scan many parts. A skip index or a trace-first projection may be needed. This is unmeasured.
-- Stale runs. A saved run does not see new traces. A dashboard needs a schedule to keep up.
+- Retention mismatch. Judgments are kept without limit. Traces follow the project retention. A judgment can outlive its trace, and the drawer would never show it. Recommendation: judgments follow the project's trace retention, decided in the build PLAN.
+- Drawer join cost. The judgments order key starts with `TenantId, RunId`. A lookup by `TraceId` alone is not a prefix of the key. On a large run, this may scan many parts. The fix to name is a `TraceId` bloom-filter skip index in a goose migration with `IF NOT EXISTS`, materialised as a background step. This is unmeasured.
+- Stale runs. A saved run does not see new traces. A current dashboard number uses a monitor (Option E), or scheduled runs if Drew picks them.
 - Two vocabularies. Filters on monitor results use `evaluations.passed`. Filters on runs use `eval:"q"`. A user may not know which to use.
-- Widgets may call `eval()` today. This is inferred from the code and not traced end to end. It must be verified before the question in section 5 is put to a customer.
-- Billing. Nobody is charged yet. The cost of a scheduled run is unknown until it is priced.
+- Widgets may call `eval()` today. This is inferred from the code and not traced end to end. It must be verified before the options in section 5 are put to a customer.
+- Billing. Nobody is charged yet. The cost of a run is unknown until it is priced. Recommendation: price in the build PLAN, after the first usage numbers.
 - Two places by design. A monitor that uses the instant evals judge already writes `evaluation_runs`. So "instant eval" already lives in two stores. The drawer must label the source so a user can tell them apart.
 
 ### What a build PLAN needs
 
-- A trace-drawer read. The trace module's repository must call the instant-eval module's `*Api`, not its table (a module rule).
-- A saved or scheduled run concept for dashboards.
-- A widget-to-run binding.
+- A trace-drawer read. Add `instant_eval_judgments` to the `shared` list in `packages/architecture-enforcer/src/policies/persistence/clickhouse-table-ownership.ts` with reader trace, and read it from a trace repository. Do not call `InstantEvalApi` from trace (peer cycle).
+- A check that a dashboard widget can or cannot call `eval()` today (the inferred claim).
+- Only if Drew picks scheduled runs: a scheduled run concept and a widget-to-run binding.
 - A decision on retention for judgments.
 - A Langy prompt and knowledge update, and a Langy scenario that checks the one answer.
 - Feature files under `specs/` for the three scenarios in the issue, error paths included.
 - The lint and architecture policy checks for the touched paths.
-- Proof: a run shows on a trace; a widget reads a saved run; Langy answers the same way each time.
+- Proof: a run shows on a trace; a monitor on the instant evals judge feeds a dashboard; Langy answers the same way each time.
+
+## Consequences
+
+If this is accepted:
+
+- Langy gives one answer, as in section 5.
+- A trace drawer gets a card for Instant Eval runs, after the read is built.
+- Monitors do not change.
+- No new table is added, and nothing is mirrored into `evaluation_runs`.
+- Scheduled runs are not built until a customer needs a backfilled live number.
 
 ## References
 
 - ADR-153: An Instant Eval run is a judgment job over the same statement, not a monitor run: `dev/docs/adr/153-instant-eval-run-is-a-judgment-job.md`
 - ADR-174: An LLM judge on Instant Evals is one metered, budget-checked call: `dev/docs/adr/174-instant-evals-judge-call-is-metered.md`
 - ADR-182: The Instant Evals decision model is a Default models column: `dev/docs/adr/182-instant-evals-decision-model-is-a-default-model-column.md`
-- ADR-144: Trace search routes on Enter: `dev/docs/adr/144-trace-search-routes-on-enter.md`
 - Issue: https://github.com/langwatch/tasks/issues/986
