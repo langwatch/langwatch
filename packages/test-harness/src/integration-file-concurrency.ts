@@ -33,3 +33,21 @@ export function assertSerialWorkerSlot(env: NodeJS.ProcessEnv): void {
       "it, or set VITEST_INTEGRATION_PARALLEL=1 to ask for concurrency deliberately.",
   );
 }
+
+/**
+ * Runs a suite's files `workers` at a time in CI, and asks for concurrency by name so the
+ * serial guards above stand down. Only for a suite whose files cannot see one another's
+ * state, and heavy enough that run-package-suites.ts gives it its shard alone. Off CI the
+ * launcher's own count stands, so a laptop starts no more containers than it did.
+ */
+export function raiseWorkerCountInCI({
+  env,
+  workers,
+}: {
+  env: NodeJS.ProcessEnv;
+  workers: number;
+}): void {
+  if (!env.CI || env.CI === "false" || env.CI === "0") return;
+  env.VITEST_MAX_WORKERS = String(workers);
+  env.VITEST_INTEGRATION_PARALLEL = "1";
+}

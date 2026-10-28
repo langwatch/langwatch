@@ -30,6 +30,10 @@
       "types": "./dist/client-doubles/stripe.double.d.ts",
       "default": "./src/client-doubles/stripe.double.ts"
     },
+    "./integration-file-concurrency": {
+      "types": "./dist/integration-file-concurrency.d.ts",
+      "default": "./src/integration-file-concurrency.ts"
+    },
     "./nlpgo": {
       "types": "./dist/nlpgo.d.ts",
       "default": "./src/nlpgo.ts"

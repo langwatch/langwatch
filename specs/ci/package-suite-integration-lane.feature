@@ -160,6 +160,17 @@ Feature: A package's integration suite runs in CI when it declares one
       Then no other suite runs while a heavy suite runs
       And every heavy suite starts before any light one
 
+    # A heavy suite has its shard to itself, so one whose files are isolated by
+    # construction can use the cores the rule leaves idle. @langwatch/analytics-process's
+    # integration lane spent 270 to 400s standing up a container and a database per
+    # file, two files at a time.
+    @unit
+    Scenario: A heavy integration suite whose files are isolated runs more of them at once in CI
+      Given an integration suite whose files cannot see one another's state
+      When its config asks for three workers and it runs in CI
+      Then its files run three at a time, with concurrency asked for by name
+      And off CI the launcher's own worker count stands
+
     @unit
     Scenario: A shard starts its heaviest suites first
       Given a shard whose packages differ in recorded weight
