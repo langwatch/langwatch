@@ -45,7 +45,7 @@ async function openProjectSubmenu() {
 }
 
 describe("the project submenu opened in a real engine", () => {
-  /** @scenario "The project search box is the shared search field" */
+  /** @scenario "Scope filter project search field displays a search icon" */
   it("draws the shared field's icon inside the input box, not beside it", async () => {
     mount();
     const search = await openProjectSubmenu();
