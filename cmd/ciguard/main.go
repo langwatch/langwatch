@@ -47,6 +47,7 @@ func main() {
 		{name: "static-cloud-keys", run: ciguard.StaticCloudKeys},
 		{name: "lambda-workdir", run: ciguard.LambdaWorkdir},
 		{name: "publish-shape", run: ciguard.PublishShape},
+		{name: "main-suites", run: ciguard.MainSuites},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
