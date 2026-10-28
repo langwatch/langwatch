@@ -22,6 +22,7 @@ import { toDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { AgentRepository, AgentVersionRecord } from "../repositories/agent.repository.ts";
+import { versionMayCopy } from "../rules/agent-version-snapshot.rules.ts";
 
 /** An agent as one of its versions holds it; `version` is null for a connected agent. */
 type ResolvedAgentVersion = { agent: Agent; version: number | null };
@@ -226,7 +227,8 @@ export class AgentVersionService {
 
   /**
    * Version 1 for every agent written before versions existed, its creator read from the
-   * earliest `agents.create` audit entry. Writes nothing on a dry run; a re-run writes nothing.
+   * earliest `agents.create` audit entry. An HTTP agent still holding a typed-in credential
+   * gets none. Writes nothing on a dry run; a re-run writes nothing.
    */
   async backfill(input: {
     dryRun: boolean;
@@ -258,6 +260,7 @@ export class AgentVersionService {
     let written = 0;
     let wouldWrite = 0;
     for (const agent of input.page) {
+      if (!(await versionMayCopy(agent))) continue;
       if (input.dryRun) {
         if (!(await this.#hasVersions(agent))) wouldWrite += 1;
         continue;

@@ -22,6 +22,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
+import { versionMayCopy } from "../../rules/agent-version-snapshot.rules.ts";
 import type {
   AgentPresenceInput,
   AgentRepository,
@@ -153,6 +154,7 @@ export class MemoryAgentRepository implements AgentRepository {
 
   async update(input: UpdatePersistedAgentInput): Promise<Agent> {
     const agent = this.#get(input);
+    await this.#baselineIfUnversioned(agent);
 
     const saved = this.#save({
       ...agent,
@@ -166,7 +168,7 @@ export class MemoryAgentRepository implements AgentRepository {
     return saved;
   }
 
-  updateConfigIfUnchanged(
+  async updateConfigIfUnchanged(
     input: Parameters<AgentRepository["updateConfigIfUnchanged"]>[0],
   ): Promise<boolean> {
     const agent = this.#agents.get(input.id);
@@ -175,12 +177,13 @@ export class MemoryAgentRepository implements AgentRepository {
       agent.projectId !== input.projectId ||
       agent.updatedAt.getTime() !== input.updatedAt.epochMilliseconds
     ) {
-      return Promise.resolve(false);
+      return false;
     }
+    await this.#baselineIfUnversioned(agent);
     const saved = this.#save({ ...agent, config: input.config });
     this.#appendVersion({ agent: saved, author: undefined, commitMessage: undefined });
 
-    return Promise.resolve(true);
+    return true;
   }
 
   async archive(input: GetAgentInput): Promise<Agent> {
@@ -205,6 +208,7 @@ export class MemoryAgentRepository implements AgentRepository {
     if (agent.workflowId !== input.workflowId) {
       throw new AgentNotFoundError(input.id, input.projectId);
     }
+    await this.#baselineIfUnversioned(agent);
 
     const updated = agentSchema.parse({ ...agent, config: input.config });
     Object.assign(updated.config, structuredClone(input.config));
@@ -220,8 +224,10 @@ export class MemoryAgentRepository implements AgentRepository {
   }
 
   async updateNameAndConfig(input: UpdateAgentCopyInput): Promise<void> {
+    const agent = this.#get(input);
+    await this.#baselineIfUnversioned(agent);
     const saved = this.#save({
-      ...this.#get(input),
+      ...agent,
       name: input.name,
       config: input.config,
       ...(input.author ? { updatedById: input.author.authorId } : {}),
@@ -316,7 +322,7 @@ export class MemoryAgentRepository implements AgentRepository {
   async findUnversioned(input: { afterId: string | null; limit: number }): Promise<Agent[]> {
     return structuredClone(
       [...this.#agents.values()]
-        .filter((agent) => agent.type !== "connected")
+        .filter((agent) => agent.type !== "connected" && agent.archivedAt === null)
         .filter((agent) => input.afterId === null || agent.id > input.afterId)
         .toSorted((left, right) => left.id.localeCompare(right.id))
         .slice(0, input.limit),
@@ -352,6 +358,13 @@ export class MemoryAgentRepository implements AgentRepository {
 
   #seedUnversioned(agent: Agent): void {
     this.#agents.set(agent.id, structuredClone(agent));
+  }
+
+  /** An agent saved before versions existed keeps its old config as version 1. */
+  async #baselineIfUnversioned(agent: Agent): Promise<void> {
+    if (this.#versions.some((row) => row.agentId === agent.id)) return;
+    if (!(await versionMayCopy(agent))) return;
+    await this.backfillFirstVersion({ agent, createdById: agent.createdById ?? null });
   }
 
   #appendVersion(input: {

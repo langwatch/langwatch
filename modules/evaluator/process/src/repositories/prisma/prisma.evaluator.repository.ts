@@ -459,35 +459,42 @@ export class PrismaEvaluatorRepository
     evaluator: Evaluator;
     createdById: string | null;
   }): Promise<boolean> {
-    const { evaluator } = input;
-    return this.transaction(async (transaction) => {
-      const existing = await transaction.evaluatorVersion.count({
-        where: { projectId: evaluator.projectId, evaluatorId: evaluator.id },
-      });
-      if (existing > 0) return false;
-      await transaction.evaluatorVersion.create({
-        data: {
-          id: generate("evaluatorversion").toString(),
-          projectId: evaluator.projectId,
-          evaluatorId: evaluator.id,
-          version: 1,
-          name: evaluator.name,
-          type: evaluator.type,
-          config: jsonInput(evaluatorConfigSchema.parse(evaluator.config ?? {})),
-          workflowId: evaluator.workflowId,
-          authorId: input.createdById,
-          authorKind: input.createdById ? "user" : "system",
-          createdAt: evaluator.createdAt,
-        },
-      });
-      if (input.createdById) {
-        await transaction.evaluator.updateMany({
-          where: { projectId: evaluator.projectId, id: evaluator.id, createdById: null },
-          data: { createdById: input.createdById, updatedAt: evaluator.updatedAt },
-        });
-      }
-      return true;
+    return this.transaction((transaction) => this.#firstVersion({ transaction, ...input }));
+  }
+
+  /** Version 1 from the row as it stands; false when the evaluator already has versions. */
+  async #firstVersion(input: {
+    transaction: VersionTransaction;
+    evaluator: Evaluator;
+    createdById: string | null;
+  }): Promise<boolean> {
+    const { transaction, evaluator } = input;
+    const existing = await transaction.evaluatorVersion.count({
+      where: { projectId: evaluator.projectId, evaluatorId: evaluator.id },
     });
+    if (existing > 0) return false;
+    await transaction.evaluatorVersion.create({
+      data: {
+        id: generate("evaluatorversion").toString(),
+        projectId: evaluator.projectId,
+        evaluatorId: evaluator.id,
+        version: 1,
+        name: evaluator.name,
+        type: evaluator.type,
+        config: jsonInput(evaluatorConfigSchema.safeParse(evaluator.config).data ?? {}),
+        workflowId: evaluator.workflowId,
+        authorId: input.createdById,
+        authorKind: input.createdById ? "user" : "system",
+        createdAt: evaluator.createdAt,
+      },
+    });
+    if (input.createdById) {
+      await transaction.evaluator.updateMany({
+        where: { projectId: evaluator.projectId, id: evaluator.id, createdById: null },
+        data: { createdById: input.createdById, updatedAt: evaluator.updatedAt },
+      });
+    }
+    return true;
   }
 
   /**
@@ -534,6 +541,8 @@ export class PrismaEvaluatorRepository
     });
     const changed = evaluatorVersionChanged({ before: mapRow(before), after: mapRow(updated) });
     if (!changed) return updated;
+    const old = mapRow(before);
+    await this.#firstVersion({ transaction, evaluator: old, createdById: old.createdById ?? null });
     await this.#appendVersion({
       transaction,
       evaluator: updated,

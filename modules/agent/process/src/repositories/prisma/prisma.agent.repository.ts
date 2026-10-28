@@ -32,6 +32,7 @@ import type { Prisma } from "@langwatch/prisma-client/generated";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
+import { versionMayCopy } from "../../rules/agent-version-snapshot.rules.ts";
 import type {
   AgentRepository,
   PersistAgentInput,
@@ -556,6 +557,7 @@ export class PrismaAgentRepository
     const rows = await this.prisma.agent.findMany({
       where: {
         type: { not: "connected" },
+        archivedAt: null,
         ...(input.afterId ? { id: { gt: input.afterId } } : {}),
       },
       orderBy: { id: "asc" },
@@ -568,35 +570,42 @@ export class PrismaAgentRepository
     agent: Agent;
     createdById: string | null;
   }): Promise<boolean> {
-    const { agent } = input;
-    return this.transaction(async (transaction) => {
-      const existing = await transaction.agentVersion.count({
-        where: { projectId: agent.projectId, agentId: agent.id },
-      });
-      if (existing > 0) return false;
-      await transaction.agentVersion.create({
-        data: {
-          id: generate("agentversion").toString(),
-          projectId: agent.projectId,
-          agentId: agent.id,
-          version: 1,
-          name: agent.name,
-          type: agent.type,
-          config: configSchema.parse(agent.config),
-          workflowId: agent.workflowId,
-          authorId: input.createdById,
-          authorKind: input.createdById ? "user" : "system",
-          createdAt: agent.createdAt,
-        },
-      });
-      if (input.createdById) {
-        await transaction.agent.updateMany({
-          where: { projectId: agent.projectId, id: agent.id, createdById: null },
-          data: { createdById: input.createdById, updatedAt: agent.updatedAt },
-        });
-      }
-      return true;
+    return this.transaction((transaction) => this.#firstVersion({ transaction, ...input }));
+  }
+
+  /** Version 1 from the row as it stands; false when the agent already has versions. */
+  async #firstVersion(input: {
+    transaction: VersionTransaction;
+    agent: Agent;
+    createdById: string | null;
+  }): Promise<boolean> {
+    const { transaction, agent } = input;
+    const existing = await transaction.agentVersion.count({
+      where: { projectId: agent.projectId, agentId: agent.id },
     });
+    if (existing > 0) return false;
+    await transaction.agentVersion.create({
+      data: {
+        id: generate("agentversion").toString(),
+        projectId: agent.projectId,
+        agentId: agent.id,
+        version: 1,
+        name: agent.name,
+        type: agent.type,
+        config: configSchema.parse(agent.config),
+        workflowId: agent.workflowId,
+        authorId: input.createdById,
+        authorKind: input.createdById ? "user" : "system",
+        createdAt: agent.createdAt,
+      },
+    });
+    if (input.createdById) {
+      await transaction.agent.updateMany({
+        where: { projectId: agent.projectId, id: agent.id, createdById: null },
+        data: { createdById: input.createdById, updatedAt: agent.updatedAt },
+      });
+    }
+    return true;
   }
 
   /** Writes the row and appends the next version in one transaction, again on a number race. */
@@ -612,8 +621,10 @@ export class PrismaAgentRepository
     for (let attempt = 1; attempt <= VERSION_WRITE_ATTEMPTS; attempt += 1) {
       try {
         return await this.transaction(async (transaction) => {
+          const where = { ...input.where, id: input.id, projectId: input.projectId };
+          await this.#baselineIfUnversioned({ transaction, where });
           const updated = await transaction.agent.update({
-            where: { ...input.where, id: input.id, projectId: input.projectId },
+            where,
             data: {
               ...input.data,
               ...(input.author ? { updatedById: input.author.authorId } : {}),
@@ -637,6 +648,21 @@ export class PrismaAgentRepository
     throw new Error(
       `Agent ${input.id} lost the version number race ${VERSION_WRITE_ATTEMPTS} times`,
     );
+  }
+
+  /** An agent saved before versions existed keeps its old config as version 1. */
+  async #baselineIfUnversioned(input: {
+    transaction: VersionTransaction;
+    where: Prisma.AgentWhereInput;
+  }): Promise<void> {
+    const before = await input.transaction.agent.findFirst({ where: input.where });
+    if (!before || !(await versionMayCopy(before))) return;
+    const agent = mapAgentRow(before);
+    await this.#firstVersion({
+      transaction: input.transaction,
+      agent,
+      createdById: agent.createdById ?? null,
+    });
   }
 
   async #appendVersion(input: {

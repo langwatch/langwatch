@@ -197,6 +197,20 @@ Feature: Agent versions and deploy labels
     And its creator is read from its earliest "agents.create" audit entry
     And a second run writes nothing
 
+  @integration
+  Scenario: A legacy agent's first save keeps its old config as version 1
+    Given an agent created before versions existed
+    When it is saved before the backfill reaches it
+    Then version 1 holds the config it had before the save
+    And version 2 holds the saved config
+
+  @integration
+  Scenario: No version copies a typed-in HTTP credential
+    Given an HTTP agent whose config still holds a typed-in credential
+    When the backfill runs or the credential move saves the agent
+    Then no version holds the typed-in credential
+    And archived agents get no version 1
+
   @unit
   Scenario: The backfill dry run writes nothing
     Given an agent without versions
