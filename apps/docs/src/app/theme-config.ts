@@ -26,6 +26,8 @@ export const docsTheme = {
           contents: colour({ light: "#5e5d56", dark: "#9a9992" }),
           action: colour({ light: "#141417", dark: "#f0f0ee" }),
           actionText: colour({ light: "#ffffff", dark: "#141417" }),
+          logoChip: colour({ light: "#ffffff", dark: "#eeece8" }),
+          logoChipRing: { value: "rgba(32, 30, 27, 0.1)" },
         },
         bg: {
           DEFAULT: { value: "{colors.bg.surface}" },

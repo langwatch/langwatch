@@ -68,8 +68,8 @@ function NavGlyph({ icon }: { icon: string }) {
       width="20px"
       height="20px"
       borderRadius="5px"
-      bg={colour ? void 0 : { base: "white", _dark: "#eeece8" }}
-      boxShadow={colour ? void 0 : "inset 0 0 0 1px rgba(32, 30, 27, 0.1)"}
+      bg={colour ? void 0 : "docs.logoChip"}
+      boxShadow={colour ? void 0 : "inset 0 0 0 1px {colors.docs.logoChipRing}"}
     >
       <img
         src={sitePath({ path: icon })}

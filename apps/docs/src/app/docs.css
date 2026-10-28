@@ -1396,11 +1396,8 @@ figure > .docs-shot {
   object-fit: contain;
 }
 .docs-command-logo[data-chip] {
-  background: white;
-  box-shadow: inset 0 0 0 1px rgba(32, 30, 27, 0.1);
-}
-.dark .docs-command-logo[data-chip] {
-  background: #eeece8;
+  background: var(--chakra-colors-docs-logo-chip);
+  box-shadow: inset 0 0 0 1px var(--chakra-colors-docs-logo-chip-ring);
 }
 .dark .docs-command-logo[data-chip] img {
   filter: none;
@@ -2552,7 +2549,7 @@ html[data-docs-theme-change]::view-transition-new(root) {
   --nf-red: var(--chakra-colors-red-fg);
   --nf-accent: var(--chakra-colors-accent-fg);
   --nf-line: var(--chakra-colors-border);
-  --nf-mark: #f56b1a;
+  --nf-mark: var(--chakra-colors-docs-primary);
   flex: 1;
   min-width: 0;
   padding: 40px 48px 64px;
