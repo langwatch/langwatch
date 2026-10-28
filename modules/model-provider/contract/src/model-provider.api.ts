@@ -300,11 +300,9 @@ export interface ModelProviderApi {
   findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null>;
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution>;
   /**
-   * What the project's Instant Evals run on: LangWatch's classifier, or the organization's own
-   * decision model with its decrypted key. An own model that cannot run answers `own_unavailable`,
-   * never `langwatch` (ADR-182 decisions 4 and 5). The answer is kept a minute per project.
-   * `model` is one caller's pick, weighed by the same guards; anything but a decision model id
-   * is ignored and the project's column answers instead.
+   * What the project's Instant Evals run on, or `model` when a caller picked one: LangWatch's
+   * classifier, or the organization's own decision model with its key. One that cannot run
+   * answers `own_unavailable`, never `langwatch`; a non-decision model id is ignored (ADR-182).
    */
   resolveDecisionModel(input: {
     projectId: string;

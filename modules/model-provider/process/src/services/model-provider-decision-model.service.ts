@@ -91,7 +91,7 @@ export class ModelProviderDecisionModelService {
     return resolution;
   }
 
-  /** Which decision models this project may be offered: the hosted one, then those that would run. */
+  /** The decision models this project may be offered: the hosted one, then any that would run. */
   async listPickable({ projectId }: { projectId: string }): Promise<readonly BuiltInModel[]> {
     const hosted = findDecisionModel(LANGWATCH_DECISION_MODEL_ID);
     const pickable: BuiltInModel[] = hosted ? [choiceOf(hosted)] : [];
