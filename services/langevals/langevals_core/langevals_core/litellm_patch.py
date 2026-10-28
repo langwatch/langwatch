@@ -58,14 +58,26 @@ REASONING_OFF = "none"
 # where the behavior changes: openai/gpt-5.6-sol-pro, azure/gpt-5.6-sol and
 # openai/gpt-5.5-sol all accept the combination, and some reasoning models
 # refuse to run with their reasoning off at all. A model joins this set once it
-# has actually been observed to need it.
+# has been observed to need it; one that refuses at runtime is retried with
+# reasoning off and remembered in `tool_reasoning_off_models`.
 TOOL_REASONING_INCOMPATIBLE_MODELS = frozenset(
     {
         "openai/gpt-5.6-luna",
         "openai/gpt-5.6-sol",
         "openai/gpt-5.6-terra",
+        "openai/gpt-6-astra",
+        "openai/gpt-6-luna",
+        "openai/gpt-6-sol",
+        "openai/gpt-6.1-sol",
+        "openai/gpt-6.1-terra",
     }
 )
+
+# Models seen refusing function tools with reasoning on in this process.
+tool_reasoning_off_models: set[str] = set()
+
+# Models seen refusing any temperature but the default in this process.
+temperature_pinned_models: set[str] = set()
 
 
 class ToolReasoningConflictError(Exception):
@@ -272,19 +284,60 @@ def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
     specific reasoning effort keeps it and gets the provider's own answer
     rather than having its intent silently rewritten. A request carrying no
     tools is left alone, since the incompatibility is only about tools and
-    reasoning is worth having on the calls that can use it. And a model outside
-    the allowlist is left alone, since disabling reasoning is itself rejected by
-    models that only work with it on.
+    reasoning is worth having on the calls that can use it. And a model that is
+    neither in the allowlist nor in `tool_reasoning_off_models` (seen refusing
+    in this process) is left alone, since disabling reasoning is itself
+    rejected by models that only work with it on.
     """
     if kwargs.get(REASONING_EFFORT_PARAM) is not None:
         return kwargs
     if not kwargs.get("tools"):
         return kwargs
-    if kwargs.get("model") not in TOOL_REASONING_INCOMPATIBLE_MODELS:
+    model = kwargs.get("model")
+    if model not in TOOL_REASONING_INCOMPATIBLE_MODELS and model not in tool_reasoning_off_models:
         return kwargs
 
-    kwargs[REASONING_EFFORT_PARAM] = REASONING_OFF
-    return kwargs
+    return with_reasoning_off(kwargs)
+
+
+def with_reasoning_off(kwargs: dict) -> dict:
+    """The request with reasoning switched off. The parameter is also named in
+    allowed_openai_params: litellm does not know every new model takes a
+    reasoning effort, and drop_params would strip it unsent."""
+    allowed = list(kwargs.get("allowed_openai_params") or [])
+    if REASONING_EFFORT_PARAM not in allowed:
+        allowed.append(REASONING_EFFORT_PARAM)
+    return {**kwargs, REASONING_EFFORT_PARAM: REASONING_OFF, "allowed_openai_params": allowed}
+
+
+def temperature_refused(kwargs: dict, exception: BaseException) -> bool:
+    """Whether the provider refused the temperature because the model only
+    takes its default ("'temperature' does not support 0 with this model.
+    Only the default (1) value is supported.")."""
+    if kwargs.get("temperature") in (None, 1, 1.0):
+        return False
+    message = str(exception).lower()
+    return "temperature" in message and "only the default (1)" in message
+
+
+def adjusted_after_refusal(kwargs: dict, exception: BaseException) -> Optional[dict]:
+    """The request to send again after a refusal the provider said how to
+    avoid, or None when the refusal belongs to the caller. Each adjustment
+    applies once per request, and the model is remembered so later calls are
+    sent adjusted from the start. A reasoning effort the caller chose is kept."""
+    model = kwargs.get("model")
+    if (
+        kwargs.get(REASONING_EFFORT_PARAM) is None
+        and tool_reasoning_conflict(kwargs, exception) is not None
+    ):
+        if model:
+            tool_reasoning_off_models.add(model)
+        return with_reasoning_off(kwargs)
+    if temperature_refused(kwargs, exception):
+        if model:
+            temperature_pinned_models.add(model)
+        return {**kwargs, "temperature": 1.0}
+    return None
 
 
 # The gpt-5 models that DO accept a temperature, so the family test does not
@@ -321,14 +374,15 @@ def is_temperature_pinned_model(model: Optional[str]) -> bool:
     return "gpt-5" in name
 
 
-def apply_gpt5_temperature_compatibility(
+def apply_temperature_compatibility(
     kwargs: dict, requested_model: Optional[str] = None
 ) -> dict:
     """
-    Pin temperature to the default for the gpt-5-family models that accept only
-    that value and reject every other with a BadRequestError ("'temperature'
-    does not support 0.0 with this model. Only the default (1) value is
-    supported.").
+    Pin temperature to the default for the models that accept only that value
+    and reject every other with a BadRequestError ("'temperature' does not
+    support 0.0 with this model. Only the default (1) value is supported."):
+    the gpt-5 family by name, and any model in `temperature_pinned_models`,
+    seen refusing in this process.
 
     drop_params cannot cover this: it strips parameters a model does not
     support at all, and these models do support temperature — they restrict
@@ -353,6 +407,7 @@ def apply_gpt5_temperature_compatibility(
     if not (
         is_temperature_pinned_model(kwargs.get("model"))
         or is_temperature_pinned_model(requested_model)
+        or kwargs.get("model") in temperature_pinned_models
     ):
         return kwargs
     if kwargs.get("temperature") in (None, 1, 1.0):
@@ -602,7 +657,7 @@ def patch_litellm_params(kwargs):
     # Same position for the same reason: the model name is now final, and an
     # explicit X_LITELLM_temperature has landed — a value the model refuses
     # is normalized rather than sent to fail.
-    kwargs = apply_gpt5_temperature_compatibility(
+    kwargs = apply_temperature_compatibility(
         kwargs, requested_model=requested_model
     )
     # Same position again: both sampling knobs have landed by now, wherever
@@ -685,49 +740,61 @@ def patch_litellm():
         retry = await originals["acompletion"](*args, **with_reminder(kwargs))
         return with_usage_of(retry, [response])
 
+    def complete(args, kwargs):
+        if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
+            kwargs.get("tool_choice")
+        ):
+            return complete_with_auto_tool_choice(args, kwargs)
+        try:
+            return complete_forced(args, kwargs)
+        except Exception as exception:
+            if not forced_tool_choice_refused(kwargs, exception):
+                raise
+            forced_tool_choice_refusers.add(kwargs.get("model"))
+            return complete_with_auto_tool_choice(args, kwargs)
+
+    async def acomplete(args, kwargs):
+        if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
+            kwargs.get("tool_choice")
+        ):
+            return await acomplete_with_auto_tool_choice(args, kwargs)
+        try:
+            return await acomplete_forced(args, kwargs)
+        except Exception as exception:
+            if not forced_tool_choice_refused(kwargs, exception):
+                raise
+            forced_tool_choice_refusers.add(kwargs.get("model"))
+            return await acomplete_with_auto_tool_choice(args, kwargs)
+
     def patched_completion(*args, **kwargs):
         kwargs = patch_litellm_params(kwargs)
-
-        try:
-            if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
-                kwargs.get("tool_choice")
-            ):
-                return complete_with_auto_tool_choice(args, kwargs)
+        while True:
             try:
-                return complete_forced(args, kwargs)
+                return complete(args, kwargs)
             except Exception as exception:
-                if not forced_tool_choice_refused(kwargs, exception):
+                adjusted = adjusted_after_refusal(kwargs, exception)
+                if adjusted is None:
+                    conflict = tool_reasoning_conflict(kwargs, exception)
+                    if conflict is not None:
+                        raise conflict from exception
                     raise
-                forced_tool_choice_refusers.add(kwargs.get("model"))
-                return complete_with_auto_tool_choice(args, kwargs)
-        except Exception as exception:
-            conflict = tool_reasoning_conflict(kwargs, exception)
-            if conflict is not None:
-                raise conflict from exception
-            raise
+                kwargs = adjusted
 
     litellm.completion = patched_completion
 
     async def patched_acompletion(*args, **kwargs):
         kwargs = patch_litellm_params(kwargs)
-
-        try:
-            if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
-                kwargs.get("tool_choice")
-            ):
-                return await acomplete_with_auto_tool_choice(args, kwargs)
+        while True:
             try:
-                return await acomplete_forced(args, kwargs)
+                return await acomplete(args, kwargs)
             except Exception as exception:
-                if not forced_tool_choice_refused(kwargs, exception):
+                adjusted = adjusted_after_refusal(kwargs, exception)
+                if adjusted is None:
+                    conflict = tool_reasoning_conflict(kwargs, exception)
+                    if conflict is not None:
+                        raise conflict from exception
                     raise
-                forced_tool_choice_refusers.add(kwargs.get("model"))
-                return await acomplete_with_auto_tool_choice(args, kwargs)
-        except Exception as exception:
-            conflict = tool_reasoning_conflict(kwargs, exception)
-            if conflict is not None:
-                raise conflict from exception
-            raise
+                kwargs = adjusted
 
     litellm.acompletion = patched_acompletion
 

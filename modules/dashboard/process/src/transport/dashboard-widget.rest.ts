@@ -56,8 +56,20 @@ const widgetNotFoundResponse: Record<404, RouteResponse> = {
   },
 };
 
-/** The widget as the API publishes it. */
-function widgetResource(
+/** The not-found answer of adding a widget to a board, which either id can cause. */
+const widgetOrBoardNotFoundResponse: Record<404, RouteResponse> = {
+  404: {
+    description:
+      "No dashboard widget with this id, or no dashboard with this id, in this project. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
+    content: { "application/json": { schema: resolver(apiErrorSchema) } },
+  },
+};
+
+/**
+ * The widget as the API publishes it. `platformUrl` is the Dashboards list; a widget on a board
+ * links to that board's page.
+ */
+export function widgetResource(
   widget: DashboardWidget,
   platformUrl: string,
 ): z.infer<typeof dashboardWidgetResourceSchema> {
@@ -67,7 +79,9 @@ function widgetResource(
     definition: { ...widget.definition, queries: [...widget.definition.queries] },
     createdAt: widget.createdAt.toString(),
     updatedAt: widget.updatedAt.toString(),
-    platformUrl,
+    platformUrl: widget.dashboardId
+      ? `${platformUrl}/${encodeURIComponent(widget.dashboardId)}`
+      : platformUrl,
     dashboardId: widget.dashboardId,
     gridColumn: widget.gridColumn,
     gridRow: widget.gridRow,
@@ -242,7 +256,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
-      ...widgetNotFoundResponse,
+      ...widgetOrBoardNotFoundResponse,
       200: { description: "The widget was added to the dashboard" },
     },
   })

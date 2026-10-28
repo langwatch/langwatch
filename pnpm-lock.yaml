@@ -549,8 +549,8 @@ catalogs:
       specifier: ^2.4.2
       version: 2.4.2
     qs:
-      specifier: ^6.16.0
-      version: 6.16.0
+      specifier: ^6.17.0
+      version: 6.17.0
     react-contextual-analytics:
       specifier: ^1.1.2
       version: 1.1.2
@@ -730,7 +730,7 @@ overrides:
   protobufjs@<7.5.6: '>=7.5.6 <8.0.0'
   protobufjs@>=8.0.0 <8.6.0: '>=8.6.0'
   proxy-addr@<2.0.8: '>=2.0.8 <3'
-  qs@<6.16.0: '>=6.16.0 <7'
+  qs@<6.17.0: '>=6.17.0 <7'
   react: ^19.2.7
   react-dom: ^19.2.7
   react-is: ^19.2.7
@@ -4900,7 +4900,7 @@ importers:
         version: 2.0.6
       qs:
         specifier: 'catalog:'
-        version: 6.16.0
+        version: 6.17.0
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -8037,7 +8037,7 @@ importers:
         version: 2.0.6
       qs:
         specifier: 'catalog:'
-        version: 6.16.0
+        version: 6.17.0
       react-feather:
         specifier: 'catalog:'
         version: 2.0.10(react@19.2.8)
@@ -9432,6 +9432,9 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -9465,6 +9468,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.32.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.7)
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.9.1
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -11208,12 +11214,18 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../../../packages/mail
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:../../notification/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -11223,9 +11235,15 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
@@ -12650,6 +12668,9 @@ importers:
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -12689,6 +12710,9 @@ importers:
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.9.1
       hono:
         specifier: 'catalog:'
         version: 4.13.13
@@ -15382,7 +15406,7 @@ importers:
         version: 2.0.6
       qs:
         specifier: 'catalog:'
-        version: 6.16.0
+        version: 6.17.0
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -16925,7 +16949,7 @@ importers:
         version: 1.415.6
       qs:
         specifier: 'catalog:'
-        version: 6.16.0
+        version: 6.17.0
       react-error-boundary:
         specifier: 'catalog:'
         version: 6.1.2(react@19.2.8)
@@ -27889,8 +27913,8 @@ packages:
     resolution: {integrity: sha512-KTqnxsgGiQ6ZAzZCVlJH5eOjSnvlyEgx1m8bkRJfOhmGRqfo5KLvmAlACQkrjEtOQ4B7wF9TdSLIs9O90MX9xA==}
     engines: {node: '>=16.0.0'}
 
-  qs@6.16.0:
-    resolution: {integrity: sha512-h6fhOIaRrID2CbEY2fqs+7t+UXZo+MLAnU5gRIq85uFtdiUPCdsApMlHhXogKVM4HM2DVbIjGNTTYH2OcmP1vA==}
+  qs@6.17.0:
+    resolution: {integrity: sha512-5LK5BZ2XDHMvcUJaf0CQ5HL3aVgKbpklvByC7qLSxYkfE8COEEbJg5xCHWCTqzqi0Gs4Jn5Mv5v3R38W6edscA==}
     engines: {node: '>=0.6'}
 
   quansync@0.2.11:
@@ -36217,7 +36241,7 @@ snapshots:
       http-errors: 2.0.1
       iconv-lite: 0.7.2
       on-finished: 2.4.1
-      qs: 6.16.0
+      qs: 6.17.0
       raw-body: 3.0.2
       type-is: 2.1.0
     transitivePeerDependencies:
@@ -37266,7 +37290,7 @@ snapshots:
       once: 1.4.0
       parseurl: 1.3.3
       proxy-addr: 2.0.8
-      qs: 6.16.0
+      qs: 6.17.0
       range-parser: 1.3.0
       router: 2.2.0(supports-color@10.2.2)
       send: 1.2.1(supports-color@10.2.2)
@@ -37372,7 +37396,7 @@ snapshots:
       '@whatwg-node/server': 0.11.0
       hotscript: 1.0.13
       json-schema-to-ts: 3.1.1
-      qs: 6.16.0
+      qs: 6.17.0
       ts-toolbelt: 9.6.0
       tslib: 2.8.1
 
@@ -40115,7 +40139,7 @@ snapshots:
 
   pvutils@1.1.5: {}
 
-  qs@6.16.0:
+  qs@6.17.0:
     dependencies:
       es-define-property: 1.0.1
       side-channel: 1.1.1
@@ -41002,7 +41026,7 @@ snapshots:
   stripe@15.12.0:
     dependencies:
       '@types/node': 26.2.0
-      qs: 6.16.0
+      qs: 6.17.0
 
   strnum@2.4.2:
     dependencies:

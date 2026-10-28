@@ -110,7 +110,7 @@ def generate_article(topic: str):
         )
 
     with langwatch.span(name="GenerateText", type="llm") as llm_span:
-        llm_span.update(model="gpt-5", prompt_length=len(topic))
+        llm_span.update(model="gpt-6-luna", prompt_length=len(topic))
         article_text = generate(topic, research_data)
         llm_span.update(output_length=len(article_text), tokens_used=150)
 

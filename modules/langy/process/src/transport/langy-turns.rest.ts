@@ -13,8 +13,11 @@ import {
   langyRestConversationParamsSchema,
   langyRestTurnBodySchema,
   type LangyKeyCaller,
+  type LangyTurnSettlement,
 } from "@langwatch/langy-contract";
 import type { z } from "zod";
+
+import { langySilentTurnReplyFromParts } from "../rules/langy-empty-turn.rules.ts";
 
 /**
  * A turn is text plus small structured parts, never an upload.
@@ -37,6 +40,16 @@ const HONO_NOT_FOUND = {
 
 /** What a turn route publishes: its JSON answers, and the dark surface's bare 404. */
 const TURN_PRODUCES = ["application/json", "text/plain; charset=UTF-8"] as const;
+
+/**
+ * A completed turn with no reply text answers with its said lines or the card it waits on. Stays
+ * here, not in the settlement, so the canary still reads a silent model as `empty_reply`.
+ */
+function replyText(settlement: Extract<LangyTurnSettlement, { succeeded: true }>): string {
+  return settlement.outcome === "completed" && settlement.text.trim() === ""
+    ? langySilentTurnReplyFromParts(settlement.parts)
+    : settlement.text;
+}
 
 function parseRequestedWaitSeconds(request: Request): number | null {
   const prefer = request.headers.get("prefer");
@@ -120,7 +133,7 @@ async function startTurn(input: {
           status: settlement.outcome,
           error: settlement.error,
           reply: settlement.succeeded
-            ? { role: "assistant" as const, text: settlement.text }
+            ? { role: "assistant" as const, text: replyText(settlement) }
             : null,
         }),
         // RFC 7240 §3: echo the applied value - it is how a caller asking

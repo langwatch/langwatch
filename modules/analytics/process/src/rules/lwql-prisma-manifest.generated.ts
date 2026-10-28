@@ -579,6 +579,7 @@ export interface LwqlPrismaRows {
     readonly name: "String";
     readonly slug: "String";
     readonly apiKey: "String";
+    readonly legacyApiKeyLastUsedAt: "DateTime?";
     readonly lwqlKey: "String";
     readonly teamId: "String";
     readonly language: "String";
@@ -666,6 +667,8 @@ export interface LwqlPrismaRows {
     readonly threadIdleTimeout: "Int?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+    readonly autoPausedAt: "DateTime?";
+    readonly autoPausedReason: "String?";
   };
   readonly Cost: {
     readonly id: "String";
@@ -753,6 +756,7 @@ export interface LwqlPrismaRows {
     readonly createdById: "String?";
     readonly scope: "DashboardScope";
     readonly organizationId: "String?";
+    readonly excludedOrigins: "Json?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };

@@ -6,7 +6,7 @@ The server half of [dashboard](../README.md). Dashboards and the graphs and save
 
 ## Installation
 
-`defineProcessModule("dashboard").withRepositories(dashboardRepositories).withApi(DashboardModule).withTransports(dashboardRest, dashboardWidgetRest, boardRest, graphRest, savedWorkbenchChartRest, dashboardTrpcTransport, boardTrpcTransport, graphTrpcTransport, savedViewTrpcTransport, savedWorkbenchChartTrpcTransport, dashboardWidgetTrpcTransport).provideMiddlewareContext(…)`, `src/dashboard.module.ts:24`.
+`defineProcessModule("dashboard").withRepositories(dashboardRepositories).withApi(DashboardModule).withTransports(dashboardRest, dashboardWidgetRest, boardRest, boardProjectRest, graphRest, savedWorkbenchChartRest, dashboardTrpcTransport, boardTrpcTransport, graphTrpcTransport, savedViewTrpcTransport, savedWorkbenchChartTrpcTransport, dashboardWidgetTrpcTransport).provideMiddlewareContext(…)`, `src/dashboard.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Flat operations a door or a peer calls once the dashboard app is composed.
 
-Peers call these through the token, declared at `../contract/src/dashboard.api.ts:47`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/dashboard.api.ts:48`; nothing else in this package is public.
 
 #### `getAll`
 
@@ -93,7 +93,7 @@ getBoardLinks(input: { projectId: string; dashboardIds: string[]; }): Promise<Re
 One Dashboards board the viewer may open here: the project's own, or the organization's.
 
 ```typescript
-getBoard(input: { projectId: string; dashboardId: string; viewer?: DashboardViewer; }): Promise<Dashboard>;
+getBoard(input: { projectId: string; dashboardId: string; viewer?: DashboardViewer; }): Promise<Board>;
 ```
 
 #### `createBoard`
@@ -101,15 +101,15 @@ getBoard(input: { projectId: string; dashboardId: string; viewer?: DashboardView
 A Dashboards board at the scope Project; `createdById` is its author, absent for a project credential. A member's own My dashboard starts starred for them, at Only me (AC160b, AC170). `dashboards_not_enabled` while `release_dashboards` is off (AC189).
 
 ```typescript
-createBoard(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
+createBoard(input: { projectId: string; name: string; createdById?: string }): Promise<Board>;
 ```
 
 #### `updateBoard`
 
-The board's name and description, an absent field left as it is; `dashboards_not_enabled` while `release_dashboards` is off.
+The board's name, description and left-out origins (`null` restores the default, AC200), an absent field left as it is; `dashboards_not_enabled` while `release_dashboards` is off.
 
 ```typescript
-updateBoard(input: { projectId: string; dashboardId: string; viewer?: DashboardViewer; name?: string; description?: string | null; }): Promise<Dashboard>;
+updateBoard(input: { projectId: string; dashboardId: string; viewer?: DashboardViewer; name?: string; description?: string | null; excludedOrigins?: readonly string[] | null; }): Promise<Board>;
 ```
 
 #### `deleteBoard`
@@ -117,7 +117,7 @@ updateBoard(input: { projectId: string; dashboardId: string; viewer?: DashboardV
 The board, its widgets, every star on it and its stale legacy copy (AC199b); `dashboards_not_enabled` while `release_dashboards` is off.
 
 ```typescript
-deleteBoard(input: { projectId: string; dashboardId: string; viewer?: DashboardViewer; }): Promise<Dashboard>;
+deleteBoard(input: { projectId: string; dashboardId: string; viewer?: DashboardViewer; }): Promise<Board>;
 ```
 
 #### `listStarred`
@@ -163,7 +163,7 @@ getDashboardLinks(input: { projectId: string; dashboardIds: string[]; }): Promis
 Dashboards area: the author alone changes who sees a board, in the project that owns it.
 
 ```typescript
-setDashboardScope(input: { projectId: string; dashboardId: string; scope: DashboardScope; viewer: DashboardViewer; }): Promise<Dashboard>;
+setDashboardScope(input: { projectId: string; dashboardId: string; scope: DashboardScope; viewer: DashboardViewer; }): Promise<Board>;
 ```
 
 #### `getDashboardScopeImpact`
@@ -252,8 +252,10 @@ listDashboardWidgets(input: { projectId: string; dashboardId?: string; viewer?: 
 
 #### `getDashboardWidget`
 
+With `onDashboardId`, a widget on any other board, or on none, is not found.
+
 ```typescript
-getDashboardWidget(input: { projectId: string; id: string; viewer?: DashboardViewer; }): Promise<DashboardWidget>;
+getDashboardWidget(input: { projectId: string; id: string; onDashboardId?: string; viewer?: DashboardViewer; }): Promise<DashboardWidget>;
 ```
 
 #### `createDashboardWidget`
@@ -266,8 +268,10 @@ createDashboardWidget(input: { projectId: string; dashboardId?: string; name: st
 
 #### `updateDashboardWidget`
 
+With `onDashboardId`, a widget on any other board, or on none, is not found.
+
 ```typescript
-updateDashboardWidget(input: { projectId: string; id: string; name?: string; viewer?: DashboardViewer; } & Partial<DashboardWidgetDefinitionInput>): Promise<DashboardWidget>;
+updateDashboardWidget(input: { projectId: string; id: string; onDashboardId?: string; name?: string; viewer?: DashboardViewer; } & Partial<DashboardWidgetDefinitionInput>): Promise<DashboardWidget>;
 ```
 
 #### `assignDashboardWidgetToDashboard`
@@ -278,8 +282,10 @@ assignDashboardWidgetToDashboard(input: { projectId: string; id: string; dashboa
 
 #### `deleteDashboardWidget`
 
+With `onDashboardId`, a widget on any other board, or on none, is not found.
+
 ```typescript
-deleteDashboardWidget(input: { projectId: string; id: string; viewer?: DashboardViewer; }): Promise<void>;
+deleteDashboardWidget(input: { projectId: string; id: string; onDashboardId?: string; viewer?: DashboardViewer; }): Promise<void>;
 ```
 
 #### `updateDashboardWidgetLayout`
@@ -436,83 +442,261 @@ countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCoun
 
 ## REST transport
 
-### `boardRest`
+### `boardProjectRest`
 
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Declared at | `src/transport/board.rest.ts:57`       |
-| Base URL    | none: each route's path is its address |
-| Addressing  | literal                                |
-| Credential  | project                                |
+|             |                                           |
+| ----------- | ----------------------------------------- |
+| Declared at | `src/transport/board-project.rest.ts:118` |
+| Base URL    | none: each route's path is its address    |
+| Addressing  | literal                                   |
+| Credential  | project                                   |
 
-#### `GET /api/v1/projects/:projectId/analytics/boards` · `getApiV1ProjectsByProjectIdAnalyticsBoards`
+#### `GET /api/v1/projects/:projectId/analytics/dashboards` · `getApiV1ProjectsByProjectIdAnalyticsDashboards`
 
-List Dashboards boards
+List dashboards
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:62`.
+Permission `analytics:view`. Declared at `src/transport/board-project.rest.ts:123`.
 
-Answers at `/api/v1/projects/:projectId/analytics/boards`.
+Answers at `/api/v1/projects/:projectId/analytics/dashboards`.
 
 ```typescript
-// Params: boardProjectParamsSchema, ../contract/src/board-rest.schemas.ts:46
+// Params: boardProjectParamsSchema, ../contract/src/board-rest.schemas.ts:52
 interface Params {
   projectId: string;
 }
-// Response: boardListSchema, ../contract/src/board-rest.schemas.ts:39
-interface Response {
-  data: {
-    id: string;
-    name: string;
-    description: string | null;
-    scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-    createdAt: string;
-    updatedAt: string;
-    platformUrl: string;
-    widgetCount: number;
-  }[];
-}
+type Response = z.infer<typeof boardListSchema>; // ../contract/src/board-rest.schemas.ts:45
 ```
 
-#### `GET /api/v1/projects/:projectId/analytics/boards/:boardId` · `getApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId`
+#### `GET /api/v1/projects/:projectId/analytics/dashboards/:dashboardId` · `getApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId`
 
-Get a Dashboards board
+Get a dashboard
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:93`.
+Permission `analytics:view`. Declared at `src/transport/board-project.rest.ts:134`.
 
-Answers at `/api/v1/projects/:projectId/analytics/boards/:boardId`.
+Answers at `/api/v1/projects/:projectId/analytics/dashboards/:dashboardId`.
 
 ```typescript
-// Params: boardParamsSchema, ../contract/src/board-rest.schemas.ts:53
+// Params: boardParamsSchema, ../contract/src/board-rest.schemas.ts:59
 interface Params {
   projectId: string;
-  boardId: string;
+  dashboardId: string;
 }
-// Response: boardResourceSchema, ../contract/src/board-rest.schemas.ts:27
+// Response: boardResourceSchema, ../contract/src/board-rest.schemas.ts:33
 interface Response {
   id: string;
   name: string;
   description: string | null;
   scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+  excludedOrigins: string[] | null;
+  createdById: string | null;
   createdAt: string;
   updatedAt: string;
   platformUrl: string;
 }
 ```
 
+#### `GET /api/v1/projects/:projectId/analytics/boards` · `getApiV1ProjectsByProjectIdAnalyticsBoards`
+
+List dashboards
+
+Permission `analytics:view`. Deprecated. Declared at `src/transport/board-project.rest.ts:145`.
+
+Answers at `/api/v1/projects/:projectId/analytics/boards`.
+
+```typescript
+type Params = z.infer<typeof boardProjectParamsSchema>; // ../contract/src/board-rest.schemas.ts:52
+type Response = z.infer<typeof boardListSchema>; // ../contract/src/board-rest.schemas.ts:45
+```
+
+#### `GET /api/v1/projects/:projectId/analytics/boards/:dashboardId` · `getApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId`
+
+Get a dashboard
+
+Permission `analytics:view`. Deprecated. Declared at `src/transport/board-project.rest.ts:154`.
+
+Answers at `/api/v1/projects/:projectId/analytics/boards/:dashboardId`.
+
+```typescript
+type Params = z.infer<typeof boardParamsSchema>; // ../contract/src/board-rest.schemas.ts:59
+type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-rest.schemas.ts:33
+```
+
+### `boardRest`
+
+|             |                                              |
+| ----------- | -------------------------------------------- |
+| Declared at | `src/transport/board.rest.ts:91`             |
+| Base URL    | `/api/dashboards`, twin `/api/v1/dashboards` |
+| Addressing  | dated                                        |
+| Credential  | project                                      |
+| Versions    | `2026-10-26`                                 |
+
+#### `GET /` · `getApiDashboards`
+
+List dashboards
+
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:96`.
+
+Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-10-26`, `/api/v1/dashboards/2026-10-26`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
+
+```typescript
+type Response = z.infer<typeof boardListSchema>; // ../contract/src/board-rest.schemas.ts:45
+```
+
+#### `POST /` · `postApiDashboards`
+
+Create a dashboard
+
+Permission `analytics:create`. Declared at `src/transport/board.rest.ts:122`.
+
+Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-10-26`, `/api/v1/dashboards/2026-10-26`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
+
+```typescript
+// Body: createBoardSchema, ../contract/src/board-rest.schemas.ts:76
+interface Body {
+  name: string;
+}
+type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-rest.schemas.ts:33
+```
+
+#### `GET /:dashboardId` · `getApiDashboardsByDashboardId`
+
+Get a dashboard
+
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:149`.
+
+Answers at `/api/dashboards/:dashboardId`, `/api/v1/dashboards/:dashboardId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId`, `/api/v1/dashboards/2026-10-26/:dashboardId`, `/api/dashboards/latest/:dashboardId`, `/api/v1/dashboards/latest/:dashboardId`.
+
+```typescript
+// Params: boardIdParamsSchema, ../contract/src/board-rest.schemas.ts:65
+interface Params {
+  dashboardId: string;
+}
+type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-rest.schemas.ts:33
+```
+
+#### `PATCH /:dashboardId` · `patchApiDashboardsByDashboardId`
+
+Update a dashboard
+
+Permission `analytics:update`. Declared at `src/transport/board.rest.ts:176`.
+
+Answers at `/api/dashboards/:dashboardId`, `/api/v1/dashboards/:dashboardId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId`, `/api/v1/dashboards/2026-10-26/:dashboardId`, `/api/dashboards/latest/:dashboardId`, `/api/v1/dashboards/latest/:dashboardId`.
+
+```typescript
+type Params = z.infer<typeof boardIdParamsSchema>; // ../contract/src/board-rest.schemas.ts:65
+// Body: updateBoardSchema, ../contract/src/board-rest.schemas.ts:95
+interface Body {
+  name?: string;
+  description?: string | null;
+  excludedOrigins?: string[] | null;
+}
+type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-rest.schemas.ts:33
+```
+
+#### `DELETE /:dashboardId` · `deleteApiDashboardsByDashboardId`
+
+Delete a dashboard
+
+Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:210`.
+
+Answers at `/api/dashboards/:dashboardId`, `/api/v1/dashboards/:dashboardId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId`, `/api/v1/dashboards/2026-10-26/:dashboardId`, `/api/dashboards/latest/:dashboardId`, `/api/v1/dashboards/latest/:dashboardId`.
+
+```typescript
+type Params = z.infer<typeof boardIdParamsSchema>; // ../contract/src/board-rest.schemas.ts:65
+// Response: dashboardDeletedResponseSchema, ../contract/src/dashboard.responses.ts:120
+interface Response {
+  id: string;
+  name: string;
+}
+```
+
+#### `GET /:dashboardId/widgets` · `getApiDashboardsByDashboardIdWidgets`
+
+List a dashboard's widgets
+
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:248`.
+
+Answers at `/api/dashboards/:dashboardId/widgets`, `/api/v1/dashboards/:dashboardId/widgets`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets`, `/api/dashboards/latest/:dashboardId/widgets`, `/api/v1/dashboards/latest/:dashboardId/widgets`.
+
+```typescript
+type Params = z.infer<typeof boardIdParamsSchema>; // ../contract/src/board-rest.schemas.ts:65
+type Response = z.infer<typeof dashboardWidgetListSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:96
+```
+
+#### `POST /:dashboardId/widgets` · `postApiDashboardsByDashboardIdWidgets`
+
+Create a widget on a dashboard
+
+Permission `analytics:create`. Declared at `src/transport/board.rest.ts:274`.
+
+Answers at `/api/dashboards/:dashboardId/widgets`, `/api/v1/dashboards/:dashboardId/widgets`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets`, `/api/dashboards/latest/:dashboardId/widgets`, `/api/v1/dashboards/latest/:dashboardId/widgets`.
+
+```typescript
+type Params = z.infer<typeof boardIdParamsSchema>; // ../contract/src/board-rest.schemas.ts:65
+type Body = z.infer<typeof createDashboardWidgetSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:30
+type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:87
+```
+
+#### `GET /:dashboardId/widgets/:widgetId` · `getApiDashboardsByDashboardIdWidgetsByWidgetId`
+
+Get a widget on a dashboard
+
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:310`.
+
+Answers at `/api/dashboards/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/:dashboardId/widgets/:widgetId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/dashboards/latest/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/latest/:dashboardId/widgets/:widgetId`.
+
+```typescript
+// Params: boardWidgetParamsSchema, ../contract/src/board-rest.schemas.ts:72
+interface Params {
+  dashboardId: string;
+  widgetId: string;
+}
+type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:87
+```
+
+#### `PATCH /:dashboardId/widgets/:widgetId` · `patchApiDashboardsByDashboardIdWidgetsByWidgetId`
+
+Update a widget on a dashboard
+
+Permission `analytics:update`. Declared at `src/transport/board.rest.ts:336`.
+
+Answers at `/api/dashboards/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/:dashboardId/widgets/:widgetId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/dashboards/latest/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/latest/:dashboardId/widgets/:widgetId`.
+
+```typescript
+type Params = z.infer<typeof boardWidgetParamsSchema>; // ../contract/src/board-rest.schemas.ts:72
+type Body = z.infer<typeof updateDashboardWidgetSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:50
+type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:87
+```
+
+#### `DELETE /:dashboardId/widgets/:widgetId` · `deleteApiDashboardsByDashboardIdWidgetsByWidgetId`
+
+Delete a widget on a dashboard
+
+Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:372`.
+
+Answers at `/api/dashboards/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/:dashboardId/widgets/:widgetId`; also, undocumented, `/api/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/2026-10-26/:dashboardId/widgets/:widgetId`, `/api/dashboards/latest/:dashboardId/widgets/:widgetId`, `/api/v1/dashboards/latest/:dashboardId/widgets/:widgetId`.
+
+```typescript
+type Params = z.infer<typeof boardWidgetParamsSchema>; // ../contract/src/board-rest.schemas.ts:72
+// Response: inline, src/transport/board.rest.ts:393
+type Response = unknown;
+```
+
 ### `dashboardWidgetRest`
 
-|             |                                             |
-| ----------- | ------------------------------------------- |
-| Declared at | `src/transport/dashboard-widget.rest.ts:86` |
-| Base URL    | none: each route's path is its address      |
-| Addressing  | literal                                     |
-| Credential  | project                                     |
+|             |                                              |
+| ----------- | -------------------------------------------- |
+| Declared at | `src/transport/dashboard-widget.rest.ts:100` |
+| Base URL    | none: each route's path is its address       |
+| Addressing  | literal                                      |
+| Credential  | project                                      |
 
 #### `GET /api/v1/projects/:projectId/analytics/dashboard-widgets` · `getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets`
 
 List dashboard widgets
 
-Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:91`.
+Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:105`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets`.
 
@@ -528,7 +712,7 @@ type Response = z.infer<typeof dashboardWidgetListSchema>; // ../contract/src/da
 
 Create a dashboard widget
 
-Permission `analytics:create`. Declared at `src/transport/dashboard-widget.rest.ts:117`.
+Permission `analytics:create`. Declared at `src/transport/dashboard-widget.rest.ts:131`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets`.
 
@@ -542,7 +726,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Get a dashboard widget
 
-Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:155`.
+Permission `analytics:view`. Declared at `src/transport/dashboard-widget.rest.ts:169`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
@@ -559,7 +743,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Update a dashboard widget
 
-Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:186`.
+Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:200`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
@@ -573,7 +757,7 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Add a dashboard widget to a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:226`.
+Permission `analytics:update`. Declared at `src/transport/dashboard-widget.rest.ts:240`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId/dashboard`.
 
@@ -590,36 +774,36 @@ type Response = z.infer<typeof dashboardWidgetResourceSchema>; // ../contract/sr
 
 Delete a dashboard widget
 
-Permission `analytics:delete`. Declared at `src/transport/dashboard-widget.rest.ts:261`.
+Permission `analytics:delete`. Declared at `src/transport/dashboard-widget.rest.ts:275`.
 
 Answers at `/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId`.
 
 ```typescript
 type Params = z.infer<typeof dashboardWidgetParamsSchema>; // ../contract/src/dashboard-widget-rest.schemas.ts:112
-// Response: inline, src/transport/dashboard-widget.rest.ts:280
+// Response: inline, src/transport/dashboard-widget.rest.ts:294
 type Response = unknown;
 ```
 
 ### `dashboardRest`
 
-|             |                                              |
-| ----------- | -------------------------------------------- |
-| Declared at | `src/transport/dashboard.rest.ts:23`         |
-| Base URL    | `/api/dashboards`, twin `/api/v1/dashboards` |
-| Addressing  | dated                                        |
-| Credential  | project                                      |
-| Versions    | `2026-08-07`                                 |
+|             |                                        |
+| ----------- | -------------------------------------- |
+| Declared at | `src/transport/dashboard.rest.ts:133`  |
+| Base URL    | none: each route's path is its address |
+| Addressing  | literal                                |
+| Credential  | project                                |
+| Deprecated  | yes                                    |
 
-#### `GET /` · `getApiDashboards`
+#### `GET /api/v1/analytics/reports` · `getApiV1AnalyticsReports`
 
 List all dashboards for the project with graph counts
 
-Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:27`.
+Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:143`.
 
-Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
+Answers at `/api/v1/analytics/reports`.
 
 ```typescript
-// Response: dashboardListResponseSchema, ../contract/src/dashboard.responses.ts:90
+// Response: dashboardListResponseSchema, ../contract/src/dashboard.responses.ts:95
 interface Response {
   data: {
     id: string;
@@ -633,20 +817,20 @@ interface Response {
 }
 ```
 
-#### `POST /` · `postApiDashboards`
+#### `POST /api/v1/analytics/reports` · `postApiV1AnalyticsReports`
 
 Create a new dashboard
 
-Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:60`.
+Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:157`.
 
-Answers at `/api/dashboards`, `/api/v1/dashboards`; also, undocumented, `/api/dashboards/2026-08-07`, `/api/v1/dashboards/2026-08-07`, `/api/dashboards/latest`, `/api/v1/dashboards/latest`.
+Answers at `/api/v1/analytics/reports`.
 
 ```typescript
-// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:215
+// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:239
 interface Body {
   name: string;
 }
-// Response: dashboardResponseSchema, ../contract/src/dashboard.responses.ts:93
+// Response: dashboardResponseSchema, ../contract/src/dashboard.responses.ts:98
 interface Response {
   id: string;
   name: string;
@@ -657,70 +841,66 @@ interface Response {
 }
 ```
 
-#### `PUT /reorder` · `putApiDashboardsReorder`
+#### `PUT /api/v1/analytics/reports/reorder` · `putApiV1AnalyticsReportsReorder`
 
 Reorder dashboards by providing an ordered list of IDs
 
-Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:76`.
+Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:172`.
 
-Answers at `/api/dashboards/reorder`, `/api/v1/dashboards/reorder`; also, undocumented, `/api/dashboards/2026-08-07/reorder`, `/api/v1/dashboards/2026-08-07/reorder`, `/api/dashboards/latest/reorder`, `/api/v1/dashboards/latest/reorder`.
+Answers at `/api/v1/analytics/reports/reorder`.
 
 ```typescript
-// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:224
+// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:248
 interface Body {
   dashboardIds: string[];
 }
-// Response: dashboardReorderResponseSchema, ../contract/src/dashboard.responses.ts:122
+// Response: dashboardReorderResponseSchema, ../contract/src/dashboard.responses.ts:127
 interface Response {
   success: true;
 }
 ```
 
-#### `GET /:id` · `getApiDashboardsById`
+#### `GET /api/v1/analytics/reports/:reportId` · `getApiV1AnalyticsReportsByReportId`
 
 Get a dashboard by its id, including its graphs
 
-Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:94`.
+Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:192`.
 
-Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
+Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-// Params: dashboardRestParamsSchema, ../contract/src/dashboard.ts:231
+// Params: reportRestParamsSchema, ../contract/src/dashboard.ts:260
 interface Params {
-  id: string;
+  reportId: string;
 }
-type Response = z.infer<typeof dashboardDetailResponseSchema>; // ../contract/src/dashboard.responses.ts:104
+type Response = z.infer<typeof dashboardDetailResponseSchema>; // ../contract/src/dashboard.responses.ts:109
 ```
 
-#### `PATCH /:id` · `patchApiDashboardsById`
+#### `PATCH /api/v1/analytics/reports/:reportId` · `patchApiV1AnalyticsReportsByReportId`
 
 Rename a dashboard
 
-Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:112`.
+Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:210`.
 
-Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
+Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-type Params = z.infer<typeof dashboardRestParamsSchema>; // ../contract/src/dashboard.ts:231
-type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:215
-type Response = z.infer<typeof dashboardResponseSchema>; // ../contract/src/dashboard.responses.ts:93
+type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:260
+type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:239
+type Response = z.infer<typeof dashboardResponseSchema>; // ../contract/src/dashboard.responses.ts:98
 ```
 
-#### `DELETE /:id` · `deleteApiDashboardsById`
+#### `DELETE /api/v1/analytics/reports/:reportId` · `deleteApiV1AnalyticsReportsByReportId`
 
 Delete a dashboard and its graphs (hard delete, cascade)
 
-Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:132`.
+Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:230`.
 
-Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, `/api/dashboards/2026-08-07/:id`, `/api/v1/dashboards/2026-08-07/:id`, `/api/dashboards/latest/:id`, `/api/v1/dashboards/latest/:id`.
+Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-type Params = z.infer<typeof dashboardRestParamsSchema>; // ../contract/src/dashboard.ts:231
-// Response: dashboardDeletedResponseSchema, ../contract/src/dashboard.responses.ts:115
-interface Response {
-  id: string;
-  name: string;
-}
+type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:260
+type Response = z.infer<typeof dashboardDeletedResponseSchema>; // ../contract/src/dashboard.responses.ts:120
 ```
 
 ### `graphRest`
@@ -746,7 +926,7 @@ Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/202
 interface Query {
   dashboardId?: string;
 }
-type Response = z.infer<typeof graphListRestResponseSchema>; // ../contract/src/dashboard.responses.ts:149
+type Response = z.infer<typeof graphListRestResponseSchema>; // ../contract/src/dashboard.responses.ts:154
 ```
 
 #### `GET /:id` · `getApiGraphsById`
@@ -762,7 +942,7 @@ Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/gr
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dashboard.responses.ts:142
+type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dashboard.responses.ts:147
 ```
 
 #### `POST /` · `postApiGraphs`
@@ -785,7 +965,7 @@ interface Body {
   colSpan?: number;
   rowSpan?: number;
 }
-type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dashboard.responses.ts:142
+type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dashboard.responses.ts:147
 ```
 
 #### `PATCH /:id` · `patchApiGraphsById`
@@ -804,7 +984,7 @@ interface Body {
   graph?: Record<string, unknown>;
   filters?: Record<string, unknown>;
 }
-type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dashboard.responses.ts:142
+type Response = z.infer<typeof graphRestResponseSchema>; // ../contract/src/dashboard.responses.ts:147
 ```
 
 #### `DELETE /:id` · `deleteApiGraphsById`
@@ -817,7 +997,7 @@ Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/gr
 
 ```typescript
 type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:87
-// Response: graphDeletedResponseSchema, ../contract/src/dashboard.responses.ts:159
+// Response: graphDeletedResponseSchema, ../contract/src/dashboard.responses.ts:164
 interface Response {
   id: string;
   deleted: boolean;
@@ -955,16 +1135,16 @@ type Response = unknown;
 
 ### `boards`
 
-Contract `../contract/src/board.trpc.ts:27`, router `src/transport/board.trpc.ts:10`.
+Contract `../contract/src/board.trpc.ts:28`, router `src/transport/board.trpc.ts:10`.
 
 | Procedure              | Kind     | Gate                          | Input                | Output                           |
 | ---------------------- | -------- | ----------------------------- | -------------------- | -------------------------------- |
 | `boards.getAll`        | query    | Permission `analytics:view`   | inline               | inline                           |
-| `boards.getById`       | query    | Permission `analytics:view`   | `boardRefSchema`     | `dashboardTrpcRowSchema`         |
-| `boards.create`        | mutation | Permission `analytics:create` | inline               | `dashboardTrpcRowSchema`         |
-| `boards.update`        | mutation | Permission `analytics:update` | inline               | `dashboardTrpcRowSchema`         |
-| `boards.delete`        | mutation | Permission `analytics:delete` | `boardRefSchema`     | `dashboardTrpcRowSchema`         |
-| `boards.setScope`      | mutation | Permission `analytics:update` | inline               | `dashboardTrpcRowSchema`         |
+| `boards.getById`       | query    | Permission `analytics:view`   | `boardRefSchema`     | `boardTrpcRowSchema`             |
+| `boards.create`        | mutation | Permission `analytics:create` | inline               | `boardTrpcRowSchema`             |
+| `boards.update`        | mutation | Permission `analytics:update` | inline               | `boardTrpcRowSchema`             |
+| `boards.delete`        | mutation | Permission `analytics:delete` | `boardRefSchema`     | `boardTrpcRowSchema`             |
+| `boards.setScope`      | mutation | Permission `analytics:update` | inline               | `boardTrpcRowSchema`             |
 | `boards.scopeImpact`   | query    | Permission `analytics:view`   | `boardRefSchema`     | `dashboardScopeImpactSchema`     |
 | `boards.scopeProjects` | query    | Permission `analytics:view`   | `boardRefSchema`     | `dashboardScopeProjectsSchema`   |
 | `boards.listStarred`   | query    | Permission `analytics:view`   | `projectScopeSchema` | inline                           |
@@ -974,74 +1154,63 @@ Contract `../contract/src/board.trpc.ts:27`, router `src/transport/board.trpc.ts
 
 ```typescript
 // boards.getAll
-// Input: inline, ../contract/src/board.trpc.ts:31
+// Input: inline, ../contract/src/board.trpc.ts:32
 interface Input {
   projectId: string;
   includeOrganization?: boolean;
 }
-// Output: boardTrpcSummarySchema.array() (inline, ../contract/src/board.trpc.ts:37)
+// Output: boardTrpcSummarySchema.array() (inline, ../contract/src/board.trpc.ts:38)
 
 // boards.getById
-// Input: boardRefSchema, ../contract/src/board.trpc.ts:25
+// Input: boardRefSchema, ../contract/src/board.trpc.ts:26
 interface Input {
   projectId: string;
   dashboardId: string;
 }
-// Output: dashboardTrpcRowSchema, ../contract/src/dashboard.responses.ts:58
-interface Output {
-  id: string;
-  projectId: string;
-  name: string;
-  order: number;
-  description: string | null;
-  createdById: string | null;
-  scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-  organizationId: string | null;
-  createdAt: unknown;
-  updatedAt: unknown;
-}
+type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:63
 
 // boards.create
-// Input: inline, ../contract/src/board.trpc.ts:44
+// Input: inline, ../contract/src/board.trpc.ts:45
 interface Input {
   projectId: string;
   name: string;
 }
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
+type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:63
 
 // boards.update
-// Input: inline, ../contract/src/board.trpc.ts:50
+// Input: inline, ../contract/src/board.trpc.ts:54
 interface Input {
   projectId: string;
   dashboardId: string;
   name?: string;
   description?: string | null;
+  excludedOrigins?: string[] | null;
 }
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
+type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:63
 
 // boards.delete
-type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:25
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
+type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:26
+type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:63
 
 // boards.setScope
-// Input: inline, ../contract/src/board.trpc.ts:65
+// Input: inline, ../contract/src/board.trpc.ts:70
 interface Input {
   projectId: string;
   dashboardId: string;
   scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
 }
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
+type Output = z.infer<typeof boardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:63
 
 // boards.scopeImpact
-type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:25
-// Output: dashboardScopeImpactSchema, ../contract/src/dashboard.ts:117
+type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:26
+// Output: dashboardScopeImpactSchema, ../contract/src/dashboard.ts:140
 interface Output {
   otherStars: number;
 }
 
 // boards.scopeProjects
-type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:25
-// Output: dashboardScopeProjectsSchema, ../contract/src/dashboard.ts:128
+type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:26
+// Output: dashboardScopeProjectsSchema, ../contract/src/dashboard.ts:151
 interface Output {
   ownerProject: {
     id: string;
@@ -1056,14 +1225,14 @@ interface Output {
 }
 
 // boards.listStarred
-// Input: projectScopeSchema, ../contract/src/board.trpc.ts:24
+// Input: projectScopeSchema, ../contract/src/board.trpc.ts:25
 interface Input {
   projectId: string;
 }
-// Output: starredDashboardSchema.array() (inline, ../contract/src/board.trpc.ts:81)
+// Output: starredDashboardSchema.array() (inline, ../contract/src/board.trpc.ts:86)
 
 // boards.star
-// Input: inline, ../contract/src/board.trpc.ts:85
+// Input: inline, ../contract/src/board.trpc.ts:90
 interface Input {
   projectId: string;
   star:
@@ -1076,10 +1245,10 @@ interface Input {
         templateId: string;
       };
 }
-type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:122
+type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:127
 
 // boards.unstar
-// Input: inline, ../contract/src/board.trpc.ts:89
+// Input: inline, ../contract/src/board.trpc.ts:94
 interface Input {
   projectId: string;
   star:
@@ -1092,11 +1261,11 @@ interface Input {
         templateId: string;
       };
 }
-type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:122
+type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:127
 
 // boards.reorderStars
-// Input: z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }) (inline, ../contract/src/board.trpc.ts:94)
-type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:122
+// Input: z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }) (inline, ../contract/src/board.trpc.ts:99)
+type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:127
 ```
 
 ### `dashboardWidgets`
@@ -1206,7 +1375,7 @@ interface Input {
   projectId: string;
   dashboardId: string;
 }
-type Output = z.infer<typeof dashboardTrpcDetailSchema>; // ../contract/src/dashboard.responses.ts:55
+type Output = z.infer<typeof dashboardTrpcDetailSchema>; // ../contract/src/dashboard.responses.ts:57
 
 // dashboards.create
 // Input: inline, ../contract/src/dashboard.trpc.ts:38
@@ -1214,7 +1383,19 @@ interface Input {
   projectId: string;
   name: string;
 }
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
+// Output: dashboardTrpcRowSchema, ../contract/src/dashboard.responses.ts:60
+interface Output {
+  id: string;
+  projectId: string;
+  name: string;
+  order: number;
+  description: string | null;
+  createdById: string | null;
+  scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+  organizationId: string | null;
+  createdAt: unknown;
+  updatedAt: unknown;
+}
 
 // dashboards.rename
 // Input: inline, ../contract/src/dashboard.trpc.ts:42
@@ -1223,11 +1404,11 @@ interface Input {
   dashboardId: string;
   name: string;
 }
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
+type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:60
 
 // dashboards.delete
 type Input = z.infer<typeof dashboardRefSchema>; // ../contract/src/dashboard.trpc.ts:18
-type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
+type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:60
 
 // dashboards.reorderDashboards
 // Input: inline, ../contract/src/dashboard.trpc.ts:52
@@ -1235,7 +1416,7 @@ interface Input {
   projectId: string;
   dashboardIds: string[];
 }
-type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:122
+type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:127
 
 // dashboards.getOrCreateFirst
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/dashboard.trpc.ts:17
@@ -1255,7 +1436,7 @@ type Output = {
 
 // dashboards.sourcePresence
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/dashboard.trpc.ts:17
-// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:206
+// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:230
 interface Output {
   traces: "present" | "absent" | "failed";
   scenarios: "present" | "absent" | "failed";

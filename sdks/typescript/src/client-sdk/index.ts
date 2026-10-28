@@ -73,6 +73,21 @@ export {
   DashboardsApiService,
   DashboardsApiError,
 } from "./services/dashboards/dashboards-api.service";
+export type {
+  Dashboard,
+  DashboardListItem,
+  DashboardWidget,
+  CreateDashboardWidgetInput,
+  UpdateDashboardWidgetInput,
+} from "./services/dashboards/dashboards-api.service";
+export {
+  AnalyticsReportsApiService,
+  AnalyticsReportsApiError,
+} from "./services/analytics-reports/analytics-reports-api.service";
+export type {
+  AnalyticsReportSummary,
+  AnalyticsReportDetail,
+} from "./services/analytics-reports/analytics-reports-api.service";
 export {
   ModelProvidersApiService,
   ModelProvidersApiError,
@@ -120,6 +135,7 @@ import { resolveEndpoint } from "@/internal/endpoint";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
 import { AgentsApiService } from "./services/agents/agents-api.service";
+import { AnalyticsReportsApiService } from "./services/analytics-reports/analytics-reports-api.service";
 import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
 import { AnnotationsApiService } from "./services/annotations/annotations-api.service";
 import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
@@ -190,7 +206,10 @@ export class LangWatch {
   readonly workflows: WorkflowsApiService;
   readonly agents: AgentsApiService;
   readonly annotations: AnnotationsApiService;
+  /** The project's dashboards and the widgets on them, over /api/v1/dashboards. */
   readonly dashboards: DashboardsApiService;
+  /** The Analytics Reports, over /api/v1/analytics/reports; the platform deprecates them. */
+  readonly analyticsReports: AnalyticsReportsApiService;
   readonly modelProviders: ModelProvidersApiService;
   readonly analytics: AnalyticsApiService;
   /** The raw LangWatchQL door: a governed SELECT or schema discovery outside a saved chart. */
@@ -255,6 +274,7 @@ export class LangWatch {
     this.agents = new AgentsApiService(this.config);
     this.annotations = new AnnotationsApiService(this.config);
     this.dashboards = new DashboardsApiService(this.config);
+    this.analyticsReports = new AnalyticsReportsApiService(this.config);
     this.modelProviders = new ModelProvidersApiService(this.config);
     this.analytics = new AnalyticsApiService(this.config);
     this.query = new QueryApiService(this.config);

@@ -26,6 +26,7 @@ import {
   DashboardApi,
   DashboardsNotEnabledError,
   dashboardConfig,
+  type Board,
   type Dashboard,
   type BoardSummary,
   type DashboardScope,
@@ -422,7 +423,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     return this.#boards.getBoard(input);
   }
 
@@ -431,19 +432,20 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     name: string;
     createdById?: string;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.createBoard(input);
   }
 
-  /** A board's inline name and description. */
+  /** A board's inline name, description and left-out origins. */
   async updateBoard(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
-  }): Promise<Dashboard> {
+    excludedOrigins?: readonly string[] | null;
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.updateBoard(input);
   }
@@ -453,7 +455,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.deleteBoard(input);
   }
@@ -464,7 +466,7 @@ export class DashboardModule implements DashboardApi {
     dashboardId: string;
     scope: DashboardScope;
     viewer: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#scopes.setScope(input);
   }
@@ -599,10 +601,11 @@ export class DashboardModule implements DashboardApi {
     return this.#widgets.getAll(input);
   }
 
-  /** One custom chart widget. */
+  /** One custom chart widget; with `onDashboardId`, only if it is on that board. */
   getDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget> {
     return this.#widgets.getById(input);
@@ -637,6 +640,7 @@ export class DashboardModule implements DashboardApi {
     input: {
       projectId: string;
       id: string;
+      onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
     } & Partial<DashboardWidgetDefinitionInput>,
@@ -645,6 +649,7 @@ export class DashboardModule implements DashboardApi {
       projectId: input.projectId,
       id: input.id,
       viewer: input.viewer,
+      ...(input.onDashboardId === undefined ? {} : { onDashboardId: input.onDashboardId }),
       input: {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.code === undefined ? {} : { code: input.code }),
@@ -666,10 +671,11 @@ export class DashboardModule implements DashboardApi {
     return this.#widgets.assignToDashboard(input);
   }
 
-  /** Removes one widget. */
+  /** Removes one widget; with `onDashboardId`, only if it is on that board. */
   deleteDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<void> {
     return this.#widgets.deleteWidget(input);
@@ -700,12 +706,12 @@ export class DashboardModule implements DashboardApi {
     return { success: true };
   }
 
-  /** Where a reader opens the dashboards list a widget lands on. */
+  /** Where a reader opens the Dashboards list; a placed widget links to its board beneath it. */
   dashboardWidgetPlatformUrl(input: { projectSlug: string }): string {
     return dashboardPlatformUrl({
       publicBaseUrl: this.#publicBaseUrl,
       projectSlug: input.projectSlug,
-      path: "/analytics/reports",
+      path: "/dashboards",
     });
   }
 

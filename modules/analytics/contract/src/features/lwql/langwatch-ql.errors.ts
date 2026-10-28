@@ -459,7 +459,8 @@ export class LangWatchQLTooManyMembersError extends HandledError {
 
 /**
  * A view the read keeps to a window is read as a subquery, and ClickHouse takes no `FINAL` or
- * `SAMPLE` on one. The views already keep one row per key, so `FINAL` adds nothing there.
+ * `SAMPLE` on one; a PostgreSQL-resident view's engine table takes neither either. The views
+ * already keep one row per key, so `FINAL` adds nothing there.
  */
 export class LangWatchQLTableModifierError extends HandledError {
   declare readonly code: "lwql_table_modifier_unsupported";

@@ -241,7 +241,7 @@ const registry = {
   saved_workbench_charts_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
-      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard widget` commands instead",
     ],
   },
   lwql_unknown_identifier: {
@@ -311,6 +311,12 @@ const registry = {
   },
   api_key_permission_denied: {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  legacy_project_key_ingestion_only: {
+    tips: [
+      "A legacy project key is limited to ingestion and the scopes enabled for its project; create an API key with the permissions this call needs and send it instead",
+    ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   api_key_permission_not_delegable: {

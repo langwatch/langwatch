@@ -257,6 +257,58 @@ export interface paths {
         patch: operations["patchApiTriggersById"];
         trace?: never;
     };
+    "/api/v1/analytics/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @deprecated
+         * @description List all dashboards for the project with graph counts. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.
+         */
+        get: operations["getApiV1AnalyticsReports"];
+        put?: never;
+        /**
+         * @deprecated
+         * @description Create a new dashboard. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.
+         */
+        post: operations["postApiV1AnalyticsReports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/reports/{reportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @deprecated
+         * @description Get a dashboard by its id, including its graphs. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.
+         */
+        get: operations["getApiV1AnalyticsReportsByReportId"];
+        put?: never;
+        post?: never;
+        /**
+         * @deprecated
+         * @description Delete a dashboard and its graphs (hard delete, cascade). The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.
+         */
+        delete: operations["deleteApiV1AnalyticsReportsByReportId"];
+        options?: never;
+        head?: never;
+        /**
+         * @deprecated
+         * @description Rename a dashboard. The Analytics Reports dashboards API is deprecated; use the Dashboards API at /api/v1/dashboards.
+         */
+        patch: operations["patchApiV1AnalyticsReportsByReportId"];
+        trace?: never;
+    };
     "/api/v1/dashboards": {
         parameters: {
             query?: never;
@@ -264,10 +316,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all dashboards for the project with graph counts */
+        /**
+         * List dashboards
+         * @description Lists the dashboards of the key's project, each with how many widgets it holds.
+         */
         get: operations["getApiDashboards"];
         put?: never;
-        /** @description Create a new dashboard */
+        /**
+         * Create a dashboard
+         * @description Creates an empty dashboard in the key's project. Add widgets to it with POST /api/v1/dashboards/{dashboardId}/widgets.
+         */
         post: operations["postApiDashboards"];
         delete?: never;
         options?: never;
@@ -275,26 +333,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/dashboards/{id}": {
+    "/api/v1/dashboards/{dashboardId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Get a dashboard by its id, including its graphs */
-        get: operations["getApiDashboardsById"];
+        /**
+         * Get a dashboard
+         * @description Returns one dashboard.
+         */
+        get: operations["getApiDashboardsByDashboardId"];
         put?: never;
         post?: never;
-        /** @description Delete a dashboard and its graphs (hard delete, cascade) */
-        delete: operations["deleteApiDashboardsById"];
+        /**
+         * Delete a dashboard
+         * @description Deletes a dashboard together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted dashboard's id and name.
+         */
+        delete: operations["deleteApiDashboardsByDashboardId"];
         options?: never;
         head?: never;
-        /** @description Rename a dashboard */
-        patch: operations["patchApiDashboardsById"];
+        /**
+         * Update a dashboard
+         * @description Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).
+         */
+        patch: operations["patchApiDashboardsByDashboardId"];
         trace?: never;
     };
-    "/api/v1/projects/{projectId}/analytics/dashboard-widgets": {
+    "/api/v1/dashboards/{dashboardId}/widgets": {
         parameters: {
             query?: never;
             header?: never;
@@ -302,23 +369,23 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List dashboard widgets
-         * @description Lists every dashboard widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.
+         * List a dashboard's widgets
+         * @description Lists the widgets on one dashboard, each with its React source and named queries.
          */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
+        get: operations["getApiDashboardsByDashboardIdWidgets"];
         put?: never;
         /**
-         * Create a dashboard widget
-         * @description Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an optional description the card shows behind its info icon and an optional prompt Langy is drafted with when asked about it. `source` records where the widget came from; without it, the widget is recorded as made through the API. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
+         * Create a widget on a dashboard
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.
          */
-        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
+        post: operations["postApiDashboardsByDashboardIdWidgets"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}": {
+    "/api/v1/dashboards/{dashboardId}/widgets/{widgetId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -326,64 +393,24 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a dashboard widget
-         * @description Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found.
+         * Get a widget on a dashboard
+         * @description Returns one widget on this dashboard with its React source and named queries.
          */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        get: operations["getApiDashboardsByDashboardIdWidgetsByWidgetId"];
         put?: never;
         post?: never;
         /**
-         * Delete a dashboard widget
-         * @description Deletes one dashboard widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.
+         * Delete a widget on a dashboard
+         * @description Deletes one widget on this dashboard. Answers 204 with no body.
          */
-        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        delete: operations["deleteApiDashboardsByDashboardIdWidgetsByWidgetId"];
         options?: never;
         head?: never;
         /**
-         * Update a dashboard widget
-         * @description Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out keeps its stored value, so code alone keeps the queries and the source is kept unless the body names one. A body with none of these fields is refused.
+         * Update a widget on a dashboard
+         * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.
          */
-        patch: operations["patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
-        trace?: never;
-    };
-    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add a dashboard widget to a dashboard
-         * @description Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.
-         */
-        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{projectId}/analytics/boards": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Dashboards boards
-         * @description Lists this project's boards in the Dashboards area, each with how many widgets it holds. Pass a board's id to the dashboard widget's add-to-dashboard endpoint to place a widget on it. Analytics Reports boards are listed by /api/v1/dashboards instead.
-         */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsBoards"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
+        patch: operations["patchApiDashboardsByDashboardIdWidgetsByWidgetId"];
         trace?: never;
     };
     "/api/v1/graphs": {
@@ -4872,7 +4899,7 @@ export interface operations {
             };
         };
     };
-    getApiDashboards: {
+    getApiV1AnalyticsReports: {
         parameters: {
             query?: never;
             header?: never;
@@ -4904,7 +4931,7 @@ export interface operations {
             };
         };
     };
-    postApiDashboards: {
+    postApiV1AnalyticsReports: {
         parameters: {
             query?: never;
             header?: never;
@@ -4939,12 +4966,12 @@ export interface operations {
             };
         };
     };
-    getApiDashboardsById: {
+    getApiV1AnalyticsReportsByReportId: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                reportId: string;
             };
             cookie?: never;
         };
@@ -4990,12 +5017,12 @@ export interface operations {
             };
         };
     };
-    deleteApiDashboardsById: {
+    deleteApiV1AnalyticsReportsByReportId: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                reportId: string;
             };
             cookie?: never;
         };
@@ -5015,12 +5042,12 @@ export interface operations {
             };
         };
     };
-    patchApiDashboardsById: {
+    patchApiV1AnalyticsReportsByReportId: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                reportId: string;
             };
             cookie?: never;
         };
@@ -5052,18 +5079,878 @@ export interface operations {
             };
         };
     };
-    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
+    getApiDashboards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The project's dashboards */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            description: string | null;
+                            /** @enum {string} */
+                            scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+                            excludedOrigins: string[] | null;
+                            createdById: string | null;
+                            createdAt: string;
+                            updatedAt: string;
+                            platformUrl: string;
+                            widgetCount: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    postApiDashboards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The dashboard was created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        /** @enum {string} */
+                        scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+                        excludedOrigins: string[] | null;
+                        createdById: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    getApiDashboardsByDashboardId: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                projectId: string;
+                dashboardId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The project's dashboard widgets */
+            /** @description The dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        /** @enum {string} */
+                        scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+                        excludedOrigins: string[] | null;
+                        createdById: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    deleteApiDashboardsByDashboardId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dashboard was deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    patchApiDashboardsByDashboardId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    excludedOrigins?: string[] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The updated dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        /** @enum {string} */
+                        scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+                        excludedOrigins: string[] | null;
+                        createdById: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
+        };
+    };
+    getApiDashboardsByDashboardIdWidgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dashboard's widgets */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5205,6 +6092,36 @@ export interface operations {
                     };
                 };
             };
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -5237,12 +6154,12 @@ export interface operations {
             };
         };
     };
-    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
+    postApiDashboardsByDashboardIdWidgets: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                projectId: string;
+                dashboardId: string;
             };
             cookie?: never;
         };
@@ -5281,7 +6198,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The widget was saved */
+            /** @description The widget was saved on the dashboard */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -5421,6 +6338,36 @@ export interface operations {
                     };
                 };
             };
+            /** @description No dashboard with this id for this key. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        type: string;
+                        code: string;
+                        message: string;
+                        retryable: boolean;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                        trace?: {
+                            traceId?: string;
+                            spanId?: string;
+                            traceUrl?: string;
+                            logsUrl?: string;
+                        };
+                        tips?: string[];
+                        docs_url?: string;
+                        /** @enum {string} */
+                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
+                        reasons?: unknown[];
+                    };
+                };
+            };
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -5453,19 +6400,19 @@ export interface operations {
             };
         };
     };
-    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+    getApiDashboardsByDashboardIdWidgetsByWidgetId: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                projectId: string;
+                dashboardId: string;
                 widgetId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The dashboard widget */
+            /** @description The widget */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5605,7 +6552,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No dashboard widget with this id in this project */
+            /** @description No dashboard with this id, or no widget with this id on that dashboard */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5667,12 +6614,12 @@ export interface operations {
             };
         };
     };
-    deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+    deleteApiDashboardsByDashboardIdWidgetsByWidgetId: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                projectId: string;
+                dashboardId: string;
                 widgetId: string;
             };
             cookie?: never;
@@ -5785,7 +6732,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No dashboard widget with this id in this project */
+            /** @description No dashboard with this id, or no widget with this id on that dashboard */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5847,12 +6794,12 @@ export interface operations {
             };
         };
     };
-    patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+    patchApiDashboardsByDashboardIdWidgetsByWidgetId: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                projectId: string;
+                dashboardId: string;
                 widgetId: string;
             };
             cookie?: never;
@@ -6031,382 +6978,8 @@ export interface operations {
                     };
                 };
             };
-            /** @description No dashboard widget with this id in this project */
+            /** @description No dashboard with this id, or no widget with this id on that dashboard */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        type: string;
-                        code: string;
-                        message: string;
-                        retryable: boolean;
-                        meta?: {
-                            [key: string]: unknown;
-                        };
-                        trace_id?: string;
-                        span_id?: string;
-                        trace?: {
-                            traceId?: string;
-                            spanId?: string;
-                            traceUrl?: string;
-                            logsUrl?: string;
-                        };
-                        tips?: string[];
-                        docs_url?: string;
-                        /** @enum {string} */
-                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
-                        reasons?: unknown[];
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        type: string;
-                        code: string;
-                        message: string;
-                        retryable: boolean;
-                        meta?: {
-                            [key: string]: unknown;
-                        };
-                        trace_id?: string;
-                        span_id?: string;
-                        trace?: {
-                            traceId?: string;
-                            spanId?: string;
-                            traceUrl?: string;
-                            logsUrl?: string;
-                        };
-                        tips?: string[];
-                        docs_url?: string;
-                        /** @enum {string} */
-                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
-                        reasons?: unknown[];
-                    };
-                };
-            };
-        };
-    };
-    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: string;
-                widgetId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    dashboardId: string;
-                };
-            };
-        };
-        responses: {
-            /** @description The widget was added to the dashboard */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        definition: {
-                            version: number;
-                            code: string;
-                            queries: {
-                                name: string;
-                                sql: string;
-                                parameters?: {
-                                    name: string;
-                                    /** @enum {string} */
-                                    type: "string" | "number" | "boolean";
-                                    default?: string | number | boolean;
-                                }[];
-                            }[];
-                            description?: string;
-                            prompt?: string;
-                            source?: {
-                                /** @constant */
-                                kind: "catalogue";
-                                catalogueId: string;
-                            } | {
-                                /** @constant */
-                                kind: "langy";
-                            } | {
-                                /** @constant */
-                                kind: "code";
-                            } | {
-                                /** @constant */
-                                kind: "api";
-                            };
-                        };
-                        createdAt: string;
-                        updatedAt: string;
-                        platformUrl: string;
-                        dashboardId: string | null;
-                        gridColumn: number;
-                        gridRow: number;
-                        colSpan: number;
-                        rowSpan: number;
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        type: string;
-                        code: string;
-                        message: string;
-                        retryable: boolean;
-                        meta?: {
-                            [key: string]: unknown;
-                        };
-                        trace_id?: string;
-                        span_id?: string;
-                        trace?: {
-                            traceId?: string;
-                            spanId?: string;
-                            traceUrl?: string;
-                            logsUrl?: string;
-                        };
-                        tips?: string[];
-                        docs_url?: string;
-                        /** @enum {string} */
-                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
-                        reasons?: unknown[];
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        type: string;
-                        code: string;
-                        message: string;
-                        retryable: boolean;
-                        meta?: {
-                            [key: string]: unknown;
-                        };
-                        trace_id?: string;
-                        span_id?: string;
-                        trace?: {
-                            traceId?: string;
-                            spanId?: string;
-                            traceUrl?: string;
-                            logsUrl?: string;
-                        };
-                        tips?: string[];
-                        docs_url?: string;
-                        /** @enum {string} */
-                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
-                        reasons?: unknown[];
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        type: string;
-                        code: string;
-                        message: string;
-                        retryable: boolean;
-                        meta?: {
-                            [key: string]: unknown;
-                        };
-                        trace_id?: string;
-                        span_id?: string;
-                        trace?: {
-                            traceId?: string;
-                            spanId?: string;
-                            traceUrl?: string;
-                            logsUrl?: string;
-                        };
-                        tips?: string[];
-                        docs_url?: string;
-                        /** @enum {string} */
-                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
-                        reasons?: unknown[];
-                    };
-                };
-            };
-            /** @description No dashboard widget with this id in this project */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        type: string;
-                        code: string;
-                        message: string;
-                        retryable: boolean;
-                        meta?: {
-                            [key: string]: unknown;
-                        };
-                        trace_id?: string;
-                        span_id?: string;
-                        trace?: {
-                            traceId?: string;
-                            spanId?: string;
-                            traceUrl?: string;
-                            logsUrl?: string;
-                        };
-                        tips?: string[];
-                        docs_url?: string;
-                        /** @enum {string} */
-                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
-                        reasons?: unknown[];
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        type: string;
-                        code: string;
-                        message: string;
-                        retryable: boolean;
-                        meta?: {
-                            [key: string]: unknown;
-                        };
-                        trace_id?: string;
-                        span_id?: string;
-                        trace?: {
-                            traceId?: string;
-                            spanId?: string;
-                            traceUrl?: string;
-                            logsUrl?: string;
-                        };
-                        tips?: string[];
-                        docs_url?: string;
-                        /** @enum {string} */
-                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
-                        reasons?: unknown[];
-                    };
-                };
-            };
-        };
-    };
-    getApiV1ProjectsByProjectIdAnalyticsBoards: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The project's Dashboards boards */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            name: string;
-                            description: string | null;
-                            /** @enum {string} */
-                            scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-                            createdAt: string;
-                            updatedAt: string;
-                            platformUrl: string;
-                            widgetCount: number;
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        type: string;
-                        code: string;
-                        message: string;
-                        retryable: boolean;
-                        meta?: {
-                            [key: string]: unknown;
-                        };
-                        trace_id?: string;
-                        span_id?: string;
-                        trace?: {
-                            traceId?: string;
-                            spanId?: string;
-                            traceUrl?: string;
-                            logsUrl?: string;
-                        };
-                        tips?: string[];
-                        docs_url?: string;
-                        /** @enum {string} */
-                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
-                        reasons?: unknown[];
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        type: string;
-                        code: string;
-                        message: string;
-                        retryable: boolean;
-                        meta?: {
-                            [key: string]: unknown;
-                        };
-                        trace_id?: string;
-                        span_id?: string;
-                        trace?: {
-                            traceId?: string;
-                            spanId?: string;
-                            traceUrl?: string;
-                            logsUrl?: string;
-                        };
-                        tips?: string[];
-                        docs_url?: string;
-                        /** @enum {string} */
-                        fault?: "customer" | "platform" | "provider" | "presumed_platform";
-                        reasons?: unknown[];
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12027,9 +12600,9 @@ export interface operations {
                         options?: (string | number | boolean)[];
                         required?: boolean;
                     }[];
-                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default. */
                     simulatorModel?: string | null;
-                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;
@@ -12180,9 +12753,9 @@ export interface operations {
                         options?: (string | number | boolean)[];
                         required?: boolean;
                     }[];
-                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default. */
                     simulatorModel?: string | null;
-                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;
@@ -12315,9 +12888,9 @@ export interface operations {
                         options?: (string | number | boolean)[];
                         required?: boolean;
                     }[];
-                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default. */
                     simulatorModel?: string | null;
-                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;

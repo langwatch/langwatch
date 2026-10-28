@@ -1,11 +1,12 @@
 import type { Named } from "@langwatch/module";
 /**
- * What `/api/dashboards` and `/api/graphs` answer with: no `projectId` (the
+ * What `/api/v1/analytics/reports` and `/api/graphs` answer with: no `projectId` (the
  * credential names the project) and a `platformUrl` the reader opens.
  */
 import { z } from "zod";
 
 import {
+  boardSchema,
   dashboardIdSchema,
   dashboardNameSchema,
   dashboardProjectSchema,
@@ -36,6 +37,7 @@ export const dashboardTrpcSummarySchema: DashboardTrpcSummarySchema =
 const boardTrpcSummarySchemaDefinition = z
   .object({
     ...dashboardTrpcSummarySchema.shape,
+    excludedOrigins: boardSchema.shape.excludedOrigins,
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
     ownerProject: dashboardProjectSchema.nullable(),
@@ -56,6 +58,9 @@ export const dashboardTrpcDetailSchema: DashboardTrpcDetailSchema =
 
 /** `create` / `rename` / `delete` / `getOrCreateFirst`: the raw stored row. */
 export const dashboardTrpcRowSchema = dashboardSchema;
+
+/** `boards.*` writes and `getById`: the stored DashboardsV2 row. */
+export const boardTrpcRowSchema = boardSchema;
 
 const dashboardOrderSchema = z.number().int().nonnegative();
 

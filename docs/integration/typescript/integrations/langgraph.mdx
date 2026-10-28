@@ -55,7 +55,7 @@ const GraphState = z.object({
 type GraphStateType = z.infer<typeof GraphState>;
 
 async function main(message: string): Promise<string> {
-  const llm = new ChatOpenAI({ model: "gpt-5" });
+  const llm = new ChatOpenAI({ model: "gpt-6-luna" });
 
   const generate = async (state: GraphStateType) => {
     const result = await llm.invoke([

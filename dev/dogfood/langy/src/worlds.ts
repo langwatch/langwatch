@@ -1,6 +1,6 @@
 /**
  * The dashboards matrix worlds (issue 8573 rows D1, D2, A1, D3, X1, D5, plus B1): seeded traffic,
- * boards and widgets, and the code-check facts read back from the public API. A port of
+ * dashboards and widgets, and the code-check facts read back from the public API. A port of
  * `apps/ui/e2e/langy/{dashboards-world,traffic-pattern,board-state}.ts` to one shared project.
  */
 import { createHash } from "node:crypto";
@@ -15,6 +15,8 @@ const DAYS = 2;
 export const EXPECTED_TOTAL = PER_HOUR * 24 * DAYS;
 
 const widgetsPath = (project: string) => `/api/v1/projects/${project}/analytics/dashboard-widgets`;
+/** Dashboards, project from the key; answers 404 unless release_dashboards is on. */
+const BOARDS_PATH = "/api/v1/dashboards";
 const chartsPath = (project: string) => `/api/v1/projects/${project}/analytics/charts`;
 
 type WidgetKind = "count" | "slowest" | "errors";
@@ -22,10 +24,10 @@ type WidgetKind = "count" | "slowest" | "errors";
 interface WorldSpec {
   board: string;
   widgets: WidgetKind[];
-  /** A board the scenario must leave alone. */
+  /** A dashboard the scenario must leave alone. */
   decoy?: string;
   decoyWidgets?: WidgetKind[];
-  /** A valid second choice of board (A1). */
+  /** A valid second choice of dashboard (A1). */
   other?: string;
   /** The widget the scenario acts on, by name. */
   target?: string;
@@ -38,7 +40,7 @@ export const MATRIX_WORLDS = {
   D3: { board: "Checkout health", widgets: [] },
   X1: { board: "Checkout health", widgets: ["count", "slowest", "errors"], target: "Error count" },
   D5: { board: "Checkout health", widgets: ["count"], target: "Traces this period" },
-  // B1: a board asked about by its id; read-only, so every fact should stay unchanged.
+  // B1: a dashboard asked about by its id; read-only, so every fact should stay unchanged.
   B1: { board: "Release review", widgets: ["count", "errors"] },
 } as const satisfies Record<MatrixWorld, WorldSpec>;
 
@@ -469,7 +471,7 @@ async function listItems({ http }: { http: LangWatchHttp }): Promise<Item[]> {
       kind: "chart" as const,
       resource,
     })),
-    // Classic custom graphs: Langy can still pin one to a board, with an alert on it.
+    // Classic custom graphs: Langy can still pin one to a dashboard, with an alert on it.
     ...expectOk({ answer: graphs, what: "list graphs" }).map((resource) => ({
       kind: "graph" as const,
       resource,
@@ -541,7 +543,8 @@ async function countItem({
   return { total: null, rows: null, errors: errors.slice(0, 2) };
 }
 
-/** Reads the facts now: the items and alerts, then what the newest widget on the board counts. */
+/** Reads the facts now: the items and alerts, then what the newest widget on the dashboard
+ * counts. */
 export async function readFacts({
   http,
   state,
@@ -580,7 +583,7 @@ export async function setupWorld({
     const boardName = `${name} ${tag}`;
     const created = await http.request<{ id: string }>({
       method: "POST",
-      path: "/api/dashboards",
+      path: BOARDS_PATH,
       body: { name: boardName },
     });
     const boardId = expectOk({ answer: created, what: "create dashboard" }).id;
@@ -674,7 +677,10 @@ export async function teardownWorld({ http, state }: { http: LangWatchHttp; stat
   const left: string[] = [];
   await deleteRunItems({ http, state, deleted: deleted.widgets, left });
   for (const boardId of Object.values(runBoards({ state }))) {
-    const answer = await http.request({ method: "DELETE", path: `/api/dashboards/${boardId}` });
+    const answer = await http.request({
+      method: "DELETE",
+      path: `${BOARDS_PATH}/${boardId}`,
+    });
     (answer.status < 300 ? deleted.dashboards : left).push(boardId);
   }
   for (const alert of finalFacts.new_alerts) {

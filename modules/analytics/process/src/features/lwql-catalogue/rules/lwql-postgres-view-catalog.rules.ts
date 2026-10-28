@@ -394,6 +394,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       CreatedById: { source: "createdById" },
       Scope: { source: "scope" },
       organizationId: "omit", // set only once a board is shared with the organization
+      excludedOrigins: "omit", // the board's own setting, not analytics data (AC200)
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -1124,6 +1125,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ThreadIdleTimeout: { source: "threadIdleTimeout" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
+      AutoPausedAt: { source: "autoPausedAt" },
+      AutoPausedReason: { source: "autoPausedReason", content: "output" },
     },
   }),
   notifications: defineTableCatalogue({
@@ -1161,6 +1164,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ProjectName: { source: "name" },
       ProjectSlug: { source: "slug" },
       apiKey: "omit", // secret
+      legacyApiKeyLastUsedAt: "omit", // operator column for retiring legacy keys
       lwqlKey: "omit", // secret
       TeamId: { source: "teamId" },
       Language: { source: "language", content: "output" },

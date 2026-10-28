@@ -857,6 +857,7 @@ export const prismaModelFieldCatalogue = {
     "name",
     "slug",
     "apiKey",
+    "legacyApiKeyLastUsedAt",
     "lwqlKey",
     "teamId",
     "team",
@@ -983,7 +984,9 @@ export const prismaModelFieldCatalogue = {
     "level",
     "threadIdleTimeout",
     "createdAt",
-    "updatedAt"
+    "updatedAt",
+    "autoPausedAt",
+    "autoPausedReason"
   ],
   "Cost": [
     "id",
@@ -1082,6 +1085,7 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "scope",
     "organizationId",
+    "excludedOrigins",
     "createdAt",
     "updatedAt"
   ],
