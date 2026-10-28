@@ -122,15 +122,14 @@ export class PrismaAgentRepository
   }
 
   async updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void> {
-    await this.prisma.agent
-      .update({
-        where: { id: input.id, projectId: input.projectId, workflowId: input.workflowId },
-        data: { config: configSchema.parse(input.config) },
-      })
-      .catch((error: unknown) => {
-        if (isRecordNotFoundError(error)) throw new AgentNotFoundError(input.id, input.projectId);
-        throw error;
-      });
+    await this.#writeWithVersion({
+      projectId: input.projectId,
+      id: input.id,
+      where: { workflowId: input.workflowId },
+      author: undefined,
+      commitMessage: undefined,
+      data: { config: configSchema.parse(input.config) },
+    });
   }
 
   async getById(input: GetAgentInput): Promise<Agent> {
@@ -295,12 +294,20 @@ export class PrismaAgentRepository
   async updateConfigIfUnchanged(
     input: Parameters<AgentRepository["updateConfigIfUnchanged"]>[0],
   ): Promise<boolean> {
-    const written = await this.prisma.agent.updateMany({
-      where: { id: input.id, projectId: input.projectId, updatedAt: toDate(input.updatedAt) },
-      data: { config: configSchema.parse(input.config) },
-    });
-
-    return written.count === 1;
+    try {
+      await this.#writeWithVersion({
+        projectId: input.projectId,
+        id: input.id,
+        where: { updatedAt: toDate(input.updatedAt) },
+        author: undefined,
+        commitMessage: undefined,
+        data: { config: configSchema.parse(input.config) },
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof AgentNotFoundError) return false;
+      throw error;
+    }
   }
 
   async archive(input: GetAgentInput): Promise<Agent> {
@@ -596,6 +603,8 @@ export class PrismaAgentRepository
   async #writeWithVersion(input: {
     projectId: string;
     id: string;
+    /** Further conditions the row must meet; a row that fails them reads as not found. */
+    where?: Prisma.AgentWhereInput;
     author: AgentWriteAuthor | undefined;
     commitMessage: string | undefined;
     data: Prisma.AgentUncheckedUpdateInput;
@@ -604,7 +613,7 @@ export class PrismaAgentRepository
       try {
         return await this.transaction(async (transaction) => {
           const updated = await transaction.agent.update({
-            where: { id: input.id, projectId: input.projectId },
+            where: { ...input.where, id: input.id, projectId: input.projectId },
             data: {
               ...input.data,
               ...(input.author ? { updatedById: input.author.authorId } : {}),
