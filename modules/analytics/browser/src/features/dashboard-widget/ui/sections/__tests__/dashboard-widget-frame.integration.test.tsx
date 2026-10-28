@@ -406,6 +406,17 @@ describe("given a widget on a board whose queries are running", () => {
     });
   });
 
+  describe("when the frame waits to retry a busy query", () => {
+    /** @scenario "A widget waiting to retry a busy query keeps its skeleton" */
+    it("keeps the skeleton while no query is open", async () => {
+      const run = frameRuns(() => Promise.reject(BUSY));
+      render(boardWidget({}));
+      await run();
+
+      expect(loadingFace()).not.toBeNull();
+    });
+  });
+
   describe("when it has nothing to wait for", () => {
     /** @scenario "A widget with nothing to wait for shows no skeleton" */
     it("shows no skeleton for a widget with no queries", () => {
@@ -422,6 +433,21 @@ describe("given a widget on a board whose queries are running", () => {
 
       act(() => {
         lastFrameProps().onLog({ level: "error", source: "lw.error", text: "Render error" });
+      });
+
+      expect(loadingFace()).toBeNull();
+    });
+
+    /** @scenario "A widget with nothing to wait for shows no skeleton" */
+    it("keeps no skeleton when a console error follows the code's own error", () => {
+      frameRuns(() => new Promise(() => undefined));
+      render(boardWidget({}));
+
+      act(() => {
+        lastFrameProps().onLog({ level: "error", source: "lw.error", text: "Render error" });
+      });
+      act(() => {
+        lastFrameProps().onLog({ level: "error", source: "console", text: "noisy" });
       });
 
       expect(loadingFace()).toBeNull();

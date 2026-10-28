@@ -68,6 +68,15 @@ describe("missingFieldGuidance", () => {
     });
   });
 
+  describe("given a field of a simulation", () => {
+    /** @scenario "An empty widget names what sends its data" */
+    it("says simulation runs come from the Scenario SDK, under the unit the simulations view derives", () => {
+      expect(
+        missingFieldGuidance({ field: "Verdict", label: "verdict", unit: "simulations" }),
+      ).toBe("Simulation runs come from running scenarios with the Scenario SDK.");
+    });
+  });
+
   describe("given a unit with no words of its own", () => {
     it("has no line, so the card adds none", () => {
       expect(
