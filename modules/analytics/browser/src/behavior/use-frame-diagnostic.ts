@@ -17,7 +17,7 @@ const isFatal = (entry: ChartFrameLogEntry) =>
   entry.level === "error" && entry.source === "lw.error";
 
 export function useFrameDiagnostic({
-  /** Whatever identifies the code being run — a change clears the last error. */
+  /** Identifies one run of the code (code and retry attempt); a change clears the last error. */
   resetKey,
 }: {
   readonly resetKey: string;

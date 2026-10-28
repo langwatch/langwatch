@@ -479,6 +479,22 @@ describe("given a widget on a board whose queries are running", () => {
     });
   });
 
+  describe("when the widget's code crashed and the member retries", () => {
+    /** @scenario "A widget with nothing to wait for shows no skeleton" */
+    it("shows the skeleton again while the next load is pending", async () => {
+      const run = frameRuns(() => Promise.reject(BROKEN));
+      render(boardWidget({}));
+      await run();
+      act(() => {
+        lastFrameProps().onLog({ level: "error", source: "lw.error", text: "Render error" });
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+      expect(loadingFace()).not.toBeNull();
+    });
+  });
+
   describe("when a query starts after the frame had nothing to wait for", () => {
     /** @scenario "A query that starts after the frame was idle brings the skeleton back" */
     it("shows the skeleton again", () => {
