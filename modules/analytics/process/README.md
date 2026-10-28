@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable analytics capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/analytics.api.ts:78`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/analytics.api.ts:80`; nothing else in this package is public.
 
 #### `getTimeseries`
 
