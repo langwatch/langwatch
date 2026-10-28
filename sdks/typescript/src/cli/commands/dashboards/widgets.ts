@@ -7,12 +7,20 @@ import { formatTable, sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
-import { type DefinitionFlags, resolveDefinitionInput, WidgetInputError } from "./definitionInput";
+import {
+  type DefinitionFlags,
+  resolveDefinitionInput,
+  resolveLangyTraces,
+  WidgetInputError,
+} from "./definitionInput";
 
-/** The definition flags, resolved; a refusal ends the command before any request. */
-const definitionOf = (flags: DefinitionFlags) => {
+/** The flags `widget add` and `update` share beyond the definition. */
+type WidgetFlags = DefinitionFlags & { name?: string; description?: string; langyTraces?: string };
+
+/** Ends the command on input refused before any request. */
+const refusedLocally = <T>(resolve: () => T): T => {
   try {
-    return resolveDefinitionInput(flags);
+    return resolve();
   } catch (error) {
     if (error instanceof WidgetInputError) {
       console.error(chalk.red(`Error: ${error.message}`));
@@ -20,6 +28,16 @@ const definitionOf = (flags: DefinitionFlags) => {
     }
     throw error;
   }
+};
+
+/** The definition flags, resolved. */
+const definitionOf = (flags: DefinitionFlags) =>
+  refusedLocally(() => resolveDefinitionInput(flags));
+
+/** `--langy-traces` as the origins the widget leaves out, when given. */
+const excludedOriginsOf = (flags: WidgetFlags) => {
+  const excludedOrigins = refusedLocally(() => resolveLangyTraces(flags.langyTraces));
+  return excludedOrigins === undefined ? {} : { excludedOrigins };
 };
 
 /** `langwatch dashboard widget list <dashboardId>`: the widgets on one dashboard. */
@@ -89,10 +107,11 @@ export const getWidgetOnDashboardCommand = async (
 
 export const addWidgetToDashboardCommand = async (
   dashboardId: string,
-  options: DefinitionFlags & { name?: string; description?: string },
+  options: WidgetFlags,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
   const definition = definitionOf(options);
+  const langy = excludedOriginsOf(options);
   if (!options.name || !definition) {
     console.error(
       chalk.red(
@@ -111,6 +130,7 @@ export const addWidgetToDashboardCommand = async (
         code: definition.code,
         queries: definition.queries,
         ...(options.description === undefined ? {} : { description: options.description }),
+        ...langy,
       },
     });
     spinner.succeed(
@@ -127,14 +147,16 @@ export const addWidgetToDashboardCommand = async (
 export const updateWidgetOnDashboardCommand = async (
   dashboardId: string,
   widgetId: string,
-  options: DefinitionFlags & { name?: string; description?: string },
+  options: WidgetFlags,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
   const definition = definitionOf(options);
-  if (options.name === undefined && options.description === undefined && !definition) {
+  const langy = excludedOriginsOf(options);
+  const named = options.name !== undefined || options.description !== undefined;
+  if (!named && !definition && langy.excludedOrigins === undefined) {
     console.error(
       chalk.red(
-        "Error: nothing to update — pass --name, --description, or --code / --code-file with --queries-file",
+        "Error: nothing to update — pass --name, --description, --langy-traces, or --code / --code-file with --queries-file",
       ),
     );
     process.exit(1);
@@ -149,6 +171,7 @@ export const updateWidgetOnDashboardCommand = async (
         ...(options.name === undefined ? {} : { name: options.name }),
         ...(options.description === undefined ? {} : { description: options.description }),
         ...definition,
+        ...langy,
       },
     });
     spinner.succeed(`Updated widget "${chalk.cyan(sanitizeTerminalText(widget.name))}"`);

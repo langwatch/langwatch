@@ -364,8 +364,25 @@ export function boardSetupDraft({
 /** What a draft from the editor is about when the editor is open on a widget not saved yet. */
 export const NEW_WIDGET_REF = "new";
 
-/** The widget open in the editor: a saved one has its id, a new one has none yet. */
-export type EditedWidget = WidgetSubject & { readonly id?: string };
+/**
+ * The widget open in the editor: a saved one has its id, a new one has none yet. `includesLangy`
+ * is its "Langy traces" setting as it runs now, which Langy saves with it (AC200i).
+ */
+export type EditedWidget = WidgetSubject & {
+  readonly id?: string;
+  readonly includesLangy?: boolean;
+};
+
+/** Asks Langy to keep the widget's "Langy traces" setting and save it with the widget. */
+function langyTracesText(widget: EditedWidget): string {
+  if (widget.includesLangy === void 0) return "";
+  const [label, flag] = widget.includesLangy ? ["Included", "included"] : ["Left out", "left-out"];
+  return (
+    ` Its "Langy traces" setting is ${label}; save it with the widget (--langy-traces ${flag}), ` +
+    "but set it to Included (--langy-traces included) when the widget reads Langy's own " +
+    `traces, such as TraceName 'langy.turn' or the origin 'langy'.`
+  );
+}
 
 /** What a draft from the editor is about: the board, and the widget open in the editor. */
 export function widgetDraftAbout({
@@ -430,10 +447,10 @@ export function widgetBuildQuestion({
     widget.id === void 0
       ? `I am building a new widget on my "${board.name}" dashboard, which already shows: ` +
         `${others}. Ask me what I want this widget to show, then propose its code and ` +
-        "LangWatchQL queries, and save it only when I agree."
+        `LangWatchQL queries, and save it only when I agree.${langyTracesText(widget)}`
       : `Edit my "${widget.name}" widget on my "${board.name}" dashboard with me. Ask me what ` +
         "I want the widget to show, propose the change to its code and queries, and save it " +
-        "only when I agree.";
+        `only when I agree.${langyTracesText(widget)}`;
   // A new widget's starter queries mean nothing in the chat; a saved one's are the subject.
   const question =
     widget.id === void 0
@@ -490,9 +507,9 @@ export function widgetAskDraft({
   const prompt =
     widget.id === void 0
       ? `${ask.ask}. Build it as a new widget on this dashboard: write its code and ` +
-        "LangWatchQL queries, and save it only when I agree."
+        `LangWatchQL queries, and save it only when I agree.${langyTracesText(widget)}`
       : `For "${widget.name}": ${ask.ask}. Propose the change to its code and queries, and ` +
-        "save it only when I agree.";
+        `save it only when I agree.${langyTracesText(widget)}`;
   return editorDraft({ prompt, widget, board, period });
 }
 

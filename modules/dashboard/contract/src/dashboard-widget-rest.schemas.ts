@@ -5,6 +5,7 @@
 import {
   dashboardWidgetCodeSchema,
   dashboardWidgetDescriptionSchema,
+  dashboardWidgetExcludedOriginsSchema,
   dashboardWidgetNameSchema,
   dashboardWidgetPromptSchema,
   dashboardWidgetQueriesSchema,
@@ -22,6 +23,8 @@ const createDashboardWidgetSchemaDefinition = z.object({
   prompt: dashboardWidgetPromptSchema.optional(),
   /** Where the widget came from; the API records `{ kind: "api" }` when the body names none. */
   source: dashboardWidgetSourceSchema.optional(),
+  /** Its "Langy traces" setting: `[]` counts Langy's traces; absent, it follows its board. */
+  excludedOrigins: dashboardWidgetExcludedOriginsSchema.optional(),
 });
 export interface CreateDashboardWidgetSchema extends Named<
   typeof createDashboardWidgetSchemaDefinition
@@ -36,11 +39,12 @@ const updateDashboardWidgetSchemaDefinition = z
     queries: dashboardWidgetQueriesSchema.optional(),
     description: dashboardWidgetDescriptionSchema.optional(),
     source: dashboardWidgetSourceSchema.optional(),
+    excludedOrigins: dashboardWidgetExcludedOriginsSchema.optional(),
   })
   // A PATCH naming nothing is a mistake worth reporting; a field it leaves out keeps its value.
   .refine(
     (body) => Object.values(body).some((value) => value !== undefined),
-    "Provide at least one of name, code, queries, description or source.",
+    "Provide at least one of name, code, queries, description, source or excludedOrigins.",
   )
   .meta({ minProperties: 1 });
 export interface UpdateDashboardWidgetSchema extends Named<
@@ -69,6 +73,7 @@ const dashboardWidgetResourceSchemaDefinition = z.object({
     description: z.string().optional(),
     prompt: z.string().optional(),
     source: dashboardWidgetSourceSchema.optional(),
+    excludedOrigins: z.array(z.string()).optional(),
   }),
   createdAt: z.string(),
   updatedAt: z.string(),

@@ -82,12 +82,39 @@ export function DashboardWidgetFrame(props: DashboardWidgetFrameProps) {
   return <DashboardWidgetFrameOverWindow {...props} timeWindow={timeWindow} />;
 }
 
+/** What a widget over a window its caller owns takes, such as a Dashboards board's period. */
+type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
+  readonly timeWindow: { start: number; end: number };
+  readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** Trace origins left out of every query this widget runs. */
+  readonly excludeOrigins?: readonly string[];
+  /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
+  readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  /** Told which face the frame draws, so the card offers only what that face allows. */
+  readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
+  /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
+  readonly onExportChange?: (widgetExport: WidgetExport) => void;
+  /** Told whether the card shows none of the widget's data, so a board can offer to set it up. */
+  readonly onEmptyChange?: (empty: boolean) => void;
+};
+
 /**
- * A widget over a window its caller owns, such as a Dashboards board's period.
+ * A widget over a window its caller owns. A new SQL statement or origin list starts it over, so
+ * no answer to an earlier query stays on the card; the period and grain re-run it in place
+ * through the dashboard context (dashboards-v2 AC201d).
+ */
+export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWindowProps) {
+  const parsed = dashboardWidgetDefinitionSchema.safeParse(props.graph);
+  const queries = parsed.success ? JSON.stringify(parsed.data.queries) : "";
+  const origins = (props.excludeOrigins ?? []).join(",");
+  return <WidgetFrameOverWindow key={`${props.id}:${queries}:${origins}`} {...props} />;
+}
+
+/**
  * `granularitySeconds`, when given, is the step the reserved parameters carry.
  * What its queries report decides its face (features/dashboards/WIDGET_STANDARD.md).
  */
-export function DashboardWidgetFrameOverWindow({
+function WidgetFrameOverWindow({
   id,
   graph,
   projectId,
@@ -102,20 +129,7 @@ export function DashboardWidgetFrameOverWindow({
   onFaceChange,
   onExportChange,
   onEmptyChange,
-}: DashboardWidgetFrameProps & {
-  readonly timeWindow: { start: number; end: number };
-  readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
-  /** Trace origins the board leaves out of every query this widget runs. */
-  readonly excludeOrigins?: readonly string[];
-  /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
-  readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
-  /** Told which face the frame draws, so the card offers only what that face allows. */
-  readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
-  /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
-  readonly onExportChange?: (widgetExport: WidgetExport) => void;
-  /** Told whether the card shows none of the widget's data, so a board can offer to set it up. */
-  readonly onEmptyChange?: (empty: boolean) => void;
-}) {
+}: DashboardWidgetFrameOverWindowProps) {
   const { colorMode } = useColorMode();
   const refreshedAt = useDashboardRefreshedAt();
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);

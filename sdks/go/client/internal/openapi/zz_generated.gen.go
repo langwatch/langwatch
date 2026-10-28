@@ -43230,11 +43230,12 @@ type GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault string
 
 // PostApiDashboardsByDashboardIdWidgetsJSONBody defines parameters for PostApiDashboardsByDashboardIdWidgets.
 type PostApiDashboardsByDashboardIdWidgetsJSONBody struct {
-	Code        string  `json:"code"`
-	Description *string `json:"description,omitempty"`
-	Name        string  `json:"name"`
-	Prompt      *string `json:"prompt,omitempty"`
-	Queries     []struct {
+	Code            string    `json:"code"`
+	Description     *string   `json:"description,omitempty"`
+	ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+	Name            string    `json:"name"`
+	Prompt          *string   `json:"prompt,omitempty"`
+	Queries         []struct {
 		Name       string `json:"name"`
 		Parameters *[]struct {
 			Default *PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default `json:"default,omitempty"`
@@ -43458,10 +43459,11 @@ type GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault stri
 
 // PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
 type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody struct {
-	Code        *string `json:"code,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Name        *string `json:"name,omitempty"`
-	Queries     *[]struct {
+	Code            *string   `json:"code,omitempty"`
+	Description     *string   `json:"description,omitempty"`
+	ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+	Name            *string   `json:"name,omitempty"`
+	Queries         *[]struct {
 		Name       string `json:"name"`
 		Parameters *[]struct {
 			Default *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default `json:"default,omitempty"`
@@ -46321,11 +46323,12 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaul
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody struct {
-	Code        string  `json:"code"`
-	Description *string `json:"description,omitempty"`
-	Name        string  `json:"name"`
-	Prompt      *string `json:"prompt,omitempty"`
-	Queries     []struct {
+	Code            string    `json:"code"`
+	Description     *string   `json:"description,omitempty"`
+	ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+	Name            string    `json:"name"`
+	Prompt          *string   `json:"prompt,omitempty"`
+	Queries         []struct {
 		Name       string `json:"name"`
 		Parameters *[]struct {
 			Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Queries_Parameters_Default `json:"default,omitempty"`
@@ -46546,10 +46549,11 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONRespon
 
 // PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
 type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody struct {
-	Code        *string `json:"code,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Name        *string `json:"name,omitempty"`
-	Queries     *[]struct {
+	Code            *string   `json:"code,omitempty"`
+	Description     *string   `json:"description,omitempty"`
+	ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+	Name            *string   `json:"name,omitempty"`
+	Queries         *[]struct {
 		Name       string `json:"name"`
 		Parameters *[]struct {
 			Default *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Queries_Parameters_Default `json:"default,omitempty"`
@@ -154099,10 +154103,11 @@ type GetApiDashboardsByDashboardIdWidgetsResponse struct {
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code        string  `json:"code"`
-				Description *string `json:"description,omitempty"`
-				Prompt      *string `json:"prompt,omitempty"`
-				Queries     []struct {
+				Code            string    `json:"code"`
+				Description     *string   `json:"description,omitempty"`
+				ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+				Prompt          *string   `json:"prompt,omitempty"`
+				Queries         []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -154252,10 +154257,11 @@ type PostApiDashboardsByDashboardIdWidgetsResponse struct {
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code        string  `json:"code"`
-			Description *string `json:"description,omitempty"`
-			Prompt      *string `json:"prompt,omitempty"`
-			Queries     []struct {
+			Code            string    `json:"code"`
+			Description     *string   `json:"description,omitempty"`
+			ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+			Prompt          *string   `json:"prompt,omitempty"`
+			Queries         []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -154529,10 +154535,11 @@ type GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse struct {
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code        string  `json:"code"`
-			Description *string `json:"description,omitempty"`
-			Prompt      *string `json:"prompt,omitempty"`
-			Queries     []struct {
+			Code            string    `json:"code"`
+			Description     *string   `json:"description,omitempty"`
+			ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+			Prompt          *string   `json:"prompt,omitempty"`
+			Queries         []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -154681,10 +154688,11 @@ type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse struct {
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code        string  `json:"code"`
-			Description *string `json:"description,omitempty"`
-			Prompt      *string `json:"prompt,omitempty"`
-			Queries     []struct {
+			Code            string    `json:"code"`
+			Description     *string   `json:"description,omitempty"`
+			ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+			Prompt          *string   `json:"prompt,omitempty"`
+			Queries         []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -162516,10 +162524,11 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code        string  `json:"code"`
-				Description *string `json:"description,omitempty"`
-				Prompt      *string `json:"prompt,omitempty"`
-				Queries     []struct {
+				Code            string    `json:"code"`
+				Description     *string   `json:"description,omitempty"`
+				ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+				Prompt          *string   `json:"prompt,omitempty"`
+				Queries         []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -162650,10 +162659,11 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code        string  `json:"code"`
-			Description *string `json:"description,omitempty"`
-			Prompt      *string `json:"prompt,omitempty"`
-			Queries     []struct {
+			Code            string    `json:"code"`
+			Description     *string   `json:"description,omitempty"`
+			ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+			Prompt          *string   `json:"prompt,omitempty"`
+			Queries         []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -162908,10 +162918,11 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code        string  `json:"code"`
-			Description *string `json:"description,omitempty"`
-			Prompt      *string `json:"prompt,omitempty"`
-			Queries     []struct {
+			Code            string    `json:"code"`
+			Description     *string   `json:"description,omitempty"`
+			ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+			Prompt          *string   `json:"prompt,omitempty"`
+			Queries         []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -163060,10 +163071,11 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code        string  `json:"code"`
-			Description *string `json:"description,omitempty"`
-			Prompt      *string `json:"prompt,omitempty"`
-			Queries     []struct {
+			Code            string    `json:"code"`
+			Description     *string   `json:"description,omitempty"`
+			ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+			Prompt          *string   `json:"prompt,omitempty"`
+			Queries         []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -163212,10 +163224,11 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code        string  `json:"code"`
-			Description *string `json:"description,omitempty"`
-			Prompt      *string `json:"prompt,omitempty"`
-			Queries     []struct {
+			Code            string    `json:"code"`
+			Description     *string   `json:"description,omitempty"`
+			ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+			Prompt          *string   `json:"prompt,omitempty"`
+			Queries         []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -186376,10 +186389,11 @@ func ParseGetApiDashboardsByDashboardIdWidgetsResponse(rsp *http.Response) (*Get
 				CreatedAt   string  `json:"createdAt"`
 				DashboardId *string `json:"dashboardId"`
 				Definition  struct {
-					Code        string  `json:"code"`
-					Description *string `json:"description,omitempty"`
-					Prompt      *string `json:"prompt,omitempty"`
-					Queries     []struct {
+					Code            string    `json:"code"`
+					Description     *string   `json:"description,omitempty"`
+					ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+					Prompt          *string   `json:"prompt,omitempty"`
+					Queries         []struct {
 						Name       string `json:"name"`
 						Parameters *[]struct {
 							Default *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -186555,10 +186569,11 @@ func ParsePostApiDashboardsByDashboardIdWidgetsResponse(rsp *http.Response) (*Po
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code        string  `json:"code"`
-				Description *string `json:"description,omitempty"`
-				Prompt      *string `json:"prompt,omitempty"`
-				Queries     []struct {
+				Code            string    `json:"code"`
+				Description     *string   `json:"description,omitempty"`
+				ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+				Prompt          *string   `json:"prompt,omitempty"`
+				Queries         []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -186884,10 +186899,11 @@ func ParseGetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp *http.Respo
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code        string  `json:"code"`
-				Description *string `json:"description,omitempty"`
-				Prompt      *string `json:"prompt,omitempty"`
-				Queries     []struct {
+				Code            string    `json:"code"`
+				Description     *string   `json:"description,omitempty"`
+				ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+				Prompt          *string   `json:"prompt,omitempty"`
+				Queries         []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -187062,10 +187078,11 @@ func ParsePatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp *http.Res
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code        string  `json:"code"`
-				Description *string `json:"description,omitempty"`
-				Prompt      *string `json:"prompt,omitempty"`
-				Queries     []struct {
+				Code            string    `json:"code"`
+				Description     *string   `json:"description,omitempty"`
+				ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+				Prompt          *string   `json:"prompt,omitempty"`
+				Queries         []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -195099,10 +195116,11 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 				CreatedAt   string  `json:"createdAt"`
 				DashboardId *string `json:"dashboardId"`
 				Definition  struct {
-					Code        string  `json:"code"`
-					Description *string `json:"description,omitempty"`
-					Prompt      *string `json:"prompt,omitempty"`
-					Queries     []struct {
+					Code            string    `json:"code"`
+					Description     *string   `json:"description,omitempty"`
+					ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+					Prompt          *string   `json:"prompt,omitempty"`
+					Queries         []struct {
 						Name       string `json:"name"`
 						Parameters *[]struct {
 							Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -195253,10 +195271,11 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code        string  `json:"code"`
-				Description *string `json:"description,omitempty"`
-				Prompt      *string `json:"prompt,omitempty"`
-				Queries     []struct {
+				Code            string    `json:"code"`
+				Description     *string   `json:"description,omitempty"`
+				ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+				Prompt          *string   `json:"prompt,omitempty"`
+				Queries         []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -195557,10 +195576,11 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code        string  `json:"code"`
-				Description *string `json:"description,omitempty"`
-				Prompt      *string `json:"prompt,omitempty"`
-				Queries     []struct {
+				Code            string    `json:"code"`
+				Description     *string   `json:"description,omitempty"`
+				ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+				Prompt          *string   `json:"prompt,omitempty"`
+				Queries         []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -195735,10 +195755,11 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code        string  `json:"code"`
-				Description *string `json:"description,omitempty"`
-				Prompt      *string `json:"prompt,omitempty"`
-				Queries     []struct {
+				Code            string    `json:"code"`
+				Description     *string   `json:"description,omitempty"`
+				ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+				Prompt          *string   `json:"prompt,omitempty"`
+				Queries         []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -195913,10 +195934,11 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code        string  `json:"code"`
-				Description *string `json:"description,omitempty"`
-				Prompt      *string `json:"prompt,omitempty"`
-				Queries     []struct {
+				Code            string    `json:"code"`
+				Description     *string   `json:"description,omitempty"`
+				ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+				Prompt          *string   `json:"prompt,omitempty"`
+				Queries         []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`

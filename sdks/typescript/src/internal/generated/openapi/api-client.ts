@@ -356,7 +356,7 @@ export interface paths {
         head?: never;
         /**
          * Update a dashboard
-         * @description Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).
+         * @description Changes a dashboard's name, description or the trace origins its widgets leave out when they set none of their own; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).
          */
         patch: operations["patchApiDashboardsByDashboardId"];
         trace?: never;
@@ -376,7 +376,7 @@ export interface paths {
         put?: never;
         /**
          * Create a widget on a dashboard
-         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. `excludedOrigins` is the widget's Langy traces setting: [] counts Langy's traces, ["langy"] leaves them out, and without it the widget follows the dashboard.
          */
         post: operations["postApiDashboardsByDashboardIdWidgets"];
         delete?: never;
@@ -408,7 +408,7 @@ export interface paths {
         head?: never;
         /**
          * Update a widget on a dashboard
-         * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.
+         * @description Changes a widget's name, code, queries, description, source or excludedOrigins (its Langy traces setting). A field the body leaves out keeps its stored value. A body with none of these fields is refused.
          */
         patch: operations["patchApiDashboardsByDashboardIdWidgetsByWidgetId"];
         trace?: never;
@@ -5989,6 +5989,7 @@ export interface operations {
                                     /** @constant */
                                     kind: "api";
                                 };
+                                excludedOrigins?: string[];
                             };
                             createdAt: string;
                             updatedAt: string;
@@ -6194,6 +6195,7 @@ export interface operations {
                         /** @constant */
                         kind: "api";
                     };
+                    excludedOrigins?: string[];
                 };
             };
         };
@@ -6236,6 +6238,7 @@ export interface operations {
                                 /** @constant */
                                 kind: "api";
                             };
+                            excludedOrigins?: string[];
                         };
                         createdAt: string;
                         updatedAt: string;
@@ -6450,6 +6453,7 @@ export interface operations {
                                 /** @constant */
                                 kind: "api";
                             };
+                            excludedOrigins?: string[];
                         };
                         createdAt: string;
                         updatedAt: string;
@@ -6834,6 +6838,7 @@ export interface operations {
                         /** @constant */
                         kind: "api";
                     };
+                    excludedOrigins?: string[];
                 };
             };
         };
@@ -6876,6 +6881,7 @@ export interface operations {
                                 /** @constant */
                                 kind: "api";
                             };
+                            excludedOrigins?: string[];
                         };
                         createdAt: string;
                         updatedAt: string;

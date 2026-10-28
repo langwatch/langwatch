@@ -1,7 +1,7 @@
 /**
- * One stored widget on a board, in the card chrome, with the drag handle, Ask Langy and menu
- * as its controls. Drawn over the board's period and grain; the menu opens the board's editor
- * on it, copies its id or API call, and drafts Langy actions on it.
+ * One stored widget on a board, with the drag handle, Ask Langy and menu as its controls. Drawn
+ * over the board's period, leaving out what its "Langy traces" setting names, else the board's
+ * (AC200f); the menu opens the editor on it, copies its id or API call, and drafts Langy actions.
  */
 
 import { Box } from "@langwatch/design-system/primitives";
@@ -15,7 +15,7 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
-import type { BoardQueryContext } from "../../model/board-period.ts";
+import { type BoardQueryContext, widgetExcludedOrigins } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
@@ -72,7 +72,11 @@ export function BoardWidgetCard({
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
-  const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
+  const { periodStart, periodEnd, granularitySeconds } = period;
+  const excludeOrigins = widgetExcludedOrigins({
+    stored: widget.definition.excludedOrigins,
+    board: period.excludeOrigins,
+  });
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],

@@ -69,6 +69,8 @@ export interface DashboardWidgetDefinitionInput {
   readonly prompt?: string;
   /** Where the widget came from; an update without one keeps the stored source. */
   readonly source?: DashboardWidgetSource;
+  /** The origins it leaves out; absent, it follows its board, and an update keeps the stored. */
+  readonly excludedOrigins?: readonly string[];
 }
 
 /** The proof a cost-gated read runs under (ADR-177 v4.15). */

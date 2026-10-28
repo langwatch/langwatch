@@ -157,3 +157,20 @@ describe("scopeLangWatchQL", () => {
     });
   });
 });
+
+describe("given a widget counting Langy's turns by name, which the gateway stores", () => {
+  const TURNS = "SELECT count() FROM traces WHERE TraceName = 'langy.turn'";
+
+  /** @scenario "AC201 Widget data: a widget set to Included reads Langy's turns, the gateway-stored ones included" */
+  it("runs the statement as written when no origin is left out: the server adds no default", () => {
+    expect(scope({ sql: TURNS, excludeOrigins: [], timeWindow: WINDOW })).toBe(TURNS);
+  });
+
+  /** @scenario "AC201b Widget data: a widget left at the default leaves Langy's turns out" */
+  it("drops Langy's traces by their origin, whatever source stored them, when langy is left out", () => {
+    expect(scope({ sql: TURNS, timeWindow: WINDOW })).toBe(
+      `SELECT count() FROM (SELECT * FROM traces WHERE ${notALangyTrace(LOOKUP_BOUND)}) AS traces ` +
+        "WHERE TraceName = 'langy.turn'",
+    );
+  });
+});

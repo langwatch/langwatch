@@ -1,7 +1,7 @@
 /**
  * The widget editor on a board: the shared edit drawer with a live preview over the board's
- * period, Code, Queries, then "API / MCP" (how the member's own agent makes the widget),
- * with Langy's suggestions above the tabs when Langy is available.
+ * period, Code, Queries with the widget's "Langy traces" setting (AC200), then "API / MCP"
+ * (how the member's own agent makes the widget), with Langy's suggestions above the tabs.
  */
 
 import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
@@ -17,6 +17,7 @@ import type { BoardWidget } from "../../model/board-widgets.ts";
 import { widgetApiSnippet, widgetCreatePrompt, widgetMcpSnippet } from "../../model/widget-api.ts";
 import { WidgetApiPanel } from "../blocks/widget-api-panel.tsx";
 import { WidgetLangyAsks } from "../blocks/widget-langy-asks.tsx";
+import { WidgetLangyControl } from "../blocks/widget-langy-control.tsx";
 
 /** The preview is not grid-constrained in the drawer: a fixed, generous height. */
 const PREVIEW_HEIGHT_PX = 320;
@@ -81,6 +82,12 @@ export function BoardWidgetEditor({
       activeTab={tab}
       onTabChange={setTab}
       assist={asks && asks.length > 0 && <WidgetLangyAsks asks={asks} onAsk={onAsk} />}
+      querySettings={
+        <WidgetLangyControl
+          includesLangy={editor.includesLangy}
+          onChange={editor.setIncludesLangy}
+        />
+      }
       extraTabs={[
         {
           value: "api",
@@ -101,7 +108,7 @@ export function BoardWidgetEditor({
       ]}
       chart={
         <SandboxedChartFrame
-          key={`${editor.previewCode}::${JSON.stringify(editor.previewQueries)}`}
+          key={`${editor.previewCode}::${JSON.stringify(editor.previewQueries)}::${editor.previewOrigins.join(",")}`}
           code={editor.previewCode}
           executeQuery={editor.executeQuery}
           dashboardContext={editor.dashboardContext}

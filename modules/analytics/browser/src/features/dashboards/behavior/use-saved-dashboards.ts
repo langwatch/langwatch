@@ -23,7 +23,7 @@ export type SavedBoard = {
   createdById: string | null;
   scope: DashboardScope;
   organizationId: string | null;
-  /** The trace origins its widgets leave out; null keeps the board's default (AC200). */
+  /** The origins a widget that sets none leaves out; null keeps the default (AC200f). */
   excludedOrigins: readonly string[] | null;
   /** The owning project, named only where the board is listed in another project. */
   ownerProject: DashboardProject | null;

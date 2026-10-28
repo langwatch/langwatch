@@ -38,10 +38,14 @@ what it is sent. The Dashboards board composes the context it runs every query w
 default. In a personal project the default is the empty list: Langy's conversations are the data
 there (owner, 2026-10-10; `defaultBoardExcludedOrigins`, dashboards-v2 AC198). A stored board
 keeps its own list in `DashboardsV2.excludedOrigins`; null keeps that default, so a board nobody
-changed behaves as before. The "Langy traces" setting in the board header shows the list as Left
-out or Included, and a member who may edit the board changes it (`boardExcludedOrigins`,
-dashboards-v2 AC200). `boards.update` and `PATCH /api/v1/dashboards/{dashboardId}` set it; `[]`
-includes Langy's traces and `null` restores the default. A From LangWatch board keeps the default.
+changed behaves as before. `boards.update` and `PATCH /api/v1/dashboards/{dashboardId}` set it;
+`[]` includes Langy's traces and `null` restores the default. The app no longer writes it: the
+setting is part of a widget's query (owner, 2026-10-28). Each widget stores its own list in its
+definition, `excludedOrigins`, set in the widget editor beside the queries as "Langy traces: Left
+out / Included" and through the widget API and CLI (`--langy-traces`). A widget runs with its own
+list, else the board's stored list, else the default (`widgetExcludedOrigins`, dashboards-v2
+AC200 to AC200j). A widget about Langy's own traces, such as `TraceName = 'langy.turn'`, is set to
+Included. A From LangWatch board's widgets keep the default.
 
 ## Rationale / Trade-offs
 

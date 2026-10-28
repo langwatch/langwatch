@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -41,6 +41,7 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
             PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionSourceType1 |
             PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionSourceType2 |
             PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionSourceType3 | Unset):
+        excluded_origins (list[str] | Unset):
     """
 
     version: float
@@ -55,6 +56,7 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
         | PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionSourceType3
         | Unset
     ) = UNSET
+    excluded_origins: list[str] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition_source_type_0 import (
@@ -98,6 +100,10 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
         else:
             source = self.source.to_dict()
 
+        excluded_origins: list[str] | Unset = UNSET
+        if not isinstance(self.excluded_origins, Unset):
+            excluded_origins = self.excluded_origins
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -113,6 +119,8 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
             field_dict["prompt"] = prompt
         if source is not UNSET:
             field_dict["source"] = source
+        if excluded_origins is not UNSET:
+            field_dict["excludedOrigins"] = excluded_origins
 
         return field_dict
 
@@ -211,6 +219,8 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
 
         source = _parse_source(d.pop("source", UNSET))
 
+        excluded_origins = cast(list[str], d.pop("excludedOrigins", UNSET))
+
         post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition = cls(
             version=version,
             code=code,
@@ -218,6 +228,7 @@ class PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201Definition
             description=description,
             prompt=prompt,
             source=source,
+            excluded_origins=excluded_origins,
         )
 
         return post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition

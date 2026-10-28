@@ -184,7 +184,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Update a dashboard",
     description:
-      "Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).",
+      "Changes a dashboard's name, description or the trace origins its widgets leave out when they set none of their own; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -283,7 +283,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Create a widget on a dashboard",
     description:
-      "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.",
+      "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. `excludedOrigins` is the widget's Langy traces setting: [] counts Langy's traces, [\"langy\"] leaves them out, and without it the widget follows the dashboard.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -301,6 +301,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       queries: input.queries,
       ...(input.description === undefined ? {} : { description: input.description }),
       ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
+      ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: input.excludedOrigins }),
       source: input.source ?? source,
     });
 
@@ -344,7 +345,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Update a widget on a dashboard",
     description:
-      "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
+      "Changes a widget's name, code, queries, description, source or excludedOrigins (its Langy traces setting). A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -353,7 +354,7 @@ export const boardRest = defineRestRouter(DashboardApi)
     },
   })
   .handle(async ({ app, input, scope, actor }, platformUrl) => {
-    const { name, code, queries, description, source } = input;
+    const { name, code, queries, description, source, excludedOrigins } = input;
     const widget = await app.updateDashboardWidget({
       projectId: scope.id,
       id: input.widgetId,
@@ -364,6 +365,7 @@ export const boardRest = defineRestRouter(DashboardApi)
       ...(queries === undefined ? {} : { queries }),
       ...(description === undefined ? {} : { description }),
       ...(source === undefined ? {} : { source }),
+      ...(excludedOrigins === undefined ? {} : { excludedOrigins }),
     });
 
     return widgetResource(widget, platformUrl);

@@ -630,6 +630,7 @@ export class DashboardModule implements DashboardApi {
         ...(input.description === undefined ? {} : { description: input.description }),
         ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
         ...(input.source === undefined ? {} : { source: input.source }),
+        ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: input.excludedOrigins }),
       },
       viewer: input.viewer,
     });
@@ -657,6 +658,7 @@ export class DashboardModule implements DashboardApi {
         ...(input.description === undefined ? {} : { description: input.description }),
         ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
         ...(input.source === undefined ? {} : { source: input.source }),
+        ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: input.excludedOrigins }),
       },
     });
   }

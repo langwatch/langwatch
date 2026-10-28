@@ -30009,6 +30009,12 @@
                                     "additionalProperties": false
                                   }
                                 ]
+                              },
+                              "excludedOrigins": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
                               }
                             },
                             "required": [
@@ -30597,6 +30603,12 @@
                               "additionalProperties": false
                             }
                           ]
+                        },
+                        "excludedOrigins": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
@@ -31168,6 +31180,15 @@
                         ]
                       }
                     ]
+                  },
+                  "excludedOrigins": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
                   }
                 },
                 "required": [
@@ -31340,6 +31361,12 @@
                               "additionalProperties": false
                             }
                           ]
+                        },
+                        "excludedOrigins": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
@@ -32012,6 +32039,12 @@
                               "additionalProperties": false
                             }
                           ]
+                        },
+                        "excludedOrigins": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
@@ -32486,7 +32519,7 @@
             }
           }
         },
-        "description": "Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out keeps its stored value, so code alone keeps the queries and the source is kept unless the body names one. A body with none of these fields is refused.",
+        "description": "Changes a dashboard widget's name, code, queries, description, source or excludedOrigins (its Langy traces setting). A field the body leaves out keeps its stored value, so code alone keeps the queries and the source is kept unless the body names one. A body with none of these fields is refused.",
         "summary": "Update a dashboard widget",
         "tags": [
           "Analytics / LangWatchQL"
@@ -32669,6 +32702,15 @@
                         ]
                       }
                     ]
+                  },
+                  "excludedOrigins": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
                   }
                 },
                 "minProperties": 1
@@ -33303,6 +33345,12 @@
                               "additionalProperties": false
                             }
                           ]
+                        },
+                        "excludedOrigins": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
@@ -35753,7 +35801,7 @@
             }
           }
         },
-        "description": "Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).",
+        "description": "Changes a dashboard's name, description or the trace origins its widgets leave out when they set none of their own; a field the body leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in a personal project).",
         "summary": "Update a dashboard",
         "tags": [
           "Dashboards"
@@ -36465,6 +36513,12 @@
                                     "additionalProperties": false
                                   }
                                 ]
+                              },
+                              "excludedOrigins": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
                               }
                             },
                             "required": [
@@ -37135,6 +37189,12 @@
                               "additionalProperties": false
                             }
                           ]
+                        },
+                        "excludedOrigins": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
@@ -37609,7 +37669,7 @@
             }
           }
         },
-        "description": "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.",
+        "description": "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. `excludedOrigins` is the widget's Langy traces setting: [] counts Langy's traces, [\"langy\"] leaves them out, and without it the widget follows the dashboard.",
         "summary": "Create a widget on a dashboard",
         "tags": [
           "Dashboards"
@@ -37788,6 +37848,15 @@
                         ]
                       }
                     ]
+                  },
+                  "excludedOrigins": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
                   }
                 },
                 "required": [
@@ -37960,6 +38029,12 @@
                               "additionalProperties": false
                             }
                           ]
+                        },
+                        "excludedOrigins": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
@@ -38632,6 +38707,12 @@
                               "additionalProperties": false
                             }
                           ]
+                        },
+                        "excludedOrigins": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
@@ -39106,7 +39187,7 @@
             }
           }
         },
-        "description": "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
+        "description": "Changes a widget's name, code, queries, description, source or excludedOrigins (its Langy traces setting). A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
         "summary": "Update a widget on a dashboard",
         "tags": [
           "Dashboards"
@@ -39289,6 +39370,15 @@
                         ]
                       }
                     ]
+                  },
+                  "excludedOrigins": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
                   }
                 },
                 "minProperties": 1

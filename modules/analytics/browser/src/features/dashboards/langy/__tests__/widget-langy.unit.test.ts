@@ -222,3 +222,33 @@ describe("editor drafts and starting prompts", () => {
     expect(fresh.about).toEqual({ ref: "board-1", itemRef: "new" });
   });
 });
+
+describe("the widget's Langy traces setting in what Langy is sent", () => {
+  /** @scenario "AC200i Langy setting: Langy writes the setting with the widgets it builds" */
+  it("names a new widget's setting and asks Langy to save it with the widget", () => {
+    const request = widgetBuildQuestion({
+      widget: { ...widget({}), includesLangy: false },
+      board: BOARD,
+      period: PERIOD,
+    });
+
+    expect(request.question).toContain('Its "Langy traces" setting is Left out');
+    expect(request.question).toContain("save it with the widget (--langy-traces left-out)");
+    expect(request.question).toContain(
+      "set it to Included (--langy-traces included) when the widget reads Langy's own traces, " +
+        "such as TraceName 'langy.turn'",
+    );
+  });
+
+  /** @scenario "AC200i Langy setting: Langy writes the setting with the widgets it builds" */
+  it("names a saved widget's setting when Langy edits it or drafts a suggestion", () => {
+    const included = { id: "w-1", ...widget({}), includesLangy: true };
+    const edit = widgetBuildQuestion({ widget: included, board: BOARD, period: PERIOD });
+    const ask = { ask: "Show the top 10", why: "Keep the ten largest, fold the rest." };
+    const suggestion = widgetAskDraft({ ask, widget: included, board: BOARD, period: PERIOD });
+
+    expect(edit.question).toContain('Its "Langy traces" setting is Included');
+    expect(edit.question).toContain("save it with the widget (--langy-traces included)");
+    expect(suggestion.draft).toContain("save it with the widget (--langy-traces included)");
+  });
+});

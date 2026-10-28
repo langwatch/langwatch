@@ -140,19 +140,19 @@ describe("defaultBoardExcludedOrigins", () => {
 
 describe("boardExcludedOrigins", () => {
   describe("given a board that stores no origins", () => {
-    /** @scenario "AC200 Langy setting: a board leaves Langy's conversations out until a member includes them" */
+    /** @scenario "AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default" */
     it("leaves out the project's default", () => {
       expect(boardExcludedOrigins({ stored: null, isPersonalProject: false })).toEqual(["langy"]);
     });
 
-    /** @scenario "AC200c Langy setting: a personal project's board still includes Langy by default" */
+    /** @scenario "AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default" */
     it("leaves out no origin in a personal project", () => {
       expect(boardExcludedOrigins({ stored: null, isPersonalProject: true })).toEqual([]);
     });
   });
 
   describe("given a board set to include Langy", () => {
-    /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
+    /** @scenario "AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default" */
     it("leaves out what it stores, the empty list, wherever it is", () => {
       expect(boardExcludedOrigins({ stored: [], isPersonalProject: false })).toEqual([]);
       expect(boardIncludesLangy({ excluded: [] })).toBe(true);
@@ -161,7 +161,7 @@ describe("boardExcludedOrigins", () => {
 });
 
 describe("boardOriginsWithLangy", () => {
-  /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
+  /** @scenario "AC200b Langy setting: a widget saved as Included runs with no origin left out" */
   it("drops langy when the member includes it, and keeps other origins", () => {
     expect(boardOriginsWithLangy({ excluded: ["langy"], includeLangy: true })).toEqual([]);
     expect(boardOriginsWithLangy({ excluded: ["eval", "langy"], includeLangy: true })).toEqual([
@@ -169,7 +169,7 @@ describe("boardOriginsWithLangy", () => {
     ]);
   });
 
-  /** @scenario "AC200c Langy setting: a personal project's board still includes Langy by default" */
+  /** @scenario "AC200c Langy setting: picking Left out stores langy as the origin a widget leaves out" */
   it("adds langy when the member leaves it out", () => {
     expect(boardOriginsWithLangy({ excluded: [], includeLangy: false })).toEqual(["langy"]);
     expect(boardIncludesLangy({ excluded: ["langy"] })).toBe(false);

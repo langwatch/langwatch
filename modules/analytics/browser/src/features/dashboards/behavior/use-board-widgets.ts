@@ -32,7 +32,10 @@ import { offerUndo, withdrawUndo } from "./widget-undo.ts";
 /** What a new widget is made from: its name, its stored parts and where it came from. */
 type NewWidget = {
   name: string;
-  definition: Pick<DashboardWidgetDefinition, "code" | "queries" | "description" | "prompt">;
+  definition: Pick<
+    DashboardWidgetDefinition,
+    "code" | "queries" | "description" | "prompt" | "excludedOrigins"
+  >;
   source: DashboardWidgetSource | undefined;
 };
 
@@ -115,6 +118,7 @@ export function useBoardWidgets({
       description: definition.description,
       prompt: definition.prompt,
       source,
+      excludedOrigins: definition.excludedOrigins,
     });
     return created.id;
   };
@@ -138,6 +142,7 @@ export function useBoardWidgets({
               name,
               code: definition.code,
               queries: definition.queries,
+              excludedOrigins: definition.excludedOrigins,
             }),
           ),
         );

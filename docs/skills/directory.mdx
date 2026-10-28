@@ -7610,6 +7610,15 @@ langwatch dashboard widget add <dashboardId> \
 
 Creating (and updating) validates the queries file's shape and the widget's JS/TSX syntax, but it does not execute the queries or mount the component — a wrong column name or a runtime error in the widget only surfaces when it actually runs. Open the widget's `platformUrl` (printed on success) and confirm it renders with real data before calling the work done.
 
+### Langy traces
+
+Every widget has a **Langy traces** setting, part of its queries: whether it counts the user's own conversations with Langy (traces with origin `langy`). Pass it with the widget:
+
+- `--langy-traces left-out` (the default): the widget counts the user's agent only. Use this for cost, volume, latency, errors and quality.
+- `--langy-traces included`: the widget also counts conversations with Langy. **Always use it when the widget reads Langy's own traces**: queries on `TraceName = 'langy.turn'`, on `Origin = 'langy'`, or about Langy's failed or refused requests. Left out, such a widget is always empty.
+
+When the request names a widget's current setting, keep it unless the widget reads Langy's own traces or the user asks to change it. A widget saved without the flag follows its dashboard, which leaves Langy out (or, in a personal project, includes it).
+
 ## Dashboards and their widgets
 
 A dashboard is the page widgets live on. **Use an existing dashboard** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new dashboard, or none fits and they agree.
@@ -7622,8 +7631,9 @@ langwatch dashboard update <dashboardId> --name "<name>"  # rename; or --descrip
 langwatch dashboard delete <dashboardId>                  # removes the dashboard and its widgets
 langwatch dashboard widget list <dashboardId> -f json
 langwatch dashboard widget get <dashboardId> <widgetId> -f json   # code, queries, platformUrl
-langwatch dashboard widget add <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
+langwatch dashboard widget add <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json --langy-traces left-out -f json
 langwatch dashboard widget update <dashboardId> <widgetId> --code-file widget.tsx --queries-file queries.json
+langwatch dashboard widget update <dashboardId> <widgetId> --langy-traces included   # count Langy's traces
 langwatch dashboard widget delete <dashboardId> <widgetId>
 ```
 
@@ -7635,7 +7645,7 @@ langwatch dashboard widget delete <dashboardId> <widgetId>
 - **Confirm before any delete** of a dashboard or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a dashboard takes its widgets with it.
 - The project needs Dashboards switched on. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
 
-`widget update` accepts `--name` or `--description` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
+`widget update` accepts `--name`, `--description` or `--langy-traces` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
 ## Worked example: bar chart of daily trace counts
 

@@ -82,6 +82,9 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
         ...(input.input.description === undefined ? {} : { description: input.input.description }),
         ...(input.input.prompt === undefined ? {} : { prompt: input.input.prompt }),
         ...(input.input.source === undefined ? {} : { source: input.input.source }),
+        ...(input.input.excludedOrigins === undefined
+          ? {}
+          : { excludedOrigins: [...input.input.excludedOrigins] }),
       },
       createdAt: nowInstant(),
       updatedAt: nowInstant(),
@@ -105,6 +108,7 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
     const description = input.input.description ?? definition.data.description;
     const prompt = input.input.prompt ?? definition.data.prompt;
     const source = input.input.source ?? definition.data.source;
+    const excludedOrigins = input.input.excludedOrigins ?? definition.data.excludedOrigins;
     const updated: DashboardWidgetRow = {
       ...current,
       ...(input.input.name === undefined ? {} : { name: input.input.name }),
@@ -115,6 +119,7 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
         ...(description === undefined ? {} : { description }),
         ...(prompt === undefined ? {} : { prompt }),
         ...(source === undefined ? {} : { source }),
+        ...(excludedOrigins === undefined ? {} : { excludedOrigins: [...excludedOrigins] }),
       },
       updatedAt: nowInstant(),
     };

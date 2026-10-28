@@ -11,6 +11,7 @@ import {
   dashboardWidgetCodeSchema,
   dashboardWidgetDefinitionSchema,
   dashboardWidgetDescriptionSchema,
+  dashboardWidgetExcludedOriginsSchema,
   dashboardWidgetNameSchema,
   dashboardWidgetPromptSchema,
   dashboardWidgetQueriesSchema,
@@ -98,6 +99,7 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       description: dashboardWidgetDescriptionSchema.optional(),
       prompt: dashboardWidgetPromptSchema.optional(),
       source: dashboardWidgetSourceSchema.optional(),
+      excludedOrigins: dashboardWidgetExcludedOriginsSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSchema)
@@ -112,6 +114,8 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       queries: dashboardWidgetQueriesSchema,
       /** Kept as stored when absent. */
       source: dashboardWidgetSourceSchema.optional(),
+      /** Kept as stored when absent. */
+      excludedOrigins: dashboardWidgetExcludedOriginsSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSuccessSchema)

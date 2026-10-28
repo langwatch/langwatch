@@ -149,9 +149,9 @@ def sync_detailed(
 ]:
     """Update a dashboard widget
 
-     Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out
-    keeps its stored value, so code alone keeps the queries and the source is kept unless the body names
-    one. A body with none of these fields is refused.
+     Changes a dashboard widget's name, code, queries, description, source or excludedOrigins (its Langy
+    traces setting). A field the body leaves out keeps its stored value, so code alone keeps the queries
+    and the source is kept unless the body names one. A body with none of these fields is refused.
 
     Args:
         project_id (str):
@@ -196,9 +196,9 @@ def sync(
 ):
     """Update a dashboard widget
 
-     Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out
-    keeps its stored value, so code alone keeps the queries and the source is kept unless the body names
-    one. A body with none of these fields is refused.
+     Changes a dashboard widget's name, code, queries, description, source or excludedOrigins (its Langy
+    traces setting). A field the body leaves out keeps its stored value, so code alone keeps the queries
+    and the source is kept unless the body names one. A body with none of these fields is refused.
 
     Args:
         project_id (str):
@@ -237,9 +237,9 @@ async def asyncio_detailed(
 ]:
     """Update a dashboard widget
 
-     Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out
-    keeps its stored value, so code alone keeps the queries and the source is kept unless the body names
-    one. A body with none of these fields is refused.
+     Changes a dashboard widget's name, code, queries, description, source or excludedOrigins (its Langy
+    traces setting). A field the body leaves out keeps its stored value, so code alone keeps the queries
+    and the source is kept unless the body names one. A body with none of these fields is refused.
 
     Args:
         project_id (str):
@@ -282,9 +282,9 @@ async def asyncio(
 ):
     """Update a dashboard widget
 
-     Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out
-    keeps its stored value, so code alone keeps the queries and the source is kept unless the body names
-    one. A body with none of these fields is refused.
+     Changes a dashboard widget's name, code, queries, description, source or excludedOrigins (its Langy
+    traces setting). A field the body leaves out keeps its stored value, so code alone keeps the queries
+    and the source is kept unless the body names one. A body with none of these fields is refused.
 
     Args:
         project_id (str):

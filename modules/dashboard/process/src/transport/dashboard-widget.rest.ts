@@ -160,6 +160,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       queries: input.queries,
       ...(input.description === undefined ? {} : { description: input.description }),
       ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
+      ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: input.excludedOrigins }),
       source: input.source ?? callerSource,
     });
 
@@ -212,7 +213,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Update a dashboard widget",
     description:
-      "Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out keeps its stored value, so code alone keeps the queries and the source is kept unless the body names one. A body with none of these fields is refused.",
+      "Changes a dashboard widget's name, code, queries, description, source or excludedOrigins (its Langy traces setting). A field the body leaves out keeps its stored value, so code alone keeps the queries and the source is kept unless the body names one. A body with none of these fields is refused.",
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -222,7 +223,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
   })
   .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const projectId = scope.id;
-    const { name, code, queries, description, source } = input;
+    const { name, code, queries, description, source, excludedOrigins } = input;
     const widget = await app.updateDashboardWidget({
       id: input.widgetId,
       projectId,
@@ -232,6 +233,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       ...(queries === undefined ? {} : { queries }),
       ...(description === undefined ? {} : { description }),
       ...(source === undefined ? {} : { source }),
+      ...(excludedOrigins === undefined ? {} : { excludedOrigins }),
     });
 
     return widgetResource(widget, platformUrl);

@@ -1737,43 +1737,46 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # the board's own, read from the project; the server takes the list it is sent (AC193)
 
   # ---------------------------------------------------------------------------
-  # A board's "Langy traces" setting
+  # A widget's "Langy traces" setting
   # ---------------------------------------------------------------------------
   # Why: a widget meant to show Langy's failed or refused requests was always empty, since every
   # board left Langy's conversations out with no way to change it (owner, 2026-10-27).
-  # How: the board stores the origins it leaves out; none stored keeps the default (AC190, AC198).
+  # Where: the setting is part of a widget's query, so it sits in the widget editor beside the
+  # queries, not in the board's header (owner, 2026-10-28; the board-wide switch is gone).
+  # How: a widget stores the origins it leaves out. One that stores none follows its board's
+  # stored list, else the board's default (AC200f). The default itself is AC190's and AC198's.
 
   @unit @integration
-  Scenario: AC200 Langy setting: a board leaves Langy's conversations out until a member includes them
-    Given a stored board in a project that holds the member's agent, never changed
-    When a member opens it
-    Then the header shows "Langy traces: Left out" beside the period
-    And every widget leaves out the origin "langy", as before (AC190)
-    # Why: no board changes until a member asks; the stored value is null (the default) until
-    # then, which is not the empty list: an empty list includes Langy (AC200e)
+  Scenario: AC200 Langy setting: the widget editor shows the setting a widget runs with
+    Given a stored widget that stores no setting, on a board that leaves out "langy"
+    When a member who may edit the board opens the widget's editor on the Queries tab
+    Then the editor shows "Langy traces" set to "Left out" beside the queries, with a one-line hint
+    And the widget's card and its preview leave out the origin "langy"
+    # The editor shows "Included" the same way for a widget that runs with nothing left out
 
   @unit @integration
-  Scenario: AC200b Langy setting: a board set to include Langy runs every widget with no origin left out
-    Given a stored board a member may edit
-    When they pick "Included" under "Langy traces" in the header
-    Then the board stores that it leaves out no origin
-    And every widget runs again and counts Langy's conversations too
-    And the header shows "Langy traces: Included" for every member who opens the board
+  Scenario: AC200b Langy setting: a widget saved as Included runs with no origin left out
+    Given a member has picked "Included" under "Langy traces" in a widget's editor
+    When they save the widget
+    Then the widget stores that it leaves out no origin
+    And its card runs with no origin left out, so it counts Langy's conversations too
+    And every other widget on the board keeps its own setting
 
   @unit
-  Scenario: AC200c Langy setting: a personal project's board still includes Langy by default
-    Given a stored board in a member's personal project, never changed
-    Then it leaves out no origin, as before (AC198)
-    And picking "Left out" stores "langy" as the origin it leaves out
+  Scenario: AC200c Langy setting: picking Left out stores langy as the origin a widget leaves out
+    Given a widget that leaves out no origin
+    When a member picks "Left out" under "Langy traces"
+    Then the widget's list of origins left out holds "langy", and any other origin it held
 
   @integration
-  Scenario: AC200d Langy setting: only a member who can edit the board changes it
+  Scenario: AC200d Langy setting: only a member who can edit the board sees the setting
     Given a member who may read a board but not edit it
     When they open it
-    Then the header shows the board's "Langy traces" value as a badge with no menu
-    And a write of the setting from them is refused, as any edit of the board is
+    Then no "Langy traces" control shows anywhere on the board
+    And no widget offers its editor, so the setting cannot be changed from there
+    # The header badge and menu are gone: a reader sees what each widget draws, nothing more
 
-  @integration
+  @unit @integration
   Scenario: AC200e Langy setting: the API reads and sets the origins a board leaves out
     Given a Dashboards board
     When an API key reads it at /api/v1/dashboards/{dashboardId}
@@ -1781,7 +1784,99 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the key sends PATCH with "excludedOrigins": []
     Then the board leaves out no origin and reads back "excludedOrigins": []
     And PATCH with "excludedOrigins": null returns it to the default
-    # The CLI, MCP and Python SDK flags are a follow-up
+    And a project that only reads the board cannot change it
+    # The board's list is now only the fallback for widgets that store none (AC200f); the app no
+    # longer writes it
+
+  @unit @integration
+  Scenario: AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default
+    Given a board set to "Included" before widgets carried the setting
+    And a widget on it that stores no setting of its own
+    When a member opens the board
+    Then the widget's card runs with no origin left out, as it did before
+    And its editor shows "Langy traces" set to "Included"
+    And on a board that stores no list, the widget runs with the board's default
+    # Order: the widget's own setting, else the board's stored list, else the default
+
+  @integration
+  Scenario: AC200g Langy setting: changing it runs the preview again
+    Given a member is editing a widget that leaves Langy's conversations out
+    When they pick "Included" under "Langy traces"
+    Then the preview runs again with no origin left out, before anything is saved
+    And closing the editor without saving leaves the widget as it was stored
+
+  @integration
+  Scenario: AC200h Langy setting: a From LangWatch board's widgets keep the board's rule
+    Given a From LangWatch board, whose curated widgets are read-only and never stored
+    When a member opens it
+    Then every widget leaves out what the board's default leaves out (AC190, AC198)
+    And no "Langy traces" control shows, since no widget there has an editor
+    # A member who wants a different setting on a curated widget adds it to their own board
+
+  @unit
+  Scenario: AC200i Langy setting: Langy writes the setting with the widgets it builds
+    Given a member builds a widget with Langy, or asks Langy to edit one
+    Then the prompt Langy is sent names the widget's "Langy traces" setting
+    And it asks Langy to save that setting with the widget's code and queries
+    And to set it to "Included" when the widget reads Langy's own traces, such as "langy.turn"
+    And the dashboard-widgets skill tells Langy how to set it when it adds or updates a widget
+    # The main case: Langy's own app showing Langy's requests (owner, 2026-10-28)
+
+  @unit @integration
+  Scenario: AC200j Langy setting: the API and the CLI read and write a widget's setting
+    Given an API key that may edit a board's widgets
+    When it adds a widget with "excludedOrigins": []
+    Then the widget reads back "excludedOrigins": []
+    And an update that does not name "excludedOrigins" keeps the stored value
+    And `langwatch dashboard widget add` and `update` send it with `--langy-traces included` or `left-out`
+
+  # ---------------------------------------------------------------------------
+  # What a custom widget's queries read
+  # ---------------------------------------------------------------------------
+  # Why: a widget counting `TraceName = 'langy.turn'` drew no bars while the same SQL run
+  # directly returned rows (owner, 2026-10-28). Langy's turns are stored with the gateway as
+  # their source and "langy" as their origin, so the board's default left them out. The default
+  # stays: a widget about Langy's own traces is set to "Included" in its query (AC200b, AC200i).
+
+  @unit @integration
+  Scenario: AC201 Widget data: a widget set to Included reads Langy's turns, the gateway-stored ones included
+    Given Langy's turns, stored with the gateway as their source and "langy" as their origin
+    And a widget set to "Included" whose named query counts the traces with TraceName "langy.turn"
+    When the query runs
+    Then the run leaves no origin out, and LangWatchQL run directly returns those traces
+    And the same named query run through LW.useChartQuery returns the same rows on the card
+    # The server leaves a statement as written when it is sent no origins: no default of its own
+
+  @unit @integration
+  Scenario: AC201b Widget data: a widget left at the default leaves Langy's turns out
+    Given the same widget storing no setting, on a board storing none, outside a personal project
+    When the query runs
+    Then the run names "langy" as the origin it leaves out
+    And none of Langy's turns are read, the ones stored from the gateway included
+
+  @integration
+  Scenario: AC201e Widget data: a board's explicit setting applies to widgets with no own value
+    Given a board that stores an empty list of origins to leave out
+    And the same widget storing no setting of its own
+    When the query runs
+    Then the run leaves no origin out and the card shows Langy's turns
+
+  @integration
+  Scenario: AC201c Widget data: every run is bound to the period and grain the board shows
+    Given a board set to the last 30 days at one bucket per day
+    When a widget's card or its editor's preview runs a query
+    Then the run carries the board's period start and end and a granularity of 86400 seconds
+    And the frame's dashboard context, which LW.useChartQuery binds from, carries the same values
+
+  @integration
+  Scenario: AC201d Widget data: a changed query never shows an earlier answer
+    Given a widget on a board whose query returned no rows
+    When its SQL changes, saved from the editor, by Langy or through the API
+    Then the card starts the widget over and runs the new SQL
+    And the earlier answer is not shown for the new query
+    # What a run is keyed by: widget id, query name, SQL and the origins left out start the frame
+    # over; the period and grain re-run it through the dashboard context. Nothing else caches a
+    # result: analytics.lwql.query is a mutation, and the server keeps no LangWatchQL cache
 
   # ---------------------------------------------------------------------------
   # Guard rails
@@ -1842,4 +1937,5 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
   # AC 190-195: "Dashboards show your agent, not Langy's work for you" (owner, 2026-10-09) → Scenario: AC190 Langy: every widget on a board leaves out Langy's conversations by default; Scenario: AC191 Langy: a widget's own origin filter keeps its meaning; Scenario: AC192 Langy: data that is Langy's own is not filtered; Scenario: AC193 Langy: the origins a board leaves out are a list a board parameter can set later; Scenario: AC194 Langy: a query run outside a board is not scoped; Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
   # AC 198: "A personal project's boards show Langy" (owner, 2026-10-10) → Scenario: AC198 Langy: a board in a personal project shows Langy's conversations
-  # AC 200: "A board's Langy traces setting" (owner, 2026-10-27) → Scenario: AC200 Langy setting: a board leaves Langy's conversations out until a member includes them; Scenario: AC200b Langy setting: a board set to include Langy runs every widget with no origin left out; Scenario: AC200c Langy setting: a personal project's board still includes Langy by default; Scenario: AC200d Langy setting: only a member who can edit the board changes it; Scenario: AC200e Langy setting: the API reads and sets the origins a board leaves out
+  # AC 200: "A widget's Langy traces setting" (owner, 2026-10-27; moved from the board header to the widget editor, owner, 2026-10-28) → Scenario: AC200 Langy setting: the widget editor shows the setting a widget runs with; Scenario: AC200b Langy setting: a widget saved as Included runs with no origin left out; Scenario: AC200c Langy setting: picking Left out stores langy as the origin a widget leaves out; Scenario: AC200d Langy setting: only a member who can edit the board sees the setting; Scenario: AC200e Langy setting: the API reads and sets the origins a board leaves out; Scenario: AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default; Scenario: AC200g Langy setting: changing it runs the preview again; Scenario: AC200h Langy setting: a From LangWatch board's widgets keep the board's rule; Scenario: AC200i Langy setting: Langy writes the setting with the widgets it builds; Scenario: AC200j Langy setting: the API and the CLI read and write a widget's setting
+  # AC 201: "A custom widget reads what its query asks for" (owner, 2026-10-28) → Scenario: AC201 Widget data: a widget set to Included reads Langy's turns, the gateway-stored ones included; Scenario: AC201b Widget data: a widget left at the default leaves Langy's turns out; Scenario: AC201e Widget data: a board's explicit setting applies to widgets with no own value; Scenario: AC201c Widget data: every run is bound to the period and grain the board shows; Scenario: AC201d Widget data: a changed query never shows an earlier answer

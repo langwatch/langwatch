@@ -15,6 +15,25 @@ export interface DefinitionFlags {
 /** Thrown for input the CLI can refuse before any request is made. */
 export class WidgetInputError extends Error {}
 
+/** `--langy-traces`: whether the widget counts the user's conversations with Langy. */
+const LANGY_TRACES: Readonly<Record<string, string[]>> = {
+  included: [],
+  "left-out": ["langy"],
+};
+
+/**
+ * The origins a widget leaves out for `--langy-traces included|left-out`, or undefined when
+ * the flag is absent, so the widget keeps what it stores (or follows its dashboard).
+ */
+export const resolveLangyTraces = (flag: string | undefined): string[] | undefined => {
+  if (flag === undefined) return undefined;
+  const origins = LANGY_TRACES[flag];
+  if (!origins) {
+    throw new WidgetInputError('--langy-traces takes "included" or "left-out"');
+  }
+  return [...origins];
+};
+
 /**
  * Resolves definition flags to { code, queries }, refusing partial
  * definitions (both source and queries required together).

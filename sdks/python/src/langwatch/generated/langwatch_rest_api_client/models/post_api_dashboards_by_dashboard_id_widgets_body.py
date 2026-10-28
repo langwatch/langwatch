@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -41,6 +41,7 @@ class PostApiDashboardsByDashboardIdWidgetsBody:
         source (PostApiDashboardsByDashboardIdWidgetsBodySourceType0 |
             PostApiDashboardsByDashboardIdWidgetsBodySourceType1 | PostApiDashboardsByDashboardIdWidgetsBodySourceType2 |
             PostApiDashboardsByDashboardIdWidgetsBodySourceType3 | Unset):
+        excluded_origins (list[str] | Unset):
     """
 
     name: str
@@ -55,6 +56,7 @@ class PostApiDashboardsByDashboardIdWidgetsBody:
         | PostApiDashboardsByDashboardIdWidgetsBodySourceType3
         | Unset
     ) = UNSET
+    excluded_origins: list[str] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -93,6 +95,10 @@ class PostApiDashboardsByDashboardIdWidgetsBody:
         else:
             source = self.source.to_dict()
 
+        excluded_origins: list[str] | Unset = UNSET
+        if not isinstance(self.excluded_origins, Unset):
+            excluded_origins = self.excluded_origins
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -108,6 +114,8 @@ class PostApiDashboardsByDashboardIdWidgetsBody:
             field_dict["prompt"] = prompt
         if source is not UNSET:
             field_dict["source"] = source
+        if excluded_origins is not UNSET:
+            field_dict["excludedOrigins"] = excluded_origins
 
         return field_dict
 
@@ -188,6 +196,8 @@ class PostApiDashboardsByDashboardIdWidgetsBody:
 
         source = _parse_source(d.pop("source", UNSET))
 
+        excluded_origins = cast(list[str], d.pop("excludedOrigins", UNSET))
+
         post_api_dashboards_by_dashboard_id_widgets_body = cls(
             name=name,
             code=code,
@@ -195,6 +205,7 @@ class PostApiDashboardsByDashboardIdWidgetsBody:
             description=description,
             prompt=prompt,
             source=source,
+            excluded_origins=excluded_origins,
         )
 
         post_api_dashboards_by_dashboard_id_widgets_body.additional_properties = d

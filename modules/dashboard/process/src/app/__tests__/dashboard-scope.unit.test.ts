@@ -469,7 +469,7 @@ describe("board scope on the server", () => {
       });
     });
 
-    /** @scenario "AC200d Langy setting: only a member who can edit the board changes it" */
+    /** @scenario "AC200e Langy setting: the API reads and sets the origins a board leaves out" */
     it("refuses its Langy setting from a project that only reads it, and keeps the default", async () => {
       const { app, target } = await boardAt("ORGANIZATION");
       const board = { dashboardId: target.dashboardId, viewer: AUTHOR };

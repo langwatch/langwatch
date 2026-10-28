@@ -1,7 +1,7 @@
 /**
  * What every widget on a board is run with: the period from the address's `range` and `grain`,
- * the origins it leaves out, and the writes the header control makes. One reading per
- * board, so every widget updates together (AC13). Live rolls; a fixed range re-ends on refresh.
+ * the origins a widget that sets none leaves out, and the header control's writes. One reading
+ * per board, so every widget updates together (AC13). Live rolls; a fixed range re-ends on refresh.
  */
 
 import { nowInstant } from "@langwatch/time";
@@ -43,7 +43,7 @@ export function useBoardRange() {
 
 /**
  * `refreshedAt` is the board's auto-refresh clock; each move re-ends a fixed range at now.
- * `excludedOrigins` is what a stored board keeps; absent or null, the board's default (AC200).
+ * `excludedOrigins` is what a stored board keeps; absent or null, the board's default (AC200f).
  */
 export function useBoardPeriod({
   refreshedAt,

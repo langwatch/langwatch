@@ -72,6 +72,21 @@ export function boardOriginsWithLangy({
   return includeLangy ? others : [...others, LANGY_TRACE_ORIGIN];
 }
 
+/**
+ * The origins one widget leaves out: its own "Langy traces" setting, else the board's, which
+ * {@link boardExcludedOrigins} resolved from its stored list or its default (AC200f).
+ */
+export function widgetExcludedOrigins({
+  stored,
+  board,
+}: {
+  /** What the widget stores; absent on a widget saved before it had the setting. */
+  stored: readonly string[] | undefined;
+  board: readonly string[];
+}): readonly string[] {
+  return stored ?? board;
+}
+
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";
 export const DEFAULT_BOARD_PERIOD_GRAIN: BoardPeriodGrain = "auto";
 

@@ -479,6 +479,31 @@ describe("given two Dashboards boards, one holding a widget", () => {
     });
   });
 
+  /** @scenario "AC200j Langy setting: the API and the CLI read and write a widget's setting" */
+  it("stores the origins a widget is sent with, and keeps them through an update without them", async () => {
+    const { other, send } = await twoBoards();
+    const widgets = `${BOARDS}/${other.id}/widgets`;
+
+    const created = await send("dashboards", widgets, {
+      method: "POST",
+      body: { name: "Langy refusals", code: CODE, queries: [], excludedOrigins: [] },
+    });
+    const path = `${widgets}/${created.json?.id}`;
+    const read = await send("dashboards", path);
+    const renamed = await send("dashboards", path, { method: "PATCH", body: { name: "Refused" } });
+    const left = await send("dashboards", path, {
+      method: "PATCH",
+      body: { excludedOrigins: ["langy"] },
+    });
+
+    expect({
+      created: created.json?.definition?.excludedOrigins,
+      read: read.json?.definition?.excludedOrigins,
+      renamed: renamed.json?.definition?.excludedOrigins,
+      left: left.json?.definition?.excludedOrigins,
+    }).toEqual({ created: [], read: [], renamed: [], left: ["langy"] });
+  });
+
   /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */
   it("answers a widget reached through another board's path as not found, and leaves it", async () => {
     const { board, other, widget, send } = await twoBoards();

@@ -58,6 +58,7 @@ export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
         ...(input.description === undefined ? {} : { description: input.description }),
         ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
         ...(input.source === undefined ? {} : { source: input.source }),
+        ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: input.excludedOrigins }),
       }),
     ),
   )
@@ -73,6 +74,7 @@ export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
       code: input.code,
       queries: input.queries,
       ...(input.source === undefined ? {} : { source: input.source }),
+      ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: input.excludedOrigins }),
     });
 
     return { success: true as const };

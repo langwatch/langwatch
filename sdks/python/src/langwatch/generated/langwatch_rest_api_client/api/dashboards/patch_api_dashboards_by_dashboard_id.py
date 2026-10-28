@@ -120,9 +120,10 @@ def sync_detailed(
 ]:
     """Update a dashboard
 
-     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
-    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
-    traces, and null restores the default (Langy's left out, none in a personal project).
+     Changes a dashboard's name, description or the trace origins its widgets leave out when they set
+    none of their own; a field the body leaves out keeps its value. A null description clears it;
+    excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in
+    a personal project).
 
     Args:
         dashboard_id (str):
@@ -164,9 +165,10 @@ def sync(
 ):
     """Update a dashboard
 
-     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
-    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
-    traces, and null restores the default (Langy's left out, none in a personal project).
+     Changes a dashboard's name, description or the trace origins its widgets leave out when they set
+    none of their own; a field the body leaves out keeps its value. A null description clears it;
+    excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in
+    a personal project).
 
     Args:
         dashboard_id (str):
@@ -202,9 +204,10 @@ async def asyncio_detailed(
 ]:
     """Update a dashboard
 
-     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
-    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
-    traces, and null restores the default (Langy's left out, none in a personal project).
+     Changes a dashboard's name, description or the trace origins its widgets leave out when they set
+    none of their own; a field the body leaves out keeps its value. A null description clears it;
+    excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in
+    a personal project).
 
     Args:
         dashboard_id (str):
@@ -244,9 +247,10 @@ async def asyncio(
 ):
     """Update a dashboard
 
-     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
-    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
-    traces, and null restores the default (Langy's left out, none in a personal project).
+     Changes a dashboard's name, description or the trace origins its widgets leave out when they set
+    none of their own; a field the body leaves out keeps its value. A null description clears it;
+    excludedOrigins [] includes Langy's traces, and null restores the default (Langy's left out, none in
+    a personal project).
 
     Args:
         dashboard_id (str):

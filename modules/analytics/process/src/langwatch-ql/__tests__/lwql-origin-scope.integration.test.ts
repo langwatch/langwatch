@@ -31,6 +31,10 @@ const TRACES = [
   { id: "langy-turn-2", origin: "langy" },
 ];
 const SPANS_PER_TRACE = 2;
+/** Langy's turns on a day of their own: stored by the gateway, origin langy (AC201). */
+const TURN_AT = "2026-06-12 12:00:00.000";
+const TURN_WINDOW = { start: "2026-06-12T00:00:00.000Z", end: "2026-06-13T00:00:00.000Z" };
+const TURN_IDS = ["gateway-turn-1", "gateway-turn-2"];
 const inPeriod = (column: string) =>
   `${column} >= {dashboard_context_period_start:DateTime} ` +
   `AND ${column} < {dashboard_context_period_end:DateTime}`;
@@ -49,7 +53,11 @@ describe("given a project with its agent's traces and Langy's turns", () => {
   let service: LangWatchQLService;
 
   /** One statement run for the board's window, leaving `excludeOrigins` out when given. */
-  const run = (sql: string, excludeOrigins?: readonly string[]) =>
+  const run = (
+    sql: string,
+    excludeOrigins?: readonly string[],
+    timeWindow: { start: string; end: string } = WINDOW,
+  ) =>
     service.execute({
       project: { id: harness.tenantA.tenantId, lwqlKey: harness.tenantA.rawSecret },
       protections: {
@@ -59,7 +67,7 @@ describe("given a project with its agent's traces and Langy's turns", () => {
         canSeeCapturedOutput: true,
       },
       sql,
-      timeWindow: WINDOW,
+      timeWindow,
       ...(excludeOrigins ? { excludeOrigins } : {}),
     });
 
@@ -155,6 +163,33 @@ describe("given a project with its agent's traces and Langy's turns", () => {
       })),
     );
 
+    await insert(
+      "trace_summaries",
+      TURN_IDS.map((id) => ({
+        ProjectionId: `${tenantA.tenantId}/${traceId(id)}`,
+        TenantId: tenantA.tenantId,
+        TraceId: traceId(id),
+        Version: "1",
+        OccurredAt: TURN_AT,
+        UpdatedAt: TURN_AT,
+        SpanCount: 1,
+        TraceName: "langy.turn",
+        SourceType: "gateway",
+      })),
+    );
+    await insert(
+      "trace_analytics",
+      TURN_IDS.map((id) => ({
+        TenantId: tenantA.tenantId,
+        TraceId: traceId(id),
+        Version: "1",
+        OccurredAt: TURN_AT,
+        CreatedAt: TURN_AT,
+        UpdatedAt: TURN_AT,
+        Origin: "langy",
+      })),
+    );
+
     service = LangWatchQLService.create({
       executor: ClickHouseLangWatchQLExecutorRepository.create({
         connection: {
@@ -207,6 +242,28 @@ describe("given a project with its agent's traces and Langy's turns", () => {
 
       expect(before).toBe(2);
       expect(await count(PRODUCTION_COUNT, ["langy"])).toBe(before);
+    });
+  });
+
+  describe("when a widget counts Langy's turns by name, which the gateway stored", () => {
+    const TURNS =
+      "SELECT count() AS n FROM traces WHERE TraceName = 'langy.turn' " +
+      `AND ${inPeriod("OccurredAt")}`;
+
+    /** @scenario "AC201 Widget data: a widget set to Included reads Langy's turns, the gateway-stored ones included" */
+    it("reads them when no origin is left out", async () => {
+      const turns = await run(TURNS, undefined, TURN_WINDOW);
+      const sentNone = await run(TURNS, [], TURN_WINDOW);
+
+      expect(Number(turns.rows[0]?.n)).toBe(TURN_IDS.length);
+      expect(Number(sentNone.rows[0]?.n)).toBe(TURN_IDS.length);
+    });
+
+    /** @scenario "AC201b Widget data: a widget left at the default leaves Langy's turns out" */
+    it("reads none of them when langy is left out", async () => {
+      const turns = await run(TURNS, ["langy"], TURN_WINDOW);
+
+      expect(Number(turns.rows[0]?.n)).toBe(0);
     });
   });
 });

@@ -172,6 +172,20 @@ export interface DashboardWidgetSourceSchema extends Named<
 export const dashboardWidgetSourceSchema: DashboardWidgetSourceSchema =
   dashboardWidgetSourceSchemaDefinition;
 
+/**
+ * The trace origins a widget leaves out of every query it runs, such as `langy`: its "Langy
+ * traces" setting. Bounded as the LangWatchQL query door bounds `excludeOrigins`. Optional:
+ * a widget storing none follows its board (dashboards-v2 AC200f).
+ */
+const dashboardWidgetExcludedOriginsSchemaDefinition = z
+  .array(z.string().trim().min(1).max(64))
+  .max(20);
+export interface DashboardWidgetExcludedOriginsSchema extends Named<
+  typeof dashboardWidgetExcludedOriginsSchemaDefinition
+> {}
+export const dashboardWidgetExcludedOriginsSchema: DashboardWidgetExcludedOriginsSchema =
+  dashboardWidgetExcludedOriginsSchemaDefinition;
+
 const dashboardWidgetDefinitionSchemaDefinition = z.object({
   version: z.literal(DASHBOARD_WIDGET_DEFINITION_VERSION),
   code: dashboardWidgetCodeSchema,
@@ -179,6 +193,7 @@ const dashboardWidgetDefinitionSchemaDefinition = z.object({
   description: dashboardWidgetDescriptionSchema.optional(),
   prompt: dashboardWidgetPromptSchema.optional(),
   source: dashboardWidgetSourceSchema.optional(),
+  excludedOrigins: dashboardWidgetExcludedOriginsSchema.optional(),
 });
 export interface DashboardWidgetDefinitionSchema extends Named<
   typeof dashboardWidgetDefinitionSchemaDefinition
