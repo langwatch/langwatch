@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -52,7 +52,14 @@ const activeDatasetVersion = () =>
   useEvaluationsV3Store.getState().datasets.find((dataset) => dataset.id === "ds-ref")
     ?.datasetVersion;
 
-const versionSelect = () => screen.getByRole("combobox", { name: "Dataset version" });
+const versionItem = () => screen.findByTestId("experiment-dataset-version");
+const badge = () => screen.queryByTestId("experiment-dataset-version-badge");
+
+const openVersions = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByTestId("dataset-tab-ds-ref"));
+  await user.click(await versionItem());
+  return screen.findAllByRole("menuitemradio");
+};
 
 describe("DatasetTabs dataset version pin", () => {
   beforeEach(() => {
@@ -76,14 +83,14 @@ describe("DatasetTabs dataset version pin", () => {
 
   describe("given an experiment whose saved dataset has versions 1 and 2", () => {
     /** @scenario "The dataset version select lists Latest and every version, newest first" */
-    it("shows Latest and lists the versions newest first", () => {
+    it("shows Latest and lists the versions newest first", async () => {
+      const user = userEvent.setup();
       attach(savedDataset());
       renderWithDesignSystem(<DatasetTabs {...handlers} />);
 
-      expect(versionSelect()).toHaveValue("latest");
-      const labels = within(versionSelect())
-        .getAllByRole("option")
-        .map((option) => option.textContent);
+      expect(badge()).not.toBeInTheDocument();
+      const labels = (await openVersions(user)).map((option) => option.textContent);
+      expect(await versionItem()).toHaveTextContent("Dataset version (Latest)");
       expect(labels).toEqual(["Latest version", "Version 2 · cleaned", "Version 1"]);
       expect(versionsQuery).toHaveBeenCalledWith(
         { projectId: "project-1", datasetId: "dataset-1" },
@@ -98,10 +105,11 @@ describe("DatasetTabs dataset version pin", () => {
         attach(savedDataset());
         renderWithDesignSystem(<DatasetTabs {...handlers} />);
 
-        await user.selectOptions(versionSelect(), "Version 1");
+        await openVersions(user);
+        await user.click(screen.getByRole("menuitemradio", { name: "Version 1" }));
 
         expect(activeDatasetVersion()).toBe(1);
-        expect(versionSelect()).toHaveValue("1");
+        expect(badge()).toHaveTextContent("v1");
       });
     });
   });
@@ -113,22 +121,27 @@ describe("DatasetTabs dataset version pin", () => {
         const user = userEvent.setup();
         attach(savedDataset(1));
         renderWithDesignSystem(<DatasetTabs {...handlers} />);
-        expect(versionSelect()).toHaveValue("1");
+        expect(badge()).toHaveTextContent("v1");
 
-        await user.selectOptions(versionSelect(), "Latest version");
+        await openVersions(user);
+        await user.click(screen.getByRole("menuitemradio", { name: "Latest version" }));
 
         expect(activeDatasetVersion()).toBeUndefined();
-        expect(versionSelect()).toHaveValue("latest");
+        expect(badge()).not.toBeInTheDocument();
       });
     });
   });
 
   describe("given an experiment whose active dataset is inline", () => {
     /** @scenario "An inline dataset offers no version select" */
-    it("shows no dataset version select and reads no versions", () => {
+    it("offers no dataset version menu and reads no versions", async () => {
+      const user = userEvent.setup();
       renderWithDesignSystem(<DatasetTabs {...handlers} />);
+      const tab = screen.getAllByTestId(/^dataset-tab-/)[0]!;
+      await user.click(tab);
 
-      expect(screen.queryByRole("combobox", { name: "Dataset version" })).not.toBeInTheDocument();
+      expect(await screen.findByRole("menuitem", { name: /Switch Dataset/ })).toBeInTheDocument();
+      expect(screen.queryByTestId("experiment-dataset-version")).not.toBeInTheDocument();
       expect(versionsQuery).not.toHaveBeenCalled();
     });
   });

@@ -1,5 +1,6 @@
-import { NativeSelect } from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Box, Text } from "@langwatch/design-system/primitives";
+import { History } from "lucide-react";
 
 import type { DatasetVersionOption } from "../../../behavior/experiments-v3/use-dataset-version-options.ts";
 
@@ -8,15 +9,20 @@ const LATEST = "latest";
 export const DATASET_VERSION_PIN_HINT =
   "Runs started from the API, CI or an SDK read this version. Runs started on this page use the rows shown here.";
 
-/** How one version reads in the select: its number, then its name when it has one. */
+/** How one version reads in the menu: its number, then its name when it has one. */
 export const datasetVersionLabel = ({ version, name }: DatasetVersionOption): string =>
   name ? `Version ${version} · ${name}` : `Version ${version}`;
 
+/** The short pin a dataset tab shows: "v3", or nothing for the latest content. */
+export const datasetVersionBadge = (version: number | null | undefined): string | null =>
+  version ? `v${version}` : null;
+
 /**
- * The saved dataset version an experiment's runs read: Latest, or one pinned version.
+ * The saved dataset version an experiment's runs read, as a submenu of the dataset tab's
+ * menu, so the dataset header takes no extra room.
  * Spec: specs/experiments-v3/dataset-version-pin.feature.
  */
-export function DatasetVersionSelect({
+export function DatasetVersionSubmenu({
   versions,
   value,
   onChange,
@@ -34,26 +40,29 @@ export function DatasetVersionSelect({
       : versions;
 
   return (
-    <Tooltip content={DATASET_VERSION_PIN_HINT} positioning={{ placement: "top" }} showArrow>
-      <NativeSelect.Root size="xs" width="150px" flexShrink={0}>
-        <NativeSelect.Field
-          aria-label="Dataset version"
-          data-testid="experiment-dataset-version"
+    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+      <Menu.TriggerItem value="dataset-version" data-testid="experiment-dataset-version">
+        <History size={14} />
+        Dataset version ({pinned === null ? "Latest" : `v${pinned}`})
+      </Menu.TriggerItem>
+      <Menu.Content minWidth="220px" maxWidth="320px">
+        <Box paddingX={2} paddingY={1.5}>
+          <Text textStyle="caption" color="fg.muted">
+            {DATASET_VERSION_PIN_HINT}
+          </Text>
+        </Box>
+        <Menu.RadioItemGroup
           value={pinned === null ? LATEST : String(pinned)}
-          onChange={(event) => {
-            const selected = event.currentTarget.value;
-            onChange(selected === LATEST ? null : Number(selected));
-          }}
+          onValueChange={(event) => onChange(event.value === LATEST ? null : Number(event.value))}
         >
-          <option value={LATEST}>Latest version</option>
+          <Menu.RadioItem value={LATEST}>Latest version</Menu.RadioItem>
           {options.map((option) => (
-            <option key={option.version} value={String(option.version)}>
+            <Menu.RadioItem key={option.version} value={String(option.version)}>
               {datasetVersionLabel(option)}
-            </option>
+            </Menu.RadioItem>
           ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
-    </Tooltip>
+        </Menu.RadioItemGroup>
+      </Menu.Content>
+    </Menu.Root>
   );
 }
