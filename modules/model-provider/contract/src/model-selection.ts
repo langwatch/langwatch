@@ -18,6 +18,12 @@ export type BuiltInModel = { value: string; label: string };
 /** The heading built-in models are listed under. */
 export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
 
+/**
+ * The built-in group's key. A constant, never a model id's prefix: an own-key decision model
+ * reads `openai/decisions:<name>`, and keying on that collided with the provider's own group.
+ */
+export const BUILT_IN_MODELS_GROUP_KEY = "langwatch-built-in";
+
 export type GroupedModelOptions = ModelOptionGroup[];
 
 /**
@@ -235,25 +241,20 @@ export function modelSelectionFrom({
     value,
     isDisabled: false,
     mode,
+    isBuiltIn: true,
   }));
-  const builtInGroups: GroupedModelOptions = builtInOptions.map((option) => ({
-    provider: option.value.split("/")[0]!,
-    label: BUILT_IN_MODELS_GROUP_LABEL,
-    models: [option],
-  }));
+  const builtInGroups: GroupedModelOptions =
+    builtInOptions.length === 0
+      ? []
+      : [
+          {
+            provider: BUILT_IN_MODELS_GROUP_KEY,
+            label: BUILT_IN_MODELS_GROUP_LABEL,
+            models: builtInOptions,
+          },
+        ];
   return {
     selectOptions: [...builtInOptions, ...selectOptions],
-    groupedByProvider: [...mergeGroups(builtInGroups), ...groupOptionsByProvider(selectOptions)],
+    groupedByProvider: [...builtInGroups, ...groupOptionsByProvider(selectOptions)],
   };
-}
-
-/** Built-in models sharing a provider prefix read as one group. */
-function mergeGroups(groups: GroupedModelOptions): GroupedModelOptions {
-  const byProvider = new Map<string, ModelOptionGroup>();
-  for (const group of groups) {
-    const existing = byProvider.get(group.provider);
-    if (existing) existing.models.push(...group.models);
-    else byProvider.set(group.provider, { ...group, models: [...group.models] });
-  }
-  return [...byProvider.values()];
 }

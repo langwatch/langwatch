@@ -5,9 +5,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { modelSelectionFrom } from "../model-selection.ts";
+import { BUILT_IN_MODELS_GROUP_KEY, modelSelectionFrom } from "../model-selection.ts";
 
 const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
+const OWN_DECISION_BUILT_IN = {
+  value: "openai/decisions:gpt-6-luna",
+  label: "OpenAI Decisions (gpt-6-luna)",
+};
 
 describe("modelSelectionFrom", () => {
   describe("given a built-in model and no provider", () => {
@@ -23,7 +27,7 @@ describe("modelSelectionFrom", () => {
       expect(selectOptions.map((option) => option.value)).toEqual(["langwatch/instant-evals"]);
       expect(selectOptions[0]?.label).toBe("Instant Evals");
       expect(groupedByProvider).toEqual([
-        { provider: "langwatch", label: "LangWatch", models: selectOptions },
+        { provider: BUILT_IN_MODELS_GROUP_KEY, label: "LangWatch", models: selectOptions },
       ]);
     });
   });
@@ -38,7 +42,51 @@ describe("modelSelectionFrom", () => {
         builtInModels: [BUILT_IN],
       });
 
-      expect(groupedByProvider.map((group) => group.provider)).toEqual(["langwatch", "openai"]);
+      expect(groupedByProvider.map((group) => group.provider)).toEqual([
+        BUILT_IN_MODELS_GROUP_KEY,
+        "openai",
+      ]);
+    });
+  });
+
+  describe("given built-in models whose ids carry different provider prefixes", () => {
+    const grouped = () =>
+      modelSelectionFrom({
+        providers: [{ provider: "openai", enabled: true, customModels: null }] as never,
+        options: ["openai/gpt-5-mini"],
+        mode: "chat",
+        featureKey: undefined,
+        builtInModels: [BUILT_IN, OWN_DECISION_BUILT_IN],
+      }).groupedByProvider;
+
+    it("keeps one built-in group, keyed apart from every provider's group", () => {
+      const keys = grouped().map((group) => group.provider);
+
+      expect(keys).toEqual([BUILT_IN_MODELS_GROUP_KEY, "openai"]);
+      expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    it("heads that one group once, and the provider's group by its own name", () => {
+      const groups = grouped();
+
+      expect(groups.filter((group) => group.label === "LangWatch")).toHaveLength(1);
+      expect(groups[0]?.models.map((model) => model.value)).toEqual([
+        BUILT_IN.value,
+        OWN_DECISION_BUILT_IN.value,
+      ]);
+      expect(groups[1]?.label).toBeUndefined();
+    });
+
+    it("marks every built-in option, so no caller asks a provider row to carry it", () => {
+      const { selectOptions } = modelSelectionFrom({
+        providers: [],
+        options: ["openai/gpt-5-mini"],
+        mode: "chat",
+        featureKey: undefined,
+        builtInModels: [OWN_DECISION_BUILT_IN],
+      });
+
+      expect(selectOptions.map((option) => option.isBuiltIn)).toEqual([true]);
     });
   });
 

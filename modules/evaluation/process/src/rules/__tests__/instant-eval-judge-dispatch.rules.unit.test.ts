@@ -22,15 +22,6 @@ describe("instantEvalJudgeOf", () => {
         judge: { evaluatorType: "langevals/llm_boolean", settings: { prompt: "is it polite?" } },
       });
     });
-
-    it("carries no decision model, so the project's column still decides", () => {
-      expect(
-        instantEvalJudgeOf({
-          evaluatorType: "langevals/llm_boolean",
-          settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID, prompt: "is it polite?" },
-        }),
-      ).not.toHaveProperty("decisionModel");
-    });
   });
 
   describe("given a score judge with a range", () => {

@@ -396,9 +396,13 @@ export const ModelSelector = React.memo(function ModelSelector({
   // scope) — the value is still persisted on the form but the user
   // needs to update it before the evaluation can run. Same chip
   // treatment ModelChip renders in the Default Models table.
+  // A built-in model is LangWatch's own offer, so no provider row of the project's has to carry it.
   const providerKey = model.split("/")[0] ?? "";
   const isProviderMissing =
-    !!model && !!providerKey && !groupedByProvider.some((group) => group.provider === providerKey);
+    !!model &&
+    !!providerKey &&
+    !selectedItem?.isBuiltIn &&
+    !groupedByProvider.some((group) => group.provider === providerKey);
 
   const selectValueText = (
     <SelectedModelValue

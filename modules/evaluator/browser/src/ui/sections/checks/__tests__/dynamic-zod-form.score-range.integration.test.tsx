@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * The score judge's min and max only steer Instant Evals, so the form shows
- * them only while Instant Evals is the judge's model.
+ * them only while the judge's model is a decision model.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
@@ -61,8 +61,8 @@ function scoreRangeInputs() {
 describe("DynamicZodForm score range", () => {
   describe("given a score judge", () => {
     describe("when a member picks Instant Evals as its model", () => {
-      /** @scenario "The score range shows only for Instant Evals" */
-      it("shows the score range fields, and hides them again for any other model", () => {
+      /** @scenario "The score range shows for Instant Evals and not for a provider model" */
+      it("shows the score range fields, and hides them again for a provider model", () => {
         const { form } = renderScoreJudge({ model: "openai/gpt-5-mini" });
         expect(scoreRangeInputs()).toHaveLength(0);
 

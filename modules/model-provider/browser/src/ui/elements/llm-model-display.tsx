@@ -27,12 +27,15 @@ function getModelDisplayState({
   model: string;
   isLoading: boolean;
   groupedByProvider: { provider: string }[];
-  modelOption: { icon?: ReactNode; isDisabled?: boolean; label?: string } | undefined;
+  modelOption:
+    | { icon?: ReactNode; isDisabled?: boolean; label?: string; isBuiltIn?: boolean }
+    | undefined;
 }) {
   const providerKey = model.split("/")[0] ?? "";
   const isProviderMissing =
     !!model &&
     !isLoading &&
+    !modelOption?.isBuiltIn &&
     groupedByProvider.length > 0 &&
     !groupedByProvider.some((g) => g.provider === providerKey);
   // The inferred mark is dark-safe and covers bare ids ("gpt-5-mini") the options miss.

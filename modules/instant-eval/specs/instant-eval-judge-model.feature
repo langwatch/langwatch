@@ -570,11 +570,11 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then Instant Evals is one of the options
 
     @integration
-    Scenario: The score range shows only for Instant Evals
+    Scenario: The score range shows for Instant Evals and not for a provider model
       Given a score judge
       When a member picks Instant Evals as its model
       Then the score range fields are shown
-      And they are hidden for any other model
+      And they are hidden again when a provider model is picked
 
     @integration
     Scenario: The score range shows for a judge on its own decision model
