@@ -18,6 +18,9 @@ const Heading = "### Operator action required"
 // changelogLink is how release-please links a pull request in a changelog line.
 var changelogLink = regexp.MustCompile(`\[#(\d+)\]\(https://github\.com/[^/)]+/[^/)]+/(?:issues|pull)/\d+\)`)
 
+// sectionStart matches the heading only as a whole line, never inside a changelog entry.
+var sectionStart = regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(Heading) + `$`)
+
 // PullRequest is one pull request carrying the label the release ships.
 type PullRequest struct {
 	Number int    `json:"number"`
@@ -72,10 +75,11 @@ func WithSection(notes string, prs []PullRequest) string {
 }
 
 func withoutSection(notes string) string {
-	start := strings.Index(notes, Heading)
-	if start < 0 {
+	loc := sectionStart.FindStringIndex(notes)
+	if loc == nil {
 		return notes
 	}
+	start := loc[0]
 	rest := notes[start+len(Heading):]
 	end := len(rest)
 	for _, next := range []string{"\n## ", "\n### "} {

@@ -40,6 +40,9 @@ func TestTheSectionListsTheMarkedPullRequestsTheReleaseShips(t *testing.T) {
 // @scenario "A release with no operator-action pull request is left as it is"
 func TestNotesWithNoMarkedPullRequestAreUnchanged(t *testing.T) {
 	assert.Equal(t, notes, WithSection(notes, Shipped(notes, nil)))
+
+	quoting := notes + "* **docs:** explain the ### Operator action required section ([#9004](https://github.com/langwatch/langwatch/pull/9004))\n"
+	assert.Equal(t, quoting, WithSection(quoting, nil), "the heading inside an entry is not the section")
 }
 
 // @scenario "Publishing the notes twice does not repeat the section"
