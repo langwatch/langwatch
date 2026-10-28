@@ -58,10 +58,10 @@ export interface DrawerContentProps extends ChakraDrawer.ContentProps {
 
 /** A caller's side margin applies on wide screens only; a phone sheet always reaches the edge. */
 function floatMargin(value: ChakraDrawer.ContentProps["marginEnd"]) {
-  if (value == null) return { mdDown: 0 };
+  if (value == null) return undefined;
   if (typeof value === "object" && !Array.isArray(value))
     return Object.assign({}, value, { mdDown: 0 });
-  return { base: value, mdDown: 0 };
+  return { base: value, md: value, mdDown: 0 };
 }
 
 export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps>(
@@ -93,8 +93,8 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
               <ChakraDrawer.Content
                 ref={contentProps.asChild ? mergeRefs(ref, portalTarget) : ref}
                 // A phone shows every drawer as a full-screen sheet; wider screens float it. The
-                // float margin is zeroed per side so a passed header offset (marginTop) survives.
-                margin={2}
+                // per-side margins below repeat their value at md so they beat this shorthand there.
+                margin={{ base: 0, md: 2 }}
                 marginStart={floatMargin(marginStart)}
                 marginBottom={floatMargin(marginBottom)}
                 maxWidth={{ mdDown: "100%" }}
@@ -102,7 +102,9 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
                 borderRadius={{ base: 0, md: "lg" }}
                 marginTop={
                   marginTop ??
-                  (context.marginTop == null ? { mdDown: 0 } : `${context.marginTop}px`)
+                  (context.marginTop == null
+                    ? { mdDown: 0 }
+                    : { base: `${context.marginTop}px`, md: `${context.marginTop}px` })
                 }
                 marginEnd={floatMargin(marginEnd ?? (inset > 0 ? `${inset}px` : undefined))}
                 {...contentProps}
