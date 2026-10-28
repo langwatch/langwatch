@@ -10,7 +10,21 @@ export interface DashboardWidgetQueryInput {
     type: "string" | "number" | "boolean";
     default?: string | number | boolean;
   }[];
+  /** The trace origins the query counts; `null` clears it back to the default, application. */
+  sources?: WidgetSource[] | null;
 }
+
+/** A trace origin a widget query can count, as the platform's widget schema lists them. */
+export type WidgetSource =
+  | "application"
+  | "simulation"
+  | "evaluation"
+  | "coding_agent"
+  | "gateway"
+  | "workflow"
+  | "playground"
+  | "langy"
+  | "other";
 
 /** Where a widget came from, as the platform records it. */
 export type DashboardWidgetSource =

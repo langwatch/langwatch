@@ -28,6 +28,7 @@ import {
   triggerActionSchema,
   validateActionParamsForAction,
 } from "./schemas/triggers.ts";
+import { widgetSourcesInput } from "./schemas/widget-sources.ts";
 import { handleExperimentResults } from "./tools/get-experiment-results.ts";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.ts";
 import { handleExperimentList } from "./tools/list-experiments.ts";
@@ -1458,6 +1459,7 @@ function registerDashboardTools(server: McpServer): void {
         .describe(
           "The widget's named LangWatchQL queries: either {name: sql} or an array of {name, sql}. Max 8. Validate each statement with run_query first.",
         ),
+      sources: widgetSourcesInput,
     },
     withToolLogging("add_dashboard_widget", async (params) => {
       requireApiKey();
@@ -1470,7 +1472,7 @@ function registerDashboardTools(server: McpServer): void {
 
   server.tool(
     "update_dashboard_widget",
-    "Changes one custom widget on a dashboard: its name, its TSX `code`, its named LangWatchQL `queries` or its `description`. Pass only the fields to change; every field left out keeps its stored value. Validate any new query's SQL with run_query first. Returns the updated widget.",
+    "Changes one custom widget on a dashboard: its name, its TSX `code`, its named LangWatchQL `queries`, its `description` or the `sources` its queries count. Pass only the fields to change; every field left out keeps its stored value. Validate any new query's SQL with run_query first. Returns the updated widget.",
     {
       dashboardId: z.string().describe("The dashboard the widget is on"),
       widgetId: z.string().describe("The widget to change, as add_dashboard_widget returned it"),
@@ -1501,6 +1503,7 @@ function registerDashboardTools(server: McpServer): void {
         .string()
         .optional()
         .describe("What the widget's info tip says: a sentence or two"),
+      sources: widgetSourcesInput,
     },
     withToolLogging("update_dashboard_widget", async (params) => {
       requireApiKey();
