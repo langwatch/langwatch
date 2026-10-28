@@ -507,6 +507,24 @@ describe("given a widget's Langy traces setting", () => {
     });
   });
 
+  describe("when a member saves another edit without touching the setting", () => {
+    /** @scenario "AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default" */
+    it("saves another edit without pinning the board's setting onto the widget", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = openBoard({ excludedOrigins: [] });
+      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+      const drawer = await openEditor(user);
+      await user.click(within(drawer).getByRole("button", { name: `Rename ${WIDGET.name}` }));
+      await user.keyboard("{Control>}a{/Control}Renamed{Enter}");
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
+
+      expect(server.updates()[0]).toEqual(expect.objectContaining({ name: "Renamed" }));
+      expect(server.updates()[0]).not.toHaveProperty("excludedOrigins");
+    });
+  });
+
   describe("when a member who may not edit the board opens it", () => {
     /** @scenario "AC200d Langy setting: only a member who can edit the board sees the setting" */
     it("shows no Langy traces control and no way into the editor", async () => {

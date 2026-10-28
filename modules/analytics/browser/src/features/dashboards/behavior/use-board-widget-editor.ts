@@ -84,12 +84,15 @@ export function useBoardWidgetEditor({
     setIncludesLangy: langy.setIncludesLangy,
     /** A new widget can always be saved; a saved one once something changed. */
     canSave: widget === null || draft.isDirty || langy.isDirty,
-    /** What Save writes: the widget's setting always, so it no longer follows the board. */
+    /**
+     * What Save writes. The setting only once the member changed it, so a widget left alone
+     * keeps following the board (AC200f); an update without it keeps what the widget stores.
+     */
     edited: {
       name: draft.draftName,
       code: draft.draftCode,
       queries: draft.draftQueries,
-      excludedOrigins: [...langy.excluded],
+      ...(langy.isDirty ? { excludedOrigins: [...langy.excluded] } : {}),
     },
   };
 }
