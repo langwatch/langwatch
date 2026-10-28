@@ -20,7 +20,8 @@ import {
   type RunningConnectedAgent,
   startConnectedAgentFixture,
 } from "./helpers/connected-agent-fixture.ts";
-import { archiveTestSuite, testSuiteCli } from "./helpers/test-suite-cleanup.ts";
+import { archiveTestSuite } from "./helpers/test-suite-cleanup.ts";
+import { createTestSuite, getTestSuite } from "./helpers/test-suite-fixture.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1048,7 +1049,7 @@ describe("Scenarios Skill", () => {
         const suiteName = `Refund requests ${Date.now().toString(36)}`;
 
         try {
-          testSuiteCli({ workingDirectory: tempFolder, args: ["create", suiteName] });
+          createTestSuite({ workingDirectory: tempFolder, name: suiteName });
 
           const result = await scenario.run({
             setId: SKILL_TESTS_SET_ID,
@@ -1099,10 +1100,7 @@ describe("Scenarios Skill", () => {
                     "--test-suite",
                   );
                 }
-                const suite = testSuiteCli({
-                  workingDirectory: tempFolder,
-                  args: ["get", suiteName],
-                });
+                const suite = getTestSuite({ workingDirectory: tempFolder, reference: suiteName });
                 expect(
                   suite.scenarioCount,
                   "Expected the scenario filed in the fitting suite",

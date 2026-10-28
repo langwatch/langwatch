@@ -64,14 +64,20 @@ describe("scenario update, given both test suite flags on one line", () => {
 });
 
 describe("scenario create --help", () => {
-  it("tells the caller to list test suites first and when --test-suite may be left out", () => {
+  /** @scenario "The create help tells the caller to pick a test suite and never to leave it out" */
+  it("says to list the test suites first, file in the one that fits or ask, and never offers omitting it", () => {
     const create = buildProgram()
       .commands.find((c) => c.name() === "scenario")
       ?.commands.find((c) => c.name() === "create");
-    const help = create?.helpInformation().replace(/\s+/g, " ") ?? "";
+    const flagHelp = create?.options.find((o) => o.long === "--test-suite")?.description ?? "";
+    const pick =
+      "Run `langwatch test-suite list` first and file the scenario in the suite that fits; " +
+      "if none fits, ask the user which suite (or whether to make a new one).";
 
-    expect(help).toContain("langwatch test-suite list");
-    expect(help).toContain("the suite that fits (or ask the user)");
-    expect(help).toContain("no suite besides Default");
+    expect(create?.description()).toContain(pick);
+    expect(flagHelp).toContain(pick);
+    for (const text of [create?.description() ?? "", flagHelp]) {
+      expect(text).not.toMatch(/leave .*out|besides Default/i);
+    }
   });
 });

@@ -8,26 +8,6 @@ const cliDistPath = path.resolve(
 );
 
 /**
- * Runs one `langwatch test-suite <args> --format json` command from
- * `workingDirectory`, whose .env carries the project key, and parses its output.
- * Seeds or reads a suite the way the agent under test would see it.
- */
-export function testSuiteCli({
-  workingDirectory,
-  args,
-}: {
-  workingDirectory: string;
-  args: string[];
-}): Record<string, unknown> {
-  const stdout = execFileSync("node", [cliDistPath, "test-suite", ...args, "--format", "json"], {
-    cwd: workingDirectory,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-  });
-  return JSON.parse(stdout) as Record<string, unknown>;
-}
-
-/**
  * Archives the test suite a run asked the agent to create, and every scenario
  * filed in it, so the next run of the same test finds nothing to reuse. Runs
  * from `workingDirectory`, whose .env carries the project key.

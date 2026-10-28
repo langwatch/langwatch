@@ -418,7 +418,7 @@ langwatch scenario run <scenario-id> --target http:<agent-id>
 
 A **test suite** groups scenarios: a name and the scenarios you file under it. Every project has a `Default` test suite, so no scenario is loose.
 
-Run `langwatch test-suite list` before `scenario create` and file the scenario in the suite that fits (or ask the user). Leave `--test-suite` out only when the project has no suite besides `Default`.
+Run `langwatch test-suite list` before `scenario create` and file the scenario in the suite that fits; if none fits, ask the user which suite (or whether to make a new one).
 
 ```bash
 langwatch test-suite list

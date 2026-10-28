@@ -27,6 +27,14 @@ Feature: Langy files a new scenario into a test suite the project already has
     Then the scenarios skill names the guided-onboarding script as the one exception
     And the guided-onboarding skill says its first scenario leaves the test suite out on purpose
 
+  @unit
+  Scenario: The connect-agent first run picks a test suite the same way
+    Given the compiled connect-agent skill Langy reads
+    When its first-run step is inspected
+    Then it lists the test suites before it creates the scenario
+    And it tells the agent to ask the user which test suite when none clearly fits
+    And it names no invented test suite
+
   @integration
   Scenario: Langy files a scenario into the test suite that fits without being told which
     Given a project with a test suite whose name fits the scenario

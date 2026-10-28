@@ -272,6 +272,22 @@ describe("native skill generation", () => {
     });
   });
 
+  // Backs specs/langy/langy-scenario-suite.feature.
+  describe("given the connect-agent skill runs its first test suite", () => {
+    /** @scenario "The connect-agent first run picks a test suite the same way" */
+    it("lists the test suites before the first create, asks when none fits, and invents no suite", () => {
+      const body = renderSkill(skills.find((s) => s.slug === "connect-agent")!);
+      const stepFive = body.slice(body.indexOf("## Step 5"), body.indexOf("## Step 6"));
+      const listAt = stepFive.indexOf("langwatch test-suite list");
+      const createAt = stepFive.indexOf("langwatch scenario create");
+      expect(listAt, "step 5 lists the suites").toBeGreaterThan(-1);
+      expect(createAt, "step 5 creates after listing").toBeGreaterThan(listAt);
+      expect(stepFive, "asks when none fits").toContain("ask the user which test suite");
+      expect(stepFive, "no invented suite name").not.toMatch(/test-suite create '[^<]/);
+      expect(stepFive, "no invented suite name").not.toContain("Smoke");
+    });
+  });
+
   // AGENTS.md tells Langy which skill to invoke per user intent. A row naming
   // a skill that isn't in the shipped image teaches the model to hallucinate.
   // The image's skill set is the root-compiled native set Docker overlays into
