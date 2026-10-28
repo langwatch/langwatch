@@ -48900,7 +48900,7 @@
             "project_api_key"
           ],
           "permissions": [
-            "datasets:update"
+            "datasets:manage"
           ]
         },
         "parameters": [
