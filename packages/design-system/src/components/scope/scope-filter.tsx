@@ -1,7 +1,8 @@
-import { Building2, ChevronDown, Folder, Search, Users } from "lucide-react";
+import { Building2, ChevronDown, Folder, Users } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { Box, Button, HStack, Icon, Input, Text } from "../../primitives.ts";
+import { Box, Button, HStack, Text } from "../../primitives.ts";
+import { SearchInput } from "../forms/search-input.tsx";
 import { Menu } from "../overlays/menu.tsx";
 
 // Read-side scope filter; read-only twin of picker; presentational only.
@@ -219,13 +220,10 @@ function ProjectSubmenu({
             This Project
           </Menu.Item>
         )}
-        <HStack gap={1.5} paddingX={2} paddingY={1}>
-          <Icon color="fg.subtle" boxSize={3.5}>
-            <Search />
-          </Icon>
-          <Input
+        <Box paddingX={2} paddingY={1}>
+          <SearchInput
             ref={searchRef}
-            size="xs"
+            size="sm"
             variant="flushed"
             placeholder="Search projects…"
             aria-label="Search projects"
@@ -235,8 +233,9 @@ function ProjectSubmenu({
               if (!MENU_KEYS.has(event.key)) event.stopPropagation();
             }}
             data-testid="filter-project-search"
+            containerProps={{ width: "full" }}
           />
-        </HStack>
+        </Box>
         <Box maxHeight="280px" overflowY="auto">
           {matching.map((project) => (
             <Menu.Item

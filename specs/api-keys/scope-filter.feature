@@ -69,6 +69,13 @@ Feature: API Keys scope filter
     And below it are a search box and every other project I can see, without the current project
     And picking "This Project" sets the filter to follow my current project
 
+  # The search box is the design system's shared search field, not a hand-rolled
+  # icon beside an input: see specs/components/search-input.feature.
+  @integration
+  Scenario: The project search box is the shared search field
+    Given I have opened the "This Project" submenu
+    Then the search box is the design system's search field, with its icon inside the input
+
   @integration
   Scenario: Typing in the project search narrows the list by name
     Given I have opened the "This Project" submenu
@@ -241,3 +248,11 @@ Feature: API Keys scope filter
     And I can move between options with ArrowDown / ArrowUp
     And pressing Enter selects the focused option and closes the menu
     And pressing Escape closes the menu without changing the selection
+
+  # The shared menu draws the arrow on a submenu trigger, so the two
+  # affordances in this one menu cannot drift apart.
+  @integration
+  Scenario: The submenu arrow matches the menu's other arrow
+    Given I have opened the scope filter dropdown
+    Then the "This Project" arrow and the "More Scopes" arrow are the same size
+    And they sit on the same right edge

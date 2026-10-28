@@ -143,6 +143,18 @@ describe("given the scope filter", () => {
       expect(picked).toEqual([{ kind: "project-current" }]);
     });
 
+    /** @scenario The project search box is the shared search field */
+    it("draws the search box with the shared search field, icon inside the input", async () => {
+      const { user } = mount();
+      const search = await openProjectSubmenu({ user });
+
+      // The shared field is a searchbox wrapping its own decorative icon, so a
+      // hand-rolled icon beside a plain input would fail both halves.
+      expect(search).toHaveAttribute("type", "search");
+      expect(screen.getByRole("searchbox")).toBe(search);
+      expect(search.closest("div")?.querySelector("svg[aria-hidden='true']")).toBeTruthy();
+    });
+
     /** @scenario Typing in the project search narrows the list by name */
     it("narrows the list by name, ignoring case, and keeps the menu and focus", async () => {
       const { user } = mount();
@@ -223,6 +235,10 @@ describe("given the scope filter", () => {
       await waitFor(() =>
         expect(screen.queryByTestId("filter-project-search")).not.toBeInTheDocument(),
       );
+      // The submenu unmounting only proves the child closed, so pin an item of
+      // the root menu too.
+      expect(screen.queryByTestId("filter-all")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("filter-more-scopes")).not.toBeInTheDocument();
       expect(picked).toEqual([]);
     });
 
