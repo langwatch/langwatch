@@ -1340,9 +1340,6 @@ jobs:
       - name: Test publish-docker-ecr.yml path filters
         run: bash .github/scripts/__tests__/publish-ecr-filters.test.sh
 
-      - name: Test the publish workflows' shape
-        run: bash .github/scripts/__tests__/publish-workflow-shape.test.sh
-
       - name: Test nearest-ancestor-tag.sh
         run: bash .github/scripts/__tests__/nearest-ancestor-tag.test.sh
 

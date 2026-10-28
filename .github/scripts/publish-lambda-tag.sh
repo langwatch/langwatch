@@ -70,7 +70,7 @@ if [ "${IMAGE_WAS_BUILT}" = "true" ]; then
     fi
     exit 1
   fi
-  # Checked here too, so the re-tag below never copies an index.
+  # A built Lambda tag that is an index fails the run: Lambda cannot run it.
   if ! is_single_manifest "${media_type}"; then
     echo "::error::${image}:${IMAGE_TAG} is ${media_type}, not a single manifest; see build-and-push-lambda"
     exit 1

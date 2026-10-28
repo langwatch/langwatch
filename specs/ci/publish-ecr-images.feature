@@ -8,7 +8,7 @@ Feature: Publish every deployable image to the artifacts registry
   # by .github/scripts/__tests__/publish-lambda-tag.test.sh. The path filters
   # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, and where a Lambda
   # image starts by tools/ciguard/lambdaworkdir_test.go. That a release
-  # publishes nothing is bound by publish-workflow-shape.test.sh. The rest is the
+  # publishes nothing is bound by tools/ciguard/publishshape_test.go. The rest is the
   # workflow's own build steps, which no test suite can run: those scenarios
   # are @unimplemented and are proved by the first run on main.
 

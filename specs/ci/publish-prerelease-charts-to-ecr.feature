@@ -9,7 +9,7 @@ Feature: Publish every prerelease chart to the artifacts registry only
   # tools/chartpush/chartpush_test.go against a stub helm.
   # Which registries the workflow reaches, and that nothing signs the ECR copy,
   # are the workflow's own shape, bound by
-  # .github/scripts/__tests__/publish-workflow-shape.test.sh. Self-hosters are
+  # tools/ciguard/publishshape_test.go. Self-hosters are
   # unaffected: they install the tagged releases from the public Helm repo.
 
   @unit
@@ -43,4 +43,4 @@ Feature: Publish every prerelease chart to the artifacts registry only
     Given the artifacts registry refuses the push
     When prerelease-charts-oci pushes a chart
     Then it fails and the log shows helm's error
-    And no digest is written to the run summary
+    And no digest is written for the rejected chart
