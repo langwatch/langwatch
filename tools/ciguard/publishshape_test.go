@@ -56,7 +56,7 @@ func publishRepo(t *testing.T, charts, images string, chartNames ...string) stri
 	for _, name := range chartNames {
 		chartDir := filepath.Join(root, "charts", name)
 		require.NoError(t, os.MkdirAll(chartDir, 0o750))
-		require.NoError(t, os.WriteFile(filepath.Join(chartDir, "Chart.yaml"), []byte("apiVersion: v2\nname: "+name+"\n"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(chartDir, "Chart.yaml"), []byte("apiVersion: v2\nname: \""+name+"\"\n"), 0o600))
 	}
 
 	return root
@@ -123,6 +123,22 @@ func TestImagesPublishOnlyFromMain(t *testing.T) {
 		require.Len(t, problems, 1)
 		assert.Contains(t, problems[0], "release trigger")
 	})
+
+	for name, on := range map[string]string{
+		"a quoted on: key":       "\"on\":\n    release:\n      types: [published]\n",
+		"a list of events":       "on: [push, release]\n",
+		"a single event":         "on: release\n",
+		"four-space indentation": "on:\n    release:\n        types: [published]\n",
+	} {
+		t.Run(name+" naming release is refused", func(t *testing.T) {
+			images := strings.Replace(goodImages, "on:\n  push:\n    branches: [main]\n  workflow_dispatch:\n", on, 1)
+
+			problems := shapeProblems(t, publishRepo(t, goodCharts, images, "alpha", "beta"))
+
+			require.Len(t, problems, 1, images)
+			assert.Contains(t, problems[0], "release trigger")
+		})
+	}
 
 	t.Run("a meta job that runs off main is refused", func(t *testing.T) {
 		images := strings.Replace(goodImages, "    if: github.ref == 'refs/heads/main'\n", "", 1)

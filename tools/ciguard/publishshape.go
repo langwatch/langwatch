@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/langwatch/langwatch/pkg/ciscan"
 )
 
@@ -29,8 +31,6 @@ var (
 	packagesWrite   = regexp.MustCompile(`packages:\s*write`)
 	signing         = regexp.MustCompile(`(?i)cosign|sigstore`)
 	ecrCharts       = regexp.MustCompile(`^\s*ECR_CHARTS:\s*(.*)$`)
-	chartName       = regexp.MustCompile(`(?m)^name:\s*(\S+)`)
-	releaseTrigger  = regexp.MustCompile(`^  release:`)
 	mainOnly        = "github.ref == 'refs/heads/main'"
 )
 
@@ -42,23 +42,23 @@ func PublishShape(repoRoot string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	images, err := codeLines(repoRoot, ImagesWorkflow)
-	if err != nil {
-		return nil, err
-	}
 	meta, err := ciscan.Load(repoRoot, ImagesWorkflow)
 	if err != nil {
 		return nil, err
 	}
-	listed, err := chartsOnDisk(repoRoot)
+	onDisk, err := chartsOnDisk(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	release, err := hasReleaseTrigger(repoRoot, ImagesWorkflow)
 	if err != nil {
 		return nil, err
 	}
 
 	problems := chartDestinations(charts)
 	problems = append(problems, chartSigning(charts)...)
-	problems = append(problems, imagesOnlyFromMain(images, meta)...)
-	problems = append(problems, everyChartListed(charts, listed)...)
+	problems = append(problems, imagesOnlyFromMain(release, meta)...)
+	problems = append(problems, everyChartListed(charts, onDisk)...)
 
 	return problems, nil
 }
@@ -117,9 +117,9 @@ func chartSigning(lines []string) []string {
 	return nil
 }
 
-func imagesOnlyFromMain(lines []string, workflow *ciscan.Workflow) []string {
+func imagesOnlyFromMain(release bool, workflow *ciscan.Workflow) []string {
 	var problems []string
-	if hasReleaseTrigger(lines) {
+	if release {
 		problems = append(problems, ImagesWorkflow+" has a release trigger")
 	}
 	if job, ok := workflow.Jobs["meta"]; !ok || strings.TrimSpace(job.If) != mainOnly {
@@ -129,19 +129,54 @@ func imagesOnlyFromMain(lines []string, workflow *ciscan.Workflow) []string {
 	return problems
 }
 
-// hasReleaseTrigger reads the top-level `on:` block, whose keys sit at two
-// spaces.
-func hasReleaseTrigger(lines []string) bool {
-	inOn := false
-	for _, line := range lines {
-		switch {
-		case line == "on:":
-			inOn = true
-		case line != "" && !strings.HasPrefix(line, " "):
-			inOn = false
-		case inOn && releaseTrigger.MatchString(line):
-			return true
+// hasReleaseTrigger parses the workflow and reads its top-level `on:` in any
+// of GitHub's forms: a mapping, a list or a single event name.
+func hasReleaseTrigger(repoRoot, rel string) (bool, error) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot, rel))
+	if err != nil {
+		return false, fmt.Errorf("read %s: %w", rel, err)
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return false, fmt.Errorf("parse %s: %w", rel, err)
+	}
+	if len(doc.Content) == 0 {
+		return false, nil
+	}
+
+	return namesRelease(valueOf(doc.Content[0], "on")), nil
+}
+
+func valueOf(mapping *yaml.Node, key string) *yaml.Node {
+	if mapping.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			return mapping.Content[i+1]
 		}
+	}
+
+	return nil
+}
+
+func namesRelease(on *yaml.Node) bool {
+	if on == nil {
+		return false
+	}
+	switch on.Kind {
+	case yaml.MappingNode:
+		return valueOf(on, "release") != nil
+	case yaml.SequenceNode:
+		for _, event := range on.Content {
+			if event.Value == "release" {
+				return true
+			}
+		}
+	case yaml.ScalarNode:
+		return on.Value == "release"
+	case yaml.DocumentNode, yaml.AliasNode:
+		return false
 	}
 
 	return false
@@ -159,8 +194,14 @@ func chartsOnDisk(repoRoot string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if m := chartName.FindSubmatch(raw); m != nil {
-			names = append(names, string(m[1]))
+		var chart struct {
+			Name string `yaml:"name"`
+		}
+		if err := yaml.Unmarshal(raw, &chart); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", path, err)
+		}
+		if chart.Name != "" {
+			names = append(names, chart.Name)
 		}
 	}
 	sort.Strings(names)
