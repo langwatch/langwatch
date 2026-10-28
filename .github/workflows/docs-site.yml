@@ -47,6 +47,7 @@ jobs:
               - 'apps/docs/**'
               - 'packages/design-system/**'
               - 'packages/time/**'
+              - 'packages/vitest-config/**'
               - 'packages/oxlint-rules/**'
               - 'packages/architecture-enforcer/oxlint.architecture.jsonc'
               - 'packages/architecture-enforcer/oxlint-plugin.mjs'
