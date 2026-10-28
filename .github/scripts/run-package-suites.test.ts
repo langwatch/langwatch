@@ -5,7 +5,6 @@ import { describe, it } from "node:test";
 import {
   DEFAULT_WEIGHT_SECONDS,
   balanceByWallTime,
-  balanceShards,
   commandFor,
   createSuiteRunner,
   discover,
@@ -25,7 +24,6 @@ import {
   runJobs,
   workerEnvFor,
   scriptsFor,
-  shardOf,
   staleEntries,
   summarise,
   wallTimeOf,
@@ -689,10 +687,15 @@ void describe("given the job is split into shards", () => {
   void describe("when every shard of a split takes its share", () => {
     /** @scenario "Every package lands on exactly one shard" */
     void it("runs each package on exactly one shard", () => {
-      const items = ["a", "b", "c", "d", "e", "f", "g"].map((name) => ({ name }));
+      const items = ["a", "b", "c", "d", "e", "f", "g"].map((name) => ({
+        name,
+        scripts: ["test"],
+      }));
       const weightOf = () => 1;
-      const shares = [1, 2, 3].map((index) =>
-        shardOf({ items, weightOf, shard: { index, total: 3 } }),
+      // Each shard computes the split alone and takes its own group.
+      const shares = [1, 2, 3].map(
+        (index) =>
+          balanceByWallTime({ items, weightOf, concurrency: 2, total: 3 }).groups[index - 1]!,
       );
       assert.deepEqual(
         shares
@@ -712,12 +715,14 @@ void describe("given the job is split into shards", () => {
       ["b", 200],
       ["c", 200],
     ]);
-    const items = ["a", "b", "c", "mid", "slow"].map((name) => ({ name }));
+    const items = ["a", "b", "c", "mid", "slow"].map((name) => ({ name, scripts: ["test"] }));
     const weightOf = (p: { name: string }) => weights.get(p.name) ?? DEFAULT_WEIGHT_SECONDS;
 
     /** @scenario "Shards are balanced by measured weight" */
     void it("places the heaviest first, each on the lightest shard", () => {
-      const groups = balanceShards({ items, weightOf, total: 2 }).map((g) => g.map((p) => p.name));
+      const groups = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 }).groups.map(
+        (g) => g.map((p) => p.name),
+      );
       assert.deepEqual(groups, [
         ["c", "slow"],
         ["a", "b", "mid"],
@@ -761,7 +766,10 @@ void describe("given the job is split into shards", () => {
       // Counted at half weight, all three joined one shard and ran 270s back to back.
       assert.deepEqual(
         groups.map((g) => g.map((p) => p.name)),
-        [["heavy", "i3"], ["i1", "i2"]],
+        [
+          ["heavy", "i3"],
+          ["i1", "i2"],
+        ],
       );
       assert.deepEqual(walls, [240, 180]);
     });
@@ -780,7 +788,7 @@ void describe("given the job is split into shards", () => {
     /** @scenario "Every shard computes the same split" */
     void it("gives the same split whatever order the packages arrive in", () => {
       const split = (list: typeof items) =>
-        balanceShards({ items: list, weightOf, total: 3 }).map((g) =>
+        balanceByWallTime({ items: list, weightOf, concurrency: 2, total: 3 }).groups.map((g) =>
           g.map((p) => p.name).toSorted(),
         );
       assert.deepEqual(split(items), split(items.toReversed()));
@@ -792,10 +800,10 @@ void describe("given the job is split into shards", () => {
     void it("is weighed at the default and assigned like any other", () => {
       const { weights } = parseWeights("known  100\n", "weights");
       const weightOf = (p: { name: string }) => weights.get(p.name) ?? DEFAULT_WEIGHT_SECONDS;
-      const items = [{ name: "known" }, { name: "new-a" }, { name: "new-b" }];
+      const items = ["known", "new-a", "new-b"].map((name) => ({ name, scripts: ["test"] }));
       assert.equal(weightOf(items[1]), DEFAULT_WEIGHT_SECONDS);
-      const placed = balanceShards({ items, weightOf, total: 2 })
-        .flat()
+      const placed = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 })
+        .groups.flat()
         .map((p) => p.name)
         .toSorted();
       assert.deepEqual(placed, ["known", "new-a", "new-b"]);
@@ -805,9 +813,9 @@ void describe("given the job is split into shards", () => {
   void describe("when a pull request narrows the packages", () => {
     /** @scenario "A pull request balances over only the packages it reaches" */
     void it("balances over just the packages given, not the whole workspace", () => {
-      const reached = [{ name: "big" }, { name: "small-a" }, { name: "small-b" }];
+      const reached = ["big", "small-a", "small-b"].map((name) => ({ name, scripts: ["test"] }));
       const weightOf = (p: { name: string }) => (p.name === "big" ? 300 : 100);
-      const groups = balanceShards({ items: reached, weightOf, total: 2 });
+      const { groups } = balanceByWallTime({ items: reached, weightOf, concurrency: 2, total: 2 });
       assert.deepEqual(
         groups.map((g) => g.map((p) => p.name)),
         [["big"], ["small-a", "small-b"]],

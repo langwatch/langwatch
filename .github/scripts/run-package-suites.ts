@@ -234,9 +234,7 @@ export const balanceByWallTime = <T extends { name: string; scripts: readonly st
     .map((item) => ({ item, weight: weightOf(item) }))
     .toSorted((a, b) => b.weight - a.weight || a.item.name.localeCompare(b.item.name));
   for (const { item, weight } of byWeight) {
-    const candidates = loads.map((load) =>
-      withPackage({ load, weight, scripts: item.scripts }),
-    );
+    const candidates = loads.map((load) => withPackage({ load, weight, scripts: item.scripts }));
     const walls = candidates.map((load) => wallTimeOf({ load, concurrency }));
     const best = walls.indexOf(Math.min(...walls));
     groupOf.set(item.name, best);
@@ -277,44 +275,6 @@ export const parseWeights = (
   });
   return { weights, errors };
 };
-
-/**
- * Splits `items` into `total` groups, heaviest first onto the lightest group.
- * Every shard computes this alone, so ties break on name then lowest group:
- * the answers must agree exactly or a package runs twice or not at all.
- */
-export const balanceShards = <T extends { name: string }>({
-  items,
-  weightOf,
-  total,
-}: {
-  items: readonly T[];
-  weightOf: (item: T) => number;
-  total: number;
-}): T[][] => {
-  const loads = Array.from({ length: total }, () => 0);
-  const groupOf = new Map<string, number>();
-  const byWeight = items
-    .map((item) => ({ item, weight: weightOf(item) }))
-    .toSorted((a, b) => b.weight - a.weight || a.item.name.localeCompare(b.item.name));
-  for (const { item, weight } of byWeight) {
-    const lightest = loads.indexOf(Math.min(...loads));
-    groupOf.set(item.name, lightest);
-    loads[lightest] += weight;
-  }
-  return loads.map((_, group) => items.filter((item) => groupOf.get(item.name) === group));
-};
-
-/** This shard's share of `items` under the weighted split. */
-export const shardOf = <T extends { name: string }>({
-  items,
-  weightOf,
-  shard,
-}: {
-  items: readonly T[];
-  weightOf: (item: T) => number;
-  shard: { index: number; total: number };
-}): T[] => balanceShards({ items, weightOf, total: shard.total })[shard.index - 1] ?? [];
 
 /** The slow packages of a run, in the weights file's own format, to paste back. */
 export const formatMeasured = (measured: { name: string; seconds: number }[]): string[] =>
