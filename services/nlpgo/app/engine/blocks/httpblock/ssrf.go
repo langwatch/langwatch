@@ -16,9 +16,10 @@ import (
 
 // SSRFOptions tunes the destination policy for the HTTP block.
 type SSRFOptions struct {
-	// AllowedHosts is the comma-separated allow-list (host:port pairs
-	// or bare hosts) that bypasses the private/loopback ban. Mirrors
-	// ALLOWED_PROXY_HOSTS on the Python side.
+	// AllowedHosts are exact hostnames or IP literals that bypass the
+	// private/loopback ban (ALLOWED_PROXY_HOSTS). Matched as packages/egress
+	// matches them: trimmed, case-insensitive, one trailing dot ignored. An
+	// entry carrying a port never matches.
 	AllowedHosts []string
 	// StrictPublicOnly refuses every address that is not globally
 	// routable — CGNAT (100.64.0.0/10), reserved (240.0.0.0/4),
@@ -100,7 +101,7 @@ func CheckURL(raw string, opts SSRFOptions) error {
 	if err != nil {
 		return ErrSSRFBlocked
 	}
-	host := strings.ToLower(u.Hostname())
+	host := normaliseHost(u.Hostname())
 	if host == "" {
 		return ErrSSRFBlocked
 	}
@@ -152,7 +153,7 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 		if err != nil {
 			return nil, err
 		}
-		host = strings.ToLower(host)
+		host = normaliseHost(host)
 		allow, deny := hostPolicy(host, opts)
 		if deny {
 			return nil, ErrSSRFBlocked
@@ -247,6 +248,12 @@ func anyMetadata(ips []net.IP, opts SSRFOptions, host string) bool {
 // ErrSSRFBlocked is returned when SSRF policy rejects a destination.
 var ErrSSRFBlocked = errors.New("ssrf_blocked")
 
+// normaliseHost is the host as judged: trimmed, lowercased, and without the
+// one trailing dot a fully-qualified name may carry.
+func normaliseHost(host string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+}
+
 // hostPolicy classifies a hostname against the static deny/allow
 // lists. Returns (allow, deny) — both false means "needs IP-level
 // check". Pulled out so CheckURL and SafeDialer apply the same rules.
@@ -258,7 +265,7 @@ func hostPolicy(host string, opts SSRFOptions) (allow, deny bool) {
 		return false, true
 	}
 	for _, allowed := range opts.AllowedHosts {
-		if strings.EqualFold(host, allowed) {
+		if host == normaliseHost(allowed) {
 			return true, false
 		}
 	}

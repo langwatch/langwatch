@@ -142,6 +142,14 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
         | TS     |
         | Go     |
 
+    @unit
+    Scenario: The HTTP block matches an allowlist entry whatever its case, spaces or trailing dot
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS names " Agent.Corp.Local. "
+      When the NLP service's HTTP block connects to "agent.corp.local" or "AGENT.corp.local."
+      Then the validation passes
+      And an entry that carries a port matches no hostname
+
   # ============================================================================
   # On-premise hosts — blocked by default, allowlistable per host
   # ============================================================================
@@ -236,6 +244,12 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       And the hostname "imds-bait.example" resolves to the cloud metadata address
       When the NLP service's HTTP block connects to "http://imds-bait.example/latest/meta-data/"
       Then the connection is refused with an SSRF block error
+
+    @unit
+    Scenario: The HTTP block judges a metadata hostname with a trailing dot as the same name
+      Given BLOCK_LOCAL_HTTP_CALLS is "false"
+      When the NLP service's HTTP block validates "http://metadata.google.internal./computeMetadata/v1/"
+      Then the validation fails with an SSRF block error, whatever the name resolves to
 
     @unit
     Scenario: A bracketed IPv6 metadata literal is refused with local calls allowed

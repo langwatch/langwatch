@@ -139,6 +139,43 @@ func TestSSRF_AllowList(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// @scenario "The HTTP block matches an allowlist entry whatever its case, spaces or trailing dot"
+func TestSSRF_AllowListEntryIsMatchedAsTheSameHostname(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	opts := httpblock.SSRFOptions{
+		AllowedHosts: []string{" Agent.Corp.Local. "},
+		Resolver: func(string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		},
+	}
+	for _, spelling := range []string{"agent.corp.local", "AGENT.corp.local."} {
+		require.NoError(t, httpblock.CheckURL("http://"+spelling+":"+port+"/", opts), spelling)
+		conn, err := httpblock.SafeDialer(opts)(context.Background(), "tcp", net.JoinHostPort(spelling, port))
+		require.NoError(t, err, spelling)
+		_ = conn.Close()
+	}
+	opts.AllowedHosts = []string{"agent.corp.local:" + port}
+	require.ErrorIs(t, httpblock.CheckURL("http://agent.corp.local:"+port+"/", opts), httpblock.ErrSSRFBlocked,
+		"an entry carrying a port never matches")
+}
+
+// @scenario "The HTTP block judges a metadata hostname with a trailing dot as the same name"
+func TestSSRF_TrailingDotDoesNotHideAMetadataName(t *testing.T) {
+	opts := httpblock.SSRFOptions{
+		AllowLocal: true,
+		Resolver: func(string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("93.184.216.34")}, nil
+		},
+	}
+	require.ErrorIs(t, httpblock.CheckURL("http://metadata.google.internal./computeMetadata/v1/", opts), httpblock.ErrSSRFBlocked)
+	_, err := httpblock.SafeDialer(opts)(context.Background(), "tcp", "metadata.google.internal.:80")
+	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+}
+
 func TestSSRF_AlwaysBlocksMetadataEvenIfAllowed(t *testing.T) {
 	err := httpblock.CheckURL("http://169.254.169.254/x", httpblock.SSRFOptions{
 		AllowedHosts: []string{"169.254.169.254"},
