@@ -103,7 +103,7 @@ func (o *Orchestrator) seedAccess(p UpParams, reveal bool) (SeedAccess, error) {
 	if err != nil {
 		return SeedAccess{}, err
 	}
-	stack, resolved := domain.EnvMap(env), resolvedDevEnv(p.WorktreeDir)
+	stack, resolved := domain.EnvMap(env), localDevEnv(p.WorktreeDir)
 	shown := envShower(p.WorktreeDir, reveal)
 	value := func(key string) string {
 		v, ok := stack[key]

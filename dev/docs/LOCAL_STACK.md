@@ -29,9 +29,9 @@ every process it starts, and `eval "$(haven env)"` puts the same set in your
 shell.
 
 Credential-carrying variables are classified once in `packages/secrets`
-(ADR-132). Each app resolves them through an ordered chain (env, `.env`, then
-1Password when `LANGWATCH_OP_ACCOUNT` is set, then a refusal by name) before
-its Zod parse. Never read `.env` to find a value and never print one:
+(ADR-132). Each app resolves them through an ordered chain (env, then `.env`,
+then a refusal by name) before its Zod parse; values kept in 1Password arrive as
+env, handed in by haven. Never read `.env` to find a value and never print one:
 `haven env` masks every classified key (`--reveal` for the shell form).
 
 ### Credentials haven makes up
@@ -51,41 +51,59 @@ headless shell per stack with a signed-in context per lane, for agent testers: s
 `haven` skill.
 
 Stripe is paymentsim on every local and CI stack: `haven up` runs it and points
-billing at it unless `.env` or the shell sets `STRIPE_SECRET_KEY`,
+billing at it unless `.env`, the shell or the 1Password item sets `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, in which case your keys are used.
-`haven up` prints which (`Stripe: paymentsim` or `Stripe: your key from .env`).
+`haven up` prints which (`Stripe: paymentsim` or `Stripe: your own test keys`).
 
-### Keeping a credential in 1Password
+### Keeping your credentials in 1Password
 
-Addressing is convention plus one key (ARCHITECTURE.md §6): vault `Private`,
-item `LangWatch`, one field per secret named exactly its `Secret.load` id
-(`STRIPE_SECRET_KEY`), read with `op read` through the desktop app's CLI
-integration. There is no `op://` reference in `.env`: a value there is used
-literally.
+The root `.env` holds config only. Every credential a developer needs lives in
+1Password and arrives through the `op` CLI (ADR-132). Addressing is convention
+plus one key (ARCHITECTURE.md §6): vault `Private`, item `LangWatch haven secrets`, one field
+per secret named exactly its env key (`STRIPE_SECRET_KEY`), and
+`LANGWATCH_OP_ACCOUNT` in `.env` names the account. There is no `op://`
+reference in `.env`: a value there is used literally, and it wins.
 
-1. `op account list`; the URL's subdomain is your account shorthand.
-2. Add the field (empty), then paste the value in the 1Password app, never on a
-   command line. `op item edit` if `LangWatch` already exists in `Private`:
-   ```bash
-   op item create --account <shorthand> --vault Private --category "Secure Note" \
-     --title LangWatch 'STRIPE_SECRET_KEY[password]=' 'STRIPE_WEBHOOK_SECRET[password]='
-   ```
-3. In `.env`: delete the moved lines (env and `.env` answer first, so a line
-   left behind wins) and set `LANGWATCH_OP_ACCOUNT="<shorthand>"`.
-4. `haven down && haven up` (a restart keeps the old env), then
-   `haven env --agent | grep -E 'STRIPE|LANGWATCH_OP'` shows only the account.
+Move once, with the 1Password desktop app unlocked and its CLI integration on:
 
-Under haven, a Stripe pair kept only in 1Password is not used: haven sees no
-Stripe key in env or `.env`, injects paymentsim's pair, and env answers first.
-Keep your own Stripe test keys in `.env` to use them.
+```bash
+op account list                                    # the URL's subdomain is your account shorthand
+haven secrets move                                 # dry run: names the credential keys, writes nothing
+haven secrets move --apply --account <shorthand>   # fills the item, deletes those lines, sets LANGWATCH_OP_ACCOUNT
+haven down && haven up                             # a restart keeps the old env
+```
 
-With the account set, each boot probes once with `op whoami`, then reads every
-handle missing from env and `.env` in parallel. 1Password is best effort: when
-`op` is missing, locked, signed out or times out, the boot logs one
-`[secrets] 1Password skipped` warning with the reason and carries on without
-it, so optional secrets stay unset and a missing required one fails by name.
-Unlock 1Password and restart to pick the values up. Production refuses the
-account by name.
+The move creates `LangWatch haven secrets` in `Private` when it is missing (a plain `LangWatch` title clashes with saved langwatch.ai logins) and otherwise
+edits it, keeping its other fields. Values go to `op` on stdin as an item
+template, never on a command line, in a log or on screen. The item is read back
+before `.env` changes; if any value is missing there, `.env` is left as it was.
+A connection string with no password in it (a local `DATABASE_URL`) is config
+and stays.
+
+To add a credential later, add the field in the 1Password app (never on a
+command line) and restart the stack. `haven up` warns, naming the key and never
+the value, whenever a credential is back in `.env`.
+
+How each process gets the values. haven is the only 1Password reader: it reads
+the item in its own memory and hands the fields the shell and `.env` leave unset
+to a process as env when it starts it. No value is ever written to a file.
+
+| Started by                  | How it gets the item's fields                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| `haven up`                  | every process haven starts or restarts (Node, Go, Python, the seed and other one-shot jobs) |
+| `pnpm dev`                  | `dev-stack.sh` re-runs itself through `haven secrets exec` when the account is set          |
+| any other script or command | `haven secrets exec -- <command>`                                                           |
+| no haven installed          | none: a credential has to be in `.env` or the shell                                         |
+
+haven counts a key the item holds as configured, so a Stripe or mail key kept
+in 1Password is used and the stand-in is not injected. `haven env` masks every
+value that came from the item, whatever its name.
+
+1Password is best effort: when `op` is missing, locked, signed out or times
+out, haven prints one `haven: 1Password skipped` line with the reason and the
+processes start as they would without it. Unlock 1Password and restart to pick
+the values up. Production never reads 1Password; it gets its environment from
+Kubernetes.
 
 ## haven (thuishaven)
 

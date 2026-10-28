@@ -170,10 +170,7 @@ async function main(): Promise<void> {
   const source = { ...processEnvironment };
   const environment = resolveTasksEnvironment(source);
   const config = resolveTasksConfig(source);
-  const chain = SecretsChain.start({ environment: processEnvironment })
-    .withEnv()
-    .withFile()
-    .withOnePassword(config.onePasswordAccount);
+  const chain = SecretsChain.start({ environment: processEnvironment }).withEnv().withFile();
   const connections = await openConnections({ config, chain });
   try {
     await runTasks(argv, {

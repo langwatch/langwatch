@@ -32,9 +32,7 @@ function workerPreamble({ ownsProcess }: { ownsProcess: boolean }) {
   return Server.create("langwatch-worker")
     .withEnvironment(processEnvironment)
     .withConfig(processConfig(processModules, "worker"))
-    .withSecrets((config, secrets) =>
-      secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
-    )
+    .withSecrets((_, secrets) => secrets.withEnv().withFile())
     .withProcessOwnership(ownsProcess)
     .withIdIndexRetention(raiseThroughDataRetention)
     .withUpgradeGate({ role: "worker", gate: servingUpgradeGate });

@@ -155,6 +155,9 @@ type Stack struct {
 	// cache and workspace data live here, never in the shared ~/.nx cache that
 	// trusted worktrees replay (ADR-150). Empty means the shared cache.
 	NxPrivateDir string `json:"nxPrivateDir,omitempty"`
+	// UntrustedCheckout marks a fork PR's stack: its processes never get the
+	// developer's 1Password item (ADR-132 amendment 2026-10-23).
+	UntrustedCheckout bool `json:"untrustedCheckout,omitempty"`
 	// LangyImage is the content-addressed langy image tag this stack was planned
 	// with (empty on the host tier or with langy off). `up` compares it against
 	// the freshly-derived tag so a source edit restarts the stack onto new bytes.

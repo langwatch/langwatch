@@ -977,7 +977,11 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, pl PlaySandbox) error {
 		}()
 	}
 	opts := PlanOptions{Selection: playSelection(), RepoRoot: pl.Checkout}
-	o.sup.Supervise(ctx, o.planChildren(st, opts, pl.Checkout))
+	children := o.planChildren(st, opts, pl.Checkout)
+	for i := range children {
+		children[i].SecretsFrom = "" // a throwaway sandbox gets none of the developer's credentials
+	}
+	o.sup.Supervise(ctx, children)
 	// Both stop on the same canceled context, but the seeder writes to the
 	// databases teardown is about to delete — so hand back only once it has
 	// actually stopped, rather than racing a `docker volume rm` against it.

@@ -59,26 +59,3 @@ export class SecretClaimedTwiceError extends HandledError {
     );
   }
 }
-
-/** 1Password answered something other than "no such key". */
-export class OnePasswordUnavailableError extends HandledError {
-  constructor(detail: string) {
-    super(
-      "one_password_unavailable",
-      `1Password could not be read: ${detail}. Run \`op signin\` and retry.`,
-      { fault: "platform" },
-    );
-  }
-}
-
-/** A development convenience reached a production process — refused loudly. */
-export class OnePasswordInProductionError extends HandledError {
-  constructor() {
-    super(
-      "one_password_in_production",
-      "1Password is a development convenience; production resolves secrets from the " +
-        "environment. Unset LANGWATCH_OP_ACCOUNT on this deployment.",
-      { fault: "platform" },
-    );
-  }
-}

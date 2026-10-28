@@ -665,9 +665,7 @@ import { processConfig, Server } from "@langwatch/process";
 
 const server = await Server.create("langwatch-api")
   .withConfig(processConfig(processModules))
-  .withSecrets((config, secrets) =>
-    secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
-  )
+  .withSecrets((_, secrets) => secrets.withEnv().withFile())
   .withTelemetry(processTelemetry("langwatch-api"))
   .start();
 
@@ -1182,24 +1180,20 @@ guard type-checks nothing while still compiling green.
 **Secrets are the sibling package, and a secret is a value you may only
 pass through** (approved 2026-09-18). A module declares its handles beside
 its config as a plain record — `{ privateKey: Secret.load("GITHUB_APP_PRIVATE_KEY") } as const`
-(there is no `Secret.define`) — where **`Secret.load(id)` takes ONE identifier every adapter interprets
-for itself**: the env adapter reads the variable of that name, the
-1Password adapter reads that key in the vault's dictionary (config, by
-contrast, always reads the environment). **1Password addressing is
-convention plus one config key** (ruled 2026-09-18): a single config value
-selects the account (personal or work); the vault is your private vault by
-convention; the handle's own `load` id is the key inside the dictionary
-there — nothing else to configure. **The preflight is part of start()**
+(there is no `Secret.define`) — where **`Secret.load(id)` takes ONE identifier**: the
+variable of that name in the environment or `.env` (config, by contrast, always reads the
+environment). **The preflight is part of start()**
 (approved 2026-09-18): the moment the chain exists, every required handle
-declared anywhere in the module array is checked answerable — env set, or
-key present in the vault — and a miss fails the boot immediately, naming
-every missing key at once. **1Password is best effort** (Alex, 2026-10-09):
-one cheap probe per boot (`op whoami --account <acct>`); a failed probe (no
-`op`, locked, signed out, timed out) logs one warning naming why and 1Password
-sits out that boot, so optional handles stay unset and a required one fails
-with the ordinary missing-key refusal. After a good probe the preflight reads
-every single handle env and `.env` leave unanswered in parallel (capped, each
-read timed out), and a field absent from the item is an ordinary miss.
+declared anywhere in the module array is checked answerable, and a miss fails
+the boot immediately, naming every missing key at once.
+**1Password is read only by haven, in memory, and handed to each process as env**
+(Alex, 2026-10-23; ADR-132 amendment, which removed the Node 1Password adapter):
+locally `.env` holds config only; `LANGWATCH_OP_ACCOUNT` names the account, the
+item is `Private/LangWatch haven secrets` with one field per env key; haven reads it when it
+starts or restarts a process and puts the fields the shell and `.env` leave unset
+into that process's env, never into a file. Outside haven,
+`haven secrets exec -- <command>` does the same; `haven secrets move` moves `.env`
+credentials into the item. Production reads the environment Kubernetes gives it.
 **Global concerns declare the
 same way at their framework owner** — logging and telemetry are
 everyone-sends-to-one-place concerns, so `@langwatch/process` and
@@ -1207,15 +1201,12 @@ observability packages declare their config slices and secret handles
 exactly as a module does, and the preamble order (config → secrets →
 telemetry) is what makes a logging credential resolvable the moment
 telemetry initializes. The app builds only the READER — a fluent adapter chain built from a handed-in builder,
-`.withSecrets((config, secrets) => secrets.withEnv().withFile()
-.withOnePassword(...))` — installed on the Server preamble AFTER
-`withConfig`, so config can feed secrets (the 1Password vault key is a
-config fact); the builder is never imported and chains directly. **The
-chain is a lookup order, not a store**: it enumerates no vault, and env and
-`.env` hold no values — each declared handle is fetched singly, at its
-owner's construction site, and handed straight to its closure. The one
-exception is 1Password's parallel preflight answers, held only until the
-resolver seals and then dropped. `boot()`
+`.withSecrets((_, secrets) => secrets.withEnv().withFile())` — installed on the
+Server preamble AFTER `withConfig`, so config can feed secrets; the builder is
+never imported and chains directly. **The
+chain is a lookup order, not a store**: it keeps no value it reads from env or
+`.env` — each declared handle is fetched singly, at its
+owner's construction site, and handed straight to its closure. `boot()`
 scopes the resolver per module: a `create()` can resolve only the handles
 its own module declared, each resolve validates against the handle's
 schema and hands the value to a closure —
@@ -1235,8 +1226,8 @@ no `Object.freeze`, no mirror types, no re-plumbing.
 
 **A family handle answers every name under one prefix** (Alex, 2026-09-29; ADR-132 amendment).
 `Secret.family(prefix)` resolves to a name-to-value map, for a credential a deployment names by
-convention (main's `CLICKHOUSE_URL__<label>__<orgId>`). The env and `.env` adapters scan by prefix
-and 1Password answers none; the resolver scopes a family like any handle and answers only names
+convention (main's `CLICKHOUSE_URL__<label>__<orgId>`). The env and `.env` adapters scan by prefix;
+the resolver scopes a family like any handle and answers only names
 under its prefix; the preflight treats a family as optional; and a config leaf may not claim a
 name under a declared prefix (`ConfigClaimsSecretError`). It is the one enumeration the chain
 does, bounded by a prefix its owner declared.
@@ -3202,7 +3193,8 @@ keep it, Alex 2026-10-08, round 39 DS-A) · `refusing*` twins ·
 array; `get*` = one or throws; `list*` = a page, Alex 2026-09-24) · `static readonly configSchema` and its
 `*AppConfigSchema`/`*ServerConfigSchema` consts · a module declaring an env
 var another owner already declares (`BASE_HOST` anywhere but `processFacts`) ·
-`surfaces/` and `screens/` browser folders · any `exports` entry on a browser
+`surfaces/` and `screens/` browser folders · `withOnePassword` on the secrets chain (haven reads
+1Password and hands values in as env, ADR-132 amendment 2026-10-23) · any `exports` entry on a browser
 package other than `./declaration` · any kit: a `*-browser-kit` package or a shared browser package · `*-openapi.rules.ts` files hand-writing a
 route's REST response schema (§8) — migrate the summary/description/tags
 into the route's own `.withDocs()` call and drop any hand-written success

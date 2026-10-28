@@ -36,9 +36,7 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
   const preamble = Server.create("langwatch-api")
     .withEnvironment(processEnvironment)
     .withConfig(processConfig(processModules))
-    .withSecrets((config, secrets) =>
-      secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
-    )
+    .withSecrets((_, secrets) => secrets.withEnv().withFile())
     .withProcessOwnership(options.ownsProcess ?? true)
     .withHealthPort(options.port)
     .withUpgradeGate({ role: "api", gate: servingUpgradeGate });

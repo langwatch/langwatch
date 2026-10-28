@@ -152,10 +152,11 @@ func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, preset string) e
 	}
 	env = append(env, "DOTENV_CONFIG_QUIET=true", o.compileCacheEnv(slug))
 	env = append(env, pre.env...)
-	if err := o.sup.RunOnce(ctx, "prepare", p.WorktreeDir, prepareDBShell, env); err != nil {
+	if err := o.sup.RunOnce(ctx, "prepare", p.WorktreeDir, prepareDBShell, itemEnvFor(p, env)); err != nil {
 		return fmt.Errorf("migrations failed on the fresh database: %w", err)
 	}
-	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm --silent run prisma:seed", env), env); err != nil {
+	seedEnv := itemEnvFor(p, env)
+	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm --silent run prisma:seed", seedEnv), seedEnv); err != nil {
 		return fmt.Errorf("seed failed: %w", err)
 	}
 	o.ClearSeedStatus(slug)
@@ -247,7 +248,8 @@ func (o *Orchestrator) DBSeed(ctx context.Context, p UpParams, preset string) er
 		return err
 	}
 	env := append(o.seedEnv(p), pre.env...)
-	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm --silent run prisma:seed", env), env); err != nil {
+	seedEnv := itemEnvFor(p, env)
+	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm --silent run prisma:seed", seedEnv), seedEnv); err != nil {
 		return fmt.Errorf("seed failed: %w", err)
 	}
 	return o.runSeedIngest(ctx, p, pre, "haven db seed "+preset)

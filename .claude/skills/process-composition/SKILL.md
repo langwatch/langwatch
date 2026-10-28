@@ -25,7 +25,7 @@ An app is `src/main.ts` plus `src/config.ts`, and holds no product code (§1, §
 - `apps/api/src/config.ts` and `apps/worker/src/config.ts` hold one export, `processEnvironment`:
   the one place `process.env` reaches the preamble (§4, §6).
 - `apps/api/src/main.ts` (`startApi`): `Server.create("langwatch-api")`, then `.withEnvironment`,
-  `.withConfig(processConfig(processModules))`, `.withSecrets(...)` (env, file, 1Password),
+  `.withConfig(processConfig(processModules))`, `.withSecrets(...)` (env, file; haven hands 1Password values in as env),
   `.withProcessOwnership`, `.withUpgradeGate`, `.withTelemetry`, `.withMetrics` and `.start()`; then
   `server.container("api")`, `.exposeTransports(...)` selecting tRPC, REST and the bundle, `.boot()`
   and `server.serve(app)`.

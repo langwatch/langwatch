@@ -1,6 +1,6 @@
 ---
 name: haven-env
-description: "Print a haven stack's resolved environment without leaking a secret, and know where each value comes from: `haven env`, `--reveal`, overlay versus the root .env, made-up stack credentials, Stripe key choice, the knobs in `haven help env`, `haven machine limits`. Use when someone says 'haven limits', 'haven env', 'what env does the stack use', 'print the environment safely', 'env reveal', 'the root .env beats the overlay', 'my .env change did nothing', 'which keys are secret', 'LANGWATCH_SLUG', 'machine limits', 'haven machine limits', 'redis maxmemory', or 'where does this variable come from'."
+description: "Print a haven stack's resolved environment without leaking a secret, and know where each value comes from: `haven env`, `--reveal`, overlay versus the root .env, made-up stack credentials, credentials in 1Password (`haven secrets move`, `haven secrets exec`), Stripe key choice, the knobs in `haven help env`, `haven machine limits`. Use when someone says 'haven limits', 'haven env', 'what env does the stack use', 'print the environment safely', 'env reveal', 'the root .env beats the overlay', 'my .env change did nothing', 'which keys are secret', 'LANGWATCH_SLUG', 'machine limits', 'haven machine limits', 'redis maxmemory', '1Password', 'LANGWATCH_OP_ACCOUNT', 'haven secrets move', 'move my keys out of .env', or 'where does this variable come from'."
 user-invocable: true
 argument-hint: "[--reveal] | machine limits [set <name> <value> | unset <name>]"
 ---
@@ -11,6 +11,7 @@ argument-hint: "[--reveal] | machine limits [set <name> <value> | unset <name>]"
 haven env                         # this stack's resolved environment, every secret masked
 haven env --json                  # machine-readable
 eval "$(haven env --reveal)"      # real values into your shell; never paste or print this
+haven secrets exec -- <cmd>       # runs <cmd> with the 1Password item too; --reveal never prints it
 haven help env                    # every knob and where it resolves from
 ```
 
@@ -41,8 +42,20 @@ haven help env                    # every knob and where it resolves from
 - Per stack, made up by haven: `NEXTAUTH_SECRET`, `CREDENTIALS_SECRET`,
   `LANGWATCH_INSTANCE_ADMIN_API_KEY`, `HAVEN_SEED_SCIM_TOKEN`. They live in haven's own state, survive
   down/up and rotate only on `haven down --destroy`. No real key, no 1Password.
-- Stripe is paymentsim on every stack unless `.env` sets a Stripe key; `haven up` prints
-  `Stripe: paymentsim` or `Stripe: your key from .env` (`paymentsim` skill).
+- Stripe is paymentsim on every stack unless `.env` or 1Password sets a Stripe key; `haven up` prints
+  `Stripe: paymentsim` or `Stripe: your own test keys` (`paymentsim` skill).
+
+## Credentials in 1Password
+
+- `.env` holds config only. Credentials live in the 1Password item `Private/LangWatch haven secrets`, one field per
+  env key, with `LANGWATCH_OP_ACCOUNT="<shorthand>"` in `.env` (`dev/docs/LOCAL_STACK.md`).
+- Precedence: shell, then `.env`, then the item. haven is the only 1Password reader: it reads the item
+  in memory when it starts or restarts a process and puts the fields into that process's env (never a
+  file); a key there counts as configured for the stand-ins.
+- `haven secrets move` (dry run, key names only), then `haven secrets move --apply --account <shorthand>`
+  moves the credential lines out of `.env`. `haven up` warns, naming keys, when one comes back.
+- `haven secrets exec -- <command>` runs any command with the item's fields; `pnpm dev` uses it itself.
+- `haven env` masks every value from the item that it prints (the passthrough model keys).
 - Logins and tokens are printed by `haven db seed` (`haven-seed`).
 
 ## Machine limits

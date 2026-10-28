@@ -62,6 +62,7 @@ func keeperPlanPath(worktreeDir, slug string) string {
 // writeKeeperPlan creates the file afresh with O_EXCL, so the environment is
 // never written into an older, wider file or through a planted symlink.
 func writeKeeperPlan(path string, plan KeeperPlan) error {
+	plan.Env = withoutItemValues(plan.Env) // never a 1Password value on disk (ADR-132)
 	data, err := json.Marshal(plan)
 	if err != nil {
 		return err

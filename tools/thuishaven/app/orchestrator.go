@@ -257,6 +257,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	}
 	if p.UntrustedCheckout {
 		st.NxPrivateDir = o.nxPrivateDir(slug)
+		st.UntrustedCheckout = true
 	}
 	var routes []func()
 	for i, r := range domain.PerWorktreeServices {
@@ -538,6 +539,9 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err := domain.RefuseLiveStripe(resolvedDevEnv(p.WorktreeDir)); err != nil {
 		return err
 	}
+	if warning := dotenvCredentialWarning(p.WorktreeDir); warning != "" {
+		fmt.Printf("  warning: %s\n", warning)
+	}
 	if err := o.ensurePortlessProxy(); err != nil {
 		return err
 	}
@@ -743,7 +747,7 @@ func (o *Orchestrator) runBuildJobs(ctx context.Context, run prepRun, jobs prepS
 func (o *Orchestrator) migrateThenSeed(ctx context.Context, run prepRun, jobs prepShells) error {
 	st := run.Stack
 	sayPhase(run.StartedAt, "migrations")
-	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "prepare", Dir: run.WorktreeDir, Shell: jobs.Prepare, Env: run.Env}); err != nil {
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "prepare", Dir: run.WorktreeDir, Shell: jobs.Prepare, Env: run.Env, WithItem: !run.UntrustedCheckout}); err != nil {
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
 	if job, ok := o.seedJob(run.UpParams, seedRun{Slug: st.Slug, Env: run.Env, Shell: jobs.Seed}); ok {
@@ -812,7 +816,9 @@ func (o *Orchestrator) seedJob(p UpParams, seed seedRun) (onceJob, bool) {
 			return onceJob{}, false
 		}
 	}
-	return onceJob{Slug: seed.Slug, WorktreeDir: p.WorktreeDir, Name: "seed", Dir: p.WorktreeDir, Shell: seedShell(seed.Shell, seed.Env), Env: seed.Env}, true
+	// The post-seed steps are chosen by key only; no value enters the shell.
+	shell := seedShell(seed.Shell, itemEnvFor(p, seed.Env))
+	return onceJob{Slug: seed.Slug, WorktreeDir: p.WorktreeDir, Name: "seed", Dir: p.WorktreeDir, Shell: shell, Env: seed.Env, WithItem: !p.UntrustedCheckout}, true
 }
 
 // runSeedJob runs the seed; a failed seed is said, never fatal.
@@ -1235,7 +1241,7 @@ func shellSingleQuoted(s string) string {
 // overlay would inherit, resolved at the child's real precedence (process env
 // over the merged dotenv layers).
 func (o *Orchestrator) guardInheritedSeedEnv(lwDir string) error {
-	return domain.GuardSeedTargets(nil, domain.LoadDotenv(lwDir), os.Getenv)
+	return domain.GuardSeedTargets(nil, resolvedDevEnv(lwDir), os.Getenv) // the item's URLs are guarded too
 }
 
 // hasEnvKey reports whether a KEY=VALUE slice already sets key.
@@ -1264,7 +1270,7 @@ func (o *Orchestrator) runIngestScript(ctx context.Context, p UpParams, retryCmd
 	if err != nil {
 		return err
 	}
-	return o.sup.RunOnce(ctx, script, p.WorktreeDir, "pnpm run "+script, env)
+	return o.sup.RunOnce(ctx, script, p.WorktreeDir, "pnpm run "+script, itemEnvFor(p, env))
 }
 
 // liveSeedEnv returns the running stack's complete environment overlay plus a

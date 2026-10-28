@@ -69,8 +69,8 @@ hostname through the portless proxy:
 
 The eleven simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
 idp, storage, payment and telemetry run by default; llm, voice, analytics, outbound, lambda and github come with
-"haven up +llm +voice +analytics +outbound +lambda +github". Billing uses paymentsim unless .env sets a Stripe
-key; "haven up" prints which. "haven sim --json" lists every one: running
+"haven up +llm +voice +analytics +outbound +lambda +github". Billing uses paymentsim unless .env or 1Password sets a
+Stripe key; "haven up" prints which. "haven sim --json" lists every one: running
 here or not, its console, its verbs and its skill. Read one's output with "haven logs
 <name>". Drive one from a terminal with "haven sim mail|idp|llm|analytics|outbound|payment|storage|voice|telemetry|lambda|github
 <verb>" (--json on every read).
@@ -105,6 +105,11 @@ Shared, machine-wide (one daemon, all worktrees):
 `
 
 var envHelpText = `Environment variables.
+
+    Credentials: .env holds config only. With LANGWATCH_OP_ACCOUNT set, haven
+    reads the 1Password item Private/LangWatch haven secrets once and hands its fields to
+    every lane after the shell and .env. "haven secrets move" moves .env's
+    credential lines there; "haven secrets exec -- <cmd>" runs a command with them.
 
     Most of the knobs below also resolve from .env, so a lasting
     preference like "this machine runs native
