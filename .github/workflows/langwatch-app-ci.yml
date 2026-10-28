@@ -1359,12 +1359,8 @@ jobs:
           export PICOMATCH="$picomatch_dir/node_modules/picomatch"
           bash .github/scripts/__tests__/detect-changes-pathspec-parity.test.sh
 
-      # Lives here rather than in deployment-impact-check.yml because that
-      # workflow filters `on.paths` down to deployment surface, which
-      # .github/** is not — so it would never start for a change to its own
-      # guard. This job's gate already lists `.github/scripts/**`.
-      - name: Test guard-deployment-impact.ts
-        run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
+      - name: Test guard-breaking-change-scope.ts
+        run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
 
       - name: Test that every generated file is marked generated
         run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts

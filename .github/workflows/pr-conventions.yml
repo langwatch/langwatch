@@ -1,57 +1,159 @@
-name: pr-impact-map
+name: pr-conventions
 
-# Posts a single sticky comment summarising which areas of the monorepo a PR
-# touches, and rewrites that same comment on every subsequent push.
-#
-# `synchronize` IS "a new commit was pushed to this PR", so one `pull_request`
-# trigger covers both "on open" and "on every push". There is deliberately no
-# `push:` trigger. The changed-file list comes from
-# a full-history checkout and `git diff --numstat`, because the pulls/files
-# API stops at 3000 files and large restructures exceed it.
-#
-# Deliberately non-blocking: this workflow only ever describes the diff, it
-# never judges it. Nothing here should gate a merge, so it is not a candidate
-# for branch protection.
-#
-# No path filter, so it always produces a result and needs no "-unmodified"
-# stub under the complementary-pair system (see specs/ci/path-filters.feature).
-#
-# Spec: specs/ci/pr-impact-map.feature
+# The checks that read a pull request rather than build it, in one job: its
+# title, a breaking change's scope, its deployment impact and the impact map
+# comment, plus linking the issue its branch names. Each check runs even when
+# one before it failed, so one push shows every finding.
+# Spec: specs/ci/deployment-impact-report.feature, specs/ci/breaking-change-scope.feature,
+# specs/ci/pr-impact-map.feature
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+# Every check reads the pull request as it is now, so a newer event supersedes
+# an older run, and two runs would race to post the impact map.
+concurrency:
+  group: pr-conventions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
   pull-requests: write
-
-# Two pushes in quick succession would otherwise race: both runs read "no
-# existing comment" and both POST, leaving duplicates on the thread.
-concurrency:
-  group: pr-impact-map-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  issues: write
 
 jobs:
-  comment:
-    # Fork PRs get a read-only GITHUB_TOKEN, so the comment POST would 403.
-    # Skip quietly rather than paint a red X on a contributor's first PR.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+  pr-conventions:
+    name: pr conventions
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      # Full history, so `git diff --numstat` counts every changed file. Only
-      # the classifier script and .gitattributes (whose linguist-generated
-      # lines drive the Generated category) are checked out.
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      # Full history: the deployment impact and the impact map read both ends of the diff.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
           sparse-checkout: |
-            .github/scripts
-            /.gitattributes
+            /*
+            !/docs/media/
+            !/docs/images/
           sparse-checkout-cone-mode: false
 
-      - name: Build and upsert impact map comment
+      # A branch named issue<number>/<slug> gets "Resolves #<number>" in its body
+      # and its author assigned to the issue. Best-effort: a fork's token is read-only.
+      - name: Link the issue the branch names
+        if: github.event.action == 'opened'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const match = pr.head.ref.match(/^issue(\d+)\//);
+            if (!match) {
+              core.info(`branch ${pr.head.ref} does not reference an issue, skipping`);
+              return;
+            }
+            const issueNumber = Number(match[1]);
+            const header = '# Related Issue';
+            if (!(pr.body ?? '').includes(header)) {
+              const body = `${header}\n\n- Resolves #${issueNumber}\n\n${pr.body ?? ''}`;
+              try {
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  body,
+                });
+              } catch (e) {
+                core.warning(`could not update PR body: ${e.message}`);
+              }
+            }
+            try {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                assignees: [pr.user.login],
+              });
+            } catch (e) {
+              core.warning(`could not assign @${pr.user.login} to #${issueNumber}: ${e.message}`);
+            }
+
+      - name: Check the title
+        if: ${{ !cancelled() }}
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            didn't match the configured pattern. Please ensure that the subject
+            doesn't start with an uppercase character.
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        if: ${{ !cancelled() }}
+        with:
+          node-version: "24.22.1"
+
+      # A squash merge puts the title in the subject and the branch's commit messages in
+      # the body, so those are where a breaking marker reaches main from. Both reach the
+      # guard as JSON strings, one per line, so a crafted title cannot escape into the shell.
+      - name: Check a breaking change stays in one release component
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPO: ${{ github.repository }}
+          ACKNOWLEDGED: ${{ contains(github.event.pull_request.labels.*.name, 'multi-component-major') }}
+        run: |
+          if [ "$ACKNOWLEDGED" = "true" ]; then
+            echo "multi-component-major label present, a major on every touched component is intended"
+            exit 0
+          fi
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename' > "$RUNNER_TEMP/changed-files.txt"
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message | @json' > "$RUNNER_TEMP/commit-messages.txt"
+          jq -Rn 'env.PR_TITLE' >> "$RUNNER_TEMP/commit-messages.txt"
+          node --experimental-strip-types .github/scripts/guard-breaking-change-scope.ts \
+            . "$RUNNER_TEMP/changed-files.txt" "$RUNNER_TEMP/commit-messages.txt"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: ${{ !cancelled() }}
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # Blocks only on a fact that breaks an existing install; the operator-action label
+      # clears it. The verdict waits for the impact map below, so the report is posted first.
+      - name: Report the deployment impact
+        id: deploy
+        if: ${{ !cancelled() }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ACKNOWLEDGED: ${{ contains(github.event.pull_request.labels.*.name, 'operator-action') }}
+        run: |
+          set -o pipefail
+          go run ./cmd/deployimpact -base "$BASE_SHA" -head "$HEAD_SHA" -acknowledged="$ACKNOWLEDGED" \
+            -out "$RUNNER_TEMP/deploy-impact.md" | tee -a "$GITHUB_STEP_SUMMARY" \
+            || echo "failed=true" >> "$GITHUB_OUTPUT"
+
+      # A fork's token is read-only, so its comment would 403; it still gets the job summary.
+      - name: Post the impact map
+        if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -196,6 +298,12 @@ jobs:
               ].join("\n");
             }
 
+            // The deployment impact, computed by the step before (cmd/deployimpact).
+            const deployReport = `${process.env.RUNNER_TEMP}/deploy-impact.md`;
+            if (require("node:fs").existsSync(deployReport)) {
+              body += "\n\n" + readFileSync(deployReport, "utf8");
+            }
+
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner,
               repo,
@@ -223,3 +331,9 @@ jobs:
               });
               core.info(`Created impact map comment on PR #${pr.number}.`);
             }
+
+      - name: Fail when the deployment impact breaks an existing install
+        if: ${{ !cancelled() && steps.deploy.outputs.failed == 'true' }}
+        run: |
+          echo "::error::The deployment impact report lists a fact that breaks an existing install. Change the code, or have a maintainer add the operator-action label."
+          exit 1
