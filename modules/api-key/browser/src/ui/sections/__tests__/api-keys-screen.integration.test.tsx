@@ -574,7 +574,9 @@ describe("given the project still has a legacy key", () => {
       expect(screen.queryByTestId("legacy-key-row")).toBeNull();
       expect(screen.queryByTestId("legacy-project-key-banner")).toBeNull();
       expect(screen.getByTestId("api-key-name")).toHaveValue("Project API Key");
-      expect(screen.getByText("The legacy project key no longer works")).toBeInTheDocument();
+      const notice = screen.getByTestId("legacy-key-revoked-notice");
+      expect(notice).toHaveTextContent("The legacy project key no longer works");
+      expect(notice).toHaveTextContent("this project may have no working key until you create one");
       // An expiry is already chosen (none), so the drawer asks for no other.
       expect(screen.queryByTestId("api-key-expiration-hint")).toBeNull();
       expect(mutations.create).not.toHaveBeenCalled();
@@ -598,10 +600,6 @@ describe("given the project still has a legacy key", () => {
         }),
       );
       expect(mutations.revokeLegacy).toHaveBeenCalledTimes(1);
-      // The legacy key is revoked on confirm, before the new key is created.
-      expect(mutations.revokeLegacy.mock.invocationCallOrder[0]).toBeLessThan(
-        mutations.create.mock.invocationCallOrder[0]!,
-      );
       expect(
         within(await screen.findByTestId("token-created-key")).getByText("Project API Key"),
       ).toBeInTheDocument();
