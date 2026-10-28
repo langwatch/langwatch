@@ -612,11 +612,11 @@ function questionLockState({
   /** The user's Stop ended the call, so its options can no longer be chosen. */
   stopped: boolean;
 }): LangyChoicesLockState {
-  if (stopped) return { status: "superseded" };
-  return (
+  const recorded =
     questionWaitLockState({ blockId: part.blockId, card: part.card, waits: props.questionWaits }) ??
-    deriveLangyChoicesLockState({ blockId: part.blockId, timeline: props.choicesTimeline ?? [] })
-  );
+    deriveLangyChoicesLockState({ blockId: part.blockId, timeline: props.choicesTimeline ?? [] });
+  // An answer given before the Stop keeps its choice; only an unanswered card is superseded.
+  return stopped && recorded.status !== "answered" ? { status: "superseded" } : recorded;
 }
 
 /**

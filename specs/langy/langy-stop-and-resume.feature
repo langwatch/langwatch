@@ -199,6 +199,13 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Given a command was running on my machine and I stopped the turn
     When the reply is drawn
     Then no failed-step line is drawn for the command
+    And the command is drawn as an interrupted row
+
+  @integration
+  Scenario: A question I answered keeps my choice when the stop text lands after it
+    Given I answered a question and then stopped the turn
+    When the reply is drawn
+    Then the card still shows the option I chose
 
   @integration
   Scenario: Only someone who can control the conversation may stop its turn

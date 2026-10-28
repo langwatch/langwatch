@@ -10,6 +10,8 @@ import { render } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
+import { LANGY_INTERRUPTED_NOTE } from "../../../../../ui/elements/langy-interrupted-note.tsx";
+
 vi.mock("../../../../../behavior/use-langy-dev-mode.ts", () => ({
   useLangyDevMode: () => [false, vi.fn()],
 }));
@@ -63,7 +65,7 @@ describe("a question tool call on a settled turn", () => {
     });
 
     /** @scenario A command I stopped reads as stopped, not as failed */
-    it("draws no failed-step line for a stopped command on their machine", () => {
+    it("draws it as an interrupted row, not a failed step", () => {
       const { container } = renderActivity([
         {
           type: "tool-local_bash",
@@ -75,6 +77,7 @@ describe("a question tool call on a settled turn", () => {
         reply,
       ]);
 
+      expect(container.textContent).toContain(LANGY_INTERRUPTED_NOTE);
       expect(container.textContent).not.toContain("failed");
       expect(container.textContent).not.toContain("carried on");
     });

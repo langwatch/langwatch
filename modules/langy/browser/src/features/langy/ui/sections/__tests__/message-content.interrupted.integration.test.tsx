@@ -50,6 +50,7 @@ vi.mock("recharts", async (importOriginal) => {
 import type * as rechartsModule from "recharts";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import type { LangyQuestionCardData } from "../../../../../model/langy-local-waits.ts";
 import { MessageContent } from "../message-content.tsx";
 
 afterEach(cleanup);
@@ -70,10 +71,12 @@ function renderMessage({
   interrupted,
   message = emptyAssistantMessage,
   isLatest,
+  questionWaits,
 }: {
   interrupted: boolean;
   message?: UIMessage;
   isLatest?: boolean;
+  questionWaits?: ReadonlyMap<string, LangyQuestionCardData>;
 }) {
   return render(
     <DesignSystemProvider forcedTheme="light">
@@ -85,6 +88,7 @@ function renderMessage({
         onApply={async () => {}}
         onDiscard={() => {}}
         interrupted={interrupted}
+        {...(questionWaits ? { questionWaits } : {})}
         {...(isLatest === undefined ? {} : { isLatest })}
       />
     </DesignSystemProvider>,
@@ -228,5 +232,46 @@ describe("given a question the user's Stop ended", () => {
     expect(
       (red as HTMLButtonElement).disabled || red.getAttribute("aria-disabled") === "true",
     ).toBe(true);
+  });
+
+  /** @scenario A question I answered keeps my choice when the stop text lands after it */
+  it("keeps the choice of a question answered before the stop", () => {
+    const message: UIMessage = {
+      id: "m-answered-then-stopped",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-question",
+          toolCallId: "call-q",
+          state: "output-error",
+          input: {
+            questions: [
+              {
+                question: "Which colour do you prefer?",
+                header: "Pick a colour",
+                options: [{ label: "Red" }, { label: "Blue" }],
+              },
+            ],
+          },
+          errorText: `${LANGY_CALL_STOPPED_PREFIX}, so the call on the user's machine was stopped too`,
+        } as never,
+      ],
+    };
+    const questionWaits = new Map<string, LangyQuestionCardData>([
+      [
+        "call-q",
+        {
+          waitId: "w1",
+          toolCallId: "call-q",
+          status: "answered",
+          questions: [],
+          answers: [{ selected: ["Red"] }],
+        },
+      ],
+    ]);
+
+    renderMessage({ interrupted: true, message, questionWaits });
+
+    expect(screen.getByRole("button", { name: /Red/ }).getAttribute("aria-pressed")).toBe("true");
   });
 });

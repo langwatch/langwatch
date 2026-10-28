@@ -446,7 +446,9 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     if (isProposalOutput(part.output)) return;
     // A failed call has its own red error card, including structured trace/log
     // actions. It must never get the green checkmark of a completed activity.
-    if (renderedToolFailure(part)) return;
+    // A call the user's own Stop ended stays an unfinished row, drawn interrupted once settled.
+    const stopped = isLangyCallStoppedText(part.errorText);
+    if (renderedToolFailure(part) && !stopped) return;
     // A call whose name maps to a capability is a CARD for its whole life —
     // the pending shell while it runs, the bespoke card once it settles. Only a
     // failed one falls back here (there is no result to draw, so raw JSON is
@@ -463,7 +465,7 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     // says which skill and what it is for. Never "Coding", never "Skill".
     const described = describeToolCall({ name, input: part.input });
     const key = described.key;
-    const done = DONE_STATES.has(part.state ?? "");
+    const done = !stopped && DONE_STATES.has(part.state ?? "");
     const call: ToolCall = {
       toolCallId: part.toolCallId,
       name,

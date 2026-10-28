@@ -7,5 +7,8 @@ export const LANGY_CALL_STOPPED_PREFIX = "cancelled: the turn was stopped";
 
 /** Whether a failed call's text says the user's own Stop ended it, which is no failure. */
 export function isLangyCallStoppedText(errorText: unknown): boolean {
-  return typeof errorText === "string" && errorText.trim().startsWith(LANGY_CALL_STOPPED_PREFIX);
+  return (
+    typeof errorText === "string" &&
+    errorText.trim().toLowerCase().startsWith(LANGY_CALL_STOPPED_PREFIX)
+  );
 }

@@ -82,7 +82,11 @@ export const reads = {
   "@langwatch/webhook-process": ["specs/webhooks/**/*"],
   "@langwatch/egress": ["pkg/ssrf/testdata/**/*", "go.work"],
   "@langwatch/langy-browser": ["services/langyagent/**/*", "infra/docker/Dockerfile.langyagent"],
-  "@langwatch/langy-contract": ["services/langyagent/**/*", "pnpm-workspace.yaml"],
+  "@langwatch/langy-contract": [
+    "services/langyagent/**/*",
+    "pnpm-workspace.yaml",
+    "services/langyworker/src/tools/local-workspace.ts",
+  ],
   "@langwatch/insight-process": [
     "services/langyagent/internal/assets/skills/daily-insights/SKILL.md",
     "pnpm-workspace.yaml",

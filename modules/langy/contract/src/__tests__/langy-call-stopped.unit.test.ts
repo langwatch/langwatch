@@ -26,6 +26,14 @@ describe("the stopped-call marker", () => {
     });
   });
 
+  describe("given the same words in another case", () => {
+    it("is still read as a stop", () => {
+      expect(
+        isLangyCallStoppedText("cancelled: The turn was stopped, so the command did not finish."),
+      ).toBe(true);
+    });
+  });
+
   describe("given text of an ordinary failure", () => {
     it("is not read as a stop", () => {
       expect(isLangyCallStoppedText("The question could not be shown.")).toBe(false);
