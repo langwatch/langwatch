@@ -4,12 +4,13 @@
  * not see keeps its place and title and offers neither, since both would read its data.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
-import { type BoardPeriod, queriesIgnoreBoardOrigins } from "../../model/board-period.ts";
+import type { BoardPeriod } from "../../model/board-period.ts";
+import { queriesIgnoreBoardOrigins } from "../../model/board-query-origins.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
@@ -43,6 +44,10 @@ export function CuratedWidgetCard({
   onAskLangy?: () => void;
 }) {
   const { name, definition } = widget;
+  const ignoresBoardOrigins = useMemo(
+    () => queriesIgnoreBoardOrigins({ sqls: definition.queries.map(({ sql }) => sql) }),
+    [definition.queries],
+  );
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
   const canAskLangy = onAskLangy !== undefined && face !== "no_access";
   const csvExport = useWidgetCsvExport({ board: boardName, widget: name });
@@ -71,9 +76,7 @@ export function CuratedWidgetCard({
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
         excludeOrigins={excludeOrigins}
-        ignoresBoardOrigins={queriesIgnoreBoardOrigins({
-          sqls: definition.queries.map(({ sql }) => sql),
-        })}
+        ignoresBoardOrigins={ignoresBoardOrigins}
         onFaceChange={setFace}
         onExportChange={csvExport.onExportChange}
       />

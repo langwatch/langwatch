@@ -10,8 +10,6 @@ import {
 } from "@langwatch/analytics-contract";
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
-import { BOARD_ROLLUP_VIEWS } from "./board-lwql-views.ts";
-
 /** "live" is the last hour, rolling, refreshed every minute (dashboards-v2 AC19c). */
 export const BOARD_PERIOD_RANGES = ["live", "1h", "24h", "7d", "30d", "90d", "1y"] as const;
 export type BoardPeriodRange = (typeof BOARD_PERIOD_RANGES)[number];
@@ -72,87 +70,6 @@ export function boardOriginsWithLangy({
 }): readonly string[] {
   const others = excluded.filter((origin) => origin !== LANGY_TRACE_ORIGIN);
   return includeLangy ? others : [...others, LANGY_TRACE_ORIGIN];
-}
-
-/** Langy's traces: column names fold case, values do not, as ClickHouse matches them exactly. */
-const LANGY_TRACE_FILTERS = [
-  { column: "Origin", value: LANGY_TRACE_ORIGIN },
-  { column: "TraceName", value: "langy.turn" },
-].map(({ column, value }) => ({
-  value: `'${value}'`,
-  pattern: new RegExp(
-    `(?<!\\bNOT\\s*\\(?\\s*)\\b${column}\\s*(?:==?\\s*'[^']*'|\\s+IN\\s*\\([^)]*\\))`,
-    "gi",
-  ),
-}));
-
-/** Whether a widget's queries ask for Langy's traces with `=` or `IN`; never `!=`, `NOT`. */
-export function queriesReadLangyTraces({ sqls }: { sqls: readonly string[] }): boolean {
-  return sqls.some((sql) => {
-    const code = sql.replace(/--[^\n]*/g, "");
-    return LANGY_TRACE_FILTERS.some(({ value, pattern }) =>
-      [...code.matchAll(pattern)].some((match) => match[0].includes(value)),
-    );
-  });
-}
-
-const VIEW_READ = /\b(?:FROM|JOIN)\s+(?:\w+\.)?(\w+)/gi;
-
-/** Whether every view the queries name is a per-minute rollup, which origin scoping skips. */
-export function queriesReadOnlyRollups({ sqls }: { sqls: readonly string[] }): boolean {
-  const views = sqls.flatMap((sql) =>
-    [...sql.replace(/--[^\n]*/g, "").matchAll(VIEW_READ)].map((match) => match[1]),
-  );
-  return views.length > 0 && views.every((view) => BOARD_ROLLUP_VIEWS.includes(view ?? ""));
-}
-
-const ORIGIN_FILTER = /(?<!\bNOT\s*\(?\s*)\bOrigin\s*(?:==?\s*'[^']*'|\s+IN\s*\([^)]*\))/gi;
-
-const COMMENTS = /\/\*[\s\S]*?\*\/|--[^\n]*/g;
-const WHERE = /\b(?:PRE)?WHERE\b/gi;
-const CLAUSE_END = /\b(?:GROUP\s+BY|ORDER\s+BY|LIMIT|HAVING|UNION|SETTINGS)\b/i;
-const NOT_A_CALL = /(?:\W|^)(?:IN|AND|OR|NOT|WHERE|PREWHERE)\s*$/i;
-
-/** Blanks everything inside a function call's parentheses; plain grouping and `IN (...)` stay. */
-function blankCallArguments({ code }: { code: string }): string {
-  const calls: boolean[] = [];
-  let out = "";
-  for (let at = 0; at < code.length; at++) {
-    const char = code[at] ?? "";
-    const before = code.slice(0, at);
-    if (char === "(") calls.push(/\w\s*$/.test(before) && !NOT_A_CALL.test(before));
-    out += calls.includes(true) ? " " : char;
-    if (char === ")") calls.pop();
-  }
-  return out;
-}
-
-/** The filter text of each WHERE clause, up to the next clause. */
-function filterClauses({ sql }: { sql: string }): string[] {
-  const code = blankCallArguments({ code: sql.replace(COMMENTS, " ") });
-  return [...code.matchAll(WHERE)].map((where) => {
-    const rest = code.slice((where.index ?? 0) + where[0].length);
-    return rest.slice(0, rest.search(CLAUSE_END) >= 0 ? rest.search(CLAUSE_END) : undefined);
-  });
-}
-
-/**
- * Whether every query pins `Origin` with `=` or `IN` in a WHERE filter, never to Langy's: the
- * board pick is moot. A comparison inside a call (`multiIf`, `if`) is a label, not a filter.
- */
-export function queriesPinOriginsWithoutLangy({ sqls }: { sqls: readonly string[] }): boolean {
-  return (
-    sqls.length > 0 &&
-    sqls.every((sql) => {
-      const pins = filterClauses({ sql }).flatMap((clause) => [...clause.matchAll(ORIGIN_FILTER)]);
-      return pins.length > 0 && pins.every(([pin]) => !pin.includes(`'${LANGY_TRACE_ORIGIN}'`));
-    })
-  );
-}
-
-/** Whether the board's Langy setting changes nothing here: rollup-only or origin-pinned. */
-export function queriesIgnoreBoardOrigins({ sqls }: { sqls: readonly string[] }): boolean {
-  return queriesReadOnlyRollups({ sqls }) || queriesPinOriginsWithoutLangy({ sqls });
 }
 
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";

@@ -15,12 +15,11 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
+import { type BoardQueryContext, boardIncludesLangy } from "../../model/board-period.ts";
 import {
-  type BoardQueryContext,
-  boardIncludesLangy,
-  queriesReadLangyTraces,
   queriesIgnoreBoardOrigins,
-} from "../../model/board-period.ts";
+  queriesReadLangyTraces,
+} from "../../model/board-query-origins.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
@@ -80,9 +79,14 @@ export function BoardWidgetCard({
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
   const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
-  const leavesOutLangyItReads =
-    !boardIncludesLangy({ excluded: excludeOrigins }) &&
-    queriesReadLangyTraces({ sqls: widget.definition.queries.map(({ sql }) => sql) });
+  const { readsLangy, ignoresBoardOrigins } = useMemo(() => {
+    const sqls = widget.definition.queries.map(({ sql }) => sql);
+    return {
+      readsLangy: queriesReadLangyTraces({ sqls }),
+      ignoresBoardOrigins: queriesIgnoreBoardOrigins({ sqls }),
+    };
+  }, [widget.definition.queries]);
+  const leavesOutLangyItReads = !boardIncludesLangy({ excluded: excludeOrigins }) && readsLangy;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],
@@ -139,9 +143,7 @@ export function BoardWidgetCard({
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
         excludeOrigins={excludeOrigins}
-        ignoresBoardOrigins={queriesIgnoreBoardOrigins({
-          sqls: widget.definition.queries.map(({ sql }) => sql),
-        })}
+        ignoresBoardOrigins={ignoresBoardOrigins}
         onFaceChange={setFace}
         onExportChange={csvExport.onExportChange}
         {...(onIncludeLangy ? { onIncludeLangy } : {})}
