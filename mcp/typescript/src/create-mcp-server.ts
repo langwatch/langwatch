@@ -2121,6 +2121,15 @@ function registerExperimentTools(server: McpServer): void {
     "Start an experiment run by slug. Returns a run ID for polling status.",
     {
       slug: z.string().describe("The experiment slug to run"),
+      concurrency: z
+        .number()
+        .int()
+        .min(1)
+        .max(24)
+        .optional()
+        .describe(
+          "Cells (one row against one target) to run at once, for this run only (default: the server's setting). Use 1 to run them one at a time, in order.",
+        ),
     },
     withToolLogging("platform_run_experiment", async (params) => {
       requireApiKey();

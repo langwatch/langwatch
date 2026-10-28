@@ -196,18 +196,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Bedrock cells. Both steps export the session into the job environment,
-      # which the gateway started below inherits. The gateway signs a Bedrock
-      # call with the virtual key's own access key when its credential carries
-      # one, and falls back to the AWS default credential chain (these
-      # variables) when it carries none. The seed below stores the Bedrock
-      # model provider keyless, so this session is what signs every Bedrock
-      # cell; with no session the seed skips Bedrock. The role trusts this
-      # workflow on pull requests and on main, and can only invoke models.
-      # Setting the MATRIX_AWS_ROLE_ARN repository variable switches to it;
-      # the stored-key step goes after.
+      # The Bedrock cells sign with this OIDC session (exported into the job
+      # environment the gateway inherits); the seed stores Bedrock keyless and
+      # skips it with no session. The role, named by MATRIX_AWS_ROLE_ARN, trusts
+      # this workflow on pull requests and main and can only invoke models.
       - name: Configure AWS credentials (OIDC)
-        if: ${{ vars.MATRIX_AWS_ROLE_ARN != '' }}
         # A refused assumption fails only the Bedrock cells, not the matrix.
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
@@ -217,17 +210,6 @@ jobs:
           role-session-name: gateway-matrix-${{ github.run_id }}
           # The job runs for up to 30 minutes; leave headroom.
           role-duration-seconds: 3600
-
-      - name: Configure AWS credentials (stored key, until MATRIX_AWS_ROLE_ARN is set)
-        if: ${{ vars.MATRIX_AWS_ROLE_ARN == '' }}
-        # Before this step existed a missing key only failed the Bedrock
-        # cells; keep it that way rather than failing the whole matrix.
-        continue-on-error: true
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
-        with:
-          aws-region: eu-central-1
-          aws-access-key-id: ${{ secrets.MATRIX_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.MATRIX_AWS_SECRET_ACCESS_KEY }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:

@@ -38,6 +38,8 @@ import {
 } from "../../../model/audit-log-export.ts";
 import {
   auditBackLink,
+  type AuditProjectFilter,
+  auditProjectFilterIn,
   matchMemberId,
   searchMatchesNobody,
   readAuditPaging,
@@ -169,6 +171,26 @@ async function collectAuditLogs<T>({
   return collected;
 }
 
+/**
+ * The project filter, rebased during render rather than masked: the organization
+ * the reader left must not come back carrying its old project if they return.
+ */
+function useAuditProjectFilter({
+  organizationId,
+  scopedProjectId,
+}: {
+  organizationId: string;
+  scopedProjectId: string | undefined;
+}) {
+  const [filter, setFilter] = useState<AuditProjectFilter>(() => ({
+    organizationId,
+    projectId: scopedProjectId ?? null,
+  }));
+  const rebased = auditProjectFilterIn({ filter, organizationId });
+  if (filter.organizationId !== organizationId) setFilter(rebased);
+  return [rebased, setFilter] as const;
+}
+
 /** Filter controls share one 32px line, 13px text and a 4px radius. */
 const FILTER_CONTROL = {
   height: "32px",
@@ -238,9 +260,11 @@ export default function AuditLogScreen() {
 
   const [userSearch, setUserSearch] = useState(query.userSearch ?? "");
   const [actionFilter, setActionFilter] = useState(query.actionFilter ?? "");
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    scope.projectId ?? null,
-  );
+  const [projectFilter, setProjectFilter] = useAuditProjectFilter({
+    organizationId,
+    scopedProjectId: scope.projectId,
+  });
+  const selectedProjectId = projectFilter.projectId;
   const [isExporting, setIsExporting] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
@@ -304,7 +328,7 @@ export default function AuditLogScreen() {
   };
 
   const handleProjectChange = (projectId: string | null) => {
-    setSelectedProjectId(projectId);
+    setProjectFilter({ organizationId, projectId });
     host.setQuery(withAuditFilter(query, { projectId: projectId ?? void 0 }));
   };
 

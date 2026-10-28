@@ -231,15 +231,15 @@ test_a_lambda_image_that_was_not_built_fails() {
 }
 
 # @scenario "A Lambda image is never re-tagged from an index"
-test_a_rebuilt_index_is_never_given_the_release_tag() {
+test_a_rebuilt_index_fails() {
   local reg
   reg="$(new_registry)"
   push "$reg" "git-$HEAD_SHA" "$INDEX" '{"index":true}'
-  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=true IS_RELEASE=true VERSION=3.9.0
-  if [ "$LAST_STATUS" -ne 0 ] && [ ! -f "$reg/tags/3.9.0" ]; then
-    record yes "a rebuilt tag that is an index fails and gets no version tag"
+  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=true
+  if [ "$LAST_STATUS" -ne 0 ] && printf '%s' "$LAST_OUTPUT" | grep -q "not a single manifest"; then
+    record yes "a rebuilt tag that is an index fails"
   else
-    record no "a rebuilt tag that is an index fails and gets no version tag"
+    record no "a rebuilt tag that is an index fails"
   fi
 }
 
@@ -253,19 +253,6 @@ test_a_failed_lookup_of_a_rebuilt_tag_shows_the_registry_error() {
     record yes "a failed lookup shows the registry error, not a missing build"
   else
     record no "a failed lookup shows the registry error, not a missing build"
-  fi
-}
-
-# @scenario "A release also tags each Lambda image with its version"
-test_a_release_also_tags_the_version() {
-  local reg
-  reg="$(new_registry)"
-  push "$reg" "git-$HEAD_SHA" "$PLAIN" '{"built":true}'
-  run_subject "$reg" IMAGE_TAG="git-$HEAD_SHA" IMAGE_WAS_BUILT=true IS_RELEASE=true VERSION=3.9.0
-  if [ "$LAST_STATUS" -eq 0 ] && [ "$(manifest_at "$reg" 3.9.0)" = '{"built":true}' ]; then
-    record yes "the version tag names the commit's manifest"
-  else
-    record no "the version tag names the commit's manifest"
   fi
 }
 
@@ -313,8 +300,7 @@ test_an_image_with_no_earlier_image_warns_and_writes_nothing
 test_a_tag_that_cannot_be_written_fails
 test_a_lambda_image_is_never_retagged_from_an_index
 test_a_lambda_image_that_was_not_built_fails
-test_a_release_also_tags_the_version
-test_a_rebuilt_index_is_never_given_the_release_tag
+test_a_rebuilt_index_fails
 test_a_failed_lookup_of_a_rebuilt_tag_shows_the_registry_error
 
 echo

@@ -26,6 +26,7 @@ import {
   DashboardApi,
   DashboardsNotEnabledError,
   dashboardConfig,
+  type Board,
   type Dashboard,
   type BoardSummary,
   type DashboardScope,
@@ -422,7 +423,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     return this.#boards.getBoard(input);
   }
 
@@ -431,19 +432,20 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     name: string;
     createdById?: string;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.createBoard(input);
   }
 
-  /** A board's inline name and description. */
+  /** A board's inline name, description and left-out origins. */
   async updateBoard(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
-  }): Promise<Dashboard> {
+    excludedOrigins?: readonly string[] | null;
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.updateBoard(input);
   }
@@ -453,7 +455,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.deleteBoard(input);
   }
@@ -464,7 +466,7 @@ export class DashboardModule implements DashboardApi {
     dashboardId: string;
     scope: DashboardScope;
     viewer: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#scopes.setScope(input);
   }

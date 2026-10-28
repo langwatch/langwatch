@@ -2318,21 +2318,24 @@ model DashboardFavourite {
 /// made before the split were copied here with their ids, so stars and insight
 /// pointers still name them. No relation, per the database rule.
 model DashboardsV2 {
-  id             String         @id @default(nanoid())
+  id              String         @id @default(nanoid())
   /// The project that owns the board; only there can it be edited.
-  projectId      String
-  name           String
+  projectId       String
+  name            String
   /// Free text under the board's name; null until a member writes one.
-  description    String?
+  description     String?
   /// The member who created it; null for boards that predate authorship.
-  createdById    String?
+  createdById     String?
   /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
-  scope          DashboardScope @default(PROJECT)
+  scope           DashboardScope @default(PROJECT)
   /// The owning project's organization, stamped when the board is first set to
   /// ORGANIZATION; null before.
-  organizationId String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @default(now()) @updatedAt
+  organizationId  String?
+  /// The trace origins every widget leaves out, a JSON list of strings; null keeps the
+  /// board's default (Langy's out, none in a personal project). dashboards-v2 AC200.
+  excludedOrigins Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now()) @updatedAt
 
   @@index([projectId])
   @@index([organizationId, scope])

@@ -268,6 +268,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The ECR chart push: which package it pushes and which digest it reports
   // for the deploy to pin (specs/ci/publish-prerelease-charts-to-ecr.feature).
   "tools/chartpush",
+  // The main-red Slack post (specs/ci/package-suite-integration-lane.feature).
+  "tools/slacknotify",
+  "tools/chartheap",
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",

@@ -120,8 +120,9 @@ def sync_detailed(
 ]:
     """Update a dashboard
 
-     Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null
-    description clears it.
+     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
+    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
+    traces, and null restores the default (Langy's left out, none in a personal project).
 
     Args:
         dashboard_id (str):
@@ -163,8 +164,9 @@ def sync(
 ):
     """Update a dashboard
 
-     Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null
-    description clears it.
+     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
+    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
+    traces, and null restores the default (Langy's left out, none in a personal project).
 
     Args:
         dashboard_id (str):
@@ -200,8 +202,9 @@ async def asyncio_detailed(
 ]:
     """Update a dashboard
 
-     Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null
-    description clears it.
+     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
+    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
+    traces, and null restores the default (Langy's left out, none in a personal project).
 
     Args:
         dashboard_id (str):
@@ -241,8 +244,9 @@ async def asyncio(
 ):
     """Update a dashboard
 
-     Changes a dashboard's name or description; a field the body leaves out keeps its value, and a null
-    description clears it.
+     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
+    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
+    traces, and null restores the default (Langy's left out, none in a personal project).
 
     Args:
         dashboard_id (str):

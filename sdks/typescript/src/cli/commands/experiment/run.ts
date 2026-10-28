@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
@@ -10,17 +11,21 @@ import { failSpinner } from "../../utils/spinnerError";
 
 export const runExperimentCommand = async (
   slug: string,
-  options: { wait?: boolean; param?: string[] },
+  options: { wait?: boolean; param?: string[]; concurrency?: string },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const parameters = parseRunParameterFlags({ pairs: options.param });
+  const concurrency = parseConcurrencyFlag({ value: options.concurrency });
 
   const service = new ExperimentsApiService();
   const spinner = createSpinner(`Starting experiment "${slug}"...`).start();
 
   try {
-    const runResult = await service.startRun(slug, { parameters });
+    const runResult = await service.startRun(slug, {
+      parameters,
+      ...(concurrency !== undefined ? { concurrency } : {}),
+    });
 
     spinner.succeed(
       `Experiment started! Run ID: ${chalk.cyan(runResult.runId)} (${runResult.total} cells)`,
@@ -75,6 +80,20 @@ export const runExperimentCommand = async (
     process.exit(1);
   }
 };
+
+function parseConcurrencyFlag({ value }: { value: string | undefined }): number | undefined {
+  if (value === undefined) return undefined;
+  const concurrency = Number(value);
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 24) {
+    reportCommandError({
+      error: commandValidationError(
+        `Invalid --concurrency value: ${value} (expected a whole number from 1 to 24)`,
+      ),
+    });
+    process.exit(1);
+  }
+  return concurrency;
+}
 
 function printRunStatus({
   runUrl,

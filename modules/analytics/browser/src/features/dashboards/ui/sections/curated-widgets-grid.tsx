@@ -24,6 +24,7 @@ export function CuratedWidgetsGrid({
   widgets,
   period,
   onAskLangy,
+  onEmptyChange,
 }: {
   projectId: string;
   projectSlug: string;
@@ -33,6 +34,8 @@ export function CuratedWidgetsGrid({
   period: BoardQueryContext;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: (widget: BoardTemplateWidget) => void;
+  /** Told whether each widget shows none of its data. */
+  onEmptyChange?: (input: { widget: BoardTemplateWidget; empty: boolean }) => void;
 }) {
   const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
   const timeWindow = useMemo(
@@ -64,6 +67,7 @@ export function CuratedWidgetsGrid({
             granularitySeconds={granularitySeconds}
             excludeOrigins={excludeOrigins}
             onAskLangy={onAskLangy && (() => onAskLangy(widget))}
+            onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}
           />
         );
       }}
