@@ -16,6 +16,7 @@ import {
   boardWindowEnd,
   defaultBoardExcludedOrigins,
   queriesReadLangyTraces,
+  queriesReadOnlyRollups,
 } from "../model/board-period.ts";
 
 const NOW = Date.UTC(2026, 8, 28);
@@ -208,5 +209,38 @@ describe("queriesReadLangyTraces", () => {
     ])("finds nothing in %s", (sql) => {
       expect(reads(sql)).toBe(false);
     });
+  });
+});
+
+describe("queriesReadOnlyRollups", () => {
+  const only = (...sqls: string[]) => queriesReadOnlyRollups({ sqls });
+
+  /** @scenario "AC195 Langy: per-minute rollups cannot leave Langy out yet" */
+  it.each([
+    ["one rollup", ["SELECT sum(TraceCount) FROM trace_metrics_by_minute"]],
+    ["a qualified rollup", ["SELECT 1 FROM analytics.model_usage_by_minute"]],
+    [
+      "two rollups",
+      ["SELECT 1 FROM trace_metrics_by_minute", "SELECT 1 FROM model_usage_by_minute"],
+    ],
+  ])("is true for %s", (_name, sqls) => {
+    expect(only(...sqls)).toBe(true);
+  });
+
+  /** @scenario "AC195 Langy: per-minute rollups cannot leave Langy out yet" */
+  it.each([
+    ["a trace view", ["SELECT 1 FROM trace_metrics"]],
+    [
+      "a rollup joined to a trace view",
+      ["SELECT 1 FROM trace_metrics_by_minute JOIN traces USING (TraceId)"],
+    ],
+    [
+      "one rollup query and one trace query",
+      ["SELECT 1 FROM model_usage_by_minute", "SELECT 1 FROM traces"],
+    ],
+    ["no query", []],
+    ["a view named only in a comment", ["SELECT 1 FROM traces -- FROM trace_metrics_by_minute"]],
+  ])("is false for %s", (_name, sqls) => {
+    expect(only(...sqls)).toBe(false);
   });
 });

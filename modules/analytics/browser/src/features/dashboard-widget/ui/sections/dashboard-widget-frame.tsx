@@ -88,6 +88,7 @@ export function DashboardWidgetFrameOverWindow({
   timeWindow,
   granularitySeconds,
   excludeOrigins,
+  readsOnlyRollups = false,
   onIncludeLangy,
   onAskLangyToSetUp,
   onFaceChange,
@@ -97,6 +98,8 @@ export function DashboardWidgetFrameOverWindow({
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   /** Trace origins the board leaves out of every query this widget runs. */
   readonly excludeOrigins?: readonly string[];
+  /** Set when every query reads a per-minute rollup, which the origins left out never reach. */
+  readonly readsOnlyRollups?: boolean;
   /** Sets the board to count Langy's traces; absent where the reader may not change that. */
   readonly onIncludeLangy?: () => void;
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
@@ -193,8 +196,8 @@ export function DashboardWidgetFrameOverWindow({
     name: widgetName ?? "this widget",
     onRetry: retry,
     onAskLangyToSetUp,
-    langyLeftOut: excludeOrigins?.includes(LANGY_TRACE_ORIGIN) ?? false,
-    ...(onIncludeLangy ? { onIncludeLangy } : {}),
+    langyLeftOut: !readsOnlyRollups && (excludeOrigins?.includes(LANGY_TRACE_ORIGIN) ?? false),
+    ...(onIncludeLangy && !readsOnlyRollups ? { onIncludeLangy } : {}),
   });
 
   // The frame stays mounted under a face, so a new period can bring the chart back.

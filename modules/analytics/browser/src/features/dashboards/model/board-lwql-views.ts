@@ -15,3 +15,9 @@ export const BOARD_LWQL_VIEWS = [
   "trace_metrics_by_minute",
   "traces",
 ] as const;
+
+/** Per-minute rollups: no Origin and no TraceId, so a board's origin scoping never reaches them. */
+export const BOARD_ROLLUP_VIEWS: readonly string[] = [
+  "model_usage_by_minute",
+  "trace_metrics_by_minute",
+];

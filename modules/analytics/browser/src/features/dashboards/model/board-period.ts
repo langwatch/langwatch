@@ -10,6 +10,8 @@ import {
 } from "@langwatch/analytics-contract";
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
+import { BOARD_ROLLUP_VIEWS } from "./board-lwql-views.ts";
+
 /** "live" is the last hour, rolling, refreshed every minute (dashboards-v2 AC19c). */
 export const BOARD_PERIOD_RANGES = ["live", "1h", "24h", "7d", "30d", "90d", "1y"] as const;
 export type BoardPeriodRange = (typeof BOARD_PERIOD_RANGES)[number];
@@ -92,6 +94,16 @@ export function queriesReadLangyTraces({ sqls }: { sqls: readonly string[] }): b
       [...code.matchAll(pattern)].some((match) => match[0].includes(value)),
     );
   });
+}
+
+const VIEW_READ = /\b(?:FROM|JOIN)\s+(?:\w+\.)?(\w+)/gi;
+
+/** Whether every view the queries name is a per-minute rollup, which origin scoping skips. */
+export function queriesReadOnlyRollups({ sqls }: { sqls: readonly string[] }): boolean {
+  const views = sqls.flatMap((sql) =>
+    [...sql.replace(/--[^\n]*/g, "").matchAll(VIEW_READ)].map((match) => match[1]),
+  );
+  return views.length > 0 && views.every((view) => BOARD_ROLLUP_VIEWS.includes(view ?? ""));
 }
 
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";

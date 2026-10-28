@@ -124,7 +124,7 @@ function boardServer({
           rows: [],
           statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
           diagnostics: [],
-          followsTimeWindow: completeness !== undefined,
+          followsTimeWindow: false,
           followsGranularity: false,
           ...(completeness ? { completeness } : {}),
         });
@@ -444,6 +444,21 @@ describe("given a widget whose query finds no traffic on a stored board", () => 
       expect(within(face).queryByText(LEFT_OUT)).toBeNull();
       expect(within(face).queryByRole("button", { name: "Include Langy traces" })).toBeNull();
     });
+  });
+});
+
+describe("given a widget that reads only the per-minute rollups and finds no traffic", () => {
+  /** @scenario "AC195 Langy: per-minute rollups cannot leave Langy out yet" */
+  it("says nothing about Langy traces and offers no button", async () => {
+    openBoard({
+      completeness: NO_TRAFFIC,
+      sql: "SELECT sum(TraceCount) AS n FROM trace_metrics_by_minute",
+    });
+    const face = await emptyFace();
+
+    expect(within(face).getByText("No traces in this period")).toBeTruthy();
+    expect(within(face).queryByText(LEFT_OUT)).toBeNull();
+    expect(within(face).queryByRole("button", { name: "Include Langy traces" })).toBeNull();
   });
 });
 
