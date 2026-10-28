@@ -14649,6 +14649,402 @@ func (e GetApiDatasetBySlugOrIdRecords200JSONResponseBodyDatasetColumnTypesType)
 	}
 }
 
+// Defines values for GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind.
+const (
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindApiKey GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind = "api_key"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindSystem GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind = "system"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindUser   GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind = "user"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind enum.
+func (e GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindApiKey:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindSystem:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKindUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType.
+const (
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeAnnotations  GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "annotations"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeBoolean      GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "boolean"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeChatMessages GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "chat_messages"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeDate         GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "date"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeEvaluations  GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "evaluations"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeFile         GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "file"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeImage        GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "image"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeJson         GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "json"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeList         GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "list"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeNumber       GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "number"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeRagContexts  GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "rag_contexts"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeSpans        GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "spans"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeString       GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType enum.
+func (e GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeAnnotations:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeBoolean:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeChatMessages:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeDate:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeEvaluations:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeFile:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeImage:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeJson:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeList:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeNumber:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeRagContexts:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeSpans:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger.
+const (
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerAutosave      GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "autosave"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerExperimentRun GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "experiment_run"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerInitial       GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "initial"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerManual        GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "manual"
+	GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerRestore       GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger = "restore"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger enum.
+func (e GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerAutosave:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerExperimentRun:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerInitial:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerManual:
+		return true
+	case GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTriggerRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind.
+const (
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindApiKey PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind = "api_key"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindSystem PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind = "system"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindUser   PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind = "user"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind enum.
+func (e PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindApiKey:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindSystem:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKindUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType.
+const (
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeAnnotations  PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "annotations"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeBoolean      PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "boolean"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeChatMessages PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "chat_messages"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeDate         PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "date"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeEvaluations  PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "evaluations"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeFile         PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "file"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeImage        PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "image"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeJson         PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "json"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeList         PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "list"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeNumber       PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "number"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeRagContexts  PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "rag_contexts"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeSpans        PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "spans"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeString       PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType enum.
+func (e PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeAnnotations:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeBoolean:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeChatMessages:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeDate:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeEvaluations:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeFile:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeImage:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeJson:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeList:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeNumber:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeRagContexts:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeSpans:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger.
+const (
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerAutosave      PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "autosave"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerExperimentRun PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "experiment_run"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerInitial       PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "initial"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerManual        PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "manual"
+	PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerRestore       PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger = "restore"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger enum.
+func (e PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerAutosave:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerExperimentRun:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerInitial:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerManual:
+		return true
+	case PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTriggerRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind.
+const (
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindApiKey GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind = "api_key"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindSystem GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind = "system"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindUser   GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind = "user"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind enum.
+func (e GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindApiKey:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindSystem:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKindUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType.
+const (
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeAnnotations  GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "annotations"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeBoolean      GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "boolean"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeChatMessages GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "chat_messages"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeDate         GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "date"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeEvaluations  GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "evaluations"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeFile         GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "file"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeImage        GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "image"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeJson         GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "json"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeList         GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "list"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeNumber       GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "number"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeRagContexts  GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "rag_contexts"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeSpans        GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "spans"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeString       GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType enum.
+func (e GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeAnnotations:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeBoolean:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeChatMessages:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeDate:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeEvaluations:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeFile:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeImage:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeJson:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeList:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeNumber:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeRagContexts:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeSpans:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger.
+const (
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerAutosave      GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "autosave"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerExperimentRun GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "experiment_run"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerInitial       GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "initial"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerManual        GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "manual"
+	GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerRestore       GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger = "restore"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger enum.
+func (e GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger) Valid() bool {
+	switch e {
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerAutosave:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerExperimentRun:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerInitial:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerManual:
+		return true
+	case GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTriggerRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind.
+const (
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindApiKey PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind = "api_key"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindSystem PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind = "system"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindUser   PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind = "user"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind enum.
+func (e PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindApiKey:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindSystem:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKindUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType.
+const (
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeAnnotations  PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "annotations"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeBoolean      PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "boolean"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeChatMessages PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "chat_messages"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeDate         PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "date"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeEvaluations  PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "evaluations"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeFile         PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "file"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeImage        PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "image"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeJson         PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "json"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeList         PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "list"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeNumber       PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "number"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeRagContexts  PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "rag_contexts"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeSpans        PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "spans"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeString       PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType enum.
+func (e PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeAnnotations:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeBoolean:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeChatMessages:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeDate:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeEvaluations:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeFile:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeImage:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeJson:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeList:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeNumber:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeRagContexts:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeSpans:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger.
+const (
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerAutosave      PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "autosave"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerExperimentRun PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "experiment_run"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerInitial       PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "initial"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerManual        PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "manual"
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerRestore       PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger = "restore"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger enum.
+func (e PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger) Valid() bool {
+	switch e {
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerAutosave:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerExperimentRun:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerInitial:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerManual:
+		return true
+	case PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTriggerRestore:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiEvaluationsBatchLogResultsJSONBodyEvaluationsStatus0.
 const (
 	PostApiEvaluationsBatchLogResultsJSONBodyEvaluationsStatus0Processed PostApiEvaluationsBatchLogResultsJSONBodyEvaluationsStatus0 = "processed"
@@ -43823,6 +44219,53 @@ type PostApiDatasetBySlugOrIdUploadMultipartBody struct {
 	File openapi_types.File `json:"file"`
 }
 
+// GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind defines parameters for GetApiDatasetBySlugOrIdVersions.
+type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind string
+
+// GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType defines parameters for GetApiDatasetBySlugOrIdVersions.
+type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType string
+
+// GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger defines parameters for GetApiDatasetBySlugOrIdVersions.
+type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger string
+
+// PostApiDatasetBySlugOrIdVersionsJSONBody defines parameters for PostApiDatasetBySlugOrIdVersions.
+type PostApiDatasetBySlugOrIdVersionsJSONBody struct {
+	Name *string `json:"name,omitempty"`
+}
+
+// PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind defines parameters for PostApiDatasetBySlugOrIdVersions.
+type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind string
+
+// PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType defines parameters for PostApiDatasetBySlugOrIdVersions.
+type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType string
+
+// PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger defines parameters for PostApiDatasetBySlugOrIdVersions.
+type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger string
+
+// GetApiDatasetBySlugOrIdVersionsByVersionParams defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
+type GetApiDatasetBySlugOrIdVersionsByVersionParams struct {
+	Page  *int `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
+type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind string
+
+// GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
+type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType string
+
+// GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger defines parameters for GetApiDatasetBySlugOrIdVersionsByVersion.
+type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger string
+
+// PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind defines parameters for PostApiDatasetBySlugOrIdVersionsByVersionRestore.
+type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind string
+
+// PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType defines parameters for PostApiDatasetBySlugOrIdVersionsByVersionRestore.
+type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType string
+
+// PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger defines parameters for PostApiDatasetBySlugOrIdVersionsByVersionRestore.
+type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger string
+
 // PostApiDspyLogStepsJSONBody defines parameters for PostApiDspyLogSteps.
 type PostApiDspyLogStepsJSONBody = []struct {
 	Examples []struct {
@@ -44302,10 +44745,11 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets struct {
 
 // PostApiExperimentsBySlugRunJSONBody defines parameters for PostApiExperimentsBySlugRun.
 type PostApiExperimentsBySlugRunJSONBody struct {
-	Data       *[]map[string]interface{}                                                       `json:"data,omitempty"`
-	DatasetId  *string                                                                         `json:"dataset_id,omitempty"`
-	Parameters *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
-	RowIndices *[]int                                                                          `json:"row_indices,omitempty"`
+	Data           *[]map[string]interface{}                                                       `json:"data,omitempty"`
+	DatasetId      *string                                                                         `json:"dataset_id,omitempty"`
+	DatasetVersion *int                                                                            `json:"dataset_version,omitempty"`
+	Parameters     *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
+	RowIndices     *[]int                                                                          `json:"row_indices,omitempty"`
 }
 
 // PostApiExperimentsBySlugRunJSONBodyParameters0 defines parameters for PostApiExperimentsBySlugRun.
@@ -53662,6 +54106,9 @@ type PostApiWorkflowsByIdEvaluateJSONBody struct {
 	// DatasetId Platform dataset id to evaluate; mutually exclusive with data
 	DatasetId *string `json:"dataset_id,omitempty"`
 
+	// DatasetVersion Version of the saved dataset to evaluate (dataset_id, else the workflow's attached dataset); defaults to its current content
+	DatasetVersion *int `json:"dataset_version,omitempty"`
+
 	// Parameters Constant entry inputs applied to every row, e.g. a feature flag or PR number
 	Parameters *map[string]PostApiWorkflowsByIdEvaluateJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
 
@@ -54330,6 +54777,9 @@ type PatchApiDatasetBySlugOrIdRecordsByRecordIdJSONRequestBody PatchApiDatasetBy
 
 // PostApiDatasetBySlugOrIdUploadMultipartRequestBody defines body for PostApiDatasetBySlugOrIdUpload for multipart/form-data ContentType.
 type PostApiDatasetBySlugOrIdUploadMultipartRequestBody PostApiDatasetBySlugOrIdUploadMultipartBody
+
+// PostApiDatasetBySlugOrIdVersionsJSONRequestBody defines body for PostApiDatasetBySlugOrIdVersions for application/json ContentType.
+type PostApiDatasetBySlugOrIdVersionsJSONRequestBody PostApiDatasetBySlugOrIdVersionsJSONBody
 
 // PostApiDspyLogStepsJSONRequestBody defines body for PostApiDspyLogSteps for application/json ContentType.
 type PostApiDspyLogStepsJSONRequestBody = PostApiDspyLogStepsJSONBody
@@ -116872,6 +117322,20 @@ type ClientInterface interface {
 	// PostApiDatasetBySlugOrIdUploadWithBody request with any body
 	PostApiDatasetBySlugOrIdUploadWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiDatasetBySlugOrIdVersions request
+	GetApiDatasetBySlugOrIdVersions(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiDatasetBySlugOrIdVersionsWithBody request with any body
+	PostApiDatasetBySlugOrIdVersionsWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiDatasetBySlugOrIdVersions(ctx context.Context, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiDatasetBySlugOrIdVersionsByVersion request
+	GetApiDatasetBySlugOrIdVersionsByVersion(ctx context.Context, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiDatasetBySlugOrIdVersionsByVersionRestore request
+	PostApiDatasetBySlugOrIdVersionsByVersionRestore(ctx context.Context, slugOrId string, version int, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiDspyLogStepsWithBody request with any body
 	PostApiDspyLogStepsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -120431,6 +120895,66 @@ func (c *Client) PatchApiDatasetBySlugOrIdRecordsByRecordId(ctx context.Context,
 
 func (c *Client) PostApiDatasetBySlugOrIdUploadWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiDatasetBySlugOrIdUploadRequestWithBody(c.Server, slugOrId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiDatasetBySlugOrIdVersions(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiDatasetBySlugOrIdVersionsRequest(c.Server, slugOrId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDatasetBySlugOrIdVersionsWithBody(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetBySlugOrIdVersionsRequestWithBody(c.Server, slugOrId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDatasetBySlugOrIdVersions(ctx context.Context, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetBySlugOrIdVersionsRequest(c.Server, slugOrId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiDatasetBySlugOrIdVersionsByVersion(ctx context.Context, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiDatasetBySlugOrIdVersionsByVersionRequest(c.Server, slugOrId, version, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDatasetBySlugOrIdVersionsByVersionRestore(ctx context.Context, slugOrId string, version int, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetBySlugOrIdVersionsByVersionRestoreRequest(c.Server, slugOrId, version)
 	if err != nil {
 		return nil, err
 	}
@@ -131687,6 +132211,208 @@ func NewPostApiDatasetBySlugOrIdUploadRequestWithBody(server string, slugOrId st
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiDatasetBySlugOrIdVersionsRequest generates requests for GetApiDatasetBySlugOrIdVersions
+func NewGetApiDatasetBySlugOrIdVersionsRequest(server string, slugOrId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "slugOrId", slugOrId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/versions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiDatasetBySlugOrIdVersionsRequest calls the generic PostApiDatasetBySlugOrIdVersions builder with application/json body
+func NewPostApiDatasetBySlugOrIdVersionsRequest(server string, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiDatasetBySlugOrIdVersionsRequestWithBody(server, slugOrId, "application/json", bodyReader)
+}
+
+// NewPostApiDatasetBySlugOrIdVersionsRequestWithBody generates requests for PostApiDatasetBySlugOrIdVersions with any type of body
+func NewPostApiDatasetBySlugOrIdVersionsRequestWithBody(server string, slugOrId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "slugOrId", slugOrId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/versions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiDatasetBySlugOrIdVersionsByVersionRequest generates requests for GetApiDatasetBySlugOrIdVersionsByVersion
+func NewGetApiDatasetBySlugOrIdVersionsByVersionRequest(server string, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "slugOrId", slugOrId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "version", version, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/versions/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiDatasetBySlugOrIdVersionsByVersionRestoreRequest generates requests for PostApiDatasetBySlugOrIdVersionsByVersionRestore
+func NewPostApiDatasetBySlugOrIdVersionsByVersionRestoreRequest(server string, slugOrId string, version int) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "slugOrId", slugOrId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "version", version, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/versions/%s/restore", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -143496,6 +144222,20 @@ type ClientWithResponsesInterface interface {
 
 	// PostApiDatasetBySlugOrIdUploadWithBodyWithResponse request with any body
 	PostApiDatasetBySlugOrIdUploadWithBodyWithResponse(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdUploadResponse, error)
+
+	// GetApiDatasetBySlugOrIdVersionsWithResponse request
+	GetApiDatasetBySlugOrIdVersionsWithResponse(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugOrIdVersionsResponse, error)
+
+	// PostApiDatasetBySlugOrIdVersionsWithBodyWithResponse request with any body
+	PostApiDatasetBySlugOrIdVersionsWithBodyWithResponse(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsResponse, error)
+
+	PostApiDatasetBySlugOrIdVersionsWithResponse(ctx context.Context, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsResponse, error)
+
+	// GetApiDatasetBySlugOrIdVersionsByVersionWithResponse request
+	GetApiDatasetBySlugOrIdVersionsByVersionWithResponse(ctx context.Context, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugOrIdVersionsByVersionResponse, error)
+
+	// PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse request
+	PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse(ctx context.Context, slugOrId string, version int, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse, error)
 
 	// PostApiDspyLogStepsWithBodyWithResponse request with any body
 	PostApiDspyLogStepsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDspyLogStepsResponse, error)
@@ -155566,6 +156306,228 @@ func (r PostApiDatasetBySlugOrIdUploadResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PostApiDatasetBySlugOrIdUploadResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiDatasetBySlugOrIdVersionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []struct {
+			AuthorId    *string                                                           `json:"authorId"`
+			AuthorKind  *GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind `json:"authorKind"`
+			AuthorName  *string                                                           `json:"authorName"`
+			ChunkCount  int                                                               `json:"chunkCount"`
+			ColumnTypes []struct {
+				Name string                                                                `json:"name"`
+				Type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			ContentHash         string                                                        `json:"contentHash"`
+			CreatedAt           time.Time                                                     `json:"createdAt"`
+			DatasetId           string                                                        `json:"datasetId"`
+			Id                  string                                                        `json:"id"`
+			Name                *string                                                       `json:"name"`
+			Pinned              bool                                                          `json:"pinned"`
+			ProjectId           string                                                        `json:"projectId"`
+			RestoredFromVersion *int                                                          `json:"restoredFromVersion"`
+			RowCount            int                                                           `json:"rowCount"`
+			RunCount            int                                                           `json:"runCount"`
+			SizeBytes           int                                                           `json:"sizeBytes"`
+			Trigger             GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger `json:"trigger"`
+			Version             int                                                           `json:"version"`
+		} `json:"data"`
+		Restorable bool `json:"restorable"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiDatasetBySlugOrIdVersionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiDatasetBySlugOrIdVersionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiDatasetBySlugOrIdVersionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiDatasetBySlugOrIdVersionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		AuthorId    *string                                                        `json:"authorId"`
+		AuthorKind  *PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind `json:"authorKind"`
+		ChunkCount  int                                                            `json:"chunkCount"`
+		ColumnTypes []struct {
+			Name string                                                             `json:"name"`
+			Type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType `json:"type"`
+		} `json:"columnTypes"`
+		ContentHash         string                                                     `json:"contentHash"`
+		CreatedAt           time.Time                                                  `json:"createdAt"`
+		DatasetId           string                                                     `json:"datasetId"`
+		Id                  string                                                     `json:"id"`
+		Name                *string                                                    `json:"name"`
+		Pinned              bool                                                       `json:"pinned"`
+		ProjectId           string                                                     `json:"projectId"`
+		RestoredFromVersion *int                                                       `json:"restoredFromVersion"`
+		RowCount            int                                                        `json:"rowCount"`
+		RunCount            int                                                        `json:"runCount"`
+		SizeBytes           int                                                        `json:"sizeBytes"`
+		Trigger             PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger `json:"trigger"`
+		Version             int                                                        `json:"version"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiDatasetBySlugOrIdVersionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiDatasetBySlugOrIdVersionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiDatasetBySlugOrIdVersionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiDatasetBySlugOrIdVersionsByVersionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Pagination struct {
+			Limit int `json:"limit"`
+			Page  int `json:"page"`
+			Total int `json:"total"`
+		} `json:"pagination"`
+		Rows []struct {
+			Entry map[string]interface{} `json:"entry"`
+			Id    string                 `json:"id"`
+		} `json:"rows"`
+		Version struct {
+			AuthorId    *string                                                                       `json:"authorId"`
+			AuthorKind  *GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind `json:"authorKind"`
+			ChunkCount  int                                                                           `json:"chunkCount"`
+			ColumnTypes []struct {
+				Name string                                                                            `json:"name"`
+				Type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			ContentHash         string                                                                    `json:"contentHash"`
+			CreatedAt           time.Time                                                                 `json:"createdAt"`
+			DatasetId           string                                                                    `json:"datasetId"`
+			Id                  string                                                                    `json:"id"`
+			Name                *string                                                                   `json:"name"`
+			Pinned              bool                                                                      `json:"pinned"`
+			ProjectId           string                                                                    `json:"projectId"`
+			RestoredFromVersion *int                                                                      `json:"restoredFromVersion"`
+			RowCount            int                                                                       `json:"rowCount"`
+			RunCount            int                                                                       `json:"runCount"`
+			SizeBytes           int                                                                       `json:"sizeBytes"`
+			Trigger             GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger `json:"trigger"`
+			Version             int                                                                       `json:"version"`
+		} `json:"version"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiDatasetBySlugOrIdVersionsByVersionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiDatasetBySlugOrIdVersionsByVersionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiDatasetBySlugOrIdVersionsByVersionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Changed bool `json:"changed"`
+		Version struct {
+			AuthorId    *string                                                                               `json:"authorId"`
+			AuthorKind  *PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind `json:"authorKind"`
+			ChunkCount  int                                                                                   `json:"chunkCount"`
+			ColumnTypes []struct {
+				Name string                                                                                    `json:"name"`
+				Type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			ContentHash         string                                                                            `json:"contentHash"`
+			CreatedAt           time.Time                                                                         `json:"createdAt"`
+			DatasetId           string                                                                            `json:"datasetId"`
+			Id                  string                                                                            `json:"id"`
+			Name                *string                                                                           `json:"name"`
+			Pinned              bool                                                                              `json:"pinned"`
+			ProjectId           string                                                                            `json:"projectId"`
+			RestoredFromVersion *int                                                                              `json:"restoredFromVersion"`
+			RowCount            int                                                                               `json:"rowCount"`
+			RunCount            int                                                                               `json:"runCount"`
+			SizeBytes           int                                                                               `json:"sizeBytes"`
+			Trigger             PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger `json:"trigger"`
+			Version             int                                                                               `json:"version"`
+		} `json:"version"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -172300,6 +173262,50 @@ func (c *ClientWithResponses) PostApiDatasetBySlugOrIdUploadWithBodyWithResponse
 	return ParsePostApiDatasetBySlugOrIdUploadResponse(rsp)
 }
 
+// GetApiDatasetBySlugOrIdVersionsWithResponse request returning *GetApiDatasetBySlugOrIdVersionsResponse
+func (c *ClientWithResponses) GetApiDatasetBySlugOrIdVersionsWithResponse(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugOrIdVersionsResponse, error) {
+	rsp, err := c.GetApiDatasetBySlugOrIdVersions(ctx, slugOrId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiDatasetBySlugOrIdVersionsResponse(rsp)
+}
+
+// PostApiDatasetBySlugOrIdVersionsWithBodyWithResponse request with arbitrary body returning *PostApiDatasetBySlugOrIdVersionsResponse
+func (c *ClientWithResponses) PostApiDatasetBySlugOrIdVersionsWithBodyWithResponse(ctx context.Context, slugOrId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsResponse, error) {
+	rsp, err := c.PostApiDatasetBySlugOrIdVersionsWithBody(ctx, slugOrId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetBySlugOrIdVersionsResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiDatasetBySlugOrIdVersionsWithResponse(ctx context.Context, slugOrId string, body PostApiDatasetBySlugOrIdVersionsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsResponse, error) {
+	rsp, err := c.PostApiDatasetBySlugOrIdVersions(ctx, slugOrId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetBySlugOrIdVersionsResponse(rsp)
+}
+
+// GetApiDatasetBySlugOrIdVersionsByVersionWithResponse request returning *GetApiDatasetBySlugOrIdVersionsByVersionResponse
+func (c *ClientWithResponses) GetApiDatasetBySlugOrIdVersionsByVersionWithResponse(ctx context.Context, slugOrId string, version int, params *GetApiDatasetBySlugOrIdVersionsByVersionParams, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugOrIdVersionsByVersionResponse, error) {
+	rsp, err := c.GetApiDatasetBySlugOrIdVersionsByVersion(ctx, slugOrId, version, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiDatasetBySlugOrIdVersionsByVersionResponse(rsp)
+}
+
+// PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse request returning *PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse
+func (c *ClientWithResponses) PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse(ctx context.Context, slugOrId string, version int, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse, error) {
+	rsp, err := c.PostApiDatasetBySlugOrIdVersionsByVersionRestore(ctx, slugOrId, version, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse(rsp)
+}
+
 // PostApiDspyLogStepsWithBodyWithResponse request with arbitrary body returning *PostApiDspyLogStepsResponse
 func (c *ClientWithResponses) PostApiDspyLogStepsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDspyLogStepsResponse, error) {
 	rsp, err := c.PostApiDspyLogStepsWithBody(ctx, contentType, body, reqEditors...)
@@ -187914,6 +188920,212 @@ func ParsePostApiDatasetBySlugOrIdUploadResponse(rsp *http.Response) (*PostApiDa
 		var dest struct {
 			DatasetId      string `json:"datasetId"`
 			RecordsCreated int    `json:"recordsCreated"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiDatasetBySlugOrIdVersionsResponse parses an HTTP response from a GetApiDatasetBySlugOrIdVersionsWithResponse call
+func ParseGetApiDatasetBySlugOrIdVersionsResponse(rsp *http.Response) (*GetApiDatasetBySlugOrIdVersionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiDatasetBySlugOrIdVersionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []struct {
+				AuthorId    *string                                                           `json:"authorId"`
+				AuthorKind  *GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataAuthorKind `json:"authorKind"`
+				AuthorName  *string                                                           `json:"authorName"`
+				ChunkCount  int                                                               `json:"chunkCount"`
+				ColumnTypes []struct {
+					Name string                                                                `json:"name"`
+					Type GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataColumnTypesType `json:"type"`
+				} `json:"columnTypes"`
+				ContentHash         string                                                        `json:"contentHash"`
+				CreatedAt           time.Time                                                     `json:"createdAt"`
+				DatasetId           string                                                        `json:"datasetId"`
+				Id                  string                                                        `json:"id"`
+				Name                *string                                                       `json:"name"`
+				Pinned              bool                                                          `json:"pinned"`
+				ProjectId           string                                                        `json:"projectId"`
+				RestoredFromVersion *int                                                          `json:"restoredFromVersion"`
+				RowCount            int                                                           `json:"rowCount"`
+				RunCount            int                                                           `json:"runCount"`
+				SizeBytes           int                                                           `json:"sizeBytes"`
+				Trigger             GetApiDatasetBySlugOrIdVersions200JSONResponseBodyDataTrigger `json:"trigger"`
+				Version             int                                                           `json:"version"`
+			} `json:"data"`
+			Restorable bool `json:"restorable"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiDatasetBySlugOrIdVersionsResponse parses an HTTP response from a PostApiDatasetBySlugOrIdVersionsWithResponse call
+func ParsePostApiDatasetBySlugOrIdVersionsResponse(rsp *http.Response) (*PostApiDatasetBySlugOrIdVersionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiDatasetBySlugOrIdVersionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			AuthorId    *string                                                        `json:"authorId"`
+			AuthorKind  *PostApiDatasetBySlugOrIdVersions200JSONResponseBodyAuthorKind `json:"authorKind"`
+			ChunkCount  int                                                            `json:"chunkCount"`
+			ColumnTypes []struct {
+				Name string                                                             `json:"name"`
+				Type PostApiDatasetBySlugOrIdVersions200JSONResponseBodyColumnTypesType `json:"type"`
+			} `json:"columnTypes"`
+			ContentHash         string                                                     `json:"contentHash"`
+			CreatedAt           time.Time                                                  `json:"createdAt"`
+			DatasetId           string                                                     `json:"datasetId"`
+			Id                  string                                                     `json:"id"`
+			Name                *string                                                    `json:"name"`
+			Pinned              bool                                                       `json:"pinned"`
+			ProjectId           string                                                     `json:"projectId"`
+			RestoredFromVersion *int                                                       `json:"restoredFromVersion"`
+			RowCount            int                                                        `json:"rowCount"`
+			RunCount            int                                                        `json:"runCount"`
+			SizeBytes           int                                                        `json:"sizeBytes"`
+			Trigger             PostApiDatasetBySlugOrIdVersions200JSONResponseBodyTrigger `json:"trigger"`
+			Version             int                                                        `json:"version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiDatasetBySlugOrIdVersionsByVersionResponse parses an HTTP response from a GetApiDatasetBySlugOrIdVersionsByVersionWithResponse call
+func ParseGetApiDatasetBySlugOrIdVersionsByVersionResponse(rsp *http.Response) (*GetApiDatasetBySlugOrIdVersionsByVersionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiDatasetBySlugOrIdVersionsByVersionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Pagination struct {
+				Limit int `json:"limit"`
+				Page  int `json:"page"`
+				Total int `json:"total"`
+			} `json:"pagination"`
+			Rows []struct {
+				Entry map[string]interface{} `json:"entry"`
+				Id    string                 `json:"id"`
+			} `json:"rows"`
+			Version struct {
+				AuthorId    *string                                                                       `json:"authorId"`
+				AuthorKind  *GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionAuthorKind `json:"authorKind"`
+				ChunkCount  int                                                                           `json:"chunkCount"`
+				ColumnTypes []struct {
+					Name string                                                                            `json:"name"`
+					Type GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionColumnTypesType `json:"type"`
+				} `json:"columnTypes"`
+				ContentHash         string                                                                    `json:"contentHash"`
+				CreatedAt           time.Time                                                                 `json:"createdAt"`
+				DatasetId           string                                                                    `json:"datasetId"`
+				Id                  string                                                                    `json:"id"`
+				Name                *string                                                                   `json:"name"`
+				Pinned              bool                                                                      `json:"pinned"`
+				ProjectId           string                                                                    `json:"projectId"`
+				RestoredFromVersion *int                                                                      `json:"restoredFromVersion"`
+				RowCount            int                                                                       `json:"rowCount"`
+				RunCount            int                                                                       `json:"runCount"`
+				SizeBytes           int                                                                       `json:"sizeBytes"`
+				Trigger             GetApiDatasetBySlugOrIdVersionsByVersion200JSONResponseBodyVersionTrigger `json:"trigger"`
+				Version             int                                                                       `json:"version"`
+			} `json:"version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse parses an HTTP response from a PostApiDatasetBySlugOrIdVersionsByVersionRestoreWithResponse call
+func ParsePostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse(rsp *http.Response) (*PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiDatasetBySlugOrIdVersionsByVersionRestoreResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Changed bool `json:"changed"`
+			Version struct {
+				AuthorId    *string                                                                               `json:"authorId"`
+				AuthorKind  *PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionAuthorKind `json:"authorKind"`
+				ChunkCount  int                                                                                   `json:"chunkCount"`
+				ColumnTypes []struct {
+					Name string                                                                                    `json:"name"`
+					Type PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionColumnTypesType `json:"type"`
+				} `json:"columnTypes"`
+				ContentHash         string                                                                            `json:"contentHash"`
+				CreatedAt           time.Time                                                                         `json:"createdAt"`
+				DatasetId           string                                                                            `json:"datasetId"`
+				Id                  string                                                                            `json:"id"`
+				Name                *string                                                                           `json:"name"`
+				Pinned              bool                                                                              `json:"pinned"`
+				ProjectId           string                                                                            `json:"projectId"`
+				RestoredFromVersion *int                                                                              `json:"restoredFromVersion"`
+				RowCount            int                                                                               `json:"rowCount"`
+				RunCount            int                                                                               `json:"runCount"`
+				SizeBytes           int                                                                               `json:"sizeBytes"`
+				Trigger             PostApiDatasetBySlugOrIdVersionsByVersionRestore200JSONResponseBodyVersionTrigger `json:"trigger"`
+				Version             int                                                                               `json:"version"`
+			} `json:"version"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

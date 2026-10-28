@@ -45437,6 +45437,7 @@ By default the run uses the dataset attached to the experiment. You can override
 - `data`: inline rows to evaluate
 - `dataset_id`: a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
 - `row_indices`: a subset of dataset row indices to evaluate, instead of the whole dataset
+- `dataset_version`: the version of the saved dataset to run, for example `1`. It overrides the version the experiment pins. Without either, the run saves the dataset's current content as a version and reads that, so every run records the exact rows it used. A version the dataset does not have answers `404` with `dataset_version_not_found`
 
 
   ### Python
@@ -45448,6 +45449,8 @@ langwatch.experiment.run("my-experiment", data=[{"input": "What is 2 + 2?"}])
 langwatch.experiment.run("my-experiment", dataset_id="dataset_xxxxxxxxxxxx")
 # Constant parameters merged into every row
 langwatch.experiment.run("my-experiment", parameters={"model": "gpt-6-luna"})
+# Version 1 of the experiment's saved dataset
+langwatch.experiment.run("my-experiment", dataset_version=1)
 ```
 
   ### TypeScript
@@ -45459,6 +45462,8 @@ await langwatch.experiments.runWithResults("my-experiment", { data: [{ input: "W
 await langwatch.experiments.runWithResults("my-experiment", { datasetId: "dataset_xxxxxxxxxxxx" });
 // Constant parameters merged into every row
 await langwatch.experiments.runWithResults("my-experiment", { parameters: { model: "gpt-6-luna" } });
+// Version 1 of the experiment's saved dataset
+await langwatch.experiments.runWithResults("my-experiment", { datasetVersion: 1 });
 ```
 
 
@@ -72445,6 +72450,15 @@ openapi: "POST /api/v1/dataset/evaluate"
 
 ---
 
+# FILE: ./api-reference/datasets/get-a-dataset-version.mdx
+
+---
+title: "Get a dataset version"
+openapi: "GET /api/v1/dataset/{slugOrId}/versions/{version}"
+---
+
+---
+
 # FILE: ./api-reference/datasets/get-dataset.mdx
 
 ---
@@ -72481,6 +72495,15 @@ openapi: "POST /api/v1/dataset/{slugOrId}/imports"
 
 ---
 
+# FILE: ./api-reference/datasets/list-dataset-versions.mdx
+
+---
+title: "List dataset versions"
+openapi: "GET /api/v1/dataset/{slugOrId}/versions"
+---
+
+---
+
 # FILE: ./api-reference/datasets/list-dataset.mdx
 
 ---
@@ -72512,6 +72535,24 @@ openapi: "POST /api/v1/dataset/{datasetSlug}/entries"
 
 This endpoint only adds entries. To read them back, call
 [`GET /api/dataset/{slugOrId}/records`](/api-reference/datasets/get-records).
+
+---
+
+# FILE: ./api-reference/datasets/restore-a-dataset-version.mdx
+
+---
+title: "Restore a dataset version"
+openapi: "POST /api/v1/dataset/{slugOrId}/versions/{version}/restore"
+---
+
+---
+
+# FILE: ./api-reference/datasets/save-a-dataset-version.mdx
+
+---
+title: "Save a dataset version"
+openapi: "POST /api/v1/dataset/{slugOrId}/versions"
+---
 
 ---
 

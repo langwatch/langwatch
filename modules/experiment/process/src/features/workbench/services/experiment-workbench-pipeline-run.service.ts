@@ -29,6 +29,7 @@ import type {
   LoadedExecutionData,
 } from "../../../services/experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "../../../services/experiment-result-dispatch.service.ts";
+import { ExperimentRunDatasetVersionService } from "../../../services/experiment-run-dataset-version.service.ts";
 import type { ExperimentService } from "../../../services/experiment.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../../run/services/experiment-run-command-dispatcher.service.ts";
 import type { ExperimentWorkbenchObserver } from "./experiment-workbench-observer.service.ts";
@@ -167,6 +168,7 @@ export class ExperimentWorkbenchPipelineRunService {
     }
 
     await this.runs.commands.startExperimentRun(run.start);
+    await this.#linkDatasetVersion({ run });
     await this.#carryBoard({ run });
     await this.#recordStart({ run });
   }
@@ -185,6 +187,7 @@ export class ExperimentWorkbenchPipelineRunService {
     });
     try {
       await this.runs.commands.startExperimentRun(run.start);
+      await this.#linkDatasetVersion({ run });
       await this.#carryBoard({ run });
       // The page polls the moment a frame names the run; the run API answers for it first.
       await this.#recordStart({ run });
@@ -231,6 +234,18 @@ export class ExperimentWorkbenchPipelineRunService {
       total: run.start.total,
       ...(HandledError.isHandled(error) ? { error: error.serialize() } : {}),
     });
+  }
+
+  /** Records the dataset version the run read; a failed link is logged, never the run's failure. */
+  async #linkDatasetVersion({ run }: { run: PipelineRunStart }): Promise<void> {
+    await ExperimentRunDatasetVersionService.create({ datasets: this.runs.services.datasets }).link(
+      {
+        projectId: run.start.tenantId,
+        runId: run.start.runId,
+        experimentId: run.start.experimentId,
+        datasetVersion: run.data.datasetVersion,
+      },
+    );
   }
 
   async #recordStart({ run }: { run: PipelineRunStart }): Promise<void> {

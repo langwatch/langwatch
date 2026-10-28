@@ -1,6 +1,8 @@
 // Dataset editor respecting I-READY gate; dataset ID from host route (screen decides readiness).
 
-import { datasetClient } from "@langwatch/dataset-client";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { datasetClient, DatasetHistoryDrawerToken } from "@langwatch/dataset-client";
+import { HistoryIcon } from "@langwatch/design-system/history-icon";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Alert, Box, Button, Spinner, Text } from "@langwatch/design-system/primitives";
@@ -26,6 +28,7 @@ export default function DatasetEditorScreen() {
   const [isRetrying, setIsRetrying] = useState(false);
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const retryNormalize = datasetClient.dataset.retryNormalize.useMutation();
+  const { openDrawer } = useDrawer();
 
   const datasetQuery = datasetClient.dataset.getById.useQuery(
     { projectId: project?.id ?? "", datasetId },
@@ -132,15 +135,23 @@ export default function DatasetEditorScreen() {
             floatingSelectionBar
             headerSlot={headerSlot}
             headerActions={
-              host.hasPermission(EXPERIMENT_PERMISSION) ? (
+              <>
                 <PageLayout.HeaderButton
-                  primary
-                  data-testid="run-experiment-from-dataset"
-                  onClick={runExperiment}
+                  data-testid="open-dataset-history"
+                  onClick={() => openDrawer(DatasetHistoryDrawerToken, { datasetId })}
                 >
-                  <FlaskConical size={16} /> Run experiment
+                  <HistoryIcon size={16} /> History
                 </PageLayout.HeaderButton>
-              ) : undefined
+                {host.hasPermission(EXPERIMENT_PERMISSION) && (
+                  <PageLayout.HeaderButton
+                    primary
+                    data-testid="run-experiment-from-dataset"
+                    onClick={runExperiment}
+                  >
+                    <FlaskConical size={16} /> Run experiment
+                  </PageLayout.HeaderButton>
+                )}
+              </>
             }
           />
         ) : (

@@ -47985,6 +47985,946 @@
         }
       }
     },
+    "/api/v1/dataset/{slugOrId}/versions": {
+      "get": {
+        "operationId": "getApiDatasetBySlugOrIdVersions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "datasetId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "version": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "trigger": {
+                            "type": "string",
+                            "enum": [
+                              "autosave",
+                              "manual",
+                              "experiment_run",
+                              "restore",
+                              "initial"
+                            ]
+                          },
+                          "contentHash": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "columnTypes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "string",
+                                    "boolean",
+                                    "number",
+                                    "date",
+                                    "list",
+                                    "json",
+                                    "spans",
+                                    "rag_contexts",
+                                    "chat_messages",
+                                    "annotations",
+                                    "evaluations",
+                                    "image",
+                                    "file"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "rowCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sizeBytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "chunkCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "restoredFromVersion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "authorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "authorKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "api_key",
+                                  "system"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          },
+                          "runCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "authorName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "projectId",
+                          "datasetId",
+                          "version",
+                          "name",
+                          "trigger",
+                          "contentHash",
+                          "columnTypes",
+                          "rowCount",
+                          "sizeBytes",
+                          "chunkCount",
+                          "restoredFromVersion",
+                          "authorId",
+                          "authorKind",
+                          "pinned",
+                          "runCount",
+                          "createdAt",
+                          "authorName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "restorable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "restorable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "List a dataset's versions, newest first. A version is an immutable snapshot of the dataset's columns and rows, saved after edits go quiet, when an experiment run starts, by hand, or by a restore.",
+        "summary": "List dataset versions",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "datasets:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slugOrId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      },
+      "post": {
+        "operationId": "postApiDatasetBySlugOrIdVersions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "datasetId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "trigger": {
+                      "type": "string",
+                      "enum": [
+                        "autosave",
+                        "manual",
+                        "experiment_run",
+                        "restore",
+                        "initial"
+                      ]
+                    },
+                    "contentHash": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "columnTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "boolean",
+                              "number",
+                              "date",
+                              "list",
+                              "json",
+                              "spans",
+                              "rag_contexts",
+                              "chat_messages",
+                              "annotations",
+                              "evaluations",
+                              "image",
+                              "file"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "type"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "rowCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "chunkCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "restoredFromVersion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "authorId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "authorKind": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "api_key",
+                            "system"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "runCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "datasetId",
+                    "version",
+                    "name",
+                    "trigger",
+                    "contentHash",
+                    "columnTypes",
+                    "rowCount",
+                    "sizeBytes",
+                    "chunkCount",
+                    "restoredFromVersion",
+                    "authorId",
+                    "authorKind",
+                    "pinned",
+                    "runCount",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Save the dataset's current content as a version, with an optional name. When the content equals the latest version, no version is created and the latest one is answered (named, when a name is given).",
+        "summary": "Save a dataset version",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "datasets:update"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slugOrId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/dataset/{slugOrId}/versions/{version}": {
+      "get": {
+        "operationId": "getApiDatasetBySlugOrIdVersionsByVersion",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "projectId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "datasetId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "version": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "trigger": {
+                          "type": "string",
+                          "enum": [
+                            "autosave",
+                            "manual",
+                            "experiment_run",
+                            "restore",
+                            "initial"
+                          ]
+                        },
+                        "contentHash": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "columnTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "string",
+                                  "boolean",
+                                  "number",
+                                  "date",
+                                  "list",
+                                  "json",
+                                  "spans",
+                                  "rag_contexts",
+                                  "chat_messages",
+                                  "annotations",
+                                  "evaluations",
+                                  "image",
+                                  "file"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "rowCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sizeBytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "chunkCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "restoredFromVersion": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "authorId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "authorKind": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "api_key",
+                                "system"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        },
+                        "runCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "projectId",
+                        "datasetId",
+                        "version",
+                        "name",
+                        "trigger",
+                        "contentHash",
+                        "columnTypes",
+                        "rowCount",
+                        "sizeBytes",
+                        "chunkCount",
+                        "restoredFromVersion",
+                        "authorId",
+                        "authorKind",
+                        "pinned",
+                        "runCount",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "entry": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "entry"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "page",
+                        "limit",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "rows",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Read one version of a dataset: its metadata and a page of the rows it held. A version the dataset does not have is refused with `dataset_version_not_found`.",
+        "summary": "Get a dataset version",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "datasets:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slugOrId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/dataset/{slugOrId}/versions/{version}/restore": {
+      "post": {
+        "operationId": "postApiDatasetBySlugOrIdVersionsByVersionRestore",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "projectId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "datasetId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "version": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "trigger": {
+                          "type": "string",
+                          "enum": [
+                            "autosave",
+                            "manual",
+                            "experiment_run",
+                            "restore",
+                            "initial"
+                          ]
+                        },
+                        "contentHash": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "columnTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "string",
+                                  "boolean",
+                                  "number",
+                                  "date",
+                                  "list",
+                                  "json",
+                                  "spans",
+                                  "rag_contexts",
+                                  "chat_messages",
+                                  "annotations",
+                                  "evaluations",
+                                  "image",
+                                  "file"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "rowCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sizeBytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "chunkCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "restoredFromVersion": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "authorId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "authorKind": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "api_key",
+                                "system"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        },
+                        "runCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "projectId",
+                        "datasetId",
+                        "version",
+                        "name",
+                        "trigger",
+                        "contentHash",
+                        "columnTypes",
+                        "rowCount",
+                        "sizeBytes",
+                        "chunkCount",
+                        "restoredFromVersion",
+                        "authorId",
+                        "authorKind",
+                        "pinned",
+                        "runCount",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "changed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "changed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Restore a version: the dataset's columns and rows become the version's, and the result is saved as a new version. Earlier versions are never changed.",
+        "summary": "Restore a dataset version",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "datasets:manage"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slugOrId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/v1/evaluations/list": {
       "get": {
         "operationId": "getApiEvaluationsList",
@@ -50044,11 +50984,11 @@
             "content": {}
           },
           "404": {
-            "description": "No such experiment or run in this project",
+            "description": "No such experiment in this project, or its dataset has no version `dataset_version` names (`dataset_version_not_found`)",
             "content": {}
           }
         },
-        "description": "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.",
+        "description": "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes. The run reads a version of its saved dataset: `dataset_version` when given, else the version the experiment pins, else the current content saved as a new version.",
         "summary": "Run an experiment",
         "tags": [
           "Experiments"
@@ -50073,6 +51013,11 @@
                   },
                   "dataset_id": {
                     "type": "string"
+                  },
+                  "dataset_version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
                   },
                   "parameters": {
                     "type": "object",
@@ -53340,7 +54285,7 @@
             }
           },
           "400": {
-            "description": "The workflow has no committed version, or the run could not start",
+            "description": "The workflow has no committed version, the run could not start, or `dataset_version` was sent with no saved dataset to read it from",
             "content": {}
           },
           "403": {
@@ -53348,7 +54293,7 @@
             "content": {}
           },
           "404": {
-            "description": "The project holds no such workflow or dataset",
+            "description": "The project holds no such workflow or dataset, or the dataset has no version `dataset_version` names (`dataset_version_not_found`)",
             "content": {}
           },
           "422": {
@@ -53356,7 +54301,7 @@
             "content": {}
           }
         },
-        "description": "Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. Returns a run id and a results URL to poll or open in the browser.",
+        "description": "Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. A saved dataset is read at `dataset_version` when given, else its current content is saved as a new version. Returns a run id and a results URL to poll or open in the browser.",
         "requestBody": {
           "required": false,
           "content": {
@@ -53382,6 +54327,12 @@
                   "dataset_id": {
                     "description": "Platform dataset id to evaluate; mutually exclusive with data",
                     "type": "string"
+                  },
+                  "dataset_version": {
+                    "description": "Version of the saved dataset to evaluate (dataset_id, else the workflow's attached dataset); defaults to its current content",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
                   },
                   "parameters": {
                     "description": "Constant entry inputs applied to every row, e.g. a feature flag or PR number",

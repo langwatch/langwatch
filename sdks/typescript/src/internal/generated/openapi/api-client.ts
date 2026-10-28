@@ -663,7 +663,7 @@ export interface paths {
         put?: never;
         /**
          * Run an experiment
-         * @description Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.
+         * @description Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes. The run reads a version of its saved dataset: `dataset_version` when given, else the version the experiment pins, else the current content saved as a new version.
          */
         post: operations["postApiExperimentsBySlugRun"];
         delete?: never;
@@ -9255,6 +9255,7 @@ export interface operations {
                         [key: string]: unknown;
                     }[];
                     dataset_id?: string;
+                    dataset_version?: number;
                     parameters?: {
                         [key: string]: string | number | boolean;
                     };
@@ -9296,7 +9297,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description No such experiment or run in this project */
+            /** @description No such experiment in this project, or its dataset has no version `dataset_version` names (`dataset_version_not_found`) */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -12,6 +12,7 @@ import {
 } from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
+import { datasetVersionListItemSchema } from "./dataset-version.ts";
 import {
   appendStoredObjectToDatasetInputSchema,
   createDatasetFromStoredObjectInputSchema,
@@ -304,3 +305,37 @@ export interface DatasetRestRecordsDeletedSchema extends Named<
 > {}
 export const datasetRestRecordsDeletedSchema: DatasetRestRecordsDeletedSchema =
   datasetRestRecordsDeletedSchemaDefinition;
+
+const datasetRestVersionParamsSchemaDefinition = z.object({
+  slugOrId: z.string(),
+  version: z.coerce.number().int().positive(),
+});
+export interface DatasetRestVersionParamsSchema extends Named<
+  typeof datasetRestVersionParamsSchemaDefinition
+> {}
+export const datasetRestVersionParamsSchema: DatasetRestVersionParamsSchema =
+  datasetRestVersionParamsSchemaDefinition;
+
+const datasetRestSaveVersionSchemaDefinition = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+});
+export interface DatasetRestSaveVersionSchema extends Named<
+  typeof datasetRestSaveVersionSchemaDefinition
+> {}
+export const datasetRestSaveVersionSchema: DatasetRestSaveVersionSchema =
+  datasetRestSaveVersionSchemaDefinition;
+
+/** An action that takes no body. */
+const datasetRestNoBodySchemaDefinition = z.object({});
+export interface DatasetRestNoBodySchema extends Named<typeof datasetRestNoBodySchemaDefinition> {}
+export const datasetRestNoBodySchema: DatasetRestNoBodySchema = datasetRestNoBodySchemaDefinition;
+
+const datasetRestVersionListSchemaDefinition = z.object({
+  data: z.array(datasetVersionListItemSchema),
+  restorable: z.boolean(),
+});
+export interface DatasetRestVersionListSchema extends Named<
+  typeof datasetRestVersionListSchemaDefinition
+> {}
+export const datasetRestVersionListSchema: DatasetRestVersionListSchema =
+  datasetRestVersionListSchemaDefinition;

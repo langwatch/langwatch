@@ -533,3 +533,49 @@ export class DatasetInlineFileUnreadableError extends HandledError {
     this.name = "DatasetInlineFileUnreadableError";
   }
 }
+
+/** The dataset has no version with that number in this project, or retention removed it. */
+export class DatasetVersionNotFoundError extends HandledError {
+  declare readonly code: "dataset_version_not_found";
+
+  constructor({ version }: { version?: number } = {}) {
+    super(
+      "dataset_version_not_found",
+      version === undefined ? "Dataset version not found" : `Dataset version ${version} not found`,
+      {
+        httpStatus: 404,
+        fault: "customer",
+        ...(version === undefined ? {} : { meta: { version } }),
+      },
+    );
+    this.name = "DatasetVersionNotFoundError";
+  }
+}
+
+/** A legacy single-file dataset is read-only to a restore; copying it first moves it to chunks. */
+export class DatasetVersionRestoreUnsupportedError extends HandledError {
+  declare readonly code: "dataset_version_restore_unsupported";
+
+  constructor() {
+    super(
+      "dataset_version_restore_unsupported",
+      "This dataset is kept in the legacy single-file layout and cannot be restored in place",
+      { httpStatus: 422, fault: "customer" },
+    );
+    this.name = "DatasetVersionRestoreUnsupportedError";
+  }
+}
+
+/** A version larger than one whole read answers; paging it still works. */
+export class DatasetVersionTooLargeError extends HandledError {
+  declare readonly code: "dataset_version_too_large";
+
+  constructor({ maxBytes, maxRows }: { maxBytes: number; maxRows: number }) {
+    super(
+      "dataset_version_too_large",
+      `This dataset version is larger than one read answers (${maxRows} rows, ${maxBytes} bytes)`,
+      { httpStatus: 413, fault: "customer", meta: { maxBytes, maxRows } },
+    );
+    this.name = "DatasetVersionTooLargeError";
+  }
+}

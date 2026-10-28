@@ -11,7 +11,7 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | dataset, dataset-record                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `DatasetApi` = `moduleApi<DatasetApi>()("dataset")`, `contract/src/dataset.api.ts:186` (41 operations) |
+| Api token      | `DatasetApi` = `moduleApi<DatasetApi>()("dataset")`, `contract/src/dataset.api.ts:239` (51 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |
 
 ## What dataset owns
@@ -26,8 +26,10 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 | Postgres table  | `BatchEvaluation`                                                                                                                        | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
 | Postgres table  | `DatasetRecord`                                                                                                                          | `process/src/repositories/prisma/prisma.dataset-record-content.repository.ts:8` |
 | Postgres table  | `DatasetRecord`                                                                                                                          | `process/src/repositories/prisma/prisma.dataset-record.repository.ts:24`        |
+| Postgres table  | `DatasetVersion`                                                                                                                         | `process/src/repositories/prisma/prisma.dataset-version.repository.ts:29`       |
+| Postgres table  | `DatasetVersionRun`                                                                                                                      | `process/src/repositories/prisma/prisma.dataset-version.repository.ts:29`       |
 | Postgres table  | `Dataset`                                                                                                                                | `process/src/repositories/prisma/prisma.dataset.repository.ts:31`               |
-| Stores required | prisma, objectStorage                                                                                                                    | `process/src/repositories/prisma/prisma.dataset.repositories.ts:29`             |
+| Stores required | prisma, objectStorage                                                                                                                    | `process/src/repositories/prisma/prisma.dataset.repositories.ts:32`             |
 | Config          | `publicBaseUrl` (BASE_HOST), `singleFileStorage.onLocalDisk` (DATASET_STORAGE_LOCAL), `singleFileStorage.localPath` (LOCAL_STORAGE_PATH) | `contract/src/dataset.config.ts:11`                                             |
 
 Anything else dataset needs belongs to another module and is reached through its `*Api`.
@@ -40,6 +42,7 @@ Anything else dataset needs belongs to another module and is reached through its
 | `permissions`   | `AuthzApi`        | [authz](../authz/README.md)                 |
 | `projects`      | `ProjectApi`      | [project](../project/README.md)             |
 | `storedObjects` | `StoredObjectApi` | [stored-object](../stored-object/README.md) |
+| `users`         | `UserApi`         | [user](../user/README.md)                   |
 
 ## Who depends on dataset
 

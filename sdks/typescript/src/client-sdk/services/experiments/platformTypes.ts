@@ -55,6 +55,11 @@ export type RunExperimentOptions = {
    * Callback for progress updates
    */
   onProgress?: (progress: number, total: number) => void;
+  /**
+   * Version of the experiment's saved dataset to run. Overrides the version the
+   * experiment pins; without either, the run saves and reads the current content.
+   */
+  datasetVersion?: number;
 };
 
 /**

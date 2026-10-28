@@ -182,6 +182,7 @@ const executionRequestSchemaDefinition = z
         })
         .optional(),
       datasetId: z.string().optional(),
+      datasetVersion: z.number().int().positive().nullish(),
       columns: z.array(z.object({ id: z.string(), name: z.string(), type: z.string() })),
       savedRecords: z.array(z.object({ id: z.string() }).passthrough()).optional(),
     }),
@@ -249,18 +250,24 @@ const runInputsBodySchemaDefinition = z
   .object({
     data: z.array(z.record(z.string(), z.unknown())).max(EXPERIMENT_INLINE_ROWS_MAX).optional(),
     dataset_id: z.string().optional(),
+    /** The version of the saved dataset to run; overrides the version the experiment pins. */
+    dataset_version: z.number().int().positive().optional(),
     parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
     row_indices: z.array(z.number().int().nonnegative()).optional(),
   })
   .refine((b) => !(b.data && b.dataset_id), {
     message: "Pass either inline data or a dataset_id, not both",
     path: ["data"],
+  })
+  .refine((b) => !(b.data && b.dataset_version !== undefined), {
+    message: "A dataset_version names a saved dataset's version; it cannot go with inline data",
+    path: ["dataset_version"],
   });
 export interface RunInputsBodySchema extends Named<typeof runInputsBodySchemaDefinition> {}
 export const runInputsBodySchema: RunInputsBodySchema = runInputsBodySchemaDefinition;
 export type RunInputsBody = z.infer<typeof runInputsBodySchema>;
 
-// True when a run evaluates the experiment's own saved dataset untouched.
+// True when a run evaluates the experiment's own saved dataset, at any version.
 // Only such runs may write cells back; rows sent in request or different
 // dataset make outputs disagree with workbench rows.
 export const runsSavedDataset = (runInputs?: RunInputsBody): boolean => {

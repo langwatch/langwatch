@@ -66,6 +66,8 @@ describe("the routes each legacy project key scope flag opens", () => {
           "GET dataset /:datasetSlug/entries",
           "GET dataset /:slugOrId",
           "GET dataset /:slugOrId/records",
+          "GET dataset /:slugOrId/versions",
+          "GET dataset /:slugOrId/versions/:version",
           "GET evaluations /:evaluationSlug/versions",
           "GET evaluations /:evaluationSlug/workbench-state",
           "GET evaluations /runs",

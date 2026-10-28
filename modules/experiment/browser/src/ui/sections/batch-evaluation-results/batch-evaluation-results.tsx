@@ -12,6 +12,7 @@ import {
   type RunWithColor,
   useMultiRunData,
 } from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
+import { useRunDatasetVersions } from "../../../behavior/batch-evaluation-results/use-run-dataset-versions.ts";
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
 import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { TraceIdPeek } from "../../../behavior/lent-trace.tsx";
@@ -357,6 +358,7 @@ export function BatchEvaluationResults({
 
   // Comparison mode
   const runIds = useMemo(() => sidebarRuns.map((r) => r.runId), [sidebarRuns]);
+  const datasetVersions = useRunDatasetVersions({ projectId: project?.id, runIds });
 
   // Map runId to human-readable name (commit message or "Run #N")
   // Sort chronologically so fallback "Run #N" numbering is stable
@@ -482,6 +484,7 @@ export function BatchEvaluationResults({
           onToggleRunSelection={toggleRunSelection}
           onEnterCompareWithRuns={enterCompareWithRuns}
           runColors={runColors}
+          datasetVersions={datasetVersions}
         />
       </Box>
 

@@ -84,6 +84,8 @@ type BatchRunsSidebarProps = {
   onEnterCompareWithRuns?: (runId1: string, runId2: string) => void;
   /** Color map for runs in comparison mode (runId -> color) */
   runColors?: Record<string, string>;
+  /** The dataset version each run read (runId -> version number) */
+  datasetVersions?: Record<string, number>;
 };
 
 /**
@@ -188,6 +190,7 @@ type RunItemProps = {
   isHighlighted: boolean;
   isSelectedForComparison: boolean;
   runColors: Record<string, string>;
+  datasetVersion: number | undefined;
   onClick: (event: React.MouseEvent) => void;
   onToggleSelection?: () => void;
 };
@@ -198,6 +201,7 @@ const RunItem = ({
   isHighlighted,
   isSelectedForComparison,
   runColors,
+  datasetVersion,
   onClick,
   onToggleSelection,
 }: RunItemProps) => {
@@ -273,6 +277,11 @@ const RunItem = ({
           {run.timestamps.createdAt ? formatTimeAgo(run.timestamps.createdAt) : "..."}
           {run.timestamps.stoppedAt && " · stopped"}
           {interrupted && " · interrupted"}
+          {datasetVersion !== undefined && (
+            <chakra.span data-testid={`run-dataset-version-${run.runId}`}>
+              {` · Dataset v${datasetVersion}`}
+            </chakra.span>
+          )}
         </Text>
       </chakra.button>
     </HStack>
@@ -292,6 +301,7 @@ export function BatchRunsSidebar({
   onToggleRunSelection,
   onEnterCompareWithRuns,
   runColors = {},
+  datasetVersions = {},
 }: BatchRunsSidebarProps) {
   const canCompare = runs.length >= 2;
 
@@ -395,6 +405,7 @@ export function BatchRunsSidebar({
                 }
                 isSelectedForComparison={isSelectedForComparison}
                 runColors={runColors}
+                datasetVersion={datasetVersions[run.runId]}
                 onClick={(e) => handleRunClick(run.runId, e)}
                 onToggleSelection={
                   compareMode && onToggleRunSelection

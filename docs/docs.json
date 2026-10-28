@@ -1112,12 +1112,16 @@
               "api-reference/datasets/get-entries",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
+              "api-reference/datasets/list-dataset-versions",
+              "api-reference/datasets/get-a-dataset-version",
               "api-reference/datasets/update-dataset",
               "api-reference/datasets/update-records",
               "api-reference/datasets/post-dataset-entries",
               "api-reference/datasets/import-an-uploaded-file-into-a-dataset",
               "api-reference/datasets/action-records",
               "api-reference/datasets/action-upload",
+              "api-reference/datasets/save-a-dataset-version",
+              "api-reference/datasets/restore-a-dataset-version",
               "api-reference/datasets/delete-dataset",
               "api-reference/datasets/delete-records"
             ]

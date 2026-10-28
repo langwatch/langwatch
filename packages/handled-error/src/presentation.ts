@@ -4000,6 +4000,20 @@ const presentations = {
     describe: () =>
       "It was archived, or it belongs to another project. Reload the list and pick one that is still there.",
   },
+  dataset_version_not_found: {
+    title: "That dataset version is gone",
+    describe: () =>
+      "The dataset has no version with that number, or retention removed it. Open the history and pick one that is listed.",
+  },
+  dataset_version_restore_unsupported: {
+    title: "This dataset can't be restored here",
+    describe: () =>
+      "It is kept in the older single-file layout. Copy the dataset to a new one first, then restore there.",
+  },
+  dataset_version_too_large: {
+    title: "That version is too large to read at once",
+    describe: () => "Page through the version's rows instead, or ask for a larger dataset limit.",
+  },
   dataset_chunk_too_large: {
     title: "That value is too large to save",
     describe: () => "Shorten the value in this row, then save again.",

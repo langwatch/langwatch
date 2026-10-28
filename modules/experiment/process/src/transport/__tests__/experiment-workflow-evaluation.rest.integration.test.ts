@@ -172,6 +172,36 @@ describe("POST /api/workflows/:id/evaluate", () => {
       );
     });
 
+    /** @scenario "The workflow evaluate API takes a dataset version" */
+    it("passes dataset_version to the trigger as the dataset version to read", async () => {
+      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
+        async () => started,
+      );
+      const response = await post(buildApi({ triggerEvaluation }), "workflow_1", {
+        dataset_version: 2,
+      });
+
+      expect(response.status).toBe(200);
+      expect(triggerEvaluation).toHaveBeenCalledWith(
+        expect.objectContaining({ datasetVersion: 2 }),
+      );
+    });
+
+    /** @scenario "The workflow evaluate API refuses a dataset version sent with inline data" */
+    it("refuses a dataset_version beside inline data before reaching the trigger", async () => {
+      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
+        async () => started,
+      );
+      const response = await post(buildApi({ triggerEvaluation }), "workflow_1", {
+        data: [{ question: "x" }],
+        dataset_version: 1,
+      });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(triggerEvaluation).not.toHaveBeenCalled();
+    });
+
     /** @scenario The endpoint rejects inline data and a dataset id together */
     it("rejects the request before reaching the trigger", async () => {
       const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(

@@ -47,10 +47,19 @@ import {
   formatDatasetByteLimit,
   storedDatasetAttachmentSchema,
   UploadValidationError,
+  datasetRestSaveVersionSchema,
+  datasetRestVersionListSchema,
+  datasetRestNoBodySchema,
+  datasetRestVersionParamsSchema,
+  datasetVersionPageSchema,
+  datasetVersionRestoredSchema,
+  datasetVersionSchema,
   type DatasetColumns,
   type DatasetRecordPage,
 } from "@langwatch/dataset-contract";
 import { resolveRequestBound } from "@langwatch/plans";
+
+import { datasetAuthorOf } from "../rules/dataset-version-author.rules.ts";
 
 /**
  * The two column refusals an append raises, given their HTTP grain here rather
@@ -215,12 +224,13 @@ export function createDatasetRest(): Readonly<{
       .withStatus(201)
       .withOutput(datasetRestRecordsCreatedSchema)
       .withDocs({ description: "Create records in a dataset in batch" })
-      .handle(async ({ app, input, scope }) => {
+      .handle(async ({ app, input, scope, actor }) => {
         const records = await app
           .batchCreateRecords({
             slugOrId: input.slugOrId,
             projectId: scope.id,
             entries: input.entries,
+            editedBy: datasetAuthorOf({ actor }),
           })
           .catch(rethrowColumnRefusal);
 
@@ -237,12 +247,13 @@ export function createDatasetRest(): Readonly<{
       .withPermission("datasets:update")
       .withOutput(datasetRestEntriesAddedSchema)
       .withDocs({ description: "Add entries to a dataset" })
-      .handle(async ({ app, input, scope }) => {
+      .handle(async ({ app, input, scope, actor }) => {
         await app
           .batchCreateRecords({
             slugOrId: input.datasetSlug,
             projectId: scope.id,
             entries: input.entries,
+            editedBy: datasetAuthorOf({ actor }),
           })
           .catch(rethrowColumnRefusal);
 
@@ -537,12 +548,13 @@ export function createDatasetRest(): Readonly<{
       .withPermission("datasets:update")
       .responds({ 200: datasetRecordSchema, 201: datasetRecordSchema })
       .withDocs({ description: "Update or create a record in a dataset" })
-      .handle(async ({ app, input, scope }) => {
+      .handle(async ({ app, input, scope, actor }) => {
         const { record, created } = await app.upsertRecord({
           slugOrId: input.slugOrId,
           projectId: scope.id,
           recordId: input.recordId,
           updatedRecord: input.entry,
+          editedBy: datasetAuthorOf({ actor }),
         });
 
         return created ? { status: 201, body: record } : { status: 200, body: record };
@@ -562,11 +574,93 @@ export function createDatasetRest(): Readonly<{
       })
       .withOutput(datasetRestRecordsDeletedSchema)
       .withDocs({ description: "Delete records from a dataset by IDs" })
-      .handle(async ({ app, input, scope }) =>
+      .handle(async ({ app, input, scope, actor }) =>
         app.deleteMatchingRecords({
           slugOrId: input.slugOrId,
           projectId: scope.id,
           recordIds: input.recordIds,
+          editedBy: datasetAuthorOf({ actor }),
+        }),
+      )
+
+      // Versions: spec modules/dataset/specs/dataset-versioning.feature.
+      .get("/:slugOrId/versions", "getApiDatasetBySlugOrIdVersions")
+      .withParams(datasetRestSlugOrIdParamsSchema)
+      .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
+      .withOutput(datasetRestVersionListSchema)
+      .withDocs({
+        summary: "List dataset versions",
+        description:
+          "List a dataset's versions, newest first. A version is an immutable snapshot of the dataset's columns and rows, saved after edits go quiet, when an experiment run starts, by hand, or by a restore.",
+      })
+      .handle(async ({ app, input, scope }) => {
+        const history = await app.listVersions({ projectId: scope.id, datasetId: input.slugOrId });
+        return { data: history.versions, restorable: history.restorable };
+      })
+
+      .post("/:slugOrId/versions", "postApiDatasetBySlugOrIdVersions")
+      .keepsRecords()
+      .withAudit("dataset.saveVersion")
+      .withParams(datasetRestSlugOrIdParamsSchema)
+      .withInput(datasetRestSaveVersionSchema)
+      .withPermission("datasets:update")
+      .withOutput(datasetVersionSchema)
+      .withDocs({
+        summary: "Save a dataset version",
+        description:
+          "Save the dataset's current content as a version, with an optional name. When the content equals the latest version, no version is created and the latest one is answered (named, when a name is given).",
+      })
+      .handle(async ({ app, input, scope, actor }) =>
+        app.saveVersion({
+          projectId: scope.id,
+          datasetId: input.slugOrId,
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          editedBy: datasetAuthorOf({ actor }),
+        }),
+      )
+
+      .get("/:slugOrId/versions/:version", "getApiDatasetBySlugOrIdVersionsByVersion")
+      .withParams(datasetRestVersionParamsSchema)
+      .withQuery(datasetRestPaginationQuerySchema)
+      .withPermission("datasets:view", { legacyKey: "legacy_project_key_experiments" })
+      .withOutput(datasetVersionPageSchema)
+      .withDocs({
+        summary: "Get a dataset version",
+        description:
+          "Read one version of a dataset: its metadata and a page of the rows it held. A version the dataset does not have is refused with `dataset_version_not_found`.",
+      })
+      .handle(async ({ app, input, scope }) =>
+        app.getVersionPage({
+          projectId: scope.id,
+          datasetId: input.slugOrId,
+          version: input.version,
+          page: input.page,
+          limit: input.limit,
+        }),
+      )
+
+      .post(
+        "/:slugOrId/versions/:version/restore",
+        "postApiDatasetBySlugOrIdVersionsByVersionRestore",
+      )
+      // The content it replaces is saved as a version first, so nothing is lost.
+      .keepsRecords()
+      .withAudit("dataset.restoreVersion")
+      .withParams(datasetRestVersionParamsSchema)
+      .withInput(datasetRestNoBodySchema)
+      .withPermission("datasets:manage")
+      .withOutput(datasetVersionRestoredSchema)
+      .withDocs({
+        summary: "Restore a dataset version",
+        description:
+          "Restore a version: the dataset's columns and rows become the version's, and the result is saved as a new version. Earlier versions are never changed.",
+      })
+      .handle(async ({ app, input, scope, actor }) =>
+        app.restoreVersion({
+          projectId: scope.id,
+          datasetId: input.slugOrId,
+          version: input.version,
+          editedBy: datasetAuthorOf({ actor }),
         }),
       )
       .build()
