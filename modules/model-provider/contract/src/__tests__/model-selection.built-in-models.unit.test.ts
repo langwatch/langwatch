@@ -118,4 +118,9 @@ describe("isServedOnlyAsBuiltIn", () => {
     expect(isServedOnlyAsBuiltIn("openai/gpt-5-mini")).toBe(false);
     expect(isServedOnlyAsBuiltIn(BUILT_IN.value)).toBe(false);
   });
+
+  it("leaves a custom model the picker offers alone, however its owner named it", () => {
+    expect(isServedOnlyAsBuiltIn("openai/decisions:draft")).toBe(false);
+    expect(isServedOnlyAsBuiltIn("openai/decisions:gpt-6-luna-tuned")).toBe(false);
+  });
 });

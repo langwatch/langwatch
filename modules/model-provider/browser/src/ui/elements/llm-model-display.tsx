@@ -6,6 +6,7 @@ import {
   allModelOptions,
   type BuiltInModel,
   isServedOnlyAsBuiltIn,
+  unavailableModelReason,
 } from "@langwatch/model-provider-contract";
 import { MODEL_ICON_SIZE } from "@langwatch/prompt-contract/llm-config-constants";
 import { AlertTriangle } from "lucide-react";
@@ -50,7 +51,7 @@ function getModelDisplayState({
     modelOption?.icon
   );
 
-  return { iconNode, isProviderMissing, providerKey };
+  return { iconNode, isProviderMissing };
 }
 
 /**
@@ -78,7 +79,7 @@ export function LLMModelDisplay({
   // Invalid = the project cannot run this model: its provider is not enabled here, or it is a
   // decision model the picker no longer offers. Same red strike and AlertTriangle the Default
   // Models table uses, skipped while the providers query is in flight so nothing flashes.
-  const { iconNode, isProviderMissing, providerKey } = getModelDisplayState({
+  const { iconNode, isProviderMissing } = getModelDisplayState({
     model,
     isLoading,
     groupedByProvider,
@@ -130,7 +131,7 @@ export function LLMModelDisplay({
 
   return (
     <Tooltip
-      content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+      content={unavailableModelReason({ model })}
       positioning={{ placement: "top" }}
       showArrow
     >

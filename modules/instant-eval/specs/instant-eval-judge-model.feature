@@ -616,6 +616,27 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When a member looks at that judge
       Then the model is marked as needing an update
 
+    @integration
+    Scenario: A decision model nobody offers tells the member to pick another model
+      Given a project the server releases Instant Evals for
+      And an LLM judge saved on a decision model the server no longer offers
+      When a member reads why the model needs an update
+      Then it tells them the decision model is no longer available to this project
+      And it does not ask them to re-add a provider that is enabled already
+
+    @integration
+    Scenario: A model whose provider is not enabled still asks for the provider
+      Given an LLM judge saved on a model of a provider the project has not stored
+      When a member reads why the model needs an update
+      Then it names that provider and asks for it to be re-added
+
+    @integration
+    Scenario: A judge's model waits for the decision models before it is marked
+      Given a project the server releases Instant Evals for
+      And an LLM judge saved on an own decision model
+      When a member opens its settings before the server answers with the project's models
+      Then no model is shown yet, so none is marked as needing an update
+
     @unit
     Scenario: A judge on an own decision model is answered by Instant Evals
       Given an LLM judge whose model is an own decision model

@@ -1,5 +1,6 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
+import { isOwnDecisionModelId } from "./catalog/decision-models.ts";
 import { allLitellmModels } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
 import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
@@ -25,11 +26,27 @@ export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
 export const BUILT_IN_MODELS_GROUP_KEY = "langwatch-built-in";
 
 /**
- * Whether only a built-in offer can serve this model. A decision model id
- * (`<provider>/decisions:<name>`, see `catalog/decision-models.ts`) carries a provider's prefix,
- * so that provider's group would otherwise vouch for a model the judge can no longer run.
+ * Whether only a built-in offer can serve this model: the catalogue's own-key decision models,
+ * whose ids carry a provider's prefix that would otherwise vouch for a model the judge can no
+ * longer run. A custom model its owner happened to name `decisions:…` is not one of them.
  */
-export const isServedOnlyAsBuiltIn = (model: string): boolean => model.includes("/decisions:");
+export const isServedOnlyAsBuiltIn = (model: string): boolean => isOwnDecisionModelId(model);
+
+const PROVIDER_NOT_ENABLED_REMEDY =
+  "provider isn't enabled here. Re-add the provider or pick a different model to use it.";
+
+const DECISION_MODEL_WITHDRAWN_REMEDY =
+  "This decision model is no longer available to this project. Pick a different model.";
+
+/**
+ * Why the project cannot run the chosen model, with the remedy that works: re-adding a provider
+ * cannot bring back a decision model the catalogue no longer offers, and that provider may well
+ * be enabled already.
+ */
+export const unavailableModelReason = ({ model }: { model: string }): string =>
+  isServedOnlyAsBuiltIn(model)
+    ? DECISION_MODEL_WITHDRAWN_REMEDY
+    : `${model.split("/")[0] ?? ""} ${PROVIDER_NOT_ENABLED_REMEDY}`;
 
 export type GroupedModelOptions = ModelOptionGroup[];
 

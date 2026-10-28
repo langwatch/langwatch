@@ -22,6 +22,7 @@ import {
   isServedOnlyAsBuiltIn,
   modelSelectionFrom,
   type ModelOption,
+  unavailableModelReason,
 } from "@langwatch/model-provider-contract";
 import {
   MODEL_ICON_SIZE,
@@ -189,12 +190,14 @@ function SelectedModelValue({
   isProviderMissing,
   isUnknown,
   label,
+  model,
   providerKey,
   size,
 }: {
   isProviderMissing: boolean;
   isUnknown: boolean;
   label: string;
+  model: string;
   providerKey: string;
   size: SelectorSize;
 }) {
@@ -219,7 +222,7 @@ function SelectedModelValue({
       </Box>
       {isProviderMissing && (
         <Tooltip
-          content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+          content={unavailableModelReason({ model })}
           positioning={{ placement: "top" }}
           showArrow
         >
@@ -400,6 +403,7 @@ export function ModelSelector({
       isProviderMissing={isProviderMissing}
       isUnknown={isUnknown}
       label={selectedItem?.label ?? model}
+      model={model}
       providerKey={providerKey}
       size={size}
     />
@@ -410,8 +414,7 @@ export function ModelSelector({
   useEffect(() => {
     const next = highlightAfterSearch({ current: highlightedValue, items: allFilteredModels });
     if (next.changed) setHighlightedValue(next.value);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelSearch]);
+  }, [modelSearch, highlightedValue, allFilteredModels]);
 
   // Skeleton while the providers query is in flight so the empty
   // state doesn't flash before the data resolves.

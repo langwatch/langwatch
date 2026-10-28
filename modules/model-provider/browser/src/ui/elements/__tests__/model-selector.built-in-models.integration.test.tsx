@@ -4,10 +4,19 @@
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
+}));
+
+// The reason rides on the trigger, so a test reads it without driving a hover jsdom
+// never completes. The same stand-in model-costs-screen's suite uses.
+vi.mock("@langwatch/design-system/tooltip", () => ({
+  Tooltip: ({ children, content }: { children?: ReactNode; content?: string }) => (
+    <span data-tooltip={content}>{children}</span>
+  ),
 }));
 
 // The project's stored providers, per test; empty unless a test enables one.
@@ -45,6 +54,13 @@ function isStruckThrough(label: string): boolean {
   return screen
     .getAllByText(label)
     .some((node) => getComputedStyle(node).textDecoration.includes("line-through"));
+}
+
+/** The reason a member reads by pointing at the refusal mark. */
+function reasonShown(): string {
+  const mark = screen.getByText(/Update needed/i).closest("[data-tooltip]");
+
+  return mark?.getAttribute("data-tooltip") ?? "";
 }
 
 describe("<ModelSelector/>", () => {
@@ -115,8 +131,7 @@ describe("<ModelSelector/>", () => {
   });
 
   describe("given a chosen decision model the picker no longer offers", () => {
-    /** @scenario "A judge holding a decision model nobody offers any more asks for an update" */
-    it("asks for an update even though its provider is stored", () => {
+    const renderUnoffered = () => {
       storedProviders.current = [STORED_OPENAI];
 
       renderWithDesignSystem(
@@ -127,8 +142,39 @@ describe("<ModelSelector/>", () => {
           builtInModels={[BUILT_IN]}
         />,
       );
+    };
+
+    /** @scenario "A judge holding a decision model nobody offers any more asks for an update" */
+    it("asks for an update even though its provider is stored", () => {
+      renderUnoffered();
 
       expect(screen.getByText(/Update needed/i)).toBeInTheDocument();
+    });
+
+    /** @scenario "A decision model nobody offers tells the member to pick another model" */
+    it("asks for another model, never for a provider that is already stored", () => {
+      renderUnoffered();
+
+      expect(reasonShown()).not.toMatch(/re-add the provider/i);
+      expect(reasonShown()).toMatch(/no longer available to this project/i);
+    });
+  });
+
+  describe("given a chosen model whose provider the project has not stored", () => {
+    /** @scenario "A model whose provider is not enabled still asks for the provider" */
+    it("keeps asking for the provider", () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model="anthropic/claude-sonnet-4-6"
+          options={["openai/gpt-5-mini", "anthropic/claude-sonnet-4-6"]}
+          onChange={() => undefined}
+          builtInModels={[BUILT_IN]}
+        />,
+      );
+
+      expect(reasonShown()).toMatch(/anthropic provider isn't enabled here\. Re-add the provider/i);
     });
   });
 });
@@ -171,6 +217,35 @@ describe("<LLMModelDisplay/>", () => {
       );
 
       expect(await screen.findByText(/Update needed/i)).toBeInTheDocument();
+    });
+
+    /** @scenario "A decision model nobody offers tells the member to pick another model" */
+    it("asks for another model, never for a provider that is already stored", async () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <LLMModelDisplay model={OWN_DECISION_BUILT_IN.value} builtInModels={[BUILT_IN]} />,
+      );
+
+      expect(await screen.findByText(/Update needed/i)).toBeInTheDocument();
+
+      expect(reasonShown()).not.toMatch(/re-add the provider/i);
+      expect(reasonShown()).toMatch(/no longer available to this project/i);
+    });
+  });
+
+  describe("given a model whose provider the project has not stored", () => {
+    /** @scenario "A model whose provider is not enabled still asks for the provider" */
+    it("keeps asking for the provider", async () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <LLMModelDisplay model="anthropic/claude-sonnet-4-6" builtInModels={[BUILT_IN]} />,
+      );
+
+      expect(await screen.findByText(/Update needed/i)).toBeInTheDocument();
+
+      expect(reasonShown()).toMatch(/anthropic provider isn't enabled here\. Re-add the provider/i);
     });
   });
 });
