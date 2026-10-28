@@ -1961,8 +1961,8 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   and each child ends its call cleanly, recorded as interrupted; phone jobs requeue. Every worker opens
   a quick tunnel to the door port alone; nonces live in Redis and upgrades carry Twilio's signature
   (Alex, 2026-09-28).
-- The X-Twilio-Signature check on the media upgrade is deferred: the door admits on the nonce alone
-  until it returns (Alex, 2026-09-28).
+- The voice door checks X-Twilio-Signature before it claims the call; a bad signature does not spend
+  the nonce (orchardist, 2026-10-27; tasks#1002).
 - A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
   declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
