@@ -515,7 +515,7 @@ The value type follows the text you type. `true` and `false` are booleans. A val
 Each command uses the values differently:
 
 - `run-plan run`, `test-suite run` and `scenario run` supply the parameters that the scenarios declare. A name that no scenario in the run declares is rejected before anything is scheduled. See [Scenario run parameters](/agent-testing/run-parameters).
-- `experiment run` merges the values into every dataset row. See [Running experiments in CI/CD](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
+- `experiment run` merges the values into every dataset row. It also takes `--concurrency <n>`, from 1 to 24, for how many cells (one row against one target) run at once in this run only. Use `--concurrency 1` to run them one at a time, in order. See [Running experiments in CI/CD](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
 - `workflow run` sends the values as entry inputs. They are merged over `--input`, so a `--param` pair wins when both name the same key.
 
 ### Inspect simulation runs

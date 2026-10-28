@@ -44302,10 +44302,11 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets struct {
 
 // PostApiExperimentsBySlugRunJSONBody defines parameters for PostApiExperimentsBySlugRun.
 type PostApiExperimentsBySlugRunJSONBody struct {
-	Data       *[]map[string]interface{}                                                       `json:"data,omitempty"`
-	DatasetId  *string                                                                         `json:"dataset_id,omitempty"`
-	Parameters *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
-	RowIndices *[]int                                                                          `json:"row_indices,omitempty"`
+	Concurrency *int                                                                            `json:"concurrency,omitempty"`
+	Data        *[]map[string]interface{}                                                       `json:"data,omitempty"`
+	DatasetId   *string                                                                         `json:"dataset_id,omitempty"`
+	Parameters  *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
+	RowIndices  *[]int                                                                          `json:"row_indices,omitempty"`
 }
 
 // PostApiExperimentsBySlugRunJSONBodyParameters0 defines parameters for PostApiExperimentsBySlugRun.
