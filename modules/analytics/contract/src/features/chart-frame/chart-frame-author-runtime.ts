@@ -67,8 +67,8 @@ export function buildAuthorRuntimeScript(): string {
     return ErrorBoundary;
   }
 
-  // Rendered after the widget: React runs a later sibling's effects after the widget's own, so
-  // the widget's first queries are open by the time the shim hears it mounted.
+  // authorMounted is set synchronously in this effect; the heartbeat is a timer, so the
+  // pending-query registration microtask of the widget's first LW.query always wins.
   function AuthorMounted() {
     window.React.useEffect(function () {
       if (typeof window.__lwAuthorMounted === "function") window.__lwAuthorMounted();

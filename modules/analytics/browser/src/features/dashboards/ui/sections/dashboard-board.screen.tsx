@@ -79,12 +79,19 @@ function AddWidgetButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** "Ask Langy to set this up" for the board's empty widgets; absent without Langy. */
-function setupAsk({
-  langy,
-  ...draft
-}: Parameters<typeof boardSetupDraft>[0] & { langy: ReturnType<typeof useLangyAsk> }) {
-  return langy.enabled ? () => langy.ask(boardSetupDraft(draft)) : undefined;
+/** The header's project chip, present only on a board shared across projects. */
+function sharedProjectChip(projects: ReturnType<typeof useBoardProjects>) {
+  if (!projects.isShared) return {};
+  return {
+    project: (
+      <BoardProjectChip
+        current={projects.current}
+        ownerProject={projects.ownerProject}
+        projects={projects.projects}
+        onPick={projects.openIn}
+      />
+    ),
+  };
 }
 
 /** The header's Langy setting; a pick that changes it refreshes every widget (AC200b). */
@@ -146,7 +153,9 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const editor = useBoardEditor({ board: subject, period, widgets });
   const empty = useEmptyWidgets();
   const emptyWidgetNames = empty.emptyNames({ widgets, keyOf: ({ id }) => id });
-  const askLangyToSetUp = setupAsk({ langy, emptyWidgetNames, board: subject, period });
+  const askLangyToSetUp = langy.enabled
+    ? () => langy.ask(boardSetupDraft({ emptyWidgetNames, board: subject, period }))
+    : undefined;
 
   const openPicker = () => {
     if (!picker.isOpen) picker.open();
@@ -183,18 +192,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
             widgetCount: boardWidgets.status === "success" ? widgets.length : void 0,
           }}
           action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
-          {...(projects.isShared
-            ? {
-                project: (
-                  <BoardProjectChip
-                    current={projects.current}
-                    ownerProject={projects.ownerProject}
-                    projects={projects.projects}
-                    onPick={projects.openIn}
-                  />
-                ),
-              }
-            : {})}
+          {...sharedProjectChip(projects)}
           langyControl={
             <BoardLangySetting
               origins={origins}
@@ -259,8 +257,8 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 widgets={widgets}
                 period={period}
                 isWriting={boardWidgets.isWriting}
-                onEmptyChange={({ widget, empty: isEmpty }) =>
-                  empty.report({ key: widget.id, empty: isEmpty })
+                onEmptyChange={({ widget, empty: showsNoData }) =>
+                  empty.report({ key: widget.id, empty: showsNoData })
                 }
                 langyFor={
                   langy.enabled

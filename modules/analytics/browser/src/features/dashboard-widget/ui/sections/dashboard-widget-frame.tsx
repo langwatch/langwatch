@@ -192,11 +192,11 @@ export function DashboardWidgetFrameOverWindow({
 
   // A compile or render error the widget reports is the code's own doing —
   // shown on the card, never restarted.
-  const { diagnostic, onLog } = useFrameDiagnostic({
+  const { diagnostic, fatal, onLog } = useFrameDiagnostic({
     resetKey: definition.code,
   });
-  // Until a query answers the frame has nothing to draw; code that reported an error never will.
-  const loading = hasQueries && diagnostic === null && !frameIdle && awaitsFirstAnswer(records);
+  // Until a query answers the frame has nothing to draw; code that crashed never will.
+  const loading = hasQueries && !fatal && !frameIdle && awaitsFirstAnswer(records);
   const slow = useSlowLoading({ isLoading: loading });
 
   if (!parsed.success) {

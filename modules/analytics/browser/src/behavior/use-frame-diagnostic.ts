@@ -9,6 +9,13 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { ChartFrameLogEntry } from "./frame-bridge.ts";
 
+/**
+ * The frame's own error panel (compile, no export, render crash) reports "lw.error";
+ * a widget's console.error does not.
+ */
+const isFatal = (entry: ChartFrameLogEntry | null) =>
+  entry !== null && entry.level === "error" && entry.source === "lw.error";
+
 export function useFrameDiagnostic({
   /** Whatever identifies the code being run — a change clears the last error. */
   resetKey,
@@ -26,5 +33,5 @@ export function useFrameDiagnostic({
     setDiagnostic(entry);
   }, []);
 
-  return { diagnostic, onLog };
+  return { diagnostic, fatal: isFatal(diagnostic), onLog };
 }

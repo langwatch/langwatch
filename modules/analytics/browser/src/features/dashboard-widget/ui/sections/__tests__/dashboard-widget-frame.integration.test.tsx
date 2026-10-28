@@ -428,6 +428,18 @@ describe("given a widget on a board whose queries are running", () => {
     });
 
     /** @scenario "A widget with nothing to wait for shows no skeleton" */
+    it("keeps the skeleton when the widget only logs a console error while loading", () => {
+      frameRuns(() => new Promise(() => undefined));
+      render(boardWidget({}));
+
+      act(() => {
+        lastFrameProps().onLog({ level: "error", source: "console", text: "noisy but alive" });
+      });
+
+      expect(loadingFace()).not.toBeNull();
+    });
+
+    /** @scenario "A widget with nothing to wait for shows no skeleton" */
     it("drops the skeleton once the frame is up with no query open", () => {
       frameRuns(() => new Promise(() => undefined));
       render(boardWidget({}));
