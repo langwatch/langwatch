@@ -80,4 +80,20 @@ describe("cancelTurn", () => {
       expect(await runtime.dispatcher.listPendingForTurn(turn)).toHaveLength(1);
     });
   });
+
+  describe("given listing the turn's calls fails", () => {
+    /** @scenario Stopping a turn ends what it left open on my machine */
+    it("still ends the waiting card", async () => {
+      const { runtime, ended, question } = await runtimeWithOpenWork();
+      vi.spyOn(runtime.dispatcher, "listPendingForTurn").mockRejectedValueOnce(
+        new Error("redis connection reset"),
+      );
+
+      await expect(runtime.cancelTurn(turn)).rejects.toThrow("redis connection reset");
+
+      expect(ended).toEqual([
+        expect.objectContaining({ waitId: question.waitId, outcome: "cancelled" }),
+      ]);
+    });
+  });
 });

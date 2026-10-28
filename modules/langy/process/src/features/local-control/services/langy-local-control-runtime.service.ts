@@ -144,19 +144,23 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
     conversationId: string;
     turnId: string;
   }): Promise<void> {
-    const calls = await this.dispatcher.listPendingForTurn({ conversationId, turnId });
-    // One call failing to cancel must not leave the others running or the cards open.
-    const settled = await Promise.allSettled(
-      calls.map((call) => this.dispatcher.cancel({ callId: call.callId })),
-    );
-    settled.forEach((result, index) => {
-      if (result.status === "rejected") {
-        logger.warn(
-          { callId: calls[index]?.callId, conversationId, turnId, error: result.reason },
-          "cancelling a local call failed; ending the rest of the turn's work anyway",
-        );
-      }
-    });
-    await this.waits.cancelTurn({ conversationId, turnId });
+    // Nothing about the calls, not even listing them, may leave the turn's cards open.
+    try {
+      const calls = await this.dispatcher.listPendingForTurn({ conversationId, turnId });
+      // One call failing to cancel must not leave the others running.
+      const settled = await Promise.allSettled(
+        calls.map((call) => this.dispatcher.cancel({ callId: call.callId })),
+      );
+      settled.forEach((result, index) => {
+        if (result.status === "rejected") {
+          logger.warn(
+            { callId: calls[index]?.callId, conversationId, turnId, error: result.reason },
+            "cancelling a local call failed; ending the rest of the turn's work anyway",
+          );
+        }
+      });
+    } finally {
+      await this.waits.cancelTurn({ conversationId, turnId });
+    }
   }
 }
