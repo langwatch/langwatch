@@ -12,6 +12,7 @@ import { FakeAuthorizeHost, renderWithAuthorizeHost } from "../../../testing.tsx
 import DocsConnect from "../docs-connect-screen.tsx";
 
 const DOCS = "https://langwatch.ai";
+const APP = "https://app.example.com";
 const STATE = "A".repeat(43);
 
 function hostWith(options: ConstructorParameters<typeof FakeAuthorizeHost>[0] = {}) {
@@ -76,7 +77,7 @@ describe("given an operator impersonating a member", () => {
 
 describe("given the consent page is open", () => {
   /** @scenario "A member who denies access mints nothing" */
-  it("tells the docs the request was denied, at their exact origin, and mints nothing", async () => {
+  it("tells the session frame the request was denied, at the app's own origin, and mints nothing", async () => {
     const host = hostWith();
     renderWithAuthorizeHost(<DocsConnect />, host);
 
@@ -86,13 +87,14 @@ describe("given the consent page is open", () => {
     expect(host.posted).toEqual([
       {
         message: { type: "langwatch:docs-session", version: 1, state: STATE, outcome: "denied" },
-        targetOrigin: DOCS,
+        targetOrigin: APP,
       },
     ]);
     expect(host.closed).toBe(1);
   });
 
-  it("hands the minted key to the docs' exact origin on Allow, then closes", async () => {
+  /** @scenario "The consent page answers only the session frame that opened it" */
+  it("hands the minted key to the session frame at the app's own origin on Allow, then closes", async () => {
     const host = hostWith();
     renderWithAuthorizeHost(<DocsConnect />, host);
     expect(screen.getByText(/anything you can do in this project/)).toBeInTheDocument();
@@ -114,7 +116,7 @@ describe("given the consent page is open", () => {
           expiresIn: 300,
           project: { id: "proj-1", name: "Checkout" },
         },
-        targetOrigin: DOCS,
+        targetOrigin: APP,
       },
     ]);
   });

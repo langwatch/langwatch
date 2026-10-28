@@ -1,7 +1,8 @@
 /**
  * `/connect/docs`: the docs playground's consent popup (ADR-185). A member lets one registered
- * docs site act as them in one project for five minutes; the key goes only to the exact
- * origin that opened the popup, through `postMessage`, and the popup closes.
+ * docs site act as them in one project for five minutes. The key goes through `postMessage`
+ * only to the session frame that opened the popup, at this app's own origin, never to the docs
+ * page; then the popup closes.
  */
 
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
@@ -75,7 +76,7 @@ export default function DocsConnect() {
       const minted = await host.mintDocsSessionKey({ projectId, docsOrigin: request.origin });
       opener.post({
         message: grantedMessage({ state: request.state, minted }),
-        targetOrigin: request.origin,
+        targetOrigin: host.appOrigin(),
       });
       host.closeWindow();
     } catch (error) {
@@ -85,7 +86,7 @@ export default function DocsConnect() {
   };
 
   const handleDeny = () => {
-    opener.post({ message: deniedMessage({ state: request.state }), targetOrigin: request.origin });
+    opener.post({ message: deniedMessage({ state: request.state }), targetOrigin: host.appOrigin() });
     host.closeWindow();
   };
 

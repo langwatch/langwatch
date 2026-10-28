@@ -136,3 +136,43 @@ stored.
 - **A trace-reading preset only:** the playground covers the whole API, and a member's
   own grants already bound what the key can do.
 - **A full-page redirect carrying the token:** tokens must never enter a URL.
+
+## Amendment, 2026-10-28: the key stays on the app's origin
+
+### Context
+
+The docs carry analytics on purpose: Google Tag Manager and PostHog run on
+`https://langwatch.ai`, the marketing site and the docs alike. Whoever can publish a tag or
+change the PostHog project can run code on that origin, and code on the docs' origin reads
+whatever the docs page holds. A key posted to the docs page therefore belongs to every tag
+vendor too. No handoff fixes that, a device code included: the page that polls for the token
+holds it. What fixes it is that the token never enters the docs page.
+
+### Decision
+
+- **A frame on the app's origin holds the key.** The playground embeds
+  `/connect/docs/frame?origin=<docs origin>`, a small document the API host serves on the
+  app's origin. Its policy allows only its own nonce'd script, requests to its own origin and
+  framing by the one docs origin its `origin` names, which must be registered. An unregistered
+  origin gets a refusal page that nothing may frame. The frame runs no analytics.
+- **The connect button is inside the frame.** The frame opens the consent popup; the popup
+  posts its answer to the frame at the app's own origin, with the same message, state and
+  checks as before. A script on the docs page cannot press the button or receive the answer.
+- **The frame sends the requests.** The docs page asks the frame to send a request to a path
+  under `/api`, and the frame adds `X-Auth-Token` and answers with the response. It accepts a
+  request only from its parent at the docs origin. A request that is not a `GET` waits for the
+  reader to press Send inside the frame, which names the method, the path and the project.
+- **What stays.** The mint, the five-minute life, the consent page, revocation on sign-out and
+  `DELETE /api/docs-session` are unchanged; the frame calls them on its own origin. Expiry, a
+  401, Disconnect and the frame unloading still clear the key. REST keeps its CORS allowance
+  for registered docs origins, because a pasted key is still sent from the docs page.
+
+### Consequences
+
+- A tag or any other script on the docs' origin can no longer read or copy a docs session key.
+- While the frame is connected, such a script can still ask it for reads and see the answers
+  the page shows. It cannot change anything without the reader pressing Send in the frame.
+  A script that also restyles the frame could trick that press; the frame ignores a press that
+  comes too soon after the confirmation appears, and does not otherwise defend against it.
+- Supersedes steps 4 to 6 of the Flow, and the XSS consequence above for the docs' origin. An
+  XSS on the app's origin still takes the key.

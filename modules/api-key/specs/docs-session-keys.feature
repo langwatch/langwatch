@@ -36,6 +36,12 @@ Feature: Docs session keys for the documentation playground
     And no key is minted
 
   @integration
+  Scenario: The consent page answers only the session frame that opened it
+    Given the consent page was opened from the session frame on the app's origin
+    When the member allows or denies access
+    Then the answer is posted to the opener at the app's own origin, never at the docs origin
+
+  @integration
   Scenario: A member who denies access mints nothing
     Given the consent page is open
     When the member denies access

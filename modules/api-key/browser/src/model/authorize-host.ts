@@ -54,7 +54,10 @@ export type AuthorizeSuccessNotice = {
   readonly description?: string;
 };
 
-/** The docs window that opened the consent popup; it hears only at the origin named. */
+/**
+ * The window that opened the consent popup: the docs session frame on this app's own origin
+ * (ADR-185, amendment of 2026-10-28). It hears only at the origin named.
+ */
 export type DocsOpener = {
   readonly post: (input: { message: DocsSessionMessage; targetOrigin: string }) => void;
 };
@@ -107,6 +110,9 @@ export abstract class AuthorizeHostApi {
 
   /** The window that opened this one, or null when the page was not opened as a popup. */
   abstract docsOpener(): DocsOpener | null;
+
+  /** This app's own origin, the only one the consent answer is posted to. */
+  abstract appOrigin(): string;
 
   /** Mints the five-minute docs session key for the chosen project; on Allow only. */
   abstract mintDocsSessionKey(input: {

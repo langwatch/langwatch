@@ -13,6 +13,7 @@ import {
 import {
   type ApiDoor,
   BrowserBundle,
+  EmbeddedDocument,
   FramedDocument,
   type HttpFailureAnswer,
   HttpMux,
@@ -225,6 +226,11 @@ class ApiSurface {
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
     for (const document of selected.documents)
       mux.route(document.path, FramedDocument.create(document));
+    for (const selection of selected.embedded)
+      mux.route(
+        selection.path,
+        EmbeddedDocument.create({ selection, embedders: composition.docsOrigins }),
+      );
     const listener = composition.doors.ahead(mux.route("/", page).handler);
     // A raw door (hosted MCP) answers ahead of the mux, so it reads the same resolved address.
     return (request, response) => {

@@ -239,6 +239,10 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
     return this.options.impersonated ?? false;
   }
 
+  appOrigin(): string {
+    return "https://app.example.com";
+  }
+
   docsOpener(): DocsOpener | null {
     if (this.options.hasOpener === false) return null;
 

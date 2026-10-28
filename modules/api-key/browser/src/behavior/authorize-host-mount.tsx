@@ -126,6 +126,10 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
     return { post: ({ message, targetOrigin }) => opener.postMessage(message, targetOrigin) };
   }
 
+  appOrigin(): string {
+    return typeof window === "undefined" ? "" : window.location.origin;
+  }
+
   mintDocsSessionKey(input: { projectId: string; docsOrigin: string }) {
     return this.deps.mintDocsSessionKey(input);
   }
