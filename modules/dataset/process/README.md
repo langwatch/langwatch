@@ -1107,16 +1107,16 @@ Declared at `src/eventing/dataset-normalization.pipeline.ts:33`. Events: `datase
 
 ### Pipeline `dataset_versions` (aggregate `dataset_history`)
 
-Declared at `src/eventing/dataset-versions.pipeline.ts:80`. Events: `datasetContentEditedEventSchema`, `datasetVersionSavedEventSchema`, `datasetVersionRestoredEventSchema`.
+Declared at `src/eventing/dataset-versions.pipeline.ts:90`. Events: `datasetContentEditedEventSchema`, `datasetVersionSavedEventSchema`, `datasetVersionRestoredEventSchema`.
 
 | Kind            | Name                           | Handles                                                                                            | Declared at                                     |
 | --------------- | ------------------------------ | -------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| command         | `recordDatasetContentEdit`     | –                                                                                                  | `src/eventing/dataset-versions.pipeline.ts:89`  |
-| command         | `recordDatasetVersionSaved`    | –                                                                                                  | `src/eventing/dataset-versions.pipeline.ts:90`  |
-| command         | `recordDatasetVersionRestored` | –                                                                                                  | `src/eventing/dataset-versions.pipeline.ts:91`  |
-| process manager | `datasetAutosave`              | intents `snapshot` (outbox)                                                                        | `src/eventing/dataset-versions.pipeline.ts:92`  |
-| process manager | `datasetVersionRetention`      | every 6 h (`DATASET_VERSION_RETENTION_INTERVAL_MS = 6 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/dataset-versions.pipeline.ts:102` |
-| peer subscriber | `datasetVersionUserErased`     | `lw.identity.user_erased` from [identity](../../identity/README.md)                                | `src/eventing/dataset-versions.pipeline.ts:112` |
+| command         | `recordDatasetContentEdit`     | –                                                                                                  | `src/eventing/dataset-versions.pipeline.ts:99`  |
+| command         | `recordDatasetVersionSaved`    | –                                                                                                  | `src/eventing/dataset-versions.pipeline.ts:100` |
+| command         | `recordDatasetVersionRestored` | –                                                                                                  | `src/eventing/dataset-versions.pipeline.ts:101` |
+| process manager | `datasetAutosave`              | intents `snapshot` (outbox)                                                                        | `src/eventing/dataset-versions.pipeline.ts:102` |
+| process manager | `datasetVersionRetention`      | every 6 h (`DATASET_VERSION_RETENTION_INTERVAL_MS = 6 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/dataset-versions.pipeline.ts:112` |
+| peer subscriber | `datasetVersionUserErased`     | `lw.identity.user_erased` from [identity](../../identity/README.md)                                | `src/eventing/dataset-versions.pipeline.ts:122` |
 
 ## Configuration
 
