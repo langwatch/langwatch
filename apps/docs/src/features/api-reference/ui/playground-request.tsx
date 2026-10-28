@@ -19,10 +19,10 @@ import { docsAppOrigin } from "../../../config.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { paramKey } from "../model/codegen.ts";
 import { sessionCovers } from "../model/docs-session.ts";
+import { JsonCode } from "../model/json-code.tsx";
 import type { Operation, Parameter, Scheme } from "../model/operation.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { Panel } from "./panel.tsx";
-import { JsonCode } from "../model/json-code.tsx";
 
 function ParamInput({
   param,

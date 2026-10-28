@@ -1,5 +1,5 @@
-import type { Outcome } from "../model/playground-outcome.ts";
 import { JsonCode } from "../model/json-code.tsx";
+import type { Outcome } from "../model/playground-outcome.ts";
 
 export function ResponseView({
   outcome,
