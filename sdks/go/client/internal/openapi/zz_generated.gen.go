@@ -43150,8 +43150,9 @@ type GetApiDashboardsByDashboardId500JSONResponseBodyFault string
 
 // PatchApiDashboardsByDashboardIdJSONBody defines parameters for PatchApiDashboardsByDashboardId.
 type PatchApiDashboardsByDashboardIdJSONBody struct {
-	Description *string `json:"description,omitempty"`
-	Name        *string `json:"name,omitempty"`
+	Description     *string   `json:"description,omitempty"`
+	ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+	Name            *string   `json:"name,omitempty"`
 }
 
 // PatchApiDashboardsByDashboardId200JSONResponseBodyScope defines parameters for PatchApiDashboardsByDashboardId.
@@ -44319,10 +44320,11 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets struct {
 
 // PostApiExperimentsBySlugRunJSONBody defines parameters for PostApiExperimentsBySlugRun.
 type PostApiExperimentsBySlugRunJSONBody struct {
-	Data       *[]map[string]interface{}                                                       `json:"data,omitempty"`
-	DatasetId  *string                                                                         `json:"dataset_id,omitempty"`
-	Parameters *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
-	RowIndices *[]int                                                                          `json:"row_indices,omitempty"`
+	Concurrency *int                                                                            `json:"concurrency,omitempty"`
+	Data        *[]map[string]interface{}                                                       `json:"data,omitempty"`
+	DatasetId   *string                                                                         `json:"dataset_id,omitempty"`
+	Parameters  *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
+	RowIndices  *[]int                                                                          `json:"row_indices,omitempty"`
 }
 
 // PostApiExperimentsBySlugRunJSONBodyParameters0 defines parameters for PostApiExperimentsBySlugRun.
@@ -153524,15 +153526,16 @@ type GetApiDashboardsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Data []struct {
-			CreatedAt   string                                       `json:"createdAt"`
-			CreatedById *string                                      `json:"createdById"`
-			Description *string                                      `json:"description"`
-			Id          string                                       `json:"id"`
-			Name        string                                       `json:"name"`
-			PlatformUrl string                                       `json:"platformUrl"`
-			Scope       GetApiDashboards200JSONResponseBodyDataScope `json:"scope"`
-			UpdatedAt   string                                       `json:"updatedAt"`
-			WidgetCount int                                          `json:"widgetCount"`
+			CreatedAt       string                                       `json:"createdAt"`
+			CreatedById     *string                                      `json:"createdById"`
+			Description     *string                                      `json:"description"`
+			ExcludedOrigins *[]string                                    `json:"excludedOrigins"`
+			Id              string                                       `json:"id"`
+			Name            string                                       `json:"name"`
+			PlatformUrl     string                                       `json:"platformUrl"`
+			Scope           GetApiDashboards200JSONResponseBodyDataScope `json:"scope"`
+			UpdatedAt       string                                       `json:"updatedAt"`
+			WidgetCount     int                                          `json:"widgetCount"`
 		} `json:"data"`
 	}
 	JSON400 *struct {
@@ -153641,14 +153644,15 @@ type PostApiDashboardsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
-		CreatedAt   string                                    `json:"createdAt"`
-		CreatedById *string                                   `json:"createdById"`
-		Description *string                                   `json:"description"`
-		Id          string                                    `json:"id"`
-		Name        string                                    `json:"name"`
-		PlatformUrl string                                    `json:"platformUrl"`
-		Scope       PostApiDashboards201JSONResponseBodyScope `json:"scope"`
-		UpdatedAt   string                                    `json:"updatedAt"`
+		CreatedAt       string                                    `json:"createdAt"`
+		CreatedById     *string                                   `json:"createdById"`
+		Description     *string                                   `json:"description"`
+		ExcludedOrigins *[]string                                 `json:"excludedOrigins"`
+		Id              string                                    `json:"id"`
+		Name            string                                    `json:"name"`
+		PlatformUrl     string                                    `json:"platformUrl"`
+		Scope           PostApiDashboards201JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                    `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Code      string                                     `json:"code"`
@@ -153884,14 +153888,15 @@ type GetApiDashboardsByDashboardIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		CreatedAt   string                                                `json:"createdAt"`
-		CreatedById *string                                               `json:"createdById"`
-		Description *string                                               `json:"description"`
-		Id          string                                                `json:"id"`
-		Name        string                                                `json:"name"`
-		PlatformUrl string                                                `json:"platformUrl"`
-		Scope       GetApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
-		UpdatedAt   string                                                `json:"updatedAt"`
+		CreatedAt       string                                                `json:"createdAt"`
+		CreatedById     *string                                               `json:"createdById"`
+		Description     *string                                               `json:"description"`
+		ExcludedOrigins *[]string                                             `json:"excludedOrigins"`
+		Id              string                                                `json:"id"`
+		Name            string                                                `json:"name"`
+		PlatformUrl     string                                                `json:"platformUrl"`
+		Scope           GetApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                                `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Code      string                                                 `json:"code"`
@@ -154018,14 +154023,15 @@ type PatchApiDashboardsByDashboardIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		CreatedAt   string                                                  `json:"createdAt"`
-		CreatedById *string                                                 `json:"createdById"`
-		Description *string                                                 `json:"description"`
-		Id          string                                                  `json:"id"`
-		Name        string                                                  `json:"name"`
-		PlatformUrl string                                                  `json:"platformUrl"`
-		Scope       PatchApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
-		UpdatedAt   string                                                  `json:"updatedAt"`
+		CreatedAt       string                                                  `json:"createdAt"`
+		CreatedById     *string                                                 `json:"createdById"`
+		Description     *string                                                 `json:"description"`
+		ExcludedOrigins *[]string                                               `json:"excludedOrigins"`
+		Id              string                                                  `json:"id"`
+		Name            string                                                  `json:"name"`
+		PlatformUrl     string                                                  `json:"platformUrl"`
+		Scope           PatchApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                                  `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Code      string                                                   `json:"code"`
@@ -161424,15 +161430,16 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Data []struct {
-			CreatedAt   string                                                                 `json:"createdAt"`
-			CreatedById *string                                                                `json:"createdById"`
-			Description *string                                                                `json:"description"`
-			Id          string                                                                 `json:"id"`
-			Name        string                                                                 `json:"name"`
-			PlatformUrl string                                                                 `json:"platformUrl"`
-			Scope       GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope `json:"scope"`
-			UpdatedAt   string                                                                 `json:"updatedAt"`
-			WidgetCount int                                                                    `json:"widgetCount"`
+			CreatedAt       string                                                                 `json:"createdAt"`
+			CreatedById     *string                                                                `json:"createdById"`
+			Description     *string                                                                `json:"description"`
+			ExcludedOrigins *[]string                                                              `json:"excludedOrigins"`
+			Id              string                                                                 `json:"id"`
+			Name            string                                                                 `json:"name"`
+			PlatformUrl     string                                                                 `json:"platformUrl"`
+			Scope           GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope `json:"scope"`
+			UpdatedAt       string                                                                 `json:"updatedAt"`
+			WidgetCount     int                                                                    `json:"widgetCount"`
 		} `json:"data"`
 	}
 	JSON400 *struct {
@@ -161541,14 +161548,15 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		CreatedAt   string                                                                          `json:"createdAt"`
-		CreatedById *string                                                                         `json:"createdById"`
-		Description *string                                                                         `json:"description"`
-		Id          string                                                                          `json:"id"`
-		Name        string                                                                          `json:"name"`
-		PlatformUrl string                                                                          `json:"platformUrl"`
-		Scope       GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope `json:"scope"`
-		UpdatedAt   string                                                                          `json:"updatedAt"`
+		CreatedAt       string                                                                          `json:"createdAt"`
+		CreatedById     *string                                                                         `json:"createdById"`
+		Description     *string                                                                         `json:"description"`
+		ExcludedOrigins *[]string                                                                       `json:"excludedOrigins"`
+		Id              string                                                                          `json:"id"`
+		Name            string                                                                          `json:"name"`
+		PlatformUrl     string                                                                          `json:"platformUrl"`
+		Scope           GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                                                          `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Code      string                                                                           `json:"code"`
@@ -163449,15 +163457,16 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Data []struct {
-			CreatedAt   string                                                                     `json:"createdAt"`
-			CreatedById *string                                                                    `json:"createdById"`
-			Description *string                                                                    `json:"description"`
-			Id          string                                                                     `json:"id"`
-			Name        string                                                                     `json:"name"`
-			PlatformUrl string                                                                     `json:"platformUrl"`
-			Scope       GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope `json:"scope"`
-			UpdatedAt   string                                                                     `json:"updatedAt"`
-			WidgetCount int                                                                        `json:"widgetCount"`
+			CreatedAt       string                                                                     `json:"createdAt"`
+			CreatedById     *string                                                                    `json:"createdById"`
+			Description     *string                                                                    `json:"description"`
+			ExcludedOrigins *[]string                                                                  `json:"excludedOrigins"`
+			Id              string                                                                     `json:"id"`
+			Name            string                                                                     `json:"name"`
+			PlatformUrl     string                                                                     `json:"platformUrl"`
+			Scope           GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope `json:"scope"`
+			UpdatedAt       string                                                                     `json:"updatedAt"`
+			WidgetCount     int                                                                        `json:"widgetCount"`
 		} `json:"data"`
 	}
 	JSON400 *struct {
@@ -163566,14 +163575,15 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse struct 
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		CreatedAt   string                                                                              `json:"createdAt"`
-		CreatedById *string                                                                             `json:"createdById"`
-		Description *string                                                                             `json:"description"`
-		Id          string                                                                              `json:"id"`
-		Name        string                                                                              `json:"name"`
-		PlatformUrl string                                                                              `json:"platformUrl"`
-		Scope       GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
-		UpdatedAt   string                                                                              `json:"updatedAt"`
+		CreatedAt       string                                                                              `json:"createdAt"`
+		CreatedById     *string                                                                             `json:"createdById"`
+		Description     *string                                                                             `json:"description"`
+		ExcludedOrigins *[]string                                                                           `json:"excludedOrigins"`
+		Id              string                                                                              `json:"id"`
+		Name            string                                                                              `json:"name"`
+		PlatformUrl     string                                                                              `json:"platformUrl"`
+		Scope           GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                                                              `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Code      string                                                                               `json:"code"`
@@ -185716,15 +185726,16 @@ func ParseGetApiDashboardsResponse(rsp *http.Response) (*GetApiDashboardsRespons
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			Data []struct {
-				CreatedAt   string                                       `json:"createdAt"`
-				CreatedById *string                                      `json:"createdById"`
-				Description *string                                      `json:"description"`
-				Id          string                                       `json:"id"`
-				Name        string                                       `json:"name"`
-				PlatformUrl string                                       `json:"platformUrl"`
-				Scope       GetApiDashboards200JSONResponseBodyDataScope `json:"scope"`
-				UpdatedAt   string                                       `json:"updatedAt"`
-				WidgetCount int                                          `json:"widgetCount"`
+				CreatedAt       string                                       `json:"createdAt"`
+				CreatedById     *string                                      `json:"createdById"`
+				Description     *string                                      `json:"description"`
+				ExcludedOrigins *[]string                                    `json:"excludedOrigins"`
+				Id              string                                       `json:"id"`
+				Name            string                                       `json:"name"`
+				PlatformUrl     string                                       `json:"platformUrl"`
+				Scope           GetApiDashboards200JSONResponseBodyDataScope `json:"scope"`
+				UpdatedAt       string                                       `json:"updatedAt"`
+				WidgetCount     int                                          `json:"widgetCount"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -185853,14 +185864,15 @@ func ParsePostApiDashboardsResponse(rsp *http.Response) (*PostApiDashboardsRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
-			CreatedAt   string                                    `json:"createdAt"`
-			CreatedById *string                                   `json:"createdById"`
-			Description *string                                   `json:"description"`
-			Id          string                                    `json:"id"`
-			Name        string                                    `json:"name"`
-			PlatformUrl string                                    `json:"platformUrl"`
-			Scope       PostApiDashboards201JSONResponseBodyScope `json:"scope"`
-			UpdatedAt   string                                    `json:"updatedAt"`
+			CreatedAt       string                                    `json:"createdAt"`
+			CreatedById     *string                                   `json:"createdById"`
+			Description     *string                                   `json:"description"`
+			ExcludedOrigins *[]string                                 `json:"excludedOrigins"`
+			Id              string                                    `json:"id"`
+			Name            string                                    `json:"name"`
+			PlatformUrl     string                                    `json:"platformUrl"`
+			Scope           PostApiDashboards201JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                    `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -186142,14 +186154,15 @@ func ParseGetApiDashboardsByDashboardIdResponse(rsp *http.Response) (*GetApiDash
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			CreatedAt   string                                                `json:"createdAt"`
-			CreatedById *string                                               `json:"createdById"`
-			Description *string                                               `json:"description"`
-			Id          string                                                `json:"id"`
-			Name        string                                                `json:"name"`
-			PlatformUrl string                                                `json:"platformUrl"`
-			Scope       GetApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
-			UpdatedAt   string                                                `json:"updatedAt"`
+			CreatedAt       string                                                `json:"createdAt"`
+			CreatedById     *string                                               `json:"createdById"`
+			Description     *string                                               `json:"description"`
+			ExcludedOrigins *[]string                                             `json:"excludedOrigins"`
+			Id              string                                                `json:"id"`
+			Name            string                                                `json:"name"`
+			PlatformUrl     string                                                `json:"platformUrl"`
+			Scope           GetApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                                `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -186302,14 +186315,15 @@ func ParsePatchApiDashboardsByDashboardIdResponse(rsp *http.Response) (*PatchApi
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			CreatedAt   string                                                  `json:"createdAt"`
-			CreatedById *string                                                 `json:"createdById"`
-			Description *string                                                 `json:"description"`
-			Id          string                                                  `json:"id"`
-			Name        string                                                  `json:"name"`
-			PlatformUrl string                                                  `json:"platformUrl"`
-			Scope       PatchApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
-			UpdatedAt   string                                                  `json:"updatedAt"`
+			CreatedAt       string                                                  `json:"createdAt"`
+			CreatedById     *string                                                 `json:"createdById"`
+			Description     *string                                                 `json:"description"`
+			ExcludedOrigins *[]string                                               `json:"excludedOrigins"`
+			Id              string                                                  `json:"id"`
+			Name            string                                                  `json:"name"`
+			PlatformUrl     string                                                  `json:"platformUrl"`
+			Scope           PatchApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                                  `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -193820,15 +193834,16 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp *http.Response)
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			Data []struct {
-				CreatedAt   string                                                                 `json:"createdAt"`
-				CreatedById *string                                                                `json:"createdById"`
-				Description *string                                                                `json:"description"`
-				Id          string                                                                 `json:"id"`
-				Name        string                                                                 `json:"name"`
-				PlatformUrl string                                                                 `json:"platformUrl"`
-				Scope       GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope `json:"scope"`
-				UpdatedAt   string                                                                 `json:"updatedAt"`
-				WidgetCount int                                                                    `json:"widgetCount"`
+				CreatedAt       string                                                                 `json:"createdAt"`
+				CreatedById     *string                                                                `json:"createdById"`
+				Description     *string                                                                `json:"description"`
+				ExcludedOrigins *[]string                                                              `json:"excludedOrigins"`
+				Id              string                                                                 `json:"id"`
+				Name            string                                                                 `json:"name"`
+				PlatformUrl     string                                                                 `json:"platformUrl"`
+				Scope           GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope `json:"scope"`
+				UpdatedAt       string                                                                 `json:"updatedAt"`
+				WidgetCount     int                                                                    `json:"widgetCount"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -193957,14 +193972,15 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse(rsp *h
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			CreatedAt   string                                                                          `json:"createdAt"`
-			CreatedById *string                                                                         `json:"createdById"`
-			Description *string                                                                         `json:"description"`
-			Id          string                                                                          `json:"id"`
-			Name        string                                                                          `json:"name"`
-			PlatformUrl string                                                                          `json:"platformUrl"`
-			Scope       GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope `json:"scope"`
-			UpdatedAt   string                                                                          `json:"updatedAt"`
+			CreatedAt       string                                                                          `json:"createdAt"`
+			CreatedById     *string                                                                         `json:"createdById"`
+			Description     *string                                                                         `json:"description"`
+			ExcludedOrigins *[]string                                                                       `json:"excludedOrigins"`
+			Id              string                                                                          `json:"id"`
+			Name            string                                                                          `json:"name"`
+			PlatformUrl     string                                                                          `json:"platformUrl"`
+			Scope           GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                                                          `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -196205,15 +196221,16 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse(rsp *http.Respo
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			Data []struct {
-				CreatedAt   string                                                                     `json:"createdAt"`
-				CreatedById *string                                                                    `json:"createdById"`
-				Description *string                                                                    `json:"description"`
-				Id          string                                                                     `json:"id"`
-				Name        string                                                                     `json:"name"`
-				PlatformUrl string                                                                     `json:"platformUrl"`
-				Scope       GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope `json:"scope"`
-				UpdatedAt   string                                                                     `json:"updatedAt"`
-				WidgetCount int                                                                        `json:"widgetCount"`
+				CreatedAt       string                                                                     `json:"createdAt"`
+				CreatedById     *string                                                                    `json:"createdById"`
+				Description     *string                                                                    `json:"description"`
+				ExcludedOrigins *[]string                                                                  `json:"excludedOrigins"`
+				Id              string                                                                     `json:"id"`
+				Name            string                                                                     `json:"name"`
+				PlatformUrl     string                                                                     `json:"platformUrl"`
+				Scope           GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope `json:"scope"`
+				UpdatedAt       string                                                                     `json:"updatedAt"`
+				WidgetCount     int                                                                        `json:"widgetCount"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -196342,14 +196359,15 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse(rs
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			CreatedAt   string                                                                              `json:"createdAt"`
-			CreatedById *string                                                                             `json:"createdById"`
-			Description *string                                                                             `json:"description"`
-			Id          string                                                                              `json:"id"`
-			Name        string                                                                              `json:"name"`
-			PlatformUrl string                                                                              `json:"platformUrl"`
-			Scope       GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
-			UpdatedAt   string                                                                              `json:"updatedAt"`
+			CreatedAt       string                                                                              `json:"createdAt"`
+			CreatedById     *string                                                                             `json:"createdById"`
+			Description     *string                                                                             `json:"description"`
+			ExcludedOrigins *[]string                                                                           `json:"excludedOrigins"`
+			Id              string                                                                              `json:"id"`
+			Name            string                                                                              `json:"name"`
+			PlatformUrl     string                                                                              `json:"platformUrl"`
+			Scope           GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                                                              `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

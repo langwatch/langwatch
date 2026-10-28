@@ -78,12 +78,6 @@ const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
 const UNDOCUMENTED_CHECKUP =
   "Not yet documented in the API reference: the checkup routes back Settings, Checkup and langwatch doctor on a self-hosted install, and the CLI documentation covers that flow.";
 
-const UNDOCUMENTED_DASHBOARD_WIDGETS =
-  "Live surface gated behind the release_dashboards and release_lwql_workbench feature flags, deliberately undocumented until release.";
-
-const UNDOCUMENTED_DASHBOARDS_API =
-  "Live surface gated behind the release_dashboards feature flag (it answers 404 while the flag is off for the key's project), deliberately undocumented until release.";
-
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
 
@@ -138,15 +132,6 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
-  "/api/v1/projects/{projectId}/analytics/dashboard-widgets": UNDOCUMENTED_DASHBOARD_WIDGETS,
-  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}":
-    UNDOCUMENTED_DASHBOARD_WIDGETS,
-  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
-    UNDOCUMENTED_DASHBOARD_WIDGETS,
-  "/api/v1/dashboards": UNDOCUMENTED_DASHBOARDS_API,
-  "/api/v1/dashboards/{dashboardId}": UNDOCUMENTED_DASHBOARDS_API,
-  "/api/v1/dashboards/{dashboardId}/widgets": UNDOCUMENTED_DASHBOARDS_API,
-  "/api/v1/dashboards/{dashboardId}/widgets/{widgetId}": UNDOCUMENTED_DASHBOARDS_API,
   "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/session": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/validate": UNDOCUMENTED_APP_INTERNAL,
@@ -383,6 +368,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/workflows", "/api/optimization"],
     overviewDescription:
       "List, run and archive the workflows you build in the LangWatch workflow editor, and update their name, icon and description.",
+  },
+  {
+    name: "Dashboards",
+    dirName: "dashboards",
+    pathPrefixes: ["/api/dashboards"],
+    overviewDescription:
+      "Create and manage dashboards and the widgets on them. Each widget holds a LangWatchQL query and a chart setup.",
   },
   {
     name: "Reports",

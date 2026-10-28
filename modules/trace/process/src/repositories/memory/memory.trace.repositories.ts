@@ -113,7 +113,7 @@ class MemoryTracePayloadReaderRepository extends TracePayloadReaderRepository {
     super();
   }
 
-  async read(): Promise<string> {
+  async readFields(): Promise<ReadonlyMap<string, string>> {
     throw new Error("the memory trace repositories hold no offloaded payloads");
   }
 }

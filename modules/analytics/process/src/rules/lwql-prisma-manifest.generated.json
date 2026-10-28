@@ -8522,6 +8522,15 @@
           "documentation": "The owning project's organization, stamped when the board is first set to\nORGANIZATION; null before."
         },
         {
+          "name": "excludedOrigins",
+          "columnName": "excludedOrigins",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The trace origins every widget leaves out, a JSON list of strings; null keeps the\nboard's default (Langy's out, none in a personal project). dashboards-v2 AC200."
+        },
+        {
           "name": "createdAt",
           "columnName": "createdAt",
           "type": "DateTime",

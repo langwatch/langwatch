@@ -15,7 +15,7 @@ import {
 import { Card } from "@langwatch/design-system/card";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   type ChartFrameExecuteQuery,
@@ -74,6 +74,10 @@ export interface SandboxedChartFrameProps {
    * card gives the chart more room without lifting the bridge's own clamp.
    */
   maxHeight?: number;
+  /** Drawn over the running frame, such as a loading skeleton; never over its restart notice. */
+  cover?: ReactNode;
+  /** Whether the frame waits on nothing (see `CreateFrameBridgeOptions`); a new frame is not. */
+  onIdleChange?: (idle: boolean) => void;
 }
 
 // One component wiring the iframe, bridge lifecycle, and render states together.
@@ -86,6 +90,8 @@ export function SandboxedChartFrame({
   onLog,
   onNavigate,
   maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
+  cover,
+  onIdleChange,
 }: SandboxedChartFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [generation, setGeneration] = useState(0);
@@ -123,6 +129,8 @@ export function SandboxedChartFrame({
   onLogRef.current = onLog;
   const onNavigateRef = useRef(onNavigate);
   onNavigateRef.current = onNavigate;
+  const onIdleChangeRef = useRef(onIdleChange);
+  onIdleChangeRef.current = onIdleChange;
   const dashboardContextRef = useRef(dashboardContext);
   dashboardContextRef.current = dashboardContext;
   const { theme } = dashboardContext;
@@ -146,8 +154,10 @@ export function SandboxedChartFrame({
       onHeightChange: setHeight,
       onNavigate: (args) => onNavigateRef.current?.(args),
       onTeardown: noteTornDown,
+      onIdleChange: (idle) => onIdleChangeRef.current?.(idle),
     });
     bridgeRef.current = bridge;
+    onIdleChangeRef.current?.(false);
     noteFrameMounted();
     return () => {
       bridgeRef.current = null;
@@ -182,7 +192,7 @@ export function SandboxedChartFrame({
   }
 
   return (
-    <Box overflow="hidden">
+    <Box overflow="hidden" position="relative">
       <iframe
         key={`${generation}:${codeGeneration}:${theme}`}
         ref={iframeRef}
@@ -201,6 +211,11 @@ export function SandboxedChartFrame({
           )}px`,
         }}
       />
+      {cover && (
+        <Box position="absolute" inset={0} bg="bg.card">
+          {cover}
+        </Box>
+      )}
     </Box>
   );
 }

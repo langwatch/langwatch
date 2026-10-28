@@ -34217,7 +34217,7 @@ The MCP server provides tools organized into categories. Your AI assistant autom
 | `platform_update_monitor` | Update, enable or disable an online evaluation |
 | `platform_delete_monitor` | Delete an online evaluation |
 | `platform_experiment_list` | List the experiments in the project |
-| `platform_run_experiment` | Start an experiment run |
+| `platform_run_experiment` | Start an experiment run, optionally with a `concurrency` from 1 to 24: the cells that run at once, for that run only |
 | `platform_experiment_status` | Get the progress of a run |
 | `platform_experiment_list_runs` | List the runs of an experiment |
 | `platform_experiment_results` | Get the per-row results of a run |
@@ -42756,12 +42756,14 @@ title: Dashboards
 description: Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
 ---
 
-## Turn on Dashboards
+## Open Dashboards
 
 Dashboards is a product in the product switcher at the top left of LangWatch.
-It sits behind the `release_dashboards` feature flag, which is off by default.
-Building and editing widgets on a dashboard also needs the `release_lwql_workbench`
-flag, which turns on LangWatchQL. No other flag is needed.
+On LangWatch Cloud, no setup is needed.
+
+On a self-hosted install, Dashboards stays off until an operator turns it on in
+**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards, and
+`release_lwql_workbench` to build and edit widgets on a dashboard.
 
 ## Your first dashboard
 
@@ -43138,6 +43140,14 @@ list|get|add|update|delete <dashboardId> [<widgetId>]`, and
 `createWidget`, `getWidget`, `updateWidget` and `deleteWidget` in the
 TypeScript SDK (`create_widget`, `get_widget`, `update_widget` and
 `delete_widget` in Python).
+
+### The REST API
+
+`/api/v1/dashboards` serves dashboards and their widgets from API version
+`2026-10-26`. A request pinned to an earlier `X-API-Version` gets a 404. See
+[API reference > Dashboards](/api-reference/dashboards/overview).
+
+Analytics Reports dashboards are at `/api/v1/analytics/reports`.
 
 ### Analytics Reports
 
@@ -46348,6 +46358,7 @@ By default the run uses the dataset attached to the experiment. You can override
 - `data`: inline rows to evaluate
 - `dataset_id`: a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
 - `row_indices`: a subset of dataset row indices to evaluate, instead of the whole dataset
+- `concurrency`: how many cells run at once, from 1 to 24, for this run only. A cell is one row against one target, so an experiment with two targets has two cells per row. Without it, the run uses the server's default. Use `1` to run the cells one at a time, in order, for example so the first row fills a prompt cache before the next rows read it. The experiment's saved run options stay unchanged.
 
 
   ### Python
@@ -46361,6 +46372,8 @@ langwatch.experiment.run("my-experiment", data=[{"input": "What is 2 + 2?"}])
 langwatch.experiment.run("my-experiment", dataset_id="dataset_xxxxxxxxxxxx")
 # Constant parameters merged into every row
 langwatch.experiment.run("my-experiment", parameters={"model": "gpt-6-luna"})
+# One row at a time, in order
+langwatch.experiment.run("my-experiment", concurrency=1)
 ```
 
   ### TypeScript
@@ -46376,6 +46389,8 @@ await langwatch.experiments.runWithResults("my-experiment", { data: [{ input: "W
 await langwatch.experiments.runWithResults("my-experiment", { datasetId: "dataset_xxxxxxxxxxxx" });
 // Constant parameters merged into every row
 await langwatch.experiments.runWithResults("my-experiment", { parameters: { model: "gpt-6-luna" } });
+// One row at a time, in order
+await langwatch.experiments.runWithResults("my-experiment", { concurrency: 1 });
 ```
 
 
@@ -65198,7 +65213,7 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 | Variable                  | Description                                                                                                                                                                                                                      | Default |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `BLOCK_LOCAL_HTTP_CALLS`  | `true` blocks user-configured outbound HTTP calls to private IPs, localhost and hostnames that resolve to private IPs. Cloud metadata addresses are always blocked                                                               | `false` |
-| `ALLOWED_PROXY_HOSTS`     | Comma-separated hostnames still allowed when `BLOCK_LOCAL_HTTP_CALLS=true`                                                                                                                                                       | -       |
+| `ALLOWED_PROXY_HOSTS`     | Comma-separated hostnames still allowed when `BLOCK_LOCAL_HTTP_CALLS=true`. Hostnames ending in `.local` or `.localhost` are refused whatever `BLOCK_LOCAL_HTTP_CALLS` says, so list each one you need here. Cloud metadata and cloud internal domains (`.amazonaws.com`, `.internal`) can never be listed | -       |
 | `TRUSTED_PROXY_ADDRESSES` | Comma-separated addresses or IPv4/IPv6 CIDR ranges of the proxies in front of the app. A forwarding header is read only from a socket peer inside this set, and the caller is the rightmost `X-Forwarded-For` hop outside it. Unset, no header is read and the socket peer is the caller. An entry that is not an address or range stops the app from starting. The Helm chart defaults to the private and loopback ranges | -       |
 | `TRUST_CLOUDFLARE_CLIENT_IP` | `true` reads the caller from `CF-Connecting-IP`, only from a peer inside `TRUSTED_PROXY_ADDRESSES` (set it to Cloudflare's published ranges). The header must hold a single valid IP; otherwise the caller comes from `X-Forwarded-For`. The app refuses to start with this on and no trusted proxy addresses | `false` |
 | `SSO_TRUSTED_IDP_ORIGINS` | Comma or whitespace separated origins of identity providers inside a private network. Without an entry here, sign-in refuses a provider whose address is not publicly routable                                                   | -       |
@@ -73427,6 +73442,111 @@ The same data renders in the product on the [sessions](/coding-agents/sessions) 
 
 ---
 
+# FILE: ./api-reference/dashboards/create-a-dashboard.mdx
+
+---
+title: "Create a dashboard"
+openapi: "POST /api/v1/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/create-a-widget-on-a-dashboard.mdx
+
+---
+title: "Create a widget on a dashboard"
+openapi: "POST /api/v1/dashboards/{dashboardId}/widgets"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/delete-a-dashboard.mdx
+
+---
+title: "Delete a dashboard"
+openapi: "DELETE /api/v1/dashboards/{dashboardId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/delete-a-widget-on-a-dashboard.mdx
+
+---
+title: "Delete a widget on a dashboard"
+openapi: "DELETE /api/v1/dashboards/{dashboardId}/widgets/{widgetId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/get-a-dashboard.mdx
+
+---
+title: "Get a dashboard"
+openapi: "GET /api/v1/dashboards/{dashboardId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/get-a-widget-on-a-dashboard.mdx
+
+---
+title: "Get a widget on a dashboard"
+openapi: "GET /api/v1/dashboards/{dashboardId}/widgets/{widgetId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/list-a-dashboard-s-widgets.mdx
+
+---
+title: "List a dashboard's widgets"
+openapi: "GET /api/v1/dashboards/{dashboardId}/widgets"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/list-dashboards.mdx
+
+---
+title: "List dashboards"
+openapi: "GET /api/v1/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/overview.mdx
+
+---
+title: "Overview"
+description: "Create and manage dashboards and the widgets on them. Each widget holds a LangWatchQL query and a chart setup."
+---
+
+## Intro
+
+Create and manage dashboards and the widgets on them. Each widget holds a LangWatchQL query and a chart setup.
+
+These routes answer from API version `2026-10-26`. A request pinned to an earlier `X-API-Version` gets a 404, so drop the pin or send `2026-10-26`.
+
+---
+
+# FILE: ./api-reference/dashboards/update-a-dashboard.mdx
+
+---
+title: "Update a dashboard"
+openapi: "PATCH /api/v1/dashboards/{dashboardId}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/update-a-widget-on-a-dashboard.mdx
+
+---
+title: "Update a widget on a dashboard"
+openapi: "PATCH /api/v1/dashboards/{dashboardId}/widgets/{widgetId}"
+---
+
+---
+
 # FILE: ./api-reference/datasets/action-records.mdx
 
 ---
@@ -75828,11 +75948,29 @@ The slug is optional and is derived from the name when you leave it out. It is a
 
 ---
 
+# FILE: ./api-reference/projects/add-a-dashboard-widget-to-a-dashboard.mdx
+
+---
+title: "Add a dashboard widget to a dashboard"
+openapi: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard"
+---
+
+---
+
 # FILE: ./api-reference/projects/archive-project.mdx
 
 ---
 title: "Archive project"
 openapi: "DELETE /api/v1/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/create-a-dashboard-widget.mdx
+
+---
+title: "Create a dashboard widget"
+openapi: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets"
 ---
 
 ---
@@ -75846,11 +75984,29 @@ openapi: "POST /api/v1/projects"
 
 ---
 
+# FILE: ./api-reference/projects/delete-a-dashboard-widget.mdx
+
+---
+title: "Delete a dashboard widget"
+openapi: "DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+---
+
+---
+
 # FILE: ./api-reference/projects/get-a-dashboard-boards.mdx
 
 ---
 title: "Get a dashboard (deprecated path)"
 openapi: "GET /api/v1/projects/{projectId}/analytics/boards/{dashboardId}"
+---
+
+---
+
+# FILE: ./api-reference/projects/get-a-dashboard-widget.mdx
+
+---
+title: "Get a dashboard widget"
+openapi: "GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
 ---
 
 ---
@@ -75878,6 +76034,15 @@ openapi: "GET /api/v1/projects/{id}/api-key"
 ---
 title: "Get project"
 openapi: "GET /api/v1/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/list-dashboard-widgets.mdx
+
+---
+title: "List dashboard widgets"
+openapi: "GET /api/v1/projects/{projectId}/analytics/dashboard-widgets"
 ---
 
 ---
@@ -75996,6 +76161,15 @@ LANGWATCH_PROJECT_ID=<project id>
 ---
 title: "Regenerate project API key"
 openapi: "POST /api/v1/projects/{id}/regenerate-api-key"
+---
+
+---
+
+# FILE: ./api-reference/projects/update-a-dashboard-widget.mdx
+
+---
+title: "Update a dashboard widget"
+openapi: "PATCH /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
 ---
 
 ---
