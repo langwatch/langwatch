@@ -636,18 +636,6 @@ export const evaluatorMappingGaps = ({
   };
 };
 
-/**
- * Whether `evaluator` is still missing a required mapping against `datasetId`/`targetId`.
- */
-export const evaluatorHasMissingMappings = (
-  evaluator: EvaluatorConfig,
-  datasetId: string,
-  targetId: string,
-): boolean => {
-  const { isValid } = getEvaluatorMissingMappings(evaluator, datasetId, targetId);
-  return !isValid;
-};
-
 // ============================================================================
 // Workbench Validation (All Targets + Evaluators)
 // ============================================================================

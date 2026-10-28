@@ -36,7 +36,6 @@ vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
 }));
 
 import {
-  evaluatorHasMissingMappings,
   extractFieldsFromContent,
   getEvaluatorMissingMappings,
   getTargetMissingMappings,
@@ -1333,52 +1332,5 @@ describe("Evaluator validation with required/optional fields", () => {
     expect(result.isValid).toBe(false);
     // No missing "required" fields in missingMappings since none are required
     expect(result.missingMappings.length).toBe(0);
-  });
-
-  it("evaluatorHasMissingMappings returns false for valid evaluator with optional unmapped", () => {
-    // langevals/llm_boolean with input and output mapped, contexts unmapped (optional)
-    const evaluator = createTestEvaluator({
-      id: "eval-1",
-      evaluatorType: "langevals/llm_boolean",
-      inputs: [
-        { identifier: "input", type: "str" },
-        { identifier: "output", type: "str" },
-        { identifier: "contexts", type: "str" },
-      ],
-      mappings: {
-        [DEFAULT_TEST_DATA_ID]: {
-          [targetId]: {
-            input: {
-              type: "source",
-              source: "dataset",
-              sourceId: DEFAULT_TEST_DATA_ID,
-              sourceField: "input",
-            },
-            output: {
-              type: "source",
-              source: "target",
-              sourceId: targetId,
-              sourceField: "output",
-            },
-          },
-        },
-      },
-    });
-
-    expect(evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId)).toBe(false);
-  });
-
-  it("evaluatorHasMissingMappings returns true when all fields empty", () => {
-    const evaluator = createTestEvaluator({
-      id: "eval-1",
-      evaluatorType: "langevals/llm_boolean",
-      inputs: [
-        { identifier: "input", type: "str" },
-        { identifier: "output", type: "str" },
-      ],
-      mappings: {},
-    });
-
-    expect(evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId)).toBe(true);
   });
 });
