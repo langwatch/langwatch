@@ -58,7 +58,7 @@ export class TraceOffloadBudgetExceededError extends Error {
     super(
       scope === "trace"
         ? `Trace ${traceId} spent its ${budgetBytes}-byte offload recall budget`
-        : `The recall spent its ${budgetBytes}-byte budget before trace ${traceId} was read`,
+        : `The recall spent its ${budgetBytes}-byte budget; trace ${traceId} keeps its previews`,
     );
     this.name = "TraceOffloadBudgetExceededError";
     this.traceId = traceId;

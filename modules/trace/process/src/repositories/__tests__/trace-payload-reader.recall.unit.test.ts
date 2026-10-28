@@ -277,6 +277,7 @@ describe("TracePayloadReaderRepository.recall", () => {
         );
       });
 
+      /** @scenario "A trace kept at its previews by the recall's total budget is not blamed for spending it" */
       it("answers the recall's budget, not the unread trace's own, for every trace it skips", async () => {
         const reader = new FakePayloadReader({
           e1: { a: "x".repeat(10) },

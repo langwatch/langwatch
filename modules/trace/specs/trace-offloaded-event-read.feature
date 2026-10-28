@@ -56,3 +56,9 @@ Feature: An offloaded trace field reads whole through eventing's event read seat
       When the trace read recalls them
       Then the traces read before the total budget ran out are served whole
       And the later traces keep their previews without being read
+
+    @unit
+    Scenario: A trace kept at its previews by the recall's total budget is not blamed for spending it
+      Given a read of several traces whose offloaded values exceed the recall's total budget
+      When the trace read recalls them
+      Then each trace kept at its previews answers that the recall's budget ran out, not its own
