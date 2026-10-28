@@ -15,24 +15,44 @@ export interface DefinitionFlags {
 /** Thrown for input the CLI can refuse before any request is made. */
 export class WidgetInputError extends Error {}
 
-/** `--langy-traces`: whether the widget counts the user's conversations with Langy. */
-const LANGY_TRACES: Readonly<Record<string, string[]>> = {
-  included: [],
-  "left-out": ["langy"],
-};
+/**
+ * The trace origins a widget query can count, as the platform's widget schema lists them; the
+ * server checks them again. "other" is every origin not listed before it.
+ */
+const TRACE_SOURCES = [
+  "application",
+  "simulation",
+  "evaluation",
+  "coding_agent",
+  "gateway",
+  "workflow",
+  "playground",
+  "langy",
+  "other",
+] as const;
+type TraceSource = (typeof TRACE_SOURCES)[number];
+
+const isTraceSource = (value: string): value is TraceSource =>
+  (TRACE_SOURCES as readonly string[]).includes(value);
 
 /**
- * The origins a widget leaves out for `--langy-traces included|left-out`, or undefined when
- * the flag is absent, so the widget keeps what it stores (or follows its dashboard).
+ * `--sources application,langy`: the origins every query of the widget counts, or undefined
+ * when the flag is absent, so each query keeps what it stores.
  */
-export const resolveLangyTraces = (flag: string | undefined): string[] | undefined => {
+export const resolveSources = (flag: string | undefined): TraceSource[] | undefined => {
   if (flag === undefined) return undefined;
-  // Own keys only: "toString" or "__proto__" must not resolve to an inherited member.
-  const origins = Object.hasOwn(LANGY_TRACES, flag) ? LANGY_TRACES[flag] : undefined;
-  if (!origins) {
-    throw new WidgetInputError('--langy-traces takes "included" or "left-out"');
+  const picked = flag
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  const unknown = picked.filter((part) => !isTraceSource(part));
+  if (picked.length === 0 || unknown.length > 0) {
+    const named = unknown.length > 0 ? `unknown source "${unknown[0]}"; ` : "";
+    throw new WidgetInputError(
+      `--sources: ${named}pass a comma list of ${TRACE_SOURCES.join(", ")}`,
+    );
   }
-  return [...origins];
+  return picked.filter(isTraceSource);
 };
 
 /**

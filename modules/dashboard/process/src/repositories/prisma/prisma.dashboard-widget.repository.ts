@@ -3,7 +3,6 @@ import {
   DashboardWidgetDefinitionInvalidError,
   DASHBOARD_SRCDOC_CHART_KIND,
   type DashboardWidgetDefinitionInput,
-  type DashboardWidgetDefinitionUpdate,
 } from "@langwatch/analytics-contract";
 import {
   CHART_GRID_DEFAULT_COL_SPAN,
@@ -13,6 +12,7 @@ import {
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   dashboardWidgetDefinitionSchema,
+  mergeQuerySources,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
@@ -35,7 +35,6 @@ const graphOf = (input: DashboardWidgetDefinitionInput): Prisma.InputJsonValue =
   ...(input.description === undefined ? {} : { description: input.description }),
   ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
   ...(input.source === undefined ? {} : { source: input.source }),
-  ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: [...input.excludedOrigins] }),
 });
 
 /** A transaction over the board table, to check a placement inside the write it guards. */
@@ -142,7 +141,7 @@ export class PrismaDashboardWidgetRepository
   }: {
     id: string;
     projectId: string;
-    input: { name?: string } & DashboardWidgetDefinitionUpdate;
+    input: { name?: string } & Partial<DashboardWidgetDefinitionInput>;
   }): Promise<DashboardWidgetRow> {
     await this.transaction(async (tx) => {
       const data: Prisma.DashboardWidgetUpdateManyMutationInput = {};
@@ -181,7 +180,7 @@ export class PrismaDashboardWidgetRepository
     tx: Pick<Prisma.TransactionClient, "dashboardWidget">;
     id: string;
     projectId: string;
-    input: DashboardWidgetDefinitionUpdate;
+    input: Partial<DashboardWidgetDefinitionInput>;
   }): Promise<Prisma.DashboardWidgetUpdateManyMutationInput["definition"]> {
     const current = await tx.dashboardWidget.findFirst({ where: { id, projectId } });
     if (!current) throw new DashboardWidgetNotFoundError();
@@ -190,22 +189,19 @@ export class PrismaDashboardWidgetRepository
       throw new DashboardWidgetDefinitionInvalidError(current.id, { reasons: [parsed.error] });
     }
     const definition = parsed.data;
-    // An edit of code or queries keeps the other fields it was saved with.
+    // An edit of code or queries keeps the description, prompt and source it was saved with.
     const description = input.description ?? definition.description;
     const prompt = input.prompt ?? definition.prompt;
     const source = input.source ?? definition.source;
-    // null clears the stored list, so the widget follows its board again.
-    const excludedOrigins =
-      input.excludedOrigins === null
-        ? undefined
-        : (input.excludedOrigins ?? definition.excludedOrigins);
     return graphOf({
       code: input.code ?? definition.code,
-      queries: input.queries ?? definition.queries,
+      queries:
+        input.queries === undefined
+          ? definition.queries
+          : mergeQuerySources({ sent: input.queries, stored: definition.queries }),
       ...(description === undefined ? {} : { description }),
       ...(prompt === undefined ? {} : { prompt }),
       ...(source === undefined ? {} : { source }),
-      ...(excludedOrigins === undefined ? {} : { excludedOrigins }),
     });
   }
 

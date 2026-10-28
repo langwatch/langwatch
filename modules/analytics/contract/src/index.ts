@@ -16,6 +16,7 @@ export * from "./features/lwql/analytics-lwql.trpc.ts";
 export * from "./features/lwql/analytics-lwql.schemas.ts";
 export * from "./features/lwql/analytics.lwql.ts";
 export * from "./features/lwql/query-reference.ts";
+export * from "./features/lwql/trace-sources.ts";
 export * from "./features/lwql/analytics.lwql-time-window.ts";
 export * from "./series-points.ts";
 export * from "./analytics.timeseries.ts";

@@ -134,8 +134,8 @@ def sync_detailed(
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
     dashboard at the next free row. `source` records where the widget came from; without it, the widget
-    is recorded as made through the API. `excludedOrigins` is the widget's Langy traces setting: []
-    counts Langy's traces, [\"langy\"] leaves them out, and without it the widget follows the dashboard.
+    is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a
+    query that names none counts `[\"application\"]`.
 
     Args:
         dashboard_id (str):
@@ -179,8 +179,8 @@ def sync(
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
     dashboard at the next free row. `source` records where the widget came from; without it, the widget
-    is recorded as made through the API. `excludedOrigins` is the widget's Langy traces setting: []
-    counts Langy's traces, [\"langy\"] leaves them out, and without it the widget follows the dashboard.
+    is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a
+    query that names none counts `[\"application\"]`.
 
     Args:
         dashboard_id (str):
@@ -218,8 +218,8 @@ async def asyncio_detailed(
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
     dashboard at the next free row. `source` records where the widget came from; without it, the widget
-    is recorded as made through the API. `excludedOrigins` is the widget's Langy traces setting: []
-    counts Langy's traces, [\"langy\"] leaves them out, and without it the widget follows the dashboard.
+    is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a
+    query that names none counts `[\"application\"]`.
 
     Args:
         dashboard_id (str):
@@ -261,8 +261,8 @@ async def asyncio(
 
      Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this
     dashboard at the next free row. `source` records where the widget came from; without it, the widget
-    is recorded as made through the API. `excludedOrigins` is the widget's Langy traces setting: []
-    counts Langy's traces, [\"langy\"] leaves them out, and without it the widget follows the dashboard.
+    is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a
+    query that names none counts `[\"application\"]`.
 
     Args:
         dashboard_id (str):

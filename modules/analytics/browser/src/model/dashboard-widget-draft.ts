@@ -9,6 +9,4 @@ export interface DashboardWidgetDraft {
   name: string;
   code: string;
   queries: DashboardWidgetQuery[];
-  /** Its "Langy traces" setting; absent, a save keeps what the widget stores. */
-  excludedOrigins?: string[];
 }

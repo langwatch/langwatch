@@ -10,6 +10,7 @@ import {
   type LangWatchQLTimeWindow,
   type QueryCompleteness,
   type QueryCompletenessState,
+  type TraceSource,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
@@ -68,8 +69,8 @@ export interface LangWatchQLCompletenessInput {
   readonly validation: AcceptedLangWatchQL;
   readonly database: string;
   readonly views: readonly LangWatchQLViewDefinition[];
-  /** The origins the main query left out, so the report counts the same rows. */
-  readonly excludeOrigins?: readonly string[];
+  /** The sources the main query counted, so the report counts the same rows. */
+  readonly sources?: readonly TraceSource[] | undefined;
   /** The members the main query read and from when, so the report counts the same rows. */
   readonly memberWindows?: readonly LangWatchQLMemberWindow[];
   /** The window the query was bound to. No window, no report: a whole history is not a period. */
@@ -97,7 +98,7 @@ export class LangWatchQLCompletenessService {
       const execution = await input.executor.execute({
         sql: scopeLangWatchQL({
           sql: completenessSql({ plan, isBucketed: granularitySeconds !== undefined }),
-          excludeOrigins: input.excludeOrigins ?? [],
+          sources: input.sources,
           database: input.database,
           views: input.views,
           timeWindow,

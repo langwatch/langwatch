@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable analytics capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/analytics.api.ts:85`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/analytics.api.ts:78`; nothing else in this package is public.
 
 #### `getTimeseries`
 
@@ -354,7 +354,7 @@ type Response = z.infer<typeof queryReferenceSchema>; // ../contract/src/feature
 
 ### `analytics.lwql`
 
-Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:74`, router `src/transport/analytics-lwql.trpc.ts:76`.
+Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:75`, router `src/transport/analytics-lwql.trpc.ts:76`.
 
 | Procedure                     | Kind     | Gate                        | Input                    | Output                          |
 | ----------------------------- | -------- | --------------------------- | ------------------------ | ------------------------------- |
@@ -365,22 +365,22 @@ Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:74`, router `src/
 
 ```typescript
 // analytics.lwql.availability
-// Input: lwqlProjectScopeSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:24
+// Input: lwqlProjectScopeSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
 interface Input {
   projectId: string;
 }
-// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:475
+// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:476
 interface Output {
   available: boolean;
   reason?: "disabled" | "unprovisioned";
 }
 
 // analytics.lwql.schema
-type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:24
-type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:212
+type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
+type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:213
 
 // analytics.lwql.validate
-// Input: lwqlRunRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:32
+// Input: lwqlRunRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:33
 interface Input {
   projectId: string;
   sql: string;
@@ -391,22 +391,11 @@ interface Input {
   };
   granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
 }
-type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:70
+type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:71
 
 // analytics.lwql.query
-// Input: lwqlQueryRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:43
-interface Input {
-  projectId: string;
-  sql: string;
-  parameters?: Record<string, string | number | boolean | null>;
-  timeWindow?: {
-    start: string | number | unknown;
-    end: string | number | unknown;
-  };
-  granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
-  excludeOrigins?: string[];
-}
-type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:111
+type Input = z.infer<typeof lwqlQueryRequestSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:44
+type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:112
 ```
 
 ### `analytics`

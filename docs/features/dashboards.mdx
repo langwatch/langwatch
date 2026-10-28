@@ -121,17 +121,25 @@ menu offers:
 - **Duplicate**: adds a copy of the widget.
 - **Delete**: removes the widget.
 
-### Langy's conversations in a widget
+### What a widget's queries count
 
-Your conversations with Langy are traced into your project with the origin
-`langy`. A widget leaves them out by default, so it shows your own agent; in a
-personal project it counts them.
+Every query in a widget has a built-in **sources** parameter: the trace origins
+it counts. The widget editor shows it as the first row under **Parameters** on
+the **Queries** tab, one pill per source. Remove a pill to stop counting that
+origin, or pick one from **Add source**:
 
-The widget editor's **Queries** tab has a **Langy traces** setting above the
-queries: pick **Included** to count them, for example on a widget about Langy's
-failed requests. The preview runs again when you change it, and **Save** stores
-it on that widget only. Widgets on From LangWatch dashboards always use the
-default.
+- `application`: your own agent. A trace with no origin set counts here.
+- `simulation`, `evaluation`, `coding_agent`, `gateway`, `workflow`,
+  `playground`: traces LangWatch itself produces.
+- `langy`: your conversations with Langy.
+- `other`: any origin not listed above.
+
+A new widget counts `application`, and so does a widget saved before sources
+existed. A widget about Langy's failed requests adds `langy`. The preview runs
+again when you change the sources, and each card names its sources in a quiet
+line underneath. A query with no source picked counts nothing, and its widget
+says **No sources picked**. Widgets on From LangWatch dashboards count every
+origin except `langy`.
 
 ## Who can see a dashboard
 
@@ -340,10 +348,10 @@ curl -X PATCH "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/da
   -d '{"name": "Errors per day", "code": "<the widget code>"}'
 ```
 
-The body takes any of `name`, `code`, `queries`, `description` and
-`excludedOrigins`, the widget's Langy traces setting: `[]` counts your
-conversations with Langy and `["langy"]` leaves them out. The answer is the
-updated widget. Each widget also records where it came from in
+The body takes any of `name`, `code`, `queries` and `description`. Each query
+may carry `sources`, such as `["application", "langy"]`; a query sent without
+it keeps the sources it stores, and `"sources": null` returns it to
+`application`. The answer is the updated widget. Each widget also records where it came from in
 `definition.source`: a catalogue template, Langy, the code editor or the API.
 A widget you create through the API without a `source` is recorded as `api`.
 

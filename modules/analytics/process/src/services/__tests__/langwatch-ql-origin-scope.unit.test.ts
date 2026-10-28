@@ -3,6 +3,7 @@
  * its completeness report are scoped alike, and a run that names no origin is sent as written.
  * @see modules/analytics/adrs/003-lwql-origin-scope.md
  */
+import { TRACE_SOURCES } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -42,10 +43,13 @@ class RecordingExecutor extends LangWatchQLExecutorRepository {
 
 async function statementsSent({
   sql,
-  excludeOrigins,
+  leftOut,
+  sources,
 }: {
   sql: string;
-  excludeOrigins?: readonly string[];
+  /** The origins the run leaves out, sent as the sources left in. */
+  leftOut?: readonly string[];
+  sources?: Parameters<LangWatchQLService["execute"]>[0]["sources"];
 }): Promise<string[]> {
   const executor = new RecordingExecutor();
   const service = LangWatchQLService.create({ executor, database: "analytics" });
@@ -60,7 +64,8 @@ async function statementsSent({
     },
     sql,
     timeWindow: WINDOW,
-    ...(excludeOrigins ? { excludeOrigins } : {}),
+    ...(leftOut ? { sources: TRACE_SOURCES.filter((source) => !leftOut.includes(source)) } : {}),
+    ...(sources ? { sources } : {}),
   });
 
   return executor.requests.map((request) => request.sql);
@@ -70,7 +75,7 @@ describe("LangWatchQLService origin scope", () => {
   describe("given a run that leaves Langy's origin out", () => {
     describe("when the statement follows the surface's window", () => {
       it("sends the statement with the view scoped and the trace lookup bounded", async () => {
-        const [statement] = await statementsSent({ sql: WINDOWED_SQL, excludeOrigins: ["langy"] });
+        const [statement] = await statementsSent({ sql: WINDOWED_SQL, leftOut: ["langy"] });
 
         expect(statement).toContain(`(SELECT * FROM analytics.spans WHERE ${LANGY_TRACES}`);
         expect(statement).toContain(LOOKUP_BOUND);
@@ -78,7 +83,7 @@ describe("LangWatchQLService origin scope", () => {
       });
 
       it("scopes the completeness report the same way, so it counts the rows the widget counts", async () => {
-        const [, report] = await statementsSent({ sql: WINDOWED_SQL, excludeOrigins: ["langy"] });
+        const [, report] = await statementsSent({ sql: WINDOWED_SQL, leftOut: ["langy"] });
 
         expect(report).toContain(LANGY_TRACES);
         expect(report).toContain(LOOKUP_BOUND);
@@ -87,7 +92,7 @@ describe("LangWatchQLService origin scope", () => {
 
     describe("when the statement keeps its own range", () => {
       it("scopes the view and reads the trace lookup over all history", async () => {
-        const statements = await statementsSent({ sql: OWN_RANGE_SQL, excludeOrigins: ["langy"] });
+        const statements = await statementsSent({ sql: OWN_RANGE_SQL, leftOut: ["langy"] });
 
         expect(statements).toHaveLength(1);
         expect(statements[0]).toContain(LANGY_TRACES);
@@ -104,11 +109,27 @@ describe("LangWatchQLService origin scope", () => {
       expect(statement).toBe(WINDOWED_SQL);
     });
 
-    /** @scenario "AC193 Langy: the origins a board leaves out are a list a board parameter can set later" */
+    /** @scenario "AC193 Sources: a run whose sources hold every origin reads every trace, Langy's included" */
     it("sends the statement as written when the list is empty", async () => {
-      const [statement] = await statementsSent({ sql: WINDOWED_SQL, excludeOrigins: [] });
+      const [statement] = await statementsSent({ sql: WINDOWED_SQL, leftOut: [] });
 
       expect(statement).toBe(WINDOWED_SQL);
     });
+  });
+});
+
+describe("given a dashboard query that names its sources", () => {
+  /** @scenario "AC200b Sources: a query saved with picked sources counts only traces of those origins" */
+  it("scopes the statement and its completeness report to them", async () => {
+    const statements = await statementsSent({
+      sql: WINDOWED_SQL,
+      sources: ["langy"],
+    });
+    const keepsLangy =
+      "ifNull(TraceId, '') NOT IN (SELECT TraceId FROM analytics.trace_metrics " +
+      "WHERE ifNull(nullIf(Origin, ''), 'application') NOT IN ('langy')";
+
+    expect(statements).toHaveLength(2);
+    expect(statements.every((statement) => statement.includes(keepsLangy))).toBe(true);
   });
 });

@@ -128,31 +128,66 @@ describe("given the dashboard widget REST family", () => {
       expect(created.status).toBe(201);
       expect(updated.status).toBe(422);
       expect(updated.json.code).toBe("validation_error");
-      expect(read.json.definition.queries).toEqual(queries);
+      expect(read.json.definition.queries).toEqual(
+        queries.map((query) => ({ ...query, sources: ["application"] })),
+      );
     });
   });
 
-  describe("when a widget's stored Langy traces setting is cleared with null", () => {
-    /** @scenario "AC200j Langy setting: the API and the CLI read and write a widget's setting" */
-    it("removes it, and an update that names none keeps what is stored", async () => {
+  describe("when a widget's query names its sources", () => {
+    /** @scenario "AC200o Sources: a new widget's query counts application traces" */
+    it("returns application on a created query that named none", async () => {
       const key = mountKey();
-      const queries = queryDeclaring({ name: "limit", type: "number", default: 10 });
+
       const created = await key.create({
         name: "Traces",
         code: CODE,
-        queries,
-        excludedOrigins: [],
+        queries: [{ name: "t", sql: SQL }],
       });
 
-      const renamed = await key.update(created.json.id, { name: "Renamed" });
-      const kept = await key.read(created.json.id);
-      const cleared = await key.update(created.json.id, { excludedOrigins: null });
-      const read = await key.read(created.json.id);
+      expect(created.status).toBe(201);
+      expect(created.json.definition.queries[0].sources).toEqual(["application"]);
+    });
 
-      expect(renamed.status).toBe(200);
-      expect(kept.json.definition.excludedOrigins).toEqual([]);
+    /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+    it("stores a picked set, keeps it through an update naming none, and null clears it", async () => {
+      const key = mountKey();
+      const created = await key.create({
+        name: "Traces",
+        code: CODE,
+        queries: [{ name: "t", sql: SQL, sources: ["langy", "other"] }],
+      });
+      const id = created.json.id;
+
+      const renamed = await key.update(id, { name: "Renamed" });
+      const resent = await key.update(id, { queries: [{ name: "t", sql: SQL }] });
+      const cleared = await key.update(id, { queries: [{ name: "t", sql: SQL, sources: null }] });
+      const read = await key.read(id);
+
+      expect(renamed.json.definition.queries[0].sources).toEqual(["langy", "other"]);
+      expect(resent.json.definition.queries[0].sources).toEqual(["langy", "other"]);
       expect(cleared.status).toBe(200);
-      expect(read.json.definition).not.toHaveProperty("excludedOrigins");
+      expect(read.json.definition.queries[0]).not.toHaveProperty("sources");
+    });
+
+    /** @scenario "AC200n Sources: an unknown source is refused at every door" */
+    it("refuses an unknown source on create and update, and stores nothing new", async () => {
+      const key = mountKey();
+      const bad = [{ name: "t", sql: SQL, sources: ["application", "langy' OR 1=1 --"] }];
+
+      const created = await key.create({ name: "Traces", code: CODE, queries: bad });
+      const good = await key.create({
+        name: "Traces",
+        code: CODE,
+        queries: [{ name: "t", sql: SQL }],
+      });
+      const updated = await key.update(good.json.id, { queries: bad });
+      const read = await key.read(good.json.id);
+
+      expect(created.status).toBe(422);
+      expect(created.json.code).toBe("validation_error");
+      expect(updated.status).toBe(422);
+      expect(read.json.definition.queries[0].sources).toEqual(["application"]);
     });
   });
 });

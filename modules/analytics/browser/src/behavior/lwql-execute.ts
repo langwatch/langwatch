@@ -4,7 +4,11 @@
  * rather than just ignoring the answer. Same seam `spanTreePagedQuery` uses.
  */
 
-import type { LangWatchQLQueryResult, LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLQueryResult,
+  LangWatchQLTimeWindow,
+  TraceSource,
+} from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 
 import type { LangWatchQLExecute } from "../model/lwql-request-controller.ts";
@@ -15,7 +19,7 @@ export interface LangWatchQLQueryInput {
   sql: string;
   parameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
   timeWindow?: LangWatchQLTimeWindow;
-  excludeOrigins?: readonly string[];
+  sources?: readonly TraceSource[];
 }
 
 const isoInstant = (epochMs: number): string =>

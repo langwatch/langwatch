@@ -2211,10 +2211,13 @@ function registerDashboardCommands(program: Command): void {
       .option("--description <description>", "What the widget shows")
       .option("--code <code>", "The widget's React source")
       .option("--code-file <path>", "Read the widget's React source from a file")
-      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
       .option(
-        "--langy-traces <setting>",
-        "included or left-out: whether the widget counts your conversations with Langy",
+        "--queries-file <path>",
+        "JSON file: an array of { name, sql, parameters?, sources? }",
+      )
+      .option(
+        "--sources <list>",
+        "Comma list of the trace origins every query counts: application, simulation, evaluation, coding_agent, gateway, workflow, playground, langy, other",
       );
 
   emitsResult(

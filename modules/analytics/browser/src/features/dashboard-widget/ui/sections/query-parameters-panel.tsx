@@ -1,7 +1,7 @@
 /**
  * Shared LangWatchQL parameters panel: a locked "Dashboard context" group (the
- * `RESERVED_PARAMETERS` the executor binds automatically) above an editable "Parameters" group,
- * in the same visual language as {@link ~/components/variables/VariablesSection}.
+ * `RESERVED_PARAMETERS` the executor binds) above an editable "Parameters" group led by a
+ * dashboard query's built-in `sources` row (AC200), styled like VariablesSection.
  */
 
 /**
@@ -14,6 +14,7 @@ import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
@@ -26,7 +27,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 
 import { FieldTypeSelect } from "../../../../ui/sections/prompt/variables/variable-type/field-type-select.tsx";
 import { VariableTypeIcon } from "../../../../ui/sections/prompt/variables/variable-type/variable-type-icon.tsx";
@@ -70,6 +71,16 @@ export interface QueryParameterRowVM {
   readonly problem?: string;
 }
 
+/** A query's built-in `sources` row: the origins it counts, as removable pills. */
+export interface QuerySourcesVM {
+  /** What the query runs with: what it stores, else the default. */
+  readonly picked: readonly string[];
+  /** Every source, in the order the menu offers the ones not picked. */
+  readonly all: readonly string[];
+  /** A method, so a caller's narrower list of sources fits. */
+  onChange(next: string[]): void;
+}
+
 export interface QueryParametersPanelProps {
   reserved: readonly (typeof RESERVED_PARAMETERS)[number][];
   /**
@@ -80,6 +91,8 @@ export interface QueryParametersPanelProps {
   rows: readonly QueryParameterRowVM[];
   typeOptions: readonly FieldTypeOption[];
   onAdd: () => void;
+  /** A dashboard query's `sources` row; absent where a query counts every origin. */
+  sources?: QuerySourcesVM;
 }
 
 function DashboardContextRow({
@@ -110,11 +123,117 @@ function DashboardContextRow({
       >
         {value ?? reserved.description}
       </Text>
-      <Badge size="sm" colorPalette="gray" flexShrink={0}>
-        built-in
-      </Badge>
+      <BuiltInBadge />
       {/* Spacer matching the remove button's width so name/type columns line
           up with the editable rows below. */}
+      <Box width="26px" flexShrink={0} />
+    </HStack>
+  );
+}
+
+function BuiltInBadge() {
+  return (
+    <Badge size="sm" colorPalette="gray" flexShrink={0}>
+      built-in
+    </Badge>
+  );
+}
+
+function SourcePill({ source, onRemove }: { source: string; onRemove: () => void }) {
+  return (
+    <HStack
+      as="span"
+      gap={1}
+      paddingLeft={2.5}
+      paddingRight={1}
+      borderRadius="full"
+      borderWidth="1px"
+      borderColor="colorPalette.emphasized"
+      background="colorPalette.subtle"
+      colorPalette="orange"
+      textStyle="monoSm"
+    >
+      {source}
+      <Button
+        size="2xs"
+        variant="ghost"
+        minWidth={0}
+        height="auto"
+        padding={0.5}
+        borderRadius="full"
+        color="fg.subtle"
+        aria-label={`Remove ${source}`}
+        onClick={onRemove}
+      >
+        <X size={11} />
+      </Button>
+    </HStack>
+  );
+}
+
+function AddSourceMenu({
+  missing,
+  onAdd,
+}: {
+  missing: readonly string[];
+  onAdd: (source: string) => void;
+}) {
+  return (
+    <Menu.Root positioning={{ placement: "bottom-start" }}>
+      <Menu.Trigger asChild>
+        <Button
+          size="2xs"
+          variant="ghost"
+          borderRadius="full"
+          borderWidth="1px"
+          borderStyle="dashed"
+          borderColor="border"
+          color="fg.muted"
+          paddingX={2.5}
+        >
+          <Plus size={11} /> Add source
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content minWidth="176px">
+        {missing.map((source) => (
+          <Menu.Item key={source} value={source} textStyle="monoSm" onClick={() => onAdd(source)}>
+            {source}
+          </Menu.Item>
+        ))}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+/** `sources = [pills] + Add source`, styled as a dashboard-context row (dashboards-v2 AC200). */
+function SourcesRow({ sources }: { sources: QuerySourcesVM }) {
+  const { picked, all } = sources;
+  const onChange = (next: string[]) => sources.onChange(next);
+  const missing = all.filter((source) => !picked.includes(source));
+  return (
+    <HStack gap={2} align="start" data-testid="query-sources">
+      <Box flexShrink={0} paddingTop={1}>
+        <VariableTypeIcon type="list[str]" size={14} />
+      </Box>
+      <Text textStyle="monoSm" color="fg.muted" flexShrink={0} paddingTop={0.5}>
+        sources
+      </Text>
+      <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
+        =
+      </Text>
+      <HStack flex={1} minWidth={0} gap={1.5} wrap="wrap">
+        {picked.map((source) => (
+          <SourcePill
+            key={source}
+            source={source}
+            onRemove={() => onChange(picked.filter((other) => other !== source))}
+          />
+        ))}
+        {missing.length > 0 && (
+          <AddSourceMenu missing={missing} onAdd={(source) => onChange([...picked, source])} />
+        )}
+      </HStack>
+      <BuiltInBadge />
       <Box width="26px" flexShrink={0} />
     </HStack>
   );
@@ -208,6 +327,7 @@ export function QueryParametersPanel({
   rows,
   typeOptions,
   onAdd,
+  sources,
 }: QueryParametersPanelProps) {
   return (
     <VStack align="stretch" gap={3} width="full">
@@ -230,10 +350,11 @@ export function QueryParametersPanel({
 
       <Box>
         <Text textStyle="micro" fontWeight="600" color="fg.muted" marginBottom={1}>
-          Parameters · declared by you
+          Parameters
         </Text>
         <Stack gap={2}>
-          {rows.length === 0 && (
+          {sources && <SourcesRow sources={sources} />}
+          {rows.length === 0 && !sources && (
             <NoDataInfoBlock
               size="line"
               title="No parameters declared yet."
@@ -243,7 +364,7 @@ export function QueryParametersPanel({
           {rows.map((row) => (
             <ParameterRow key={row.id} row={row} typeOptions={typeOptions} />
           ))}
-          {rows.length > 0 && (
+          {(rows.length > 0 || sources) && (
             <Box>
               <Button size="xs" variant="outline" onClick={onAdd}>
                 <Plus size={14} /> Add parameter

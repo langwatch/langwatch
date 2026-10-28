@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -41,7 +41,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBody:
             PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodySourceType1 |
             PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodySourceType2 |
             PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodySourceType3 | Unset):
-        excluded_origins (list[str] | None | Unset):
     """
 
     name: str | Unset = UNSET
@@ -55,7 +54,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBody:
         | PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodySourceType3
         | Unset
     ) = UNSET
-    excluded_origins: list[str] | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -94,15 +92,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBody:
         else:
             source = self.source.to_dict()
 
-        excluded_origins: list[str] | None | Unset
-        if isinstance(self.excluded_origins, Unset):
-            excluded_origins = UNSET
-        elif isinstance(self.excluded_origins, list):
-            excluded_origins = self.excluded_origins
-
-        else:
-            excluded_origins = self.excluded_origins
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -116,8 +105,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBody:
             field_dict["description"] = description
         if source is not UNSET:
             field_dict["source"] = source
-        if excluded_origins is not UNSET:
-            field_dict["excludedOrigins"] = excluded_origins
 
         return field_dict
 
@@ -210,30 +197,12 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBody:
 
         source = _parse_source(d.pop("source", UNSET))
 
-        def _parse_excluded_origins(data: object) -> list[str] | None | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, list):
-                    raise TypeError()
-                excluded_origins_type_0 = cast(list[str], data)
-
-                return excluded_origins_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(list[str] | None | Unset, data)
-
-        excluded_origins = _parse_excluded_origins(d.pop("excludedOrigins", UNSET))
-
         patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_body = cls(
             name=name,
             code=code,
             queries=queries,
             description=description,
             source=source,
-            excluded_origins=excluded_origins,
         )
 
         patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_body.additional_properties = d

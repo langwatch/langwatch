@@ -69,14 +69,7 @@ export interface DashboardWidgetDefinitionInput {
   readonly prompt?: string;
   /** Where the widget came from; an update without one keeps the stored source. */
   readonly source?: DashboardWidgetSource;
-  /** The origins it leaves out; absent, it follows its board, and an update keeps the stored. */
-  readonly excludedOrigins?: readonly string[];
 }
-
-/** A definition update: absent keeps the stored value; `excludedOrigins: null` clears it. */
-export type DashboardWidgetDefinitionUpdate = Partial<
-  Omit<DashboardWidgetDefinitionInput, "excludedOrigins">
-> & { readonly excludedOrigins?: readonly string[] | null };
 
 /** The proof a cost-gated read runs under (ADR-177 v4.15). */
 export type CostReadOptions = { readonly authorization: Authorization };

@@ -27,15 +27,13 @@ import {
 } from "../model/board-widgets.ts";
 import type { WidgetQuestion } from "../model/widget-questions.ts";
 import { CODE_SOURCE, catalogueSource } from "../model/widget-source.ts";
+import { withStoredSources } from "../model/widget-sources.ts";
 import { offerUndo, withdrawUndo } from "./widget-undo.ts";
 
 /** What a new widget is made from: its name, its stored parts and where it came from. */
 type NewWidget = {
   name: string;
-  definition: Pick<
-    DashboardWidgetDefinition,
-    "code" | "queries" | "description" | "prompt" | "excludedOrigins"
-  >;
+  definition: Pick<DashboardWidgetDefinition, "code" | "queries" | "description" | "prompt">;
   source: DashboardWidgetSource | undefined;
 };
 
@@ -118,7 +116,6 @@ export function useBoardWidgets({
       description: definition.description,
       prompt: definition.prompt,
       source,
-      excludedOrigins: definition.excludedOrigins,
     });
     return created.id;
   };
@@ -141,9 +138,7 @@ export function useBoardWidgets({
               id,
               name,
               code: definition.code,
-              queries: definition.queries,
-              // null clears a setting the widget did not store before: it follows its board.
-              excludedOrigins: definition.excludedOrigins ?? null,
+              queries: withStoredSources(definition.queries),
             }),
           ),
         );
@@ -262,7 +257,12 @@ export function useBoardWidgets({
         write({
           fallbackTitle: "Couldn't save the widget",
           work: async () => {
-            await update.mutateAsync({ projectId, id: widget.id, ...draft });
+            await update.mutateAsync({
+              projectId,
+              id: widget.id,
+              ...draft,
+              queries: withStoredSources(draft.queries),
+            });
           },
         }),
     });

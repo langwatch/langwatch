@@ -17,6 +17,7 @@ import {
   LWQL_VIOLATION_CODES,
   type LangWatchQLViolation,
 } from "./langwatch-ql-violation.ts";
+import { traceSourcesSchema } from "./trace-sources.ts";
 
 /** The project every workbench question is asked about. */
 const lwqlProjectScopeSchemaDefinition = z.object({ projectId: z.string() });
@@ -32,12 +33,12 @@ export interface LwqlRunRequestSchema extends Named<typeof lwqlRunRequestSchemaD
 export const lwqlRunRequestSchema: LwqlRunRequestSchema = lwqlRunRequestSchemaDefinition;
 
 /**
- * One statement run for a surface that leaves trace origins out, as a Dashboards board leaves
- * out Langy's turns. Only this door takes it: the REST query runs what it is sent.
+ * One statement run for a dashboard query, kept to the trace origins it counts (its sources,
+ * dashboards-v2 AC200). Only this door takes them: the REST query runs what it is sent.
  */
 const lwqlQueryRequestSchemaDefinition = z.object({
   ...lwqlRunRequestSchema.shape,
-  excludeOrigins: z.array(z.string().min(1).max(64)).max(20).readonly().optional(),
+  sources: traceSourcesSchema.readonly().optional(),
 });
 export interface LwqlQueryRequestSchema extends Named<typeof lwqlQueryRequestSchemaDefinition> {}
 export const lwqlQueryRequestSchema: LwqlQueryRequestSchema = lwqlQueryRequestSchemaDefinition;

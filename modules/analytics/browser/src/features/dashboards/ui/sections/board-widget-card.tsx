@@ -1,7 +1,7 @@
 /**
- * One stored widget on a board, with the drag handle, Ask Langy and menu as its controls. Drawn
- * over the board's period, leaving out what its "Langy traces" setting names, else the board's
- * (AC200f); the menu opens the editor on it, copies its id or API call, and drafts Langy actions.
+ * One stored widget on a board, in the card chrome, with the drag handle, Ask Langy and menu
+ * as its controls, and its queries' sources underneath (AC200). Drawn over the board's period
+ * and grain; the menu opens the editor, copies its id or API call, and drafts Langy actions.
  */
 
 import { Box } from "@langwatch/design-system/primitives";
@@ -15,10 +15,12 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
-import { type BoardQueryContext, widgetExcludedOrigins } from "../../model/board-period.ts";
+import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
+import { picksNoSources, widgetSourcesLine } from "../../model/widget-sources.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
+import { NoSourcesPicked } from "../blocks/no-sources-picked.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 
@@ -52,7 +54,7 @@ export function BoardWidgetCard({
   dashboardId: string;
   /** The board's name, which an exported file is named for. */
   boardName: string;
-  period: BoardQueryContext;
+  period: BoardPeriod;
   isWriting: boolean;
   langy?: WidgetCardLangy;
   /**
@@ -73,10 +75,6 @@ export function BoardWidgetCard({
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
   const { periodStart, periodEnd, granularitySeconds } = period;
-  const excludeOrigins = widgetExcludedOrigins({
-    stored: widget.definition.excludedOrigins,
-    board: period.excludeOrigins,
-  });
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],
@@ -86,6 +84,7 @@ export function BoardWidgetCard({
     <WidgetCardShell
       name={widget.name}
       description={widget.definition.description}
+      footer={widgetSourcesLine(widget.definition.queries)}
       controls={
         <>
           {onEdit && (
@@ -121,22 +120,25 @@ export function BoardWidgetCard({
         </>
       }
     >
-      <DashboardWidgetFrameOverWindow
-        id={widget.id}
-        graph={widget.definition}
-        projectId={projectId}
-        projectSlug={projectSlug}
-        dashboardId={dashboardId}
-        widgetName={widget.name}
-        maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
-        timeWindow={timeWindow}
-        granularitySeconds={granularitySeconds}
-        excludeOrigins={excludeOrigins}
-        onFaceChange={setFace}
-        onExportChange={csvExport.onExportChange}
-        onEmptyChange={onEmptyChange}
-        {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
-      />
+      {picksNoSources(widget.definition.queries) ? (
+        <NoSourcesPicked />
+      ) : (
+        <DashboardWidgetFrameOverWindow
+          id={widget.id}
+          graph={widget.definition}
+          projectId={projectId}
+          projectSlug={projectSlug}
+          dashboardId={dashboardId}
+          widgetName={widget.name}
+          maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
+          timeWindow={timeWindow}
+          granularitySeconds={granularitySeconds}
+          onFaceChange={setFace}
+          onExportChange={csvExport.onExportChange}
+          onEmptyChange={onEmptyChange}
+          {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
+        />
+      )}
     </WidgetCardShell>
   );
 }

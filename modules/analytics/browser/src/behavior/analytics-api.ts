@@ -243,22 +243,13 @@ type BorrowedProcedures = {
           description?: string;
           prompt?: string;
           source?: DashboardWidgetSource;
-          /** The widget's "Langy traces" setting; absent, it follows its board. */
-          excludedOrigins?: string[];
         };
         output: DashboardWidget;
       };
     };
     update: {
       mutation: {
-        input: ProjectScope & {
-          id: string;
-          name?: string;
-          code: string;
-          queries: unknown[];
-          /** Kept as stored when absent; null clears it. */
-          excludedOrigins?: string[] | null;
-        };
+        input: ProjectScope & { id: string; name?: string; code: string; queries: unknown[] };
         output: { success: true };
       };
     };

@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
- * The origins a widget leaves out, as the query door receives them: by default Langy's, else its
- * own "Langy traces" setting from the editor, else its board's stored list. Only the sandboxed
- * frame is stood in for, since jsdom cannot run it.
- * @see modules/dashboard/specs/dashboards-v2.feature
+ * A widget query's sources, as the query door receives them and the editor and card show them:
+ * what the query stores, else application. Only the sandboxed frame is stood in for, since jsdom
+ * cannot run it.
+ * @see modules/dashboard/specs/dashboards-v2.feature AC200
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
@@ -38,8 +38,8 @@ import {
   type StubAnalyticsHostOptions,
 } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
-import { boardExcludedOrigins } from "../model/board-period.ts";
 import { curatedBoardById } from "../model/curated-boards.ts";
+import { CATALOGUE_QUERY_SOURCES } from "../templates/model/template-widget.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
@@ -61,13 +61,9 @@ const BOARD = {
   isStarred: false,
   updatedAt: new Date("2026-01-01"),
 };
-/** A stored widget's definition, which may carry its own Langy traces setting. */
-const GRAPH: {
-  version: 1;
-  code: string;
-  queries: { name: string; sql: string }[];
-  excludedOrigins?: string[];
-} = {
+type StoredQuery = { name: string; sql: string; sources?: string[] | null };
+/** A stored widget's definition; its query stores no sources, as one saved before them. */
+const GRAPH: { version: 1; code: string; queries: StoredQuery[] } = {
   version: 1,
   code: "export default function Widget() { return null; }",
   queries: [{ name: "main", sql: "SELECT count() AS n FROM traces" }],
@@ -93,7 +89,7 @@ const OTHER_WIDGET = {
 
 /**
  * Langy's turns as the store holds them: source gateway, origin langy. A statement naming
- * them reads them unless "langy" is left out, as the server's origin scope does; others read none.
+ * them reads them when the run's sources hold "langy", as the server's scope does.
  */
 const LANGY_TURN_SQL =
   "SELECT toStartOfDay(OccurredAt) AS day, count() AS n FROM traces " +
@@ -102,21 +98,25 @@ const LANGY_TURN_ROWS = [
   { day: "2026-10-20", n: 2 },
   { day: "2026-10-21", n: 9 },
 ];
-function langyTurnRows(input: { sql: string; excludeOrigins?: readonly string[] }) {
-  const hidden = input.excludeOrigins?.includes("langy") === true;
-  return input.sql === LANGY_TURN_SQL && !hidden ? LANGY_TURN_ROWS : [];
+function langyTurnRows(input: { sql: string; sources?: readonly string[] }) {
+  const counted = input.sources?.includes("langy") === true;
+  return input.sql === LANGY_TURN_SQL && counted ? LANGY_TURN_ROWS : [];
+}
+
+/** A query as the server stores an update: absent keeps the stored list, null drops it. */
+function storedQuery(sent: StoredQuery, held: readonly StoredQuery[]): StoredQuery {
+  const { sources, ...query } = sent;
+  const kept = sources === undefined ? held.find((h) => h.name === query.name)?.sources : sources;
+  return kept === undefined || kept === null ? query : { ...query, sources: kept };
 }
 
 /**
  * One stored board with its widgets, and a query door that answers no rows; calls are kept.
  * `dashboardWidgets.update` stores the widget it is sent, as the server does.
  */
-function boardServer({
-  excludedOrigins = null,
-  widgets = [WIDGET],
-}: { excludedOrigins?: string[] | null; widgets?: readonly (typeof WIDGET)[] } = {}) {
+function boardServer({ widgets = [WIDGET] }: { widgets?: readonly (typeof WIDGET)[] } = {}) {
   const calls: UiProcedureCall[] = [];
-  const stored = { ...BOARD, excludedOrigins };
+  const stored = { ...BOARD };
   const storedWidgets = widgets.map((widget) => structuredClone(widget));
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
@@ -128,29 +128,20 @@ function boardServer({
       case "dashboardWidgets.list":
         return Promise.resolve(structuredClone(storedWidgets));
       case "dashboardWidgets.update": {
-        const {
-          id,
-          name,
-          code,
-          queries,
-          excludedOrigins: origins,
-        } = call.input as {
+        const { id, name, code, queries } = call.input as {
           id: string;
           name?: string;
           code: string;
-          queries: { name: string; sql: string }[];
-          excludedOrigins?: string[] | null;
+          queries: StoredQuery[];
         };
         const widget = storedWidgets.find((candidate) => candidate.id === id);
         if (widget) {
           widget.name = name ?? widget.name;
-          const { excludedOrigins: held, ...rest } = widget.graph;
-          const kept = origins === undefined ? held : (origins ?? undefined);
+          const held = widget.graph.queries;
           widget.graph = {
-            ...rest,
+            ...widget.graph,
             code,
-            queries,
-            ...(kept === undefined ? {} : { excludedOrigins: kept }),
+            queries: queries.map((query) => storedQuery(query, held)),
           };
         }
         return Promise.resolve({ success: true });
@@ -158,7 +149,7 @@ function boardServer({
       case "analytics.lwql.query":
         return Promise.resolve({
           columns: [{ name: "n", type: "UInt64" }],
-          rows: langyTurnRows(call.input as { sql: string; excludeOrigins?: readonly string[] }),
+          rows: langyTurnRows(call.input as { sql: string; sources?: readonly string[] }),
           statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
           diagnostics: [],
           followsTimeWindow: false,
@@ -175,6 +166,7 @@ function boardServer({
         ? [
             input as {
               sql: string;
+              sources?: unknown;
               excludeOrigins?: unknown;
               granularitySeconds?: number;
               timeWindow?: { start: string; end: string };
@@ -184,7 +176,9 @@ function boardServer({
     );
   /** What each `dashboardWidgets.update` was sent. */
   const updates = () =>
-    calls.flatMap(({ path, input }) => (path === "dashboardWidgets.update" ? [input] : []));
+    calls.flatMap(({ path, input }) =>
+      path === "dashboardWidgets.update" ? [input as { id: string; queries: StoredQuery[] }] : [],
+    );
   return { answer, runs, updates };
 }
 
@@ -271,31 +265,46 @@ async function openEditor(user: ReturnType<typeof userEvent.setup>): Promise<HTM
   return drawer;
 }
 
-/** The Langy traces choice the editor shows as picked. */
-function pickedLangyTraces(drawer: HTMLElement): string | undefined {
-  const control = within(drawer).getByTestId("widget-langy-control");
-  const picked = within(control)
-    .getAllByRole("radio")
-    .find((radio) => (radio as HTMLInputElement).checked);
-  return picked?.closest("label")?.textContent ?? undefined;
+/** The sources pills the editor's first query shows, in order. */
+function pickedSources(drawer: HTMLElement): string[] {
+  const row = within(drawer).getByTestId("query-sources");
+  return within(row)
+    .queryAllByRole("button", { name: /^Remove / })
+    .map((button) => button.getAttribute("aria-label")?.replace("Remove ", "") ?? "");
+}
+
+/** Adds one source through the row's "Add source" menu. */
+async function addSource(
+  user: ReturnType<typeof userEvent.setup>,
+  drawer: HTMLElement,
+  source: string,
+) {
+  await user.click(
+    within(within(drawer).getByTestId("query-sources")).getByRole("button", { name: /Add source/ }),
+  );
+  await user.click(await screen.findByRole("menuitem", { name: source }));
+}
+
+/** Saves the editor and waits for it to close. */
+async function save(user: ReturnType<typeof userEvent.setup>, drawer: HTMLElement) {
+  await user.click(within(drawer).getByRole("button", { name: "Save" }));
+  await vi.waitFor(() => expect(screen.queryByRole("tab", { name: "API / MCP" })).toBeNull());
 }
 
 /** Opens the stored board in the project in view, a personal one when asked. */
 function openBoard({
   isPersonal = false,
-  excludedOrigins = null,
   permissions = MEMBER,
   widgets,
   query = {},
 }: {
   isPersonal?: boolean;
-  excludedOrigins?: string[] | null;
   permissions?: readonly string[];
   widgets?: readonly (typeof WIDGET)[];
   /** The board's address, such as its range and grain. */
   query?: Readonly<Record<string, string>>;
 } = {}) {
-  const server = boardServer({ excludedOrigins, ...(widgets ? { widgets } : {}) });
+  const server = boardServer(widgets ? { widgets } : {});
   const host = new AddressedHost({
     flags: FLAGS,
     permissions,
@@ -315,287 +324,204 @@ function openBoard({
   return { ...server, host };
 }
 
-describe("given a member opens a stored board", () => {
-  describe("when a widget's card runs its query", () => {
-    /** @scenario "AC193 Langy: the origins a board leaves out are a list a board parameter can set later" */
-    it("names the origins the board leaves out as a list, langy by default", async () => {
-      const server = openBoard();
+const sourcesOf = (runs: ReturnType<ReturnType<typeof boardServer>["runs"]>) =>
+  runs.map((run) => run.sources);
 
-      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+describe("given a stored widget whose query stores no sources", () => {
+  /** @scenario "AC200f Sources: a query that stores none counts application traces" */
+  it("runs the card and the preview with application, and the pills show the same set", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const server = openBoard();
+    await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
 
-      expect(server.runs()).toEqual([
-        expect.objectContaining({ sql: WIDGET.graph.queries[0]?.sql, excludeOrigins: ["langy"] }),
-      ]);
+    const drawer = await openEditor(user);
+    await frameRuns({
+      frame: await within(drawer).findByTestId("sandboxed-frame"),
+      queryName: "main",
     });
+
+    expect(sourcesOf(server.runs())).toEqual([["application"], ["application"]]);
+    expect(pickedSources(drawer)).toEqual(["application"]);
+    expect(server.runs().every((run) => run.excludeOrigins === undefined)).toBe(true);
   });
 
-  describe("when the member opens the widget's editor", () => {
-    /** @scenario "AC190 Langy: every widget on a board leaves out Langy's conversations by default" */
-    it("runs the preview with the origins the card leaves out", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const server = openBoard();
-      const card = await screen.findByTestId("sandboxed-frame");
+  /** @scenario "AC200 Sources: each query shows its sources as pills, and the card names them" */
+  it("shows the sources row under Parameters with a built-in badge, and the card's line", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    openBoard();
+    await screen.findByTestId("sandboxed-frame");
 
-      await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Edit code" }));
-      await screen.findByRole("tab", { name: "API / MCP" });
-      const drawer = screen
-        .getAllByRole("dialog")
-        .find((dialog) => within(dialog).queryByRole("tab", { name: "API / MCP" }));
-      if (!drawer) throw new Error("the editor did not open");
-      const preview = await within(drawer).findByTestId("sandboxed-frame");
-      await frameRuns({ frame: card, queryName: "main" });
-      await frameRuns({ frame: preview, queryName: "main" });
+    const footer = screen.getByTestId("widget-card-footer");
+    const drawer = await openEditor(user);
+    const row = within(drawer).getByTestId("query-sources");
 
-      expect(preview).not.toBe(card);
-      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([["langy"], ["langy"]]);
-    });
+    expect(footer.textContent).toBe("Sources: application");
+    expect(within(drawer).getByText("Parameters")).toBeTruthy();
+    expect(within(drawer).queryByText(/declared by you/)).toBeNull();
+    expect(within(drawer).queryByText("No parameters declared yet.")).toBeNull();
+    expect(within(row).getByText("built-in")).toBeTruthy();
+    expect(within(drawer).getByRole("button", { name: /Add parameter/ })).toBeTruthy();
+  });
+
+  /** @scenario "AC200f Sources: a query that stores none counts application traces" */
+  it("saves another edit without writing sources onto the query", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const server = openBoard();
+    await screen.findByTestId("sandboxed-frame");
+
+    const drawer = await openEditor(user);
+    await user.click(within(drawer).getByRole("button", { name: `Rename ${WIDGET.name}` }));
+    await user.keyboard("{Control>}a{/Control}Renamed{Enter}");
+    await save(user, drawer);
+
+    expect(server.updates()[0]?.queries).toEqual([{ ...GRAPH.queries[0], sources: null }]);
   });
 });
 
-describe("given a member opens a stored board in their personal project", () => {
-  describe("when a widget's card runs its query", () => {
-    /** @scenario "AC198 Langy: a board in a personal project shows Langy's conversations" */
-    it("leaves out no origin, so the widget counts Langy's conversations too", async () => {
-      const server = openBoard({ isPersonal: true });
+describe("given a member changes a query's sources in the editor", () => {
+  /** @scenario "AC200b Sources: a query saved with picked sources counts only traces of those origins" */
+  it("stores the picked list on that query and runs the card with it; the other widget keeps its own", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const server = openBoard({ widgets: [WIDGET, OTHER_WIDGET] });
+    await screen.findAllByTestId("sandboxed-frame");
 
-      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+    const drawer = await openEditor(user);
+    await addSource(user, drawer, "langy");
+    const picked = pickedSources(drawer);
+    await save(user, drawer);
+    await vi.waitFor(() => expect(screen.getAllByTestId("sandboxed-frame")).toHaveLength(2));
+    await frameRuns({ frame: cardFrame(WIDGET.graph.code), queryName: "main" });
+    await frameRuns({ frame: cardFrame(OTHER_WIDGET.graph.code), queryName: "main" });
 
-      expect(server.runs()).toEqual([
-        expect.objectContaining({ sql: WIDGET.graph.queries[0]?.sql, excludeOrigins: [] }),
-      ]);
+    expect(picked).toEqual(["application", "langy"]);
+    expect(server.updates()[0]?.queries[0]?.sources).toEqual(["application", "langy"]);
+    expect(sourcesOf(server.runs())).toEqual([["application", "langy"], ["application"]]);
+  });
+
+  /** @scenario "AC200g Sources: changing them runs the preview again" */
+  it("runs the preview again with the new list, and Cancel stores nothing", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const server = openBoard();
+    await screen.findByTestId("sandboxed-frame");
+    const drawer = await openEditor(user);
+    const before = await within(drawer).findByTestId("sandboxed-frame");
+    await frameRuns({ frame: before, queryName: "main" });
+
+    await addSource(user, drawer, "simulation");
+    const after = await vi.waitFor(() => {
+      const frame = within(drawer).getByTestId("sandboxed-frame");
+      if (frame === before) throw new Error("the preview has not run again yet");
+      return frame;
     });
+    await frameRuns({ frame: after, queryName: "main" });
+    await user.click(within(drawer).getByTestId("analytics-widget-cancel"));
+    await vi.waitFor(() => expect(screen.queryByRole("tab", { name: "API / MCP" })).toBeNull());
+
+    expect(sourcesOf(server.runs())).toEqual([["application"], ["application", "simulation"]]);
+    expect(server.updates()).toEqual([]);
+  });
+
+  /** @scenario "AC200m Sources: a query with no source picked counts nothing and says so" */
+  it("stores an empty list when the last pill goes, and the preview and card say no sources are picked", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const server = openBoard();
+    await screen.findByTestId("sandboxed-frame");
+    const drawer = await openEditor(user);
+
+    await user.click(within(drawer).getByRole("button", { name: "Remove application" }));
+    await vi.waitFor(() => expect(within(drawer).getByTestId("no-sources-picked")).toBeTruthy());
+    const preview = within(drawer).getByTestId("widget-preview-sources").textContent;
+    await save(user, drawer);
+
+    expect(preview).toBe("No sources picked");
+    expect(server.updates()[0]?.queries[0]?.sources).toEqual([]);
+    await vi.waitFor(() => expect(screen.getByTestId("no-sources-picked")).toBeTruthy());
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe("No sources picked");
+    expect(screen.queryByTestId("sandboxed-frame")).toBeNull();
   });
 });
 
-describe("given a member opens a From LangWatch board", () => {
-  /** @scenario "AC190 Langy: every widget on a board leaves out Langy's conversations by default" */
-  it("runs every widget's query with Langy's origin left out", async () => {
-    const server = boardServer();
-    const host = new StubAnalyticsHost({
-      flags: FLAGS,
-      permissions: MEMBER,
-      route: { params: { templateId: "release" }, query: {} },
-    });
-    const widgets = curatedBoardById("release")?.widgets ?? [];
-    renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
-    await screen.findByRole("heading", { name: "Release check" });
+describe("given a member saves only a query's sources and presses Undo", () => {
+  /** @scenario "AC200k Sources: Undo puts a query's sources back, including back to none" */
+  it("clears a list the query did not store, so it counts application again", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const server = openBoard();
+    await screen.findByTestId("sandboxed-frame");
+    const drawer = await openEditor(user);
+    await addSource(user, drawer, "langy");
+    await save(user, drawer);
+    await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
 
-    for (const frame of screen.getAllByTestId("sandboxed-frame")) {
-      const widget = widgets.find(({ definition }) => definition.code === frames.get(frame)?.code);
-      const queryName = widget?.definition.queries[0]?.name;
-      if (queryName) await frameRuns({ frame, queryName });
-    }
+    await user.click(await screen.findByRole("button", { name: "Undo" }));
+    await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
 
-    expect(server.runs().length).toBe(widgets.length);
-    expect(server.runs().length).toBeGreaterThan(0);
-    expect(server.runs().map((run) => run.excludeOrigins)).toEqual(widgets.map(() => ["langy"]));
+    expect(server.updates()[1]?.queries[0]?.sources).toBeNull();
+    await vi.waitFor(() =>
+      expect(screen.getByTestId("widget-card-footer").textContent).toBe("Sources: application"),
+    );
+  });
+
+  /** @scenario "AC200k Sources: Undo puts a query's sources back, including back to none" */
+  it("writes a stored list back", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const langy = { ...GRAPH.queries[0]!, sources: ["langy"] };
+    const server = openBoard({ widgets: [{ ...WIDGET, graph: { ...GRAPH, queries: [langy] } }] });
+    await screen.findByTestId("sandboxed-frame");
+    const drawer = await openEditor(user);
+    await addSource(user, drawer, "application");
+    await save(user, drawer);
+    await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
+
+    await user.click(await screen.findByRole("button", { name: "Undo" }));
+    await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
+
+    expect(server.updates()[1]?.queries[0]?.sources).toEqual(["langy"]);
+  });
+});
+
+describe("given a member who may not edit the board", () => {
+  /** @scenario "AC200d Sources: only a member who can edit the board changes them" */
+  it("shows the card's sources line and no way into the editor", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    openBoard({ permissions: MEMBER.filter((grant) => grant !== "analytics:update") });
+    await screen.findByTestId("sandboxed-frame");
+
+    await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
+    await screen.findByRole("menuitem", { name: "Copy widget id" });
+
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe("Sources: application");
+    expect(screen.queryByRole("menuitem", { name: "Edit code" })).toBeNull();
   });
 });
 
 describe("given a From LangWatch board", () => {
-  /** @scenario "AC200h Langy setting: a From LangWatch board's widgets keep the board's rule" */
-  it("shows no Langy traces control and leaves langy out", async () => {
-    const server = boardServer();
-    const host = new StubAnalyticsHost({
-      flags: FLAGS,
-      permissions: MEMBER,
-      route: { params: { templateId: "release" }, query: {} },
-    });
-    renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
-    await screen.findByRole("heading", { name: "Release check" });
-    const frame = screen.getAllByTestId("sandboxed-frame")[0]!;
-    const widget = curatedBoardById("release")?.widgets.find(
-      ({ definition }) => definition.code === frames.get(frame)?.code,
-    );
-    await frameRuns({ frame, queryName: widget?.definition.queries[0]?.name ?? "" });
-
-    expect(screen.queryByText("Langy traces")).toBeNull();
-    expect(server.runs().map((run) => run.excludeOrigins)).toEqual([
-      boardExcludedOrigins({ stored: null, isPersonalProject: false }),
-    ]);
-  });
-
-  /** @scenario "AC200h Langy setting: a From LangWatch board's widgets keep the board's rule" */
-  it("leaves out no origin in a personal project", async () => {
-    const server = boardServer();
-    const host = new StubAnalyticsHost({
-      flags: FLAGS,
-      permissions: MEMBER,
-      project: { ...PROJECT, isPersonal: true },
-      route: { params: { templateId: "release" }, query: {} },
-    });
-    renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
-    await screen.findByRole("heading", { name: "Release check" });
-    const frame = screen.getAllByTestId("sandboxed-frame")[0]!;
-    const widget = curatedBoardById("release")?.widgets.find(
-      ({ definition }) => definition.code === frames.get(frame)?.code,
-    );
-    await frameRuns({ frame, queryName: widget?.definition.queries[0]?.name ?? "" });
-
-    expect(server.runs().map((run) => run.excludeOrigins)).toEqual([
-      boardExcludedOrigins({ stored: null, isPersonalProject: true }),
-    ]);
-  });
-});
-
-describe("given a widget's Langy traces setting", () => {
-  describe("when the widget stores none and its board leaves langy out", () => {
-    /** @scenario "AC200 Langy setting: the widget editor shows the setting a widget runs with" */
-    it("shows Left out beside the queries, with a hint, and leaves langy out", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const server = openBoard({ excludedOrigins: ["langy"] });
-      const card = await screen.findByTestId("sandboxed-frame");
-      await frameRuns({ frame: card, queryName: "main" });
-
-      const drawer = await openEditor(user);
-      await frameRuns({
-        frame: await within(drawer).findByTestId("sandboxed-frame"),
-        queryName: "main",
+  /** @scenario "AC200h Sources: a From LangWatch board's widgets count every origin but Langy's" */
+  it("runs every widget with the catalogue's sources, in a personal project too", async () => {
+    for (const isPersonal of [false, true]) {
+      const server = boardServer();
+      const host = new StubAnalyticsHost({
+        flags: FLAGS,
+        permissions: MEMBER,
+        project: { ...PROJECT, isPersonal },
+        route: { params: { templateId: "release" }, query: {} },
       });
+      const widgets = curatedBoardById("release")?.widgets ?? [];
+      renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
+      await screen.findByRole("heading", { name: "Release check" });
+      for (const frame of screen.getAllByTestId("sandboxed-frame")) {
+        const widget = widgets.find(
+          ({ definition }) => definition.code === frames.get(frame)?.code,
+        );
+        const queryName = widget?.definition.queries[0]?.name;
+        if (queryName) await frameRuns({ frame, queryName });
+      }
 
-      expect(pickedLangyTraces(drawer)).toBe("Left out");
-      expect(within(drawer).getByText("This widget counts your agent's traces only.")).toBeTruthy();
-      expect(screen.queryAllByText("Langy traces")).toHaveLength(1);
-      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([["langy"], ["langy"]]);
-    });
-  });
-
-  describe("when a member picks Included and saves", () => {
-    /** @scenario "AC200b Langy setting: a widget saved as Included runs with no origin left out" */
-    it("stores the empty list on that widget and runs its card with Langy counted", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const server = openBoard({ excludedOrigins: ["langy"], widgets: [WIDGET, OTHER_WIDGET] });
-      await screen.findAllByTestId("sandboxed-frame");
-
-      const drawer = await openEditor(user);
-      await user.click(within(drawer).getByRole("radio", { name: "Included" }));
-      await user.click(within(drawer).getByRole("button", { name: "Save" }));
-      await vi.waitFor(() => expect(screen.queryByRole("tab", { name: "API / MCP" })).toBeNull());
-      await vi.waitFor(() => expect(screen.getAllByTestId("sandboxed-frame")).toHaveLength(2));
-      await frameRuns({ frame: cardFrame(WIDGET.graph.code), queryName: "main" });
-      await frameRuns({ frame: cardFrame(OTHER_WIDGET.graph.code), queryName: "main" });
-
-      expect(server.updates()).toEqual([
-        expect.objectContaining({ id: WIDGET.id, excludedOrigins: [] }),
-      ]);
-      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([[], ["langy"]]);
-    });
-  });
-
-  describe("when a member saves only the Langy setting and presses Undo", () => {
-    /** @scenario "AC200k Langy setting: Undo puts the setting back, including back to none" */
-    it("clears a setting the widget did not store, and restores one it did", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const server = openBoard({ excludedOrigins: ["langy"] });
-      await screen.findByTestId("sandboxed-frame");
-      const drawer = await openEditor(user);
-      await user.click(within(drawer).getByRole("radio", { name: "Included" }));
-      await user.click(within(drawer).getByRole("button", { name: "Save" }));
-      await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
-
-      await user.click(await screen.findByRole("button", { name: "Undo" }));
-      await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
-
-      expect(server.updates()[1]).toEqual(
-        expect.objectContaining({ id: WIDGET.id, excludedOrigins: null }),
+      expect(server.runs().length).toBeGreaterThan(0);
+      expect(new Set(server.runs().map((run) => JSON.stringify(run.sources)))).toEqual(
+        new Set([JSON.stringify(CATALOGUE_QUERY_SOURCES)]),
       );
-      await vi.waitFor(async () => {
-        const reopened = await openEditor(user);
-        expect(pickedLangyTraces(reopened)).toBe("Left out");
-      });
-    });
-
-    it("writes the stored list back when the widget had one", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const server = openBoard({
-        widgets: [{ ...WIDGET, graph: { ...GRAPH, excludedOrigins: [] } }],
-      });
-      await screen.findByTestId("sandboxed-frame");
-      const drawer = await openEditor(user);
-      await user.click(within(drawer).getByRole("radio", { name: "Left out" }));
-      await user.click(within(drawer).getByRole("button", { name: "Save" }));
-      await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
-
-      await user.click(await screen.findByRole("button", { name: "Undo" }));
-      await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
-
-      expect(server.updates()[1]).toEqual(
-        expect.objectContaining({ id: WIDGET.id, excludedOrigins: [] }),
-      );
-    });
-  });
-
-  describe("when a member picks Included in the editor", () => {
-    /** @scenario "AC200g Langy setting: changing it runs the preview again" */
-    it("runs the preview again with no origin left out, and Cancel stores nothing", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const server = openBoard({ excludedOrigins: ["langy"] });
-      await screen.findByTestId("sandboxed-frame");
-      const drawer = await openEditor(user);
-      const before = await within(drawer).findByTestId("sandboxed-frame");
-      await frameRuns({ frame: before, queryName: "main" });
-
-      await user.click(within(drawer).getByRole("radio", { name: "Included" }));
-      const after = within(drawer).getByTestId("sandboxed-frame");
-      await frameRuns({ frame: after, queryName: "main" });
-      const picked = pickedLangyTraces(drawer);
-      await user.click(within(drawer).getByTestId("analytics-widget-cancel"));
-      await vi.waitFor(() => expect(screen.queryByRole("tab", { name: "API / MCP" })).toBeNull());
-      await frameRuns({ frame: cardFrame(WIDGET.graph.code), queryName: "main" });
-
-      expect(after).not.toBe(before);
-      expect(picked).toBe("Included");
-      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([["langy"], [], ["langy"]]);
-      expect(server.updates()).toEqual([]);
-    });
-  });
-
-  describe("when the board was set to include Langy before widgets carried the setting", () => {
-    /** @scenario "AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default" */
-    it("runs the card with no origin left out and shows Included in the editor", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const server = openBoard({ excludedOrigins: [] });
-      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
-
-      const drawer = await openEditor(user);
-
-      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([[]]);
-      expect(pickedLangyTraces(drawer)).toBe("Included");
-    });
-  });
-
-  describe("when a member saves another edit without touching the setting", () => {
-    /** @scenario "AC200f Langy setting: a widget that stores none follows its board's stored setting, else the default" */
-    it("saves another edit without pinning the board's setting onto the widget", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const server = openBoard({ excludedOrigins: [] });
-      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
-
-      const drawer = await openEditor(user);
-      await user.click(within(drawer).getByRole("button", { name: `Rename ${WIDGET.name}` }));
-      await user.keyboard("{Control>}a{/Control}Renamed{Enter}");
-      await user.click(within(drawer).getByRole("button", { name: "Save" }));
-      await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
-
-      expect(server.updates()[0]).toEqual(expect.objectContaining({ name: "Renamed" }));
-      expect(server.updates()[0]).not.toHaveProperty("excludedOrigins");
-    });
-  });
-
-  describe("when a member who may not edit the board opens it", () => {
-    /** @scenario "AC200d Langy setting: only a member who can edit the board sees the setting" */
-    it("shows no Langy traces control and no way into the editor", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      openBoard({ permissions: MEMBER.filter((grant) => grant !== "analytics:update") });
-      await screen.findByTestId("sandboxed-frame");
-
-      await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
-      await screen.findByRole("menuitem", { name: "Copy widget id" });
-
-      expect(screen.queryByText("Langy traces")).toBeNull();
-      expect(screen.queryByRole("menuitem", { name: "Edit code" })).toBeNull();
-    });
+      cleanup();
+    }
   });
 });
 
@@ -604,9 +530,12 @@ const LANGY_TURN_WIDGET = {
   name: "Langy requests",
   graph: { ...GRAPH, queries: [{ name: "turns", sql: LANGY_TURN_SQL }] },
 };
-const INCLUDED_LANGY_TURN_WIDGET = {
+const COUNTING_LANGY_TURN_WIDGET = {
   ...LANGY_TURN_WIDGET,
-  graph: { ...LANGY_TURN_WIDGET.graph, excludedOrigins: [] },
+  graph: {
+    ...LANGY_TURN_WIDGET.graph,
+    queries: [{ name: "turns", sql: LANGY_TURN_SQL, sources: ["langy"] }],
+  },
 };
 
 /** Runs the card's "turns" query, as LW.useChartQuery does on load. */
@@ -615,41 +544,29 @@ async function runTurns() {
 }
 
 describe("given a widget counting Langy's turns, stored from the gateway with origin langy", () => {
-  describe("when the widget is set to Included", () => {
-    /** @scenario "AC201 Widget data: a widget set to Included reads Langy's turns, the gateway-stored ones included" */
-    it("leaves no origin out and returns the turns through LW.useChartQuery", async () => {
-      const server = openBoard({ widgets: [INCLUDED_LANGY_TURN_WIDGET] });
+  describe("when its query's sources hold langy", () => {
+    /** @scenario "AC201 Widget data: a query whose sources hold langy reads Langy's turns, the gateway-stored ones included" */
+    it("sends langy and returns the turns through LW.useChartQuery", async () => {
+      const server = openBoard({ widgets: [COUNTING_LANGY_TURN_WIDGET] });
 
       const answer = await runTurns();
 
       expect(server.runs()).toEqual([
-        expect.objectContaining({ sql: LANGY_TURN_SQL, excludeOrigins: [] }),
+        expect.objectContaining({ sql: LANGY_TURN_SQL, sources: ["langy"] }),
       ]);
       expect(answer?.rows).toEqual(LANGY_TURN_ROWS);
     });
   });
 
-  describe("when the widget and its board store no setting", () => {
-    /** @scenario "AC201b Widget data: a widget left at the default leaves Langy's turns out" */
-    it("names langy on the run and reads none of the turns", async () => {
-      const server = openBoard({ widgets: [LANGY_TURN_WIDGET] });
+  describe("when its query stores no sources", () => {
+    /** @scenario "AC201b Widget data: a query left at the default leaves Langy's turns out" */
+    it("sends application and reads none of the turns, in a personal project too", async () => {
+      const server = openBoard({ isPersonal: true, widgets: [LANGY_TURN_WIDGET] });
 
       const answer = await runTurns();
 
-      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([["langy"]]);
+      expect(sourcesOf(server.runs())).toEqual([["application"]]);
       expect(answer?.rows).toEqual([]);
-    });
-  });
-
-  describe("when the board stores that it leaves no origin out", () => {
-    /** @scenario "AC201e Widget data: a board's explicit setting applies to widgets with no own value" */
-    it("runs the widget with no origin left out and shows the turns", async () => {
-      const server = openBoard({ excludedOrigins: [], widgets: [LANGY_TURN_WIDGET] });
-
-      const answer = await runTurns();
-
-      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([[]]);
-      expect(answer?.rows).toEqual(LANGY_TURN_ROWS);
     });
   });
 });

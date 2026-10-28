@@ -1,9 +1,10 @@
 /**
- * Editor for one query's declared parameters, checked against a live
- * `LW.query` call by `validateDashboardWidgetQueryParams`. Each row is a
- * name, JS type, and optional default — the Run button's only value source.
+ * Editor for one query's declared parameters, checked against a live `LW.query` call by
+ * `validateDashboardWidgetQueryParams`. Each row is a name, JS type and optional default, the
+ * Run button's only value source; the built-in `sources` row leads them, as the query runs.
  */
 
+import { effectiveSources, TRACE_SOURCES, type TraceSource } from "@langwatch/analytics-contract";
 import {
   type DashboardWidgetQuery,
   type DashboardWidgetQueryParameterDeclaration,
@@ -92,14 +93,25 @@ function rowVM({
 interface DashboardWidgetQueryParamsEditorProps {
   params: DashboardWidgetQueryParameterDeclaration[];
   onChange: (params: DashboardWidgetQueryParameterDeclaration[]) => void;
+  /** What the query stores; absent or null, it runs with the default and shows it. */
+  sources: readonly TraceSource[] | null | undefined;
+  /** Any change stores the list, the default included once a pill is touched. */
+  onSourcesChange: (sources: TraceSource[]) => void;
 }
 
 export function DashboardWidgetQueryParamsEditor({
   params,
   onChange,
+  sources,
+  onSourcesChange,
 }: DashboardWidgetQueryParamsEditorProps) {
   return (
     <QueryParametersPanel
+      sources={{
+        picked: effectiveSources(sources),
+        all: TRACE_SOURCES,
+        onChange: onSourcesChange,
+      }}
       reserved={RESERVED_PARAMETERS}
       typeOptions={TYPE_OPTIONS}
       rows={params.map((param, index) =>

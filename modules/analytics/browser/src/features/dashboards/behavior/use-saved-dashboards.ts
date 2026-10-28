@@ -23,8 +23,6 @@ export type SavedBoard = {
   createdById: string | null;
   scope: DashboardScope;
   organizationId: string | null;
-  /** The origins a widget that sets none leaves out; null keeps the default (AC200f). */
-  excludedOrigins: readonly string[] | null;
   /** The owning project, named only where the board is listed in another project. */
   ownerProject: DashboardProject | null;
   /** Whether the member reading the list has starred it. */
@@ -42,7 +40,6 @@ function savedBoardOf({
   createdById,
   scope,
   organizationId,
-  excludedOrigins,
   ownerProject,
   isStarred,
   updatedAt,
@@ -55,7 +52,6 @@ function savedBoardOf({
     createdById,
     scope,
     organizationId,
-    excludedOrigins,
     ownerProject,
     isStarred,
     updatedAt,

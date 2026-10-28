@@ -29,16 +29,15 @@ vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
-import type { BoardQueryContext } from "../model/board-period.ts";
+import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { BoardWidgetCard } from "../ui/sections/board-widget-card.tsx";
 import { renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
-const PERIOD: BoardQueryContext = {
+const PERIOD: BoardPeriod = {
   periodStart: Date.UTC(2026, 9, 1),
   periodEnd: Date.UTC(2026, 9, 31),
   granularitySeconds: 86_400,
-  excludeOrigins: [],
 };
 const CODE = "export default function Widget() { return null; }";
 const OLD_SQL = "SELECT count() AS n FROM traces WHERE TraceName = 'langy.trun'";

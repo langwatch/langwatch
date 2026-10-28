@@ -7,6 +7,7 @@ import type {
   LangWatchQLAcceptedStatement,
   LangWatchQLAppFunctionCall,
 } from "./langwatch-ql-app-functions.ts";
+import type { TraceSource } from "./trace-sources.ts";
 
 /** One column in a LangWatchQL result. */
 const langWatchQLColumnSchemaDefinition = z
@@ -280,8 +281,8 @@ export type LangWatchQLRunContext = Readonly<{
   timeWindow?: LangWatchQLTimeWindow;
   granularitySeconds?: number;
   onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
-  /** Trace origins the surface leaves out of every view the statement reads; none when absent. */
-  excludeOrigins?: readonly string[];
+  /** The trace origins a dashboard query counts (AC200); every origin when absent. */
+  sources?: readonly TraceSource[];
   /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */
   signal?: AbortSignal;
 }>;

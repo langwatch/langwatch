@@ -110,10 +110,8 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   });
   const { range } = useBoardRange();
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
-  // The board's stored list is only the fallback for a widget that sets none (AC200f).
   const { grain, period, setRange, setGrain } = useBoardPeriod({
     refreshedAt: autoRefresh.refreshedAt,
-    excludedOrigins: board.excludedOrigins,
   });
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.

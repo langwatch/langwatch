@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { lwqlQueryRequestSchema } from "../analytics-lwql.trpc.ts";
 import { TRACE_SOURCES, traceSourceScope, traceSourcesSchema } from "../trace-sources.ts";
 
 describe("TRACE_SOURCES", () => {
@@ -39,12 +40,20 @@ describe("traceSourceScope", () => {
     it("drops the known origins left unpicked, so every unlisted origin stays", () => {
       expect(traceSourceScope(["application", "other"])).toEqual({
         kind: "exclude",
-        origins: ["simulation", "evaluation", "coding_agent", "gateway", "workflow", "playground", "langy"],
+        origins: [
+          "simulation",
+          "evaluation",
+          "coding_agent",
+          "gateway",
+          "workflow",
+          "playground",
+          "langy",
+        ],
       });
     });
 
     it("drops nothing when every source is picked", () => {
-      expect(traceSourceScope([...TRACE_SOURCES])).toEqual({ kind: "exclude", origins: [] });
+      expect(traceSourceScope([...TRACE_SOURCES])).toEqual({ kind: "every" });
     });
   });
 
@@ -59,10 +68,16 @@ describe("traceSourceScope", () => {
 describe("traceSourcesSchema", () => {
   /** @scenario "AC200n Sources: an unknown source is refused at every door" */
   it("refuses a value outside the nine sources", () => {
-    expect(traceSourcesSchema.safeParse(["application", "langy"]).success).toBe(true);
-    expect(traceSourcesSchema.safeParse(["application", "x'); DROP TABLE t; --"]).success).toBe(
-      false,
-    );
-    expect(traceSourcesSchema.safeParse(["Langy"]).success).toBe(false);
+    expect(traceSourcesSchema.validate(["application", "langy"])).toBe(true);
+    expect(traceSourcesSchema.validate(["application", "x'); DROP TABLE t; --"])).toBe(false);
+    expect(traceSourcesSchema.validate(["Langy"])).toBe(false);
+  });
+
+  /** @scenario "AC200n Sources: an unknown source is refused at every door" */
+  it("is the query door's check too, so an unknown source never reaches the statement", () => {
+    const run = { projectId: "p", sql: "SELECT 1" };
+
+    expect(lwqlQueryRequestSchema.validate({ ...run, sources: ["langy"] })).toBe(true);
+    expect(lwqlQueryRequestSchema.validate({ ...run, sources: ["langy') OR 1"] })).toBe(false);
   });
 });

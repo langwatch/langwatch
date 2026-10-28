@@ -13,7 +13,7 @@ export interface BoardRestorePlan {
   readonly remove: readonly string[];
   /** Widgets that were on the board and are gone: made again, at their old place. */
   readonly recreate: readonly BoardWidget[];
-  /** Widgets whose name, code, queries or Langy setting changed: written back as they were. */
+  /** Widgets whose name, code or queries changed: written back as they were. */
   readonly revert: readonly BoardWidget[];
   /** Widgets moved or resized: put back where they were. */
   readonly layouts: readonly ChartGridPlacement[];
@@ -22,7 +22,6 @@ export interface BoardRestorePlan {
 const sameContent = (a: BoardWidget, b: BoardWidget): boolean =>
   a.name === b.name &&
   a.definition.code === b.definition.code &&
-  JSON.stringify(a.definition.excludedOrigins) === JSON.stringify(b.definition.excludedOrigins) &&
   JSON.stringify(a.definition.queries) === JSON.stringify(b.definition.queries);
 
 const samePlace = (a: ChartGridPlacement, b: ChartGridPlacement): boolean =>

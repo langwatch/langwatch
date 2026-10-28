@@ -1,7 +1,4 @@
-import type {
-  DashboardWidgetDefinitionInput,
-  DashboardWidgetDefinitionUpdate,
-} from "@langwatch/analytics-contract";
+import type { DashboardWidgetDefinitionInput } from "@langwatch/analytics-contract";
 import type { GraphLayout } from "@langwatch/dashboard-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -33,7 +30,7 @@ export interface CreateDashboardWidgetInput {
 }
 
 export interface UpdateDashboardWidgetInput extends DashboardWidgetScope {
-  readonly input: { readonly name?: string } & DashboardWidgetDefinitionUpdate;
+  readonly input: { readonly name?: string } & Partial<DashboardWidgetDefinitionInput>;
 }
 
 export interface AssignDashboardWidgetInput extends DashboardWidgetScope {

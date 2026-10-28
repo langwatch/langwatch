@@ -58,8 +58,6 @@ interface DashboardWidgetEditDrawerProps<Tab extends string> {
   extraTabs?: readonly WidgetEditExtraTab<Tab>[];
   /** Shown between the preview and the tabs, such as an assistant's suggestions. */
   assist?: ReactNode;
-  /** Shown above the queries on the Queries tab: settings that are part of the query. */
-  querySettings?: ReactNode;
   /** The side it opens from; "start" leaves a panel docked on the right in view. */
   placement?: "start" | "end";
   /** Room kept free at the far edge, so a panel docked there sits beside the drawer. */
@@ -110,7 +108,6 @@ export function DashboardWidgetEditDrawer<Tab extends string = WidgetEditTab>({
   onTabChange,
   extraTabs = [],
   assist,
-  querySettings,
   placement = "end",
   reserveEndPx,
 }: DashboardWidgetEditDrawerProps<Tab>) {
@@ -159,7 +156,6 @@ export function DashboardWidgetEditDrawer<Tab extends string = WidgetEditTab>({
         onQueriesChange={onQueriesChange}
         lastRuns={lastRuns}
         onRun={onRun}
-        querySettings={querySettings}
       />
     </Drawer>
   );
@@ -177,7 +173,6 @@ function WidgetEditTabs<Tab extends string>({
   onQueriesChange,
   lastRuns,
   onRun,
-  querySettings,
 }: {
   projectId: string;
   extraTabs: readonly WidgetEditExtraTab<Tab>[];
@@ -189,7 +184,6 @@ function WidgetEditTabs<Tab extends string>({
   onQueriesChange: (queries: DashboardWidgetQuery[]) => void;
   lastRuns: Record<string, QueryLastRun>;
   onRun: (query: DashboardWidgetQuery) => Promise<void>;
-  querySettings?: ReactNode;
 }) {
   const queryColumns = useMemo(
     () =>
@@ -239,11 +233,6 @@ function WidgetEditTabs<Tab extends string>({
           testId: "analytics-widget-tab-queries",
           content: (
             <Box flex={1} minHeight={0} display="flex" flexDirection="column" paddingTop={3}>
-              {querySettings && (
-                <Box flexShrink={0} marginBottom={3}>
-                  {querySettings}
-                </Box>
-              )}
               <DashboardWidgetQueriesPanel
                 projectId={projectId}
                 queries={queries}

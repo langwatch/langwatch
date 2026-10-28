@@ -17,32 +17,14 @@ import {
   widgetEditorOpened,
 } from "../langy/model/board-langy.ts";
 import { BLANK_WIDGET } from "../model/blank-widget.ts";
-import {
-  type BoardQueryContext,
-  boardIncludesLangy,
-  widgetExcludedOrigins,
-} from "../model/board-period.ts";
+import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { widgetShape } from "../model/widget-shape.ts";
 import { useWidgetEditorAddress } from "./use-widget-editor-address.ts";
 
-/** The widget a draft names, the saved one or the starter, with the Langy setting it runs with. */
-const editedWidget = ({
-  widget,
-  period,
-}: {
-  widget: BoardWidget | null;
-  period: BoardQueryContext;
-}): EditedWidget => {
-  const excluded = widgetExcludedOrigins({
-    stored: widget?.definition.excludedOrigins,
-    board: period.excludeOrigins,
-  });
-  return {
-    ...(widget ?? { name: BLANK_WIDGET.name, definition: { queries: BLANK_WIDGET.queries } }),
-    includesLangy: boardIncludesLangy({ excluded }),
-  };
-};
+/** The widget a draft names: the saved one, or the starter a new widget opens on. */
+const editedWidget = (widget: BoardWidget | null): EditedWidget =>
+  widget ?? { name: BLANK_WIDGET.name, definition: { queries: BLANK_WIDGET.queries } };
 
 /** The editor the address opens: on a saved widget, on a new one (null), or none at all. */
 function openEditor({
@@ -67,7 +49,7 @@ export function useBoardEditor({
   widgets,
 }: {
   board: BoardSubject;
-  period: BoardQueryContext;
+  period: BoardPeriod;
   /** The board's widgets; an address naming none of them opens nothing. */
   widgets: readonly BoardWidget[];
 }) {
@@ -91,7 +73,7 @@ export function useBoardEditor({
   }) => {
     address.open({ target: widget?.id ?? NEW_WIDGET_REF, ...(closing ? { closing } : {}) });
     if (!langy.enabled) return;
-    const subject = { widget: editedWidget({ widget, period }), board, period };
+    const subject = { widget: editedWidget(widget), board, period };
     const builds = widget === null || withLangy;
     langy.ask(builds ? widgetBuildQuestion(subject) : widgetEditorOpened(subject));
   };
@@ -100,8 +82,7 @@ export function useBoardEditor({
 
   const ask = (picked: WidgetAsk) => {
     if (!editing) return;
-    const widget = editedWidget({ widget: editing.widget, period });
-    langy.ask(widgetAskDraft({ ask: picked, widget, board, period }));
+    langy.ask(widgetAskDraft({ ask: picked, widget: editedWidget(editing.widget), board, period }));
   };
 
   return { editing, open, close: address.close, asks, ask };

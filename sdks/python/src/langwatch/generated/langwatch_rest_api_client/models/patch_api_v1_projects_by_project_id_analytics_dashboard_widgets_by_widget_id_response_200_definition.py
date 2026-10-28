@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -42,7 +42,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
             PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1 |
             PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2 |
             PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType3 | Unset):
-        excluded_origins (list[str] | Unset):
     """
 
     version: float
@@ -57,7 +56,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
         | PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType3
         | Unset
     ) = UNSET
-    excluded_origins: list[str] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_0 import (
@@ -104,10 +102,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
         else:
             source = self.source.to_dict()
 
-        excluded_origins: list[str] | Unset = UNSET
-        if not isinstance(self.excluded_origins, Unset):
-            excluded_origins = self.excluded_origins
-
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -123,8 +117,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
             field_dict["prompt"] = prompt
         if source is not UNSET:
             field_dict["source"] = source
-        if excluded_origins is not UNSET:
-            field_dict["excludedOrigins"] = excluded_origins
 
         return field_dict
 
@@ -215,8 +207,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
 
         source = _parse_source(d.pop("source", UNSET))
 
-        excluded_origins = cast(list[str], d.pop("excludedOrigins", UNSET))
-
         patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition = cls(
             version=version,
             code=code,
@@ -224,7 +214,6 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
             description=description,
             prompt=prompt,
             source=source,
-            excluded_origins=excluded_origins,
         )
 
         return patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition

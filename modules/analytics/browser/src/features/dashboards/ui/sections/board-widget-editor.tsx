@@ -1,9 +1,10 @@
 /**
  * The widget editor on a board: the shared edit drawer with a live preview over the board's
- * period, Code, Queries with the widget's "Langy traces" setting (AC200), then "API / MCP"
+ * period and the sources it counts, Code, Queries (each with its sources row), then "API / MCP"
  * (how the member's own agent makes the widget), with Langy's suggestions above the tabs.
  */
 
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
 import { useState } from "react";
 
@@ -12,12 +13,13 @@ import { DashboardWidgetEditDrawer } from "../../../dashboard-widget/ui/sections
 import { SandboxedChartFrame } from "../../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import { useBoardWidgetEditor } from "../../behavior/use-board-widget-editor.ts";
 import type { WidgetAsk } from "../../langy/model/board-langy.ts";
-import type { BoardQueryContext } from "../../model/board-period.ts";
+import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { widgetApiSnippet, widgetCreatePrompt, widgetMcpSnippet } from "../../model/widget-api.ts";
+import { picksNoSources, widgetSourcesLine } from "../../model/widget-sources.ts";
+import { NoSourcesPicked } from "../blocks/no-sources-picked.tsx";
 import { WidgetApiPanel } from "../blocks/widget-api-panel.tsx";
 import { WidgetLangyAsks } from "../blocks/widget-langy-asks.tsx";
-import { WidgetLangyControl } from "../blocks/widget-langy-control.tsx";
 
 /** The preview is not grid-constrained in the drawer: a fixed, generous height. */
 const PREVIEW_HEIGHT_PX = 320;
@@ -47,7 +49,7 @@ export function BoardWidgetEditor({
   projectId: string;
   projectSlug: string;
   dashboardId: string;
-  period: BoardQueryContext;
+  period: BoardPeriod;
   isSaving: boolean;
   /** Langy's suggestions for this widget; absent when Langy is not available. */
   asks?: readonly WidgetAsk[];
@@ -82,12 +84,6 @@ export function BoardWidgetEditor({
       activeTab={tab}
       onTabChange={setTab}
       assist={asks && asks.length > 0 && <WidgetLangyAsks asks={asks} onAsk={onAsk} />}
-      querySettings={
-        <WidgetLangyControl
-          includesLangy={editor.includesLangy}
-          onChange={editor.setIncludesLangy}
-        />
-      }
       extraTabs={[
         {
           value: "api",
@@ -107,16 +103,32 @@ export function BoardWidgetEditor({
         },
       ]}
       chart={
-        <SandboxedChartFrame
-          key={`${editor.previewCode}::${JSON.stringify(editor.previewQueries)}::${editor.previewOrigins.join(",")}`}
-          code={editor.previewCode}
-          executeQuery={editor.executeQuery}
-          dashboardContext={editor.dashboardContext}
-          params={editor.paramsSnapshot}
-          onLog={noLog}
-          onNavigate={editor.onNavigate}
-          maxHeight={PREVIEW_HEIGHT_PX}
-        />
+        <VStack align="stretch" gap={1}>
+          {picksNoSources(editor.previewQueries) ? (
+            <Box height={`${PREVIEW_HEIGHT_PX}px`}>
+              <NoSourcesPicked />
+            </Box>
+          ) : (
+            <SandboxedChartFrame
+              key={`${editor.previewCode}::${JSON.stringify(editor.previewQueries)}`}
+              code={editor.previewCode}
+              executeQuery={editor.executeQuery}
+              dashboardContext={editor.dashboardContext}
+              params={editor.paramsSnapshot}
+              onLog={noLog}
+              onNavigate={editor.onNavigate}
+              maxHeight={PREVIEW_HEIGHT_PX}
+            />
+          )}
+          <Text
+            textStyle="caption"
+            color="fg.subtle"
+            paddingX={1}
+            data-testid="widget-preview-sources"
+          >
+            {widgetSourcesLine(editor.previewQueries)}
+          </Text>
+        </VStack>
       }
     />
   );
