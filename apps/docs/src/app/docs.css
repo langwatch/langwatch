@@ -3284,7 +3284,7 @@ html[data-docs-theme-change]::view-transition-new(root) {
 .docs-session-frame {
   display: block;
   width: 100%;
-  height: 64px;
+  height: 40px;
   margin: 8px 0;
   border: 0;
   color-scheme: normal;

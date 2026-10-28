@@ -1,9 +1,11 @@
+import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Badge,
   Box,
   Button,
   chakra,
   Flex,
+  IconButton,
   Input,
   NativeSelect,
   Text,
@@ -149,32 +151,38 @@ function AuthField({
       <summary>API key · {scheme.type === "apiKey" ? scheme.name : "Authorization"}</summary>
       {docsAppOrigin && sessionCovers({ scheme }) ? <SessionControls /> : null}
       <Box data-docs-manual-key="">
-        <Flex gap="2" marginTop="1">
-          <Input
-            id="pg-auth"
-            size="sm"
-            type={reveal ? "text" : "password"}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            placeholder={scheme.type === "apiKey" ? "API key" : "Bearer token"}
-            aria-label={scheme.type === "apiKey" ? `${scheme.name} value` : "Bearer token"}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            colorPalette="gray"
-            aria-label={reveal ? "Hide key" : "Reveal key"}
-            onClick={() => setReveal((value) => !value)}
+        <Flex gap="2" marginTop="1" align="center">
+          <InputGroup
+            flex="1"
+            endElement={
+              <IconButton
+                type="button"
+                size="xs"
+                variant="ghost"
+                colorPalette="gray"
+                aria-label={reveal ? "Hide key" : "Reveal key"}
+                onClick={() => setReveal((value) => !value)}
+              >
+                {reveal ? (
+                  <EyeOff size={16} aria-hidden="true" />
+                ) : (
+                  <Eye size={16} aria-hidden="true" />
+                )}
+              </IconButton>
+            }
           >
-            {reveal ? (
-              <EyeOff size={16} aria-hidden="true" />
-            ) : (
-              <Eye size={16} aria-hidden="true" />
-            )}
-          </Button>
+            <Input
+              id="pg-auth"
+              size="sm"
+              type={reveal ? "text" : "password"}
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+              placeholder={scheme.type === "apiKey" ? "API key" : "Bearer token"}
+              aria-label={scheme.type === "apiKey" ? `${scheme.name} value` : "Bearer token"}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </InputGroup>
           <Button
             type="button"
             size="sm"

@@ -423,9 +423,11 @@ const FRAME_RUNTIME = String.raw`function (config) {
   });
 
   if (typeof ResizeObserver === "function") {
+    /* The content's own height: the document's never drops below the frame it fills. */
+    var content = document.querySelector("main");
     new ResizeObserver(function () {
-      toParent({ kind: "height", height: Math.ceil(document.documentElement.scrollHeight) });
-    }).observe(document.body);
+      toParent({ kind: "height", height: Math.ceil(content.getBoundingClientRect().height) });
+    }).observe(content);
   }
   show();
 }`;
