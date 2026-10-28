@@ -1,4 +1,12 @@
+import type { Account } from "better-auth";
 import { z } from "zod";
+
+/**
+ * An account written through Better Auth with our `issuer` field, which its account type does
+ * not carry (ADR-189). Typed as this, a value passes where Better Auth asks for an account.
+ */
+export type AccountWithIssuer<T = Omit<Account, "id" | "createdAt" | "updatedAt">> = T &
+  Readonly<{ issuer: string }>;
 
 /** The one claim read from a Microsoft ID token: its tenant's own issuer. */
 const tenantIssuerClaimsSchema = z.looseObject({ iss: z.string().min(1) });

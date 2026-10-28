@@ -4,6 +4,7 @@
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
+import type { Account } from "better-auth";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BetterAuthFederation } from "../../channels/better-auth.channel.ts";
@@ -14,7 +15,7 @@ import {
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import { MemoryAuthDatabase } from "../../repositories/memory/memory.auth.database.ts";
 import { MemoryBetterAuthHooksRepository } from "../../repositories/memory/memory.better-auth-hooks.repository.ts";
-import { withAccountIssuer } from "./better-auth-transport.test-helpers.ts";
+import type { AccountWithIssuer } from "../../rules/provider-account-issuer.rules.ts";
 
 const idTokenAsserting = (claims: Record<string, unknown>): string =>
   [
@@ -46,19 +47,17 @@ function establishedAccount({
   });
   const attach = (idToken: string | undefined) => {
     const now = toDate(nowInstant());
-    return hook(
-      withAccountIssuer({
-        id: "account-1",
-        userId: "user_1",
-        providerId: "google",
-        accountId: "google-sub-1",
-        issuer: "https://google.issuer.test",
-        idToken,
-        createdAt: now,
-        updatedAt: now,
-      }),
-      null,
-    );
+    const account: AccountWithIssuer<Account> = {
+      id: "account-1",
+      userId: "user_1",
+      providerId: "google",
+      accountId: "google-sub-1",
+      issuer: "https://google.issuer.test",
+      idToken,
+      createdAt: now,
+      updatedAt: now,
+    };
+    return hook(account, null);
   };
   return { attach, proposeLink, accountRows: () => memory.db.Account.length };
 }
