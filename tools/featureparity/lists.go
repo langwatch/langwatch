@@ -62,6 +62,7 @@ var (
 		"tools/linkcheck",
 		"tools/chartpush",
 		"tools/chartheap",
+		"tools/suiteweights",
 		"tools/matrixseed",
 		"cmd/linkcheck",
 		"cmd/service",
