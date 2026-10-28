@@ -21,6 +21,7 @@ import (
 // connection down mid-stream (langwatch/tasks#1016).
 type plainBodyClient struct{ http.Client }
 
+// Do sends req with its body wrapped so only Read and Close are visible.
 func (c *plainBodyClient) Do(req *http.Request) (*http.Response, error) {
 	if req.Body != nil {
 		req.Body = struct{ io.ReadCloser }{req.Body}
