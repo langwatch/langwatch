@@ -1,8 +1,11 @@
-import { cliVerbTone } from "@langwatch/langy-contract";
+import type { LangwatchCommand } from "@langwatch/langy-contract";
 import { z } from "zod";
 
-import { commandOfToolCall } from "../../../../model/langy-capability-digest.ts";
-import { effectiveToolName } from "../../model/logic/langy-tool-label.ts";
+import type { LangyApiMap } from "../../../../behavior/langy-api.ts";
+import { commandsOfToolCall } from "../../../../model/langy-capability-digest.ts";
+
+/** A tRPC router the Langy dock's typed api declares, so an invalidation path is checked. */
+export type LangyRouter = keyof LangyApiMap;
 
 /**
  * The one map from a Langy CLI resource to the app's tRPC routers whose cached reads it can
@@ -10,7 +13,7 @@ import { effectiveToolName } from "../../model/logic/langy-tool-label.ts";
  * router is covered without touching this file.
  * @see specs/langy/langy-dashboard-widget-refresh.feature
  */
-const ROUTERS_BY_RESOURCE: Readonly<Record<string, readonly string[]>> = {
+const ROUTERS_BY_RESOURCE: Readonly<Record<string, readonly LangyRouter[]>> = {
   scenario: ["scenarios", "suites"],
   "test-suite": ["suites", "scenarios"],
   "run-plan": ["suites", "scenarios"],
@@ -67,18 +70,89 @@ export const LANGY_UNREFRESHED_RESOURCES: ReadonlySet<string> = new Set([
   "onboarding",
 ]);
 
-/** Verbs that change state without a write tone: they start work that lands in a list. */
-const STATE_CHANGING_VERBS: ReadonlySet<string> = new Set(["run", "cancel", "move"]);
+/**
+ * Verbs that only name a subcommand group (`dataset records add`, `teams members add`): what the
+ * command does is the word after them.
+ */
+const SUBCOMMAND_GROUPS: ReadonlySet<string> = new Set([
+  "records",
+  "members",
+  "bindings",
+  "widget",
+  "tag",
+  "version",
+  "ingestion-templates",
+]);
+
+/**
+ * Every CLI action that only reads. Anything else changes state, so a verb the CLI adds later
+ * refreshes by default: a spare refetch is cheap, a stale list is the bug.
+ */
+const READ_ACTIONS: ReadonlySet<string> = new Set([
+  "list",
+  "get",
+  "search",
+  "query",
+  "versions",
+  "status",
+  "schema",
+  "results",
+  "health",
+  "get-state",
+  "events",
+  "types",
+  "summary",
+  "state",
+  "tail",
+  "sample",
+  "report",
+  "reference",
+  "fires",
+  "fields",
+  "facets",
+  "export",
+  "examples",
+  "event-types",
+  "estimate",
+  "download",
+  "docs",
+  "commands",
+  "help",
+  "help-tree",
+  "by-user",
+  "access",
+  "permissions",
+  "actions",
+  "list-runs",
+  "admin-list",
+  "deliveries",
+  "spend",
+  "transcript",
+  "open",
+  "navigate",
+  "whoami",
+]);
+
+/** The action a command performs: its verb, or the subcommand under a group verb. */
+function actionOf({ verb, args }: Pick<LangwatchCommand, "verb" | "args">): string {
+  if (!SUBCOMMAND_GROUPS.has(verb)) return verb;
+  const positionals = args._;
+  const subcommand = Array.isArray(positionals) ? positionals[0] : undefined;
+  return typeof subcommand === "string" ? subcommand : verb;
+}
 
 /** The routers to invalidate once this command's result lands; empty for a read. */
 export function routersRefreshedByWrite({
   resource,
   verb,
+  args = {},
 }: {
   resource: string;
   verb: string;
-}): readonly string[] {
-  if (cliVerbTone(verb) === "read" && !STATE_CHANGING_VERBS.has(verb)) return [];
+  args?: Record<string, unknown>;
+}): readonly LangyRouter[] {
+  if (args.help !== undefined || args.h !== undefined) return [];
+  if (READ_ACTIONS.has(actionOf({ verb, args }))) return [];
   return ROUTERS_BY_RESOURCE[resource] ?? [];
 }
 
@@ -96,20 +170,17 @@ function toolNameOf({ type, toolName }: { type: string; toolName?: string }): st
 }
 
 /**
- * The routers a message part's write refreshes, once its result has landed; null for any part
- * that is not a settled tool call (text, a call still running, a failure).
+ * The routers a message part's writes refresh, once its result has landed, across every
+ * `langwatch` invocation the call chained; null for any part that is not a settled tool call.
  */
 export function settledWriteOf(
   part: unknown,
-): { callId: string; routers: readonly string[] } | null {
+): { callId: string; routers: readonly LangyRouter[] } | null {
   const parsed = settledToolPartSchema.safeParse(part);
   if (!parsed.success) return null;
   const name = toolNameOf(parsed.data);
   if (!name) return null;
-  const command = commandOfToolCall({
-    name: effectiveToolName(name, parsed.data.input),
-    input: parsed.data.input,
-  });
-  const routers = command ? routersRefreshedByWrite(command) : [];
-  return { callId: parsed.data.toolCallId, routers };
+  const commands = commandsOfToolCall({ name, input: parsed.data.input });
+  const routers = new Set(commands.flatMap((command) => routersRefreshedByWrite(command)));
+  return { callId: parsed.data.toolCallId, routers: [...routers] };
 }

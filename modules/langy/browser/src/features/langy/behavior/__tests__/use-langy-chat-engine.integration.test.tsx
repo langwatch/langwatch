@@ -25,8 +25,6 @@ vi.mock("@ai-sdk/react", () => ({
   }),
 }));
 
-vi.mock("@langwatch/api/web", () => ({ useInvalidateProcedure: () => vi.fn() }));
-
 vi.mock("../../../../behavior/langy-api.ts", () => ({
   api: {
     useUtils: () => ({

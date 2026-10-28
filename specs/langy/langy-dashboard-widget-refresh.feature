@@ -47,8 +47,30 @@ Feature: Dashboard refresh after a Langy turn
   @unit
   Scenario: A write is refreshed once, not on every render
     Given Langy's "langwatch scenario create" call has returned its result
-    When the panel re-renders with the same messages
+    When the panel re-renders with a new messages list holding the same call
     Then the scenarios queries are not invalidated again
+
+  @unit
+  Scenario: A write through a subcommand group refreshes its resource's lists
+    Given the Langy panel is mid-turn
+    When Langy's "langwatch dataset records add" call returns its result
+    Then the dataset record queries are invalidated
+    And "teams members add", "groups bindings add" and "prompt tag assign" refresh their resource the same way
+    And "dataset records list" refreshes nothing
+
+  @unit
+  Scenario: Every write in a chained command refreshes its lists
+    Given the Langy panel is mid-turn
+    When one shell call runs "langwatch prompt create" and then "langwatch evaluator create"
+    Then the prompts queries are invalidated
+    And the evaluators queries are invalidated
+
+  @unit
+  Scenario: Loading a stored conversation does not refresh its old writes
+    Given a stored conversation holds a "langwatch scenario create" call that returned long ago
+    When the conversation is loaded into the panel
+    Then no query is invalidated
+    And a write that returns after the load still refreshes its lists
 
   @unit
   Scenario: Every resource in the capability catalogue is mapped or declared unrefreshed

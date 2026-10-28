@@ -3,10 +3,12 @@
  * @see specs/langy/langy-dashboard-widget-refresh.feature
  * @vitest-environment jsdom
  */
-import { renderHook } from "@testing-library/react";
+import type { LangyMessageDto } from "@langwatch/langy-contract";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const invalidateProcedure = vi.fn((_path: string) => Promise.resolve());
+/** Router names whose router-level `invalidate()` ran, in call order. */
+const invalidatedRouters: string[] = [];
 
 let chatMessages: unknown[] = [];
 
@@ -16,21 +18,30 @@ vi.mock("@ai-sdk/react", () => ({
     sendMessage: vi.fn(),
     stop: vi.fn(),
     status: "streaming",
-    setMessages: vi.fn(),
+    setMessages: (next: unknown[]) => {
+      chatMessages = next;
+    },
     error: null,
     regenerate: vi.fn(),
     clearError: vi.fn(),
   }),
 }));
 
-vi.mock("@langwatch/api/web", () => ({ useInvalidateProcedure: () => invalidateProcedure }));
-
+// tRPC's utils answer every router path; this one records which routers were invalidated.
 vi.mock("../../../../behavior/langy-api.ts", () => ({
   api: {
-    useUtils: () => ({
-      dashboardWidgets: { list: { invalidate: vi.fn(() => Promise.resolve()) } },
-      graphs: { getAll: { invalidate: vi.fn(() => Promise.resolve()) } },
-    }),
+    useUtils: () =>
+      new Proxy(
+        {},
+        {
+          get: (_target, router) => ({
+            invalidate: () => {
+              invalidatedRouters.push(String(router));
+              return Promise.resolve();
+            },
+          }),
+        },
+      ),
   },
 }));
 
@@ -48,7 +59,7 @@ const toolMessage = ({
   id?: string;
 }) => ({
   id: `m-${id}`,
-  role: "assistant",
+  role: "assistant" as const,
   parts: [
     {
       type: "dynamic-tool",
@@ -61,17 +72,17 @@ const toolMessage = ({
   ],
 });
 
-const invalidatedPaths = () => invalidateProcedure.mock.calls.map(([path]) => path).toSorted();
+const invalidatedPaths = () => invalidatedRouters.toSorted();
 
 describe("useLangyChatEngine write refresh", () => {
   beforeEach(() => {
-    invalidateProcedure.mockClear();
+    invalidatedRouters.length = 0;
     chatMessages = [];
   });
 
   describe("when Langy creates a scenario", () => {
     /** @scenario "A scenario Langy creates refreshes the scenario and suite lists" */
-    it("invalidates the scenarios and suites queries", () => {
+    it("invalidates the scenarios and suites routers", () => {
       chatMessages = [toolMessage({ command: "langwatch scenario create --name Refunds --json" })];
       renderHook(() => useLangyChatEngine({ transport }));
 
@@ -81,7 +92,7 @@ describe("useLangyChatEngine write refresh", () => {
 
   describe("when Langy creates a test suite", () => {
     /** @scenario "A suite Langy creates refreshes the suite and scenario lists" */
-    it("invalidates the suites and scenarios queries", () => {
+    it("invalidates the suites and scenarios routers", () => {
       chatMessages = [
         toolMessage({ command: "langwatch test-suite create --name default --json" }),
       ];
@@ -91,13 +102,25 @@ describe("useLangyChatEngine write refresh", () => {
     });
   });
 
+  describe("when one shell call chains two writes", () => {
+    /** @scenario "Every write in a chained command refreshes its lists" */
+    it("invalidates the routers of both", () => {
+      chatMessages = [
+        toolMessage({ command: "langwatch prompt create a && langwatch evaluator create b" }),
+      ];
+      renderHook(() => useLangyChatEngine({ transport }));
+
+      expect(invalidatedPaths()).toEqual(["evaluators", "promptTags", "prompts"]);
+    });
+  });
+
   describe("when Langy only reads", () => {
     /** @scenario "A read does not refresh anything" */
     it("invalidates nothing", () => {
       chatMessages = [toolMessage({ command: "langwatch scenario list --json" })];
       renderHook(() => useLangyChatEngine({ transport }));
 
-      expect(invalidateProcedure).not.toHaveBeenCalled();
+      expect(invalidatedRouters).toEqual([]);
     });
   });
 
@@ -108,7 +131,7 @@ describe("useLangyChatEngine write refresh", () => {
       ];
       renderHook(() => useLangyChatEngine({ transport }));
 
-      expect(invalidateProcedure).not.toHaveBeenCalled();
+      expect(invalidatedRouters).toEqual([]);
     });
   });
 
@@ -117,9 +140,55 @@ describe("useLangyChatEngine write refresh", () => {
     it("does not invalidate again", () => {
       chatMessages = [toolMessage({ command: "langwatch scenario create --name A" })];
       const { rerender } = renderHook(() => useLangyChatEngine({ transport }));
+      // Streaming hands the engine a fresh messages array every chunk, holding the same call.
+      chatMessages = [toolMessage({ command: "langwatch scenario create --name A" })];
       rerender();
 
-      expect(invalidateProcedure).toHaveBeenCalledTimes(2);
+      expect(invalidatedPaths()).toEqual(["scenarios", "suites"]);
+    });
+  });
+
+  describe("when a stored conversation is loaded", () => {
+    const storedWrite: LangyMessageDto = {
+      ...toolMessage({ command: "langwatch scenario create --name Old", id: "old-call" }),
+      createdAtMs: 0,
+    };
+
+    /** @scenario "Loading a stored conversation does not refresh its old writes" */
+    it("does not invalidate for the writes already in its history", () => {
+      const { result, rerender } = renderHook(() => useLangyChatEngine({ transport }));
+      act(() => result.current.applyHistoryToEngine([storedWrite]));
+      rerender();
+
+      expect(chatMessages).toHaveLength(1);
+      expect(invalidatedRouters).toEqual([]);
+    });
+
+    it("still invalidates for a write that settles after it", () => {
+      const { result, rerender } = renderHook(() => useLangyChatEngine({ transport }));
+      act(() => result.current.applyHistoryToEngine([storedWrite]));
+      rerender();
+      chatMessages = [
+        ...chatMessages,
+        toolMessage({ command: "langwatch evaluator create b", id: "new-call" }),
+      ];
+      rerender();
+
+      expect(invalidatedRouters).toEqual(["evaluators"]);
+    });
+
+    it("invalidates for a stored call that was still running and settles later", () => {
+      const runningWrite: LangyMessageDto = {
+        ...toolMessage({ command: "langwatch evaluator create b", state: "input-available" }),
+        createdAtMs: 0,
+      };
+      const { result, rerender } = renderHook(() => useLangyChatEngine({ transport }));
+      act(() => result.current.applyHistoryToEngine([runningWrite]));
+      rerender();
+      chatMessages = [toolMessage({ command: "langwatch evaluator create b" })];
+      rerender();
+
+      expect(invalidatedRouters).toEqual(["evaluators"]);
     });
   });
 });

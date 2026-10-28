@@ -1,5 +1,4 @@
 import { useChat } from "@ai-sdk/react";
-import { useInvalidateProcedure } from "@langwatch/api/web";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import type { LangyMessageDto } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
@@ -69,7 +68,7 @@ export function useLangyChatEngine({
     previousStatusRef.current = status;
   }, [status, utils]);
 
-  useRefreshAppListsOnWrite(messages);
+  const markCallsSeen = useRefreshAppListsOnWrite({ messages, utils });
 
   // useChat's setMessages identity is not guaranteed stable across renders.
   // Capture it in a ref so callers' effects key on real state changes (a
@@ -78,17 +77,22 @@ export function useLangyChatEngine({
   const setMessagesRef = useRef(setMessages);
   setMessagesRef.current = setMessages;
 
-  const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
-    const uiMessages = history
-      .filter(isLangyTranscriptMessage)
-      // `recorded` marks a message off the durable fold: a card fence still in its
-      // TEXT is one the relay decided was not a block (ADR-060 §1). Its `parts`
-      // were stored VERBATIM off the stream and re-enter the engine checked.
-      .map((m) =>
-        toEngineMessage({ id: m.id, role: m.role, parts: m.parts, metadata: { recorded: true } }),
-      );
-    setMessagesRef.current(uiMessages);
-  }, []);
+  const applyHistoryToEngine = useCallback(
+    (history: LangyMessageDto[]) => {
+      const uiMessages = history
+        .filter(isLangyTranscriptMessage)
+        // `recorded` marks a message off the durable fold: a card fence still in its
+        // TEXT is one the relay decided was not a block (ADR-060 §1). Its `parts`
+        // were stored VERBATIM off the stream and re-enter the engine checked.
+        .map((m) =>
+          toEngineMessage({ id: m.id, role: m.role, parts: m.parts, metadata: { recorded: true } }),
+        );
+      // Writes already in a stored history landed long ago; only calls settling from here refresh.
+      markCallsSeen(uiMessages);
+      setMessagesRef.current(uiMessages);
+    },
+    [markCallsSeen],
+  );
 
   const retryTurn = useRetryKeepingFailedReply({ messages, regenerate, setMessagesRef });
 
@@ -132,10 +136,16 @@ export function useLangyChatEngine({
 
 /**
  * Invalidate the app queries a settled Langy write touched, once per tool call, so an open page
- * shows what Langy made without a reload.
+ * shows what Langy made without a reload. Answers the call that marks a hydrated history's calls
+ * as already refreshed.
  */
-function useRefreshAppListsOnWrite(messages: UIMessage[]) {
-  const invalidateProcedure = useInvalidateProcedure();
+function useRefreshAppListsOnWrite({
+  messages,
+  utils,
+}: {
+  messages: UIMessage[];
+  utils: ReturnType<typeof api.useUtils>;
+}): (hydrated: UIMessage[]) => void {
   const refreshedCallsRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -143,9 +153,16 @@ function useRefreshAppListsOnWrite(messages: UIMessage[]) {
       const write = settledWriteOf(part);
       if (!write || refreshedCallsRef.current.has(write.callId)) continue;
       refreshedCallsRef.current.add(write.callId);
-      for (const router of write.routers) void invalidateProcedure(router);
+      for (const router of write.routers) void utils[router].invalidate();
     }
-  }, [messages, invalidateProcedure]);
+  }, [messages, utils]);
+
+  return useCallback((hydrated: UIMessage[]) => {
+    for (const part of hydrated.flatMap((message) => message.parts)) {
+      const write = settledWriteOf(part);
+      if (write) refreshedCallsRef.current.add(write.callId);
+    }
+  }, []);
 }
 
 /**
