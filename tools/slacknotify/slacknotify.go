@@ -40,7 +40,7 @@ type Result struct {
 	Reason string
 }
 
-// Notify posts unless the same job was red in the previous finished main run.
+// Notify posts unless the same job was red in the last finished main run that ran it.
 // A failed lookup posts anyway: a duplicate alert beats a silent red main.
 func (n Notifier) Notify(ctx context.Context, run Run) (Result, error) {
 	if n.Webhook == "" {
@@ -71,40 +71,49 @@ type jobsPage struct {
 }
 
 // wasRed reports whether run.Job failed or was cancelled (a timeout) in the
-// newest finished run on main before this one.
+// newest earlier finished run on main that ran the job. A run cancelled before
+// it started holds no such job, so it is passed over rather than read as green.
 func (n Notifier) wasRed(ctx context.Context, run Run) (bool, string) {
 	var runs runsPage
-	q := url.Values{"branch": {"main"}, "event": {"push"}, "status": {"completed"}, "per_page": {"5"}}
+	q := url.Values{"branch": {"main"}, "event": {"push"}, "status": {"completed"}, "per_page": {"10"}}
 	path := fmt.Sprintf("/repos/%s/actions/workflows/%s/runs?%s", run.Repository, url.PathEscape(run.Workflow), q.Encode())
 	if err := n.get(ctx, path, &runs); err != nil {
 		return false, "could not read earlier runs, posting: " + err.Error()
 	}
-	previous := previousRun(runs, run.RunID)
-	if previous == 0 {
-		return false, "no earlier finished run on main"
-	}
-	var jobs jobsPage
-	if err := n.get(ctx, fmt.Sprintf("/repos/%s/actions/runs/%d/jobs?filter=latest&per_page=100", run.Repository, previous), &jobs); err != nil {
-		return false, "could not read run " + strconv.FormatInt(previous, 10) + ", posting: " + err.Error()
-	}
-	for _, j := range jobs.Jobs {
-		if j.Name == run.Job && (j.Conclusion == "failure" || j.Conclusion == "cancelled") {
-			return true, fmt.Sprintf("%s was already %s in run %d", run.Job, j.Conclusion, previous)
+	for _, r := range runs.Runs {
+		if r.ID == run.RunID {
+			continue
 		}
+		conclusion, ran, err := n.jobConclusion(ctx, run, r.ID)
+		if err != nil {
+			return false, "could not read run " + strconv.FormatInt(r.ID, 10) + ", posting: " + err.Error()
+		}
+		if !ran {
+			continue
+		}
+		if conclusion == "failure" || conclusion == "cancelled" {
+			return true, fmt.Sprintf("%s was already %s in run %d", run.Job, conclusion, r.ID)
+		}
+
+		return false, fmt.Sprintf("%s was not red in run %d", run.Job, r.ID)
 	}
 
-	return false, fmt.Sprintf("%s was not red in run %d", run.Job, previous)
+	return false, "no earlier finished run on main ran " + run.Job
 }
 
-// previousRun is the newest listed run that is not this one, or 0.
-func previousRun(runs runsPage, current int64) int64 {
-	for _, r := range runs.Runs {
-		if r.ID != current {
-			return r.ID
+// jobConclusion is run.Job's conclusion in the given run, and whether it ran there.
+func (n Notifier) jobConclusion(ctx context.Context, run Run, id int64) (string, bool, error) {
+	var jobs jobsPage
+	if err := n.get(ctx, fmt.Sprintf("/repos/%s/actions/runs/%d/jobs?filter=latest&per_page=100", run.Repository, id), &jobs); err != nil {
+		return "", false, err
+	}
+	for _, j := range jobs.Jobs {
+		if j.Name == run.Job {
+			return j.Conclusion, true, nil
 		}
 	}
 
-	return 0
+	return "", false, nil
 }
 
 func (n Notifier) get(ctx context.Context, path string, into any) error {

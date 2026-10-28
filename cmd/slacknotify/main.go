@@ -3,8 +3,9 @@
 //
 // Usage:
 //
-//	go run ./cmd/slacknotify -workflow langwatch-app-ci.yml -job "package-suites (1/1)"
+//	go run ./cmd/slacknotify -job typecheck
 //
+// -workflow defaults to the running workflow's file, from GITHUB_WORKFLOW_REF.
 // It reads GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_SHA, GH_TOKEN,
 // SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL, COMMIT_SUBJECT and COMMIT_AUTHOR.
 //
@@ -17,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -25,7 +27,7 @@ import (
 )
 
 func main() {
-	workflow := flag.String("workflow", "", "workflow file name, e.g. langwatch-app-ci.yml")
+	workflow := flag.String("workflow", runningWorkflow(), "workflow file name, e.g. langwatch-app-ci.yml")
 	job := flag.String("job", "", "the failed job's display name")
 	flag.Parse()
 	if *workflow == "" || *job == "" {
@@ -55,4 +57,15 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("slacknotify: posted=%t (%s)\n", result.Posted, result.Reason)
+}
+
+// runningWorkflow is the file name in GITHUB_WORKFLOW_REF,
+// owner/repo/.github/workflows/<file>@<ref>, or "" outside Actions.
+func runningWorkflow() string {
+	ref, _, _ := strings.Cut(os.Getenv("GITHUB_WORKFLOW_REF"), "@")
+	if ref == "" {
+		return ""
+	}
+
+	return path.Base(ref)
 }

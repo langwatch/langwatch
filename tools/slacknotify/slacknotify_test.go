@@ -23,11 +23,13 @@ var failing = slacknotify.Run{
 }
 
 // fake serves the runs and jobs endpoints and records Slack posts. previous is
-// the job conclusion in the newest earlier finished run, "" for no earlier run.
+// the job conclusion in the newest earlier run that ran it, "" for none.
 type fake struct {
-	previous string
-	broken   bool
-	posts    []map[string]any
+	previous   string
+	superseded bool // a newer run cancelled before it ran the job sits in front
+
+	broken bool
+	posts  []map[string]any
 }
 
 func (f *fake) start(t *testing.T) slacknotify.Notifier {
@@ -42,11 +44,16 @@ func (f *fake) start(t *testing.T) slacknotify.Notifier {
 			q := r.URL.Query()
 			assert.Equal(t, "main", q.Get("branch"))
 			assert.Equal(t, "completed", q.Get("status"))
-			runs := []map[string]any{}
+			runs := []map[string]any{{"id": 30}}
+			if f.superseded {
+				runs = append(runs, map[string]any{"id": 25})
+			}
 			if f.previous != "" {
 				runs = append(runs, map[string]any{"id": 20})
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"workflow_runs": runs})
+		case r.URL.Path == "/repos/langwatch/langwatch/actions/runs/25/jobs":
+			_ = json.NewEncoder(w).Encode(map[string]any{"jobs": []map[string]any{}})
 		case r.URL.Path == "/repos/langwatch/langwatch/actions/runs/20/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jobs": []map[string]any{
 				{"name": "lint", "conclusion": "success"},
@@ -93,9 +100,17 @@ func TestANewRedRunPostsToSlack(t *testing.T) {
 
 // @scenario "A repeat failure or timeout on main posts once"
 func TestARepeatFailureOrTimeoutDoesNotPostAgain(t *testing.T) {
-	for _, previous := range []string{"failure", "cancelled"} {
-		t.Run("the job was "+previous+" in the run before", func(t *testing.T) {
-			f := &fake{previous: previous}
+	for _, tc := range []struct {
+		previous   string
+		superseded bool
+	}{{"failure", false}, {"cancelled", false}, {"failure", true}} {
+		name := "the job was " + tc.previous + " in the run before"
+		if tc.superseded {
+			name += ", behind a run cancelled before it started"
+		}
+		t.Run(name, func(t *testing.T) {
+			previous := tc.previous
+			f := &fake{previous: previous, superseded: tc.superseded}
 			result, err := f.start(t).Notify(context.Background(), failing)
 
 			require.NoError(t, err)

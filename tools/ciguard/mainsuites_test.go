@@ -109,7 +109,7 @@ func TestARedOrTimedOutMainSuitesRunPostsToSlack(t *testing.T) {
 
 	breakEach(t, good, map[string][2]string{
 		"no Slack job": {
-			"go run ./cmd/slacknotify",
+			`go run ./cmd/slacknotify -job "package-suites (1/1)"`,
 			"echo skipped",
 		},
 		"a timeout that does not post": {
