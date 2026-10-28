@@ -10,6 +10,8 @@ import type { UIMessage, UIMessageChunk } from "ai";
 import { useEffect, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("@langwatch/api/web", () => ({ useInvalidateProcedure: () => vi.fn() }));
+
 vi.mock("../../../../behavior/langy-api.ts", () => ({
   api: {
     useUtils: () => ({

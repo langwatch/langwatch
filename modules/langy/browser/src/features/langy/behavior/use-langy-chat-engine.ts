@@ -1,4 +1,5 @@
 import { useChat } from "@ai-sdk/react";
+import { useInvalidateProcedure } from "@langwatch/api/web";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import type { LangyMessageDto } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
@@ -8,6 +9,7 @@ import { api } from "../../../behavior/langy-api.ts";
 import { isLangyTranscriptMessage } from "../../transcript/model/langy-transcript.ts";
 import { toEngineMessage } from "../model/langy-engine-parts.ts";
 import type { createLangyChatTransport } from "./logic/langy-chat-transport.ts";
+import { settledWriteOf } from "./logic/langy-write-refresh.ts";
 
 /**
  * At most one transcript re-render per window while a turn streams. Unthrottled, every chunk is a
@@ -67,6 +69,8 @@ export function useLangyChatEngine({
     previousStatusRef.current = status;
   }, [status, utils]);
 
+  useRefreshAppListsOnWrite(messages);
+
   // useChat's setMessages identity is not guaranteed stable across renders.
   // Capture it in a ref so callers' effects key on real state changes (a
   // conversation-id transition) without re-firing every render — which would
@@ -124,6 +128,24 @@ export function useLangyChatEngine({
      */
     clearError,
   };
+}
+
+/**
+ * Invalidate the app queries a settled Langy write touched, once per tool call, so an open page
+ * shows what Langy made without a reload.
+ */
+function useRefreshAppListsOnWrite(messages: UIMessage[]) {
+  const invalidateProcedure = useInvalidateProcedure();
+  const refreshedCallsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    for (const part of messages.flatMap((message) => message.parts)) {
+      const write = settledWriteOf(part);
+      if (!write || refreshedCallsRef.current.has(write.callId)) continue;
+      refreshedCallsRef.current.add(write.callId);
+      for (const router of write.routers) void invalidateProcedure(router);
+    }
+  }, [messages, invalidateProcedure]);
 }
 
 /**

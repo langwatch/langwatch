@@ -8,6 +8,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { UIMessage, UIMessageChunk } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("@langwatch/api/web", () => ({ useInvalidateProcedure: () => vi.fn() }));
+
 vi.mock("../../../../behavior/langy-api.ts", () => ({
   api: {
     useUtils: () => ({
