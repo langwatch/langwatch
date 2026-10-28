@@ -852,10 +852,12 @@ jobs:
       # plugins, and drops the whole cache when the lockfile changes. It does not key
       # how an import resolves (package manifests) or what a tsconfig tells the
       # transform, so a cache is restored only when those are identical too: the
-      # hash is over the blob ids of the lockfile, every package.json and tsconfig.
+      # hash is over the blob ids of the lockfile, every package.json and tsconfig,
+      # and packages/vitest-config: the shared config is loaded from the package, so
+      # vitest does not count its source (plugin options, React compiler) as a config file.
       - name: Hash what a cached transform depends on besides its source
         id: transform-inputs
-        run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+        run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' packages/vitest-config | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Restore the vitest transforms
         if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
@@ -905,12 +907,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --experimental-strip-types .github/scripts/check-test-reads.ts "$RUNNER_TEMP/test-reads"
 
-      # Keeps the saved transforms small: an entry is written once and only read
-      # after, so one no run has written for a week goes, and the next suite that
-      # needs it writes it again.
-      - name: Drop week-old vitest transforms before they are saved
+      # Keeps the saved cache bounded. Nothing records which entry a run read: a
+      # restored file keeps the time it was first written, so purging by age would
+      # drop the hottest entries first. A new lockfile, manifest, tsconfig or shared
+      # config already starts a fresh cache (the key above); between those, a cache
+      # past 400 MB is dropped whole and the next run on this shard starts cold.
+      - name: Drop the vitest transforms before saving if they grew past 400 MB
         if: ${{ !cancelled() }}
-        run: find node_modules/.vitest-cache -type f -mtime +7 -delete 2>/dev/null || true
+        run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache; fi
 
   lint:
     needs: changes

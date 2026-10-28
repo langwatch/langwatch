@@ -14,8 +14,10 @@ Feature: The package-suites shards keep vitest's transformed modules between run
   # each entry by the module's own source, the vitest config files and plugin
   # names, and clears the cache when the lockfile changes. It does not key how
   # an import resolves (the package manifests) or what a tsconfig tells the
-  # transform, so the job restores only a cache built from the same lockfile,
-  # package.json files and tsconfig files, and never a nearer one.
+  # transform, and the shared config in packages/vitest-config is imported as a
+  # package, so its source (the plugins and their options) is not a config file
+  # to vitest either. The job restores only a cache built from the same lockfile,
+  # package.json files, tsconfig files and shared config, and never a nearer one.
   #
   # ciguard asserts all of it (go run ./cmd/ciguard).
 
@@ -25,7 +27,7 @@ Feature: The package-suites shards keep vitest's transformed modules between run
     Scenario: The transform cache is restored only for the same inputs
       Given the package-suites job's vitest transform cache
       When its key and restore keys are read
-      Then the key names a hash of the lockfile, every package.json and every tsconfig
+      Then the key names a hash of the lockfile, every package.json, every tsconfig and the shared vitest config
       And it restores only a cache saved under that same hash
 
     @unit
@@ -36,11 +38,15 @@ Feature: The package-suites shards keep vitest's transformed modules between run
 
   Rule: the saved cache stays small
 
+    # A restored file keeps the time it was first written and nothing records a
+    # read, so purging entries by age drops the ones every run uses first. A new
+    # lockfile, manifest, tsconfig or shared config already starts a fresh cache.
     @unit
-    Scenario: Transforms no run has written for a week are dropped before the save
+    Scenario: A transform cache past its size limit is dropped whole before the save
       Given the package-suites job
       When its steps are read
-      Then one deletes week-old files from the transform cache
+      Then one drops the transform cache whole when it is past its size limit
+      And none purges single transforms by age
 
   Rule: every suite persists its transforms
 

@@ -17,7 +17,7 @@ const goodTransformJob = `jobs:
     steps:
       - name: Hash
         id: transform-inputs
-        run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' | sha256sum)" >> "$GITHUB_OUTPUT"
+        run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' packages/vitest-config | sha256sum)" >> "$GITHUB_OUTPUT"
       - name: Restore the vitest transforms
         uses: actions/cache@x
         with:
@@ -25,7 +25,7 @@ const goodTransformJob = `jobs:
           key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
           restore-keys: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
       - name: Trim
-        run: find node_modules/.vitest-cache -type f -mtime +7 -delete 2>/dev/null || true
+        run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache; fi
 `
 
 func transformRepo(t *testing.T, workflow string) string {
@@ -69,6 +69,9 @@ func TestTransformCacheRestoresOnlyTheSameInputs(t *testing.T) {
 		"a hash that leaves out the tsconfigs": func(s string) string {
 			return strings.Replace(s, " '*tsconfig*.json'", "", 1)
 		},
+		"a hash that leaves out the shared vitest config": func(s string) string {
+			return strings.Replace(s, " packages/vitest-config", "", 1)
+		},
 	} {
 		t.Run(name+" is refused", func(t *testing.T) {
 			assert.NotEmpty(t, transformProblems(t, breakIt(goodTransformJob)))
@@ -85,14 +88,25 @@ func TestTransformCacheIsPerShardAndPerCommit(t *testing.T) {
 	assert.NotEmpty(t, transformProblems(t, noCommit))
 }
 
-// @scenario "Transforms no run has written for a week are dropped before the save"
-func TestTransformCacheIsTrimmed(t *testing.T) {
-	untrimmed := strings.Replace(goodTransformJob, "find node_modules/.vitest-cache -type f -mtime +7 -delete", "true", 1)
+// @scenario "A transform cache past its size limit is dropped whole before the save"
+func TestTransformCacheIsBoundedBySize(t *testing.T) {
+	unbounded := strings.Replace(goodTransformJob, "then rm -rf node_modules/.vitest-cache", "then true", 1)
 
-	problems := transformProblems(t, untrimmed)
+	problems := transformProblems(t, unbounded)
 
 	require.Len(t, problems, 1)
 	assert.Contains(t, problems[0], "only grows")
+}
+
+// @scenario "A transform cache past its size limit is dropped whole before the save"
+func TestTransformCacheIsNeverPurgedByAge(t *testing.T) {
+	aged := strings.Replace(goodTransformJob, "      - name: Trim\n",
+		"      - name: Age\n        run: find node_modules/.vitest-cache -type f -mtime +7 -delete\n      - name: Trim\n", 1)
+
+	problems := transformProblems(t, aged)
+
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], "by age")
 }
 
 func writePackage(t *testing.T, dir, scripts string, config bool) {

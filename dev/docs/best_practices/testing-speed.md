@@ -96,7 +96,7 @@ The three levers, in the order they pay:
 2. **`fsModuleCache: true`** - attacks the transform share (24% above). It does
    nothing on a cold first run; it is a rerun and a second-process win. In CI
    the package-suites job restores `node_modules/.vitest-cache` per shard, only
-   for the same lockfile, manifests and tsconfigs
+   for the same lockfile, manifests, tsconfigs and shared config
    (`specs/ci/package-suites-transform-cache.feature`). A package with no
    vitest config passes `--fsModuleCache` on its script instead, which
    `go run ./cmd/ciguard` enforces.

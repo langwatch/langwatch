@@ -25,7 +25,9 @@ const (
 
 // transformInputs is what the hash a transform cache is restored by must cover:
 // what decides a transform's output besides the module's own source.
-var transformInputs = []string{"pnpm-lock.yaml", "package.json", "tsconfig"}
+// packages/vitest-config is there because every config imports it as a package, so vitest
+// does not count its source, which sets the plugins and their options, as a config file.
+var transformInputs = []string{"pnpm-lock.yaml", "package.json", "tsconfig", "packages/vitest-config"}
 
 // TransformCacheProblems checks that the package-suites job restores vitest's
 // transformed modules only when nothing a transform depends on besides its
@@ -85,13 +87,21 @@ func transformKeyProblems(step ciscan.Step) []string {
 	return problems
 }
 
-var trimCommand = regexp.MustCompile(`find ` + regexp.QuoteMeta(transformCachePath) + ` .*-mtime \+\d+ -delete`)
+// trimCommand drops the whole cache past a size, never single entries by age: a restored
+// entry keeps the time it was first written, so an age purge drops the hottest first.
+var trimCommand = regexp.MustCompile(`du -sm ` + regexp.QuoteMeta(transformCachePath) + `.*-gt \d+ \]; then rm -rf ` + regexp.QuoteMeta(transformCachePath))
+
+var agePurge = regexp.MustCompile(`find ` + regexp.QuoteMeta(transformCachePath) + `.*-[acm](time|min) `)
 
 func trimProblems(steps []ciscan.Step) []string {
-	if slices.ContainsFunc(steps, func(s ciscan.Step) bool { return trimCommand.MatchString(s.Run) }) {
-		return nil
+	var problems []string
+	if slices.ContainsFunc(steps, func(s ciscan.Step) bool { return agePurge.MatchString(s.Run) }) {
+		problems = append(problems, "package-suites purges transforms by age, which drops the entries every run reads")
 	}
-	return []string{"package-suites never drops old transforms, so the saved cache only grows"}
+	if !slices.ContainsFunc(steps, func(s ciscan.Step) bool { return trimCommand.MatchString(s.Run) }) {
+		problems = append(problems, "package-suites never bounds the transform cache, so the saved cache only grows")
+	}
+	return problems
 }
 
 // vitestRun is a package script that runs vitest; configFlag one that names its config.
