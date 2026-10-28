@@ -150,17 +150,12 @@ const buildHarness = () => {
     account: [],
     verification: [],
   };
-  const loggedErrors: string[] = [];
   const auth = betterAuth({
     baseURL: BASE_URL,
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter(db),
-    logger: {
-      level: "error",
-      log: (level, message) => {
-        if (level === "error") loggedErrors.push(message);
-      },
-    },
+    // Keeps Better Auth from printing the refusals these tests provoke.
+    logger: { level: "error", log: () => undefined },
     account: { accountLinking: { enabled: true } },
     plugins: [
       genericOAuth({
@@ -168,7 +163,7 @@ const buildHarness = () => {
       }),
     ],
   });
-  return { auth, db, loggedErrors };
+  return { auth, db };
 };
 
 const callbackWith = async ({
