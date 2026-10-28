@@ -60,8 +60,9 @@ A board opens with every widget's queries in flight, and a blank card reads as b
 
 - **A skeleton until the first answer.** The frame covers the card with a chart-shaped skeleton
   until any of its queries answers, then the widget draws its own card. A widget with no query,
-  whose code reported an error, or whose frame is up with no query open (such as a query behind
-  a tab), has nothing to wait for and shows none.
+  whose code reported an error, or whose code has loaded with no query open and no retry waiting
+  (such as a query behind a tab), has nothing to wait for and shows none. Only the frame knows
+  this, so it says so on each heartbeat; a query that opens later brings the skeleton back.
 - **Slow says so.** After 5 seconds (`SLOW_WIDGET_LOADING_MS`) the skeleton says "Still
   loading…".
 - **A refresh keeps the chart.** Once a query answered, a new run never brings the skeleton back.

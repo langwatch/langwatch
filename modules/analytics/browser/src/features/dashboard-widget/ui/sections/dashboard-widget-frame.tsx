@@ -152,9 +152,8 @@ export function DashboardWidgetFrameOverWindow({
   const empty = widgetShowsNoData({ face: face.kind, status: widgetExport.status });
   useEffect(() => onEmptyChange?.(empty), [onEmptyChange, empty]);
 
-  // A frame up with no query open waits on nothing, such as a query behind a tab.
+  // The frame's own word: its code mounted with no query open, such as a query behind a tab.
   const [frameIdle, setFrameIdle] = useState(false);
-  const onFrameIdle = useCallback(() => setFrameIdle(true), []);
 
   // Retry starts the frame over, so every query of the widget runs again.
   const [attempt, setAttempt] = useState(0);
@@ -230,7 +229,7 @@ export function DashboardWidgetFrameOverWindow({
           onNavigate={onNavigate}
           maxHeight={maxHeight}
           cover={loading && !cover ? <WidgetLoadingFace slow={slow} /> : undefined}
-          onIdle={onFrameIdle}
+          onIdleChange={setFrameIdle}
         />
       </Box>
       {cover && (

@@ -434,10 +434,28 @@ describe("given a widget on a board whose queries are running", () => {
       expect(loadingFace()).not.toBeNull();
 
       act(() => {
-        lastFrameProps().onIdle?.();
+        lastFrameProps().onIdleChange?.(true);
       });
 
       expect(loadingFace()).toBeNull();
+    });
+  });
+
+  describe("when a query starts after the frame had nothing to wait for", () => {
+    /** @scenario "A query that starts after the frame was idle brings the skeleton back" */
+    it("shows the skeleton again", () => {
+      frameRuns(() => new Promise(() => undefined));
+      render(boardWidget({}));
+      act(() => {
+        lastFrameProps().onIdleChange?.(true);
+      });
+      expect(loadingFace()).toBeNull();
+
+      act(() => {
+        lastFrameProps().onIdleChange?.(false);
+      });
+
+      expect(loadingFace()).not.toBeNull();
     });
   });
 });

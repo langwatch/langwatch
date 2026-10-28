@@ -6,7 +6,7 @@
  * source to the bridge; a code change remounts the iframe for a fresh init.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) => ({
@@ -33,13 +33,18 @@ const dashboardContext = {
   theme: "light" as const,
 };
 
-const ui = (code: string, theme: "light" | "dark" = "light") => (
+const ui = (
+  code: string,
+  theme: "light" | "dark" = "light",
+  onIdleChange?: (idle: boolean) => void,
+) => (
   <DesignSystemProvider forcedTheme="light">
     <SandboxedChartFrame
       code={code}
       executeQuery={vi.fn()}
       dashboardContext={{ ...dashboardContext, theme }}
       onLog={vi.fn()}
+      onIdleChange={onIdleChange}
     />
   </DesignSystemProvider>
 );
@@ -95,6 +100,23 @@ describe("given a sandboxed chart frame", () => {
       expect(bridgeMock).toHaveBeenLastCalledWith(
         expect.objectContaining({ dashboardContext: expect.objectContaining({ theme: "dark" }) }),
       );
+    });
+  });
+
+  describe("when its frame said it was idle and the widget source changes", () => {
+    /** @scenario "The frame reloads when the widget code changes" */
+    it("tells its host the new frame is not idle yet", () => {
+      const onIdleChange = vi.fn();
+      const { rerender } = render(ui("A", "light", onIdleChange));
+      const options = bridgeMock.mock.calls.at(-1)?.[0] as {
+        onIdleChange: (idle: boolean) => void;
+      };
+      act(() => options.onIdleChange(true));
+      expect(onIdleChange).toHaveBeenLastCalledWith(true);
+
+      rerender(ui("B", "light", onIdleChange));
+
+      expect(onIdleChange).toHaveBeenLastCalledWith(false);
     });
   });
 });

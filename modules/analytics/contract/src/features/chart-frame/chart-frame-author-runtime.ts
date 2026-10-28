@@ -67,6 +67,15 @@ export function buildAuthorRuntimeScript(): string {
     return ErrorBoundary;
   }
 
+  // Rendered after the widget: React runs a later sibling's effects after the widget's own, so
+  // the widget's first queries are open by the time the shim hears it mounted.
+  function AuthorMounted() {
+    window.React.useEffect(function () {
+      if (typeof window.__lwAuthorMounted === "function") window.__lwAuthorMounted();
+    }, []);
+    return null;
+  }
+
   function mount(Component) {
     if (Component == null || (typeof Component !== "function" && typeof Component !== "object")) {
       showError("No default export", "The widget file must export default a React component.");
@@ -79,7 +88,8 @@ export function buildAuthorRuntimeScript(): string {
         window.React.createElement(
           ErrorBoundary,
           null,
-          window.React.createElement(Component)
+          window.React.createElement(Component),
+          window.React.createElement(AuthorMounted)
         )
       );
     } catch (renderError) {

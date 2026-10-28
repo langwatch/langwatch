@@ -79,8 +79,26 @@ Feature: A dashboard widget frame shows what its queries report
 
     @integration
     Scenario: A widget with nothing to wait for shows no skeleton
-      Given a widget with no queries, whose code reported an error, or whose frame is up with no query open
+      Given a widget with no queries, whose code reported an error, or whose code has loaded and has no query open or waiting to retry
       Then the card shows no loading skeleton
+
+    @integration
+    Scenario: A widget whose code is still loading keeps its skeleton
+      Given a widget on a board whose code has not loaded yet
+      When the frame is up with no query open
+      Then the card still shows the loading skeleton
+
+    @integration
+    Scenario: A widget waiting to retry a busy query keeps its skeleton
+      Given a widget on a board whose first query was refused as busy
+      When the frame waits to retry it with no query open
+      Then the card still shows the loading skeleton
+
+    @integration
+    Scenario: A query that starts after the frame was idle brings the skeleton back
+      Given a widget whose frame had nothing to wait for and whose queries never answered
+      When a query starts
+      Then the card shows the loading skeleton again
 
   Rule: An empty widget says how to get its data
 
