@@ -211,11 +211,20 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
     unclicked: { target: ConfirmTarget; name: string | null }[];
     gone: Set<ConfirmTarget>;
   }> {
+    // Each record's reads are independent, so they run together; any rejection still fails the
+    // whole call. The name is read only for a record without a click, and the order kept.
+    const looked = await Promise.all(
+      targets.map(async (target, index) => {
+        if (await this.members.confirmations.hasGrant(target)) {
+          return { target, granted: true, name: undefined };
+        }
+        return { target, granted: false, name: await request.targets[index]?.name() };
+      }),
+    );
     const unclicked: { target: ConfirmTarget; name: string | null }[] = [];
     const gone = new Set<ConfirmTarget>();
-    for (const [index, target] of targets.entries()) {
-      if (await this.members.confirmations.hasGrant(target)) continue;
-      const name = await request.targets[index]?.name();
+    for (const { target, granted, name } of looked) {
+      if (granted) continue;
       if (name === undefined) gone.add(target);
       else unclicked.push({ target, name });
     }
