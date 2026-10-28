@@ -30,6 +30,7 @@ type fake struct {
 
 	broken bool
 	posts  []map[string]any
+	raw    []string
 }
 
 func (f *fake) start(t *testing.T) slacknotify.Notifier {
@@ -71,6 +72,7 @@ func (f *fake) start(t *testing.T) slacknotify.Notifier {
 			t.Errorf("Slack got a body that is not JSON: %v", err)
 		}
 		f.posts = append(f.posts, body)
+		f.raw = append(f.raw, string(raw))
 	}))
 	t.Cleanup(slack.Close)
 
@@ -155,11 +157,25 @@ func TestAPostErrorNeverNamesTheWebhook(t *testing.T) {
 }
 
 func TestACommitSubjectCannotPingTheChannel(t *testing.T) {
+	f := &fake{previous: "success"}
 	run := failing
 	run.Subject = "fix: <!channel> & co"
-	section, ok := slacknotify.Message(run)["blocks"].([]any)[1].(map[string]any)["text"].(map[string]any)
-	require.True(t, ok)
 
-	assert.NotContains(t, section["text"], "<!channel>")
-	assert.Contains(t, section["text"], "&lt;!channel&gt; &amp; co")
+	_, err := f.start(t).Notify(context.Background(), run)
+
+	require.NoError(t, err)
+	require.Len(t, f.raw, 1)
+	var body struct {
+		Blocks []struct {
+			Text struct{ Text string } `json:"text"`
+		} `json:"blocks"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(f.raw[0]), &body))
+	var texts []string
+	for _, b := range body.Blocks {
+		texts = append(texts, b.Text.Text)
+	}
+	posted := strings.Join(texts, "\n")
+	assert.NotContains(t, posted, "<!channel>")
+	assert.Contains(t, posted, "&lt;!channel&gt; &amp; co")
 }
