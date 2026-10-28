@@ -15,12 +15,13 @@ func TestSimulatorLanesUseTheHavenExecutable(t *testing.T) {
 	repo := t.TempDir()
 	home := t.TempDir()
 	executable := filepath.Join(t.TempDir(), "haven's binary $(exit 1)")
-	// A script, not a symlink to printf: a multicall printf (Rust coreutils)
-	// picks its tool from its own name and refuses this one.
-	if err := os.WriteFile(executable, []byte("#!/bin/sh\nprintf \"$@\"\n"), 0o700); err != nil { //nolint:gosec // the fixture needs the exec bit
+	// /bin/sh under the odd name, running printf: a symlink to a multicall
+	// printf (Rust coreutils) would pick its tool from this name and refuse it.
+	if err := os.Symlink("/bin/sh", executable); err != nil {
 		t.Fatal(err)
 	}
-	o := &Orchestrator{cfg: Config{Home: home, SimulatorArgv: []string{executable, "%s/%s", "simulator"}}, proxy: stubProxy{}}
+	argv := []string{executable, "-c", `printf "$@"`, "sh", "%s/%s", "simulator"}
+	o := &Orchestrator{cfg: Config{Home: home, SimulatorArgv: argv}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "old-branch", WorktreeDir: repo, Services: []domain.Service{
 		{Name: "idp", Port: 45570, DNSPort: 45571, URL: "https://idp.old-branch.langwatch.localhost:1355"},
 		{Name: "mail", Port: 45580, SMTPPort: 45581, URL: "https://mail.old-branch.langwatch.localhost:1355"},
