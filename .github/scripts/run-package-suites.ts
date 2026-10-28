@@ -180,11 +180,9 @@ export interface ShardLoad {
 const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, integration: 0, browser: 0 };
 
 /**
- * A shard's wall time, which is what the split balances. A heavy package runs
- * alone and adds all of its weight. Light suites share `concurrency` slots, but
- * the integration and browser lanes each run one suite at a time, so the light
- * part takes whichever is longest. Splitting by raw weight, a shard holding 737s
- * of heavy suites ran 1073s while one holding 211s ran 473s.
+ * A shard's wall time, which the split balances: heavy packages run alone and add
+ * all their weight; light suites share `concurrency` slots, but the integration and
+ * browser lanes run one suite at a time, so the light part takes the longest of them.
  */
 export const wallTimeOf = ({ load, concurrency }: { load: ShardLoad; concurrency: number }) =>
   load.alone + Math.max(load.shared / concurrency, load.integration, load.browser);
@@ -212,10 +210,9 @@ export const withPackage = ({
 };
 
 /**
- * Splits packages into `total` groups, heaviest first, each onto the group whose
- * wall time it raises least. Every shard computes this alone, so ties break on
- * name then lowest group: the answers must agree exactly or a package runs twice
- * or not at all.
+ * Splits packages into `total` groups, heaviest first, each onto the group whose wall
+ * time it raises least. Every shard computes this alone, so ties break on name then
+ * lowest group, or a package runs twice or not at all.
  */
 export const balanceByWallTime = <T extends { name: string; scripts: readonly string[] }>({
   items,

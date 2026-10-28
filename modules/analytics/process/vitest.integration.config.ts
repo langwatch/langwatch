@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 // The slowest package suite, and its files share no state, so in CI, where it has
 // its shard to itself, they run three at a time.
 // Spec: specs/ci/package-suite-integration-lane.feature
-raiseWorkerCountInCI({ workers: 3 });
+raiseWorkerCountInCI({ env: process.env, workers: 3 });
 
 /**
  * Integration lane: `*.integration.test.ts` under `src/`, excluded from the

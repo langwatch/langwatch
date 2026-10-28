@@ -43,10 +43,10 @@ const LAUNCHER_DEFAULT_WORKERS = "2";
  * when someone exported a count other than the launcher's default, the count stands.
  */
 export function raiseWorkerCountInCI({
-  env = process.env,
+  env,
   workers,
 }: {
-  env?: NodeJS.ProcessEnv;
+  env: NodeJS.ProcessEnv;
   workers: number;
 }): void {
   if (!env.CI || env.CI === "false" || env.CI === "0") return;
