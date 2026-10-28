@@ -276,13 +276,6 @@ export const parseWeights = (
   return { weights, errors };
 };
 
-/** The slow packages of a run, in the weights file's own format, to paste back. */
-export const formatMeasured = (measured: { name: string; seconds: number }[]): string[] =>
-  measured
-    .filter((entry) => entry.seconds >= 20)
-    .toSorted((a, b) => b.seconds - a.seconds || (a.name < b.name ? -1 : 1))
-    .map((entry) => `${entry.name}  ${Math.round(entry.seconds)}`);
-
 /**
  * The nightly flaky-test hunt names each package suite's JSON report after the
  * package and script, so the report alone says what to rerun. `:` is not allowed
@@ -548,12 +541,10 @@ export const createSuiteRunner = ({
   now?: () => number;
 }) => {
   const unfinished = new Map<SuiteJob, { title: string; chunks: Buffer[] }>();
-  const secondsOf = new Map<string, number>();
   const report = (job: SuiteJob, title: string, chunks: Buffer[], startedAt: number) => {
     // Absent once flushed on cancellation: its output is printed already.
     const pending = unfinished.delete(job);
     const seconds = (now() - startedAt) / 1000;
-    secondsOf.set(job.pkg.name, (secondsOf.get(job.pkg.name) ?? 0) + seconds);
     if (live) log("::endgroup::");
     else if (pending)
       printGroup({ log, write, header: `${title} (${Math.round(seconds)}s)`, chunks });
@@ -579,7 +570,7 @@ export const createSuiteRunner = ({
       printGroup({ log, write, header: `${title} (unfinished)`, chunks });
     }
   };
-  return { run, flushUnfinished, secondsOf };
+  return { run, flushUnfinished };
 };
 
 const printGroup = ({
@@ -853,27 +844,12 @@ if (isEntrypoint()) {
   const statusOf = (pkg: DiscoveredPackage) => (script: string) =>
     [...statuses].find(([job]) => job.pkg === pkg && job.script === script)?.[1] ?? 1;
   const outcomes = assigned.map((pkg) => outcomeOf(pkg, excluded, statusOf(pkg)));
-  const measured = outcomes
-    .filter((outcome) => outcome.outcome === "passed")
-    .map((outcome) => ({ name: outcome.name, seconds: runner.secondsOf.get(outcome.name) ?? 0 }));
   for (const line of failureAnnotations(outcomes)) console.log(line);
 
   const summary = summarise(outcomes);
   for (const line of summary) console.log(line);
   if (process.env.GITHUB_STEP_SUMMARY) {
-    const times = formatMeasured(measured);
-    const refresh =
-      times.length === 0
-        ? []
-        : [
-            "",
-            "<details><summary>Measured seconds (weights file format)</summary>",
-            "",
-            "```",
-            ...times,
-            "```",
-            "</details>",
-          ];
+    const refresh = ["", "Refresh the shard weights with `go run ./cmd/suiteweights`."];
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${[...summary, ...refresh].join("\n")}\n`);
   }
 

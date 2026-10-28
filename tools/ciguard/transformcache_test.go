@@ -25,7 +25,7 @@ const goodTransformJob = `jobs:
           key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
           restore-keys: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
       - name: Trim
-        run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache; fi
+        run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
 `
 
 func transformRepo(t *testing.T, workflow string) string {
@@ -99,6 +99,16 @@ func TestTransformCacheIsBoundedBySize(t *testing.T) {
 }
 
 // @scenario "A transform cache past its size limit is dropped whole before the save"
+func TestTransformCacheTrimLeavesADirectoryToSave(t *testing.T) {
+	removed := strings.Replace(goodTransformJob, " && mkdir -p node_modules/.vitest-cache", "", 1)
+
+	problems := transformProblems(t, removed)
+
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], "only grows")
+}
+
+// @scenario "A transform cache past its size limit is dropped whole before the save"
 func TestTransformCacheIsNeverPurgedByAge(t *testing.T) {
 	aged := strings.Replace(goodTransformJob, "      - name: Trim\n",
 		"      - name: Age\n        run: find node_modules/.vitest-cache -type f -mtime +7 -delete\n      - name: Trim\n", 1)
@@ -109,12 +119,12 @@ func TestTransformCacheIsNeverPurgedByAge(t *testing.T) {
 	assert.Contains(t, problems[0], "by age")
 }
 
-func writePackage(t *testing.T, dir, scripts string, config bool) {
+func writePackage(t *testing.T, dir, scripts, config string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(dir, 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"scripts": `+scripts+`}`), 0o600))
-	if config {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "vitest.config.ts"), []byte("export default {}\n"), 0o600))
+	if config != "" {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "vitest.config.ts"), []byte(config), 0o600))
 	}
 }
 
@@ -130,13 +140,25 @@ func TestEveryConfiglessVitestScriptOnThisRepositoryAsksForTheCache(t *testing.T
 // @scenario "A suite that runs vitest without a config file asks for the transform cache"
 func TestConfiglessVitestScriptsMustAskForTheCache(t *testing.T) {
 	root := t.TempDir()
-	writePackage(t, filepath.Join(root, "bare"), `{"test": "vitest run --exclude x", "test:integration": "vitest run --config vitest.integration.config.ts"}`, false)
-	writePackage(t, filepath.Join(root, "flagged"), `{"test": "vitest run --fsModuleCache"}`, false)
-	writePackage(t, filepath.Join(root, "configured"), `{"test": "vitest run"}`, true)
-	writePackage(t, filepath.Join(root, "node_modules", "dep"), `{"test": "vitest run"}`, false)
+	writePackage(t, filepath.Join(root, "bare"), `{"test": "vitest run --exclude x", "test:integration": "vitest run --config vitest.integration.config.ts"}`, "")
+	writePackage(t, filepath.Join(root, "flagged"), `{"test": "vitest run --fsModuleCache"}`, "")
+	writePackage(t, filepath.Join(root, "configured"), `{"test": "vitest run"}`, "export default { test: { fsModuleCache: true } }\n")
+	writePackage(t, filepath.Join(root, "shared"), `{"test": "vitest run"}`, `import { defineModuleVitestConfig } from "@langwatch/vitest-config";`+"\n")
+	writePackage(t, filepath.Join(root, "node_modules", "dep"), `{"test": "vitest run"}`, "")
 
 	missing, err := UncachedVitestScripts(root)
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{filepath.Join("bare", "package.json") + " test"}, missing)
+}
+
+// @scenario "A suite whose own vitest config does not persist transforms asks for the cache"
+func TestHandRolledVitestConfigsMustAskForTheCache(t *testing.T) {
+	root := t.TempDir()
+	writePackage(t, filepath.Join(root, "handrolled"), `{"test": "vitest run"}`, "export default { test: {} }\n")
+
+	missing, err := UncachedVitestScripts(root)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{filepath.Join("handrolled", "package.json") + " test"}, missing)
 }

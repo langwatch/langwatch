@@ -87,9 +87,11 @@ func transformKeyProblems(step ciscan.Step) []string {
 	return problems
 }
 
-// trimCommand drops the whole cache past a size, never single entries by age: a restored
-// entry keeps the time it was first written, so an age purge drops the hottest first.
-var trimCommand = regexp.MustCompile(`du -sm ` + regexp.QuoteMeta(transformCachePath) + `.*-gt \d+ \]; then rm -rf ` + regexp.QuoteMeta(transformCachePath))
+// trimCommand empties the whole cache past a size, never single entries by age: a restored
+// entry keeps the time it was first written, so an age purge drops the hottest first. The
+// directory is recreated: with no path to save, the next run restores the oversized cache.
+var trimCommand = regexp.MustCompile(`du -sm ` + regexp.QuoteMeta(transformCachePath) + `.*-gt \d+ \]; then rm -rf ` +
+	regexp.QuoteMeta(transformCachePath) + ` && mkdir -p ` + regexp.QuoteMeta(transformCachePath))
 
 var agePurge = regexp.MustCompile(`find ` + regexp.QuoteMeta(transformCachePath) + `.*-[acm](time|min) `)
 
@@ -110,9 +112,9 @@ var (
 	configFlag = regexp.MustCompile(`(--config|(^|\s)-c)[\s=]`)
 )
 
-// UncachedVitestScripts lists the package suite scripts that run vitest with no
-// config file, and so with vitest's own default of not persisting transforms,
-// without asking for it on the command line.
+// UncachedVitestScripts lists the package suite scripts that run vitest with its default
+// of not persisting transforms: no config file, or one that neither sets fsModuleCache nor
+// builds on @langwatch/vitest-config, and no --fsModuleCache on the command line.
 func UncachedVitestScripts(root string) ([]string, error) {
 	var found []string
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
@@ -152,7 +154,7 @@ func uncachedScriptsIn(dir string) ([]string, error) {
 		Scripts map[string]string `json:"scripts"`
 	}
 	// A manifest that is not JSON is a fixture, not a package that runs suites.
-	if unmarshalErr := json.Unmarshal(raw, &manifest); unmarshalErr != nil || hasVitestConfig(dir) {
+	if unmarshalErr := json.Unmarshal(raw, &manifest); unmarshalErr != nil || configCaches(dir) {
 		return nil, nil //nolint:nilerr // see above
 	}
 	var missing []string
@@ -165,11 +167,15 @@ func uncachedScriptsIn(dir string) ([]string, error) {
 	return missing, nil
 }
 
-func hasVitestConfig(dir string) bool {
+// configCaches is whether the package's default vitest config persists transforms.
+func configCaches(dir string) bool {
 	for _, ext := range []string{"ts", "mts", "js", "mjs"} {
-		if _, err := os.Stat(filepath.Join(dir, "vitest.config."+ext)); err == nil {
-			return true
+		source, err := os.ReadFile(filepath.Join(dir, "vitest.config."+ext))
+		if err == nil {
+			return cachingConfig.Match(source)
 		}
 	}
 	return false
 }
+
+var cachingConfig = regexp.MustCompile(`fsModuleCache|@langwatch/vitest-config|defineModuleVitestConfig`)

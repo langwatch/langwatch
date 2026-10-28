@@ -10,7 +10,6 @@ import {
   discover,
   exclusionNotices,
   failureAnnotations,
-  formatMeasured,
   heaviestFirst,
   isHeavyPackage,
   jobsFor,
@@ -313,20 +312,6 @@ void describe("given the runner holds each suite's output until it ends", () => 
       processes.get("@fix/a")!.end(2);
       processes.get("@fix/b")!.end(null);
       assert.deepEqual(await Promise.all([failed, killed]), [2, 1]);
-    });
-  });
-
-  void describe("when a package runs two scripts", () => {
-    void it("adds both durations to the package's measured seconds", async () => {
-      const { runner, processes } = fakeRunner(false);
-      const two = pkg("@fix/a", ["test", "test:integration"]);
-      const unit = runner.run({ pkg: two, script: "test" });
-      processes.get("@fix/a")!.end(0);
-      await unit;
-      const integration = runner.run({ pkg: two, script: "test:integration" });
-      processes.get("@fix/a")!.end(0);
-      await integration;
-      assert.equal(runner.secondsOf.get("@fix/a"), 6);
     });
   });
 
@@ -845,17 +830,6 @@ void describe("given the job is split into shards", () => {
       for (const bad of ["@fix/a", "@fix/a  0", "@fix/a  slow", infinite, "@fix/a 1\n@fix/a 2"]) {
         assert.equal(parseWeights(bad, "weights").errors.length, 1, bad);
       }
-    });
-
-    void it("prints the slow packages of a run in its own format", () => {
-      assert.deepEqual(
-        formatMeasured([
-          { name: "@fix/quick", seconds: 3 },
-          { name: "@fix/slow", seconds: 120.4 },
-          { name: "@fix/slower", seconds: 640 },
-        ]),
-        ["@fix/slower  640", "@fix/slow  120"],
-      );
     });
   });
 

@@ -136,11 +136,20 @@ func (g GitHub) Jobs(run int64) ([]Job, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseJobs(out)
+}
+
+// parseJobs reads `id<TAB>conclusion<TAB>name` lines. A line of any other shape is an
+// error: skipping it could drop a shard and make a green run look incomplete.
+func parseJobs(out string) ([]Job, error) {
 	var jobs []Job
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
 		fields := strings.SplitN(line, "\t", 3)
 		if len(fields) != 3 {
-			continue
+			return nil, fmt.Errorf("job line %q: want id, conclusion and name", line)
 		}
 		id, err := strconv.ParseInt(fields[0], 10, 64)
 		if err != nil {

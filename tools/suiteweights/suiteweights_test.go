@@ -169,3 +169,28 @@ func TestRenderListsHeaviestFirstAndNamesTheRuns(t *testing.T) {
 	assert.Equal(t, []string{"@x/c  300", "@x/a  120", "@x/b  120"}, body)
 	assert.Contains(t, out, "main runs 11, 22")
 }
+
+// @scenario "GitHub's listings are read strictly"
+func TestParseIDsReadsOneRunPerLine(t *testing.T) {
+	ids, err := parseIDs("101\n202\n\n")
+	require.NoError(t, err)
+	assert.Equal(t, []int64{101, 202}, ids)
+
+	_, err = parseIDs("101\nnot-an-id\n")
+	assert.Error(t, err)
+}
+
+// @scenario "GitHub's listings are read strictly"
+func TestParseJobsReadsIDConclusionAndName(t *testing.T) {
+	jobs, err := parseJobs("7\tsuccess\tpackage-suites (1/8)\n8\tfailure\tlint\twith a tab\n\n")
+	require.NoError(t, err)
+	assert.Equal(t, []Job{
+		{ID: 7, Conclusion: "success", Name: "package-suites (1/8)"},
+		{ID: 8, Conclusion: "failure", Name: "lint\twith a tab"},
+	}, jobs)
+
+	_, err = parseJobs("7\tsuccess\n")
+	require.Error(t, err, "a short line is an error, not a skipped job")
+	_, err = parseJobs("x\tsuccess\tlint\n")
+	assert.Error(t, err)
+}

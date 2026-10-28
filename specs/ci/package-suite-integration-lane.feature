@@ -68,7 +68,7 @@ Feature: A package's integration suite runs in CI when it declares one
     Scenario: Shards are balanced by measured weight
       Given a weights file recording how many seconds each slow package takes
       When the packages are split over the shards
-      Then the heaviest packages are placed first, each on the shard with the least weight so far
+      Then the heaviest packages are placed first, each on the shard whose wall time it raises least
 
     # A shard's wall time is the sum of its heavy suites, which run alone, plus
     # its light suites divided by the concurrency, since they share the shard,

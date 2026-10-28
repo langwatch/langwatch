@@ -68,6 +68,12 @@ Feature: The package-suites weights are refreshed by a command
       When runs are collected
       Then the command fails without writing the file
 
+    @unit
+    Scenario: GitHub's listings are read strictly
+      Given gh lists runs and jobs one per line
+      When a line is not the shape asked for
+      Then the command fails rather than skipping it
+
   Rule: the file says where its numbers came from
 
     @unit

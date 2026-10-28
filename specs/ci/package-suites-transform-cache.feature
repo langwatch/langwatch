@@ -45,7 +45,8 @@ Feature: The package-suites shards keep vitest's transformed modules between run
     Scenario: A transform cache past its size limit is dropped whole before the save
       Given the package-suites job
       When its steps are read
-      Then one drops the transform cache whole when it is past its size limit
+      Then one empties the transform cache whole when it is past its size limit
+      And the emptied directory is left in place, so the save replaces the oversized cache
       And none purges single transforms by age
 
   Rule: every suite persists its transforms
@@ -55,3 +56,9 @@ Feature: The package-suites shards keep vitest's transformed modules between run
       Given a package whose suite script runs vitest with no vitest config file
       When its scripts are read
       Then the script passes --fsModuleCache
+
+    @unit
+    Scenario: A suite whose own vitest config does not persist transforms asks for the cache
+      Given a package whose vitest config neither sets fsModuleCache nor builds on the shared config
+      When its scripts are read
+      Then each suite script that runs vitest with that config is listed

@@ -36,6 +36,7 @@ func main() {
 	}
 }
 
+// no-test: wiring over ciscan.RepoRoot and the file; tools/suiteweights tests each step.
 func run(runs int, src suiteweights.Source) error {
 	root, err := ciscan.RepoRoot(".")
 	if err != nil {

@@ -911,10 +911,10 @@ jobs:
       # restored file keeps the time it was first written, so purging by age would
       # drop the hottest entries first. A new lockfile, manifest, tsconfig or shared
       # config already starts a fresh cache (the key above); between those, a cache
-      # past 400 MB is dropped whole and the next run on this shard starts cold.
+      # past 400 MB is emptied, so the save stores a small one the next run restores.
       - name: Drop the vitest transforms before saving if they grew past 400 MB
         if: ${{ !cancelled() }}
-        run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache; fi
+        run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
 
   lint:
     needs: changes
