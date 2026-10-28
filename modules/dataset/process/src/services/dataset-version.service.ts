@@ -7,7 +7,6 @@ import {
   DatasetNotReadyError,
   DatasetVersionNotFoundError,
   DatasetVersionRestoreUnsupportedError,
-  DatasetVersionTooLargeError,
   type CompareDatasetVersionInput,
   type Dataset,
   type DatasetColumns,
@@ -37,6 +36,7 @@ import {
   DATASET_VERSION_ROWS_PER_CHUNK,
   versionChunksOfPage,
   versionRowOf,
+  assertWithinWholeRead,
 } from "../rules/dataset-version.rules.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 import { DatasetContentHasherService } from "./dataset-content-hasher.service.ts";
@@ -185,22 +185,14 @@ export class DatasetVersionService {
     const version = await this.get(input);
     const before = { columns: version.columnTypes, rows: await this.readWhole(version) };
     const dataset = await this.#readyDataset(input);
-    await this.#assertWholeRead({
-      projectId: input.projectId,
-      rows: dataset.rowCount,
-      bytes: dataset.sizeBytes === null ? null : Number(dataset.sizeBytes),
-    });
-    // A postgres-layout dataset records no counts, so the current rows
-    // are also bounded as they stream.
-    const { maxRows, maxBytes } = await this.deps.wholeReadBounds(input.projectId);
+    const bounds = await this.deps.wholeReadBounds(input.projectId);
     const current: DatasetVersionRow[] = [];
     let bytes = 0;
+    // Bounded as the rows stream: a postgres-layout dataset records no counts.
     for await (const row of this.#currentRows(dataset)) {
       bytes += Buffer.byteLength(JSON.stringify(row.entry));
-      if (current.length >= maxRows || bytes > maxBytes) {
-        throw new DatasetVersionTooLargeError({ maxRows, maxBytes });
-      }
       current.push(row);
+      assertWithinWholeRead({ rows: current.length, bytes, ...bounds });
     }
     return compareDatasetContents({
       version: version.version,
@@ -287,10 +279,8 @@ export class DatasetVersionService {
     rows: number | null;
     bytes: number | null;
   }): Promise<void> {
-    const { maxRows, maxBytes } = await this.deps.wholeReadBounds(input.projectId);
-    if ((input.rows ?? 0) > maxRows || (input.bytes ?? 0) > maxBytes) {
-      throw new DatasetVersionTooLargeError({ maxRows, maxBytes });
-    }
+    const bounds = await this.deps.wholeReadBounds(input.projectId);
+    assertWithinWholeRead({ rows: input.rows ?? 0, bytes: input.bytes ?? 0, ...bounds });
   }
 
   async #readyDataset(input: { projectId: string; datasetId: string }): Promise<Dataset> {

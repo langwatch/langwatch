@@ -5,10 +5,23 @@
  */
 import {
   DATASET_VERSION_COMPARE_LIST_MAX,
+  DatasetVersionTooLargeError,
   type DatasetColumns,
   type DatasetVersionComparison,
   type DatasetVersionRow,
 } from "@langwatch/dataset-contract";
+
+/** Refuses a whole read of more rows or bytes than one answer holds. */
+export function assertWithinWholeRead(input: {
+  rows: number;
+  bytes: number;
+  maxRows: number;
+  maxBytes: number;
+}): void {
+  if (input.rows > input.maxRows || input.bytes > input.maxBytes) {
+    throw new DatasetVersionTooLargeError({ maxRows: input.maxRows, maxBytes: input.maxBytes });
+  }
+}
 
 /** Rows per stored version chunk, so a page of a version reads the chunks it covers only. */
 export const DATASET_VERSION_ROWS_PER_CHUNK = 500;
