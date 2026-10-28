@@ -64,6 +64,13 @@ Feature: docs.json stays the single source of truth for both documentation sites
     Then the tag loads as on any production page
 
   @unit
+  Scenario: Let the tag manager run only Google's own tags
+    Given docs.json names a Google Tag Manager container
+    When the container loads
+    Then the page has already limited it to Google's own tags
+    And it refuses custom HTML, custom JavaScript and any non-Google script, frame or pixel, whatever the container publishes
+
+  @unit
   Scenario: Mark deprecated pages
     Given a page's frontmatter marks it deprecated or gives it a tag
     When the page is rendered

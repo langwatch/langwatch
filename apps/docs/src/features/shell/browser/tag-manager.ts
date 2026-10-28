@@ -4,6 +4,25 @@ const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
 /* The marketing site's cookie banner writes the reader's choice here, on the same origin. */
 const CONSENT_STORAGE_KEY = "lw-cookie-consent";
 
+/*
+ * What the container may run, set by the page before the container loads, so publishing the
+ * container cannot widen it: Google's own tags only, and never a tag that runs code of our
+ * own or a third party's (Custom HTML, custom JavaScript variables, script-injecting
+ * templates, non-Google scripts, frames and pixels). Blocked classes win over allowed ones.
+ */
+export const TAG_RESTRICTIONS = {
+  "gtm.allowlist": ["google"],
+  "gtm.blocklist": [
+    "customScripts",
+    "html",
+    "sandboxedScripts",
+    "nonGoogleScripts",
+    "nonGoogleIframes",
+    "nonGooglePixels",
+    "customPixels",
+  ],
+} as const;
+
 type TagWindow = Window & { dataLayer?: unknown[] };
 
 /** Whether the reader accepted cookies; unknown, declined or unreadable storage is a no. */
@@ -43,6 +62,7 @@ export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
     started = true;
     for (const name of INTERACTIONS) win.removeEventListener(name, start);
     win.dataLayer = win.dataLayer ?? [];
+    win.dataLayer.push(TAG_RESTRICTIONS);
     // The performance clock gives epoch milliseconds without pulling Temporal into this island.
     const epochMilliseconds = Math.round(performance.timeOrigin + performance.now());
     win.dataLayer.push({ "gtm.start": epochMilliseconds, event: "gtm.js" });

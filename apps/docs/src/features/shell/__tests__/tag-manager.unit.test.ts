@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { analyticsConsented, startTagManager, tagManagerId } from "../browser/tag-manager.ts";
+import {
+  analyticsConsented,
+  startTagManager,
+  TAG_RESTRICTIONS,
+  tagManagerId,
+} from "../browser/tag-manager.ts";
 
 /* A window double with just the surface the loader touches. */
 function fakeWindow({
@@ -63,7 +68,7 @@ describe("the tag manager loader", () => {
       expect(appended).toEqual([
         { src: "https://www.googletagmanager.com/gtm.js?id=GTM-KJ4S6Z9C", async: true },
       ]);
-      expect(win.dataLayer).toEqual([expect.objectContaining({ event: "gtm.js" })]);
+      expect(win.dataLayer).toEqual([TAG_RESTRICTIONS, expect.objectContaining({ event: "gtm.js" })]);
     });
 
     /** @scenario "Load the tag manager without slowing the page" */
@@ -130,6 +135,29 @@ describe("the tag manager loader", () => {
       const storage = (value: string | null) => ({ localStorage: { getItem: () => value } }) as never;
       expect(analyticsConsented({ win: storage("accepted") })).toBe(true);
       expect(analyticsConsented({ win: storage("yes") })).toBe(false);
+    });
+  });
+
+  describe("when the container loads", () => {
+    /** @scenario "Let the tag manager run only Google's own tags" */
+    it("restricts it to Google's tags before the container starts", () => {
+      const { win, fire } = fakeWindow({ id: "GTM-KJ4S6Z9C" });
+      startTagManager({ win: win as never });
+      fire("pointerdown");
+
+      const [restrictions, start] = win.dataLayer ?? [];
+      expect(start).toMatchObject({ event: "gtm.js" });
+      expect(restrictions).toEqual({
+        "gtm.allowlist": ["google"],
+        "gtm.blocklist": expect.arrayContaining([
+          "customScripts",
+          "html",
+          "sandboxedScripts",
+          "nonGoogleScripts",
+          "nonGoogleIframes",
+          "nonGooglePixels",
+        ]),
+      });
     });
   });
 });
