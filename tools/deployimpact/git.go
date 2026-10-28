@@ -41,22 +41,6 @@ func (g GitTree) Paths() ([]string, error) {
 	return splitNul(out), err
 }
 
-// Grep lists the files at the revision with a line matching pattern.
-func (g GitTree) Grep(pattern string) ([]string, error) {
-	out, err := git(g.Ctx, "grep", "-l", "-z", "-E", "-e", pattern, g.Rev)
-	if exit, ok := errors.AsType[*exec.ExitError](err); ok && exit.ExitCode() == 1 {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var paths []string
-	for _, hit := range splitNul(out) {
-		paths = append(paths, strings.TrimPrefix(hit, g.Rev+":"))
-	}
-	return paths, nil
-}
-
 // Read returns a file's content at the revision, or an empty string when it is absent.
 func (g GitTree) Read(path string) (string, error) {
 	listed, err := git(g.Ctx, "ls-tree", "-z", "--name-only", g.Rev, "--", path)

@@ -141,6 +141,8 @@ jobs:
               - '.github/workflows/gateway-matrix.yaml'
               # Read by .github/scripts/release-please-timer.test.ts.
               - '.github/workflows/release-please-sdks.yml'
+              # Read by .github/scripts/guard-breaking-change-scope.test.ts.
+              - '.github/workflows/pr-conventions.yml'
               # Read by .github/scripts/pr-workflow-filters.test.ts.
               - '.github/workflows/e2e-ci.yml'
               - '.github/workflows/langwatch-nlp-ci.yml'

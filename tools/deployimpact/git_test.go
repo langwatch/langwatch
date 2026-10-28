@@ -51,13 +51,6 @@ func TestGitTreeReadsARevisionWithoutACheckout(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"charts/langwatch/templates/a b.yaml", valuesFile}, paths)
 
-	hits, err := tree.Grep(`port: [0-9]`)
-	require.NoError(t, err)
-	assert.Equal(t, []string{valuesFile}, hits, "the revision prefix is stripped")
-	none, err := tree.Grep(`no such text`)
-	require.NoError(t, err)
-	assert.Empty(t, none, "no match is an empty list, not an error")
-
 	content, err := tree.Read(valuesFile)
 	require.NoError(t, err)
 	assert.Equal(t, "app:\n  port: 2\n", content)
