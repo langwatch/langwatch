@@ -771,11 +771,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the board is made
     Then it is pinned for nobody, its creator included
     # My dashboard is the one exception: it starts pinned for its maker (AC160b)
-    # The LLM Ops sidebar's "+" stars its new board for its maker (product-sidebars.feature)
+    # The LLM Ops sidebar's "+" pins its new board for its maker (product-sidebars.feature)
 
   @unit
   Scenario: AC157 Stars are per member
-    Given one member stars a board
+    Given one member pins a board
     When another member lists their pinned boards
     Then that board is not among them
 
@@ -800,7 +800,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC171 Scope: an Only me board exists for its author alone
     Given a board its author set to Only me
     When another member of the project, or a project credential, lists the boards or the
-      pinned boards, opens the board by its id, renames, deletes, stars or copies it,
+      pinned boards, opens the board by its id, renames, deletes, pins or copies it,
       or reads, adds, edits, moves or deletes a widget on it
     Then every one of these answers as it does for a board that does not exist
     And the author lists it, opens it and edits it as before
@@ -823,7 +823,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       or adds, edits, moves or deletes a widget on it
     Then the server refuses each write and the board is unchanged
     And the same writes are accepted in the project that owns it
-    And a member may star it, and copy it into the project they are in
+    And a member may pin it, and copy it into the project they are in
 
   @unit
   Scenario: AC174 Scope: only the author changes a board's scope
@@ -844,8 +844,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a board other members pinned
     When its author sets it to Only me
     Then it leaves the other members' pinned lists
-    And their stars come back when the author widens the scope again
-    And a star on an Organization board is one star: it shows in every project that lists the board
+    And their pins come back when the author widens the scope again
+    And a pin on an Organization board is one pin: it shows in every project that lists the board
 
   @unit @integration
   Scenario: AC177 Scope control: the board header shows the scope beside the title
