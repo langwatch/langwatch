@@ -189,8 +189,8 @@ catalogs:
       specifier: ^3.826.0
       version: 3.1108.0
     '@azure/identity':
-      specifier: ^4.14.0
-      version: 4.14.0
+      specifier: ^4.13.1
+      version: 4.13.1
     '@better-auth/passkey':
       specifier: 1.7.1
       version: 1.7.1
@@ -677,7 +677,6 @@ overrides:
   '@opensearch-project/opensearch': '-'
   '@opentelemetry/core@<2.8.0': '>=2.8.0'
   '@opentelemetry/exporter-prometheus@<0.217.0': '>=0.217.0'
-  '@azure/identity>@azure/msal-node': '>=7.1.0 <8'
   '@opentelemetry/propagator-jaeger@<2.9.0': '>=2.9.0'
   '@opentelemetry/sdk-node@<0.217.0': '>=0.217.0'
   '@tiptap/core@<3.30.4': '>=3.30.4 <4'
@@ -14753,7 +14752,7 @@ importers:
         version: 3.1108.0
       '@azure/identity':
         specifier: 'catalog:'
-        version: 4.14.0(supports-color@10.2.2)
+        version: 4.13.1(supports-color@10.2.2)
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -17901,7 +17900,7 @@ importers:
         version: 3.1108.0
       '@azure/identity':
         specifier: 'catalog:'
-        version: 4.14.0(supports-color@10.2.2)
+        version: 4.13.1(supports-color@10.2.2)
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
@@ -19093,10 +19092,6 @@ packages:
     resolution: {integrity: sha512-JjQWO6akOck45PH/XBrxzsQGAiKrfFl4m5iggJ0ItMIz5omRufOXWpqCPpdjKN3vKDzlSUvFjaMb7Zwf0gvAdA==}
     engines: {node: '>=22.0.0'}
 
-  '@azure/core-process@1.0.0':
-    resolution: {integrity: sha512-/shnJ+ooO8WPxDhPEeI/2oRQuubn16gZ6CvlbpWbEswZfzwI9tI/sMAHmF3x1LuQ9yZYXfLW3TjzGMLEC5blKg==}
-    engines: {node: '>=22.0.0'}
-
   '@azure/core-rest-pipeline@1.25.0':
     resolution: {integrity: sha512-bMs8ekJLjX8wPV+9IPBges1SLPyuDtE9g5gLDWOpxzKcoOFQnpLGkbcT1tdw3FaAmDS1gnPmMmJ6y/T5B96kIA==}
     engines: {node: '>=22.0.0'}
@@ -19109,9 +19104,9 @@ packages:
     resolution: {integrity: sha512-9n2pWK61veAuN0V20t9lOuoV4CFMdyAZ1ygZzvBGk/pBBJRib/PjL9PLXa/aI2CcPpyHfqVsxxqLCYl6uZlfDw==}
     engines: {node: '>=22.0.0'}
 
-  '@azure/identity@4.14.0':
-    resolution: {integrity: sha512-8utCLdTZn14CiAe0HW4JbtzUMsc0mdDwnjUvStFMrR4IxQP8S2eL9zVAdplpfORVJGYmidZElpeXRYjJQ4UyUw==}
-    engines: {node: '>=22.0.0'}
+  '@azure/identity@4.13.1':
+    resolution: {integrity: sha512-5C/2WD5Vb1lHnZS16dNQRPMjN6oV/Upba+C9nBIs15PmOi6A3ZGs4Lr2u60zw4S04gi+u3cEXiqTVP7M4Pz3kw==}
+    engines: {node: '>=20.0.0'}
 
   '@azure/logger@1.4.0':
     resolution: {integrity: sha512-rbAE25KUfjU/s3XHUdJgceoCP5dEOpMx85J04kF+QMdta73XkuG9JGHHinch+XIoKpBdqljin+KqURpJriSzLA==}
@@ -19125,12 +19120,12 @@ packages:
     resolution: {integrity: sha512-VeXOW+t3Rdd9XGX6lVyIg3DhtjMR1JD8ARKcsnGbJFUWwAmF3sHL7GwZc/ZjEUfHESResAonETRYCuG06OBT7A==}
     engines: {node: '>=0.8.0'}
 
-  '@azure/msal-common@16.14.2':
-    resolution: {integrity: sha512-HOBR0Gfo39TMrkxNG8k6cfjRkrRjXZc3JQs3ebMWQc9S4cihuknMYra3sgmzbZB752oQBqBN9+WF7c826p2vIQ==}
+  '@azure/msal-common@16.13.0':
+    resolution: {integrity: sha512-rOAy0KUcyBbdwVJ+f3uPpthXatFLLZN+/KWAsTLzk1aB23Xl9DRmmXYwSvBFOZyXj4jUQQ5FKxxRkhAFW1fOow==}
     engines: {node: '>=0.8.0'}
 
-  '@azure/msal-node@7.1.0':
-    resolution: {integrity: sha512-s1O6hSY/C/dmqykTmmeHY6GhSkDuY8N1gxyhuLyaCwbY7N+UBvU2Wu4flas7+NxZiAPcXNPVpgt3n/HP/5yL+w==}
+  '@azure/msal-node@5.6.0':
+    resolution: {integrity: sha512-uFY9NxrWHw8PwZx7gAX6PDn+9vdfS05+levc/kwkx77IkjfaldnQbbcQzzDIZ5Hq5Zdr6/z92oAIoRWKp6MnOA==}
     engines: {node: '>=20'}
 
   '@babel/code-frame@7.29.7':
@@ -30361,8 +30356,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/core-process@1.0.0': {}
-
   '@azure/core-rest-pipeline@1.25.0(supports-color@10.2.2)':
     dependencies:
       '@azure/abort-controller': 2.2.0
@@ -30387,19 +30380,18 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/identity@4.14.0(supports-color@10.2.2)':
+  '@azure/identity@4.13.1(supports-color@10.2.2)':
     dependencies:
       '@azure/abort-controller': 2.2.0
       '@azure/core-auth': 1.11.0(supports-color@10.2.2)
       '@azure/core-client': 1.11.0(supports-color@10.2.2)
-      '@azure/core-process': 1.0.0
       '@azure/core-rest-pipeline': 1.25.0(supports-color@10.2.2)
       '@azure/core-tracing': 1.4.0
       '@azure/core-util': 1.14.0(supports-color@10.2.2)
       '@azure/logger': 1.4.0(supports-color@10.2.2)
       '@azure/msal-browser': 5.17.3
-      '@azure/msal-node': 7.1.0
-      open: 11.0.1
+      '@azure/msal-node': 5.6.0
+      open: 10.2.0
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -30417,11 +30409,11 @@ snapshots:
 
   '@azure/msal-common@16.11.3': {}
 
-  '@azure/msal-common@16.14.2': {}
+  '@azure/msal-common@16.13.0': {}
 
-  '@azure/msal-node@7.1.0':
+  '@azure/msal-node@5.6.0':
     dependencies:
-      '@azure/msal-common': 16.14.2
+      '@azure/msal-common': 16.13.0
       jsonwebtoken: 9.0.3
 
   '@babel/code-frame@7.29.7':

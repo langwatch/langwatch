@@ -157,6 +157,7 @@ override-dependencies = [
 # and upper bounds included.
 constraint-dependencies = [
   # fastmcp-slim: post-transform component authorization skipped on direct calls (#3202).
+  # Capped below 4: 4.x is a major with its own fixes, and a bare floor lets a relock float onto it.
   "fastmcp-slim>=3.4.10,<4",
   "fsspec>=2026.6.0", # fsspec advisory covering <2026.6.0
   "datasets>=5.0.1", # datasets advisory covering <5.0.1; 4.x also caps fsspec below its fix
