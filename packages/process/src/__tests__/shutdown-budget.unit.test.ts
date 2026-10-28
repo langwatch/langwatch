@@ -64,7 +64,7 @@ const chartGraceMarginSeconds = numberFrom({
   label: "chart required grace",
 });
 
-/** The preStop sleep an unpinned app gets, and the seconds the chart keeps above preStop + drain. */
+/** The app's unset preStop sleep, and the seconds its grace keeps above preStop + drain. */
 const chartPreStopDefaultSeconds = numberFrom({
   source: appDeployment,
   pattern: /\$preStop = min (\d+) \(sub \$grace/,
