@@ -17,7 +17,7 @@ func TestSimulatorLanesUseTheHavenExecutable(t *testing.T) {
 	executable := filepath.Join(t.TempDir(), "haven's binary $(exit 1)")
 	// A script, not a symlink to printf: a multicall printf (Rust coreutils)
 	// picks its tool from its own name and refuses this one.
-	if err := os.WriteFile(executable, []byte("#!/bin/sh\nprintf \"$@\"\n"), 0o755); err != nil {
+	if err := os.WriteFile(executable, []byte("#!/bin/sh\nprintf \"$@\"\n"), 0o700); err != nil { //nolint:gosec // the fixture needs the exec bit
 		t.Fatal(err)
 	}
 	o := &Orchestrator{cfg: Config{Home: home, SimulatorArgv: []string{executable, "%s/%s", "simulator"}}, proxy: stubProxy{}}
