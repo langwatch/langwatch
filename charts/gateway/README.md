@@ -45,14 +45,17 @@ JWT pre-rotation has expired (default ~15 min).
 ## Install
 
 The gateway sub-chart is shipped as a dependency of the umbrella
-`langwatch` chart, not as a standalone published chart. Installing the
-umbrella chart from the LangWatch Helm repository installs the gateway too
+`langwatch` chart, not as a standalone published chart. Released
+`langwatch` charts are published to the project's GitHub Pages Helm
+repository. Installing the umbrella chart installs the gateway too
 (`gateway.chartManaged` defaults to `true`):
 
 ```bash
 helm repo add langwatch https://langwatch.github.io/langwatch
 helm repo update
-helm install langwatch langwatch/langwatch -n langwatch -f values.prod.yaml
+
+helm install langwatch langwatch/langwatch \
+  -n langwatch -f values.prod.yaml
 ```
 
 Or, for development against the chart in this repo, render this
