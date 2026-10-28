@@ -47,7 +47,7 @@ var Checks = []Check{
 		Scenario: "The app and the worker with a memory limit get a heap of three quarters of it",
 		Values: "app:\n  resources:\n    limits: { memory: 4Gi }\n" +
 			"workers:\n  resources:\n    limits: { memory: 4Gi }\n",
-		Expect: map[string]Assertion{App: onlyIs(Ceiling), Workers: lastIs(Ceiling)},
+		Expect: map[string]Assertion{App: onlyIs(Ceiling), Workers: onlyIs(Ceiling)},
 	},
 	{
 		Scenario: "With no memory limit the app and the worker keep Node's own heap size",
@@ -67,6 +67,11 @@ var Checks = []Check{
 			App:     onlyIs("--max-old-space-size=2500"),
 			Workers: onlyIs("--max-old-space-size=2500"),
 		},
+	},
+	{
+		Scenario: "The operator can turn the ceiling off",
+		Values:   "global:\n  nodeHeapCeiling:\n    enabled: false\n",
+		Expect:   map[string]Assertion{App: noneSet, Workers: noneSet},
 	},
 }
 
@@ -142,15 +147,6 @@ func containerNodeOptions(doc deployment) []string {
 		}
 	}
 	return options
-}
-
-func lastIs(want string) func([]string) error {
-	return func(options []string) error {
-		if len(options) == 0 || options[len(options)-1] != want {
-			return fmt.Errorf("want NODE_OPTIONS %q to win, got %q", want, options)
-		}
-		return nil
-	}
 }
 
 // onlyIs asserts a single NODE_OPTIONS entry: server-side apply refuses a duplicate env name.

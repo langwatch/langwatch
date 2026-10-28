@@ -180,6 +180,7 @@ describe("TracePayloadReaderRepository.recall", () => {
         const third = outcomes.get(offloadedFieldKey(ref("spent", "big3", "a")));
         expect(third?.ok).toBe(false);
         expect(!third?.ok && third?.error).toBeInstanceOf(TraceOffloadBudgetExceededError);
+        expect(!third?.ok && third?.error).toMatchObject({ traceId: "spent", scope: "trace" });
         expect(outcomes.get(offloadedFieldKey(ref("other-trace", "other", "a")))?.ok).toBe(true);
         expect(outcomes.get(offloadedFieldKey(ref("spent", "big1", "a")))?.ok).toBe(true);
         expect(outcomes.get(offloadedFieldKey(ref("spent", "big2", "a")))?.ok).toBe(true);
@@ -274,6 +275,33 @@ describe("TracePayloadReaderRepository.recall", () => {
         expect(second && !second.ok && second.error).toBeInstanceOf(
           TraceOffloadBudgetExceededError,
         );
+      });
+
+      /** @scenario "A trace kept at its previews by the recall's total budget is not blamed for spending it" */
+      it("answers the recall's budget, not the unread trace's own, for every trace it skips", async () => {
+        const reader = new FakePayloadReader({
+          e1: { a: "x".repeat(10) },
+          e2: { a: "y".repeat(10) },
+          e3: { a: "z".repeat(10) },
+        });
+
+        const outcomes = await reader.recall({
+          tenantId: "project-1",
+          references: [ref("t1", "e1", "a"), ref("t2", "e2", "a"), ref("t3", "e3", "a")],
+          concurrency: 1,
+          traceBudgetBytes: 100,
+          totalBudgetBytes: 10,
+        });
+
+        for (const traceId of ["t2", "t3"]) {
+          const eventId = traceId === "t2" ? "e2" : "e3";
+          const outcome = outcomes.get(offloadedFieldKey(ref(traceId, eventId, "a")));
+          expect(outcome && !outcome.ok && outcome.error).toMatchObject({
+            traceId,
+            scope: "recall",
+            budgetBytes: 10,
+          });
+        }
       });
     });
   });

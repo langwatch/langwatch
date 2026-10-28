@@ -41,6 +41,9 @@ global:
     readOnlyRootFilesystem: true
   ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
+  ## @param global.nodeHeapCeiling.enabled [default: true] Give the app and workers containers a JavaScript heap of three quarters of their memory limit (NODE_OPTIONS=--max-old-space-size-percentage=75). Rendered only for a container with a memory limit and no NODE_OPTIONS in its extraEnvs. Set false when NODE_OPTIONS reaches the containers another way, such as extraEnvFrom: the chart's entry would replace it.
+  nodeHeapCeiling:
+    enabled: true
 
   # ServiceAccount for the first-party workloads that touch object storage
   # (app and workers; the cron pods only curl the app over HTTP, so they are

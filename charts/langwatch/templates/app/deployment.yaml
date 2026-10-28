@@ -186,7 +186,7 @@ spec:
             # probes and the Service all name the service port.
             - name: API_PORT
               value: {{ .Values.app.service.port | default 5560 | quote }}
-            {{- include "langwatch.heapCeilingEnv" (dict "resources" .Values.app.resources "extraEnvs" (default (list) .Values.app.extraEnvs)) | nindent 12 }}
+            {{- include "langwatch.heapCeilingEnv" (dict "global" .Values.global "resources" .Values.app.resources "extraEnvs" (default (list) .Values.app.extraEnvs)) | nindent 12 }}
 
             {{- /* Everything else the app is given, the workers are given too:
                    both processes parse one config (Alex, 2026-09-30). */}}
