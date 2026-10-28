@@ -22,6 +22,7 @@ import {
   parseShard,
   parseWeights,
   runJobs,
+  workerEnvFor,
   scriptsFor,
   shardCostOf,
   shardOf,
@@ -599,6 +600,37 @@ void describe("given the scripts a package declares", () => {
     assert.equal(laneOf("test:browser"), "browser");
     assert.equal(laneOf("test"), "shared");
     assert.equal(laneOf("test:unit"), "shared");
+  });
+});
+
+void describe("given a suite the shard is about to start", () => {
+  const job = (name: string, script: string) => ({
+    pkg: { name, dir: `modules/${name}`, scripts: [script] },
+    script,
+  });
+
+  void describe("when it is a heavy package's unit suite on four cores", () => {
+    /** @scenario "A heavy unit suite running alone uses every core" */
+    void it("asks vitest for four workers", () => {
+      assert.deepEqual(workerEnvFor({ job: job("@fix/trace", "test"), heavy: true, cores: 4 }), {
+        VITEST_MAX_WORKERS: "4",
+      });
+    });
+  });
+
+  void describe("when it needs a quiet CPU or shares a datastore", () => {
+    /** @scenario "A heavy suite that needs a quiet CPU keeps the launcher's workers" */
+    void it("adds nothing for design-system, integration, browser or light suites", () => {
+      const cases = [
+        { job: job("@langwatch/design-system", "test"), heavy: true },
+        { job: job("@fix/trace", "test:integration"), heavy: true },
+        { job: job("@fix/trace", "test:browser"), heavy: true },
+        { job: job("@fix/small", "test"), heavy: false },
+      ];
+      for (const { job: suite, heavy } of cases) {
+        assert.deepEqual(workerEnvFor({ job: suite, heavy, cores: 4 }), {});
+      }
+    });
   });
 });
 

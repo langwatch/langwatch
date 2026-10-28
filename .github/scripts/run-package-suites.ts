@@ -5,6 +5,7 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -312,6 +313,32 @@ const LANES: Record<string, "integration" | "browser"> = {
 };
 export const laneOf = (script: string): "integration" | "browser" | "shared" =>
   LANES[script] ?? "shared";
+
+/**
+ * Packages whose suites keep the launcher's two workers even with the shard to
+ * themselves: design-system's story tests time out under any CPU sharing, and
+ * more workers in one suite is sharing too.
+ */
+export const KEEPS_LAUNCHER_WORKERS: ReadonlySet<string> = new Set(["@langwatch/design-system"]);
+
+/**
+ * What a job adds to its environment. A heavy suite runs alone, and with the
+ * launcher's two workers it left half of a four-core runner idle for most of a
+ * shard, so a heavy unit suite takes every core. Integration and browser lanes
+ * keep their own counts: their files share a datastore or an apt lock.
+ */
+export const workerEnvFor = ({
+  job,
+  heavy,
+  cores,
+}: {
+  job: SuiteJob;
+  heavy: boolean;
+  cores: number;
+}): Record<string, string> =>
+  heavy && cores > 2 && laneOf(job.script) === "shared" && !KEEPS_LAUNCHER_WORKERS.has(job.pkg.name)
+    ? { VITEST_MAX_WORKERS: String(cores) }
+    : {};
 
 /** The scripts nx.json caches. They run through Nx, so an unchanged suite replays its pass. */
 const CACHED_SCRIPTS = new Set(["test", "test:unit"]);
@@ -752,8 +779,10 @@ if (isEntrypoint()) {
     });
   };
   for (const line of exclusionNotices(assigned, excluded)) console.log(line);
-  // Each suite keeps its own configured worker count. VITEST_MAX_WORKERS would
-  // outrank it, and an integration suite's serial files would then overlap.
+  // A suite keeps its own configured worker count unless workerEnvFor gives a
+  // heavy unit suite every core; VITEST_MAX_WORKERS outranks the config, so it
+  // is never set for an integration suite, whose serial files would overlap.
+  const cores = availableParallelism();
   const live = concurrency === 1;
   console.log(`Running up to ${concurrency} suite(s) at once.`);
   const huntCommandFor = (job: SuiteJob): string[] | undefined => {
@@ -766,6 +795,10 @@ if (isEntrypoint()) {
       // The hunt skips nx, whose cache would replay a result instead of rerunning under the seed.
       spawn("pnpm", huntCommandFor(job) ?? commandFor(job), {
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          ...workerEnvFor({ job, heavy: isHeavyPackage({ weightOf, pkg: job.pkg }), cores }),
+        },
       }),
     log: (line) => console.log(line),
     write: (output) => process.stdout.write(output),

@@ -160,6 +160,20 @@ Feature: A package's integration suite runs in CI when it declares one
       Then no other suite runs while a heavy suite runs
       And every heavy suite starts before any light one
 
+    # Alone with the launcher's two workers, a heavy suite left half of a
+    # four-core runner idle, and heavy suites are about half of a shard's work.
+    @unit
+    Scenario: A heavy unit suite running alone uses every core
+      Given a heavy package's unit suite on a runner with four cores
+      When the package suites job starts it
+      Then it runs with four workers
+
+    @unit
+    Scenario: A heavy suite that needs a quiet CPU keeps the launcher's workers
+      Given design-system's suite, or a heavy package's integration or browser suite
+      When the package suites job starts it
+      Then it keeps the worker count its config and the launcher give it
+
     # A heavy suite has its shard to itself, so one whose files are isolated by
     # construction can use the cores the rule leaves idle. @langwatch/analytics-process's
     # integration lane spent 270 to 400s standing up a container and a database per
