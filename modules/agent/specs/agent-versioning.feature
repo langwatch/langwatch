@@ -199,6 +199,15 @@ Feature: Agent versions and deploy labels
     And saving the dialog assigns the chosen versions
 
   @integration
+  Scenario: The deploy dialog adds a custom label and refuses a reserved one
+    Given the deploy dialog is open for an agent with versions 1 and 2
+    When the user adds a label named "latest" or a number
+    Then the dialog explains why the name is refused and the label cannot be added
+    And Escape closes the label input but leaves the dialog open
+    When the user adds "canary", points it at version 1 and saves
+    Then "canary" is assigned to version 1
+
+  @integration
   Scenario: The agent card shows who created it and its version
     Given an agent created by "Ada"
     When the agents screen lists it
