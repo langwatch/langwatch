@@ -64,7 +64,7 @@ const chartGraceMarginSeconds = numberFrom({
   label: "chart required grace",
 });
 
-/** The app's preStop sleep when unset, and the seconds the grace must leave above it and the drain. */
+/** The app's unset preStop sleep, and the seconds its grace must leave above it and the drain. */
 const appPreStopPattern = /min (\d+) \(sub \$grace \(add \$appDrain (\d+)\)\)/;
 const appPreStopDefaultSeconds = numberFrom({
   source: appDeployment,
