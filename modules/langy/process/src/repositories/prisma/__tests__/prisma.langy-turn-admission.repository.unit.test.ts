@@ -1,9 +1,8 @@
-import { LangyAgentUnavailableError } from "@langwatch/langy-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it } from "vitest";
 
-import { PrismaLangyTurnAdmissionRepository } from "../prisma/prisma.langy-turn-admission.repository.ts";
+import { PrismaLangyTurnAdmissionRepository } from "../prisma.langy-turn-admission.repository.ts";
 
 const CLAIM = {
   kind: "claimed",
@@ -51,6 +50,7 @@ function uniqueKeyClash(): Error {
 
 describe("PrismaLangyTurnAdmissionRepository.claim", () => {
   describe("given the first attempt hits a unique-key clash", () => {
+    /** @scenario A turn send that loses a write conflict is retried and admitted */
     it("retries and returns the claim from the second attempt", async () => {
       const { database, calls } = fakeDatabase([uniqueKeyClash()]);
       const repository = PrismaLangyTurnAdmissionRepository.create(database);
@@ -61,6 +61,7 @@ describe("PrismaLangyTurnAdmissionRepository.claim", () => {
   });
 
   describe("given the first serializable attempt loses a driver-adapter write conflict", () => {
+    /** @scenario A turn send that loses a write conflict is retried and admitted */
     it("retries and returns the claim from the second attempt", async () => {
       const { database, calls } = fakeDatabase([driverAdapterWriteConflict()]);
       const repository = PrismaLangyTurnAdmissionRepository.create(database);
@@ -71,15 +72,16 @@ describe("PrismaLangyTurnAdmissionRepository.claim", () => {
   });
 
   describe("given every attempt loses a write conflict", () => {
+    /** @scenario A turn send that keeps losing write conflicts is refused as unavailable */
     it("fails with LangyAgentUnavailableError after four attempts", async () => {
       const { database, calls } = fakeDatabase(
         Array.from({ length: 4 }, driverAdapterWriteConflict),
       );
       const repository = PrismaLangyTurnAdmissionRepository.create(database);
 
-      await expect(repository.claim(CLAIM_INPUT)).rejects.toBeInstanceOf(
-        LangyAgentUnavailableError,
-      );
+      await expect(repository.claim(CLAIM_INPUT)).rejects.toMatchObject({
+        code: "langy_agent_unavailable",
+      });
       expect(calls()).toBe(4);
     });
   });
