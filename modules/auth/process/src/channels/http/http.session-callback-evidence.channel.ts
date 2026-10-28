@@ -55,7 +55,8 @@ export class SessionCallbackEvidenceChannel {
   }
 
   /** The account the SSO plugin's resolveUser seam admitted, and the issuer it was verified
-   *  under, before it writes an account row or mints a session (ADR-189). */
+   *  under, before it writes an account row or mints a session (ADR-189). Identity refuses an
+   *  assertion naming no issuer, so one is always recorded. */
   recordAuthenticatedSsoAccount({
     providerId,
     providerAccountId,
@@ -70,7 +71,7 @@ export class SessionCallbackEvidenceChannel {
     slot.accepted = [
       { providerId, providerAccountId, assertedFactors: [], verifiedTokenClaims: false },
     ];
-    slot.assertedIssuer = issuer ? { providerId, providerAccountId, issuer } : null;
+    slot.assertedIssuer = { providerId, providerAccountId, issuer };
   }
 
   /** The issuer the SSO seam verified this exact subject under: one entry, or none. */
@@ -78,8 +79,8 @@ export class SessionCallbackEvidenceChannel {
     providerId,
     providerAccountId,
   }: {
-    providerId: unknown;
-    providerAccountId: unknown;
+    providerId: string;
+    providerAccountId: string;
   }): string[] {
     const asserted = this.scope.getStore()?.assertedIssuer;
     if (!asserted) return [];
