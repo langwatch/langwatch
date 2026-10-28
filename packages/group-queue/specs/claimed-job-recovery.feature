@@ -142,3 +142,76 @@ Feature: GroupQueue brings back a job whose worker died while running it
     Given a projection group with no active key but a claimed record left by a worker that died
     When a replay waits for the projection's in-flight jobs to drain
     Then it treats the group as in flight until the claimed record is gone
+
+  Rule: A worker that is gone loses its claim when its beacon does, not when its active key does
+    The active key outlives a dead worker by up to its whole TTL. The claim and each heartbeat put
+    a held group half the active TTL out, past the next heartbeat, so a live claim never comes due
+    but a dead owner's does. The scan reclaims it only if the claim marker for that very claim names
+    an owner with no beacon at two looks a confirmation interval apart by Redis's clock; the owner's
+    heartbeat clears the suspicion, so a beacon lost to a short Redis outage costs nothing. An alive or retired owner keeps its claim until the active key
+    lapses, since a retiring worker is still draining. A live owner stalled past the beacon's
+    lifetime loses its claim: the job runs again and its outcome is refused as a lost claim.
+
+    @integration
+    Scenario: A group whose worker's beacon is gone is reclaimed before its active key lapses
+      Given a worker that claims a job with its beacon alive and then dies
+      When its beacon is gone while its active key still has most of its life left
+      And the group comes up for dispatch, and again a confirmation interval later
+      Then the first look leaves the claim alone
+      And a live worker runs the job again at the second, without waiting for the active key
+      And the death is counted once by the poison guard
+      And the dead claim no longer counts against its tenant's in-flight cap
+
+    @integration
+    Scenario: A group held by a live worker is neither reclaimed nor parked when it comes up
+      Given a worker with its beacon alive that holds a claimed group of a tenant at its in-flight cap
+      When the group comes up for dispatch
+      Then the claim keeps its active key and claimed record
+      And the group is not parked, and comes up again within the recheck interval
+
+    @integration
+    Scenario: A held group whose active key is about to lapse comes up when it lapses
+      Given a worker with its beacon alive whose group is held by a short retry hold
+      When the group comes up for dispatch with less than the recheck interval left on its active key
+      Then the group comes up again when its active key lapses, not a recheck interval later
+
+    @integration
+    Scenario: A retired worker's claim waits for its active key
+      Given a worker that retired while it still held a claimed group
+      When the group comes up for dispatch
+      Then the claim keeps its active key
+
+    @integration
+    Scenario: A marker left by an earlier claim does not reclaim a newer one
+      Given a group whose claim marker names a dead worker from an earlier claim
+      And a newer claim of the group made without a marker of its own
+      When the group comes up for dispatch
+      Then the newer claim keeps its active key
+
+    @integration
+    Scenario: A worker whose beacon lapses for a moment keeps its claim
+      Given a worker whose beacon lapsed while Redis was unreachable
+      And the group came up for dispatch while the beacon was missing
+      When its beacon is back by the time the group comes up again
+      Then the claim keeps its active key, claimed record and death count
+      And a later lapse of its beacon starts the confirmation over
+
+    @integration
+    Scenario: A worker whose clock runs ahead does not confirm a missing beacon early
+      Given a held group whose owner's beacon was just found missing
+      When a worker whose clock runs ten minutes ahead looks at the group straight away
+      Then the claim keeps its active key
+
+    @integration
+    Scenario: A missing beacon seen during an earlier claim does not count toward a newer one
+      Given a missing beacon recorded against an earlier claim of the group
+      And a newer claim whose worker's beacon is gone
+      When the group first comes up for dispatch
+      Then the newer claim keeps its active key
+
+    @integration
+    Scenario: A held group comes up for dispatch after its next heartbeat, not when its active key lapses
+      Given a worker that claims a group with a long active key
+      When it claims the group, and again when its heartbeat refreshes the claim
+      Then the group's ready score is half the active key's life from then
+      And the heartbeat clears any suspicion that its beacon was missing
