@@ -244,6 +244,13 @@ Feature: Langy conversations are an event-sourced projection
     Then my turn is admitted on the later attempt
 
   @unit
+  Scenario: A turn send that clashes on the receipt unique key re-reads the receipt on retry
+    Given another send for the same idempotency key created the receipt first
+    And my admission transaction fails on the receipt unique key
+    When the admission is attempted again
+    Then the retry reads the receipt the other send created and answers from it
+
+  @unit
   Scenario: A turn send that keeps losing write conflicts is refused as unavailable
     Given every admission attempt for my send loses a write conflict
     When the retry limit is reached
