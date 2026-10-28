@@ -42055,7 +42055,9 @@ Once connected, your agent has these dashboard tools:
   widget tool takes.
 - `get_dashboard`: read one dashboard by its id.
 - `create_dashboard`: create an empty dashboard.
-- `rename_dashboard`: change a dashboard's name.
+- `rename_dashboard`: change a dashboard's name, description or Langy traces
+  setting (`excludedOrigins`: `[]` includes Langy's traces, `["langy"]` leaves
+  them out, `null` restores the default). `get_dashboard` shows the setting.
 - `delete_dashboard`: delete a dashboard and its widgets.
 - `list_dashboard_widgets`: list the widgets of one dashboard. Pass the
   `dashboardId`.
@@ -42209,6 +42211,8 @@ dashboards = langwatch.dashboards.list()
 dashboard = langwatch.dashboards.create(name="Agent health")
 
 langwatch.dashboards.update(dashboard_id=dashboard.id, name="Agent health (prod)")
+# [] includes Langy's traces, ["langy"] leaves them out, None restores the default
+langwatch.dashboards.update(dashboard_id=dashboard.id, excluded_origins=[])
 
 widgets = langwatch.dashboards.list_widgets(dashboard_id=dashboard.id)
 ```
@@ -42217,6 +42221,7 @@ widgets = langwatch.dashboards.list_widgets(dashboard_id=dashboard.id)
 langwatch dashboard list
 langwatch dashboard create "Agent health"
 langwatch dashboard update <dashboardId> --name "Agent health (prod)"
+langwatch dashboard update <dashboardId> --include-langy-traces   # or --exclude-langy-traces, --reset-langy-traces
 langwatch dashboard widget list <dashboardId>
 langwatch dashboard delete <dashboardId>
 ```
