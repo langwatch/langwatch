@@ -81,8 +81,9 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
             <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
               <ChakraDrawer.Content
                 ref={contentProps.asChild ? mergeRefs(ref, portalTarget) : ref}
-                // A phone shows every drawer as a full-screen sheet; wider screens float it.
-                margin={{ base: 0, md: 2 }}
+                // A phone shows every drawer as a full-screen sheet; wider screens float it. The
+                // float margin stays unconditioned so marginTop/marginEnd below can override it.
+                margin={{ base: 2, mdDown: 0 }}
                 maxWidth={{ mdDown: "100%" }}
                 pointerEvents="auto"
                 borderRadius={{ base: 0, md: "lg" }}
