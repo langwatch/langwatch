@@ -872,6 +872,7 @@ jobs:
       # hash is over the blob ids of the lockfile, every package.json and tsconfig,
       # and packages/vitest-config: the shared config is loaded from the package, so
       # vitest does not count its source (plugin options, React compiler) as a config file.
+      # Main's one job saves under `all`, which a shard falls back to: entries are keyed by content.
       - name: Hash what a cached transform depends on besides its source
         id: transform-inputs
         run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' packages/vitest-config | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
@@ -881,16 +882,20 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vitest-cache
-          key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
 
       - name: Restore the vitest transforms, saving them at the end of the job
         if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vitest-cache
-          key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
 
       - uses: ./.github/actions/prune-pr-caches
         with:

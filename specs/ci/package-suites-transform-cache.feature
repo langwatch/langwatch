@@ -8,7 +8,8 @@ Feature: The package-suites shards keep vitest's transformed modules between run
   # node_modules/.vitest-cache. Vitest itself said so in the job log: "persist
   # transforms across runs with fsModuleCache: true; on CI this only helps when
   # the cache directory is persisted between runs". The job now restores that
-  # directory per shard and saves it at the end.
+  # directory per shard and saves it at the end. Main runs the suites as one
+  # job and saves under `all`; a shard with no cache of its own falls back to it.
   #
   # A cached transform must never make a test pass that would fail. Vitest keys
   # each entry by the module's own source, the vitest config files and plugin
@@ -29,6 +30,7 @@ Feature: The package-suites shards keep vitest's transformed modules between run
       When its key and restore keys are read
       Then the key names a hash of the lockfile, every package.json, every tsconfig and the shared vitest config
       And it restores only a cache saved under that same hash
+      And a shard may fall back to main's `all` cache, under that same hash only
 
     @unit
     Scenario: Each shard keeps its own transform cache, saved under its commit

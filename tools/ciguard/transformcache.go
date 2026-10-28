@@ -73,7 +73,8 @@ func transformKeyProblems(step ciscan.Step) []string {
 	key, _ := step.With["key"].(string)
 	restore, _ := step.With["restore-keys"].(string)
 	var problems []string
-	for _, part := range []string{"${{ matrix.shard }}", "${{ steps." + transformInputsStep + ".outputs.hash }}"} {
+	hash := "${{ steps." + transformInputsStep + ".outputs.hash }}"
+	for _, part := range []string{"matrix.shard", hash} {
 		if !strings.Contains(key, part) {
 			problems = append(problems, fmt.Sprintf("step %q: key does not name %s", step.Name, part))
 		}
@@ -81,8 +82,11 @@ func transformKeyProblems(step ciscan.Step) []string {
 	if !strings.HasSuffix(key, "-"+commitSuffix) {
 		problems = append(problems, fmt.Sprintf("step %q: key does not end in the commit", step.Name))
 	}
-	if strings.TrimSpace(restore) != strings.TrimSuffix(key, commitSuffix) {
-		problems = append(problems, fmt.Sprintf("step %q: restore-keys may restore a cache built from other inputs; it must be the key without the commit", step.Name))
+	// Any shard's cache will do (entries are keyed by content), but only under the same inputs.
+	for line := range strings.Lines(strings.TrimSpace(restore)) {
+		if !strings.HasSuffix(strings.TrimSpace(line), "-"+hash+"-") {
+			problems = append(problems, fmt.Sprintf("step %q: restore key %q may restore a cache built from other inputs; each must end at the inputs hash", step.Name, strings.TrimSpace(line)))
+		}
 	}
 	return problems
 }

@@ -23,7 +23,9 @@ const goodTransformJob = `jobs:
         with:
           path: node_modules/.vitest-cache
           key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+          restore-keys: |
+            ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
       - name: Trim
         run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
 `
@@ -61,7 +63,10 @@ func TestTransformCacheRestoresOnlyTheSameInputs(t *testing.T) {
 
 	for name, breakIt := range map[string]func(string) string{
 		"a restore key without the inputs hash": func(s string) string {
-			return strings.Replace(s, "restore-keys: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-", "restore-keys: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-", 1)
+			return strings.Replace(s, "-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-\n", "-${{ matrix.shard }}-\n", 1)
+		},
+		"a fallback to another shard without the inputs hash": func(s string) string {
+			return strings.Replace(s, "-all-${{ steps.transform-inputs.outputs.hash }}-", "-all-", 1)
 		},
 		"a key without the inputs hash": func(s string) string {
 			return strings.Replace(s, "-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}", "-${{ github.sha }}", 1)
