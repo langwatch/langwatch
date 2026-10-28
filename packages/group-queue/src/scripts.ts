@@ -1183,6 +1183,8 @@ local guardTtlSec = tonumber(ARGV[13]) or 0
 if guardWorkerId ~= "" and (guardTtlSec <= 0 or redis.call("GET", keyPrefix .. "worker:" .. guardWorkerId) ~= "alive") then
   guardWorkerId = ""
 end
+-- The claiming worker: a group whose job it handed back is passed over (#9148). "" = none.
+local claimWorkerId = ARGV[14] or ""
 local claimedGroups = 0
 -- Open batches by tenant and handler, and how many more groups they can still take.
 local openBatches = {}
@@ -1362,8 +1364,13 @@ local function scanBatch(effCap, bypassPark, dispatched)
           -- Defensive activeKey check — covers legacy state during migration
           -- and the small race between ZADD ready and ZADD active.
           local activeJob = redis.call("GET", activeKey)
+          -- The worker that handed this group's job back leaves it ready for a peer asleep in its
+          -- signal wait; any other claim clears the record, whose expiry bounds it (#9148).
+          local handedBackKey = keyPrefix .. "group:" .. groupId .. ":handed-back-by"
+          local handedBackBy = not activeJob and redis.call("GET", handedBackKey)
+          local passedOver = handedBackBy and claimWorkerId ~= "" and handedBackBy == claimWorkerId
 
-          if not activeJob then
+          if not activeJob and not passedOver then
           local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
           local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
           local claimedKey = keyPrefix .. "group:" .. groupId .. ":claimed"
@@ -1446,6 +1453,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 openRoomByTenant[tenant] = openRoomByTenant[tenant] - 1
               end
               claimedGroups = claimedGroups + 1
+              if handedBackBy then redis.call("DEL", handedBackKey) end
               redis.call("ZREM", jobsKey, stagedJobId)
               redis.call("DECR", totalPendingKey)
               redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
@@ -2032,6 +2040,14 @@ if attempt ~= "" then
   redis.call("SET", attemptKey, attempt, "EX", attemptTtlSec)
 end
 
+-- 1c. A hand-back names its worker, whose dispatch passes the group over until another worker
+--     claims it or this lapses (#9148). An ordinary retry passes nobody over.
+local handedBackBy = ARGV[15] or ""
+local passOverMs = tonumber(ARGV[16]) or 0
+if handedBackBy ~= "" and passOverMs > 0 then
+  redis.call("SET", keyPrefix .. "group:" .. groupId .. ":handed-back-by", handedBackBy, "PX", passOverMs)
+end
+
 -- 2. Re-stage job with future score (backoff delay)
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
@@ -2148,6 +2164,8 @@ export interface GroupRetryRestage {
   /** Recorded on the group's retry chain in the same atomic step. */
   attempt: number;
   attemptTtlSec: number;
+  /** A hand-back: `workerId` passes the group over until `ttlMs` lapses or a peer claims it. */
+  passOver?: { workerId: string; ttlMs: number };
 }
 
 /**
@@ -2824,6 +2842,7 @@ export class GroupStagingScripts {
     listKey,
     groupBatch,
     claimGuardWorkerId,
+    workerId,
   }: {
     nowMs: number;
     activeTtlSec: number;
@@ -2836,6 +2855,8 @@ export class GroupStagingScripts {
     groupBatch?: { maxGroups: number; routes: readonly string[]; maxClaims: number };
     /** Writes this worker's poison-guard marker with each claim, while its beacon is alive. */
     claimGuardWorkerId?: string;
+    /** The claiming worker: a group whose job it handed back is passed over meanwhile. */
+    workerId?: string;
   }): Promise<DispatchResult[]> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
@@ -2868,6 +2889,7 @@ export class GroupStagingScripts {
       String(groupBatch?.maxClaims ?? 0),
       claimGuardWorkerId ?? "",
       String(CLAIM_MARKER_TTL_SECONDS),
+      workerId ?? "",
     );
 
     // The script returns [flatResults, overrideDispatched]. The count rides
@@ -3231,6 +3253,7 @@ export class GroupStagingScripts {
     attempt,
     attemptTtlSec,
     claimToken = "",
+    passOver,
   }: GroupRetryRestage): ScriptCall {
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
@@ -3254,6 +3277,8 @@ export class GroupStagingScripts {
         String(this.tenantConcurrencyCap),
         claimToken,
         this.claimMarkerOwner,
+        passOver?.workerId ?? "",
+        String(passOver?.ttlMs ?? 0),
       ],
     };
   }

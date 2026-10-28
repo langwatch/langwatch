@@ -88,6 +88,8 @@ export class GroupQueueDispatcher {
       groupBatch?: () => { maxGroups: number; routes: readonly string[] } | undefined;
       /** The worker stamped on each claim's poison-guard marker, read before each claim. */
       claimGuardWorkerId?: () => string | undefined;
+      /** This worker: the claim passes over a group whose job it handed back. */
+      workerId?: string;
     },
   ) {}
 
@@ -314,7 +316,11 @@ export class GroupQueueDispatcher {
   private async claim(maxJobs: number): Promise<DispatchedWork[]> {
     this.claimedAtMs = nowInstant().epochMilliseconds;
     const claimGuardWorkerId = this.params.claimGuardWorkerId?.();
-    const guard = claimGuardWorkerId ? { claimGuardWorkerId } : {};
+    const { workerId } = this.params;
+    const claimer = {
+      ...(claimGuardWorkerId ? { claimGuardWorkerId } : {}),
+      ...(workerId ? { workerId } : {}),
+    };
     const claimFrom = ({
       allowedGroupsKey,
       jobs,
@@ -330,7 +336,7 @@ export class GroupQueueDispatcher {
         maxJobs: jobs,
         allowedGroupsKey,
         ...(listKey ? { listKey } : {}),
-        ...guard,
+        ...claimer,
       });
     if (!this.params.listedGroupsKeys) {
       const allowList = this.params.dispatchGroupAllowListKey;
@@ -344,7 +350,7 @@ export class GroupQueueDispatcher {
           activeTtlSec: this.params.activeTtlSec,
           maxJobs,
           ...this.groupBatchArgs(),
-          ...guard,
+          ...claimer,
         }),
       );
     }

@@ -275,6 +275,12 @@ export const GROUP_QUEUE_CONFIG = {
   shutdownTimeoutMs: 25_000,
 } as const;
 
+/**
+ * How long the worker that handed a job back passes its group over: two signal waits, so a peer
+ * asleep in one when the job came back claims it first (#9148). The expiry is the only bound.
+ */
+export const HAND_BACK_PASS_OVER_MS = 2 * GROUP_QUEUE_CONFIG.signalTimeoutSec * 1000;
+
 /** Default TTL for deduplication in milliseconds */
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
@@ -668,6 +674,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           : undefined,
         groupBatch: () => this.groupBatching(),
         claimGuardWorkerId: () => this.claimGuardWorkerId(),
+        workerId: this.workerId,
       });
       this.dispatcher.start();
       this.adaptiveSlots.start();
@@ -2363,7 +2370,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
   /**
    * Returns a job this worker has no handler for to the queue unspent: same attempt, no failure
-   * streak, no audit. A short delay keeps this worker from taking it straight back.
+   * streak, no audit. This worker passes the group over meanwhile, so a peer takes it first.
    */
   private async handBackClaimedJob({
     job,
@@ -2422,6 +2429,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       attempt,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
       claimToken,
+      passOver: { workerId: this.workerId, ttlMs: HAND_BACK_PASS_OVER_MS },
     });
     if (restaged) {
       await this.blobLifecycle.transferLease({
