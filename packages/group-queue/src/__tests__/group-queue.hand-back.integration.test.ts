@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import type { GroupQueueRuntimeDefinition, JobDelivery } from "../contracts.ts";
 import { HandBackGroupQueueError } from "../errors.ts";
-import { GroupQueueProcessor, HAND_BACK_PASS_OVER_MS } from "../groupQueue.ts";
+import { GroupQueueProcessor, HAND_BACK_CONFIG } from "../groupQueue.ts";
 
 type TestPayload = { id: string; groupId: string };
 
@@ -14,9 +14,12 @@ describe("GroupQueueProcessor - hand-back of a job a worker has no handler for",
   let queues: GroupQueueProcessor<TestPayload>[];
 
   beforeAll(() => {
-    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      maxRetriesPerRequest: 0,
-    });
+    redis = new IORedis(
+      process.env.LANGWATCH_TEST_REDIS_URL ?? process.env.REDIS_URL ?? "redis://localhost:6379",
+      {
+        maxRetriesPerRequest: 0,
+      },
+    );
   });
 
   beforeEach(() => {
@@ -89,9 +92,97 @@ describe("GroupQueueProcessor - hand-back of a job a worker has no handler for",
     });
   });
 
+  /** Workers with no handler: the first one's first claim waits for `release`, the rest do not. */
+  function heldWorker({ name, claims }: { name: string; claims: string[] }) {
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const withoutHandler = (id: string) =>
+      worker({
+        name,
+        process: async () => {
+          claims.push(id);
+          if (id === "first") await released;
+          throw new HandBackGroupQueueError("no handler registered in this worker");
+        },
+      });
+    return { withoutHandler, release };
+  }
+
+  /** Lets a worker that just started reach its signal wait: the job is claimed, so it sleeps. */
+  const untilAsleep = () => new Promise((resolve) => setTimeout(resolve, 300));
+
+  describe("given the worker with the handler is asleep in its signal wait before the hand-back", () => {
+    describe("when the worker without the handler hands the job back", () => {
+      /** @scenario "A worker with the handler, asleep when the job is handed back, runs it first" */
+      it("runs it on its first attempt, and the job is handed back once (#9148)", async () => {
+        const name = `{test/gqhandback/${crypto.randomUUID().slice(0, 8)}}`;
+        const claims: string[] = [];
+        const { withoutHandler, release } = heldWorker({ name, claims });
+        const first = withoutHandler("first");
+        await first.waitUntilReady();
+        await first.send({ id: "job-1", groupId: "group-a" });
+        await vi.waitFor(() => expect(claims).toEqual(["first"]), {
+          timeout: 10_000,
+          interval: 20,
+        });
+
+        const ran: number[] = [];
+        const handler = worker({
+          name,
+          process: async (_payload, delivery) => {
+            ran.push(delivery?.attempt ?? 0);
+          },
+        });
+        await handler.waitUntilReady();
+        await untilAsleep();
+        release();
+
+        await vi.waitFor(() => expect(ran).toEqual([1]), { timeout: 20_000, interval: 50 });
+        expect(claims).toEqual(["first"]);
+      });
+    });
+  });
+
+  describe("given two workers without the handler and one with it, asleep before the hand-back", () => {
+    describe("when each worker without the handler hands the job back", () => {
+      /** @scenario "Every worker that handed a job back passes it over, so the worker with the handler runs it" */
+      it("hands it back once from each, and the worker with the handler runs it on its first attempt", async () => {
+        const name = `{test/gqhandback/${crypto.randomUUID().slice(0, 8)}}`;
+        const claims: string[] = [];
+        const { withoutHandler, release } = heldWorker({ name, claims });
+        const first = withoutHandler("first");
+        await first.waitUntilReady();
+        await first.send({ id: "job-1", groupId: "group-a" });
+        await vi.waitFor(() => expect(claims).toEqual(["first"]), {
+          timeout: 10_000,
+          interval: 20,
+        });
+
+        await withoutHandler("second").waitUntilReady();
+        await untilAsleep();
+        const ran: number[] = [];
+        const handler = worker({
+          name,
+          process: async (_payload, delivery) => {
+            ran.push(delivery?.attempt ?? 0);
+          },
+        });
+        await handler.waitUntilReady();
+        await untilAsleep();
+        release();
+
+        await vi.waitFor(() => expect(ran).toEqual([1]), { timeout: 20_000, interval: 50 });
+        expect(claims.filter((id) => id === "first")).toEqual(["first"]);
+        expect(claims.filter((id) => id === "second").length).toBeLessThanOrEqual(1);
+      });
+    });
+  });
+
   describe("given one worker on the queue, with no handler for the job", () => {
     describe("when it hands the job back", () => {
-      /** @scenario "The only worker takes back a job it handed back once the record lapses" */
+      /** @scenario "The only worker, or one whose peers are gone, takes back a job it handed back once its pass-over lapses" */
       it("takes the job again only after two signal waits, still on its first attempt", async () => {
         const name = `{test/gqhandback/${crypto.randomUUID().slice(0, 8)}}`;
         const keyPrefix = `${name}:gq:`;
@@ -112,12 +203,12 @@ describe("GroupQueueProcessor - hand-back of a job a worker has no handler for",
           { timeout: 10_000, interval: 50 },
         );
         await vi.waitFor(() => expect(handBacks.length).toBeGreaterThanOrEqual(2), {
-          timeout: HAND_BACK_PASS_OVER_MS + 10_000,
+          timeout: HAND_BACK_CONFIG.passOverMs + 10_000,
           interval: 50,
         });
 
         const [first, second] = handBacks;
-        expect(second!.at - first!.at).toBeGreaterThanOrEqual(HAND_BACK_PASS_OVER_MS - 100);
+        expect(second!.at - first!.at).toBeGreaterThanOrEqual(HAND_BACK_CONFIG.passOverMs - 100);
         expect([first!.attempt, second!.attempt]).toEqual([1, 1]);
       });
     });

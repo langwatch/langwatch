@@ -8,13 +8,16 @@ import fastq from "fastq";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { GroupQueueDispatcher } from "../dispatcher.ts";
-import type { DispatchResult } from "../scripts.ts";
+import type { ClaimedBatch, DispatchResult } from "../scripts.ts";
 
 describe("GroupQueueDispatcher with an allow-list", () => {
   describe("given it runs beside the queue's own dispatcher", () => {
     /** @scenario "The upgrade-step consumer leaves the queue's wake-up signal to the main consumer" */
     it("claims from each open list in turn, polling without taking or clearing the signal", async () => {
-      const dispatchBatch = vi.fn(async (): Promise<DispatchResult[]> => []);
+      const claimBatch = vi.fn(async (): Promise<ClaimedBatch> => ({
+        claims: [],
+        passedOverUntilMs: null,
+      }));
       const brpop = vi.fn(async () => null);
       const del = vi.fn(async () => 0);
       const dispatcher = new GroupQueueDispatcher({
@@ -22,7 +25,7 @@ describe("GroupQueueDispatcher with an allow-list", () => {
           getSignalKey: () => "{test}:gq:signal",
           getEarliestReadyScore: async () => null,
           getEarliestCandidateScore: async () => null,
-          dispatchBatch,
+          claimBatch,
         },
         processingQueue: fastq.promise(async () => {}, 10),
         blockingConnection: { brpop, del },
@@ -35,7 +38,7 @@ describe("GroupQueueDispatcher with an allow-list", () => {
       });
 
       dispatcher.start();
-      await vi.waitFor(() => expect(dispatchBatch.mock.calls.length).toBeGreaterThanOrEqual(3), {
+      await vi.waitFor(() => expect(claimBatch.mock.calls.length).toBeGreaterThanOrEqual(3), {
         timeout: 2_000,
         interval: 5,
       });
@@ -45,7 +48,7 @@ describe("GroupQueueDispatcher with an allow-list", () => {
       expect(brpop).not.toHaveBeenCalled();
       expect(del).not.toHaveBeenCalled();
       for (const list of ["a", "b"]) {
-        expect(dispatchBatch).toHaveBeenCalledWith(
+        expect(claimBatch).toHaveBeenCalledWith(
           expect.objectContaining({ allowedGroupsKey: `{test}:gq:listed:${list}:candidates` }),
         );
       }
@@ -56,18 +59,17 @@ describe("GroupQueueDispatcher with an allow-list", () => {
     /** @scenario "The upgrade-step consumer claims again as soon as one of its own jobs finishes" */
     it("claims its next job when that job finishes, not at its next poll", async () => {
       let claimed = 0;
-      const dispatchBatch = vi.fn(async (): Promise<DispatchResult[]> => {
-        if (claimed >= 3) return [];
+      const claimBatch = vi.fn(async (): Promise<ClaimedBatch> => {
+        if (claimed >= 3) return { claims: [], passedOverUntilMs: null };
         claimed += 1;
-        return [
-          {
-            stagedJobId: `job-${claimed}`,
-            groupId: `tenant/listed/${claimed}`,
-            jobDataJson: "{}",
-            originalScore: 0,
-            claimToken: `token-${claimed}`,
-          },
-        ];
+        const claim: DispatchResult = {
+          stagedJobId: `job-${claimed}`,
+          groupId: `tenant/listed/${claimed}`,
+          jobDataJson: "{}",
+          originalScore: 0,
+          claimToken: `token-${claimed}`,
+        };
+        return { claims: [claim], passedOverUntilMs: null };
       });
       const ran: string[] = [];
       const dispatcher = new GroupQueueDispatcher({
@@ -75,7 +77,7 @@ describe("GroupQueueDispatcher with an allow-list", () => {
           getSignalKey: () => "{test}:gq:signal",
           getEarliestReadyScore: async () => null,
           getEarliestCandidateScore: async () => null,
-          dispatchBatch,
+          claimBatch,
         },
         processingQueue: fastq.promise(async (job: DispatchResult) => {
           await new Promise((resolve) => setTimeout(resolve, 60));
@@ -114,9 +116,9 @@ describe("GroupQueueDispatcher with an allow-list", () => {
           getSignalKey: () => "{test}:gq:signal",
           getEarliestReadyScore: async () => null,
           getEarliestCandidateScore: async ({ afterMs }) => (afterMs < dueAtMs ? dueAtMs : null),
-          dispatchBatch: async ({ nowMs }) => {
+          claimBatch: async ({ nowMs }) => {
             claimedAt.push(nowMs);
-            return [];
+            return { claims: [], passedOverUntilMs: null };
           },
         },
         processingQueue: fastq.promise(async () => {}, 1),
@@ -152,11 +154,11 @@ describe("GroupQueueDispatcher with an allow-list", () => {
           getEarliestReadyScore: async () => null,
           getEarliestCandidateScore: async ({ afterMs }) =>
             claimedAt.some((at) => at > dueAtMs) || afterMs >= dueAtMs ? null : dueAtMs,
-          dispatchBatch: async ({ nowMs }) => {
+          claimBatch: async ({ nowMs }) => {
             claimedAt.push(nowMs);
             // The claim takes 20 ms, so the candidate comes due while it runs.
             if (claimedAt.length === 1) vi.setSystemTime(nowMs + 20);
-            return [];
+            return { claims: [], passedOverUntilMs: null };
           },
         },
         processingQueue: fastq.promise(async () => {}, 1),

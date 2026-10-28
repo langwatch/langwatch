@@ -64,12 +64,14 @@ export class GroupQueueDispatcher {
   private scannedCandidates: readonly string[] = [];
   /** The clock just before the last claim: a candidate due since then may have been missed. */
   private claimedAtMs = 0;
+  /** The last claim's clock, and when the groups it passed over come due to this worker (#9148). */
+  private passOver: { scannedToMs: number; untilMs: number } | null = null;
 
   constructor(
     private readonly params: {
       scripts: Pick<
         GroupStagingScripts,
-        "getSignalKey" | "getEarliestReadyScore" | "getEarliestCandidateScore" | "dispatchBatch"
+        "getSignalKey" | "getEarliestReadyScore" | "getEarliestCandidateScore" | "claimBatch"
       >;
       processingQueue: fastq.queueAsPromised<DispatchedWork, void>;
       blockingConnection: BlockingConnection;
@@ -294,6 +296,16 @@ export class GroupQueueDispatcher {
   private async untilEarliestDueMs(): Promise<number | null> {
     if (this.saturated()) return null;
     try {
+      const passOver = this.passOver;
+      if (passOver && passOver.untilMs > nowInstant().epochMilliseconds) {
+        // A passed-over group waits for a peer: wake as it lapses, or for one due after the claim.
+        const next = await this.params.scripts.getEarliestReadyScore({
+          afterMs: passOver.scannedToMs,
+        });
+        return (
+          Math.min(passOver.untilMs, next ?? passOver.untilMs) - nowInstant().epochMilliseconds
+        );
+      }
       const earliest = await this.params.scripts.getEarliestReadyScore();
       if (earliest === null) return null;
       return earliest - nowInstant().epochMilliseconds;
@@ -321,7 +333,7 @@ export class GroupQueueDispatcher {
       ...(claimGuardWorkerId ? { claimGuardWorkerId } : {}),
       ...(workerId ? { workerId } : {}),
     };
-    const claimFrom = ({
+    const claimFrom = async ({
       allowedGroupsKey,
       jobs,
       listKey,
@@ -329,8 +341,8 @@ export class GroupQueueDispatcher {
       allowedGroupsKey: string | undefined;
       jobs: number;
       listKey?: string;
-    }) =>
-      this.params.scripts.dispatchBatch({
+    }) => {
+      const claimed = await this.params.scripts.claimBatch({
         nowMs: nowInstant().epochMilliseconds,
         activeTtlSec: this.params.activeTtlSec,
         maxJobs: jobs,
@@ -338,21 +350,25 @@ export class GroupQueueDispatcher {
         ...(listKey ? { listKey } : {}),
         ...claimer,
       });
+      return claimed.claims;
+    };
     if (!this.params.listedGroupsKeys) {
       const allowList = this.params.dispatchGroupAllowListKey;
       this.scannedCandidates = allowList ? [allowList] : [];
       if (allowList) {
         return dispatchedWorkOf(await claimFrom({ allowedGroupsKey: allowList, jobs: maxJobs }));
       }
-      return dispatchedWorkOf(
-        await this.params.scripts.dispatchBatch({
-          nowMs: nowInstant().epochMilliseconds,
-          activeTtlSec: this.params.activeTtlSec,
-          maxJobs,
-          ...this.groupBatchArgs(),
-          ...claimer,
-        }),
-      );
+      const nowMs = nowInstant().epochMilliseconds;
+      const { claims, passedOverUntilMs } = await this.params.scripts.claimBatch({
+        nowMs,
+        activeTtlSec: this.params.activeTtlSec,
+        maxJobs,
+        ...this.groupBatchArgs(),
+        ...claimer,
+      });
+      this.passOver =
+        passedOverUntilMs === null ? null : { scannedToMs: nowMs, untilMs: passedOverUntilMs };
+      return dispatchedWorkOf(claims);
     }
     const work: DispatchedWork[] = [];
     const lists = await this.params.listedGroupsKeys();

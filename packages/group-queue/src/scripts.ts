@@ -1185,6 +1185,8 @@ if guardWorkerId ~= "" and (guardTtlSec <= 0 or redis.call("GET", keyPrefix .. "
 end
 -- The claiming worker: a group whose job it handed back is passed over (#9148). "" = none.
 local claimWorkerId = ARGV[14] or ""
+-- The soonest a group passed over for this worker comes due to it again; nil = none passed over.
+local passOverUntilMs = nil
 local claimedGroups = 0
 -- Open batches by tenant and handler, and how many more groups they can still take.
 local openBatches = {}
@@ -1364,11 +1366,16 @@ local function scanBatch(effCap, bypassPark, dispatched)
           -- Defensive activeKey check — covers legacy state during migration
           -- and the small race between ZADD ready and ZADD active.
           local activeJob = redis.call("GET", activeKey)
-          -- The worker that handed this group's job back leaves it ready for a peer asleep in its
-          -- signal wait; any other claim clears the record, whose expiry bounds it (#9148).
-          local handedBackKey = keyPrefix .. "group:" .. groupId .. ":handed-back-by"
-          local handedBackBy = not activeJob and redis.call("GET", handedBackKey)
-          local passedOver = handedBackBy and claimWorkerId ~= "" and handedBackBy == claimWorkerId
+          -- Each worker that handed this group's job back leaves it ready for a peer asleep in its
+          -- signal wait, until its own entry lapses; a completion clears them all (#9148).
+          local passedOver = false
+          if not activeJob and claimWorkerId ~= "" then
+            local handedBackUntil = tonumber(redis.call("ZSCORE", keyPrefix .. "group:" .. groupId .. ":handed-back-by", claimWorkerId))
+            if handedBackUntil and handedBackUntil > nowMs then
+              passedOver = true
+              if not passOverUntilMs or handedBackUntil < passOverUntilMs then passOverUntilMs = handedBackUntil end
+            end
+          end
 
           if not activeJob and not passedOver then
           local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
@@ -1453,7 +1460,6 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 openRoomByTenant[tenant] = openRoomByTenant[tenant] - 1
               end
               claimedGroups = claimedGroups + 1
-              if handedBackBy then redis.call("DEL", handedBackKey) end
               redis.call("ZREM", jobsKey, stagedJobId)
               redis.call("DECR", totalPendingKey)
               redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
@@ -1567,7 +1573,7 @@ if not restrictedDispatch and globalBudget > 0 and tenantCap > 0 and dispatched 
   overrideDispatched = dispatched - beforeOverride
 end
 
-return {results, overrideDispatched, recoveredTotal}
+return {results, overrideDispatched, recoveredTotal, passOverUntilMs or 0}
 `;
 
 /**
@@ -1739,6 +1745,8 @@ gqReleaseClaimMarker(string.sub(activeKey, 1, #activeKey - 7) .. ":claim", ARGV[
 
 redis.call("DEL", claimedKey)
 redis.call("DEL", activeKey)
+-- The job is done with, so no worker that handed it back passes the group over any longer (#9148).
+redis.call("DEL", string.sub(activeKey, 1, #activeKey - 7) .. ":handed-back-by")
 if endsRetryChain then
   redis.call("DEL", failStreakKey, attemptKey)
 end
@@ -2040,12 +2048,14 @@ if attempt ~= "" then
   redis.call("SET", attemptKey, attempt, "EX", attemptTtlSec)
 end
 
--- 1c. A hand-back names its worker, whose dispatch passes the group over until another worker
---     claims it or this lapses (#9148). An ordinary retry passes nobody over.
+-- 1c. A hand-back adds its worker to the group's record, scored by when that worker's pass-over
+--     lapses on its own clock; the key outlives its longest entry (#9148). A retry adds nobody.
 local handedBackBy = ARGV[15] or ""
 local passOverMs = tonumber(ARGV[16]) or 0
 if handedBackBy ~= "" and passOverMs > 0 then
-  redis.call("SET", keyPrefix .. "group:" .. groupId .. ":handed-back-by", handedBackBy, "PX", passOverMs)
+  local handedBackKey = keyPrefix .. "group:" .. groupId .. ":handed-back-by"
+  redis.call("ZADD", handedBackKey, nowMs + passOverMs, handedBackBy)
+  if redis.call("PTTL", handedBackKey) < passOverMs then redis.call("PEXPIRE", handedBackKey, passOverMs) end
 end
 
 -- 2. Re-stage job with future score (backoff delay)
@@ -2126,6 +2136,30 @@ export interface DispatchResult {
   claimGuard?: ClaimMarkerRecord;
 }
 
+/** One dispatch call: the clock, the slots to fill and who claims. */
+export interface DispatchBatchClaim {
+  nowMs: number;
+  activeTtlSec: number;
+  /** Worker slots to fill: claimed groups alone, or cross-group batches under `groupBatch`. */
+  maxJobs: number;
+  allowedGroupsKey?: string;
+  /** The listed run whose candidates these are: the scan forgets its settled groups. */
+  listKey?: string;
+  /** Up to `maxGroups` ready groups per slot, of one tenant and one of `routes`. */
+  groupBatch?: { maxGroups: number; routes: readonly string[]; maxClaims: number };
+  /** Writes this worker's poison-guard marker with each claim, while its beacon is alive. */
+  claimGuardWorkerId?: string;
+  /** The claiming worker: a group whose job it handed back is passed over meanwhile. */
+  workerId?: string;
+}
+
+/** A dispatch call's claims, and when the soonest group it passed over comes due to it again. */
+export interface ClaimedBatch {
+  claims: DispatchResult[];
+  /** On the claiming worker's clock; null when the call passed no group over. */
+  passedOverUntilMs: number | null;
+}
+
 /** One group's completion; its claim token fences it, as it fences every outcome. */
 export interface GroupCompletion {
   groupId: string;
@@ -2164,7 +2198,7 @@ export interface GroupRetryRestage {
   /** Recorded on the group's retry chain in the same atomic step. */
   attempt: number;
   attemptTtlSec: number;
-  /** A hand-back: `workerId` passes the group over until `ttlMs` lapses or a peer claims it. */
+  /** A hand-back: `workerId` passes the group over for `ttlMs`, or until the job completes. */
   passOver?: { workerId: string; ttlMs: number };
 }
 
@@ -2834,7 +2868,15 @@ export class GroupStagingScripts {
    * Pick eligible groups and dispatch up to maxJobs in a single atomic Lua call.
    * Returns an array of dispatch results (may be empty).
    */
-  async dispatchBatch({
+  async dispatchBatch(claim: DispatchBatchClaim): Promise<DispatchResult[]> {
+    return (await this.claimBatch(claim)).claims;
+  }
+
+  /**
+   * {@link dispatchBatch}, with when the soonest group it passed over for `workerId` comes due to
+   * that worker again (#9148): the dispatcher waits that long rather than polling a group it skips.
+   */
+  async claimBatch({
     nowMs,
     activeTtlSec,
     maxJobs,
@@ -2843,21 +2885,7 @@ export class GroupStagingScripts {
     groupBatch,
     claimGuardWorkerId,
     workerId,
-  }: {
-    nowMs: number;
-    activeTtlSec: number;
-    /** Worker slots to fill: claimed groups alone, or cross-group batches under `groupBatch`. */
-    maxJobs: number;
-    allowedGroupsKey?: string;
-    /** The listed run whose candidates these are: the scan forgets its settled groups. */
-    listKey?: string;
-    /** Up to `maxGroups` ready groups per slot, of one tenant and one of `routes`. */
-    groupBatch?: { maxGroups: number; routes: readonly string[]; maxClaims: number };
-    /** Writes this worker's poison-guard marker with each claim, while its beacon is alive. */
-    claimGuardWorkerId?: string;
-    /** The claiming worker: a group whose job it handed back is passed over meanwhile. */
-    workerId?: string;
-  }): Promise<DispatchResult[]> {
+  }: DispatchBatchClaim): Promise<ClaimedBatch> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
     const pausedJobKey = `${this.keyPrefix}paused-jobs`;
@@ -2892,16 +2920,19 @@ export class GroupStagingScripts {
       workerId ?? "",
     );
 
-    // The script returns [flatResults, overrideDispatched]. The count rides
+    // The script returns [flatResults, overrideDispatched, recovered, passOverUntil]. Counts ride
     // back with the results rather than living in a Redis key because a
     // Prometheus counter has to be per-process: one shared key reported by
     // every pod would multiply under sum(), the way the blocked-groups gauge
     // already does.
     if (!Array.isArray(result)) {
-      return [];
+      return { claims: [], passedOverUntilMs: null };
     }
 
-    const [rawResults, rawOverride, rawRecovered] = result as [unknown, unknown, unknown];
+    const [rawResults, rawOverride, rawRecovered, rawPassOver] = result as unknown[];
+    const passOverUntil = Number(rawPassOver);
+    const passedOverUntilMs =
+      Number.isSafeInteger(passOverUntil) && passOverUntil > 0 ? passOverUntil : null;
     const recovered = Number(rawRecovered);
     if (Number.isSafeInteger(recovered) && recovered > 0) {
       gqJobsRecoveredTotal.inc({ queue_name: this.queueName }, recovered);
@@ -2911,7 +2942,7 @@ export class GroupStagingScripts {
     // A layout the script cannot produce (partial tuples) means the reply is
     // corrupt: don't count anything from it, and dispatch nothing.
     if (flat.length % DISPATCH_TUPLE_SIZE !== 0) {
-      return [];
+      return { claims: [], passedOverUntilMs };
     }
 
     // Override dispatches are a subset of this batch's dispatches, so the
@@ -2926,7 +2957,7 @@ export class GroupStagingScripts {
     }
 
     if (flat.length === 0) {
-      return [];
+      return { claims: [], passedOverUntilMs };
     }
 
     const dispatched: DispatchResult[] = [];
@@ -2943,7 +2974,7 @@ export class GroupStagingScripts {
       });
     }
 
-    return dispatched;
+    return { claims: dispatched, passedOverUntilMs };
   }
 
   /**
@@ -3633,12 +3664,24 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Earliest dispatch-after score in the ready set, or null when empty. The
-   * dispatcher clamps its BRPOP fallback to this so a group staged with a
-   * dispatch delay still wakes when due, since nothing else re-signals it.
+   * Earliest dispatch-after score in the ready set (strictly after `afterMs`, if given), or null.
+   * The dispatcher clamps its BRPOP fallback to this so a group staged with a dispatch delay
+   * still wakes when due, since nothing else re-signals it.
    */
-  async getEarliestReadyScore(): Promise<number | null> {
-    const result = await this.redis.zrange(`${this.keyPrefix}ready`, 0, 0, "WITHSCORES");
+  async getEarliestReadyScore({ afterMs }: { afterMs?: number } = {}): Promise<number | null> {
+    const readyKey = `${this.keyPrefix}ready`;
+    const result =
+      afterMs === undefined
+        ? await this.redis.zrange(readyKey, 0, 0, "WITHSCORES")
+        : await this.redis.zrangebyscore(
+            readyKey,
+            `(${afterMs}`,
+            "+inf",
+            "WITHSCORES",
+            "LIMIT",
+            0,
+            1,
+          );
     if (result.length < 2) return null;
     const score = Number(result[1]);
     return Number.isFinite(score) ? score : null;
