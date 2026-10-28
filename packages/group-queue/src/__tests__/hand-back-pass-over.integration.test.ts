@@ -123,6 +123,39 @@ describe("given a worker that handed back the job of one group while another gro
   });
 });
 
+describe("given a listed run whose group's job one worker handed back", () => {
+  describe("when that worker claims from the run, then another worker does", () => {
+    /** @scenario "A listed run's worker that handed a job back waits out its pass-over instead of polling" */
+    it("passes it over for the first, keeps the shared candidate due, and the other claims it", async () => {
+      const candidatesKey = `${KEY_PREFIX}listed:run-1:candidates`;
+      await stage({ groupId: "group-a", stagedJobId: "job-a" });
+      await claimAndReturn({ workerId: OLDER });
+      await redis.zadd(candidatesKey, 0, "group-a");
+      const claimListed = (workerId: string) =>
+        scripts.claimBatch({
+          nowMs: nowInstant().epochMilliseconds,
+          activeTtlSec: 300,
+          maxJobs: 10,
+          allowedGroupsKey: candidatesKey,
+          workerId,
+        });
+
+      const passedOver = await claimListed(OLDER);
+      expect(passedOver.claims).toEqual([]);
+      expect(passedOver.passedOverUntilMs).not.toBeNull();
+      const candidateScore = Number(await redis.zscore(candidatesKey, "group-a"));
+      expect(candidateScore).toBeLessThanOrEqual(nowInstant().epochMilliseconds);
+
+      // The listed scan reads candidates strictly below its clock.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const { claims } = await claimListed(NEWER);
+      expect(claims.map((claim) => [claim.stagedJobId, claim.groupAttempt])).toEqual([
+        ["job-a", 1],
+      ]);
+    });
+  });
+});
+
 describe("given a job two workers without its handler have each handed back", () => {
   describe("when each of them claims, then a worker that has not handed it back", () => {
     /** @scenario "Every worker that handed a job back passes it over, so the worker with the handler runs it" */

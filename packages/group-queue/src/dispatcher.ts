@@ -336,72 +336,91 @@ export class GroupQueueDispatcher {
   /** One claim over the allow-list, or over each open list in turn while slots remain. */
   private async claim(maxJobs: number): Promise<DispatchedWork[]> {
     this.claimedAtMs = nowInstant().epochMilliseconds;
-    const claimGuardWorkerId = this.params.claimGuardWorkerId?.();
-    const { workerId } = this.params;
-    const claimer = {
-      ...(claimGuardWorkerId ? { claimGuardWorkerId } : {}),
-      ...(workerId ? { workerId } : {}),
-    };
-    const claimFrom = async ({
-      allowedGroupsKey,
-      jobs,
-      listKey,
-    }: {
-      allowedGroupsKey: string;
-      jobs: number;
-      listKey?: string;
-    }) => {
-      const nowMs = nowInstant().epochMilliseconds;
-      const { claims, passedOverUntilMs } = await this.params.scripts.claimBatch({
-        nowMs,
-        activeTtlSec: this.params.activeTtlSec,
-        maxJobs: jobs,
-        allowedGroupsKey,
-        ...(listKey ? { listKey } : {}),
-        ...claimer,
-      });
-      const scannedList = this.scannedCandidates.find(({ key }) => key === allowedGroupsKey);
-      if (scannedList) scannedList.scannedToMs = nowMs;
-      if (passedOverUntilMs !== null) {
-        const untilMs = Math.min(passedOverUntilMs, this.passOver?.untilMs ?? passedOverUntilMs);
-        this.passOver = { scannedToMs: nowMs, untilMs };
-      }
-      return claims;
-    };
-    // A list left unclaimed this time is peeked from just before the claim, as before it.
-    const scanned = (keys: readonly string[]) =>
-      keys.map((key) => ({ key, scannedToMs: this.claimedAtMs - 1 }));
     this.passOver = null;
-    if (!this.params.listedGroupsKeys) {
-      const allowList = this.params.dispatchGroupAllowListKey;
-      this.scannedCandidates = scanned(allowList ? [allowList] : []);
-      if (allowList) {
-        return dispatchedWorkOf(await claimFrom({ allowedGroupsKey: allowList, jobs: maxJobs }));
-      }
-      const nowMs = nowInstant().epochMilliseconds;
-      const { claims, passedOverUntilMs } = await this.params.scripts.claimBatch({
-        nowMs,
-        activeTtlSec: this.params.activeTtlSec,
-        maxJobs,
-        ...this.groupBatchArgs(),
-        ...claimer,
-      });
-      this.passOver =
-        passedOverUntilMs === null ? null : { scannedToMs: nowMs, untilMs: passedOverUntilMs };
-      return dispatchedWorkOf(claims);
-    }
+    if (!this.params.listedGroupsKeys) return this.claimUnlisted(maxJobs);
     const work: DispatchedWork[] = [];
     const lists = await this.params.listedGroupsKeys();
-    this.scannedCandidates = scanned(lists.map((listKey) => `${listKey}:candidates`));
+    this.scannedCandidates = this.scannedBeforeClaim(
+      lists.map((listKey) => `${listKey}:candidates`),
+    );
     const first = this.nextList++ % Math.max(lists.length, 1);
     for (const listKey of [...lists.slice(first), ...lists.slice(0, first)]) {
       if (work.length >= maxJobs) break;
       const jobs = maxJobs - work.length;
       // Each list's reply numbers its batch slots from one, so it is grouped on its own.
-      const claims = await claimFrom({ allowedGroupsKey: `${listKey}:candidates`, jobs, listKey });
+      const claims = await this.claimCandidates({
+        allowedGroupsKey: `${listKey}:candidates`,
+        jobs,
+        listKey,
+      });
       work.push(...dispatchedWorkOf(claims));
     }
     return work;
+  }
+
+  /** The queue's own claim, or one over its allow-list. */
+  private async claimUnlisted(maxJobs: number): Promise<DispatchedWork[]> {
+    const allowList = this.params.dispatchGroupAllowListKey;
+    this.scannedCandidates = this.scannedBeforeClaim(allowList ? [allowList] : []);
+    if (allowList) {
+      return dispatchedWorkOf(
+        await this.claimCandidates({ allowedGroupsKey: allowList, jobs: maxJobs }),
+      );
+    }
+    const nowMs = nowInstant().epochMilliseconds;
+    const { claims, passedOverUntilMs } = await this.params.scripts.claimBatch({
+      nowMs,
+      activeTtlSec: this.params.activeTtlSec,
+      maxJobs,
+      ...this.groupBatchArgs(),
+      ...this.claimer(),
+    });
+    this.passOver =
+      passedOverUntilMs === null ? null : { scannedToMs: nowMs, untilMs: passedOverUntilMs };
+    return dispatchedWorkOf(claims);
+  }
+
+  /** One candidates set's claim; it records the clock it scanned below and any pass-over. */
+  private async claimCandidates({
+    allowedGroupsKey,
+    jobs,
+    listKey,
+  }: {
+    allowedGroupsKey: string;
+    jobs: number;
+    listKey?: string;
+  }): Promise<DispatchResult[]> {
+    const nowMs = nowInstant().epochMilliseconds;
+    const { claims, passedOverUntilMs } = await this.params.scripts.claimBatch({
+      nowMs,
+      activeTtlSec: this.params.activeTtlSec,
+      maxJobs: jobs,
+      allowedGroupsKey,
+      ...(listKey ? { listKey } : {}),
+      ...this.claimer(),
+    });
+    const scannedList = this.scannedCandidates.find(({ key }) => key === allowedGroupsKey);
+    if (scannedList) scannedList.scannedToMs = nowMs;
+    if (passedOverUntilMs !== null) {
+      const untilMs = Math.min(passedOverUntilMs, this.passOver?.untilMs ?? passedOverUntilMs);
+      this.passOver = { scannedToMs: nowMs, untilMs };
+    }
+    return claims;
+  }
+
+  /** A list left unclaimed this time is peeked from just before the claim, as before it. */
+  private scannedBeforeClaim(keys: readonly string[]): { key: string; scannedToMs: number }[] {
+    return keys.map((key) => ({ key, scannedToMs: this.claimedAtMs - 1 }));
+  }
+
+  /** Who claims: the poison-guard marker's worker, read before each claim, and this worker. */
+  private claimer(): { claimGuardWorkerId?: string; workerId?: string } {
+    const claimGuardWorkerId = this.params.claimGuardWorkerId?.();
+    const { workerId } = this.params;
+    return {
+      ...(claimGuardWorkerId ? { claimGuardWorkerId } : {}),
+      ...(workerId ? { workerId } : {}),
+    };
   }
 
   /** Batching for the queue's own claim; listed and allow-listed claims take groups alone. */
