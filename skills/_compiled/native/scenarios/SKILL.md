@@ -734,11 +734,11 @@ The UI calls the two surfaces **Agent Testing > Scenarios** (the test suites and
 
 ### The flow
 
-Steps 2 and 4 are questions **for the user**. Ask them in the same reply that reports the created scenario (its name, its id and, when the target rule below gives you one, the proposed target), so one answer starts the run. Wait for the answer and do not guess.
+Steps 2 and 4 are questions **for the user**. Ask them in the same reply that reports the created scenario (its name, its id and, when the target rule below gives you one, the proposed target), so one answer starts the run. Step 1 can raise one question earlier, before the scenario exists: which test suite to file it in, asked only when no test suite clearly fits. Wait for each answer and do not guess.
 
 #### 1. Pick the test suite, then create the scenario
 
-Pick the test suite first. Run `langwatch test-suite list --format json` before every `scenario create`. File the scenario in the test suite whose name and scenarios fit it. When none clearly fits, or the list is empty, ask the user which test suite to use, or whether to create a new one, and wait for the answer. Never create a scenario with `--test-suite` left out, and never invent a suite name the user did not agree to.
+Pick the test suite first. Run `langwatch test-suite list --format json` before every `scenario create`. File the scenario in the test suite whose name and scenarios fit it; when the names alone do not settle it, read a candidate's scenarios with `langwatch test-suite get <id> --format json`. When none clearly fits, or the list is empty, ask the user which test suite to use, or whether to create a new one, and wait for the answer. Never create a scenario with `--test-suite` left out, and never invent a suite name the user did not agree to. The one exception is the guided-onboarding script: its first scenario goes to `Default` because the project is brand new and has no test suite to pick yet, and its own commands win while it runs.
 
 ```bash
 langwatch scenario create "Angry refund request" \

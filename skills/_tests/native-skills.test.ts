@@ -246,10 +246,29 @@ describe("native skill generation", () => {
     /** @scenario "Creating a scenario with no suite named lists the suites first" */
     it("lists the test suites and files or asks, and never lets the scenario land in Default", () => {
       const body = renderSkill(skills.find((s) => s.slug === "scenarios")!);
-      expect(body, "lists suites first").toContain("Pick the test suite first");
-      expect(body, "asks when none fits").toContain("ask the user which test suite");
-      expect(body, "no silent default").not.toContain("leave the flag out");
-      expect(body, "no silent default").not.toContain("let the scenario land in `Default`");
+      const stepOne = body.slice(
+        body.indexOf("#### 1. Pick the test suite"),
+        body.indexOf("#### 2."),
+      );
+      const listAt = stepOne.indexOf("langwatch test-suite list --format json");
+      const createAt = stepOne.indexOf("langwatch scenario create");
+      expect(listAt, "step 1 lists the suites").toBeGreaterThan(-1);
+      expect(createAt, "step 1 creates after listing").toBeGreaterThan(listAt);
+      expect(stepOne.slice(createAt), "the create example files into a suite").toMatch(
+        /^langwatch scenario create[^`]*--test-suite /,
+      );
+      expect(stepOne, "asks when none fits").toContain("ask the user which test suite");
+      expect(stepOne, "no silent default").toContain(
+        "Never create a scenario with `--test-suite` left out",
+      );
+    });
+
+    /** @scenario "The guided-onboarding first scenario is the one Default exception both skills name" */
+    it("names the onboarding first scenario as the one Default exception in both skills", () => {
+      const scenarios = renderSkill(skills.find((s) => s.slug === "scenarios")!);
+      const onboarding = renderSkill(skills.find((s) => s.slug === "guided-onboarding")!);
+      expect(scenarios).toContain("The one exception is the guided-onboarding script");
+      expect(onboarding).toContain("Item 1 leaves `--test-suite` out on purpose");
     });
   });
 
