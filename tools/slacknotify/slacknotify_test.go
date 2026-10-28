@@ -29,7 +29,6 @@ type fake struct {
 	superseded bool // a newer run cancelled before it ran the job sits in front
 
 	broken bool
-	posts  []map[string]any
 	raw    []string
 }
 
@@ -67,11 +66,9 @@ func (f *fake) start(t *testing.T) slacknotify.Notifier {
 	t.Cleanup(gh.Close)
 	slack := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
-		var body map[string]any
-		if err := json.Unmarshal(raw, &body); err != nil {
-			t.Errorf("Slack got a body that is not JSON: %v", err)
+		if !json.Valid(raw) {
+			t.Errorf("Slack got a body that is not JSON: %s", raw)
 		}
-		f.posts = append(f.posts, body)
 		f.raw = append(f.raw, string(raw))
 	}))
 	t.Cleanup(slack.Close)
@@ -91,11 +88,10 @@ func TestANewRedRunPostsToSlack(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.True(t, result.Posted, result.Reason)
-			require.Len(t, f.posts, 1)
-			raw, _ := json.Marshal(f.posts[0])
-			assert.Contains(t, string(raw), job)
-			assert.Contains(t, string(raw), "abcdef1")
-			assert.Contains(t, string(raw), "/actions/runs/30")
+			require.Len(t, f.raw, 1)
+			assert.Contains(t, f.raw[0], job)
+			assert.Contains(t, f.raw[0], "abcdef1")
+			assert.Contains(t, f.raw[0], "/actions/runs/30")
 		})
 	}
 }
@@ -118,7 +114,7 @@ func TestARepeatFailureOrTimeoutDoesNotPostAgain(t *testing.T) {
 			require.NoError(t, err)
 			assert.False(t, result.Posted)
 			assert.Contains(t, result.Reason, previous)
-			assert.Empty(t, f.posts)
+			assert.Empty(t, f.raw)
 		})
 	}
 }
@@ -130,7 +126,7 @@ func TestAnUnreadableHistoryStillPosts(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, result.Posted)
-	assert.Len(t, f.posts, 1)
+	assert.Len(t, f.raw, 1)
 }
 
 func TestNoWebhookPostsNothing(t *testing.T) {
@@ -142,7 +138,7 @@ func TestNoWebhookPostsNothing(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.False(t, result.Posted)
-	assert.Empty(t, f.posts)
+	assert.Empty(t, f.raw)
 }
 
 func TestAPostErrorNeverNamesTheWebhook(t *testing.T) {

@@ -145,8 +145,8 @@ func (n Notifier) get(ctx context.Context, path string, into any) error {
 // <!channel> reads as text rather than pinging the channel.
 var mrkdwn = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 
-// Message is the Slack payload: a header, the job, commit and author, and a button to the run.
-func Message(run Run) map[string]any {
+// message is the Slack payload: a header, the job, commit and author, and a button to the run.
+func message(run Run) map[string]any {
 	short := run.SHA
 	if len(short) > 7 {
 		short = short[:7]
@@ -164,7 +164,7 @@ func Message(run Run) map[string]any {
 }
 
 func (n Notifier) post(ctx context.Context, run Run) error {
-	body, err := json.Marshal(Message(run))
+	body, err := json.Marshal(message(run))
 	if err != nil {
 		return err
 	}
