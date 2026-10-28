@@ -314,9 +314,10 @@ type CheckoutStep struct {
 func (w *Workflow) CheckoutSteps() []CheckoutStep {
 	var found []CheckoutStep
 	for _, job := range w.JobNames() {
-		for _, step := range w.Jobs[job].Steps {
-			if strings.HasPrefix(step.Uses, "actions/checkout@") {
-				found = append(found, CheckoutStep{Workflow: w.Path, Job: job, Step: step})
+		steps := w.Jobs[job].Steps
+		for i := range steps {
+			if strings.HasPrefix(steps[i].Uses, "actions/checkout@") {
+				found = append(found, CheckoutStep{Workflow: w.Path, Job: job, Step: steps[i]})
 			}
 		}
 	}
