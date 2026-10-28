@@ -241,6 +241,18 @@ describe("native skill generation", () => {
     });
   });
 
+  // Backs specs/langy/langy-scenario-suite.feature.
+  describe("given the scenarios skill creates a platform scenario", () => {
+    /** @scenario "Creating a scenario with no suite named lists the suites first" */
+    it("lists the test suites and files or asks, and never lets the scenario land in Default", () => {
+      const body = renderSkill(skills.find((s) => s.slug === "scenarios")!);
+      expect(body, "lists suites first").toContain("Pick the test suite first");
+      expect(body, "asks when none fits").toContain("ask the user which test suite");
+      expect(body, "no silent default").not.toContain("leave the flag out");
+      expect(body, "no silent default").not.toContain("let the scenario land in `Default`");
+    });
+  });
+
   // AGENTS.md tells Langy which skill to invoke per user intent. A row naming
   // a skill that isn't in the shipped image teaches the model to hallucinate.
   // The image's skill set is the root-compiled native set Docker overlays into

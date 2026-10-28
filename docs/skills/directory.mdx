@@ -1672,7 +1672,9 @@ The UI calls the two surfaces **Agent Testing > Scenarios** (the test suites and
 
 Steps 2 and 4 are questions **for the user**. Ask them in the same reply that reports the created scenario (its name, its id and, when the target rule below gives you one, the proposed target), so one answer starts the run. Wait for the answer and do not guess.
 
-#### 1. Create the scenario
+#### 1. Pick the test suite, then create the scenario
+
+Pick the test suite first. Run `langwatch test-suite list --format json` before every `scenario create`. File the scenario in the test suite whose name and scenarios fit it. When none clearly fits, or the list is empty, ask the user which test suite to use, or whether to create a new one, and wait for the answer. Never create a scenario with `--test-suite` left out, and never invent a suite name the user did not agree to.
 
 ```bash
 langwatch scenario create "Angry refund request" \
@@ -1685,7 +1687,7 @@ langwatch scenario create "Angry refund request" \
 
 - `<name>` (positional) and `--situation` are the only **required** inputs.
 - `--criteria` and `--labels` each take **one comma-separated string**, not repeated flags and not space-separated. A criterion therefore cannot contain a comma; rephrase instead.
-- `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
+- `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first. Always pass it: leaving the flag out files the scenario in `Default`, a script's convenience and not a choice you may make for the user (see the pick step above). `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
 - `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
@@ -1944,7 +1946,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do NOT reuse a run plan name for a different configuration by accident. The name is the identity, so a run under an existing name REPLACES that plan's configuration. Read `run-plan list --format json` before naming one
 - Do NOT invent a target reference. `connected`/`http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `connected` also takes `<name>@<environment>`; `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
 - Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first
-- Do NOT pass `--test-suite` a test suite that does not exist. The command refuses it. Create the test suite with `langwatch test-suite create "<name>"` first, or leave the flag out and let the scenario land in `Default`
+- Do NOT pass `--test-suite` a test suite that does not exist. The command refuses it. Create the test suite with `langwatch test-suite create "<name>"` first. Do NOT omit `--test-suite` to get `Default` unless the user chose it
 - Do NOT mix scope flags on `run-plan run`. Exactly one of `--all`, `--test-suite`, `--label` or `--scenario` per run
 - Do NOT propose scenarios for a connected agent before reading `langwatch agent get <id> --format json`. Its `parameters` are the levers the scenarios turn, and a proposal that ignores them tests one configuration by accident
 - Do NOT write a parameter value into the situation text ("the customer is on the pro plan") when the target declares that parameter. Supply it with `--param plan=pro`, or a `?plan=pro` suffix on the target, so the agent really runs with it
@@ -5159,7 +5161,9 @@ The UI calls the two surfaces **Agent Testing > Scenarios** (the test suites and
 
 Steps 2 and 4 are questions **for the user**. Ask them in the same reply that reports the created scenario (its name, its id and, when the target rule below gives you one, the proposed target), so one answer starts the run. Wait for the answer and do not guess.
 
-#### 1. Create the scenario
+#### 1. Pick the test suite, then create the scenario
+
+Pick the test suite first. Run `langwatch test-suite list --format json` before every `scenario create`. File the scenario in the test suite whose name and scenarios fit it. When none clearly fits, or the list is empty, ask the user which test suite to use, or whether to create a new one, and wait for the answer. Never create a scenario with `--test-suite` left out, and never invent a suite name the user did not agree to.
 
 ```bash
 langwatch scenario create "Angry refund request" \
@@ -5172,7 +5176,7 @@ langwatch scenario create "Angry refund request" \
 
 - `<name>` (positional) and `--situation` are the only **required** inputs.
 - `--criteria` and `--labels` each take **one comma-separated string**, not repeated flags and not space-separated. A criterion therefore cannot contain a comma; rephrase instead.
-- `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
+- `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first. Always pass it: leaving the flag out files the scenario in `Default`, a script's convenience and not a choice you may make for the user (see the pick step above). `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
 - `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
@@ -5423,7 +5427,7 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 - Do NOT reuse a run plan name for a different configuration by accident. The name is the identity, so a run under an existing name REPLACES that plan's configuration. Read `run-plan list --format json` before naming one
 - Do NOT invent a target reference. `connected`/`http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `connected` also takes `<name>@<environment>`; `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
 - Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first
-- Do NOT pass `--test-suite` a test suite that does not exist. The command refuses it. Create the test suite with `langwatch test-suite create "<name>"` first, or leave the flag out and let the scenario land in `Default`
+- Do NOT pass `--test-suite` a test suite that does not exist. The command refuses it. Create the test suite with `langwatch test-suite create "<name>"` first. Do NOT omit `--test-suite` to get `Default` unless the user chose it
 - Do NOT mix scope flags on `run-plan run`. Exactly one of `--all`, `--test-suite`, `--label` or `--scenario` per run
 - Do NOT propose scenarios for a connected agent before reading `langwatch agent get <id> --format json`. Its `parameters` are the levers the scenarios turn, and a proposal that ignores them tests one configuration by accident
 - Do NOT write a parameter value into the situation text ("the customer is on the pro plan") when the target declares that parameter. Supply it with `--param plan=pro`, or a `?plan=pro` suffix on the target, so the agent really runs with it
