@@ -35,6 +35,7 @@ export function useLangyPanelStop({
   stop: () => Promise<void>;
 }) {
   const stopTurn = api.langy.stopTurn.useMutation();
+  const utils = api.useUtils();
 
   // This tab's own live turn if it has one, otherwise the turn the durable
   // record names — read from the store at call time to dodge a stale closure.
@@ -60,17 +61,31 @@ export function useLangyPanelStop({
         turnId: target.turnId,
         resolution: "dispatch",
       });
-      // A request that did not land hands the control back; a stop a beat too
-      // late is settled to idle by the fold's next read.
+      // The answer comes only once the stopped terminal is recorded, so it settles the turn here:
+      // a tab that hears no update signal is never left on Stopping. A request that did not
+      // land hands the control back.
       void stopTurn
         .mutateAsync({
           projectId: target.projectId,
           conversationId: target.conversationId,
           turnId: target.turnId,
         })
-        .catch(() => useLangyStore.getState().abandonStop());
+        .then(
+          () => {
+            const store = useLangyStore.getState();
+            // A newer turn this tab moved on to keeps its own live lines.
+            if (store.activeTurnId !== null && store.activeTurnId !== target.turnId) return;
+            store.resetTurnSignals();
+            store.settleTurn(target.turnId);
+            void utils.langy.messages.invalidate({
+              projectId: target.projectId,
+              conversationId: target.conversationId,
+            });
+          },
+          () => useLangyStore.getState().abandonStop(),
+        );
     },
-    [stop, stopTurn],
+    [stop, stopTurn, utils],
   );
 
   const handleStop = useCallback(() => {

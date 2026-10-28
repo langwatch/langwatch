@@ -59,6 +59,14 @@ export interface LangyToolErrorPresentation {
   raw?: string;
 }
 
+/** The worker's `CANCELLED_PUSHBACK` (services/langyworker/src/tools/local-workspace.ts). */
+const STOPPED_BY_USER_PREFIX = "cancelled: the turn was stopped";
+
+/** Whether a failed call's text says the user's own Stop ended it, which is no failure. */
+export function isStoppedByUser(errorText: unknown): boolean {
+  return typeof errorText === "string" && errorText.trim().startsWith(STOPPED_BY_USER_PREFIX);
+}
+
 type RecordValue = Record<string, unknown>;
 
 function asRecord(value: unknown): RecordValue | null {

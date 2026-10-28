@@ -43,6 +43,7 @@ import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
   type LangyToolErrorPresentation,
+  isStoppedByUser,
   presentLangyToolError,
 } from "../../model/logic/langy-tool-failure.ts";
 import {
@@ -364,6 +365,8 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
   message.parts.forEach((rawPart, index) => {
     const part = rawPart as ToolPartLike;
     if (!renderedToolFailure(part)) return;
+    // A question the user stopped is closed by its own card.
+    if (isQuestionToolPart(part) && isStoppedByUser(part.errorText)) return;
     const name = partToolName(part);
     if (!name) return;
     const described = describeToolCall({ name, input: part.input });

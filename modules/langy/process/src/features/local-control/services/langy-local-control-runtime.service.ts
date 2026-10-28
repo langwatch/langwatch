@@ -125,4 +125,22 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
     });
     this.skipPolicy = LocalSkipPolicyService.create({ presence, workspace });
   }
+
+  /**
+   * Ends every local call and every card of one turn, for Stop: the command line is told to
+   * cancel each call and each waiting card ends as cancelled. Idempotent, as the worker's own
+   * cancel route reaches the same records.
+   */
+  async cancelTurn({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<void> {
+    for (const call of await this.dispatcher.listPendingForTurn({ conversationId, turnId })) {
+      await this.dispatcher.cancel({ callId: call.callId });
+    }
+    await this.waits.cancelTurn({ conversationId, turnId });
+  }
 }
