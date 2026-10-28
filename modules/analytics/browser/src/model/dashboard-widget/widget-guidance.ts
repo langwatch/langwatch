@@ -51,7 +51,7 @@ export function missingFieldGuidance({
   const own = FIELD_GUIDANCE[field];
   if (own) return own;
   if (unit === "traces") return `Send ${label} on your traces ${SDK}.`;
-  return UNIT_GUIDANCE[unit];
+  return undefined;
 }
 
 /**

@@ -61,19 +61,19 @@ describe("missingFieldGuidance", () => {
 
   describe("given a field of an evaluation", () => {
     /** @scenario "An empty widget names what sends its data" */
-    it("says evaluations come from evaluators", () => {
-      expect(missingFieldGuidance({ field: "Score", label: "score", unit: "evaluations" })).toBe(
-        "Evaluations come from the evaluators you run on your traces.",
-      );
+    it("has no line, since the no-traffic line about evaluators would be wrong for a field", () => {
+      expect(
+        missingFieldGuidance({ field: "Score", label: "score", unit: "evaluations" }),
+      ).toBeUndefined();
     });
   });
 
   describe("given a field of a simulation", () => {
     /** @scenario "An empty widget names what sends its data" */
-    it("says simulation runs come from the Scenario SDK, under the unit the simulations view derives", () => {
+    it("has no line, since the no-traffic line about scenarios would be wrong for a field", () => {
       expect(
         missingFieldGuidance({ field: "Verdict", label: "verdict", unit: "simulations" }),
-      ).toBe("Simulation runs come from running scenarios with the Scenario SDK.");
+      ).toBeUndefined();
     });
   });
 

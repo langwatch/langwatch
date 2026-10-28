@@ -95,6 +95,12 @@ Feature: A dashboard widget frame shows what its queries report
       Then the card still shows the loading skeleton
 
     @integration
+    Scenario: A member's Retry after a code error brings the skeleton back
+      Given a widget whose code reported an error and which shows no skeleton
+      When the member presses Retry
+      Then the card shows the loading skeleton while the next load is pending
+
+    @integration
     Scenario: A query that starts after the frame was idle brings the skeleton back
       Given a widget whose frame had nothing to wait for and whose queries never answered
       When a query starts
@@ -134,6 +140,7 @@ Feature: A dashboard widget frame shows what its queries report
       And TotalCost names the model, the token counts and a model price in Settings
       And evaluations read "Evaluations come from the evaluators you run on your traces."
       And a trace field with no words of its own reads "Send <field> on your traces with the LangWatch SDK."
+      And a field of another unit with no words of its own gets no line, never the unit's no-traffic line
 
     @integration
     Scenario: The setup view says how to send the field it needs

@@ -11,11 +11,10 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { periodMock, executorMock, frameProps, navigateMock } = vi.hoisted(() => ({
+const { periodMock, executorMock, frameProps } = vi.hoisted(() => ({
   periodMock: vi.fn(),
   executorMock: vi.fn(),
   frameProps: vi.fn<(props: SandboxedChartFrameProps) => void>(),
-  navigateMock: vi.fn(),
 }));
 
 vi.mock("../../../../../behavior/use-analytics-period.ts", async (importOriginal) => ({
@@ -25,10 +24,6 @@ vi.mock("../../../../../behavior/use-analytics-period.ts", async (importOriginal
 
 vi.mock("../../../behavior/use-dashboard-widget-executor.ts", () => ({
   useDashboardWidgetExecutor: (...args: unknown[]) => executorMock(...args),
-}));
-
-vi.mock("../../../behavior/use-dashboard-widget-chart-navigate.ts", () => ({
-  useDashboardWidgetChartNavigate: () => navigateMock,
 }));
 
 vi.mock("../sandboxed-chart-frame.tsx", () => ({
@@ -68,17 +63,19 @@ const period = ({ startMs, endMs }: { startMs: number; endMs: number }) => ({
 });
 
 const widget = (refreshedAt?: number) => (
-  <DesignSystemProvider forcedTheme="light">
-    <DashboardRefreshedAtContext.Provider value={refreshedAt}>
-      <DashboardWidgetFrame
-        id="graph_1"
-        graph={GRAPH}
-        projectId="project_1"
-        projectSlug="project"
-        maxHeight={300}
-      />
-    </DashboardRefreshedAtContext.Provider>
-  </DesignSystemProvider>
+  <AnalyticsHostProvider value={new StubAnalyticsHost()}>
+    <DesignSystemProvider forcedTheme="light">
+      <DashboardRefreshedAtContext.Provider value={refreshedAt}>
+        <DashboardWidgetFrame
+          id="graph_1"
+          graph={GRAPH}
+          projectId="project_1"
+          projectSlug="project"
+          maxHeight={300}
+        />
+      </DashboardRefreshedAtContext.Provider>
+    </DesignSystemProvider>
+  </AnalyticsHostProvider>
 );
 
 beforeEach(() => {
@@ -192,14 +189,16 @@ const PROJECT: AnalyticsHostProject = {
 const boardWidget = ({
   project = PROJECT,
   graph = GRAPH,
+  host = new StubAnalyticsHost({ project }),
   ...props
 }: {
   project?: AnalyticsHostProject;
+  host?: StubAnalyticsHost;
   graph?: unknown;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   onEmptyChange?: (empty: boolean) => void;
 }) => (
-  <AnalyticsHostProvider value={new StubAnalyticsHost({ project })}>
+  <AnalyticsHostProvider value={host}>
     <DesignSystemProvider forcedTheme="light">
       <DashboardWidgetFrameOverWindow
         id="graph_1"
@@ -480,7 +479,7 @@ describe("given a widget on a board whose queries are running", () => {
   });
 
   describe("when the widget's code crashed and the member retries", () => {
-    /** @scenario "A widget with nothing to wait for shows no skeleton" */
+    /** @scenario "A member's Retry after a code error brings the skeleton back" */
     it("shows the skeleton again while the next load is pending", async () => {
       const run = frameRuns(() => Promise.reject(BROKEN));
       render(boardWidget({}));
@@ -521,7 +520,8 @@ describe("given an empty widget on a board", () => {
       const run = frameRuns(() =>
         Promise.resolve(resultWith(report({ state: "no_traffic", total: 0 }))),
       );
-      render(boardWidget({ project: { ...PROJECT, hasFirstMessage: false } }));
+      const host = new StubAnalyticsHost({ project: { ...PROJECT, hasFirstMessage: false } });
+      render(boardWidget({ host }));
       await run();
 
       expect(screen.getByText("No traces in this period")).toBeTruthy();
@@ -529,7 +529,7 @@ describe("given an empty widget on a board", () => {
         screen.getByText("Send traces with the LangWatch SDK to fill this widget."),
       ).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "Set up tracing" }));
-      expect(navigateMock).toHaveBeenCalledWith({ target: "traces", params: {} });
+      expect(host.navigations[0]).toMatch(/^\/project\/traces(#|$)/);
     });
   });
 
