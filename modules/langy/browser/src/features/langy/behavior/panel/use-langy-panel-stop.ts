@@ -73,10 +73,16 @@ export function useLangyPanelStop({
         .then(
           () => {
             const store = useLangyStore.getState();
-            // A newer turn this tab moved on to keeps its own live lines.
-            if (store.activeTurnId !== null && store.activeTurnId !== target.turnId) return;
-            store.resetTurnSignals();
-            store.settleTurn(target.turnId);
+            // Another conversation, or a newer turn (even one still unnamed after
+            // beginSend), keeps its own live lines.
+            const tabMovedOn =
+              store.activeConversationId !== target.conversationId ||
+              isSendUnanswered(store) ||
+              (store.activeTurnId !== null && store.activeTurnId !== target.turnId);
+            if (!tabMovedOn) {
+              store.resetTurnSignals();
+              store.settleTurn(target.turnId);
+            }
             void utils.langy.messages.invalidate({
               projectId: target.projectId,
               conversationId: target.conversationId,

@@ -13,7 +13,12 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { readCliErrorDocument } from "@langwatch/handled-error/langwatch-handled-error";
-import { cliToolResultPayload, cliToolResultSchema, parseCliJson } from "@langwatch/langy-contract";
+import {
+  cliToolResultPayload,
+  cliToolResultSchema,
+  isLangyCallStoppedText,
+  parseCliJson,
+} from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { AlertCircle, Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
@@ -43,7 +48,6 @@ import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
   type LangyToolErrorPresentation,
-  isStoppedByUser,
   presentLangyToolError,
 } from "../../model/logic/langy-tool-failure.ts";
 import {
@@ -365,8 +369,8 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
   message.parts.forEach((rawPart, index) => {
     const part = rawPart as ToolPartLike;
     if (!renderedToolFailure(part)) return;
-    // A question the user stopped is closed by its own card.
-    if (isQuestionToolPart(part) && isStoppedByUser(part.errorText)) return;
+    // A call the user's own Stop ended (a question, a local command) is no failed step.
+    if (isLangyCallStoppedText(part.errorText)) return;
     const name = partToolName(part);
     if (!name) return;
     const described = describeToolCall({ name, input: part.input });

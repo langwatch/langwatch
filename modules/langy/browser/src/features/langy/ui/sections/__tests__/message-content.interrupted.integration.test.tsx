@@ -4,6 +4,7 @@
  * Spec: specs/langy/langy-stop-and-resume.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { LANGY_CALL_STOPPED_PREFIX } from "@langwatch/langy-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { cloneElement, type ReactElement } from "react";
@@ -193,5 +194,39 @@ describe("given a settled empty reply with a later message after it", () => {
 
     expect(screen.queryByText("No content")).toBeNull();
     expect(screen.queryByText("Interrupted")).toBeNull();
+  });
+});
+
+describe("given a question the user's Stop ended", () => {
+  /** @scenario A question card I stopped reads as closed, not as failed */
+  it("keeps its options from being chosen", () => {
+    const message: UIMessage = {
+      id: "m-stopped-question",
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-question",
+          toolCallId: "call-q",
+          state: "output-error",
+          input: {
+            questions: [
+              {
+                question: "Which colour do you prefer?",
+                header: "Pick a colour",
+                options: [{ label: "Red" }, { label: "Blue" }],
+              },
+            ],
+          },
+          errorText: `${LANGY_CALL_STOPPED_PREFIX}, so the call on the user's machine was stopped too`,
+        } as never,
+      ],
+    };
+
+    renderMessage({ interrupted: true, message });
+
+    const red = screen.getByRole("button", { name: /Red/ });
+    expect(
+      (red as HTMLButtonElement).disabled || red.getAttribute("aria-disabled") === "true",
+    ).toBe(true);
   });
 });

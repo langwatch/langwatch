@@ -5,6 +5,7 @@
  * @see specs/langy/langy-stop-and-resume.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { LANGY_CALL_STOPPED_PREFIX } from "@langwatch/langy-contract";
 import { render } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { describe, expect, it, vi } from "vitest";
@@ -52,8 +53,25 @@ describe("a question tool call on a settled turn", () => {
     it("draws no failed-step line for it", () => {
       const { container } = renderActivity([
         questionPart(
-          "cancelled: the turn was stopped, so the call on the user's machine was stopped too",
+          `${LANGY_CALL_STOPPED_PREFIX}, so the call on the user's machine was stopped too`,
         ),
+        reply,
+      ]);
+
+      expect(container.textContent).not.toContain("failed");
+      expect(container.textContent).not.toContain("carried on");
+    });
+
+    /** @scenario A command I stopped reads as stopped, not as failed */
+    it("draws no failed-step line for a stopped command on their machine", () => {
+      const { container } = renderActivity([
+        {
+          type: "tool-local_bash",
+          toolCallId: "call-b",
+          state: "output-error",
+          input: { command: "sleep 60" },
+          errorText: `${LANGY_CALL_STOPPED_PREFIX}, so the call on the user's machine was stopped too`,
+        } as never,
         reply,
       ]);
 

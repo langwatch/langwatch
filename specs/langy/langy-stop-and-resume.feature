@@ -170,6 +170,13 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the composer shows Send again
     And I can send my next message
 
+  # The stop's answer can land after I moved on. It may only settle the turn it stopped.
+  @integration
+  Scenario: A late stop answer leaves a newer turn alone
+    Given I clicked Stop and then sent a new message, or opened another turn
+    When the backend confirms the earlier stop
+    Then the newer turn keeps its live lines and its working composer state
+
   # The worker's abort only ends its own polling. A card or a command the turn left
   # on my machine would otherwise wait for an answer nobody reads (ADR-129).
   @unit
@@ -186,6 +193,12 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Given Langy asked a question and I stopped the turn before answering
     When the reply is drawn
     Then no failed-step line is drawn for the question
+
+  @integration
+  Scenario: A command I stopped reads as stopped, not as failed
+    Given a command was running on my machine and I stopped the turn
+    When the reply is drawn
+    Then no failed-step line is drawn for the command
 
   @integration
   Scenario: Only someone who can control the conversation may stop its turn
