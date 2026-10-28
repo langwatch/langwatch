@@ -186,6 +186,22 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the question card's options can no longer be chosen
     And a question card a newer turn raised stays open
 
+  # The server leaves a confirmation card the platform raised answerable after Stop,
+  # since its click is read in a later turn; the live tab must not lock it either.
+  @integration
+  Scenario: A confirmation card raised during the turn stays answerable after Stop
+    Given the turn raised a question card and a platform confirmation card, and I clicked Stop
+    When the backend confirms the stop
+    Then the question card's options can no longer be chosen
+    And the confirmation card stays answerable
+
+  # An untagged live card would make Stop close nothing, so the tag is pinned.
+  @integration
+  Scenario: A question card the stream raises is tied to the turn the tab is streaming
+    Given the tab is streaming a turn
+    When the stream raises a question card
+    Then the card is recorded against that turn
+
   # The worker's abort only ends its own polling. A card or a command the turn left
   # on my machine would otherwise wait for an answer nobody reads (ADR-129).
   @unit

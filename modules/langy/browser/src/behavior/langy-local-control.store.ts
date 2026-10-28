@@ -73,7 +73,11 @@ function isForeign(
   return !!conversationId && state.conversationId !== conversationId;
 }
 
-/** The entries with one turn's still-waiting questions cancelled, every other entry as it was. */
+/**
+ * The entries with one turn's still-waiting tool questions cancelled, every other entry as it was.
+ * A card with no `toolCallId` is the platform's own confirmation, which the server leaves
+ * answerable after Stop (its `wait.confirm` skip), so it is left alone here too.
+ */
 function withTurnQuestionsCancelled({
   state,
   conversationId,
@@ -87,7 +91,10 @@ function withTurnQuestionsCancelled({
   return Object.fromEntries(
     Object.entries(state.waits).map(([waitId, wait]) => [
       waitId,
-      wait.kind === "question" && wait.turnId === turnId && wait.status === "pending"
+      wait.kind === "question" &&
+      wait.toolCallId &&
+      wait.turnId === turnId &&
+      wait.status === "pending"
         ? { ...wait, status: "cancelled" as const }
         : wait,
     ]),

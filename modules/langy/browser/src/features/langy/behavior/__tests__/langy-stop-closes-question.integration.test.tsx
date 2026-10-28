@@ -184,4 +184,25 @@ describe("a live question card when Stop is answered", () => {
       expect(isLocked("m-2")).toBe(false);
     });
   });
+
+  describe("given the turn also raised a platform confirmation card", () => {
+    /** @scenario A confirmation card raised during the turn stays answerable after Stop */
+    it("closes the tool question but leaves the confirmation answerable", async () => {
+      recordLiveQuestion({ turnId: "turn-1", toolCallId: "call-q1" });
+      useLangyLocalControlStore.getState().recordWait({
+        conversationId: "conv-1",
+        wait: { waitId: "wait-confirm", kind: "question", status: "pending", turnId: "turn-1" },
+      });
+      const { result } = renderHook(() =>
+        useLangyPanelStop({ projectId: "proj-1", foldInFlightTurnId: null, stop: async () => {} }),
+      );
+
+      act(() => result.current());
+      await answerStop();
+
+      const { waits } = useLangyLocalControlStore.getState();
+      expect(waits["wait-call-q1"]?.status).toBe("cancelled");
+      expect(waits["wait-confirm"]?.status).toBe("pending");
+    });
+  });
 });
