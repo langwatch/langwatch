@@ -142,3 +142,47 @@ Feature: GroupQueue brings back a job whose worker died while running it
     Given a projection group with no active key but a claimed record left by a worker that died
     When a replay waits for the projection's in-flight jobs to drain
     Then it treats the group as in flight until the claimed record is gone
+
+  Rule: A worker that is gone loses its claim when its beacon does, not when its active key does
+    The active key outlives a dead worker by up to its whole TTL, and the poison guard counts a
+    death the moment the owner's beacon is missing. A claimed group comes up for dispatch every
+    recheck interval while it is held; the scan then reclaims it if the claim marker for that very
+    claim names an owner with no beacon at all. An owner that is alive or retired keeps its claim
+    until the active key lapses, since a retiring worker is still draining. A live owner stalled
+    longer than the beacon's lifetime loses its claim too: at-least-once delivery runs the job
+    again, and the stalled owner's outcome is refused as a lost claim.
+
+    @integration
+    Scenario: A group whose worker's beacon is gone is reclaimed before its active key lapses
+      Given a worker that claims a job with its beacon alive and then dies
+      When its beacon is gone while its active key still has most of its life left
+      And the group comes up for dispatch
+      Then a live worker runs the job again without waiting for the active key
+      And the death is counted once by the poison guard
+      And the dead claim no longer counts against its tenant's in-flight cap
+
+    @integration
+    Scenario: A group held by a live worker is neither reclaimed nor parked when it comes up
+      Given a worker with its beacon alive that holds a claimed group of a tenant at its in-flight cap
+      When the group comes up for dispatch
+      Then the claim keeps its active key and claimed record
+      And the group is not parked, and comes up again within the recheck interval
+
+    @integration
+    Scenario: A retired worker's claim waits for its active key
+      Given a worker that retired while it still held a claimed group
+      When the group comes up for dispatch
+      Then the claim keeps its active key
+
+    @integration
+    Scenario: A marker left by an earlier claim does not reclaim a newer one
+      Given a group whose claim marker names a dead worker from an earlier claim
+      And a newer claim of the group made without a marker of its own
+      When the group comes up for dispatch
+      Then the newer claim keeps its active key
+
+    @integration
+    Scenario: A held group comes up for dispatch within the recheck interval
+      Given a worker that claims a group with a long active key
+      When it claims the group, and again when its heartbeat refreshes the claim
+      Then the group's ready score is no later than the recheck interval from then

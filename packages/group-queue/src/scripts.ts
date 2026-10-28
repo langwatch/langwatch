@@ -25,6 +25,13 @@ export const PARK_RECONCILE_MAX_DRAIN = 1000;
 /** Reconcile cadence (ms); defines dynamic-cap TTL and claimant window multiples. */
 export const RECONCILE_INTERVAL_MS = 2000;
 
+/**
+ * How often dispatch looks again at a group a worker holds: the claim and every heartbeat put
+ * its ready score this far out, never the active key's whole TTL, so a dead owner's claim is
+ * reclaimed within a beacon lifetime plus this (specs/claimed-job-recovery.feature).
+ */
+export const CLAIM_RECHECK_MS = 30_000;
+
 /** How far back a listed run's jobless group that stays (a failure, say) goes in its candidates. */
 const SETTLED_CANDIDATE_DELAY_MS = 3_600_000;
 
@@ -668,6 +675,15 @@ local function gqReleaseClaimMarker(claimKey, workerId, claimToken)
   end
   return redis.call("DEL", claimKey)
 end
+
+-- The held claim's owner is gone: the marker is this very claim's (its token is the claimed
+-- record's) and its owner publishes no beacon at all. Alive or retired owners are still running.
+local function gqClaimOwnerGone(keyPrefix, groupId, claimedKey)
+  local marker = redis.call("HMGET", keyPrefix .. "group:" .. groupId .. ":claim", "owner", "token")
+  if not marker[1] or not marker[2] or marker[2] == "" then return false end
+  if redis.call("HGET", claimedKey, "token") ~= marker[2] then return false end
+  return redis.call("EXISTS", keyPrefix .. "worker:" .. marker[1]) == 0
+end
 `;
 
 /**
@@ -1250,6 +1266,23 @@ local function scanBatch(effCap, bypassPark, dispatched)
         end
         removedAllowed = removedAllowed + 1
       end
+      -- A held group comes up every CLAIM_RECHECK_MS, ahead of the cap and pause checks, which
+      -- must never park a group a worker is running. Its owner gone, the active key and the dead
+      -- claim's tenant slot go and the recovery below puts its jobs back; otherwise it comes up
+      -- again at the recheck or when the active key lapses, whichever is first (a retry's hold).
+      local heldMs = groupDue and redis.call("PTTL", keyPrefix .. "group:" .. groupId .. ":active") or -2
+      if heldMs > 0 then
+        if gqClaimOwnerGone(keyPrefix, groupId, keyPrefix .. "group:" .. groupId .. ":claimed") then
+          redis.call("DEL", keyPrefix .. "group:" .. groupId .. ":active")
+          local heldTenant = parkTenantOf(groupId)
+          tenantActiveRemove(keyPrefix .. "tenant_active_z:", heldTenant, groupId)
+          tenantCapCache[heldTenant] = nil
+        else
+          redis.call("ZADD", readyKey, "XX", nowMs + math.min(heldMs, ${CLAIM_RECHECK_MS}), groupId)
+          removed = removed + 1
+          groupDue = false
+        end
+      end
       if groupDue then
 
       -- Tenant cap check (no-op when effCap == 0). capTenantId resolved
@@ -1380,8 +1413,8 @@ local function scanBatch(effCap, bypassPark, dispatched)
               redis.call("DECR", totalPendingKey)
               redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-              -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
-              redis.call("ZADD", readyKey, activeUntil, groupId)
+              -- Held: out of the due window until the owner's liveness is next checked.
+              redis.call("ZADD", readyKey, math.min(activeUntil, nowMs + ${CLAIM_RECHECK_MS}), groupId)
               if restrictedDispatch then
                 redis.call("ZADD", allowedGroupsKey, nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS}, groupId)
               end
@@ -1765,7 +1798,7 @@ if gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   -- while this heartbeat was in flight, the group has been removed and we must not
   -- reinsert it (would violate "blocked => not in ready").
   if redis.call("ZSCORE", readyKey, groupId) then
-    redis.call("ZADD", readyKey, nowMs + activeTtlSec * 1000, groupId)
+    redis.call("ZADD", readyKey, math.min(nowMs + activeTtlSec * 1000, nowMs + ${CLAIM_RECHECK_MS}), groupId)
   end
   if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
     local slashPos = string.find(groupId, "/", 1, true)
