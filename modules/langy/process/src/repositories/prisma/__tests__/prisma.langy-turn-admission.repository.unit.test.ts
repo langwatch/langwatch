@@ -50,7 +50,7 @@ function uniqueKeyClash(): Error {
 
 describe("PrismaLangyTurnAdmissionRepository.claim", () => {
   describe("given the first attempt hits a unique-key clash", () => {
-    /** @scenario A turn send that clashes on the receipt unique key re-reads the receipt on retry */
+    /** @scenario A turn send that clashes on the receipt unique key is retried */
     it("retries and returns the claim from the second attempt", async () => {
       const { database, calls } = fakeDatabase([uniqueKeyClash()]);
       const repository = PrismaLangyTurnAdmissionRepository.create(database);
