@@ -77,7 +77,7 @@ Feature: Read and navigate the generated documentation
   @unit
   Scenario: Colour the request body like the docs' code blocks
     Given a reader edits a JSON request body in Try it
-    Then keys, strings, numbers and literals take the code blocks' light and dark colours as they type
+    Then keys, strings and other values take the code blocks' colours as they type
     And text that is not yet valid JSON is still shown, uncoloured where it cannot be read
 
   @e2e

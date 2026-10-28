@@ -19,10 +19,10 @@ import { docsAppOrigin } from "../../../config.ts";
 import type { RequestState } from "../model/codegen.ts";
 import { paramKey } from "../model/codegen.ts";
 import { sessionCovers } from "../model/docs-session.ts";
-import { JSON_TOKEN_COLOURS, jsonTokens } from "../model/json-tokens.ts";
 import type { Operation, Parameter, Scheme } from "../model/operation.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { Panel } from "./panel.tsx";
+import { JsonCode } from "../model/json-code.tsx";
 
 function ParamInput({
   param,
@@ -292,22 +292,7 @@ function BodyEditor({ body, onChange }: { body: string; onChange: (value: string
           whiteSpace="pre-wrap"
           overflowWrap="anywhere"
         >
-          {jsonTokens({ text: body }).map((token, index) =>
-            token.kind === "plain" ? (
-              token.text
-            ) : (
-              <span
-                // Tokens never reorder: the index is the token's place in the body.
-                key={index}
-                style={{
-                  ["--sl" as string]: JSON_TOKEN_COLOURS[token.kind].light,
-                  ["--sd" as string]: JSON_TOKEN_COLOURS[token.kind].dark,
-                }}
-              >
-                {token.text}
-              </span>
-            ),
-          )}
+          <JsonCode text={body} />
           {/* A trailing newline needs a character after it to take up its line. */}
           {"\u200b"}
         </chakra.pre>

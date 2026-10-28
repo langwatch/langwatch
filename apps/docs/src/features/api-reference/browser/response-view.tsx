@@ -1,5 +1,5 @@
-import { JSON_TOKEN_COLOURS, jsonTokens } from "../model/json-tokens.ts";
 import type { Outcome } from "../model/playground-outcome.ts";
+import { JsonCode } from "../model/json-code.tsx";
 
 export function ResponseView({
   outcome,
@@ -42,21 +42,7 @@ export function ResponseView({
               {outcome.status} {outcome.statusText} · {outcome.ms} ms · {outcome.contentType}
             </p>
             <pre aria-label="Response body" className="docs-json">
-              {jsonTokens({ text: prettyBody({ body: outcome.body }) }).map((token, index) =>
-                token.kind === "plain" ? (
-                  token.text
-                ) : (
-                  <span
-                    key={index}
-                    style={{
-                      ["--sl" as string]: JSON_TOKEN_COLOURS[token.kind].light,
-                      ["--sd" as string]: JSON_TOKEN_COLOURS[token.kind].dark,
-                    }}
-                  >
-                    {token.text}
-                  </span>
-                ),
-              )}
+              <JsonCode text={prettyBody({ body: outcome.body })} />
             </pre>
           </>
         ) : null}

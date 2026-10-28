@@ -505,13 +505,6 @@ figure > .docs-shot {
 .dark .docs-line span {
   color: color-mix(in srgb, var(--sd) 85%, var(--chakra-colors-fg));
 }
-/* The playground colours the JSON it edits and answers like a code block. */
-.docs-json span {
-  color: color-mix(in srgb, var(--sl) 80%, var(--chakra-colors-fg));
-}
-.dark .docs-json span {
-  color: color-mix(in srgb, var(--sd) 85%, var(--chakra-colors-fg));
-}
 .docs-line[data-highlighted="true"] {
   background: color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent);
   box-shadow: inset 2px 0 0 var(--chakra-colors-accent-solid);
@@ -2095,13 +2088,16 @@ body {
 #try-it-form > div {
   gap: 12px;
 }
-.docs-line span.docs-json-key {
+.docs-line span.docs-json-key,
+.docs-json span.docs-json-key {
   color: var(--chakra-colors-blue-fg);
 }
-.docs-line span.docs-json-string {
+.docs-line span.docs-json-string,
+.docs-json span.docs-json-string {
   color: var(--chakra-colors-green-fg);
 }
-.docs-line span.docs-json-value {
+.docs-line span.docs-json-value,
+.docs-json span.docs-json-value {
   color: var(--chakra-colors-accent-fg);
 }
 
