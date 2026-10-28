@@ -16,9 +16,12 @@ const served = (origin: string, method = "GET") =>
     .use(SecurityHeaders.strict())
     .route(selection.path, EmbeddedDocument.create({ selection, embedders: [DOCS] }))
     .fetch(
-      new Request(`https://app.langwatch.ai${selection.path}?origin=${encodeURIComponent(origin)}`, {
-        method,
-      }),
+      new Request(
+        `https://app.langwatch.ai${selection.path}?origin=${encodeURIComponent(origin)}`,
+        {
+          method,
+        },
+      ),
     );
 
 describe("an embedded document", () => {

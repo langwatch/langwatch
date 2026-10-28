@@ -68,7 +68,10 @@ describe("the tag manager loader", () => {
       expect(appended).toEqual([
         { src: "https://www.googletagmanager.com/gtm.js?id=GTM-KJ4S6Z9C", async: true },
       ]);
-      expect(win.dataLayer).toEqual([TAG_RESTRICTIONS, expect.objectContaining({ event: "gtm.js" })]);
+      expect(win.dataLayer).toEqual([
+        TAG_RESTRICTIONS,
+        expect.objectContaining({ event: "gtm.js" }),
+      ]);
     });
 
     /** @scenario "Load the tag manager without slowing the page" */
@@ -115,7 +118,10 @@ describe("the tag manager loader", () => {
 
     /** @scenario "Load the tag manager only after the reader accepted cookies" */
     it("starts once the reader accepts in another tab, and not for another key", () => {
-      const { win, appended, fire, idle, stored } = fakeWindow({ id: "GTM-KJ4S6Z9C", consent: null });
+      const { win, appended, fire, idle, stored } = fakeWindow({
+        id: "GTM-KJ4S6Z9C",
+        consent: null,
+      });
       startTagManager({ win: win as never });
       fire("storage", { key: "something-else" });
       stored.value = "accepted";
@@ -132,7 +138,8 @@ describe("the tag manager loader", () => {
   describe("when the reader accepted cookies", () => {
     /** @scenario "Load the tag manager only after the reader accepted cookies" */
     it("reads the choice the marketing site stored", () => {
-      const storage = (value: string | null) => ({ localStorage: { getItem: () => value } }) as never;
+      const storage = (value: string | null) =>
+        ({ localStorage: { getItem: () => value } }) as never;
       expect(analyticsConsented({ win: storage("accepted") })).toBe(true);
       expect(analyticsConsented({ win: storage("yes") })).toBe(false);
     });

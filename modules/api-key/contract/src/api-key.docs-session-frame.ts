@@ -1,14 +1,10 @@
 /**
- * The docs session frame (ADR-185, amendment of 2026-10-28): a small document on the app's
- * origin that a registered docs site embeds. It runs the consent popup, holds the docs session
- * key and sends the playground's requests, so the key never enters the docs page and its
- * analytics. Only strings, so the API host that serves it builds it too.
+ * The docs session frame (ADR-185, amendment of 2026-10-28): the app-origin document a docs
+ * site embeds, which holds the key so it never enters the docs page and its analytics. Only
+ * strings, so the API host that serves it builds it too.
  * @see modules/api-key/specs/docs-session-frame.feature
  */
-import {
-  DOCS_SESSION_MESSAGE_TYPE,
-  DOCS_SESSION_MESSAGE_VERSION,
-} from "./api-key.docs-session.ts";
+import { DOCS_SESSION_MESSAGE_TYPE, DOCS_SESSION_MESSAGE_VERSION } from "./api-key.docs-session.ts";
 
 /** Where the API host serves the frame; `?origin=` names the docs site embedding it. */
 export const DOCS_SESSION_FRAME_PATH = "/connect/docs/frame";

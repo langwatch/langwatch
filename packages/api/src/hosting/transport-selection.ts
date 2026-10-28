@@ -71,7 +71,9 @@ export class TransportSelection {
   /** A module-built document the registered docs sites may frame (ADR-185), beside the bundle. */
   embeddedDocument(selection: EmbeddedDocumentSelection): this {
     if (!this.#bundle)
-      throw new Error("Select the browser bundle before an embedded document; it answers beside it.");
+      throw new Error(
+        "Select the browser bundle before an embedded document; it answers beside it.",
+      );
     if (
       [...this.#documents, ...this.#embedded].some((document) => document.path === selection.path)
     )

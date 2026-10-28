@@ -113,7 +113,11 @@ export class EmbeddedDocument implements HttpTarget {
     if (!this.embedders.has(embedder)) {
       return new Response(this.selection.refusal(), {
         status: 403,
-        headers: { ...common, "Content-Security-Policy": REFUSAL_POLICY, "X-Frame-Options": "DENY" },
+        headers: {
+          ...common,
+          "Content-Security-Policy": REFUSAL_POLICY,
+          "X-Frame-Options": "DENY",
+        },
       });
     }
 

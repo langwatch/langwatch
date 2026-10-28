@@ -3,37 +3,55 @@ import { z } from "zod/mini";
 import { liveRequest, type RequestState } from "./codegen.ts";
 import type { Operation, Scheme } from "./operation.ts";
 
-/** The message type the app's consent page posts back to the docs (ADR-185). */
-export const DOCS_SESSION_MESSAGE = "langwatch:docs-session";
-/** How long the docs wait for the consent page before giving up. */
-export const CONNECT_TIMEOUT_MS = 120_000;
-/** The app's REST door a docs session key revokes itself through. */
-export const REVOKE_PATH = "/api/docs-session";
+/*
+ * The signed-in playground (ADR-185, amendment of 2026-10-28). The key lives in the app's
+ * session frame, never in this page: the page asks the frame to send a request and reads the
+ * answer. These are the frame's address and the messages both sides speak.
+ */
 
-export type DocsSession = {
-  token: string;
-  /** When the key ends on this page's monotonic clock (`performance.now()`), not the wall clock. */
-  endsAt: number;
-  project: { id: string; name: string };
-  appOrigin: string;
-};
+/** Where the app serves its session frame; `?origin=` names this docs site. */
+export const FRAME_PATH = "/connect/docs/frame";
+/** The `type` of every message between this page and the frame. */
+export const FRAME_MESSAGE = "langwatch:docs-frame";
+export const FRAME_VERSION = 1;
 
-const grantSchema = z.object({
-  type: z.literal(DOCS_SESSION_MESSAGE),
-  version: z.literal(1),
-  state: z.string(),
-  outcome: z.literal("granted"),
-  token: z.string().check(z.minLength(16)),
-  expiresAt: z.iso.datetime({ offset: true }),
-  expiresIn: z.number().check(z.positive()),
-  project: z.object({ id: z.string().check(z.minLength(1)), name: z.string() }),
-});
-const denialSchema = z.object({
-  type: z.literal(DOCS_SESSION_MESSAGE),
-  version: z.literal(1),
-  state: z.string(),
-  outcome: z.literal("denied"),
-});
+/** Why the frame did not answer with a response. */
+export type FrameFailure =
+  | "not-connected"
+  | "declined"
+  | "refused"
+  | "timeout"
+  | "cancelled"
+  | "network";
+
+const envelope = { type: z.literal(FRAME_MESSAGE), version: z.literal(FRAME_VERSION) };
+const frameMessageSchema = z.discriminatedUnion("kind", [
+  z.object({
+    ...envelope,
+    kind: z.literal("state"),
+    connected: z.boolean(),
+    project: z.nullable(z.string()),
+  }),
+  z.object({ ...envelope, kind: z.literal("height"), height: z.number().check(z.nonnegative()) }),
+  z.object({
+    ...envelope,
+    kind: z.literal("response"),
+    id: z.string(),
+    status: z.number(),
+    statusText: z.string(),
+    contentType: z.string(),
+    headers: z.array(z.tuple([z.string(), z.string()])),
+    body: z.string(),
+    ms: z.number(),
+  }),
+  z.object({
+    ...envelope,
+    kind: z.literal("failed"),
+    id: z.string(),
+    reason: z.enum(["not-connected", "declined", "refused", "timeout", "cancelled", "network"]),
+  }),
+]);
+export type FrameMessage = z.infer<typeof frameMessageSchema>;
 
 /** The app the playground connects to: the configured origin, or the page's own for "self". */
 export function resolveAppOrigin({
@@ -47,54 +65,17 @@ export function resolveAppOrigin({
   return configured === "self" ? pageOrigin : configured;
 }
 
-/** A single-use, 256-bit state value, base64url without padding (43 characters). */
-export function newConnectState(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return btoa(String.fromCharCode(...bytes))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/, "");
-}
-
-/** The consent page for this docs origin and state; the token never travels in a URL. */
-export function connectUrl({
-  appOrigin,
-  docsOrigin,
-  state,
-}: {
-  appOrigin: string;
-  docsOrigin: string;
-  state: string;
-}): string {
-  const url = new URL("/connect/docs", appOrigin);
+/** The app's session frame for this docs origin. */
+export function frameUrl({ appOrigin, docsOrigin }: { appOrigin: string; docsOrigin: string }) {
+  const url = new URL(FRAME_PATH, appOrigin);
   url.searchParams.set("origin", docsOrigin);
-  url.searchParams.set("state", state);
   return url.href;
 }
 
-/**
- * The consent page's answer for this state, or null for anything else: a message of another
- * type, another state, or a malformed body. The caller has already checked origin and source.
- */
-export function readConsentAnswer({
-  data,
-  state,
-  appOrigin,
-  receivedAt,
-}: {
-  data: unknown;
-  state: string;
-  appOrigin: string;
-  /** `performance.now()` when the answer arrived; the key's lifetime counts from here. */
-  receivedAt: number;
-}): { outcome: "granted"; session: DocsSession } | { outcome: "denied" } | null {
-  const denial = denialSchema.safeParse(data);
-  if (denial.success) return denial.data.state === state ? { outcome: "denied" } : null;
-  const grant = grantSchema.safeParse(data);
-  if (!grant.success || grant.data.state !== state) return null;
-  const { token, project, expiresIn } = grant.data;
-  const endsAt = receivedAt + expiresIn * 1000;
-  return { outcome: "granted", session: { token, endsAt, project, appOrigin } };
+/** What the frame said, or null for anything that is not one of its messages. */
+export function readFrameMessage({ data }: { data: unknown }): FrameMessage | null {
+  const parsed = frameMessageSchema.safeParse(data);
+  return parsed.success ? parsed.data : null;
 }
 
 /** A docs session key is a project key: it can answer only operations that take `X-Auth-Token`. */
@@ -102,22 +83,17 @@ export function sessionCovers({ scheme }: { scheme?: Scheme }): boolean {
   return scheme?.type === "apiKey" && scheme.in === "header" && scheme.name === "X-Auth-Token";
 }
 
-/** The live request sent as the connected member: the app's API, the key as X-Auth-Token. */
-export function connectedRequest({
-  operation,
-  state,
-  session,
-}: {
-  operation: Operation;
-  state: RequestState;
-  session: DocsSession;
-}) {
+/**
+ * The request the frame is asked to send: the path on the app's origin and no credential, which
+ * the frame adds itself and drops if named.
+ */
+export function frameRequest({ operation, state }: { operation: Operation; state: RequestState }) {
   const request = liveRequest({ operation, state, key: "" });
   const url = new URL(request.url);
-  const target = new URL(`${url.pathname}${url.search}`, session.appOrigin);
   return {
-    url: target.href,
-    headers: { ...request.headers, "X-Auth-Token": session.token },
-    body: request.body,
+    method: operation.method.toUpperCase(),
+    path: `${url.pathname}${url.search}`,
+    headers: request.headers,
+    body: request.body ?? null,
   };
 }

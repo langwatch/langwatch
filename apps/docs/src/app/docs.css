@@ -3267,8 +3267,18 @@ html[data-docs-theme-change]::view-transition-new(root) {
   color: var(--chakra-colors-fg-muted);
 }
 
-/* The playground's connect controls toggle with `hidden`, over Chakra's display classes. */
-:is([data-docs-session], [data-docs-manual-key]) [hidden],
+/* The pasted key field toggles with `hidden`, over Chakra's display classes. */
+[data-docs-manual-key] [hidden],
 [data-docs-manual-key][hidden] {
   display: none !important;
+}
+
+/* The app's session frame sizes itself; this is its room until it says how tall it is. */
+.docs-session-frame {
+  display: block;
+  width: 100%;
+  height: 64px;
+  margin: 8px 0;
+  border: 0;
+  color-scheme: normal;
 }

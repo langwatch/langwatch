@@ -1,11 +1,10 @@
 // @vitest-environment node
 /**
- * The docs session frame's runtime, run as served: the document the API host answers, its
- * inline script executed in a window at the app's origin, the docs page and the consent popup
- * as real windows beside it.
+ * The docs session frame's runtime, run as served: its inline script executes in a window at
+ * the app's origin, with the docs page and the consent popup as real windows beside it.
  */
 import { buildDocsSessionFrameDocument } from "@langwatch/api-key-contract";
-// @ts-expect-error -- jsdom ships no types and the workspace carries none; the slice used is typed below.
+// @ts-expect-error -- jsdom ships no types and the workspace has none; its slice is typed below.
 import { JSDOM as UntypedJSDOM } from "jsdom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -52,31 +51,39 @@ function mountFrame({
   const popups: string[] = [];
   const sent: Sent[] = [];
 
-  const dom = new JSDOM(buildDocsSessionFrameDocument({ nonce: "n0nce", embedder: DOCS, timings }), {
-    url: `${APP}/connect/docs/frame?origin=${encodeURIComponent(DOCS)}`,
-    runScripts: "dangerously",
-    beforeParse(window) {
-      if (embedded) Object.defineProperty(window, "parent", { value: docs });
-      window.open = ((url: string) => {
-        popups.push(url);
-        return popupBlocked ? null : popup;
-      }) as never;
-      window.fetch = (async (url: string, init: RequestInit) => {
-        const entry = { url: String(url), init };
-        sent.push(entry);
-        if (init.signal?.aborted) throw new DOMException("aborted", "AbortError");
-        return await new Promise<Response>((resolve, reject) => {
-          init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
-          void Promise.resolve(respond(entry)).then(resolve, reject);
-        });
-      }) as never;
+  const dom = new JSDOM(
+    buildDocsSessionFrameDocument({ nonce: "n0nce", embedder: DOCS, timings }),
+    {
+      url: `${APP}/connect/docs/frame?origin=${encodeURIComponent(DOCS)}`,
+      runScripts: "dangerously",
+      beforeParse(window) {
+        if (embedded) Object.defineProperty(window, "parent", { value: docs });
+        window.open = ((url: string) => {
+          popups.push(url);
+          return popupBlocked ? null : popup;
+        }) as never;
+        window.fetch = (async (url: string, init: RequestInit) => {
+          const entry = { url: String(url), init };
+          sent.push(entry);
+          if (init.signal?.aborted) throw new DOMException("aborted", "AbortError");
+          return new Promise<Response>((resolve, reject) => {
+            init.signal?.addEventListener("abort", () =>
+              reject(new DOMException("aborted", "AbortError")),
+            );
+            void Promise.resolve(respond(entry)).then(resolve, reject);
+          });
+        }) as never;
+      },
     },
-  });
+  );
   const frame = dom.window;
   opened.push(frame);
   const byId = (id: string) => frame.document.getElementById(id) as HTMLElement;
 
-  const fromDocs = (data: Record<string, unknown>, { origin = DOCS, source = docs as unknown } = {}) =>
+  const fromDocs = (
+    data: Record<string, unknown>,
+    { origin = DOCS, source = docs as unknown } = {},
+  ) =>
     frame.dispatchEvent(
       new frame.MessageEvent("message", {
         data: { type: "langwatch:docs-frame", version: 1, ...data },
@@ -85,7 +92,9 @@ function mountFrame({
       }),
     );
   const fromPopup = (data: unknown, { origin = APP, source = popup as unknown } = {}) =>
-    frame.dispatchEvent(new frame.MessageEvent("message", { data, origin, source: source as never }));
+    frame.dispatchEvent(
+      new frame.MessageEvent("message", { data, origin, source: source as never }),
+    );
   const state = () => new URL(popups.at(-1) ?? "about:blank").searchParams.get("state") ?? "";
   const grant = (overrides: Record<string, unknown> = {}) => ({
     type: "langwatch:docs-session",
@@ -102,10 +111,27 @@ function mountFrame({
     byId("connect").click();
     fromPopup(grant());
   };
-  const states = () => toDocs.filter((entry) => entry.message.kind === "state").map((entry) => entry.message);
-  const answers = (id: string) => toDocs.filter((entry) => entry.message.id === id).map((entry) => entry.message);
+  const states = () =>
+    toDocs.filter((entry) => entry.message.kind === "state").map((entry) => entry.message);
+  const answers = (id: string) =>
+    toDocs.filter((entry) => entry.message.id === id).map((entry) => entry.message);
 
-  return { frame, docs, popup, popups, toDocs, sent, byId, fromDocs, fromPopup, grant, state, connect, states, answers };
+  return {
+    frame,
+    docs,
+    popup,
+    popups,
+    toDocs,
+    sent,
+    byId,
+    fromDocs,
+    fromPopup,
+    grant,
+    state,
+    connect,
+    states,
+    answers,
+  };
 }
 
 describe("the docs session frame", () => {
@@ -119,7 +145,9 @@ describe("the docs session frame", () => {
         '<script nonce="n0nce">',
       ]);
       expect(html).not.toMatch(/\son[a-z]+=|javascript:|<script[^>]+src=/i);
-      expect(() => buildDocsSessionFrameDocument({ nonce: '"><b>', embedder: DOCS })).toThrow();
+      expect(() => buildDocsSessionFrameDocument({ nonce: '"><b>', embedder: DOCS })).toThrow(
+        "invalid docs frame nonce",
+      );
     });
   });
 
@@ -147,7 +175,14 @@ describe("the docs session frame", () => {
     it("asks for a new state on every connection", () => {
       const { byId, popups, fromPopup, grant } = mountFrame();
       byId("connect").click();
-      fromPopup({ ...grant(), outcome: "denied", token: undefined, expiresAt: undefined, expiresIn: undefined, project: undefined });
+      fromPopup({
+        ...grant(),
+        outcome: "denied",
+        token: undefined,
+        expiresAt: undefined,
+        expiresIn: undefined,
+        project: undefined,
+      });
       byId("connect").click();
 
       const [first, second] = popups.map((url) => new URL(url).searchParams.get("state"));
@@ -231,24 +266,52 @@ describe("the docs session frame", () => {
       const { connect, fromDocs, sent, answers } = mountFrame();
       connect();
 
-      fromDocs({ kind: "send", id: "r1", method: "GET", path: "/api/v1/dataset?page=2", headers: { Accept: "application/json" }, body: null });
+      fromDocs({
+        kind: "send",
+        id: "r1",
+        method: "GET",
+        path: "/api/v1/dataset?page=2",
+        headers: { Accept: "application/json" },
+        body: null,
+      });
 
       await vi.waitFor(() => expect(answers("r1")).toHaveLength(1));
       expect(sent).toHaveLength(1);
       expect(sent[0]!.url).toBe("/api/v1/dataset?page=2");
-      expect(sent[0]!.init).toMatchObject({ method: "GET", credentials: "omit", redirect: "error", cache: "no-store" });
+      expect(sent[0]!.init).toMatchObject({
+        method: "GET",
+        credentials: "omit",
+        redirect: "error",
+        cache: "no-store",
+      });
       expect(sent[0]!.init.headers).toEqual({ Accept: "application/json", "X-Auth-Token": TOKEN });
-      expect(answers("r1")[0]).toMatchObject({ kind: "response", status: 200, body: '{"ok":true}', contentType: "application/json" });
+      expect(answers("r1")[0]).toMatchObject({
+        kind: "response",
+        status: 200,
+        body: '{"ok":true}',
+        contentType: "application/json",
+      });
     });
 
     /** @scenario "A request that changes data waits for the reader inside the frame" */
     it("names the method, path and project, and sends a POST only once the reader presses Send", async () => {
-      const { connect, fromDocs, sent, byId, answers } = mountFrame({ timings: { confirmDelayMs: 40 } });
+      const { connect, fromDocs, sent, byId, answers } = mountFrame({
+        timings: { confirmDelayMs: 40 },
+      });
       connect();
 
-      fromDocs({ kind: "send", id: "w1", method: "POST", path: "/api/v1/dataset", headers: {}, body: '{"name":"x"}' });
+      fromDocs({
+        kind: "send",
+        id: "w1",
+        method: "POST",
+        path: "/api/v1/dataset",
+        headers: {},
+        body: '{"name":"x"}',
+      });
       expect(byId("confirm").hidden).toBe(false);
-      expect(byId("confirm-text").textContent).toBe("Send POST /api/v1/dataset as you in Checkout?");
+      expect(byId("confirm-text").textContent).toBe(
+        "Send POST /api/v1/dataset as you in Checkout?",
+      );
       expect(sent).toEqual([]);
 
       byId("confirm-send").click();
@@ -265,12 +328,21 @@ describe("the docs session frame", () => {
     it("answers that the reader declined when they press Cancel", () => {
       const { connect, fromDocs, sent, byId, answers } = mountFrame();
       connect();
-      fromDocs({ kind: "send", id: "w2", method: "DELETE", path: "/api/v1/dataset/1", headers: {}, body: null });
+      fromDocs({
+        kind: "send",
+        id: "w2",
+        method: "DELETE",
+        path: "/api/v1/dataset/1",
+        headers: {},
+        body: null,
+      });
 
       byId("confirm-cancel").click();
 
       expect(sent).toEqual([]);
-      expect(answers("w2")).toEqual([expect.objectContaining({ kind: "failed", reason: "declined" })]);
+      expect(answers("w2")).toEqual([
+        expect.objectContaining({ kind: "failed", reason: "declined" }),
+      ]);
     });
 
     /** @scenario "The frame refuses what it was not built to send" */
@@ -278,8 +350,14 @@ describe("the docs session frame", () => {
       const { connect, fromDocs, sent, popup, answers } = mountFrame();
       connect();
 
-      fromDocs({ kind: "send", id: "x1", method: "GET", path: "/api/v1/dataset" }, { origin: "https://evil.example" });
-      fromDocs({ kind: "send", id: "x2", method: "GET", path: "/api/v1/dataset" }, { source: popup });
+      fromDocs(
+        { kind: "send", id: "x1", method: "GET", path: "/api/v1/dataset" },
+        { origin: "https://evil.example" },
+      );
+      fromDocs(
+        { kind: "send", id: "x2", method: "GET", path: "/api/v1/dataset" },
+        { source: popup },
+      );
       fromDocs({ kind: "send", id: "x3", method: "GET", path: "/settings" });
       fromDocs({ kind: "send", id: "x4", method: "GET", path: "//evil.example/api/x" });
       fromDocs({ kind: "send", id: "x5", method: "GET", path: "https://evil.example/api/x" });
@@ -289,7 +367,9 @@ describe("the docs session frame", () => {
       expect(answers("x1")).toEqual([]);
       expect(answers("x2")).toEqual([]);
       for (const id of ["x3", "x4", "x5", "x6"])
-        expect(answers(id)).toEqual([expect.objectContaining({ kind: "failed", reason: "refused" })]);
+        expect(answers(id)).toEqual([
+          expect.objectContaining({ kind: "failed", reason: "refused" }),
+        ]);
     });
 
     /** @scenario "The frame refuses what it was not built to send" */
@@ -302,7 +382,12 @@ describe("the docs session frame", () => {
         id: "h1",
         method: "GET",
         path: "/api/v1/dataset",
-        headers: { "x-auth-token": "sk-other", Authorization: "Bearer x", Cookie: "a=b", "X-Trace": "1" },
+        headers: {
+          "x-auth-token": "sk-other",
+          Authorization: "Bearer x",
+          Cookie: "a=b",
+          "X-Trace": "1",
+        },
       });
 
       await vi.waitFor(() => expect(sent).toHaveLength(1));
@@ -349,7 +434,10 @@ describe("the docs session frame", () => {
 
       expect(states().at(-1)).toMatchObject({ connected: false });
       await vi.waitFor(() => expect(byId("status").textContent).toBe("Disconnected."));
-      expect(sent[0]).toMatchObject({ url: "/api/docs-session", init: { method: "DELETE", credentials: "omit" } });
+      expect(sent[0]).toMatchObject({
+        url: "/api/docs-session",
+        init: { method: "DELETE", credentials: "omit" },
+      });
       expect(sent[0]!.init.headers).toEqual({ "X-Auth-Token": TOKEN });
     });
 
@@ -360,7 +448,9 @@ describe("the docs session frame", () => {
 
       byId("disconnect").click();
 
-      await vi.waitFor(() => expect(byId("status").textContent).toMatch(/ends on its own within five minutes/));
+      await vi.waitFor(() =>
+        expect(byId("status").textContent).toMatch(/ends on its own within five minutes/),
+      );
     });
 
     /** @scenario "The frame ends the connection when access ends" */
@@ -370,7 +460,10 @@ describe("the docs session frame", () => {
 
       frame.dispatchEvent(new frame.Event("pagehide"));
 
-      expect(sent[0]).toMatchObject({ url: "/api/docs-session", init: { method: "DELETE", keepalive: true } });
+      expect(sent[0]).toMatchObject({
+        url: "/api/docs-session",
+        init: { method: "DELETE", keepalive: true },
+      });
     });
 
     /** @scenario "The frame ends the connection when access ends" */
@@ -380,7 +473,9 @@ describe("the docs session frame", () => {
       fromDocs({ kind: "send", id: "n1", method: "GET", path: "/api/v1/dataset" });
 
       expect(sent).toEqual([]);
-      expect(answers("n1")).toEqual([expect.objectContaining({ kind: "failed", reason: "not-connected" })]);
+      expect(answers("n1")).toEqual([
+        expect.objectContaining({ kind: "failed", reason: "not-connected" }),
+      ]);
     });
   });
 });

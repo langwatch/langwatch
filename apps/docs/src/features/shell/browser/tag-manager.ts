@@ -5,10 +5,9 @@ const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
 const CONSENT_STORAGE_KEY = "lw-cookie-consent";
 
 /*
- * What the container may run, set by the page before the container loads, so publishing the
- * container cannot widen it: Google's own tags only, and never a tag that runs code of our
- * own or a third party's (Custom HTML, custom JavaScript variables, script-injecting
- * templates, non-Google scripts, frames and pixels). Blocked classes win over allowed ones.
+ * Set by the page before the container loads, so publishing cannot widen it: Google's own
+ * tags only, never Custom HTML, custom JavaScript, script-injecting templates or a non-Google
+ * script, frame or pixel. Blocked classes win over allowed ones.
  */
 export const TAG_RESTRICTIONS = {
   "gtm.allowlist": ["google"],

@@ -9,7 +9,8 @@ export function validateRequest({
 }: {
   operation: Operation;
   state: RequestState;
-  key: string;
+  /** The pasted key, or the session frame, which adds the reader's own key itself. */
+  key: string | { from: "frame" };
 }) {
   const { values, body } = state;
   const required = operation.parameters.filter((param) => param.required);
@@ -19,7 +20,7 @@ export function validateRequest({
     if (!values[paramKey({ location: param.in, name: param.name })]?.trim())
       nextErrors[paramKey({ location: param.in, name: param.name })] = `${param.name} is required.`;
   }
-  if (scheme && !key.trim()) nextErrors.auth = "Enter an API key.";
+  if (scheme && typeof key === "string" && !key.trim()) nextErrors.auth = "Enter an API key.";
   if (operation.body?.required && !body.trim()) nextErrors.body = "Enter a request body.";
   if (body.trim()) {
     try {

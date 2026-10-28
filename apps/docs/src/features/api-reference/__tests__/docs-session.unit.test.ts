@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import { readBuildOptions } from "../../../paths.ts";
 import {
-  connectedRequest,
-  readConsentAnswer,
+  frameRequest,
+  frameUrl,
+  readFrameMessage,
   resolveAppOrigin,
   sessionCovers,
 } from "../model/docs-session.ts";
 import { operationSchema } from "../model/operation-schema.ts";
 
 const APP = "https://app.example.test";
-const STATE = "s".repeat(43);
 const operation = operationSchema.parse({
   method: "POST",
   path: "/api/traces/search",
@@ -23,76 +23,47 @@ const operation = operationSchema.parse({
   body: { required: false, description: "", contents: [] },
   responses: [],
 });
-const grant = {
-  type: "langwatch:docs-session",
-  version: 1,
-  state: STATE,
-  outcome: "granted",
-  token: "sk-lw-docs-session-0123456789",
-  expiresAt: "2026-10-26T12:05:00.000Z",
-  expiresIn: 300,
-  project: { id: "project_1", name: "Checkout agent" },
-};
-
-describe("when the consent page answers", () => {
-  /** @scenario "Ignore any message that is not the expected answer" */
-  it("accepts only a well-formed answer for this state", () => {
-    expect(
-      readConsentAnswer({ data: grant, state: STATE, appOrigin: APP, receivedAt: 1_000 }),
-    ).toEqual({
-      outcome: "granted",
-      session: {
-        token: grant.token,
-        endsAt: 1_000 + 300_000,
-        project: grant.project,
-        appOrigin: APP,
-      },
-    });
+describe("when the frame speaks", () => {
+  /** @scenario "Listen only to the frame it embedded" */
+  it("reads only the frame's own messages", () => {
+    const state = {
+      type: "langwatch:docs-frame",
+      version: 1,
+      kind: "state",
+      connected: true,
+      project: "Checkout",
+    };
+    expect(readFrameMessage({ data: state })).toEqual(state);
     for (const data of [
-      { ...grant, state: "t".repeat(43) },
-      { ...grant, version: 2 },
-      { ...grant, type: "other" },
-      { ...grant, token: "" },
-      { ...grant, expiresAt: "soon" },
-      { ...grant, expiresIn: 0 },
-      { ...grant, expiresIn: "300" },
-      { ...grant, project: { id: "" } },
+      { ...state, version: 2 },
+      { ...state, type: "langwatch:docs-session" },
+      { ...state, connected: "yes" },
+      { ...state, kind: "token", token: "sk-lw" },
+      { type: "langwatch:docs-frame", version: 1, kind: "failed", id: "r1", reason: "whatever" },
       null,
-      "granted",
+      "state",
     ])
-      expect(
-        readConsentAnswer({ data, state: STATE, appOrigin: APP, receivedAt: 1_000 }),
-      ).toBeNull();
-  });
-
-  /** @scenario "Fall back to a pasted key when connecting does not work" */
-  it("reads a denial for this state", () => {
-    const denial = { type: grant.type, version: 1, state: STATE, outcome: "denied" };
-    expect(
-      readConsentAnswer({ data: denial, state: STATE, appOrigin: APP, receivedAt: 1_000 }),
-    ).toEqual({
-      outcome: "denied",
-    });
+      expect(readFrameMessage({ data })).toBeNull();
   });
 });
 
-describe("when the playground sends as the connected member", () => {
-  /** @scenario "Connect with my account" */
-  it("calls the app's API with the key as X-Auth-Token, whatever the documented scheme", () => {
-    const request = connectedRequest({
-      operation,
-      state: { values: {}, body: '{"query":"refund"}' },
-      session: {
-        token: grant.token,
-        endsAt: 0,
-        project: grant.project,
-        appOrigin: APP,
-      },
+describe("when the playground asks the frame to send", () => {
+  /** @scenario "Send through the frame while it is connected" */
+  it("names the path on the app's origin and no credential, whatever the documented scheme", () => {
+    const request = frameRequest({ operation, state: { values: {}, body: '{"query":"refund"}' } });
+    expect(request).toEqual({
+      method: "POST",
+      path: "/api/traces/search",
+      headers: { "Content-Type": "application/json" },
+      body: '{"query":"refund"}',
     });
-    expect(request.url).toBe(`${APP}/api/traces/search`);
-    expect(request.headers["X-Auth-Token"]).toBe(grant.token);
-    expect(Object.keys(request.headers)).not.toContain("Authorization");
-    expect(request.body).toBe('{"query":"refund"}');
+  });
+
+  /** @scenario "Embed the app's session frame where a project key answers" */
+  it("embeds the frame for this docs origin", () => {
+    expect(frameUrl({ appOrigin: APP, docsOrigin: "https://langwatch.ai" })).toBe(
+      `${APP}/connect/docs/frame?origin=https%3A%2F%2Flangwatch.ai`,
+    );
   });
 });
 

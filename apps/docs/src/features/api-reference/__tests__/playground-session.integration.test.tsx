@@ -47,264 +47,210 @@ document.body.innerHTML = `${renderToStaticMarkup(
 )}<script type="application/json" id="docs-page-data">${JSON.stringify({ operation })}</script>`;
 await import("../browser/playground.tsx");
 
-/* Only `closed` and `close` are read from the popup; jsdom opens no real windows. */
-const fakePopup = () => ({ closed: false, close: () => {} }) as Window;
-let popup: Window | null;
-let opened: string[] = [];
+const frame = () => document.querySelector<HTMLIFrameElement>("iframe.docs-session-frame");
+const manualKey = () => document.querySelector<HTMLElement>("[data-docs-manual-key]");
+/* Every message this page posted to the frame, with the origin it addressed. */
+let toFrame: { message: Record<string, unknown>; targetOrigin: string }[] = [];
 const fetches: { url: string; init: RequestInit }[] = [];
-let answer = { status: 200, body: "{}" };
-
-const status = () => document.querySelector("[data-docs-session-status]")?.textContent ?? "";
-const connectButton = () => document.querySelector<HTMLElement>("[data-docs-session-connect]");
-const disconnectButton = () =>
-  document.querySelector<HTMLElement>("[data-docs-session-disconnect]");
-/* Long enough for a stubbed fetch, its body and the playground's state update. */
+/* Long enough for the playground's state updates to land. */
 const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 20)));
-const state = () => new URL(opened.at(-1) ?? APP).searchParams.get("state") ?? "";
-const grant = (overrides: Record<string, unknown> = {}) => ({
-  type: "langwatch:docs-session",
-  version: 1,
-  state: state(),
-  outcome: "granted",
-  token: "sk-lw-docs-session-0123456789",
-  expiresAt: "2026-10-26T12:05:00.000Z",
-  expiresIn: 300,
-  project: { id: "project_1", name: "Checkout agent" },
-  ...overrides,
-});
-function post({ data, origin = APP, source }: { data: unknown; origin?: string; source?: Window }) {
-  window.dispatchEvent(
-    new MessageEvent("message", {
-      data,
-      origin,
-      source: source ?? popup,
-    }),
-  );
-}
 
-async function connected() {
-  connectButton()?.click();
-  post({ data: grant() });
+function fromFrame(
+  data: Record<string, unknown>,
+  { origin = APP, source }: { origin?: string; source?: Window | null } = {},
+) {
+  act(() => {
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { type: "langwatch:docs-frame", version: 1, ...data },
+        origin,
+        source: source === undefined ? frame()?.contentWindow : source,
+      }),
+    );
+  });
+}
+async function connectedIn(project: string | null) {
+  fromFrame({ kind: "state", connected: project !== null, project });
   await settle();
 }
+const sends = () => toFrame.filter((entry) => entry.message.kind === "send");
+
+/* Sends the form and waits for the page to ask the frame. */
+async function send() {
+  const before = sends().length;
+  await act(async () => document.getElementById("pg-send")?.click());
+  await vi.waitFor(() => expect(sends().length).toBe(before + 1));
+}
+const liveResponse = () =>
+  document.querySelector('[aria-label="Live response"]')?.textContent ?? "";
 
 beforeEach(async () => {
-  opened = [];
+  toFrame = [];
   fetches.length = 0;
-  answer = { status: 200, body: "{}" };
-  popup = fakePopup();
-  vi.spyOn(window, "open").mockImplementation((url) => {
-    opened.push(String(url));
-    return popup;
-  });
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string | URL, init: RequestInit = {}) => {
       fetches.push({ url: String(url), init });
-      return new Response(answer.body, { status: answer.status });
+      return new Response("{}", { status: 200 });
     }),
   );
   if (document.getElementById("try-it-button")?.getAttribute("aria-expanded") !== "true") {
     await act(async () => document.getElementById("try-it-button")?.click());
   }
+  const window = frame()?.contentWindow;
+  if (window)
+    vi.spyOn(window, "postMessage").mockImplementation(((message: never, targetOrigin: string) =>
+      toFrame.push({ message, targetOrigin })) as never);
 });
 
-/* A consent window still open blocks the next attempt, as it does for a reader. */
-async function closePopup() {
-  if (!connectButton()?.hasAttribute("disabled")) return;
-  if (popup) Object.assign(popup, { closed: true });
-  await vi.waitFor(() => expect(connectButton()?.hasAttribute("disabled")).toBe(false));
-}
-
-/* Sends the form and waits for the playground to show the answer. */
-async function send() {
-  const before = fetches.length;
-  await act(async () => document.getElementById("pg-send")?.click());
-  await vi.waitFor(() => expect(fetches.length).toBe(before + 1));
-  await settle();
-}
-
 afterEach(async () => {
-  await closePopup();
-  if (disconnectButton()?.hidden === false) disconnectButton()?.click();
-  await settle();
+  /* A request left unanswered keeps Send disabled, as it would for a reader. */
+  for (const { message } of sends())
+    fromFrame({ kind: "failed", id: message.id, reason: "cancelled" });
+  await connectedIn(null);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-describe("when I connect with my account", () => {
-  /** @scenario "Connect with my account" */
-  it("opens the app's consent page with a fresh single-use state", () => {
-    connectButton()?.click();
-    const url = new URL(opened[0] ?? "");
-    expect(`${url.origin}${url.pathname}`).toBe(`${APP}/connect/docs`);
+describe("when I open the playground on an endpoint that takes X-Auth-Token", () => {
+  /** @scenario "Embed the app's session frame where a project key answers" */
+  it("embeds the app's session frame for this docs origin", () => {
+    const url = new URL(frame()?.src ?? "");
+    expect(`${url.origin}${url.pathname}`).toBe(`${APP}/connect/docs/frame`);
     expect(url.searchParams.get("origin")).toBe(location.origin);
-    expect(state()).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(frame()?.referrerPolicy).toBe("no-referrer");
   });
 
-  /** @scenario "Connect with my account" */
-  it("waits for one answer at a time and uses a new state for each attempt", async () => {
-    connectButton()?.click();
-    connectButton()?.click();
-    expect(opened).toHaveLength(1);
-    await closePopup();
-    popup = fakePopup();
-    connectButton()?.click();
-    expect(opened).toHaveLength(2);
-    expect(state()).not.toBe(new URL(opened[0] ?? "").searchParams.get("state"));
+  /** @scenario "Embed the app's session frame where a project key answers" */
+  it("keeps a single frame however often the playground opens", async () => {
+    await act(async () => document.getElementById("try-it-button")?.click());
+    await act(async () => document.getElementById("try-it-button")?.click());
+    expect(document.querySelectorAll("iframe.docs-session-frame")).toHaveLength(1);
   });
 
-  /** @scenario "Connect with my account" */
-  it("shows the project and sends requests to the app's API as me, without cookies", async () => {
-    await connected();
-    expect(status()).toMatch(/^Sending as you in Checkout agent\. Access ends within 5 minutes\./);
+  /** @scenario "Embed the app's session frame where a project key answers" */
+  it("never holds a key: what it sends the frame names none", async () => {
+    await connectedIn("Checkout agent");
     await send();
-    const sent = fetches.at(-1);
-    expect(sent?.url).toBe(`${APP}/api/traces`);
-    expect(new Headers(sent?.init.headers).get("X-Auth-Token")).toBe(grant().token);
-    expect(sent?.init.credentials).toBe("omit");
-    expect(sent?.init.redirect).toBe("error");
+    expect(JSON.stringify(sends())).not.toMatch(/X-Auth-Token|Authorization|sk-lw/i);
+    expect(fetches).toEqual([]);
+  });
+
+  /** @scenario "Embed the app's session frame where a project key answers" */
+  it("sizes the frame as the frame asks", async () => {
+    fromFrame({ kind: "height", height: 131.2 });
+    expect(frame()?.style.height).toBe("132px");
   });
 });
 
-describe("when a message is not the expected answer", () => {
-  /** @scenario "Ignore any message that is not the expected answer" */
-  it("ignores another origin, another window, a stale state and a malformed body", async () => {
-    connectButton()?.click();
-    post({ data: grant(), origin: "https://evil.example.test" });
-    post({ data: grant(), source: window });
-    post({ data: grant({ state: "x".repeat(43) }) });
-    post({ data: grant({ token: 42 }) });
-    post({ data: "granted" });
-    await settle();
-    expect(status()).toBe("Waiting for LangWatch…");
-    post({ data: grant() });
-    await settle();
-    expect(status()).toMatch(/Checkout agent/);
-  });
-});
-
-describe("when the key would leak", () => {
-  /** @scenario "Keep the key out of every place it could leak" */
-  it("keeps it out of the URL, storage, the examples and the page", async () => {
-    await connected();
-    const token = grant().token;
-    expect(location.href).not.toContain(token);
-    expect(JSON.stringify(Object.entries(localStorage))).not.toContain(token);
-    expect(JSON.stringify(Object.entries(sessionStorage))).not.toContain(token);
-    expect(document.body.innerHTML).not.toContain(token);
-    expect(opened.join(" ")).not.toContain(token);
-  });
-});
-
-describe("when connecting does not work", () => {
-  /** @scenario "Fall back to a pasted key when connecting does not work" */
-  it("says the popup was blocked", async () => {
-    popup = null;
-    connectButton()?.click();
-    await settle();
-    expect(status()).toMatch(/blocked the LangWatch window/);
-    expect(document.getElementById("pg-auth")?.closest("[hidden]")).toBeNull();
+describe("given the frame says it is connected in a project", () => {
+  /** @scenario "Send through the frame while it is connected" */
+  it("hides the pasted key field", async () => {
+    await connectedIn("Checkout agent");
+    expect(manualKey()?.hidden).toBe(true);
   });
 
-  /** @scenario "Fall back to a pasted key when connecting does not work" */
-  it("says the member denied access", async () => {
-    connectButton()?.click();
-    post({
-      data: { type: "langwatch:docs-session", version: 1, state: state(), outcome: "denied" },
+  /** @scenario "Send through the frame while it is connected" */
+  it("asks the frame to send the request, at the app's origin, and shows its answer", async () => {
+    await connectedIn("Checkout agent");
+    await send();
+
+    const [{ message, targetOrigin }] = sends() as [(typeof toFrame)[number]];
+    expect(targetOrigin).toBe(APP);
+    expect(message).toMatchObject({
+      type: "langwatch:docs-frame",
+      version: 1,
+      kind: "send",
+      method: "GET",
+      path: "/api/traces",
+      body: null,
+    });
+
+    fromFrame({
+      kind: "response",
+      id: message.id,
+      status: 200,
+      statusText: "OK",
+      contentType: "application/json",
+      headers: [["content-type", "application/json"]],
+      body: '{"traces":[]}',
+      ms: 12,
     });
     await settle();
-    expect(status()).toMatch(/did not allow access/);
-  });
-
-  /** @scenario "Fall back to a pasted key when connecting does not work" */
-  it("says the window closed, or that LangWatch did not answer in time", async () => {
-    vi.useFakeTimers();
-    try {
-      connectButton()?.click();
-      if (popup) Object.assign(popup, { closed: true });
-      await vi.advanceTimersByTimeAsync(600);
-      expect(status()).toMatch(/closed before access was granted/);
-      popup = fakePopup();
-      connectButton()?.click();
-      await vi.advanceTimersByTimeAsync(120_000);
-      expect(status()).toMatch(/did not answer within two minutes/);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(liveResponse()).toMatch(/200 OK · 12 ms · application\/json/);
+    expect(liveResponse()).toContain('"traces": []');
   });
 });
 
-describe("when access ends", () => {
-  /** @scenario "End the connection when access ends" */
-  it("clears the key when a request answers 401, and asks for consent again", async () => {
-    await connected();
-    answer = { status: 401, body: "{}" };
-    await send();
-    expect(status()).toMatch(/Your access ended/);
-    expect(connectButton()?.hidden).toBe(false);
-    connectButton()?.click();
-    expect(opened).toHaveLength(2);
+describe("when a message does not come from the frame it embedded", () => {
+  /** @scenario "Listen only to the frame it embedded" */
+  it("ignores another origin and another window", async () => {
+    fromFrame(
+      { kind: "state", connected: true, project: "Evil" },
+      { origin: "https://evil.example" },
+    );
+    fromFrame({ kind: "state", connected: true, project: "Evil" }, { source: window });
+    fromFrame({ kind: "state", connected: "yes", project: "Evil" });
+    await settle();
+    expect(manualKey()?.hidden).toBe(false);
+  });
+});
+
+describe("given the frame is not connected", () => {
+  /** @scenario "Fall back to the pasted key when the frame is not connected" */
+  it("shows the pasted key and sends with it, never through the frame", async () => {
+    await connectedIn(null);
+    expect(manualKey()?.hidden).toBe(false);
+    const input = document.getElementById("pg-auth") as HTMLInputElement;
+    await act(async () => {
+      input.value = "sk-lw-pasted-0123456789";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    await act(async () => document.getElementById("pg-send")?.click());
+    await vi.waitFor(() => expect(fetches).toHaveLength(1));
+    expect(new Headers(fetches[0]?.init.headers).get("X-Auth-Token")).toBe(
+      "sk-lw-pasted-0123456789",
+    );
+    expect(sends()).toEqual([]);
   });
 
-  /** @scenario "End the connection when access ends" */
-  it("clears and revokes the key when the docs navigate to another page", async () => {
-    await connected();
+  /** @scenario "Fall back to the pasted key when the frame is not connected" */
+  it("shows the pasted key again when the connection ends", async () => {
+    await connectedIn("Checkout agent");
+    await connectedIn(null);
+    expect(manualKey()?.hidden).toBe(false);
+  });
+});
+
+describe("when the reader cancels the request in the frame", () => {
+  /** @scenario "Say so when the reader declines a request in the frame" */
+  it("says the request was not sent", async () => {
+    await connectedIn("Checkout agent");
+    await send();
+    fromFrame({ kind: "failed", id: sends()[0]?.message.id, reason: "declined" });
+    await settle();
+    expect(liveResponse()).toMatch(/cancelled this request in the LangWatch frame/);
+  });
+
+  /** @scenario "Say so when the reader declines a request in the frame" */
+  it("asks the frame to cancel when I cancel here", async () => {
+    await connectedIn("Checkout agent");
+    await send();
+    await settle();
+    await act(async () =>
+      [...document.querySelectorAll("button")].find((b) => b.textContent === "Cancel")?.click(),
+    );
+    expect(toFrame.at(-1)?.message).toMatchObject({ kind: "cancel", id: sends()[0]?.message.id });
+  });
+});
+
+describe("when I leave the page", () => {
+  /** @scenario "End the connection when I leave the page" */
+  it("removes the frame, which ends its connection", async () => {
+    await connectedIn("Checkout agent");
     await act(async () => document.dispatchEvent(new Event("docs:leaving")));
-    const revoke = fetches.at(-1);
-    expect(revoke?.url).toBe(`${APP}/api/docs-session`);
-    expect(revoke?.init.method).toBe("DELETE");
-    expect(revoke?.init.keepalive).toBe(true);
-    expect(disconnectButton()?.hidden).toBe(true);
-    await act(async () => document.getElementById("try-it-button")?.click());
-  });
-
-  /** @scenario "End the connection when access ends" */
-  it("clears the key when it expires", async () => {
-    vi.useFakeTimers();
-    try {
-      connectButton()?.click();
-      post({ data: grant({ expiresIn: 1 }) });
-      await vi.advanceTimersByTimeAsync(1_500);
-      expect(status()).toMatch(/Your access ended/);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
-describe("when my access does not allow a request", () => {
-  /** @scenario "Say so when my access does not allow a request" */
-  it("says so on a 403 and stays connected without retrying", async () => {
-    await connected();
-    answer = { status: 403, body: "{}" };
-    await send();
-    expect(status()).toMatch(/does not allow this request/);
-    expect(fetches).toHaveLength(1);
-    expect(disconnectButton()?.hidden).toBe(false);
-  });
-});
-
-describe("when I disconnect", () => {
-  /** @scenario "Disconnect revokes the key on the app" */
-  it("clears the key at once and asks the app to revoke it with the key itself", async () => {
-    await connected();
-    disconnectButton()?.click();
-    expect(connectButton()?.hidden).toBe(false);
     await settle();
-    const revoke = fetches.at(-1);
-    expect(revoke?.url).toBe(`${APP}/api/docs-session`);
-    expect(revoke?.init.method).toBe("DELETE");
-    expect(new Headers(revoke?.init.headers).get("X-Auth-Token")).toBe(grant().token);
-    expect(status()).toBe("Disconnected.");
-  });
-
-  /** @scenario "Disconnect revokes the key on the app" */
-  it("says the disconnection was local when the app cannot be reached", async () => {
-    await connected();
-    answer = { status: 503, body: "" };
-    disconnectButton()?.click();
-    await settle();
-    expect(status()).toMatch(/Disconnected in this tab.*within five minutes/);
+    expect(frame()).toBeNull();
   });
 });

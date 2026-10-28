@@ -37,18 +37,20 @@ await it("connects, disconnects, sends as the member, and loses access when the 
     await page.goto(`${base}/docs/${slug}`, { waitUntil: "networkidle" });
     await page.click("#try-it-button");
 
-    const status = page.locator("[data-docs-session-status]");
+    /* The key lives in the app's session frame; its controls and status are inside it. */
+    const frame = page.frameLocator("iframe.docs-session-frame");
+    const status = frame.locator("#status");
     const connect = async () => {
       const [popup] = await Promise.all([
         page.waitForEvent("popup"),
-        page.click("[data-docs-session-connect]"),
+        frame.getByRole("button", { name: "Use my LangWatch account" }).click(),
       ]);
       await popup.getByRole("button", { name: "Allow" }).click();
       await popup.waitForEvent("close");
       await status.filter({ hasText: /^Sending as you in / }).waitFor();
     };
     await connect();
-    await page.click("[data-docs-session-disconnect]");
+    await frame.getByRole("button", { name: "Disconnect" }).click();
     await status.filter({ hasText: /^Disconnected\.$/ }).waitFor();
     await connect();
 
@@ -63,7 +65,17 @@ await it("connects, disconnects, sends as the member, and loses access when the 
     const headers = await granted.request().allHeaders();
     assert.equal(granted.status(), 200);
     assert.ok(headers["x-auth-token"], "the key travels as X-Auth-Token");
-    assert.equal(headers.cookie, undefined, "the docs never send the app's cookies");
+    assert.equal(headers.cookie, undefined, "the frame never sends the app's cookies");
+    assert.equal(
+      granted.frame().url().split("?")[0],
+      `${base}/connect/docs/frame`,
+      "the session frame sends the request, not the docs page",
+    );
+    const pageHolds = await page.evaluate(
+      () =>
+        JSON.stringify({ ...localStorage, ...sessionStorage }) + document.documentElement.outerHTML,
+    );
+    assert.ok(!pageHolds.includes(headers["x-auth-token"]), "the docs page never holds the key");
 
     const app = await context.newPage();
     await app.goto(`${base}/api/auth/logout`);
