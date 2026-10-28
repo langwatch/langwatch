@@ -155,7 +155,7 @@ describe("the shutdown budget", () => {
 
   describe("given the app sleeps in preStop before SIGTERM", () => {
     describe("when its grace period is compared with the chart's preStop floor", () => {
-      /** @scenario "The chart is sized for the same production drain the code uses" */
+      /** @scenario "The app's grace period covers its preStop sleep" */
       it("covers the default preStop sleep, the drain and the preStop margin", () => {
         const app = componentValues[0]!;
 

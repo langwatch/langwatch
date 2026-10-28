@@ -87,6 +87,12 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Then all of them agree
     So that the pod cannot be sized for a budget the process no longer uses
 
+  @unit @shutdown-budget
+  Scenario: The app's grace period covers its preStop sleep
+    Given the app sleeps in preStop before SIGTERM
+    When its grace period is compared with the chart's preStop floor
+    Then it covers the default sleep, the drain and the preStop margin
+
   # The chart's shutdownDrainSeconds reaches the queue as
   # SHUTDOWN_DRAIN_TIMEOUT_MS, so raising the drain for long jobs gives the
   # in-flight jobs that long, and the process watchdog moves with it.
