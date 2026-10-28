@@ -32,11 +32,12 @@ import {
 } from "../repositories/dataset-version.repository.ts";
 import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import {
+  assertWithinWholeRead,
   compareDatasetContents,
   DATASET_VERSION_ROWS_PER_CHUNK,
+  stableStringify,
   versionChunksOfPage,
   versionRowOf,
-  assertWithinWholeRead,
 } from "../rules/dataset-version.rules.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 import { DatasetContentHasherService } from "./dataset-content-hasher.service.ts";
@@ -190,7 +191,7 @@ export class DatasetVersionService {
     let bytes = 0;
     // Bounded as the rows stream: a postgres-layout dataset records no counts.
     for await (const row of this.#currentRows(dataset)) {
-      bytes += Buffer.byteLength(JSON.stringify(row.entry));
+      bytes += Buffer.byteLength(stableStringify({ id: row.id, entry: row.entry })) + 1;
       current.push(row);
       assertWithinWholeRead({ rows: current.length, bytes, ...bounds });
     }
@@ -274,13 +275,9 @@ export class DatasetVersionService {
     return this.deps.versions.forgetAuthor(input);
   }
 
-  async #assertWholeRead(input: {
-    projectId: string;
-    rows: number | null;
-    bytes: number | null;
-  }): Promise<void> {
+  async #assertWholeRead(input: { projectId: string; rows: number; bytes: number }): Promise<void> {
     const bounds = await this.deps.wholeReadBounds(input.projectId);
-    assertWithinWholeRead({ rows: input.rows ?? 0, bytes: input.bytes ?? 0, ...bounds });
+    assertWithinWholeRead({ rows: input.rows, bytes: input.bytes, ...bounds });
   }
 
   async #readyDataset(input: { projectId: string; datasetId: string }): Promise<Dataset> {
