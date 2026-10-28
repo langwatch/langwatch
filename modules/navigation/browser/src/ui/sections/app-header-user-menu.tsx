@@ -213,6 +213,7 @@ function PersonalWorkspaceEntries({
             onSelect={() => {
               host.rememberScope({
                 organizationId: entry.organizationId ?? undefined,
+                teamId: "",
                 projectSlug: "",
               });
               host.navigate("/me");
