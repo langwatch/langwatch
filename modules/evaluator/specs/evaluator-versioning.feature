@@ -130,6 +130,11 @@ Feature: Evaluator versions and deploy labels
     Then its evaluator carries the latest settings
 
   @unit
+  Scenario: A monitor refuses a label name the evaluator label rules refuse
+    When a monitor is saved pinned to "latest", a number or a malformed name
+    Then the save is refused with the label rule it breaks
+
+  @unit
   Scenario: A guardrail pinned to a label runs that evaluator version
     Given a gateway guardrail monitor on an evaluator, pinned to the label "production"
     And the evaluator's production settings differ from the monitor's own settings
@@ -155,6 +160,15 @@ Feature: Evaluator versions and deploy labels
     When the user opens its version history
     Then the versions are listed newest first with author, date and labels
     And "Deploy" opens a dialog with latest, production and staging rows
+
+  @integration
+  Scenario: The deploy dialog adds a custom label and refuses a reserved one
+    Given the deploy dialog is open for an evaluator with versions 1 and 2
+    When the user adds a label named "latest" or a number
+    Then the dialog explains why the name is refused and the label cannot be added
+    And Escape closes the label input but leaves the dialog open
+    When the user adds "canary", points it at version 1 and saves
+    Then "canary" is assigned to version 1
 
   @integration
   Scenario: The online evaluation drawer picks the evaluator deploy label

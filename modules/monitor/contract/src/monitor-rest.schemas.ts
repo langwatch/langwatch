@@ -2,7 +2,11 @@ import type { Named } from "@langwatch/module";
 /** Wire shapes for `/api/monitors`, distinct from domain schemas. */
 import { z } from "zod";
 
-import { monitorExecutionModeSchema, monitorMappingStateSchema } from "./monitor.ts";
+import {
+  monitorEvaluatorLabelSchema,
+  monitorExecutionModeSchema,
+  monitorMappingStateSchema,
+} from "./monitor.ts";
 
 const monitorRestIdParamsSchemaDefinition = z.object({
   id: z.string().min(1).describe("The monitor id."),
@@ -95,10 +99,7 @@ const monitorRestCreateInputSchemaDefinition = z.object({
   evaluatorId: z.string().min(1).optional(),
   level: z.enum(["trace", "thread"]).default("trace"),
   threadIdleTimeout: z.number().int().positive().nullable().optional(),
-  evaluatorLabel: z
-    .string()
-    .min(1)
-    .max(64)
+  evaluatorLabel: monitorEvaluatorLabelSchema
     .nullable()
     .optional()
     .describe("Run the evaluator at this deploy label, such as production; null runs the latest."),
@@ -121,10 +122,7 @@ const monitorRestUpdateInputSchemaDefinition = z.object({
   evaluatorId: z.string().min(1).nullable().optional(),
   level: z.enum(["trace", "thread"]).optional(),
   threadIdleTimeout: z.number().int().positive().nullable().optional(),
-  evaluatorLabel: z
-    .string()
-    .min(1)
-    .max(64)
+  evaluatorLabel: monitorEvaluatorLabelSchema
     .nullable()
     .optional()
     .describe("Run the evaluator at this deploy label, such as production; null runs the latest."),
