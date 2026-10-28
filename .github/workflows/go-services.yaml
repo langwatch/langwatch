@@ -158,9 +158,8 @@ jobs:
         run: echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
       # Build-only guard: this image is never pushed from here, main included.
-      # A main image does not belong in a public registry (DECISIONS 4.2);
-      # the release run publishes ai-gateway, multi-arch, from the release
-      # commit. amd64 only, as the langyagent job below: the failures this
+      # Only released versions go to a public registry: publish-docker-app.yml
+      # publishes ai-gateway, multi-arch, from the release commit. amd64 only, as the langyagent job below: the failures this
       # catches (a broken Go compile, a missing COPY input) are
       # arch-independent.
       - name: Build gateway image (no push)
