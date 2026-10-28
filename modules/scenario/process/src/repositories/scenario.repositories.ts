@@ -1,4 +1,5 @@
 import type { ScenarioTabStore } from "../app/scenario.app.ts";
+import type { PendingVoiceCallRepository } from "./pending-voice-call.repository.ts";
 import type { ResultAtomsRepository } from "./result-atoms.repository.ts";
 import type { RunConfigurationsRepository } from "./run-configurations.repository.ts";
 import type { ScenarioCancellationRepository } from "./scenario-cancellation.repository.ts";
@@ -27,6 +28,8 @@ export interface ScenarioRepositories {
   readonly runConfigurations: RunConfigurationsRepository;
   /** The Twilio media nonces the worker's door takes, one use each. */
   readonly voiceNonces: VoiceNonceRepository;
+  /** The phone calls waiting for Twilio's media upgrade, claimed by whichever worker it reaches. */
+  readonly pendingVoiceCalls: PendingVoiceCallRepository;
   /** The runs and batches a simulation produced, read from the run fold in ClickHouse. */
   readonly simulations: SimulationRepository;
   /** The author-assist's generation window. */

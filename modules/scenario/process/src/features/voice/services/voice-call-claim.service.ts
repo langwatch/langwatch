@@ -5,56 +5,56 @@ import { createLogger } from "@langwatch/observability";
 import type { VoiceMediaUpgrade } from "@langwatch/scenario-contract";
 
 import { handOffVoiceSocket } from "../../../channels/voice-socket-handoff.channels.ts";
+import type {
+  PendingVoiceCall,
+  PendingVoiceCallRepository,
+} from "../../../repositories/pending-voice-call.repository.ts";
+import type { ScenarioCancellationRepository } from "../../../repositories/scenario-cancellation.repository.ts";
+import { isValidTwilioSignature } from "../../../rules/twilio-signature.rules.ts";
 
 const logger = createLogger("langwatch:voice:call-claim");
 
-// Slice 1 spike for https://github.com/langwatch/tasks/issues/1002: claim a pending call,
-// spawn the child after the upgrade arrives, then hand it the raw socket.
+const UPGRADE_PATH = /^\/twilio\/([^/]+)\/([^/]+)$/;
+const FORBIDDEN = "HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n";
 
-/** A call waiting to be claimed (spike). */
-export interface PendingVoiceCall {
-  nonce: string;
-}
-
-/** What taking a nonce found: the pending call, answered at most once. */
-export type TakenPendingVoiceCall = { taken: true; call: PendingVoiceCall } | { taken: false };
-
-/** Single-use lookup of pending calls (spike). */
-export interface PendingVoiceCallStore {
-  take(nonce: string): Promise<TakenPendingVoiceCall>;
-}
-
-/** In-memory store (spike); take deletes. */
-export class InMemoryPendingVoiceCallStore implements PendingVoiceCallStore {
-  private readonly calls = new Map<string, PendingVoiceCall>();
-
-  add(call: PendingVoiceCall): void {
-    this.calls.set(call.nonce, call);
-  }
-
-  take(nonce: string): Promise<TakenPendingVoiceCall> {
-    const call = this.calls.get(nonce);
-    this.calls.delete(nonce);
-    return Promise.resolve(call ? { taken: true, call } : { taken: false });
-  }
-}
+/** A claimed run's child, or the cancel that beat the spawn to it. */
+type ClaimedRun = { child?: ChildProcess; cancelled: boolean };
 
 /**
- * The claiming pod spawns the child after the upgrade arrives, then hands it the raw socket.
- * An unknown or already-used nonce is refused 403 and spawns nothing.
+ * The worker Twilio dials claims the call: the pending call must exist, Twilio's signature must
+ * be valid, and only the claim that wins spawns the child and hands it the raw socket. A bad
+ * signature never spends the nonce. A cancel for a claimed run kills its child.
  */
 export class VoiceCallClaimService {
   static create(input: {
-    pending: PendingVoiceCallStore;
+    pending: PendingVoiceCallRepository;
+    cancellations: ScenarioCancellationRepository;
+    authTokenFor: (input: { projectId: string }) => Promise<string>;
+    publicBaseUrl: string;
     spawnChild: (call: PendingVoiceCall) => ChildProcess;
   }): VoiceCallClaimService {
-    return new VoiceCallClaimService(input.pending, input.spawnChild);
+    return new VoiceCallClaimService(input);
   }
 
+  private readonly claimed = new Map<string, ClaimedRun>();
+  private subscription: Promise<() => Promise<void>> | undefined;
+
   private constructor(
-    private readonly pending: PendingVoiceCallStore,
-    private readonly spawnChild: (call: PendingVoiceCall) => ChildProcess,
+    private readonly input: {
+      pending: PendingVoiceCallRepository;
+      cancellations: ScenarioCancellationRepository;
+      authTokenFor: (input: { projectId: string }) => Promise<string>;
+      publicBaseUrl: string;
+      spawnChild: (call: PendingVoiceCall) => ChildProcess;
+    },
   ) {}
+
+  /** Stops listening for cancellations. */
+  async close(): Promise<void> {
+    const unsubscribe = await this.subscription;
+    this.subscription = undefined;
+    await unsubscribe?.();
+  }
 
   accept(upgrade: VoiceMediaUpgrade): void {
     const { socket } = upgrade;
@@ -69,6 +69,11 @@ export class VoiceCallClaimService {
     });
   }
 
+  private refuse({ socket, url, reason }: { socket: Socket; url: string; reason: string }): void {
+    logger.warn({ url, status: 403, reason }, "voice media upgrade refused");
+    socket.end(FORBIDDEN);
+  }
+
   private async claim({
     upgrade,
     socket,
@@ -76,16 +81,63 @@ export class VoiceCallClaimService {
     upgrade: VoiceMediaUpgrade;
     socket: Socket;
   }): Promise<void> {
-    const result = await this.pending.take(upgrade.nonce);
-    if (!result.taken) {
-      logger.warn(
-        { url: upgrade.url, status: 403 },
-        "voice media upgrade refused: no pending call",
-      );
-      socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+    const { url } = upgrade;
+    const pathname = new URL(url, "http://door.invalid").pathname;
+    const match = UPGRADE_PATH.exec(pathname);
+    if (!match) return this.refuse({ socket, url, reason: "unrecognised path" });
+    const key = { scenarioRunId: match[1]!, nonce: match[2]! };
+
+    const peeked = await this.input.pending.peek(key);
+    if (!peeked.found) return this.refuse({ socket, url, reason: "no pending call" });
+
+    const header = upgrade.headers["x-twilio-signature"];
+    const authToken = await this.input.authTokenFor({ projectId: peeked.call.projectId });
+    const signed = `${this.input.publicBaseUrl.replace(/\/$/, "")}${pathname}`;
+    if (
+      typeof header !== "string" ||
+      !isValidTwilioSignature({ authToken, url: signed, signature: header })
+    ) {
+      return this.refuse({ socket, url, reason: "bad signature" });
+    }
+
+    if (this.claimed.has(key.scenarioRunId)) {
+      return this.refuse({ socket, url, reason: "run already claimed here" });
+    }
+    const run: ClaimedRun = { cancelled: false };
+    this.claimed.set(key.scenarioRunId, run);
+    await this.listenForCancellations();
+    const result = await this.input.pending.claim(key);
+    if (!result.claimed) {
+      this.forget({ scenarioRunId: key.scenarioRunId, run });
+      return this.refuse({ socket, url, reason: result.reason });
+    }
+    try {
+      await this.spawnAndHandOff({ upgrade, socket, call: result.call, run });
+    } catch (error) {
+      this.forget({ scenarioRunId: key.scenarioRunId, run });
+      throw error;
+    }
+  }
+
+  private async spawnAndHandOff({
+    upgrade,
+    socket,
+    call,
+    run,
+  }: {
+    upgrade: VoiceMediaUpgrade;
+    socket: Socket;
+    call: PendingVoiceCall;
+    run: ClaimedRun;
+  }): Promise<void> {
+    if (run.cancelled) {
+      socket.destroy();
+      this.forget({ scenarioRunId: call.scenarioRunId, run });
       return;
     }
-    const child = this.spawnChild(result.call);
+    const child = this.input.spawnChild(call);
+    run.child = child;
+    child.once("exit", () => this.forget({ scenarioRunId: call.scenarioRunId, run }));
     child.once("error", (error: Error) => {
       logger.error({ error, nonce: upgrade.nonce }, "voice child failed to spawn");
       socket.destroy();
@@ -104,6 +156,23 @@ export class VoiceCallClaimService {
       child.kill();
       throw error;
     }
+    if (run.cancelled) child.kill();
     logger.info({ nonce: upgrade.nonce }, "voice media socket handed to spawned child");
+  }
+
+  /** Drops `run` only while it is still the entry, so a losing claim never drops the winner. */
+  private forget({ scenarioRunId, run }: { scenarioRunId: string; run: ClaimedRun }): void {
+    if (this.claimed.get(scenarioRunId) === run) this.claimed.delete(scenarioRunId);
+  }
+
+  /** One subscription for the worker, opened no later than the first claim. */
+  private async listenForCancellations(): Promise<void> {
+    this.subscription ??= this.input.cancellations.subscribe(({ scenarioRunId }) => {
+      const run = this.claimed.get(scenarioRunId);
+      if (!run) return;
+      run.cancelled = true;
+      run.child?.kill();
+    });
+    await this.subscription;
   }
 }
