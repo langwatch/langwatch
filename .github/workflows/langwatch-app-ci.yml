@@ -43,9 +43,10 @@ env:
 concurrency:
   # A manual run (coverage, duration weights) has its own group, so a push cannot cancel it.
   group: langwatch-app-ci-${{ github.event_name }}-${{ github.ref }}
-  # A newer commit supersedes an older run, on main too: the newest verdict
-  # covers the commits before it. Image and release builds keep their own rule.
-  cancel-in-progress: true
+  # A newer commit supersedes an older run, except on main: there package-suites
+  # runs as one long job (see `suites-one-job`), so a run finishes and the newest
+  # commit waits behind it. Image and release builds keep their own rule.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -56,6 +57,9 @@ jobs:
       # Drafts and release-please PRs (rewritten on every merge) get lint, typecheck and
       # feature-parity only; `ci:full` lifts that. merge_group is never a draft and main
       # runs the full suite, so nothing lands without it.
+      # A push to main runs package-suites as one job: nobody waits on it, and one
+      # setup instead of eight saves about a fifth of its Actions minutes (#9146).
+      suites-one-job: ${{ github.event_name == 'push' }}
       heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
@@ -693,8 +697,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
-    name: package-suites (${{ matrix.shard }}/8)
+        shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}
+    name: package-suites (${{ matrix.shard }}/${{ strategy.job-total }})
     #
     # It DOES have services. This job absorbed the datastore lane at the
     # deployment cutover: `test-integration` existed to shard the monolith's
@@ -702,7 +706,7 @@ jobs:
     # package suites, which this job already discovers. Standing the datastores
     # up here is what keeps their integration halves running for real instead
     # of self-skipping into a green job.
-    timeout-minutes: 45
+    timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}
 
     services:
       redis:
@@ -823,21 +827,26 @@ jobs:
 
       # The suites' own Nx cache, apart from the build cache so it holds only test
       # results and stays small. Per shard: a re-push to the same change splits alike.
+      # Main's one job saves under `all`, which a shard falls back to.
       - name: Restore the package suite results
         if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
-          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
+          key: ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-
+            ${{ runner.os }}-nx-suites-all-
 
       - name: Restore the package suite results, saving them at the end of the job
         if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
-          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
+          key: ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-
+            ${{ runner.os }}-nx-suites-all-
 
       - uses: ./.github/actions/prune-pr-caches
         with:
@@ -851,7 +860,7 @@ jobs:
           NX_CACHE_DIRECTORY: ${{ github.workspace }}/.nx/suites/cache
           NX_WORKSPACE_DATA_DIRECTORY: ${{ github.workspace }}/.nx/suites/data
           REQUIRE_HELM_TESTS: "1"
-          PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
+          PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
           # at a time left half the cores idle. A heavy suite still runs alone.
           PACKAGE_SUITES_CONCURRENCY: "2"
@@ -873,6 +882,13 @@ jobs:
       - name: Check suites declare what they read outside their package
         if: ${{ !cancelled() }}
         run: node --experimental-strip-types .github/scripts/check-test-reads.ts "$RUNNER_TEMP/test-reads"
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh "package-suites (${{ matrix.shard }}/${{ strategy.job-total }})"
 
   lint:
     needs: changes

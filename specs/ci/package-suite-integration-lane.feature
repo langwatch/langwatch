@@ -200,3 +200,21 @@ Feature: A package's integration suite runs in CI when it declares one
       Given a package's integration or browser script
       When the package suites job runs it
       Then it runs through pnpm, every time
+
+  # The workflow's own shape, which no test suite can run: proved by the first
+  # run on main and by a pull request run (#9146).
+  Rule: Main runs every suite in one job and tells Slack when it fails
+
+    @unimplemented
+    Scenario: A push to main runs the package suites as one job
+      Given a merge to main
+      When langwatch-app-ci runs for that commit
+      Then package-suites runs as one job holding every suite
+      And a newer merge waits for that run instead of cancelling it
+      And a pull request still splits its suites over eight jobs
+
+    @unimplemented
+    Scenario: A red package-suites run on main posts to Slack
+      Given package-suites fails on main and passed in the previous failed run
+      When the job finishes
+      Then Slack gets the job, the commit and a link to the run
