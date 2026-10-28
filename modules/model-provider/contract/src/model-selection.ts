@@ -24,6 +24,13 @@ export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
  */
 export const BUILT_IN_MODELS_GROUP_KEY = "langwatch-built-in";
 
+/**
+ * Whether only a built-in offer can serve this model. A decision model id
+ * (`<provider>/decisions:<name>`, see `catalog/decision-models.ts`) carries a provider's prefix,
+ * so that provider's group would otherwise vouch for a model the judge can no longer run.
+ */
+export const isServedOnlyAsBuiltIn = (model: string): boolean => model.includes("/decisions:");
+
 export type GroupedModelOptions = ModelOptionGroup[];
 
 /**

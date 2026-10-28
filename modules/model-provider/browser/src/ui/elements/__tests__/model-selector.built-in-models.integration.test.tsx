@@ -38,6 +38,15 @@ afterEach(() => {
   storedProviders.current = [];
 });
 
+const STORED_OPENAI = { provider: "openai", enabled: true, customModels: null };
+
+/** The struck-through label is the refusal mark; only the chosen value ever carries it. */
+function isStruckThrough(label: string): boolean {
+  return screen
+    .getAllByText(label)
+    .some((node) => getComputedStyle(node).textDecoration.includes("line-through"));
+}
+
 describe("<ModelSelector/>", () => {
   describe("given a project with no model provider", () => {
     describe("when the picker is handed a built-in model", () => {
@@ -70,7 +79,7 @@ describe("<ModelSelector/>", () => {
 
   describe("given a stored provider and a built-in model carrying its prefix", () => {
     it("heads one built-in group, apart from that provider's own group", () => {
-      storedProviders.current = [{ provider: "openai", enabled: true, customModels: null }];
+      storedProviders.current = [STORED_OPENAI];
 
       renderWithDesignSystem(
         <ModelSelector
@@ -84,6 +93,42 @@ describe("<ModelSelector/>", () => {
       const listbox = screen.getByRole("listbox", { hidden: true });
       expect(within(listbox).getAllByText("LangWatch")).toHaveLength(1);
       expect(within(listbox).getByText("OpenAI")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a chosen built-in model whose prefix heads no group of the project's", () => {
+    it("shows its label and asks for no update", () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model={UNSTORED_PROVIDER_BUILT_IN.value}
+          options={["openai/gpt-5-mini"]}
+          onChange={() => undefined}
+          builtInModels={[BUILT_IN, UNSTORED_PROVIDER_BUILT_IN]}
+        />,
+      );
+
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+      expect(isStruckThrough(UNSTORED_PROVIDER_BUILT_IN.label)).toBe(false);
+    });
+  });
+
+  describe("given a chosen decision model the picker no longer offers", () => {
+    /** @scenario "A judge holding a decision model nobody offers any more asks for an update" */
+    it("asks for an update even though its provider is stored", () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model={OWN_DECISION_BUILT_IN.value}
+          options={["openai/gpt-5-mini"]}
+          onChange={() => undefined}
+          builtInModels={[BUILT_IN]}
+        />,
+      );
+
+      expect(screen.getByText(/Update needed/i)).toBeInTheDocument();
     });
   });
 });
@@ -102,7 +147,7 @@ describe("<LLMModelDisplay/>", () => {
 
   describe("given a built-in model whose prefix heads no group of the project's", () => {
     it("shows its label and asks for no update", async () => {
-      storedProviders.current = [{ provider: "openai", enabled: true, customModels: null }];
+      storedProviders.current = [STORED_OPENAI];
 
       renderWithDesignSystem(
         <LLMModelDisplay
@@ -113,6 +158,19 @@ describe("<LLMModelDisplay/>", () => {
 
       expect(await screen.findByText(UNSTORED_PROVIDER_BUILT_IN.label)).toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a decision model the picker no longer offers", () => {
+    /** @scenario "A judge holding a decision model nobody offers any more asks for an update" */
+    it("asks for an update even though its provider is stored", async () => {
+      storedProviders.current = [STORED_OPENAI];
+
+      renderWithDesignSystem(
+        <LLMModelDisplay model={OWN_DECISION_BUILT_IN.value} builtInModels={[BUILT_IN]} />,
+      );
+
+      expect(await screen.findByText(/Update needed/i)).toBeInTheDocument();
     });
   });
 });

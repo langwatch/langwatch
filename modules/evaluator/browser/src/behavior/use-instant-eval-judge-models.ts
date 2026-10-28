@@ -6,7 +6,6 @@
  */
 import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
 import type { BuiltInModel } from "@langwatch/model-provider-contract";
-import { useMemo } from "react";
 
 import { evaluatorApi } from "./evaluator-api.ts";
 
@@ -30,21 +29,17 @@ export function useInstantEvalJudgeModels({ projectId }: { projectId: string | u
   const released = !!access.data?.released;
   const decisionModels = evaluatorApi.modelProvider.listDecisionModelsForProject.useQuery(
     { projectId: projectId ?? "" },
-    { enabled: !!projectId && released, staleTime: 5 * 60 * 1000 },
+    { enabled: !!projectId && released },
   );
-
-  // One identity per answer, so the picker's `useMemo` and `React.memo` are not defeated per
-  // render. Memoised above the release gate: a hook may not run only on some renders.
-  const offered = decisionModels.data;
-  const builtInModels = useMemo(() => {
-    // Instant Evals keeps its own name and its place first; the server's hosted entry is its twin.
-    const own = (offered ?? []).filter(
-      (model) => model.value !== INSTANT_EVALS_BUILT_IN_MODEL.value,
-    );
-    return own.length === 0 ? RELEASED : [INSTANT_EVALS_BUILT_IN_MODEL, ...own];
-  }, [offered]);
-
   if (!released) return { builtInModels: NONE, isLoading: access.isLoading };
 
-  return { builtInModels, isLoading: decisionModels.isLoading };
+  // Instant Evals keeps its own name and its place first; the server's hosted entry is its twin.
+  const own = (decisionModels.data ?? []).filter(
+    (model) => model.value !== INSTANT_EVALS_BUILT_IN_MODEL.value,
+  );
+
+  return {
+    builtInModels: own.length === 0 ? RELEASED : [INSTANT_EVALS_BUILT_IN_MODEL, ...own],
+    isLoading: decisionModels.isLoading,
+  };
 }

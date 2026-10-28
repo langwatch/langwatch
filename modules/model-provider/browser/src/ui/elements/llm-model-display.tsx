@@ -2,7 +2,11 @@ import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-tex
 import { Box, HStack, type StackProps, Text, VStack } from "@langwatch/design-system/primitives";
 import { inferProvider, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { allModelOptions, type BuiltInModel } from "@langwatch/model-provider-contract";
+import {
+  allModelOptions,
+  type BuiltInModel,
+  isServedOnlyAsBuiltIn,
+} from "@langwatch/model-provider-contract";
 import { MODEL_ICON_SIZE } from "@langwatch/prompt-contract/llm-config-constants";
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
@@ -36,8 +40,8 @@ function getModelDisplayState({
     !!model &&
     !isLoading &&
     !modelOption?.isBuiltIn &&
-    groupedByProvider.length > 0 &&
-    !groupedByProvider.some((g) => g.provider === providerKey);
+    (isServedOnlyAsBuiltIn(model) ||
+      (groupedByProvider.length > 0 && !groupedByProvider.some((g) => g.provider === providerKey)));
   // The inferred mark is dark-safe and covers bare ids ("gpt-5-mini") the options miss.
   const provider = inferProvider(model);
   const iconNode = provider ? (
@@ -71,10 +75,9 @@ export function LLMModelDisplay({
   // Model is disabled if explicitly marked or if provider is disabled
   const isDisabled = modelOption?.isDisabled ?? false;
 
-  // Invalid = model points at a provider not enabled for this project.
-  // Render the same red strike + AlertTriangle pattern the Default Models
-  // table uses. Skip while the providers query is in flight (avoids a
-  // false-positive flash).
+  // Invalid = the project cannot run this model: its provider is not enabled here, or it is a
+  // decision model the picker no longer offers. Same red strike and AlertTriangle the Default
+  // Models table uses, skipped while the providers query is in flight so nothing flashes.
   const { iconNode, isProviderMissing, providerKey } = getModelDisplayState({
     model,
     isLoading,

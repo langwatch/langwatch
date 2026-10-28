@@ -394,7 +394,7 @@ describe("EvaluationExecutionService with a judge on an own decision model", () 
 
     /** @scenario "A judge whose own decision model cannot run is an error, never moved onto the hosted model" */
     it("answers an error naming the key and never calls LangWatch's classifier", async () => {
-      const { service, judge } = buildService({
+      const { service, judge, resolveDecisionModel } = buildService({
         decisionModel: { kind: "own_unavailable", model: OWN.model, reason: "key_missing" },
       });
 
@@ -406,6 +406,10 @@ describe("EvaluationExecutionService with a judge on an own decision model", () 
         mappings: null,
       });
 
+      expect(resolveDecisionModel).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        model: OWN.model,
+      });
       expect(judge).not.toHaveBeenCalled();
       expect(result.status).toBe("error");
       expect(result.status === "error" ? result.error : "").toContain("classifier_key_invalid");

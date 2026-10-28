@@ -609,6 +609,13 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then Instant Evals is not an option
       And no own decision model is an option
 
+    @integration
+    Scenario: A judge holding a decision model nobody offers any more asks for an update
+      Given a project the server releases Instant Evals for
+      And an LLM judge saved on a decision model the server no longer offers
+      When a member looks at that judge
+      Then the model is marked as needing an update
+
     @unit
     Scenario: A judge on an own decision model is answered by Instant Evals
       Given an LLM judge whose model is an own decision model

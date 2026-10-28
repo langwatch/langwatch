@@ -5,7 +5,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { BUILT_IN_MODELS_GROUP_KEY, modelSelectionFrom } from "../model-selection.ts";
+import {
+  BUILT_IN_MODELS_GROUP_KEY,
+  isServedOnlyAsBuiltIn,
+  modelSelectionFrom,
+} from "../model-selection.ts";
 
 const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
 const OWN_DECISION_BUILT_IN = {
@@ -101,5 +105,17 @@ describe("modelSelectionFrom", () => {
 
       expect(selectOptions).toEqual([]);
     });
+  });
+});
+
+describe("isServedOnlyAsBuiltIn", () => {
+  it("claims a decision model id, whose provider prefix cannot answer for it", () => {
+    expect(isServedOnlyAsBuiltIn(OWN_DECISION_BUILT_IN.value)).toBe(true);
+    expect(isServedOnlyAsBuiltIn("cloudflare/decisions:clef")).toBe(true);
+  });
+
+  it("leaves a chat model to its provider's group", () => {
+    expect(isServedOnlyAsBuiltIn("openai/gpt-5-mini")).toBe(false);
+    expect(isServedOnlyAsBuiltIn(BUILT_IN.value)).toBe(false);
   });
 });
