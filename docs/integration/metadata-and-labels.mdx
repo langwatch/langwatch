@@ -268,7 +268,7 @@ curl -X POST "https://app.langwatch.ai/api/v1/collector" \
         "type": "llm",
         "span_id": "span-456",
         "name": "chat-completion",
-        "model": "gpt-5-mini",
+        "model": "gpt-6-luna",
         "input": {"type": "text", "value": "Hello"},
         "output": {"type": "text", "value": "Hi there!"},
         "timestamps": {
@@ -304,7 +304,7 @@ requests.post(
                 "type": "llm",
                 "span_id": "span-456",
                 "name": "chat-completion",
-                "model": "gpt-5-mini",
+                "model": "gpt-6-luna",
                 "input": {"type": "text", "value": "Hello"},
                 "output": {"type": "text", "value": "Hi there!"},
                 "timestamps": {
@@ -338,7 +338,7 @@ const response = await fetch("https://app.langwatch.ai/api/v1/collector", {
         type: "llm",
         span_id: "span-456",
         name: "chat-completion",
-        model: "gpt-5-mini",
+        model: "gpt-6-luna",
         input: { type: "text", value: "Hello" },
         output: { type: "text", value: "Hi there!" },
         timestamps: {
@@ -376,7 +376,7 @@ func sendTrace() error {
 				"type":    "llm",
 				"span_id": "span-456",
 				"name":    "chat-completion",
-				"model":   "gpt-5-mini",
+				"model":   "gpt-6-luna",
 				"input":   map[string]any{"type": "text", "value": "Hello"},
 				"output":  map[string]any{"type": "text", "value": "Hi there!"},
 				"timestamps": map[string]any{

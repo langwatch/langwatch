@@ -209,9 +209,9 @@ evaluation = langwatch.experiment.init("model-comparison")
 
 for index, row in evaluation.loop(df.iterrows()):
     def compare_models(index, row):
-        # Evaluate GPT-5 with automatic latency tracking
-        with evaluation.target("gpt5-baseline", {"model": "openai/gpt-5"}):
-            response = call_openai("gpt-5", row["question"])
+        # Evaluate gpt-6-luna with automatic latency tracking
+        with evaluation.target("gpt6-baseline", {"model": "openai/gpt-6-luna"}):
+            response = call_openai("gpt-6-luna", row["question"])
             evaluation.log_response(response)  # Store the model output
             # Target is auto-inferred inside target()!
             evaluation.log("accuracy", index=index,
@@ -240,8 +240,8 @@ evaluation.log(
     "accuracy",
     index=index,
     score=0.95,
-    target="gpt5-baseline",
-    metadata={"model": "openai/gpt-5", "temperature": 0.7}
+    target="gpt6-baseline",
+    metadata={"model": "openai/gpt-6-luna", "temperature": 0.7}
 )
 ```
 
@@ -254,9 +254,9 @@ const evaluation = await langwatch.experiments.init("model-comparison");
 
 await evaluation.run(dataset, async ({ item, index }) => {
   // Run targets in parallel with automatic tracing
-  const [gpt5Result, claudeResult] = await Promise.all([
-    evaluation.withTarget("gpt5-baseline", { model: "openai/gpt-5" }, async () => {
-      const response = await callOpenAI("gpt-5", item.question);
+  const [gpt6Result, claudeResult] = await Promise.all([
+    evaluation.withTarget("gpt6-baseline", { model: "openai/gpt-6-luna" }, async () => {
+      const response = await callOpenAI("gpt-6-luna", item.question);
       // Target and index are auto-inferred inside withTarget()!
       evaluation.log("accuracy", { score: calculateAccuracy(response, item.expected) });
       return response;
@@ -270,7 +270,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
   ]);
 
   // Latency is automatically captured from each withTarget() span
-  console.log(`GPT-5: ${gpt5Result.duration}ms, Claude: ${claudeResult.duration}ms`);
+  console.log(`gpt-6-luna: ${gpt6Result.duration}ms, Claude: ${claudeResult.duration}ms`);
 });
 ```
 
@@ -288,33 +288,33 @@ The first time you use a target name, it's automatically registered with the pro
   <Tab title="Python">
 ```python
 # Using target() - metadata is set when entering the context
-with evaluation.target("gpt5", {"model": "gpt-5", "temp": 0.7}):
+with evaluation.target("gpt6", {"model": "gpt-6-luna", "temp": 0.7}):
     evaluation.log_response("AI response here")  # Store the output
     evaluation.log("latency", index=0, score=150)  # target auto-inferred
     evaluation.log("accuracy", index=0, score=0.95)  # target auto-inferred
 
 # Or using explicit target parameter (without target() context)
 
-evaluation.log("latency", index=0, target="gpt5", metadata={"model": "gpt-5", "temp": 0.7})
+evaluation.log("latency", index=0, target="gpt6", metadata={"model": "gpt-6-luna", "temp": 0.7})
 
 # Subsequent calls can omit metadata - it's already registered
 
-evaluation.log("accuracy", index=0, target="gpt5", score=0.95)
-evaluation.log("latency", index=1, target="gpt5", score=150)
+evaluation.log("accuracy", index=0, target="gpt6", score=0.95)
+evaluation.log("latency", index=1, target="gpt6", score=150)
 
 ````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
 // Using withTarget() - metadata is set once when registering the target
-await evaluation.withTarget("gpt5", { model: "gpt-5", temp: 0.7 }, async () => {
+await evaluation.withTarget("gpt6", { model: "gpt-6-luna", temp: 0.7 }, async () => {
   evaluation.log("latency", { score: 150 });  // target auto-inferred
   evaluation.log("accuracy", { score: 0.95 }); // target auto-inferred
 });
 
 // Or using explicit target parameter
-evaluation.log("latency", { index: 0, target: "gpt5", metadata: { model: "gpt-5", temp: 0.7 } });
-evaluation.log("accuracy", { index: 0, target: "gpt5", score: 0.95 }); // metadata already registered
+evaluation.log("latency", { index: 0, target: "gpt6", metadata: { model: "gpt-6-luna", temp: 0.7 } });
+evaluation.log("accuracy", { index: 0, target: "gpt6", score: 0.95 }); // metadata already registered
 ````
 
   </Tab>
@@ -335,13 +335,13 @@ Target metadata is used for comparison charts in the LangWatch UI. You can group
 # Compare different temperatures
 for temp in [0.0, 0.5, 0.7, 1.0]:
     for index, row in evaluation.loop(df.iterrows()):
-        response = call_llm(row["question"], temperature=temp)
+        response = call_llm(row["question"], temperature=temp, reasoning_effort="none")
         evaluation.log(
             "quality",
             index=index,
             score=evaluate_quality(response),
             target=f"temp-{temp}",
-            metadata={"model": "gpt-5", "temperature": temp}
+            metadata={"model": "gpt-6-luna", "temperature": temp}
         )
 ```
   </Tab>
@@ -350,12 +350,12 @@ for temp in [0.0, 0.5, 0.7, 1.0]:
 // Compare different temperatures
 for (const temp of [0.0, 0.5, 0.7, 1.0]) {
   await evaluation.run(dataset, async ({ item, index }) => {
-    const response = await callLLM(item.question, { temperature: temp });
+    const response = await callLLM(item.question, { temperature: temp, reasoning_effort: "none" });
     evaluation.log("quality", {
       index,
       score: evaluateQuality(response),
       target: `temp-${temp}`,
-      metadata: { model: "gpt-5", temperature: temp }
+      metadata: { model: "gpt-6-luna", temperature: temp }
     });
   });
 }
@@ -451,7 +451,7 @@ for index, row in evaluation.loop(df.iterrows()):
                 "contexts": contexts,
             },
             settings={
-                "model": "openai/gpt-5",
+                "model": "openai/gpt-6-luna",
                 "max_tokens": 2048,
             }
         )
@@ -479,7 +479,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
       contexts,
     },
     settings: {
-      model: "openai/gpt-5",
+      model: "openai/gpt-6-luna",
       max_tokens: 2048,
     },
   });
@@ -517,7 +517,7 @@ import langwatch
 evaluation = langwatch.experiment.init("model-comparison")
 
 for index, row in evaluation.loop(df.iterrows()):
-with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+with evaluation.target("gpt-6-luna", {"model": "openai/gpt-6-luna"}):
 evaluation.log_response(ask_gpt(row["question"]))
 
     with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
@@ -536,7 +536,7 @@ const evaluation = await langwatch.experiments.init("model-comparison");
 
 await evaluation.run(dataset, async ({ item }) => {
   await Promise.all([
-    evaluation.withTarget("gpt-5-mini", { model: "openai/gpt-5-mini" }, () =>
+    evaluation.withTarget("gpt-6-luna", { model: "openai/gpt-6-luna" }, () =>
       askGpt(item.question)
     ),
     evaluation.withTarget("claude-sonnet-5", { model: "anthropic/claude-sonnet-5" }, () =>
@@ -675,7 +675,7 @@ Every option is optional, because the judge already has a default for each one. 
 | `input` | No task context | The task the candidates were answering, for the judge to weigh them against |
 | `golden` | No reference answer, so candidates are judged on their own merits | A reference answer to judge each candidate against, and the switch that turns reference judging on |
 | `prompt` | The shipped prompt matching what the row carries | Your own judge prompt, used exactly as written |
-| `model` | Your project's configured evaluator model | The judge model, for example `openai/gpt-5-mini` |
+| `model` | Your project's configured evaluator model | The judge model, for example `openai/gpt-6-luna` |
 | `allow_tie` / `allowTie` | `true` | Lets the judge answer "tie" when no candidate is clearly better |
 | `randomize_order` / `randomizeOrder` | `true` | Shuffles candidate order per row, seeded by the row index, so a candidate's position never sways the verdict |
 | `swap_and_reconcile` / `swapAndReconcile` | `true` | Judges each row a second time with the candidate order reversed, and establishes no winner when the two passes disagree. Doubles the judge cost per row |
@@ -730,7 +730,7 @@ evaluation = langwatch.experiment.init("support-reply-comparison")
 
 for index, row in evaluation.loop(df.iterrows(), threads=4):
 def task(index, row):
-with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+with evaluation.target("gpt-6-luna", {"model": "openai/gpt-6-luna"}):
 evaluation.log_response(ask_gpt(row["question"]))
 
         with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
@@ -765,7 +765,7 @@ const evaluation = await langwatch.experiments.init("support-reply-comparison");
 
 await evaluation.run(dataset, async ({ item, index }) => {
   await Promise.all([
-    evaluation.withTarget("gpt-5-mini", { model: "openai/gpt-5-mini" }, () =>
+    evaluation.withTarget("gpt-6-luna", { model: "openai/gpt-6-luna" }, () =>
       askGpt(item.question)
     ),
     evaluation.withTarget("claude-sonnet-5", { model: "anthropic/claude-sonnet-5" }, () =>
@@ -800,7 +800,7 @@ In async-native mode, use `acompare()` so the judge is awaited rather than block
 evaluation = langwatch.experiment.init("async-comparison")
 
 async def task(index, row):
-    with evaluation.target("gpt-5-mini"):
+    with evaluation.target("gpt-6-luna"):
         evaluation.log_response(await ask_gpt(row["question"]))
 
     with evaluation.target("claude-sonnet-5"):
@@ -824,7 +824,7 @@ await evaluation.run(
   dataset,
   async ({ item }) => {
     await Promise.all([
-      evaluation.withTarget("gpt-5-mini", () => askGpt(item.question)),
+      evaluation.withTarget("gpt-6-luna", () => askGpt(item.question)),
       evaluation.withTarget("claude-sonnet-5", () => askClaude(item.question)),
     ]);
 
@@ -864,7 +864,7 @@ evaluation = langwatch.experiment.init("rag-pipeline-evaluation-v2")
 
 for index, row in evaluation.loop(df.iterrows(), threads=8):
 def task(index, row): # Compare two RAG configurations
-with evaluation.target("rag-v1", {"model": "gpt-5", "retriever": "dense"}):
+with evaluation.target("rag-v1", {"model": "gpt-6-luna", "retriever": "dense"}):
 response, contexts = execute_rag_pipeline(row["question"], version="v1")
 evaluation.log_response(response.text) # Store the output
 
@@ -873,13 +873,13 @@ evaluation.log_response(response.text) # Store the output
                 "ragas/faithfulness",
                 index=index,
                 data={"input": row["question"], "output": response, "contexts": contexts},
-                settings={"model": "openai/gpt-5", "max_tokens": 2048}
+                settings={"model": "openai/gpt-6-luna", "max_tokens": 2048}
             )
 
             # Log custom metrics - latency auto-captured by target()
             evaluation.log("response_quality", index=index, score=response.quality)
 
-        with evaluation.target("rag-v2", {"model": "gpt-5", "retriever": "hybrid"}):
+        with evaluation.target("rag-v2", {"model": "gpt-6-luna", "retriever": "hybrid"}):
             response, contexts = execute_rag_pipeline(row["question"], version="v2")
             evaluation.log_response(response.text)
 
@@ -887,7 +887,7 @@ evaluation.log_response(response.text) # Store the output
                 "ragas/faithfulness",
                 index=index,
                 data={"input": row["question"], "output": response, "contexts": contexts},
-                settings={"model": "openai/gpt-5", "max_tokens": 2048}
+                settings={"model": "openai/gpt-6-luna", "max_tokens": 2048}
             )
 
             evaluation.log("response_quality", index=index, score=response.quality)
@@ -912,25 +912,25 @@ const evaluation = await langwatch.experiments.init("rag-pipeline-evaluation-v2"
 await evaluation.run(dataset, async ({ item, index }) => {
   // Compare multiple RAG configurations in parallel
   await Promise.all([
-    evaluation.withTarget("rag-v1", { model: "gpt-5", retriever: "dense" }, async () => {
+    evaluation.withTarget("rag-v1", { model: "gpt-6-luna", retriever: "dense" }, async () => {
       const { response, contexts } = await executeRagPipeline(item.question, "v1");
 
       // Use LangWatch evaluators - target auto-inferred
       await evaluation.evaluate("ragas/faithfulness", {
         data: { input: item.question, output: response, contexts },
-        settings: { model: "openai/gpt-5", max_tokens: 2048 }
+        settings: { model: "openai/gpt-6-luna", max_tokens: 2048 }
       });
 
       // Log custom metrics - latency auto-captured by withTarget()
       evaluation.log("response_quality", { score: response.quality });
     }),
 
-    evaluation.withTarget("rag-v2", { model: "gpt-5", retriever: "hybrid" }, async () => {
+    evaluation.withTarget("rag-v2", { model: "gpt-6-luna", retriever: "hybrid" }, async () => {
       const { response, contexts } = await executeRagPipeline(item.question, "v2");
 
       await evaluation.evaluate("ragas/faithfulness", {
         data: { input: item.question, output: response, contexts },
-        settings: { model: "openai/gpt-5", max_tokens: 2048 }
+        settings: { model: "openai/gpt-6-luna", max_tokens: 2048 }
       });
 
       evaluation.log("response_quality", { score: response.quality });
@@ -1023,15 +1023,15 @@ For each target in your evaluation, the following columns are exported:
 
 | Column Pattern            | Description                                  | Example                                      |
 | ------------------------- | -------------------------------------------- | -------------------------------------------- |
-| `{target}_model`          | Model used for this target                   | `gpt-5-mini_model` → `openai/gpt-5-mini`     |
-| `{target}_prompt_id`      | Prompt configuration ID (for prompt targets) | `gpt-5-mini_prompt_id` → `prompt-abc123`     |
-| `{target}_prompt_version` | Prompt version number                        | `gpt-5-mini_prompt_version` → `2`            |
-| `{target}_{metadata_key}` | Custom metadata values                       | `gpt-5-mini_seed` → `42`                     |
-| `{target}_output`         | Model output (or individual output fields)   | `gpt-5-mini_output` → `"The answer is 42"`   |
-| `{target}_cost`           | Execution cost in USD                        | `gpt-5-mini_cost` → `0.0012`                 |
-| `{target}_duration_ms`    | Execution time in milliseconds               | `gpt-5-mini_duration_ms` → `1250`            |
-| `{target}_error`          | Error message if execution failed            | `gpt-5-mini_error` → `"Rate limit exceeded"` |
-| `{target}_trace_id`       | Trace ID for viewing execution details       | `gpt-5-mini_trace_id` → `trace_abc123`       |
+| `{target}_model`          | Model used for this target                   | `gpt-6-luna_model` → `openai/gpt-6-luna`     |
+| `{target}_prompt_id`      | Prompt configuration ID (for prompt targets) | `gpt-6-luna_prompt_id` → `prompt-abc123`     |
+| `{target}_prompt_version` | Prompt version number                        | `gpt-6-luna_prompt_version` → `2`            |
+| `{target}_{metadata_key}` | Custom metadata values                       | `gpt-6-luna_seed` → `42`                     |
+| `{target}_output`         | Model output (or individual output fields)   | `gpt-6-luna_output` → `"The answer is 42"`   |
+| `{target}_cost`           | Execution cost in USD                        | `gpt-6-luna_cost` → `0.0012`                 |
+| `{target}_duration_ms`    | Execution time in milliseconds               | `gpt-6-luna_duration_ms` → `1250`            |
+| `{target}_error`          | Error message if execution failed            | `gpt-6-luna_error` → `"Rate limit exceeded"` |
+| `{target}_trace_id`       | Trace ID for viewing execution details       | `gpt-6-luna_trace_id` → `trace_abc123`       |
 
 #### Evaluator Columns (per target, per evaluator)
 
@@ -1039,12 +1039,12 @@ For each evaluator applied to a target:
 
 | Column Pattern                     | Description                       | Example                                                      |
 | ---------------------------------- | --------------------------------- | ------------------------------------------------------------ |
-| `{target}_{evaluator}_score`       | Numeric score (0-1)               | `gpt-5-mini_faithfulness_score` → `0.95`                     |
-| `{target}_{evaluator}_passed`      | Boolean pass/fail                 | `gpt-5-mini_faithfulness_passed` → `true`                    |
-| `{target}_{evaluator}_label`       | Classification label              | `gpt-5-mini_sentiment_label` → `positive`                    |
-| `{target}_{evaluator}_details`     | Additional details or explanation | `gpt-5-mini_faithfulness_details` → `"All claims supported"` |
-| `{target}_{evaluator}_cost`        | Cost of running the evaluator     | `gpt-5-mini_faithfulness_cost` → `0.0005`                    |
-| `{target}_{evaluator}_duration_ms` | Evaluator execution time          | `gpt-5-mini_faithfulness_duration_ms` → `850`                |
+| `{target}_{evaluator}_score`       | Numeric score (0-1)               | `gpt-6-luna_faithfulness_score` → `0.95`                     |
+| `{target}_{evaluator}_passed`      | Boolean pass/fail                 | `gpt-6-luna_faithfulness_passed` → `true`                    |
+| `{target}_{evaluator}_label`       | Classification label              | `gpt-6-luna_sentiment_label` → `positive`                    |
+| `{target}_{evaluator}_details`     | Additional details or explanation | `gpt-6-luna_faithfulness_details` → `"All claims supported"` |
+| `{target}_{evaluator}_cost`        | Cost of running the evaluator     | `gpt-6-luna_faithfulness_cost` → `0.0005`                    |
+| `{target}_{evaluator}_duration_ms` | Evaluator execution time          | `gpt-6-luna_faithfulness_duration_ms` → `850`                |
 
 #### Comparison Columns (per comparison)
 
@@ -1052,9 +1052,9 @@ A comparison grades the row as a whole rather than one target, so it gets its ow
 
 | Column Pattern            | Description                                                             | Example                                                            |
 | ------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `{comparison}_winner`     | Name of the winning target, `tie`, `no_verdict`, `unresolved`, or empty | `comparison_winner` → `gpt-5-mini`                                 |
-| `{comparison}_candidates` | The targets compared on this row, comma separated                       | `comparison_candidates` → `gpt-5-mini, claude-sonnet-5`            |
-| `{comparison}_reasoning`  | The judge's explanation for the verdict                                 | `comparison_reasoning` → `"gpt-5-mini gives the exact reset link"` |
+| `{comparison}_winner`     | Name of the winning target, `tie`, `no_verdict`, `unresolved`, or empty | `comparison_winner` → `gpt-6-luna`                                 |
+| `{comparison}_candidates` | The targets compared on this row, comma separated                       | `comparison_candidates` → `gpt-6-luna, claude-sonnet-5`            |
+| `{comparison}_reasoning`  | The judge's explanation for the verdict                                 | `comparison_reasoning` → `"gpt-6-luna gives the exact reset link"` |
 
 What each [verdict](#the-verdict) writes into those three cells:
 
@@ -1076,12 +1076,12 @@ A row's candidates can be fewer than the comparison's full set of targets, becau
 
 ### Example CSV Output
 
-For an evaluation comparing two targets, `gpt-5-mini` and `claude`, with a faithfulness evaluator:
+For an evaluation comparing two targets, `gpt-6-luna` and `claude`, with a faithfulness evaluator:
 
 ```csv
-index,question,expected,gpt-5-mini_model,gpt-5-mini_output,gpt-5-mini_cost,gpt-5-mini_duration_ms,gpt-5-mini_faithfulness_score,gpt-5-mini_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
-0,What is 2+2?,4,openai/gpt-5-mini,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-sonnet-5,2+2 equals 4,0.0008,980,0.92,true
-1,Capital of France?,Paris,openai/gpt-5-mini,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-sonnet-5,The capital of France is Paris,0.0010,890,0.97,true
+index,question,expected,gpt-6-luna_model,gpt-6-luna_output,gpt-6-luna_cost,gpt-6-luna_duration_ms,gpt-6-luna_faithfulness_score,gpt-6-luna_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
+0,What is 2+2?,4,openai/gpt-6-luna,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-sonnet-5,2+2 equals 4,0.0008,980,0.92,true
+1,Capital of France?,Paris,openai/gpt-6-luna,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-sonnet-5,The capital of France is Paris,0.0010,890,0.97,true
 ```
 
 ### Using the Data

@@ -1638,6 +1638,22 @@ containers:
 {{- printf "%s|%s|%s" .Chart.Version (.Chart.AppVersion | default "") (toJson .Values) | sha256sum -}}
 {{- end -}}
 
+{{- /* Node sizes its heap at about half the memory it sees, so a 4Gi process
+       died of heap exhaustion with 2 GiB of its container free. Three quarters
+       leaves a quarter outside the heap. Only with a limit (without one the
+       percentage is of the node), and never beside an operator's NODE_OPTIONS.
+       specs/setup/helm-heap-ceiling.feature */}}
+{{- define "langwatch.heapCeilingEnv" -}}
+{{- $operatorNodeOptions := false }}
+{{- range .extraEnvs }}
+{{- if eq (toString .name) "NODE_OPTIONS" }}{{- $operatorNodeOptions = true }}{{- end }}
+{{- end }}
+{{- if and (dig "limits" "memory" "" (.resources | default dict)) (not $operatorNodeOptions) }}
+- name: NODE_OPTIONS
+  value: "--max-old-space-size-percentage=75"
+{{- end }}
+{{- end }}
+
 {{/* The worker container: the workers Deployment, or a sidecar in each app pod when workers.enabled is false. */}}
 {{- define "langwatch.workersContainer" -}}
 - name: {{ .Release.Name }}-workers
@@ -1657,6 +1673,7 @@ containers:
       value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
     - name: LANGWATCH_ENDPOINT
       value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+    {{- include "langwatch.heapCeilingEnv" (dict "resources" .Values.workers.resources "extraEnvs" (concat (default (list) .Values.app.extraEnvs) (default (list) .Values.workers.extraEnvs))) | nindent 4 }}
     {{- /* Everything the app is given beyond its port and its own address:
            the worker parses the same config over the same modules (Alex,
            2026-09-30), including the Langy pair its turns are dispatched

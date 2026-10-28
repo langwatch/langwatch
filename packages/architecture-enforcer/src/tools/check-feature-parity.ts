@@ -267,6 +267,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The ECR chart push: which package it pushes and which digest it reports
   // for the deploy to pin (specs/ci/publish-prerelease-charts-to-ecr.feature).
   "tools/chartpush",
+  "tools/chartheap",
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
@@ -467,7 +468,7 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/undo-redo.feature",
   "specs/features/agent-cli.feature",
   "specs/features/annotation-cli.feature",
-  "specs/features/dashboard-cli.feature",
+  "specs/features/analytics-report-cli.feature",
   "specs/features/dataset-python-sdk.feature",
   "specs/features/devtools/issue-creation-skill.feature",
   "specs/features/devtools/orchestrator-bug-fix-workflow.feature",

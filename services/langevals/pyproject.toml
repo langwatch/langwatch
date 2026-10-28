@@ -112,14 +112,19 @@ override-dependencies = [
   #
   # litellm auth bypass via Host header injection AND via OIDC userinfo cache
   # key collision (both CRITICAL), plus four further advisories fixed across
-  # 1.83.7 / 1.83.10 / 1.83.14. 1.84.0 is the first release above all of them.
-  "litellm>=1.84.0",
+  # 1.83.7 / 1.83.10 / 1.83.14, then GHSA-7hp6-4w63-5g45 fixed in 1.100.4.
+  "litellm>=1.100.4",
   # Pillow: heap overflow / DoS across several decoders, then 28 advisories
   # covering <13.0.0, three of them critical.
   "pillow>=13.0.0",
   # nltk unsafe deserialization in the pickle loader path, plus the advisories
   # closed in 3.10.1 and 3.10.3.
   "nltk>=3.10.3",
+  # authlib (via arize-phoenix and fastmcp): JWS empty-signature validation
+  # (CRITICAL) and further advisories, all fixed by 1.9.1.
+  "authlib>=1.9.1",
+  # dnspython: GHSA-45c3-73f7-pv4m, fixed in 2.9.0.
+  "dnspython>=2.9.0",
   # pyasn1 decoder DoS on crafted BER/DER input.
   "pyasn1>=0.6.4",
   # aiohttp request smuggling and header-parsing advisories, then no initial
@@ -140,11 +145,11 @@ override-dependencies = [
   #
   # NOT fixed here, deliberately:
   #   ragas, diskcache: no patched release exists upstream yet.
-  #   nltk: GHSA-8mgp-746c-j5xp covers <=3.10.3 and names no fix. 3.10.4
-  #   (uploaded 2026-10-21) sandboxes the model-artifact paths it describes,
-  #   but it is inside the age gate, and langevals reaches nltk only through
-  #   rouge-score's stemmer, not the affected loaders. Raise the floor to
-  #   3.10.4 once it clears the gate on 2026-10-28.
+  #   nltk: GHSA-j456-xh4h-cpf2 (high) is fixed in 3.10.4, and 3.10.4 also
+  #   sandboxes the model-artifact paths of GHSA-8mgp-746c-j5xp, which names
+  #   no fix. 3.10.4 (uploaded 2026-10-21) is inside the age gate, neither
+  #   advisory is a 0-day or exploited, and langevals reaches nltk only through
+  #   rouge-score's stemmer. Raise the floor to 3.10.4 from 2026-10-29.
 ]
 
 # Security floors that only need to raise a version. Constraints add to the

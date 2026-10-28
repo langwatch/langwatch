@@ -31,6 +31,7 @@ constraint-dependencies = [
   "mako>=1.4.2", # security: Mako advisory covering <=1.4.1 (#2748)
   "certifi>=2026.10.19", # security: certifi advisory covering <2026.10.19 (#2918)
   "multidict>=6.9.1", # security: multidict advisory covering 6.7.0-6.9.0 (#2747)
+  "litellm>=1.100.4", # security: litellm advisory GHSA-7hp6-4w63-5g45, fixed in 1.100.4
   # filelock 4.2.1 needs Python 3.11; on 3.10, 3.20.3 sits below the advisories covering 3.20.4-4.2.0.
   "filelock>=4.2.1; python_full_version >= '3.11'", # security: filelock advisories covering 3.20.4-4.2.0 (#3195-#3197)
   "filelock>=3.20.3,<3.20.4; python_full_version < '3.11'", # security: same advisories, on 3.10 (#3195-#3197)

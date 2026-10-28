@@ -135,7 +135,7 @@ def sync_detailed(
     | PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse404
     | PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500
 ]:
-    """Update a widget on a board
+    """Update a widget on a dashboard
 
      Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its
     stored value. A body with none of these fields is refused.
@@ -181,7 +181,7 @@ def sync(
     | PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500
     | None
 ):
-    """Update a widget on a board
+    """Update a widget on a dashboard
 
      Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its
     stored value. A body with none of these fields is refused.
@@ -221,7 +221,7 @@ async def asyncio_detailed(
     | PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse404
     | PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500
 ]:
-    """Update a widget on a board
+    """Update a widget on a dashboard
 
      Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its
     stored value. A body with none of these fields is refused.
@@ -265,7 +265,7 @@ async def asyncio(
     | PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse500
     | None
 ):
-    """Update a widget on a board
+    """Update a widget on a dashboard
 
      Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its
     stored value. A body with none of these fields is refused.

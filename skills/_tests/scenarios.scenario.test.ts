@@ -29,7 +29,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
 
-const judgeModel = openai("gpt-5-mini");
+const judgeModel = openai("gpt-6-luna");
 
 function copySkillToWorkDir(tempFolder: string) {
   installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "scenarios" });
@@ -860,7 +860,7 @@ describe("Scenarios Skill", () => {
             name: "Platform scenarios from a connected agent's levers",
             description:
               "The user's support agent is already connected to LangWatch from code and declares two " +
-              "run parameters, model (gpt-5-mini, gpt-5) and plan (free, pro). The scenarios skill must " +
+              "run parameters, model (gpt-6-luna, gpt-6-sol) and plan (free, pro). The scenarios skill must " +
               "read those levers from the platform before proposing scenarios, write at least one " +
               "scenario whose expected behavior depends on the plan, supply the plan as a run parameter " +
               "rather than in the situation text, and offer a comparison across the model options.",
@@ -873,7 +873,7 @@ describe("Scenarios Skill", () => {
                   "Agent read the scenarios skill instructions before acting",
                   "Agent read the connected agent's declared run parameters from the platform (langwatch agent get or agent list) before proposing scenarios",
                   "Agent proposed or created at least one scenario whose expected behavior depends on the customer plan, and named the plan as a run parameter (--param plan=... or a ?plan=... target suffix) instead of writing the plan into the situation text",
-                  "Agent mentioned a comparison run across the model options (gpt-5-mini and gpt-5) or ran one",
+                  "Agent mentioned a comparison run across the model options (gpt-6-luna and gpt-6-sol) or ran one",
                   "Agent created the scenarios on the platform with the langwatch CLI and did not write test files",
                   "If any langwatch command failed, the agent reported the failure instead of claiming the run succeeded",
                 ],

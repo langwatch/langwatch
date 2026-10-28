@@ -48,7 +48,7 @@ async def support_agent(
     messages: list[dict],
     thread_id: str,
     *,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-6-luna",
 ) -> str:
     result = await SupportAgent(model=model).run(messages, conversation_id=thread_id)
     return result.output_text
@@ -67,7 +67,7 @@ connectAgent(
   {
     name: "support-agent",
     parameters: z.object({
-      model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+      model: z.enum(["gpt-6-sol", "gpt-6-luna"]).default("gpt-6-luna"),
     }),
   },
   async ({ messages, threadId, params }) => {
@@ -103,7 +103,7 @@ from typing import Literal
 async def support_agent(
     messages: list[dict],
     *,
-    model: Literal["gpt-5", "gpt-5-mini"] = "gpt-5-mini",
+    model: Literal["gpt-6-sol", "gpt-6-luna"] = "gpt-6-luna",
     plan: str = "free",
     max_tools: int = 5,
 ) -> str:
@@ -119,7 +119,7 @@ TypeScript declares them with a zod schema in `parameters`, the way Step 3 shows
 
 Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
 
-valibot and arktype work the same way, and so does any other Standard Schema object that has a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`), or a plain JSON Schema object.
+valibot and arktype work the same way, and so does any other Standard Schema object that has a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-6-sol", "gpt-6-luna"], default: "gpt-6-luna" } }`), or a plain JSON Schema object.
 
 Declare a parameter for a value the tests must vary: a model, a plan, a tenant, a fixture id. `Literal` and `Enum` in Python, and `z.enum` in TypeScript, become a closed list that the run dialog offers as choices and the platform refuses a value outside of.
 
@@ -199,7 +199,7 @@ langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
-- Repeat `--target` to compare two environments, or the same agent with two parameter values: `--target 'connected:support-agent@production?model=gpt-5'`.
+- Repeat `--target` to compare two environments, or the same agent with two parameter values: `--target 'connected:support-agent@production?model=gpt-6-sol'`.
 - `--wait` blocks until the run finishes and exits non-zero when it fails. Use it here: the report in Step 6 needs the result.
 - Keep the agent process running for the whole run. A run against an agent with no connected instance is refused with `agent_offline`.
 
@@ -207,8 +207,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent?model=gpt-5' \
-  --target 'connected:support-agent?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-6-sol' \
+  --target 'connected:support-agent?model=gpt-6-luna' \
   --name 'Smoke: model comparison' --format json
 ```
 

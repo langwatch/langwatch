@@ -150,7 +150,7 @@ span.
     SetType(langwatch.SpanTypeLLM).
     SetInput("What is the capital of France?").
     SetOutput("The capital of France is Paris.").
-    SetRequestModel("gpt-5-mini").
+    SetRequestModel("gpt-6-luna").
     SetThreadID("conversation-123")
 ```
 
@@ -284,8 +284,8 @@ Handy when instrumenting manually. These map directly to OpenTelemetry GenAI sem
 
   **Example:**
   ```go
-  span.SetRequestModel("gpt-5-mini")
-  span.SetResponseModel("gpt-5-mini-2025-08-07")
+  span.SetRequestModel("gpt-6-luna")
+  span.SetResponseModel("gpt-6-luna")
   ```
 </ParamField>
 
@@ -632,7 +632,7 @@ prod, err := lw.Prompts.Get(ctx, "support-greeting", &client.GetPromptOptions{Ta
 // Create a prompt (Update creates a new version).
 p, err := lw.Prompts.Create(ctx, client.CreatePromptParams{
 	Handle: "support-greeting",
-	Model:  "openai/gpt-5-mini",
+	Model:  "openai/gpt-6-luna",
 	Messages: []client.Message{
 		{Role: client.RoleSystem, Content: "You are a friendly support agent."},
 	},

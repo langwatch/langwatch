@@ -118,10 +118,11 @@ def sync_detailed(
     | PatchApiDashboardsByDashboardIdResponse404
     | PatchApiDashboardsByDashboardIdResponse500
 ]:
-    """Update a board
+    """Update a dashboard
 
-     Changes a board's name or description; a field the body leaves out keeps its value, and a null
-    description clears it.
+     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
+    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
+    traces, and null restores the default (Langy's left out, none in a personal project).
 
     Args:
         dashboard_id (str):
@@ -161,10 +162,11 @@ def sync(
     | PatchApiDashboardsByDashboardIdResponse500
     | None
 ):
-    """Update a board
+    """Update a dashboard
 
-     Changes a board's name or description; a field the body leaves out keeps its value, and a null
-    description clears it.
+     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
+    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
+    traces, and null restores the default (Langy's left out, none in a personal project).
 
     Args:
         dashboard_id (str):
@@ -198,10 +200,11 @@ async def asyncio_detailed(
     | PatchApiDashboardsByDashboardIdResponse404
     | PatchApiDashboardsByDashboardIdResponse500
 ]:
-    """Update a board
+    """Update a dashboard
 
-     Changes a board's name or description; a field the body leaves out keeps its value, and a null
-    description clears it.
+     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
+    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
+    traces, and null restores the default (Langy's left out, none in a personal project).
 
     Args:
         dashboard_id (str):
@@ -239,10 +242,11 @@ async def asyncio(
     | PatchApiDashboardsByDashboardIdResponse500
     | None
 ):
-    """Update a board
+    """Update a dashboard
 
-     Changes a board's name or description; a field the body leaves out keeps its value, and a null
-    description clears it.
+     Changes a dashboard's name, description or the trace origins its widgets leave out; a field the body
+    leaves out keeps its value. A null description clears it; excludedOrigins [] includes Langy's
+    traces, and null restores the default (Langy's left out, none in a personal project).
 
     Args:
         dashboard_id (str):

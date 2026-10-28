@@ -7,9 +7,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   BOARD_PERIOD_RANGES,
+  boardExcludedOrigins,
   boardGrainFits,
+  boardIncludesLangy,
+  boardOriginsWithLangy,
   boardPeriodBounds,
   boardPeriodGranularity,
+  boardWindowEnd,
   defaultBoardExcludedOrigins,
 } from "../model/board-period.ts";
 
@@ -66,6 +70,49 @@ describe("given the Live range", () => {
   });
 });
 
+describe("boardWindowEnd", () => {
+  const MINUTE = 60_000;
+
+  describe("given a fixed range", () => {
+    /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+    it("ends at the minute the range was picked until the first refresh", () => {
+      const end = boardWindowEnd({ range: "24h", now: NOW + 5 * MINUTE, pickedAt: NOW + 10 });
+      expect(end).toBe(NOW + MINUTE);
+    });
+
+    /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+    it("moves its end to the minute after each refresh", () => {
+      const end = boardWindowEnd({
+        range: "24h",
+        now: NOW + 9 * MINUTE,
+        pickedAt: NOW,
+        refreshedAt: NOW + 3 * MINUTE + 1,
+      });
+      expect(end).toBe(NOW + 4 * MINUTE);
+    });
+
+    /** @scenario "AC19d A fixed range moves its end to now on each refresh" */
+    it("keeps the range's length when the end moves", () => {
+      const end = boardWindowEnd({
+        range: "7d",
+        now: NOW,
+        pickedAt: NOW,
+        refreshedAt: NOW + MINUTE,
+      });
+      const bounds = boardPeriodBounds({ range: "7d", now: end });
+      expect(bounds.periodEnd - bounds.periodStart).toBe(7 * 86_400_000);
+    });
+  });
+
+  describe("given the Live range", () => {
+    /** @scenario "AC19c Live is the last hour, rolling, refreshed every minute" */
+    it("rolls with the clock to the next minute", () => {
+      const end = boardWindowEnd({ range: "live", now: NOW + 5 * MINUTE + 1, pickedAt: NOW });
+      expect(end).toBe(NOW + 6 * MINUTE);
+    });
+  });
+});
+
 describe("fitGranularity", () => {
   it("widens to a week when days would exceed the bucket budget", () => {
     const thirtyYears = 30 * 365 * DAY_S * 1000;
@@ -88,5 +135,43 @@ describe("defaultBoardExcludedOrigins", () => {
     it("leaves out no origin", () => {
       expect(defaultBoardExcludedOrigins({ isPersonalProject: true })).toEqual([]);
     });
+  });
+});
+
+describe("boardExcludedOrigins", () => {
+  describe("given a board that stores no origins", () => {
+    /** @scenario "AC200 Langy setting: a board leaves Langy's conversations out until a member includes them" */
+    it("leaves out the project's default", () => {
+      expect(boardExcludedOrigins({ stored: null, isPersonalProject: false })).toEqual(["langy"]);
+    });
+
+    /** @scenario "AC200c Langy setting: a personal project's board still includes Langy by default" */
+    it("leaves out no origin in a personal project", () => {
+      expect(boardExcludedOrigins({ stored: null, isPersonalProject: true })).toEqual([]);
+    });
+  });
+
+  describe("given a board set to include Langy", () => {
+    /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
+    it("leaves out what it stores, the empty list, wherever it is", () => {
+      expect(boardExcludedOrigins({ stored: [], isPersonalProject: false })).toEqual([]);
+      expect(boardIncludesLangy({ excluded: [] })).toBe(true);
+    });
+  });
+});
+
+describe("boardOriginsWithLangy", () => {
+  /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
+  it("drops langy when the member includes it, and keeps other origins", () => {
+    expect(boardOriginsWithLangy({ excluded: ["langy"], includeLangy: true })).toEqual([]);
+    expect(boardOriginsWithLangy({ excluded: ["eval", "langy"], includeLangy: true })).toEqual([
+      "eval",
+    ]);
+  });
+
+  /** @scenario "AC200c Langy setting: a personal project's board still includes Langy by default" */
+  it("adds langy when the member leaves it out", () => {
+    expect(boardOriginsWithLangy({ excluded: [], includeLangy: false })).toEqual(["langy"]);
+    expect(boardIncludesLangy({ excluded: ["langy"] })).toBe(false);
   });
 });

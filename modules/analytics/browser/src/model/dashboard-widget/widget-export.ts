@@ -173,6 +173,11 @@ export function widgetExportFileName({
 }): string {
   const period = Object.values(results).find((result) => result.period)?.period;
   const days = period ? [utcDay(period.start), utcDay(period.end - 1)] : [];
-  const parts = [slugify(board) || "board", slugify(widget) || "widget", "query-results", ...days];
+  const parts = [
+    slugify(board) || "dashboard",
+    slugify(widget) || "widget",
+    "query-results",
+    ...days,
+  ];
   return `${parts.join("_")}.csv`;
 }

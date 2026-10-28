@@ -44,6 +44,34 @@ export function defaultBoardExcludedOrigins({
   return isPersonalProject ? [] : [LANGY_TRACE_ORIGIN];
 }
 
+/** The origins a board leaves out: what it stores, or its default while it stores none (AC200). */
+export function boardExcludedOrigins({
+  stored,
+  isPersonalProject,
+}: {
+  stored: readonly string[] | null;
+  isPersonalProject: boolean;
+}): readonly string[] {
+  return stored ?? defaultBoardExcludedOrigins({ isPersonalProject });
+}
+
+/** Whether a board's widgets count Langy's conversations. */
+export function boardIncludesLangy({ excluded }: { excluded: readonly string[] }): boolean {
+  return !excluded.includes(LANGY_TRACE_ORIGIN);
+}
+
+/** The list to store when the member includes or leaves out Langy; other origins stay. */
+export function boardOriginsWithLangy({
+  excluded,
+  includeLangy,
+}: {
+  excluded: readonly string[];
+  includeLangy: boolean;
+}): readonly string[] {
+  const others = excluded.filter((origin) => origin !== LANGY_TRACE_ORIGIN);
+  return includeLangy ? others : [...others, LANGY_TRACE_ORIGIN];
+}
+
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";
 export const DEFAULT_BOARD_PERIOD_GRAIN: BoardPeriodGrain = "auto";
 
@@ -72,6 +100,27 @@ function autoGrain({ spanMs }: { spanMs: number }): Exclude<BoardPeriodGrain, "a
   if (spanMs <= RANGE_MS["24h"]) return "1h";
   if (spanMs <= RANGE_MS["30d"]) return "1d";
   return "1w";
+}
+
+const MINUTE_MS = 60_000;
+
+/**
+ * Where a board's window ends, on the next whole minute so a render does not refetch: Live
+ * rolls with the clock; a fixed range ends at the last refresh, or when it was picked (AC19d).
+ */
+export function boardWindowEnd({
+  range,
+  now,
+  pickedAt,
+  refreshedAt,
+}: {
+  range: BoardPeriodRange;
+  now: number;
+  pickedAt: number;
+  refreshedAt?: number;
+}): number {
+  const end = range === "live" ? now : Math.max(pickedAt, refreshedAt ?? 0);
+  return Math.ceil(end / MINUTE_MS) * MINUTE_MS;
 }
 
 /** `[periodStart, periodEnd]` in epoch milliseconds for a range ending at `now`. */
