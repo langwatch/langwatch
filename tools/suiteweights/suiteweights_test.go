@@ -40,16 +40,29 @@ func TestWeighIgnoresCacheReplaysWhenARealRunExists(t *testing.T) {
 		{m("a", "test", 2, true)},
 		{m("a", "test", 90, false)},
 		{m("a", "test", 3, true)},
-	})
+	}, nil)
 
 	assert.InDelta(t, 90.0, weights["a"], 0.001)
 }
 
 // @scenario "A suite only ever replayed from the cache still has a weight"
 func TestWeighFallsBackToReplaysWhenNothingRanForReal(t *testing.T) {
-	weights := Weigh([][]Measurement{{m("a", "test", 4, true)}, {m("a", "test", 6, true)}})
+	weights := Weigh([][]Measurement{{m("a", "test", 4, true)}, {m("a", "test", 6, true)}}, nil)
 
 	assert.InDelta(t, 5.0, weights["a"], 0.001)
+}
+
+// @scenario "A package only ever replayed from the cache keeps its committed weight"
+func TestWeighKeepsTheCommittedWeightOfAPackageNoRunExecuted(t *testing.T) {
+	previous := ParseWeights("# header\n@x/sims  28\n@x/ran  90  # note\n")
+
+	weights := Weigh([][]Measurement{
+		{m("@x/sims", "test", 2, true), m("@x/ran", "test", 40, false)},
+		{m("@x/sims", "test", 3, true), m("@x/ran", "test", 50, false)},
+	}, previous)
+
+	assert.InDelta(t, 28.0, weights["@x/sims"], 0.001)
+	assert.InDelta(t, 45.0, weights["@x/ran"], 0.001)
 }
 
 // @scenario "A package's weight is the median of its runs, summed over its scripts"
@@ -58,7 +71,7 @@ func TestWeighSumsTheMedianOfEachScript(t *testing.T) {
 		{m("a", "test", 50, false), m("a", "test:integration", 274, false)},
 		{m("a", "test", 40, false), m("a", "test:integration", 404, false)},
 		{m("a", "test", 60, false), m("a", "test:integration", 300, false)},
-	})
+	}, nil)
 
 	assert.InDelta(t, 350.0, weights["a"], 0.001)
 }

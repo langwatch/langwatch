@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -11,16 +12,43 @@ import (
 // the median of each script's measured seconds, summed over the package's
 // scripts. A measurement Nx replayed from its cache is used only when no run
 // executed that script for real, so a cache hit never makes a suite look cheap.
-func Weigh(runs [][]Measurement) map[string]float64 {
+// A package no sampled run executed at all keeps its weight from `previous`,
+// the committed file, when it has one: its replays say nothing about its cost.
+func Weigh(runs [][]Measurement, previous map[string]float64) map[string]float64 {
 	ran, replayed := byScript(runs)
+	executed := map[string]bool{}
 	weights := map[string]float64{}
+	for k, seconds := range ran {
+		executed[k.pkg] = true
+		weights[k.pkg] += median(seconds)
+	}
 	for k, seconds := range replayed {
-		if _, executed := ran[k]; !executed {
+		if _, ranForReal := ran[k]; !ranForReal {
 			weights[k.pkg] += median(seconds)
 		}
 	}
-	for k, seconds := range ran {
-		weights[k.pkg] += median(seconds)
+	for pkg, seconds := range previous {
+		if _, measured := weights[pkg]; measured && !executed[pkg] {
+			weights[pkg] = seconds
+		}
+	}
+	return weights
+}
+
+// ParseWeights reads a weights file: `<package>  <seconds>` per line, `#`
+// comments and blank lines ignored. A line of any other shape is skipped; the
+// file is only a fallback here, and run-package-suites.ts is what refuses it.
+func ParseWeights(source string) map[string]float64 {
+	weights := map[string]float64{}
+	for _, raw := range strings.Split(source, "\n") {
+		line, _, _ := strings.Cut(raw, "#")
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		if seconds, err := strconv.ParseFloat(fields[1], 64); err == nil && seconds > 0 {
+			weights[fields[0]] = seconds
+		}
 	}
 	return weights
 }

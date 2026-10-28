@@ -31,8 +31,16 @@ Feature: The package-suites weights are refreshed by a command
     @unit
     Scenario: A suite only ever replayed from the cache still has a weight
       Given a script Nx replayed from its cache in every run
+      And the committed weights file does not name its package
       When the weights are computed
       Then its replayed seconds are its weight
+
+    @unit
+    Scenario: A package only ever replayed from the cache keeps its committed weight
+      Given a package every sampled run replayed from the cache
+      And the committed weights file names it
+      When the weights are computed
+      Then it keeps the committed weight rather than the replay's seconds
 
     @unit
     Scenario: A package's weight is the median of its runs, summed over its scripts
