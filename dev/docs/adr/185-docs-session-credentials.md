@@ -136,6 +136,10 @@ stored.
 - **A trace-reading preset only:** the playground covers the whole API, and a member's
   own grants already bound what the key can do.
 - **A full-page redirect carrying the token:** tokens must never enter a URL.
+- **A device code (RFC 8628), alone or as a fallback (2026-10-28):** whoever starts a grant
+  receives the key that the approver approves, so anyone who gets a reader to approve a code
+  holds a key acting as that reader. The popup returns the key only to the frame that opened
+  it, and storage partitioning leaves no way to bind a device approval to the reader's browser.
 
 ## Amendment, 2026-10-28: the key stays on the app's origin
 
