@@ -42,11 +42,21 @@ export type {
   FrameSecondaryTone,
 } from "../action-row.tsx";
 
+type MarginValue = string | number;
+
 /**
  * The panel's ground, border and radius are the recipe's: don't pass `bg`, `background` or
  * `borderRadius` (lint proposal `no-drawer-content-ground`). Width comes from Root's `size`.
  */
-export interface DrawerContentProps extends ChakraDrawer.ContentProps {
+export interface DrawerContentProps extends Omit<
+  ChakraDrawer.ContentProps,
+  "marginTop" | "marginEnd" | "marginBottom" | "marginStart"
+> {
+  /** Plain per-side margins for wide screens; a phone sheet still fills the edges. */
+  marginTop?: MarginValue;
+  marginEnd?: MarginValue;
+  marginBottom?: MarginValue;
+  marginStart?: MarginValue;
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement | null>;
   offset?: ChakraDrawer.ContentProps["padding"];
@@ -56,12 +66,9 @@ export interface DrawerContentProps extends ChakraDrawer.ContentProps {
   errorScope?: string;
 }
 
-/** A caller's side margin applies on wide screens only; a phone sheet always reaches the edge. */
-function floatMargin(value: ChakraDrawer.ContentProps["marginEnd"]) {
-  if (value == null) return undefined;
-  if (typeof value === "object" && !Array.isArray(value))
-    return Object.assign({}, value, { mdDown: 0 });
-  return { base: value, md: value, mdDown: 0 };
+/** A wide screen floats the drawer by `value`, or the default 2; a phone sheet reaches the edge. */
+function floatMargin({ value, phone = "0px" }:{ value?: MarginValue; phone?: MarginValue }) {
+  return { base: phone, md: value ?? 2 };
 }
 
 export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps>(
@@ -83,6 +90,8 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
   ) {
     const context = React.useContext(DrawerOffsetContext);
     const inset = useDrawerEndInset();
+    const topOffset =
+      marginTop ?? (context.marginTop == null ? undefined : `${context.marginTop}px`);
     const guarded = withErrorBoundary;
     const portalTarget = React.useRef<HTMLDivElement | null>(null);
     return (
@@ -92,21 +101,17 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
             <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
               <ChakraDrawer.Content
                 ref={contentProps.asChild ? mergeRefs(ref, portalTarget) : ref}
-                // A phone shows every drawer as a full-screen sheet; wider screens float it. The
-                // per-side margins below repeat their value at md so they beat this shorthand there.
-                margin={{ base: 0, md: 2 }}
-                marginStart={floatMargin(marginStart)}
-                marginBottom={floatMargin(marginBottom)}
+                // A phone shows every drawer as a full-screen sheet below any header; wider
+                // screens float it. Longhands only: a shorthand at md would beat them there.
+                marginTop={floatMargin({ value: topOffset, phone: topOffset })}
+                marginEnd={floatMargin({
+                  value: marginEnd ?? (inset > 0 ? `${inset}px` : undefined),
+                })}
+                marginBottom={floatMargin({ value: marginBottom })}
+                marginStart={floatMargin({ value: marginStart })}
                 maxWidth={{ mdDown: "100%" }}
                 pointerEvents="auto"
                 borderRadius={{ base: 0, md: "lg" }}
-                marginTop={
-                  marginTop ??
-                  (context.marginTop == null
-                    ? { mdDown: 0 }
-                    : { base: `${context.marginTop}px`, md: `${context.marginTop}px` })
-                }
-                marginEnd={floatMargin(marginEnd ?? (inset > 0 ? `${inset}px` : undefined))}
                 {...contentProps}
               >
                 {contentProps.asChild ? (

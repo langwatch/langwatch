@@ -1,4 +1,4 @@
-/** Measured in real Chromium: a drawer yields the docked side panel's room on a wide screen. */
+/** Measured in real Chromium: a drawer floats on a wide screen and fills a phone as a sheet. */
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
@@ -14,11 +14,19 @@ import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 const DOCK_ROOM_PX = 412;
 const PHONE_WIDTH = 600;
+/** The floating drawer's own margin on a wide screen (spacing token 2). */
+const FLOAT_PX = 8;
+/** The studio header's clearance (`marginTop="14"`). */
+const STUDIO_HEADER_PX = 56;
 
 /** The drawer slides in; measure where it comes to rest. */
 async function restingGapToRightEdge(element: Element): Promise<number> {
   await Promise.all(element.getAnimations({ subtree: true }).map((motion) => motion.finished));
   return window.innerWidth - element.getBoundingClientRect().right;
+}
+
+function bottomGap(element: Element): number {
+  return window.innerHeight - element.getBoundingClientRect().bottom;
 }
 
 interface OpenDrawerOptions {
@@ -58,8 +66,28 @@ async function renderOpenDrawer({
   return element;
 }
 
-function bottomGap(element: Element): number {
-  return window.innerHeight - element.getBoundingClientRect().bottom;
+interface FramedDrawerOptions {
+  width?: number;
+  endInset?: number;
+  topInset?: "studio-header";
+}
+
+/** Opens the framed drawer feature code uses and returns it once it has come to rest. */
+async function renderFramedDrawer({
+  width = 1400,
+  endInset = 0,
+  topInset,
+}: FramedDrawerOptions = {}): Promise<HTMLElement> {
+  await page.viewport(width, 800);
+  setDrawerEndInset(endInset);
+  renderWithDesignSystem(
+    <Drawer title="Trace" onClose={() => undefined} topInset={topInset} data-testid="framed">
+      <Text>body</Text>
+    </Drawer>,
+  );
+  const element = await screen.findByTestId("framed");
+  await restingGapToRightEdge(element);
+  return element;
 }
 
 afterEach(() => {
@@ -77,16 +105,19 @@ describe("given a docked side panel keeps room on the right edge of a wide scree
 
   /** @scenario "An open drawer sits beside the open Langy panel instead of under it" */
   it("the framed drawer sits clear of that room", async () => {
-    await page.viewport(1400, 800);
-    setDrawerEndInset(DOCK_ROOM_PX);
-    renderWithDesignSystem(
-      <Drawer title="Trace" onClose={() => undefined} data-testid="framed">
-        <Text>body</Text>
-      </Drawer>,
-    );
-    const drawer = await screen.findByTestId("framed");
+    const drawer = await renderFramedDrawer({ endInset: DOCK_ROOM_PX });
 
     expect(await restingGapToRightEdge(drawer)).toBeCloseTo(DOCK_ROOM_PX, 0);
+  });
+});
+
+describe("given a wide screen with no docked side panel", () => {
+  it("a drawer floats with its own small margin on every side", async () => {
+    const drawer = await renderOpenDrawer();
+
+    expect(drawer.getBoundingClientRect().top).toBeCloseTo(FLOAT_PX, 0);
+    expect(await restingGapToRightEdge(drawer)).toBeCloseTo(FLOAT_PX, 0);
+    expect(bottomGap(drawer)).toBeCloseTo(FLOAT_PX, 0);
   });
 
   it("a drawer below a header keeps its top offset", async () => {
@@ -95,24 +126,43 @@ describe("given a docked side panel keeps room on the right edge of a wide scree
     expect(drawer.getBoundingClientRect().top).toBeCloseTo(48, 0);
   });
 
-  it("a phone keeps the header offset above the full-screen sheet", async () => {
-    const drawer = await renderOpenDrawer({ width: PHONE_WIDTH, headerOffset: 48 });
+  it("a studio drawer keeps its clearance below the studio header", async () => {
+    const drawer = await renderFramedDrawer({ topInset: "studio-header" });
 
-    expect(drawer.getBoundingClientRect().top).toBeCloseTo(48, 0);
+    expect(drawer.getBoundingClientRect().top).toBeCloseTo(STUDIO_HEADER_PX, 0);
   });
 
+  it("a caller's top margin beats a header offset", async () => {
+    const drawer = await renderOpenDrawer({
+      headerOffset: 48,
+      contentProps: { marginTop: "100px" },
+    });
+
+    expect(drawer.getBoundingClientRect().top).toBeCloseTo(100, 0);
+  });
+
+  it("the drawer honours the end margin a caller passes", async () => {
+    const drawer = await renderOpenDrawer({ contentProps: { marginEnd: "40px" } });
+
+    expect(await restingGapToRightEdge(drawer)).toBeCloseTo(40, 0);
+  });
+});
+
+describe("given a phone", () => {
   /** @scenario "An open drawer sits beside the open Langy panel instead of under it" */
-  it("a phone still shows the drawer as a full-screen sheet", async () => {
+  it("a docked side panel's room still leaves the drawer a full-screen sheet", async () => {
     const drawer = await renderOpenDrawer({ width: PHONE_WIDTH, endInset: DOCK_ROOM_PX });
 
-    expect(await restingGapToRightEdge(drawer)).toBeCloseTo(0, 0);
+    expect(drawer.getBoundingClientRect().top).toBeCloseTo(0, 0);
     expect(drawer.getBoundingClientRect().left).toBeCloseTo(0, 0);
+    expect(await restingGapToRightEdge(drawer)).toBeCloseTo(0, 0);
+    expect(bottomGap(drawer)).toBeCloseTo(0, 0);
   });
 
   it.each([
     ["no end margin", undefined],
     ["an end margin", "8px"],
-  ])("a phone reaches both edges when the caller passes %s", async (_name, marginEnd) => {
+  ])("the sheet reaches both edges when the caller passes %s", async (_name, marginEnd) => {
     const drawer = await renderOpenDrawer({
       width: PHONE_WIDTH,
       contentProps: { marginEnd },
@@ -122,7 +172,7 @@ describe("given a docked side panel keeps room on the right edge of a wide scree
     expect(drawer.getBoundingClientRect().left).toBeCloseTo(0, 0);
   });
 
-  it("a phone ignores start and bottom margins a caller passes", async () => {
+  it("the sheet ignores start and bottom margins a caller passes", async () => {
     const drawer = await renderOpenDrawer({
       width: PHONE_WIDTH,
       contentProps: { marginStart: "8px", marginBottom: "8px" },
@@ -132,9 +182,20 @@ describe("given a docked side panel keeps room on the right edge of a wide scree
     expect(bottomGap(drawer)).toBeCloseTo(0, 0);
   });
 
-  it("a wide screen honours the end margin a caller passes", async () => {
-    const drawer = await renderOpenDrawer({ contentProps: { marginEnd: "40px" } });
+  it("the sheet sits below a header offset and fills the rest", async () => {
+    const drawer = await renderOpenDrawer({ width: PHONE_WIDTH, headerOffset: 48 });
 
-    expect(await restingGapToRightEdge(drawer)).toBeCloseTo(40, 0);
+    expect(drawer.getBoundingClientRect().top).toBeCloseTo(48, 0);
+    expect(drawer.getBoundingClientRect().left).toBeCloseTo(0, 0);
+    expect(await restingGapToRightEdge(drawer)).toBeCloseTo(0, 0);
+    expect(bottomGap(drawer)).toBeCloseTo(0, 0);
+  });
+
+  it("a studio sheet sits below the studio header and fills the width", async () => {
+    const drawer = await renderFramedDrawer({ width: PHONE_WIDTH, topInset: "studio-header" });
+
+    expect(drawer.getBoundingClientRect().top).toBeCloseTo(STUDIO_HEADER_PX, 0);
+    expect(drawer.getBoundingClientRect().left).toBeCloseTo(0, 0);
+    expect(await restingGapToRightEdge(drawer)).toBeCloseTo(0, 0);
   });
 });

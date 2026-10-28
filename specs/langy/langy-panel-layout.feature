@@ -123,7 +123,7 @@ Feature: Langy panel layout modes
 
   # Regression: a phone-only full-screen margin, conditioned on a media query,
   # silently beat the yield on wide screens and left the drawer under Langy.
-  @integration
+  @regression @integration
   Scenario: An open drawer sits beside the open Langy panel instead of under it
     Given the Langy panel is open in sidebar mode on a wide screen
     When a right-anchored drawer opens, such as the trace drawer

@@ -14,7 +14,7 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 
-import { Drawer } from "../drawer.tsx";
+import { Drawer, DrawerOffsetProvider } from "../drawer.tsx";
 
 // Stand in for Langy, the owner of the slice, which this package only reads.
 const langy = defineSlice<LangySliceSurface>({
@@ -66,5 +66,21 @@ describe("given the Langy panel is minimised", () => {
     const drawer = await renderTraceDrawer();
 
     expect(await restingGapToRightEdge(drawer)).toBeCloseTo(8, 0);
+  });
+
+  it("the trace drawer keeps the top offset its header context gives it", async () => {
+    renderWithDesignSystem(
+      <DrawerOffsetProvider value={{ marginTop: 48 }}>
+        <Drawer.Root open placement="end">
+          <Drawer.Content data-testid="offset-drawer">
+            <Drawer.Body>trace</Drawer.Body>
+          </Drawer.Content>
+        </Drawer.Root>
+      </DrawerOffsetProvider>,
+    );
+    const drawer = await screen.findByTestId("offset-drawer");
+    await restingGapToRightEdge(drawer);
+
+    expect(drawer.getBoundingClientRect().top).toBeCloseTo(48, 0);
   });
 });
