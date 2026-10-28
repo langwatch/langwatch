@@ -63,5 +63,6 @@ export function VersionList({ versions, "data-testid": testId }: VersionListProp
 
 function authorOf(row: VersionListItem): string {
   if (row.author) return row.author.name ?? row.author.email ?? "Unknown user";
-  return row.authorKind === "api_key" ? "API key" : "LangWatch";
+  if (row.authorKind === "api_key") return "API key";
+  return row.authorKind === "user" ? "Unknown user" : "LangWatch";
 }

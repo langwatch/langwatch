@@ -149,6 +149,10 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
       ...(input.author ? { updatedById: input.author.authorId } : {}),
     });
 
+    await this.backfillFirstVersion({
+      evaluator: existing,
+      createdById: existing.createdById ?? null,
+    });
     this.#rows.set(written.id, written);
     this.#appendVersion({
       evaluator: written,
@@ -188,6 +192,10 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
     });
     if (!evaluatorVersionChanged({ before: existing, after: updated })) return;
 
+    await this.backfillFirstVersion({
+      evaluator: existing,
+      createdById: existing.createdById ?? null,
+    });
     this.#rows.set(updated.id, updated);
     this.#appendVersion({ evaluator: updated, author: void 0, commitMessage: input.commitMessage });
   }

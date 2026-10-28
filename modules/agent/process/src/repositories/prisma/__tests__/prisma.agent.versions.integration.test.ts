@@ -193,4 +193,75 @@ describe.skipIf(!databaseUrl)("Prisma agent versions", () => {
     const versions = await repository.findVersions({ projectId, agentId: oldId });
     expect(versions.map((row) => row.version)).toEqual([1]);
   });
+
+  /** @scenario "A legacy agent's first save keeps its old config as version 1" */
+  it("records the pre-version config as version 1 before the first save", async () => {
+    const legacyId = `${namespace}-legacy`;
+    await connection.client.agent.create({
+      data: {
+        id: legacyId,
+        projectId,
+        name: "Legacy bot",
+        type: "signature",
+        config: configAt("before") as object,
+      },
+    });
+
+    await repository.update({
+      id: legacyId,
+      projectId,
+      type: "signature",
+      config: configAt("after"),
+      author: userAuthor,
+    });
+
+    const versions = await repository.findVersions({ projectId, agentId: legacyId });
+    expect(
+      versions.map((row) => [row.version, (row.config as { prompt?: string }).prompt]),
+    ).toEqual([
+      [2, "after"],
+      [1, "before"],
+    ]);
+  });
+
+  /** @scenario "No version copies a typed-in HTTP credential" */
+  it("skips archived agents and typed-in credentials when recording version 1", async () => {
+    const archivedId = `${namespace}-archived`;
+    const literalId = `${namespace}-literal`;
+    const literal = {
+      url: "https://a.example",
+      method: "POST",
+      auth: { type: "bearer", token: "tok_live_old_123" },
+    };
+    await connection.client.agent.createMany({
+      data: [
+        {
+          id: archivedId,
+          projectId,
+          name: "Archived bot",
+          type: "http",
+          config: literal,
+          archivedAt: new Date(),
+        },
+        { id: literalId, projectId, name: "Literal bot", type: "http", config: literal },
+      ],
+    });
+    const page = await repository.findUnversioned({ afterId: null, limit: 10_000 });
+    expect(page.some((row) => row.id === archivedId)).toBe(false);
+
+    const head = await repository.getById({ id: literalId, projectId });
+    const moved = { ...literal, auth: { type: "bearer", token: "{{ secrets.LITERAL_BOT }}" } };
+    expect(
+      await repository.updateConfigIfUnchanged({
+        id: literalId,
+        projectId,
+        config: parseAgentConfig("http", moved),
+        updatedAt: fromDate(head.updatedAt),
+      }),
+    ).toBe(true);
+
+    const versions = await repository.findVersions({ projectId, agentId: literalId });
+    expect(versions.map((row) => row.version)).toEqual([1]);
+    expect(JSON.stringify(versions)).not.toContain("tok_live_old_123");
+  });
 });

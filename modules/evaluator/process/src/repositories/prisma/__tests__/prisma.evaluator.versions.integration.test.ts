@@ -154,4 +154,27 @@ describe.skipIf(!databaseUrl)("Prisma evaluator versions", () => {
     const versions = await repository.findVersions({ projectId, evaluatorId: oldId });
     expect(versions.map((row) => row.version)).toEqual([1]);
   });
+
+  /** @scenario "A legacy evaluator's first save keeps its old settings as version 1" */
+  it("records the pre-version settings as version 1 before the first save", async () => {
+    const legacyId = `${namespace}-legacy`;
+    await connection.client.evaluator.create({
+      data: {
+        id: legacyId,
+        projectId,
+        name: "Legacy judge",
+        slug: `${namespace}-legacy`,
+        type: "evaluator",
+        config: configAt(3),
+      },
+    });
+
+    await repository.update({ id: legacyId, projectId, data: { config: configAt(4) }, author });
+
+    const versions = await repository.findVersions({ projectId, evaluatorId: legacyId });
+    expect(versions.map((row) => [row.version, row.config])).toEqual([
+      [2, configAt(4)],
+      [1, configAt(3)],
+    ]);
+  });
 });

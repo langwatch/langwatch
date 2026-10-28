@@ -159,6 +159,13 @@ Feature: Evaluator versions and deploy labels
     And its creator is read from its earliest "evaluators.create" audit entry
     And a second run writes nothing
 
+  @integration
+  Scenario: A legacy evaluator's first save keeps its old settings as version 1
+    Given an evaluator created before versions existed
+    When it is saved before the backfill reaches it
+    Then version 1 holds the settings it had before the save
+    And version 2 holds the saved settings
+
   # --- UI ---
 
   @integration
