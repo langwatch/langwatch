@@ -1,4 +1,4 @@
-import { evaluatorSchema } from "@langwatch/evaluator-contract";
+import { checkEvaluatorLabel, evaluatorSchema } from "@langwatch/evaluator-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -63,8 +63,18 @@ export interface MonitorPreconditionsSchema extends Named<
 export const monitorPreconditionsSchema: MonitorPreconditionsSchema =
   monitorPreconditionsSchemaDefinition;
 
-/** A deploy label name; the evaluator checks it against its own label rules. */
-export const monitorEvaluatorLabelSchema = z.string().min(1).max(64);
+/**
+ * A deploy label name under the evaluator's label rules. Whether the evaluator holds it is read
+ * at run time: a label that points nowhere runs the latest version.
+ */
+export const monitorEvaluatorLabelSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .superRefine((label, ctx) => {
+    const check = checkEvaluatorLabel(label);
+    if (!check.valid) ctx.addIssue({ code: "custom", message: check.reason });
+  });
 
 const monitorPersonSchema = z.object({ id: z.string(), name: z.string().nullable() }).strict();
 

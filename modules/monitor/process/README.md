@@ -195,11 +195,11 @@ Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:114`.
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
 ```typescript
-// Params: monitorRestIdParamsSchema, ../contract/src/monitor-rest.schemas.ts:14
+// Params: monitorRestIdParamsSchema, ../contract/src/monitor-rest.schemas.ts:18
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:84
+type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:88
 ```
 
 #### `POST /` · `postApiMonitors`
@@ -211,8 +211,8 @@ Permission `evaluations:create`. Declared at `src/transport/monitor.rest.ts:136`
 Answers at `/api/monitors`, `/api/v1/monitors`; also, undocumented, `/api/monitors/2026-08-07`, `/api/v1/monitors/2026-08-07`, `/api/monitors/latest`, `/api/v1/monitors/latest`.
 
 ```typescript
-type Body = z.infer<typeof monitorRestCreateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:110
-type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:84
+type Body = z.infer<typeof monitorRestCreateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:111
+type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:88
 ```
 
 #### `PATCH /:id` · `patchApiMonitorsById`
@@ -224,9 +224,9 @@ Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:172`
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:14
-type Body = z.infer<typeof monitorRestUpdateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:136
-type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:84
+type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:18
+type Body = z.infer<typeof monitorRestUpdateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:134
+type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:88
 ```
 
 #### `POST /:id/toggle` · `postApiMonitorsByIdToggle`
@@ -238,12 +238,12 @@ Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:197`
 Answers at `/api/monitors/:id/toggle`, `/api/v1/monitors/:id/toggle`; also, undocumented, `/api/monitors/2026-08-07/:id/toggle`, `/api/v1/monitors/2026-08-07/:id/toggle`, `/api/monitors/latest/:id/toggle`, `/api/v1/monitors/latest/:id/toggle`.
 
 ```typescript
-type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:14
-// Body: monitorRestToggleInputSchema, ../contract/src/monitor-rest.schemas.ts:143
+type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:18
+// Body: monitorRestToggleInputSchema, ../contract/src/monitor-rest.schemas.ts:141
 interface Body {
   enabled: boolean;
 }
-// Response: monitorRestToggledSchema, ../contract/src/monitor-rest.schemas.ts:149
+// Response: monitorRestToggledSchema, ../contract/src/monitor-rest.schemas.ts:147
 interface Response {
   id: string;
   enabled: boolean;
@@ -259,8 +259,8 @@ Permission `evaluations:manage`. Declared at `src/transport/monitor.rest.ts:216`
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:14
-// Response: monitorRestDeletedSchema, ../contract/src/monitor-rest.schemas.ts:155
+type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:18
+// Response: monitorRestDeletedSchema, ../contract/src/monitor-rest.schemas.ts:153
 interface Response {
   id: string;
   deleted: boolean;
@@ -298,7 +298,7 @@ interface Input {
   id: string;
   projectId: string;
 }
-type Output = z.infer<typeof monitorWithEvaluatorSchema>; // ../contract/src/monitor.ts:113
+type Output = z.infer<typeof monitorWithEvaluatorSchema>; // ../contract/src/monitor.ts:123
 
 // monitors.isNameAvailable
 // Input: monitorApiNameAvailabilityInputSchema, ../contract/src/monitor-trpc.schemas.ts:68
@@ -314,11 +314,11 @@ interface Output {
 
 // monitors.create
 type Input = z.infer<typeof monitorApiCreateInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:100
-type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:103
+type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:113
 
 // monitors.update
 type Input = z.infer<typeof monitorApiUpdateInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:123
-type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:103
+type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:113
 
 // monitors.toggle
 // Input: monitorApiToggleInputSchema, ../contract/src/monitor-trpc.schemas.ts:44
@@ -343,7 +343,7 @@ interface Input {
   projectId: string;
   sourceProjectId: string;
 }
-type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:103
+type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:113
 ```
 
 ## Sockets
