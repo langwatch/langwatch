@@ -83,14 +83,14 @@ export function restoreBlockedReason({
   version,
   latestVersion,
   restoreSupported,
-  canUpdate,
+  canManage,
 }: {
   version: number;
   latestVersion: number | undefined;
   restoreSupported: boolean;
-  canUpdate: boolean;
+  canManage: boolean;
 }): string | null {
-  if (!canUpdate) return "You need permission to edit this dataset to restore a version.";
+  if (!canManage) return "You need permission to manage this dataset to restore a version.";
   if (!restoreSupported) {
     return "This dataset uses the older single-file layout. Copy it to a new dataset to restore versions.";
   }

@@ -20,13 +20,11 @@ export function DatasetVersionSelect({
   versions,
   value,
   onChange,
-  disabled,
 }: {
   versions: DatasetVersionOption[];
   /** The pinned version; absent or null reads the latest content. */
   value: number | null | undefined;
   onChange: (version: number | null) => void;
-  disabled?: boolean;
 }) {
   const pinned = value ?? null;
   // A pinned version the history no longer lists still shows as pinned.
@@ -37,7 +35,7 @@ export function DatasetVersionSelect({
 
   return (
     <Tooltip content={DATASET_VERSION_PIN_HINT} positioning={{ placement: "top" }} showArrow>
-      <NativeSelect.Root size="xs" width="150px" flexShrink={0} disabled={disabled}>
+      <NativeSelect.Root size="xs" width="150px" flexShrink={0}>
         <NativeSelect.Field
           aria-label="Dataset version"
           data-testid="experiment-dataset-version"

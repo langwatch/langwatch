@@ -113,22 +113,18 @@ export class MemoryDatasetVersionRepository implements DatasetVersionRepository 
     olderThanMs: number;
     limit: number;
   }): Promise<DatasetWithVersionHistory[]> {
-    const counts = new Map<string, DatasetWithVersionHistory & { count: number }>();
+    const datasets = new Map<string, DatasetWithVersionHistory>();
     for (const row of this.#versions) {
       if (row.createdAt.getTime() >= input.olderThanMs) continue;
       if (input.afterDatasetId !== null && row.datasetId <= input.afterDatasetId) continue;
-      const entry = counts.get(row.datasetId) ?? {
+      datasets.set(`${row.projectId}/${row.datasetId}`, {
         projectId: row.projectId,
         datasetId: row.datasetId,
-        count: 0,
-      };
-      entry.count += 1;
-      counts.set(row.datasetId, entry);
+      });
     }
-    return [...counts.values()]
+    return [...datasets.values()]
       .toSorted((left, right) => (left.datasetId < right.datasetId ? -1 : 1))
-      .slice(0, input.limit)
-      .map(({ projectId, datasetId }) => ({ projectId, datasetId }));
+      .slice(0, input.limit);
   }
 
   async hasAny(input: { projectId: string; datasetId: string }): Promise<boolean> {

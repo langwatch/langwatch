@@ -61,7 +61,7 @@ import type {
 } from "./dataset.ts";
 
 /** Who made a change, when the transport could tell; the autosave names them as its author. */
-type EditedBy = { editedBy?: DatasetVersionAuthor };
+export type EditedBy = { editedBy?: DatasetVersionAuthor };
 
 /**
  * What the install-wide usage report counts here (ADR-156, section 10): how
@@ -206,7 +206,6 @@ export interface DatasetApi {
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount>;
 
   // Versions (spec: modules/dataset/specs/dataset-versioning.feature).
-  /** Every version of the dataset, newest first. */
   /** Newest first, with author names, and whether the layout allows a restore. */
   listVersions(input: ListDatasetVersionsInput): Promise<DatasetVersionHistory>;
   /** The current content saved by hand, optionally named; unchanged content names the latest. */

@@ -77,7 +77,13 @@ Feature: Dataset version history
   Scenario: A version of another project is not readable
     Given a dataset version in another project
     When it is read from this project
-    Then it is refused with code "dataset_version_not_found"
+    Then it is refused with code "dataset_not_found"
+
+  @unit
+  Scenario: A version larger than one whole read is refused before it is read
+    Given a version with more rows than one whole read allows
+    When it is read, compared or restored
+    Then it is refused with code "dataset_version_too_large" before any stored rows are read
 
   # --- Comparing ---
 
@@ -118,6 +124,12 @@ Feature: Dataset version history
     When a user restores version 9
     Then it is refused with code "dataset_version_not_found"
 
+  @integration
+  Scenario: Restoring a version needs permission to manage the dataset
+    Given a member who may edit the dataset but not manage it
+    When they open the history drawer
+    Then they can save a version but restore is disabled with a reason
+
   @unit
   Scenario: Restoring a legacy single-file dataset is refused
     Given a dataset kept in the legacy single-file layout
@@ -140,6 +152,12 @@ Feature: Dataset version history
     When an experiment run starts pinned to version 1
     Then the run reads version 1's rows, not the current content
     And version 1 records the run that used it
+
+  @unit
+  Scenario: A run pinned to a version keeps it out of retention
+    Given a dataset with versions 1 and 2
+    When an experiment run pins version 1
+    Then version 1 is marked pinned, so the retention sweep never thins it
 
   @unit
   Scenario: Pinning a version the dataset does not have refuses the run

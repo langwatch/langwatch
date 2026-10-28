@@ -109,7 +109,7 @@ describe("compareDatasetContents", () => {
       ],
     };
 
-    const comparison = compareDatasetContents({ version: 1, against: null, before, after });
+    const comparison = compareDatasetContents({ version: 1, before, after });
 
     expect(comparison.counts).toEqual({ added: 1, removed: 1, changed: 1, unchanged: 1 });
     expect(comparison.changed).toEqual([
@@ -123,9 +123,9 @@ describe("compareDatasetContents", () => {
     const left = { columns: COLUMNS, rows: [{ id: "a", entry: { x: 1, y: 2 } }] };
     const right = { columns: COLUMNS, rows: [{ id: "a", entry: { y: 2, x: 1 } }] };
 
-    expect(
-      compareDatasetContents({ version: 1, against: 2, before: left, after: right }).counts,
-    ).toMatchObject({ changed: 0, unchanged: 1 });
+    expect(compareDatasetContents({ version: 1, before: left, after: right }).counts).toMatchObject(
+      { changed: 0, unchanged: 1 },
+    );
   });
 
   /** @scenario "Comparing a version with the current content" */
@@ -137,7 +137,6 @@ describe("compareDatasetContents", () => {
 
     const comparison = compareDatasetContents({
       version: 1,
-      against: null,
       before: { columns: COLUMNS, rows: [] },
       after: many,
     });
@@ -151,7 +150,7 @@ describe("compareDatasetContents", () => {
   it("lists columns added and removed", () => {
     const after = { columns: [{ name: "expected", type: "string" as const }], rows: before.rows };
 
-    expect(compareDatasetContents({ version: 1, against: null, before, after }).columns).toEqual({
+    expect(compareDatasetContents({ version: 1, before, after }).columns).toEqual({
       added: ["expected"],
       removed: ["input"],
     });

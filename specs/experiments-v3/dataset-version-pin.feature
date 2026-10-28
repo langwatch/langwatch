@@ -67,6 +67,12 @@ Feature: An experiment can pin the saved dataset version its runs read
     When the workflow evaluate API is called with inline data and "dataset_version" 1
     Then the body fails validation on "dataset_version"
 
+  @unit
+  Scenario: Saving an experiment pinned to a dataset version keeps that version
+    Given an experiment whose saved dataset is pinned to version 3
+    When the experiment is saved
+    Then version 3 is marked pinned, so the retention sweep never thins it
+
   # --- Writing results back ---
 
   @unit
@@ -82,3 +88,10 @@ Feature: An experiment can pin the saved dataset version its runs read
     When a run over version 1 writes its cells back
     Then the deleted row's cells are left out
     And every other cell lands on the board row with the same row id
+
+  @unit
+  Scenario: Board rows are read in smaller pages when a page is too large for one response
+    Given a saved dataset whose first page of row ids is too large for one response
+    When a pinned run reads the board's row ids
+    Then it asks again with the smaller limit the refusal names
+    And it reads every row id once, in order

@@ -7,6 +7,7 @@ import {
   DatasetNotReadyError,
   DatasetVersionNotFoundError,
   DatasetVersionRestoreUnsupportedError,
+  DatasetVersionTooLargeError,
   type CompareDatasetVersionInput,
   type Dataset,
   type DatasetColumns,
@@ -57,6 +58,8 @@ export type DatasetVersionServiceDeps = {
   lookup: (input: { projectId: string; slugOrId: string }) => Promise<Dataset>;
   /** Every row of a legacy single-file dataset, read the way the dataset reads them. */
   readSingleFile: (dataset: Dataset) => Promise<DatasetVersionRow[]>;
+  /** The most rows and bytes one whole read may hold, as the project's plan answers them. */
+  wholeReadBounds: (projectId: string) => Promise<{ maxRows: number; maxBytes: number }>;
   generateId: () => string;
 };
 
@@ -102,14 +105,6 @@ export class DatasetVersionService {
       return { version: await this.#keepUnchanged({ latest, input }), created: false };
     }
     return this.#writeVersion({ dataset, latest, input });
-  }
-
-  async list(input: { projectId: string; datasetId: string }): Promise<DatasetVersion[]> {
-    const dataset = await this.deps.lookup({
-      projectId: input.projectId,
-      slugOrId: input.datasetId,
-    });
-    return this.deps.versions.findAll({ projectId: input.projectId, datasetId: dataset.id });
   }
 
   /** The versions, newest first, and whether the dataset's layout lets one be restored. */
@@ -166,6 +161,16 @@ export class DatasetVersionService {
     return { version, rows, pagination: { page, limit, total: version.rowCount } };
   }
 
+  /** Every row of a version, refused before reading when it is larger than one whole read. */
+  async readWhole(version: DatasetVersion): Promise<DatasetVersionRow[]> {
+    await this.#assertWholeRead({
+      projectId: version.projectId,
+      rows: version.rowCount,
+      bytes: version.sizeBytes,
+    });
+    return this.readRows(version);
+  }
+
   /** Every row of a version, in the order it was saved. */
   async readRows(version: DatasetVersion): Promise<DatasetVersionRow[]> {
     const rows: DatasetVersionRow[] = [];
@@ -178,22 +183,17 @@ export class DatasetVersionService {
 
   async compare(input: CompareDatasetVersionInput): Promise<DatasetVersionComparison> {
     const version = await this.get(input);
-    const before = { columns: version.columnTypes, rows: await this.readRows(version) };
-    if (input.against !== undefined) {
-      const other = await this.get({ ...input, version: input.against });
-      return compareDatasetContents({
-        version: version.version,
-        against: other.version,
-        before,
-        after: { columns: other.columnTypes, rows: await this.readRows(other) },
-      });
-    }
+    const before = { columns: version.columnTypes, rows: await this.readWhole(version) };
     const dataset = await this.#readyDataset(input);
+    await this.#assertWholeRead({
+      projectId: input.projectId,
+      rows: dataset.rowCount,
+      bytes: dataset.sizeBytes === null ? null : Number(dataset.sizeBytes),
+    });
     const current: DatasetVersionRow[] = [];
     for await (const row of this.#currentRows(dataset)) current.push(row);
     return compareDatasetContents({
       version: version.version,
-      against: null,
       before,
       after: { columns: dataset.columnTypes, rows: current },
     });
@@ -221,12 +221,9 @@ export class DatasetVersionService {
       return { version: latest ?? target, changed: false };
     }
 
+    const rows = await this.readWhole(target);
     await this.snapshot({ ...input, datasetId: dataset.id, trigger: "autosave" });
-    await this.#replaceContent({
-      dataset,
-      columns: target.columnTypes,
-      rows: await this.readRows(target),
-    });
+    await this.#replaceContent({ dataset, columns: target.columnTypes, rows });
     const restored = await this.snapshot({
       ...input,
       datasetId: dataset.id,
@@ -249,16 +246,19 @@ export class DatasetVersionService {
 
   /** Removes versions and their stored rows; retention's only write. */
   async remove(input: { projectId: string; versions: readonly DatasetVersion[] }): Promise<number> {
+    // Rows go first: a failure part way leaves unreachable chunks, never a listed version
+    // whose rows are gone.
+    const removed = await this.deps.versions.deleteMany({
+      projectId: input.projectId,
+      ids: input.versions.map((version) => version.id),
+    });
     for (const version of input.versions) {
       await this.deps.versionContent.deleteChunks({
         ...this.#address(version),
         chunkCount: version.chunkCount,
       });
     }
-    return this.deps.versions.deleteMany({
-      projectId: input.projectId,
-      ids: input.versions.map((version) => version.id),
-    });
+    return removed;
   }
 
   /** Removes every version of one dataset, with its stored rows and run links. */
@@ -270,6 +270,17 @@ export class DatasetVersionService {
   /** Clears an erased user from every version they saved; the versions stay. */
   forgetAuthor(input: { userId: string }): Promise<number> {
     return this.deps.versions.forgetAuthor(input);
+  }
+
+  async #assertWholeRead(input: {
+    projectId: string;
+    rows: number | null;
+    bytes: number | null;
+  }): Promise<void> {
+    const { maxRows, maxBytes } = await this.deps.wholeReadBounds(input.projectId);
+    if ((input.rows ?? 0) > maxRows || (input.bytes ?? 0) > maxBytes) {
+      throw new DatasetVersionTooLargeError({ maxRows, maxBytes });
+    }
   }
 
   async #readyDataset(input: { projectId: string; datasetId: string }): Promise<Dataset> {

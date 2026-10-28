@@ -138,7 +138,7 @@ const VERSION_2 = makeVersion({
 
 const renderDrawer = (options: { permissions?: string[] } = {}) =>
   renderWithDatasetHost(<DatasetHistoryDrawer datasetId="ds-1" />, {
-    permissions: options.permissions ?? ["datasets:view", "datasets:update"],
+    permissions: options.permissions ?? ["datasets:view", "datasets:update", "datasets:manage"],
     currentUserId: "user-1",
   });
 
@@ -278,13 +278,27 @@ describe("Dataset history drawer", () => {
     });
   });
 
+  describe("given a member who may edit the dataset but not manage it", () => {
+    /** @scenario "Restoring a version needs permission to manage the dataset" */
+    it("saves a version but disables restore with a reason", async () => {
+      const user = userEvent.setup();
+      renderDrawer({ permissions: ["datasets:view", "datasets:update"] });
+
+      expect(screen.getByRole("button", { name: "Save version" })).toBeEnabled();
+      await openRowMenu(user, 1);
+      expect(await screen.findByRole("menuitem", { name: "Restore this version" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    });
+  });
+
   describe("given a dataset in the legacy single-file layout", () => {
     it("explains that its versions cannot be restored", async () => {
       const user = userEvent.setup();
       fake.state.history = { versions: [VERSION_2, VERSION_1], restorable: false };
       fake.compareVersion.mockReturnValue({
         version: 1,
-        against: null,
         columns: { added: [], removed: [] },
         counts: { added: 0, removed: 0, changed: 0, unchanged: 3 },
         added: [],
@@ -309,7 +323,6 @@ describe("Dataset history drawer", () => {
       const user = userEvent.setup();
       fake.compareVersion.mockReturnValue({
         version: 1,
-        against: null,
         columns: { added: ["expected"], removed: ["notes"] },
         counts: { added: 1, removed: 1, changed: 1, unchanged: 4 },
         added: [{ id: "d", entry: { input: "Row d is new" } }],
