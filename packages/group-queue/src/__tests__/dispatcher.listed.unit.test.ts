@@ -180,3 +180,58 @@ describe("GroupQueueDispatcher with an allow-list", () => {
     });
   });
 });
+
+describe("GroupQueueDispatcher with an allow-list waiting out a pass-over", () => {
+  describe.each([
+    { nextDueInMs: null, waitMs: 3_000, waitsFor: "until the pass-over lapses" },
+    { nextDueInMs: 1_000, waitMs: 1_000, waitsFor: "until a candidate due after the claim" },
+  ])(
+    "given its last claim passed a due candidate over for 3s",
+    ({ nextDueInMs, waitMs, waitsFor }) => {
+      /** @scenario "A listed run's worker that handed a job back waits out its pass-over instead of polling" */
+      it(`polls again ${waitsFor}, not at the shortest poll`, async () => {
+        vi.useFakeTimers({ now: 1_000_000 });
+        onTestFinished(() => void vi.useRealTimers());
+        const claimedAt: number[] = [];
+        const dispatcher = new GroupQueueDispatcher({
+          scripts: {
+            getSignalKey: () => "{test}:gq:signal",
+            getEarliestReadyScore: async () => null,
+            // Each claim re-scores the passed-over group to its clock; another comes due later.
+            getEarliestCandidateScore: async ({ afterMs }) => {
+              const lastClaimMs = claimedAt.at(-1);
+              if (lastClaimMs === undefined) return null;
+              if (afterMs < lastClaimMs) return lastClaimMs;
+              const nextDueMs = nextDueInMs === null ? null : claimedAt[0]! + nextDueInMs;
+              return nextDueMs !== null && nextDueMs > afterMs ? nextDueMs : null;
+            },
+            claimBatch: async ({ nowMs }) => {
+              claimedAt.push(nowMs);
+              return { claims: [], passedOverUntilMs: nowMs + 3_000 };
+            },
+          },
+          processingQueue: fastq.promise(async () => {}, 1),
+          blockingConnection: { brpop: vi.fn(async () => null), del: vi.fn(async () => 0) },
+          queueName: "{test}",
+          globalConcurrency: 1,
+          activeTtlSec: 300,
+          signalTimeoutSec: 5,
+          logger: createTestLogger().logger,
+          listedGroupsKeys: async () => ["{test}:gq:listed:a"],
+        });
+
+        dispatcher.start();
+        // The first claim follows the first idle wait, at 1_005_000.
+        await vi.advanceTimersByTimeAsync(5_000 + waitMs - 100);
+        expect(claimedAt).toHaveLength(1);
+        await vi.advanceTimersByTimeAsync(200);
+        const beforeShutdown = [...claimedAt];
+        dispatcher.requestShutdown();
+        await vi.advanceTimersByTimeAsync(100);
+
+        expect(beforeShutdown).toHaveLength(2);
+        expect(beforeShutdown[1]! - beforeShutdown[0]!).toBeGreaterThanOrEqual(waitMs);
+      });
+    },
+  );
+});

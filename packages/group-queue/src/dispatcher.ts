@@ -60,8 +60,8 @@ export class GroupQueueDispatcher {
   private slotFreed = false;
   /** The open list that claims first next time, so each list leads in turn. */
   private nextList = 0;
-  /** The candidates the last listed claim scanned; the poll wakes when the soonest comes due. */
-  private scannedCandidates: readonly string[] = [];
+  /** Each candidates set the last listed claim scanned, and the clock it scanned below. */
+  private scannedCandidates: readonly { key: string; scannedToMs: number }[] = [];
   /** The clock just before the last claim: a candidate due since then may have been missed. */
   private claimedAtMs = 0;
   /** The last claim's clock, and when the groups it passed over come due to this worker (#9148). */
@@ -269,12 +269,21 @@ export class GroupQueueDispatcher {
     const idleAtMs = nowMs + this.params.signalTimeoutSec * 1000;
     if (this.saturated() || this.scannedCandidates.length === 0) return idleAtMs;
     try {
-      const earliest = await this.params.scripts.getEarliestCandidateScore({
-        candidatesKeys: this.scannedCandidates,
-        afterMs: this.claimedAtMs - 1,
-      });
-      if (earliest === null) return idleAtMs;
-      return Math.min(idleAtMs, Math.max(earliest, nowMs + 50));
+      const passOverUntilMs =
+        this.passOver && this.passOver.untilMs > nowMs ? this.passOver.untilMs : null;
+      // A passed-over group keeps its shared candidate score for a peer: past each list's own
+      // claim only, so the poll wakes as the pass-over lapses rather than re-scanning it.
+      const scores = await Promise.all(
+        this.scannedCandidates.map(({ key, scannedToMs }) =>
+          this.params.scripts.getEarliestCandidateScore({
+            candidatesKeys: [key],
+            afterMs: passOverUntilMs === null ? this.claimedAtMs - 1 : scannedToMs,
+          }),
+        ),
+      );
+      const due = [...scores, passOverUntilMs].filter((score) => score !== null);
+      if (due.length === 0) return idleAtMs;
+      return Math.min(idleAtMs, Math.max(Math.min(...due), nowMs + 50));
     } catch {
       // Peek is best-effort; fall back to the fixed interval.
       return idleAtMs;
@@ -338,23 +347,34 @@ export class GroupQueueDispatcher {
       jobs,
       listKey,
     }: {
-      allowedGroupsKey: string | undefined;
+      allowedGroupsKey: string;
       jobs: number;
       listKey?: string;
     }) => {
-      const claimed = await this.params.scripts.claimBatch({
-        nowMs: nowInstant().epochMilliseconds,
+      const nowMs = nowInstant().epochMilliseconds;
+      const { claims, passedOverUntilMs } = await this.params.scripts.claimBatch({
+        nowMs,
         activeTtlSec: this.params.activeTtlSec,
         maxJobs: jobs,
         allowedGroupsKey,
         ...(listKey ? { listKey } : {}),
         ...claimer,
       });
-      return claimed.claims;
+      const scannedList = this.scannedCandidates.find(({ key }) => key === allowedGroupsKey);
+      if (scannedList) scannedList.scannedToMs = nowMs;
+      if (passedOverUntilMs !== null) {
+        const untilMs = Math.min(passedOverUntilMs, this.passOver?.untilMs ?? passedOverUntilMs);
+        this.passOver = { scannedToMs: nowMs, untilMs };
+      }
+      return claims;
     };
+    // A list left unclaimed this time is peeked from just before the claim, as before it.
+    const scanned = (keys: readonly string[]) =>
+      keys.map((key) => ({ key, scannedToMs: this.claimedAtMs - 1 }));
+    this.passOver = null;
     if (!this.params.listedGroupsKeys) {
       const allowList = this.params.dispatchGroupAllowListKey;
-      this.scannedCandidates = allowList ? [allowList] : [];
+      this.scannedCandidates = scanned(allowList ? [allowList] : []);
       if (allowList) {
         return dispatchedWorkOf(await claimFrom({ allowedGroupsKey: allowList, jobs: maxJobs }));
       }
@@ -372,7 +392,7 @@ export class GroupQueueDispatcher {
     }
     const work: DispatchedWork[] = [];
     const lists = await this.params.listedGroupsKeys();
-    this.scannedCandidates = lists.map((listKey) => `${listKey}:candidates`);
+    this.scannedCandidates = scanned(lists.map((listKey) => `${listKey}:candidates`));
     const first = this.nextList++ % Math.max(lists.length, 1);
     for (const listKey of [...lists.slice(first), ...lists.slice(0, first)]) {
       if (work.length >= maxJobs) break;

@@ -80,6 +80,13 @@ Feature: GroupQueue hands back a job the worker has no handler for
     Then it waits until the pass-over lapses, or a group due after that claim comes due
     And it does not poll at the shortest interval
 
+  @unit
+  Scenario: A listed run's worker that handed a job back waits out its pass-over instead of polling
+    Given the worker's last claim from a listed run passed over a group that is due
+    When it waits for its next poll
+    Then it waits until the pass-over lapses, or a candidate due after that claim comes due
+    And the group stays due for every other worker
+
   @integration
   Scenario: Each worker's pass-over lapses on its own
     Given a job two workers handed back, one of them with a short pass-over
