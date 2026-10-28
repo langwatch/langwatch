@@ -148,6 +148,24 @@ describe("given the dashboard tools", () => {
     expect(calls).toEqual([]);
   });
 
+  /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
+  it("sends excludedOrigins as [], a list or null and shows the stored setting", async () => {
+    const calls = stubFetch({ answer: () => ({ ...dashboard, excludedOrigins: [] }) });
+
+    await handleRenameDashboard({ dashboardId: "b_1", excludedOrigins: [] });
+    await handleRenameDashboard({ dashboardId: "b_1", excludedOrigins: ["langy"] });
+    const reset = await handleRenameDashboard({ dashboardId: "b_1", excludedOrigins: null });
+    const read = await handleGetDashboard({ dashboardId: "b_1" });
+
+    expect(calls.filter(({ method }) => method === "PATCH").map(({ body }) => body)).toEqual([
+      { excludedOrigins: [] },
+      { excludedOrigins: ["langy"] },
+      { excludedOrigins: null },
+    ]);
+    expect(reset).toContain("**Langy traces**: included");
+    expect(read).toContain("**Langy traces**: included");
+  });
+
   /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
   it("lists a dashboard's widgets and deletes one under that dashboard", async () => {
     const calls = stubFetch({

@@ -99,15 +99,24 @@ class DashboardsFacade:
         *,
         name: Optional[str] = None,
         description: Optional[str] = _UNSET,
+        excluded_origins: Optional[List[str]] = _UNSET,
     ) -> Dict[str, Any]:
-        """Change a dashboard's name or description; `description=None` clears it."""
+        """Change a dashboard's name, description or the trace origins its widgets leave out.
+
+        `description=None` clears it. `excluded_origins=[]` includes Langy's traces,
+        `["langy"]` leaves them out and `None` restores the default.
+        """
         body: Dict[str, Any] = {}
         if name is not None:
             body["name"] = name
         if description is not _UNSET:
             body["description"] = description
+        if excluded_origins is not _UNSET:
+            body["excludedOrigins"] = excluded_origins
         if not body:
-            raise ValueError("Provide at least one of name or description.")
+            raise ValueError(
+                "Provide at least one of name, description or excluded_origins."
+            )
         return self._send("PATCH", f"/api/v1/dashboards/{_quote(dashboard_id)}", body)
 
     def delete(self, dashboard_id: str) -> Dict[str, Any]:

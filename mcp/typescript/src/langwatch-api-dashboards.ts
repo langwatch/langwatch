@@ -14,6 +14,8 @@ export interface Dashboard {
   name: string;
   description: string | null;
   scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+  /** Trace origins the widgets leave out; `[]` includes Langy's traces, `null` is the default. */
+  excludedOrigins: string[] | null;
   createdById: string | null;
   createdAt: string;
   updatedAt: string;
@@ -43,7 +45,7 @@ export async function createDashboard({ name }: { name: string }): Promise<Dashb
   return makeRequest("POST", "/api/v1/dashboards", { name }) as Promise<Dashboard>;
 }
 
-/** A field left out keeps its value; a `null` description clears it. */
+/** A field left out keeps its value; a `null` description clears it, a `null` excludedOrigins resets it. */
 export async function updateDashboard({
   dashboardId,
   ...changes
@@ -51,6 +53,7 @@ export async function updateDashboard({
   dashboardId: string;
   name?: string;
   description?: string | null;
+  excludedOrigins?: string[] | null;
 }): Promise<Dashboard> {
   return makeRequest("PATCH", dashboardPath(dashboardId), changes) as Promise<Dashboard>;
 }

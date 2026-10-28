@@ -66,6 +66,9 @@ export const getDashboardCommand = async (dashboardId: string): Promise<CommandR
           `  ${chalk.gray("Name:")}  ${chalk.cyan(sanitizeTerminalText(dashboard.name))}`,
         );
         console.log(`  ${chalk.gray("Scope:")} ${dashboard.scope}`);
+        console.log(
+          `  ${chalk.gray("Langy traces:")} ${describeLangyTraces(dashboard.excludedOrigins)}`,
+        );
         if (dashboard.platformUrl) {
           console.log(`  ${chalk.gray("View:")}  ${chalk.underline(dashboard.platformUrl)}`);
         }
@@ -102,16 +105,49 @@ export const createDashboardCommand = async (name: string): Promise<CommandResul
   }
 };
 
+const LANGY_ORIGIN = "langy";
+
+/** The stored origins a dashboard leaves out, in words; null is the project default. */
+export function describeLangyTraces(excludedOrigins: string[] | null | undefined): string {
+  if (excludedOrigins == null) return "default (left out, included in a personal project)";
+  if (excludedOrigins.length === 0) return "included";
+  const others = excludedOrigins.filter((origin) => origin !== LANGY_ORIGIN);
+  const langy = excludedOrigins.includes(LANGY_ORIGIN) ? "left out" : "included";
+  return others.length === 0 ? langy : `${langy}; also leaves out ${others.join(", ")}`;
+}
+
+/** The `excludedOrigins` value the Langy traces flags send; undefined sends nothing. */
+function langyTracesSetting(options: {
+  includeLangyTraces?: boolean;
+  excludeLangyTraces?: boolean;
+  resetLangyTraces?: boolean;
+}): string[] | null | undefined {
+  if (options.includeLangyTraces) return [];
+  if (options.excludeLangyTraces) return [LANGY_ORIGIN];
+  if (options.resetLangyTraces) return null;
+  return undefined;
+}
+
 /** A call naming nothing is refused locally, matching the API's own refusal. */
 export const updateDashboardCommand = async (
   dashboardId: string,
-  options: { name?: string; description?: string; clearDescription?: boolean },
+  options: {
+    name?: string;
+    description?: string;
+    clearDescription?: boolean;
+    includeLangyTraces?: boolean;
+    excludeLangyTraces?: boolean;
+    resetLangyTraces?: boolean;
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
   const description = options.clearDescription ? null : options.description;
-  if (options.name === undefined && description === undefined) {
+  const excludedOrigins = langyTracesSetting(options);
+  if (options.name === undefined && description === undefined && excludedOrigins === undefined) {
     console.error(
-      chalk.red("Error: nothing to update — pass --name, --description or --clear-description"),
+      chalk.red(
+        "Error: nothing to update — pass --name, --description, --clear-description, --include-langy-traces, --exclude-langy-traces or --reset-langy-traces",
+      ),
     );
     process.exit(1);
   }
@@ -122,6 +158,7 @@ export const updateDashboardCommand = async (
       dashboardId,
       ...(options.name === undefined ? {} : { name: options.name }),
       ...(description === undefined ? {} : { description }),
+      ...(excludedOrigins === undefined ? {} : { excludedOrigins }),
     });
     spinner.succeed(`Updated dashboard "${chalk.cyan(sanitizeTerminalText(dashboard.name))}"`);
 

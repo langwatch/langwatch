@@ -1543,11 +1543,19 @@ function registerDashboardCrudTools(server: McpServer): void {
 
   server.tool(
     "rename_dashboard",
-    "Changes a dashboard's name and/or description; a field left out keeps its value.",
+    "Changes a dashboard's name, description and/or the trace origins its widgets leave out; a field left out keeps its value. excludedOrigins [] includes Langy's traces, [\"langy\"] leaves them out and null restores the default.",
     {
       dashboardId,
       name: z.string().optional().describe("The dashboard's new name"),
       description: z.string().optional().describe("The dashboard's new description"),
+      excludedOrigins: z
+        .array(z.string().min(1).max(64))
+        .max(20)
+        .nullable()
+        .optional()
+        .describe(
+          'Trace origins the widgets leave out: [] includes Langy\'s traces, ["langy"] leaves them out, null restores the default',
+        ),
     },
     withToolLogging("rename_dashboard", async (params) => {
       requireApiKey();

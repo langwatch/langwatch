@@ -2134,18 +2134,45 @@ function registerDashboardCommands(program: Command): void {
     format(
       dashboardsCmd
         .command("update <dashboardId>")
-        .description("Rename a dashboard or change its description")
+        .description(
+          "Rename a dashboard, change its description or whether its widgets count Langy's traces",
+        )
         .option("--name <name>", "New dashboard name")
         .option("--description <description>", "New dashboard description")
         .addOption(
           new Option("--clear-description", "Remove the dashboard's description").conflicts(
             "description",
           ),
+        )
+        .addOption(
+          new Option(
+            "--include-langy-traces",
+            "Count Langy's traces in the dashboard's widgets",
+          ).conflicts(["excludeLangyTraces", "resetLangyTraces"]),
+        )
+        .addOption(
+          new Option(
+            "--exclude-langy-traces",
+            "Leave Langy's traces out of the dashboard's widgets",
+          ).conflicts(["includeLangyTraces", "resetLangyTraces"]),
+        )
+        .addOption(
+          new Option(
+            "--reset-langy-traces",
+            "Restore the default (Langy's traces left out, none in a personal project)",
+          ).conflicts(["includeLangyTraces", "excludeLangyTraces"]),
         ),
     ),
     async (
       dashboardId: string,
-      options: { name?: string; description?: string; clearDescription?: boolean },
+      options: {
+        name?: string;
+        description?: string;
+        clearDescription?: boolean;
+        includeLangyTraces?: boolean;
+        excludeLangyTraces?: boolean;
+        resetLangyTraces?: boolean;
+      },
     ) => {
       const { updateDashboardCommand: impl } = await import("./commands/dashboards/dashboards.js");
       return impl(dashboardId, options);
