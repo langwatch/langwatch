@@ -18,9 +18,9 @@ Agents a project builds and runs: their workflow configurations, the connected a
 
 | Kind            | Name                                                                                                                             | Declared at                                                      |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Postgres table  | `Agent`                                                                                                                          | `process/src/repositories/prisma/prisma.agent.repository.ts:107` |
-| Postgres table  | `AgentVersion`                                                                                                                   | `process/src/repositories/prisma/prisma.agent.repository.ts:107` |
-| Postgres table  | `AgentVersionLabel`                                                                                                              | `process/src/repositories/prisma/prisma.agent.repository.ts:107` |
+| Postgres table  | `Agent`                                                                                                                          | `process/src/repositories/prisma/prisma.agent.repository.ts:108` |
+| Postgres table  | `AgentVersion`                                                                                                                   | `process/src/repositories/prisma/prisma.agent.repository.ts:108` |
+| Postgres table  | `AgentVersionLabel`                                                                                                              | `process/src/repositories/prisma/prisma.agent.repository.ts:108` |
 | Stores required | redis                                                                                                                            | `process/src/channels/redis/redis.agent.channels.ts:8`           |
 | Stores required | redis                                                                                                                            | `process/src/repositories/redis/redis.agent.repositories.ts:9`   |
 | Config          | `replicaCount` (LANGWATCH_APP_REPLICAS), `relayMaxPayloadMb` (LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB), `publicBaseUrl` (BASE_HOST) | `contract/src/agent.config.ts:10`                                |
