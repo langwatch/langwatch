@@ -229,6 +229,11 @@ export function assertNoUnsupportedTableModifiers({
   });
 }
 
+/** Whether the origin scope reaches a view: it carries an `Origin` or a `TraceId` column. */
+export function isOriginScopedView({ columns }: { columns: ReadonlySet<string> }): boolean {
+  return columns.has(ORIGIN_COLUMN) || columns.has(TRACE_ID_COLUMN);
+}
+
 /**
  * The predicate keeping each view's rows to the origins not left out, keyed like a reference.
  * A view with no `Origin` and no `TraceId`, such as a per-minute rollup, gets none.
@@ -262,6 +267,7 @@ function buildOriginPredicates({
   for (const view of views) {
     const columns = new Set(view.columns.map((column) => column.name));
     const key = qualifyTableName({ table: view.name, defaultDatabase: database });
+    if (!isOriginScopedView({ columns })) continue;
     if (columns.has(ORIGIN_COLUMN)) predicates.set(key, byOrigin);
     else if (columns.has(TRACE_ID_COLUMN) && canReachTraceOrigin) predicates.set(key, byTrace);
   }

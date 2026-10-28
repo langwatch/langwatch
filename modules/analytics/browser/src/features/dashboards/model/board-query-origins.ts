@@ -3,9 +3,8 @@
  * board's Langy setting touches it. Text analysis only: no React, no period maths.
  */
 
+import { LWQL_ORIGIN_UNSCOPED_VIEWS } from "@langwatch/analytics-contract";
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
-
-import { BOARD_UNSCOPED_VIEWS } from "./board-lwql-views.ts";
 
 const COMMENTS = /\/\*[\s\S]*?\*\/|--[^\n]*/g;
 
@@ -38,7 +37,7 @@ export function queriesReadOnlyUnscopedViews({ sqls }: { sqls: readonly string[]
   const views = sqls.flatMap((sql) =>
     [...sql.replace(COMMENTS, " ").matchAll(VIEW_READ)].map((match) => match[1]),
   );
-  return views.length > 0 && views.every((view) => BOARD_UNSCOPED_VIEWS.includes(view ?? ""));
+  return views.length > 0 && views.every((view) => LWQL_ORIGIN_UNSCOPED_VIEWS.includes(view ?? ""));
 }
 
 const ORIGIN_FILTER = /(?<!\bNOT\s*\(?\s*)\bOrigin\s*(?:==?\s*'[^']*'|\s+IN\s*\([^)]*\))/gi;

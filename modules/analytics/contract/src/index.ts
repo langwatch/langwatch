@@ -32,3 +32,4 @@ export * from "./features/lwql/langwatch-ql-access-refusal.ts";
 export * from "./features/lwql/langwatch-ql-validation.errors.ts";
 export * from "./analytics.config.ts";
 export * from "./analytics.filter-field.ts";
+export * from "./features/lwql/langwatch-ql-origin-unscoped-views.ts";

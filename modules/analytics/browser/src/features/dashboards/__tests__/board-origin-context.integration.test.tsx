@@ -448,7 +448,7 @@ describe("given a widget whose query finds no traffic on a stored board", () => 
 });
 
 describe("given a widget that reads only the per-minute rollups and finds no traffic", () => {
-  /** @scenario "AC195 Langy: per-minute rollups cannot leave Langy out yet" */
+  /** @scenario "AC200j Langy setting: a widget reading only views without an origin says nothing about Langy traces" */
   it("says nothing about Langy traces and offers no button", async () => {
     openBoard({
       completeness: NO_TRAFFIC,
@@ -463,7 +463,7 @@ describe("given a widget that reads only the per-minute rollups and finds no tra
 });
 
 describe("given a widget that reads only simulations and finds no runs", () => {
-  /** @scenario "AC195 Langy: per-minute rollups cannot leave Langy out yet" */
+  /** @scenario "AC200j Langy setting: a widget reading only views without an origin says nothing about Langy traces" */
   it("says nothing about Langy traces and offers no button", async () => {
     openBoard({ completeness: NO_TRAFFIC, sql: "SELECT count() AS n FROM simulations" });
     const face = await emptyFace();
