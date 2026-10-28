@@ -69,7 +69,7 @@ export class SsoUserResolutionService {
       connectionId: providerId,
       accountId: accountKey.accountId,
     });
-    if (isStoredUnderAnotherIssuer({ storedIssuers, providerId, issuer: accountKey.issuer })) {
+    if (isStoredUnderAnotherIssuer({ storedIssuers, issuer: accountKey.issuer })) {
       logger.warn(
         { providerId, issuer: accountKey.issuer },
         "Refused a single sign-on subject whose account row was stored under another issuer",

@@ -782,20 +782,52 @@ describe("given a connection subject that already has an account row", () => {
 
   describe("when another issuer mints the same subject through the connection", () => {
     /** @scenario A connection subject stored under another issuer is refused */
-    it("refuses the sign-in rather than signing them in as the row's person", async () => {
-      const { service, proposals } = storedUnder({ issuer: "https://another-idp.test" });
+    it.each([
+      ["another identity provider's issuer", "https://another-idp.test"],
+      ["no issuer", null],
+      ["the connection's own synthetic namespace", `local:oauth:${CONNECTION_ID}`],
+      ["the generic OIDC namespace", "local:oauth:oidc"],
+      ["another connection's namespace", "local:oauth:local_ssoc_another"],
+    ])("refuses a row stored with %s", async (_name, issuer) => {
+      const { service, proposals } = storedUnder({ issuer });
 
       expect(await service.resolveUser(assertion())).toEqual(NOT_LINKED);
       expect(proposals).toEqual([]);
     });
+
+    it("refuses when the row belongs to someone the asserted address does not name", async () => {
+      const world = createWorld({ confirmed: true });
+      world.store.users.set("user_victim", {
+        id: "user_victim",
+        email: "victim@elsewhere.test",
+        emailVerified: true,
+        createdAtMs: 0,
+        userHashKey: null,
+        payload: {},
+      });
+      world.store.accounts.set("user_victim", [
+        {
+          id: "account-user_victim",
+          provider: CONNECTION_ID,
+          issuer: "https://idp.before-repoint.test",
+          providerAccountId: SUBJECT,
+          createdAtMs: 0,
+        },
+      ]);
+
+      const resolution = await world.service.resolveUser(
+        assertion({ email: "nobody@unmatched.test" }),
+      );
+
+      expect(resolution).toEqual(NOT_LINKED);
+      expect(world.proposals).toEqual([]);
+    });
   });
 
-  describe("when the row was stored before it carried the real issuer", () => {
-    /** @scenario A connection subject stored before its real issuer was recorded still signs in */
+  describe("when the row was stored under the issuer that asserts it", () => {
+    /** @scenario A connection subject stored under its own issuer still signs in */
     it.each([
       ["the asserted issuer", ISSUER],
-      ["no issuer", null],
-      ["the connection's own synthetic namespace", `local:oauth:${CONNECTION_ID}`],
       ["the same issuer with a trailing slash", `${ISSUER}/`],
     ])("is not refused for a row with %s", async (_name, issuer) => {
       const unbound = await createWorld({ confirmed: true }).service.resolveUser(assertion());

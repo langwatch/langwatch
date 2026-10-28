@@ -33,8 +33,8 @@ With 1.7.1 the same case failed on the unique constraint.
    `local:oauth:<provider>`. The identifier attach states the same value.
 3. Identity's single sign-on resolution refuses a subject whose row at this connection
    was stored under another issuer, as `OAuthAccountNotLinked`, before anything links it.
-   A row with no issuer, this connection's own `local:oauth:` namespace, or the same issuer
-   with a trailing slash names no other issuer and is not refused.
+   Only the same issuer, with or without a trailing slash, passes. Connections post-date the
+   issuer column, so a connection row with no issuer or a `local:` namespace is refused too.
 4. A generic OAuth provider that must verify ID tokens and has no signing keys is left
    unmounted at startup with the reason logged, as the resilient wrapper already did. The
    rest of sign-in stays up; 1.7.1 failed the whole auth context instead.
