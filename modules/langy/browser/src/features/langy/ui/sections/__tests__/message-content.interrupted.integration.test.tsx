@@ -51,6 +51,7 @@ import type * as rechartsModule from "recharts";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import type { LangyQuestionCardData } from "../../../../../model/langy-local-waits.ts";
+import { langyChoicesTimeline } from "../../../../transcript/model/langy-choices-timeline.ts";
 import { MessageContent } from "../message-content.tsx";
 
 afterEach(cleanup);
@@ -72,12 +73,18 @@ function renderMessage({
   message = emptyAssistantMessage,
   isLatest,
   questionWaits,
+  answerable = false,
 }: {
   interrupted: boolean;
   message?: UIMessage;
   isLatest?: boolean;
   questionWaits?: ReadonlyMap<string, LangyQuestionCardData>;
+  /** The card is on the timeline with a handler, so its recorded state reads open. */
+  answerable?: boolean;
 }) {
+  const open = answerable
+    ? { choicesTimeline: langyChoicesTimeline([message]), onChoiceSelect: () => {} }
+    : {};
   return render(
     <DesignSystemProvider forcedTheme="light">
       <MessageContent
@@ -90,6 +97,7 @@ function renderMessage({
         interrupted={interrupted}
         {...(questionWaits ? { questionWaits } : {})}
         {...(isLatest === undefined ? {} : { isLatest })}
+        {...open}
       />
     </DesignSystemProvider>,
   );
@@ -274,4 +282,58 @@ describe("given a question the user's Stop ended", () => {
 
     expect(screen.getByRole("button", { name: /Red/ }).getAttribute("aria-pressed")).toBe("true");
   });
+
+  describe("given its recorded state is still open", () => {
+    /** @scenario A question card I stopped reads as closed, not as failed */
+    it("closes it because of the stop text alone", () => {
+      renderMessage({
+        interrupted: true,
+        message: questionEndedWith(
+          `${LANGY_CALL_STOPPED_PREFIX}, so the call on the user's machine was stopped too`,
+        ),
+        answerable: true,
+      });
+
+      expect(isRedLocked()).toBe(true);
+    });
+
+    it("leaves it open when the call ended for another reason", () => {
+      renderMessage({
+        interrupted: true,
+        message: questionEndedWith("The question could not be shown. Ask the user in words."),
+        answerable: true,
+      });
+
+      expect(isRedLocked()).toBe(false);
+    });
+  });
 });
+
+function questionEndedWith(errorText: string): UIMessage {
+  return {
+    id: "m-question",
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-question",
+        toolCallId: "call-q",
+        state: "output-error",
+        input: {
+          questions: [
+            {
+              question: "Which colour do you prefer?",
+              header: "Pick a colour",
+              options: [{ label: "Red" }, { label: "Blue" }],
+            },
+          ],
+        },
+        errorText,
+      } as never,
+    ],
+  };
+}
+
+function isRedLocked(): boolean {
+  const red = screen.getByRole("button", { name: /Red/ });
+  return (red as HTMLButtonElement).disabled || red.getAttribute("aria-disabled") === "true";
+}

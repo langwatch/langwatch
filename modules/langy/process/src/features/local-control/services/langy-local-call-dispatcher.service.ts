@@ -260,7 +260,7 @@ export class LocalCallDispatcherService {
   async cancel({
     callId,
     code = "cancelled",
-    message = "the turn was stopped, so the command did not finish.",
+    message = "The turn was stopped, so the command did not finish.",
   }: {
     callId: string;
     code?: "cancelled" | "timeout" | "permission_expired" | "exec_failed";

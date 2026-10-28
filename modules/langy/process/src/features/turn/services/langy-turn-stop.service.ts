@@ -81,7 +81,7 @@ export class LangyTurnStopService {
     const settled = await Promise.allSettled([
       tokenBuffer.markEnd({ conversationId, turnId }),
       worker?.cancel({ conversationId, turnId, projectId }) ?? Promise.resolve(),
-      Promise.resolve().then(() => localWork.cancelTurn({ conversationId, turnId })),
+      localWork.cancelTurn({ conversationId, turnId }),
     ]);
     for (const outcome of settled) {
       if (outcome.status !== "rejected") continue;
