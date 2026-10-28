@@ -39,7 +39,7 @@ type suitesJob struct {
 	Timeout  yaml.Node            `yaml:"timeout-minutes"`
 	Outputs  map[string]yaml.Node `yaml:"outputs"`
 	Strategy struct {
-		Matrix map[string]yaml.Node `yaml:"matrix"`
+		Matrix yaml.Node `yaml:"matrix"`
 	} `yaml:"strategy"`
 	Steps []suitesStep `yaml:"steps"`
 }
@@ -78,7 +78,7 @@ func MainSuites(repoRoot string) ([]string, error) {
 
 func oneJobProblems(job suitesJob) []string {
 	var problems []string
-	if shard := job.Strategy.Matrix["shard"]; !strings.Contains(shard.Value, oneJobFlag+" && '[1]'") {
+	if shard := mappingValue(job.Strategy.Matrix, "shard"); !strings.Contains(shard, oneJobFlag+" && '[1]'") {
 		problems = append(problems, "package-suites must run one shard when suites-one-job is true")
 	}
 	if !strings.Contains(job.Timeout.Value, oneJobFlag) {
@@ -125,6 +125,20 @@ func notifyProblems(jobs map[string]suitesJob) []string {
 	}
 
 	return []string{"no job after package-suites runs " + notifyCommand}
+}
+
+// mappingValue is key's scalar in a mapping node, "" for any other shape.
+func mappingValue(node yaml.Node, key string) string {
+	if node.Kind != yaml.MappingNode {
+		return ""
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == key {
+			return node.Content[i+1].Value
+		}
+	}
+
+	return ""
 }
 
 func needsJob(needs yaml.Node, name string) bool {

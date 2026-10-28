@@ -6,6 +6,8 @@
 //	go run ./cmd/slacknotify -job typecheck
 //
 // -workflow defaults to the running workflow's file, from GITHUB_WORKFLOW_REF.
+// COMMIT_SUBJECT and COMMIT_AUTHOR come from a push event; any other event
+// falls back to the checked-out commit.
 // It reads GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_SHA, GH_TOKEN,
 // SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL, COMMIT_SUBJECT and COMMIT_AUTHOR.
 //
@@ -18,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"strconv"
 	"strings"
@@ -45,11 +48,11 @@ func main() {
 		Webhook: os.Getenv("SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL"),
 		HTTP:    &http.Client{Timeout: 20 * time.Second},
 	}
-	subject, _, _ := strings.Cut(os.Getenv("COMMIT_SUBJECT"), "\n")
+	subject, _, _ := strings.Cut(orGit(os.Getenv("COMMIT_SUBJECT"), "%s"), "\n")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	result, err := n.Notify(ctx, slacknotify.Run{
 		Repository: os.Getenv("GITHUB_REPOSITORY"), Workflow: *workflow, RunID: runID, Job: *job,
-		SHA: os.Getenv("GITHUB_SHA"), Subject: subject, Author: os.Getenv("COMMIT_AUTHOR"),
+		SHA: os.Getenv("GITHUB_SHA"), Subject: subject, Author: orGit(os.Getenv("COMMIT_AUTHOR"), "%an"),
 	})
 	cancel()
 	if err != nil {
@@ -68,4 +71,17 @@ func runningWorkflow() string {
 	}
 
 	return path.Base(ref)
+}
+
+// orGit is value, or else the checked-out commit's field in git log's format.
+func orGit(value, format string) string {
+	if value != "" {
+		return value
+	}
+	out, err := exec.Command("git", "log", "-1", "--format="+format).Output()
+	if err != nil {
+		return "unknown"
+	}
+
+	return strings.TrimSpace(string(out))
 }

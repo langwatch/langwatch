@@ -91,6 +91,10 @@ func TestMainSuitesReportsRatherThanFailsOnOtherLegalShapes(t *testing.T) {
 			"shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}",
 			"shard: [1, 2, 3, 4, 5, 6, 7, 8]",
 		},
+		"a matrix that is one expression": {
+			"matrix:\n        shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}",
+			"matrix: ${{ fromJSON(needs.changes.outputs.suites-matrix) }}",
+		},
 		"a numeric timeout": {
 			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}",
 			"timeout-minutes: 45",

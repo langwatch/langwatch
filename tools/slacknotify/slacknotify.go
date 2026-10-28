@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 // Run is the failing run and job.
@@ -88,17 +89,20 @@ func (n Notifier) wasRed(ctx context.Context, run Run) (bool, string) {
 		if err != nil {
 			return false, "could not read run " + strconv.FormatInt(r.ID, 10) + ", posting: " + err.Error()
 		}
-		if !ran {
-			continue
+		if ran {
+			return verdict(run.Job, conclusion, r.ID)
 		}
-		if conclusion == "failure" || conclusion == "cancelled" {
-			return true, fmt.Sprintf("%s was already %s in run %d", run.Job, conclusion, r.ID)
-		}
-
-		return false, fmt.Sprintf("%s was not red in run %d", run.Job, r.ID)
 	}
 
 	return false, "no earlier finished run on main ran " + run.Job
+}
+
+func verdict(job, conclusion string, id int64) (bool, string) {
+	if conclusion == "failure" || conclusion == "cancelled" {
+		return true, fmt.Sprintf("%s was already %s in run %d", job, conclusion, id)
+	}
+
+	return false, fmt.Sprintf("%s was not red in run %d", job, id)
 }
 
 // jobConclusion is run.Job's conclusion in the given run, and whether it ran there.
@@ -137,14 +141,18 @@ func (n Notifier) get(ctx context.Context, path string, into any) error {
 	return json.NewDecoder(resp.Body).Decode(into)
 }
 
-// Message is the Slack payload, the same blocks the shell notifier sends.
+// mrkdwn escapes Slack's control characters, so a commit subject holding
+// <!channel> reads as text rather than pinging the channel.
+var mrkdwn = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+
+// Message is the Slack payload: a header, the job, commit and author, and a button to the run.
 func Message(run Run) map[string]any {
 	short := run.SHA
 	if len(short) > 7 {
 		short = short[:7]
 	}
 	runURL := fmt.Sprintf("https://github.com/%s/actions/runs/%d", run.Repository, run.RunID)
-	text := fmt.Sprintf("*Job:* %s\n*Commit:* %#q - %s\n*Author:* %s", run.Job, short, run.Subject, run.Author)
+	text := fmt.Sprintf("*Job:* %s\n*Commit:* %#q - %s\n*Author:* %s", run.Job, short, mrkdwn.Replace(run.Subject), mrkdwn.Replace(run.Author))
 
 	return map[string]any{"blocks": []any{
 		map[string]any{"type": "header", "text": map[string]any{"type": "plain_text", "text": "🚨 CI Job Failed on main", "emoji": true}},

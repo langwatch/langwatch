@@ -1089,12 +1089,6 @@ jobs:
           BASE: ${{ steps.lint-scope.outputs.base }}
         run: pnpm lint:types ${BASE:+--base "$BASE"}
 
-      - name: Set up Go for the Slack notifier
-        if: failure() && github.ref == 'refs/heads/main'
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.work
-          cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:

@@ -153,3 +153,13 @@ func TestAPostErrorNeverNamesTheWebhook(t *testing.T) {
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "secret-hook-path")
 }
+
+func TestACommitSubjectCannotPingTheChannel(t *testing.T) {
+	run := failing
+	run.Subject = "fix: <!channel> & co"
+	section, ok := slacknotify.Message(run)["blocks"].([]any)[1].(map[string]any)["text"].(map[string]any)
+	require.True(t, ok)
+
+	assert.NotContains(t, section["text"], "<!channel>")
+	assert.Contains(t, section["text"], "&lt;!channel&gt; &amp; co")
+}
