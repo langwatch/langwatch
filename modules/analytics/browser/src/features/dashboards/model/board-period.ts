@@ -106,6 +106,24 @@ export function queriesReadOnlyRollups({ sqls }: { sqls: readonly string[] }): b
   return views.length > 0 && views.every((view) => BOARD_ROLLUP_VIEWS.includes(view ?? ""));
 }
 
+const ORIGIN_FILTER = /(?<!\bNOT\s*\(?\s*)\bOrigin\s*(?:==?\s*'[^']*'|\s+IN\s*\([^)]*\))/gi;
+
+/** Whether every query pins `Origin` with `=` or `IN`, never to Langy's: the board pick is moot. */
+export function queriesPinOriginsWithoutLangy({ sqls }: { sqls: readonly string[] }): boolean {
+  return (
+    sqls.length > 0 &&
+    sqls.every((sql) => {
+      const pins = [...sql.replace(/--[^\n]*/g, "").matchAll(ORIGIN_FILTER)];
+      return pins.length > 0 && pins.every(([pin]) => !pin.includes(`'${LANGY_TRACE_ORIGIN}'`));
+    })
+  );
+}
+
+/** Whether the board's Langy setting changes nothing here: rollup-only or origin-pinned. */
+export function queriesIgnoreBoardOrigins({ sqls }: { sqls: readonly string[] }): boolean {
+  return queriesReadOnlyRollups({ sqls }) || queriesPinOriginsWithoutLangy({ sqls });
+}
+
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";
 export const DEFAULT_BOARD_PERIOD_GRAIN: BoardPeriodGrain = "auto";
 

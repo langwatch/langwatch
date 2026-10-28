@@ -6,6 +6,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  COST_PER_CALL_SQL,
+  SPEND_BY_SOURCE_SQL,
+} from "../catalogue/widgets/flight-deck-costs-queries.ts";
+import {
   BOARD_PERIOD_RANGES,
   boardExcludedOrigins,
   boardGrainFits,
@@ -16,6 +20,7 @@ import {
   boardWindowEnd,
   defaultBoardExcludedOrigins,
   queriesReadLangyTraces,
+  queriesPinOriginsWithoutLangy,
   queriesReadOnlyRollups,
 } from "../model/board-period.ts";
 
@@ -242,5 +247,35 @@ describe("queriesReadOnlyRollups", () => {
     ["a view named only in a comment", ["SELECT 1 FROM traces -- FROM trace_metrics_by_minute"]],
   ])("is false for %s", (_name, sqls) => {
     expect(only(...sqls)).toBe(false);
+  });
+});
+
+describe("queriesPinOriginsWithoutLangy", () => {
+  const pinned = (...sqls: string[]) => queriesPinOriginsWithoutLangy({ sqls });
+
+  /** @scenario "AC200i Langy setting: an empty widget that pins its own origins does not blame the board" */
+  it.each([
+    ["an IN list", ["SELECT 1 FROM traces WHERE Origin IN ('', 'application')"]],
+    ["an equality", ["SELECT 1 FROM traces WHERE origin = 'evaluation'"]],
+    ["the catalogue's cost per call", [COST_PER_CALL_SQL]],
+    ["the catalogue's spend by source", [SPEND_BY_SOURCE_SQL]],
+    ["a literal that differs in case", ["SELECT 1 WHERE Origin IN ('a', 'Langy')"]],
+    ["every query pinning", ["SELECT 1 WHERE Origin = 'a'", "SELECT 2 WHERE Origin IN ('b')"]],
+  ])("is true for %s", (_name, sqls) => {
+    expect(pinned(...sqls)).toBe(true);
+  });
+
+  /** @scenario "AC200i Langy setting: an empty widget that pins its own origins does not blame the board" */
+  it.each([
+    ["no filter on origin", ["SELECT 1 FROM traces"]],
+    ["no query", []],
+    ["an IN list holding langy", ["SELECT 1 WHERE Origin IN ('application', 'langy')"]],
+    ["an equality on langy", ["SELECT 1 WHERE Origin = 'langy'"]],
+    ["a negation", ["SELECT 1 WHERE Origin != 'application'"]],
+    ["a NOT IN", ["SELECT 1 WHERE Origin NOT IN ('application')"]],
+    ["a query with no pin among pinned ones", ["SELECT 1 WHERE Origin = 'a'", "SELECT 2"]],
+    ["a pin named only in a comment", ["SELECT 1 FROM traces -- WHERE Origin = 'a'"]],
+  ])("is false for %s", (_name, sqls) => {
+    expect(pinned(...sqls)).toBe(false);
   });
 });

@@ -19,7 +19,7 @@ import {
   type BoardQueryContext,
   boardIncludesLangy,
   queriesReadLangyTraces,
-  queriesReadOnlyRollups,
+  queriesIgnoreBoardOrigins,
 } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
@@ -139,7 +139,7 @@ export function BoardWidgetCard({
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
         excludeOrigins={excludeOrigins}
-        readsOnlyRollups={queriesReadOnlyRollups({
+        ignoresBoardOrigins={queriesIgnoreBoardOrigins({
           sqls: widget.definition.queries.map(({ sql }) => sql),
         })}
         onFaceChange={setFace}

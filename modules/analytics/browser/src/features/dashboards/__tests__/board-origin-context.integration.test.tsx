@@ -462,6 +462,21 @@ describe("given a widget that reads only the per-minute rollups and finds no tra
   });
 });
 
+describe("given a widget that pins its own origins and finds no traffic", () => {
+  /** @scenario "AC200i Langy setting: an empty widget that pins its own origins does not blame the board" */
+  it("says nothing about Langy traces and offers no button", async () => {
+    openBoard({
+      completeness: NO_TRAFFIC,
+      sql: "SELECT count() AS n FROM traces WHERE Origin IN ('application')",
+    });
+    const face = await emptyFace();
+
+    expect(within(face).getByText("No traces in this period")).toBeTruthy();
+    expect(within(face).queryByText(LEFT_OUT)).toBeNull();
+    expect(within(face).queryByRole("button", { name: "Include Langy traces" })).toBeNull();
+  });
+});
+
 describe("given a member asks Langy about a widget on a board that stores no origins", () => {
   /** @scenario "AC200g Langy setting: Langy's board context names the origins the board leaves out" */
   it("hands Langy the default, langy, as the origins the board leaves out", async () => {
