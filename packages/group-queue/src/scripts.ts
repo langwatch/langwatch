@@ -28,6 +28,17 @@ export const RECONCILE_INTERVAL_MS = 2000;
 /** Beacon refresh interval. Three refreshes fit inside {@link WORKER_LIVENESS_TTL_SECONDS}. */
 export const WORKER_LIVENESS_REFRESH_MS = 30_000;
 
+/** How often a worker refreshes the active key of a group it holds: three times per its TTL. */
+export function activeKeyHeartbeatMs({ activeTtlSec }: { activeTtlSec: number }): number {
+  return (activeTtlSec * 1000) / 3;
+}
+
+/**
+ * Milliseconds per second of active TTL a held group's ready score sits out: half the TTL, past
+ * {@link activeKeyHeartbeatMs}, so a live claim's heartbeat always re-scores it before it is due.
+ */
+export const HELD_RESCORE_MS_PER_TTL_SEC = 500;
+
 /**
  * How soon dispatch looks again at a held group it found due: a heartbeat that ran late, or an
  * owner whose beacon is missing. The claim and each heartbeat put a held group half its active
@@ -1441,7 +1452,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
 
               -- Held: half the active TTL out, past the first heartbeat, so a live claim never comes
               -- due while a dead owner's does, long before its active key lapses.
-              redis.call("ZADD", readyKey, nowMs + activeTtlSec * 500, groupId)
+              redis.call("ZADD", readyKey, nowMs + activeTtlSec * ${HELD_RESCORE_MS_PER_TTL_SEC}, groupId)
               if restrictedDispatch then
                 redis.call("ZADD", allowedGroupsKey, nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS}, groupId)
               end
@@ -1826,7 +1837,7 @@ if gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   -- while this heartbeat was in flight, the group has been removed and we must not
   -- reinsert it (would violate "blocked => not in ready").
   if redis.call("ZSCORE", readyKey, groupId) then
-    redis.call("ZADD", readyKey, nowMs + activeTtlSec * 500, groupId)
+    redis.call("ZADD", readyKey, nowMs + activeTtlSec * ${HELD_RESCORE_MS_PER_TTL_SEC}, groupId)
   end
   if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
     local slashPos = string.find(groupId, "/", 1, true)

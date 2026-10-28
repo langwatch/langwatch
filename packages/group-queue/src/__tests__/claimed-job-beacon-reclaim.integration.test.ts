@@ -266,6 +266,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         const again = await q.claim({ nowMs: now + HELD_DUE_MS + 10 * 60_000 });
 
         expect(again).toBeUndefined();
+        expect(await redis.get(q.activeKey)).toBe("job-1");
         expect(await redis.hget(q.claimedKey, "token")).toBe(held?.claimToken);
       });
     });
@@ -286,6 +287,7 @@ describe("GroupQueue reclaims a claim whose worker's beacon is gone", () => {
         const again = await q.claim({ nowMs: now + HELD_DUE_MS });
 
         expect(again).toBeUndefined();
+        expect(await redis.get(q.activeKey)).toBe("job-1");
         expect(await redis.hget(q.claimedKey, "token")).toBe(held?.claimToken);
         expect((await redis.get(q.suspectKey))?.split("|")[0]).toBe(held?.claimToken);
       });
