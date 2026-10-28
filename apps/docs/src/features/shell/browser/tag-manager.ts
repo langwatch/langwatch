@@ -1,7 +1,19 @@
 const INTERACTIONS = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/;
 
+/* The marketing site's cookie banner writes the reader's choice here, on the same origin. */
+const CONSENT_STORAGE_KEY = "lw-cookie-consent";
+
 type TagWindow = Window & { dataLayer?: unknown[] };
+
+/** Whether the reader accepted cookies; unknown, declined or unreadable storage is a no. */
+export function analyticsConsented({ win }: { win: Pick<Window, "localStorage"> }) {
+  try {
+    return win.localStorage.getItem(CONSENT_STORAGE_KEY) === "accepted";
+  } catch {
+    return false;
+  }
+}
 
 /** The container a production page names; none in development or on a local host. */
 export function tagManagerId({ doc, host }: { doc: Document; host: string }) {
@@ -9,10 +21,22 @@ export function tagManagerId({ doc, host }: { doc: Document; host: string }) {
   return /^GTM-[A-Z0-9]+$/.test(id) && !LOCAL_HOST.test(host) ? id : "";
 }
 
-/** Adds Google Tag Manager once, when the reader first interacts or the page is idle. */
+/**
+ * Adds Google Tag Manager once, when the reader first interacts or the page is idle, and only
+ * after they accepted cookies. Accepting in another tab starts it here too.
+ */
 export function startTagManager({ win = window }: { win?: TagWindow } = {}) {
   const id = tagManagerId({ doc: win.document, host: win.location.hostname });
   if (!id) return;
+  if (!analyticsConsented({ win })) {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== CONSENT_STORAGE_KEY || !analyticsConsented({ win })) return;
+      win.removeEventListener("storage", onStorage);
+      startTagManager({ win });
+    };
+    win.addEventListener("storage", onStorage);
+    return;
+  }
   let started = false;
   const start = () => {
     if (started) return;

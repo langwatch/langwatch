@@ -56,6 +56,14 @@ Feature: docs.json stays the single source of truth for both documentation sites
     And development builds and local hosts load no tag
 
   @unit
+  Scenario: Load the tag manager only after the reader accepted cookies
+    Given docs.json names a Google Tag Manager container
+    When the reader has not chosen, has declined, or their browser storage cannot be read
+    Then no tag loads
+    When the reader accepted cookies on langwatch.ai
+    Then the tag loads as on any production page
+
+  @unit
   Scenario: Mark deprecated pages
     Given a page's frontmatter marks it deprecated or gives it a tag
     When the page is rendered

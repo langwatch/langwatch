@@ -1,18 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { startTagManager, tagManagerId } from "../browser/tag-manager.ts";
+import { analyticsConsented, startTagManager, tagManagerId } from "../browser/tag-manager.ts";
 
 /* A window double with just the surface the loader touches. */
 function fakeWindow({
   id,
   host = "langwatch.ai",
   ready = "complete",
+  consent = "accepted",
 }: {
   id: string;
   host?: string;
   ready?: string;
+  /** The stored cookie choice; null for none, "throws" for storage the browser refuses. */
+  consent?: string | null;
 }) {
-  const listeners = new Map<string, (() => void)[]>();
+  const listeners = new Map<string, ((event?: unknown) => void)[]>();
+  const stored = { value: consent };
   const appended: { src: string; async: boolean }[] = [];
   const idle: (() => void)[] = [];
   const doc = {
@@ -24,10 +28,16 @@ function fakeWindow({
   const win = {
     document: doc,
     location: { hostname: host },
+    localStorage: {
+      getItem: (key: string) => {
+        if (stored.value === "throws") throw new Error("SecurityError");
+        return key === "lw-cookie-consent" ? stored.value : null;
+      },
+    },
     dataLayer: undefined as unknown[] | undefined,
-    addEventListener: (name: string, listener: () => void) =>
+    addEventListener: (name: string, listener: (event?: unknown) => void) =>
       listeners.set(name, [...(listeners.get(name) ?? []), listener]),
-    removeEventListener: (name: string, listener: () => void) =>
+    removeEventListener: (name: string, listener: (event?: unknown) => void) =>
       listeners.set(
         name,
         (listeners.get(name) ?? []).filter((entry) => entry !== listener),
@@ -35,8 +45,9 @@ function fakeWindow({
     requestIdleCallback: (callback: () => void) => idle.push(callback),
     setTimeout: (callback: () => void) => idle.push(callback),
   };
-  const fire = (name: string) => (listeners.get(name) ?? []).forEach((listener) => listener());
-  return { win, appended, idle, fire };
+  const fire = (name: string, event?: unknown) =>
+    (listeners.get(name) ?? []).forEach((listener) => listener(event));
+  return { win, appended, idle, fire, stored, listeners };
 }
 
 describe("the tag manager loader", () => {
@@ -78,6 +89,47 @@ describe("the tag manager loader", () => {
       ).toBe("");
       expect(tagManagerId({ doc: doc("<script>"), host: "langwatch.ai" })).toBe("");
       expect(tagManagerId({ doc: doc("GTM-KJ4S6Z9C"), host: "langwatch.ai" })).toBe("GTM-KJ4S6Z9C");
+    });
+  });
+
+  describe("when the reader has not accepted cookies", () => {
+    /** @scenario "Load the tag manager only after the reader accepted cookies" */
+    it.each([
+      ["has not chosen", null],
+      ["declined", "declined"],
+      ["has storage the browser refuses", "throws"],
+    ])("loads no tag when the reader %s", (_label, consent) => {
+      const { win, appended, fire, idle } = fakeWindow({ id: "GTM-KJ4S6Z9C", consent });
+      startTagManager({ win: win as never });
+      fire("pointerdown");
+      fire("load");
+      idle.forEach((callback) => callback());
+      expect(appended).toEqual([]);
+      expect(win.dataLayer).toBeUndefined();
+    });
+
+    /** @scenario "Load the tag manager only after the reader accepted cookies" */
+    it("starts once the reader accepts in another tab, and not for another key", () => {
+      const { win, appended, fire, idle, stored } = fakeWindow({ id: "GTM-KJ4S6Z9C", consent: null });
+      startTagManager({ win: win as never });
+      fire("storage", { key: "something-else" });
+      stored.value = "accepted";
+      fire("storage", { key: "something-else" });
+      expect(idle).toHaveLength(0);
+      fire("storage", { key: "lw-cookie-consent" });
+      fire("pointerdown");
+      fire("storage", { key: "lw-cookie-consent" });
+      idle.forEach((callback) => callback());
+      expect(appended).toHaveLength(1);
+    });
+  });
+
+  describe("when the reader accepted cookies", () => {
+    /** @scenario "Load the tag manager only after the reader accepted cookies" */
+    it("reads the choice the marketing site stored", () => {
+      const storage = (value: string | null) => ({ localStorage: { getItem: () => value } }) as never;
+      expect(analyticsConsented({ win: storage("accepted") })).toBe(true);
+      expect(analyticsConsented({ win: storage("yes") })).toBe(false);
     });
   });
 });
