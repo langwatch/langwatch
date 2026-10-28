@@ -32,10 +32,13 @@ const json = (body: unknown) =>
     headers: { "content-type": "application/json" },
   });
 
-/** The JSON bodies the requests sent. */
-async function sentBodies(): Promise<unknown[]> {
+/** The JSON bodies the requests sent, optionally only those of one method. */
+async function sentBodies(method?: string): Promise<unknown[]> {
   const calls = fetchMock.mock.calls as unknown as [Request][];
-  return Promise.all(calls.map(async ([request]) => request.clone().json()));
+  const requests = calls
+    .map(([request]) => request)
+    .filter((request) => method === undefined || request.method === method);
+  return Promise.all(requests.map(async (request) => request.clone().json()));
 }
 
 describe("langwatch dashboard update, Langy traces flags", () => {
@@ -72,23 +75,17 @@ describe("langwatch dashboard update, Langy traces flags", () => {
     await updateDashboardCommand("dashboard_v2", { includeLangyTraces: true });
     await updateDashboardCommand("dashboard_v2", { excludeLangyTraces: true });
 
-    const patches = (fetchMock.mock.calls as unknown as [Request][])
-      .map(([request]) => request)
-      .filter((request) => request.method === "PATCH");
-    const bodies = await Promise.all(patches.map((request) => request.clone().json()));
-    expect(bodies).toEqual([{ excludedOrigins: include }, { excludedOrigins: exclude }]);
+    expect(await sentBodies("PATCH")).toEqual([
+      { excludedOrigins: include },
+      { excludedOrigins: exclude },
+    ]);
   });
 
   /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
   it("sends the setting together with a rename", async () => {
     await updateDashboardCommand("dashboard_v2", { name: "Ops", includeLangyTraces: true });
 
-    const patches = (fetchMock.mock.calls as unknown as [Request][])
-      .map(([request]) => request)
-      .filter((request) => request.method === "PATCH");
-    expect(await Promise.all(patches.map((request) => request.clone().json()))).toEqual([
-      { name: "Ops", excludedOrigins: [] },
-    ]);
+    expect(await sentBodies("PATCH")).toEqual([{ name: "Ops", excludedOrigins: [] }]);
   });
 
   /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */

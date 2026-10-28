@@ -1775,8 +1775,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out
     Given a Dashboards board
     When `langwatch dashboard update` is given --include-langy-traces, --exclude-langy-traces or --reset-langy-traces
-    Then it sends "excludedOrigins" as [], ["langy"] or null
-    And the MCP rename_dashboard tool and the Python dashboards.update helper send the same values
+    Then --include-langy-traces and --exclude-langy-traces read the board and add or remove only "langy", keeping the other origins it leaves out
+    And --reset-langy-traces sends "excludedOrigins" as null without reading the board
+    And the MCP rename_dashboard tool and the Python dashboards.update helper send the list they are given
     And `langwatch dashboard get` and the MCP get_dashboard tool show the setting
 
   # ---------------------------------------------------------------------------
