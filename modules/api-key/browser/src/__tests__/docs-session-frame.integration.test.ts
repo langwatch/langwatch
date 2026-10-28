@@ -107,6 +107,11 @@ function mountFrame({
     project: { id: "proj-1", name: "Checkout" },
     ...overrides,
   });
+  /** A reader's press: it begins with the pointer going down, then clicks. */
+  const press = (button: HTMLElement) => {
+    button.dispatchEvent(new frame.Event("pointerdown"));
+    button.click();
+  };
   const connect = () => {
     byId("connect").click();
     fromPopup(grant());
@@ -124,6 +129,7 @@ function mountFrame({
     toDocs,
     sent,
     byId,
+    press,
     fromDocs,
     fromPopup,
     grant,
@@ -136,7 +142,7 @@ function mountFrame({
 
 describe("the docs session frame", () => {
   describe("when the API host serves it", () => {
-    /** @scenario "Only a registered docs origin may frame the session frame" */
+    /** @scenario "The frame runs only the code it was served with" */
     it("carries the answer's nonce on every inline tag, so its own policy runs it", () => {
       const html = buildDocsSessionFrameDocument({ nonce: "n0nce", embedder: DOCS });
 
@@ -295,7 +301,7 @@ describe("the docs session frame", () => {
 
     /** @scenario "A request that changes data waits for the reader inside the frame" */
     it("names the method, path and project, and sends a POST only once the reader presses Send", async () => {
-      const { connect, fromDocs, sent, byId, answers } = mountFrame({
+      const { connect, fromDocs, sent, byId, answers, press } = mountFrame({
         timings: { confirmDelayMs: 40 },
       });
       connect();
@@ -314,14 +320,44 @@ describe("the docs session frame", () => {
       );
       expect(sent).toEqual([]);
 
-      byId("confirm-send").click();
+      press(byId("confirm-send"));
       expect(sent).toEqual([]);
 
       await new Promise((resolve) => setTimeout(resolve, 60));
-      byId("confirm-send").click();
+      press(byId("confirm-send"));
       await vi.waitFor(() => expect(answers("w1")).toHaveLength(1));
       expect(sent[0]!.init).toMatchObject({ method: "POST", body: '{"name":"x"}' });
       expect(byId("confirm").hidden).toBe(true);
+    });
+
+    /** @scenario "A request that changes data waits for the reader inside the frame" */
+    it("ignores a press that began before the delay ran out, and does not move focus to Send", async () => {
+      const {
+        connect,
+        fromDocs,
+        sent,
+        byId,
+        frame: frameWindow,
+      } = mountFrame({
+        timings: { confirmDelayMs: 40 },
+      });
+      connect();
+      fromDocs({
+        kind: "send",
+        id: "w3",
+        method: "POST",
+        path: "/api/v1/dataset",
+        headers: {},
+        body: "{}",
+      });
+      expect(frameWindow.document.activeElement).not.toBe(byId("confirm-send"));
+
+      byId("confirm-send").dispatchEvent(new frameWindow.Event("pointerdown"));
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      byId("confirm-send").click();
+
+      expect(sent).toEqual([]);
+      expect(byId("confirm").hidden).toBe(false);
     });
 
     /** @scenario "A request that changes data waits for the reader inside the frame" */
@@ -342,6 +378,26 @@ describe("the docs session frame", () => {
       expect(sent).toEqual([]);
       expect(answers("w2")).toEqual([
         expect.objectContaining({ kind: "failed", reason: "declined" }),
+      ]);
+    });
+
+    /** @scenario "The frame refuses what it was not built to send" */
+    it("refuses a request that reuses the id of one still waiting", () => {
+      const { connect, fromDocs, answers } = mountFrame();
+      connect();
+      const write = {
+        kind: "send",
+        id: "w4",
+        method: "POST",
+        path: "/api/v1/dataset",
+        headers: {},
+        body: "{}",
+      };
+      fromDocs(write);
+      fromDocs({ ...write, method: "GET", body: null });
+
+      expect(answers("w4")).toEqual([
+        expect.objectContaining({ kind: "failed", reason: "refused" }),
       ]);
     });
 

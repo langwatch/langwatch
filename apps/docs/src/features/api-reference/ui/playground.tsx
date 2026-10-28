@@ -49,6 +49,9 @@ export function Playground({
       minWidth="0"
       data-type-mode="productive"
       data-docs-playground=""
+      // Session recorders on the docs leave the reader's requests and answers out.
+      className="ph-no-capture"
+      data-hj-suppress=""
     >
       <PlaygroundRequest
         operation={operation}

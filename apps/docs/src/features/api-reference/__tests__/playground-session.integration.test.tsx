@@ -4,6 +4,7 @@ import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { frameConnection, sendThroughFrame } from "../browser/docs-session.ts";
 import { operationSchema } from "../model/operation-schema.ts";
 import { EndpointStateProvider } from "../ui/endpoint-state.tsx";
 import { Playground } from "../ui/playground.tsx";
@@ -179,6 +180,35 @@ describe("given the frame says it is connected in a project", () => {
     await settle();
     expect(liveResponse()).toMatch(/200 OK · 12 ms · application\/json/);
     expect(liveResponse()).toContain('"traces": []');
+  });
+});
+
+describe("when I open the playground", () => {
+  /** @scenario "Keep the playground out of session recordings" */
+  it("marks it for Hotjar and PostHog to leave out of recordings", () => {
+    const playground = document.querySelector("[data-docs-playground]");
+    expect(playground?.hasAttribute("data-hj-suppress")).toBe(true);
+    expect(playground?.classList.contains("ph-no-capture")).toBe(true);
+  });
+});
+
+describe("when the page replaced the frame without leaving", () => {
+  /** @scenario "Stop waiting on a frame the page no longer shows" */
+  it("answers the next request as not connected", async () => {
+    await connectedIn("Checkout agent");
+    const shown = frame()!;
+    const container = shown.parentElement!;
+    shown.remove();
+    try {
+      const answer = await sendThroughFrame({
+        request: { method: "GET", path: "/api/v1/dataset", headers: {}, body: null },
+        signal: new AbortController().signal,
+      });
+      expect(answer).toEqual({ kind: "failed", reason: "not-connected" });
+      expect(frameConnection()).toBeNull();
+    } finally {
+      container.append(shown);
+    }
   });
 });
 

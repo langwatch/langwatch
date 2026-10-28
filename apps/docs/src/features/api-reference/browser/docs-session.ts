@@ -98,7 +98,11 @@ export function sendThroughFrame({
   request: { method: string; path: string; headers: Record<string, string>; body: string | null };
   signal: AbortSignal;
 }): Promise<FrameAnswer> {
-  if (!frame) return Promise.resolve({ kind: "failed", reason: "not-connected" });
+  // A frame the page swapped out without leaving would never answer.
+  if (!frame?.isConnected) {
+    setConnected(null);
+    return Promise.resolve({ kind: "failed", reason: "not-connected" });
+  }
   nextId += 1;
   const id = `request-${nextId}`;
   return new Promise((resolve) => {

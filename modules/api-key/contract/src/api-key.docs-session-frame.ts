@@ -157,6 +157,7 @@ const FRAME_RUNTIME = String.raw`function (config) {
   var waiting = null;
   var pending = null;
   var inFlight = {};
+  var pressedAt = null;
 
   function toParent(message) {
     if (!embedded) return;
@@ -349,13 +350,13 @@ const FRAME_RUNTIME = String.raw`function (config) {
   function confirmWrite(request) {
     dismissConfirm("cancelled");
     pending = { request: request, shownAt: performance.now() };
+    pressedAt = null;
     confirmText.textContent = "";
     confirmText.append("Send ");
     var code = document.createElement("code");
     code.textContent = request.method + " " + request.url.pathname;
     confirmText.append(code, " as you in " + session.project.name + "?");
     confirmPanel.hidden = false;
-    confirmSend.focus();
   }
 
   window.addEventListener("message", function (event) {
@@ -374,6 +375,8 @@ const FRAME_RUNTIME = String.raw`function (config) {
       return;
     }
     if (!session) return answer(request.id, { kind: "failed", reason: "not-connected" });
+    if (inFlight[request.id] || (pending && pending.request.id === request.id))
+      return answer(request.id, { kind: "failed", reason: "refused" });
     if (request.method === "GET") send(request);
     else confirmWrite(request);
   });
@@ -381,9 +384,16 @@ const FRAME_RUNTIME = String.raw`function (config) {
   /* Only this origin can reach these buttons: a parent on another origin cannot press them. */
   connectButton.addEventListener("click", connect);
   disconnectButton.addEventListener("click", disconnect);
+  /*
+   * Send counts only a press that began after the delay, so a press already under way when the
+   * docs page asks (a click, or Enter held in a field) cannot confirm a write.
+   */
+  function startPress() { pressedAt = performance.now(); }
+  confirmSend.addEventListener("pointerdown", startPress);
+  confirmSend.addEventListener("keydown", startPress);
   confirmSend.addEventListener("click", function () {
-    if (!pending || !session) return;
-    if (performance.now() - pending.shownAt < config.confirmDelayMs) return;
+    if (!pending || !session || pressedAt === null) return;
+    if (pressedAt - pending.shownAt < config.confirmDelayMs) return;
     var request = pending.request;
     dismissConfirm(null);
     send(request);

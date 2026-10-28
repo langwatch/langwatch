@@ -19,6 +19,18 @@ Feature: Use my LangWatch account in the API playground
     And shows the response the frame answers with
 
   @integration
+  Scenario: Keep the playground out of session recordings
+    Given the docs carry analytics that can record the page
+    When I open the playground
+    Then it is marked for session recorders to leave out, so my requests and their answers are never recorded
+
+  @integration
+  Scenario: Stop waiting on a frame the page no longer shows
+    Given the frame said it was connected
+    When the page replaced the frame without my leaving
+    Then my next request says I am not connected, instead of waiting for an answer that never comes
+
+  @integration
   Scenario: Listen only to the frame it embedded
     Given the frame is embedded
     When a message arrives from another origin or another window

@@ -12,6 +12,12 @@ Feature: The docs session frame keeps the key on the app's origin
     And the unregistered origin gets a refusal page that nothing may embed
 
   @integration
+  Scenario: The frame runs only the code it was served with
+    When the API host serves the session frame
+    Then its one script and one style carry the response's nonce
+    And it has no inline handlers, script links or external scripts
+
+  @integration
   Scenario: Connecting runs the consent flow from inside the frame
     Given the frame is embedded by a registered docs origin
     When the reader presses Use my LangWatch account in the frame
@@ -45,7 +51,7 @@ Feature: The docs session frame keeps the key on the app's origin
     When the docs page asks it to send a POST
     Then the frame names the method, the path and the project, and waits
     And it sends the request only when the reader presses Send in the frame
-    And a press that comes too soon after the confirmation appears is ignored
+    And a press that began too soon after the confirmation appeared is ignored, and Send is never focused for the reader
     And Cancel answers the docs page that the reader declined
 
   @integration
@@ -53,6 +59,7 @@ Feature: The docs session frame keeps the key on the app's origin
     Given the frame is connected
     When a message from anywhere but its parent at the docs origin asks it to send a request
     Or the docs page asks for a path outside /api, another origin, or an unknown method
+    Or it reuses the id of a request still waiting
     Then nothing is sent
     And credentials the docs page names in the request are dropped before sending
 
