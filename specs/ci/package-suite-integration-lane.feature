@@ -186,6 +186,7 @@ Feature: A package's integration suite runs in CI when it declares one
       When its config asks for three workers and it runs in CI
       Then its files run three at a time, with concurrency asked for by name
       And off CI the launcher's own worker count stands
+      And a worker count exported on purpose, other than the launcher's default, stands
 
     @unit
     Scenario: A shard starts its heaviest suites first
