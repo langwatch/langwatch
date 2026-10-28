@@ -9,18 +9,18 @@ import { useEffect, useState } from "react";
 export const SLOW_WIDGET_LOADING_MS = 5_000;
 
 export function useSlowLoading({
-  loading,
+  isLoading,
   afterMs = SLOW_WIDGET_LOADING_MS,
 }: {
-  loading: boolean;
+  isLoading: boolean;
   afterMs?: number;
 }): boolean {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     setSlow(false);
-    if (!loading) return;
+    if (!isLoading) return;
     const timer = setTimeout(() => setSlow(true), afterMs);
     return () => clearTimeout(timer);
-  }, [loading, afterMs]);
-  return loading && slow;
+  }, [isLoading, afterMs]);
+  return isLoading && slow;
 }

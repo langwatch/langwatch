@@ -197,7 +197,7 @@ export function DashboardWidgetFrameOverWindow({
   });
   // Until a query answers the frame has nothing to draw; code that reported an error never will.
   const loading = hasQueries && diagnostic === null && !frameIdle && awaitsFirstAnswer(records);
-  const slow = useSlowLoading({ loading });
+  const slow = useSlowLoading({ isLoading: loading });
 
   if (!parsed.success) {
     return (

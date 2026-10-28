@@ -17,6 +17,7 @@ import { ArrowRight, Lock, Plug, RotateCcw, Sparkles, TriangleAlert } from "luci
 
 /** The widget's queries have not answered yet: a chart-shaped skeleton, and words when slow. */
 export function WidgetLoadingFace({ slow }: { slow: boolean }) {
+  // The skeleton is busy; the words sit outside it so screen readers still announce them.
   return (
     <VStack
       height="full"
@@ -24,17 +25,21 @@ export function WidgetLoadingFace({ slow }: { slow: boolean }) {
       justify="center"
       gap={3}
       padding={4}
-      aria-busy="true"
       data-widget-state="loading"
     >
-      <VisuallyHidden>Loading</VisuallyHidden>
-      <Skeleton height="20px" width="30%" aria-hidden />
-      <Skeleton flex={1} maxHeight="160px" aria-hidden />
-      {slow && (
-        <Text textStyle="caption" color="fg.muted" textAlign="center">
-          Still loading…
-        </Text>
-      )}
+      <VStack align="stretch" gap={3} flex={1} justify="center" aria-busy="true">
+        <Skeleton height="20px" width="30%" aria-hidden />
+        <Skeleton flex={1} maxHeight="160px" aria-hidden />
+      </VStack>
+      <output>
+        {slow ? (
+          <Text textStyle="caption" color="fg.muted" textAlign="center">
+            Still loading…
+          </Text>
+        ) : (
+          <VisuallyHidden>Loading</VisuallyHidden>
+        )}
+      </output>
     </VStack>
   );
 }
