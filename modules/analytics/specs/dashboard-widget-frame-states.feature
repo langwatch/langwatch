@@ -100,6 +100,13 @@ Feature: A dashboard widget frame shows what its queries report
       When a query starts
       Then the card shows the loading skeleton again
 
+    @integration
+    Scenario: The loading skeleton covers a running frame, never its restart notice
+      Given a widget whose frame is given a loading skeleton to draw over itself
+      When the frame is running
+      Then the skeleton is drawn over the chart frame
+      And when the frame stops responding and is restarting, the restart notice shows and the skeleton does not
+
   Rule: An empty widget says how to get its data
 
     An empty card says what is not there and what sends it: the SDK call, the setting or the

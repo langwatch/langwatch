@@ -6,7 +6,8 @@
  * source to the bridge; a code change remounts the iframe for a fresh init.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) => ({
@@ -37,6 +38,7 @@ const ui = (
   code: string,
   theme: "light" | "dark" = "light",
   onIdleChange?: (idle: boolean) => void,
+  cover?: ReactNode,
 ) => (
   <DesignSystemProvider forcedTheme="light">
     <SandboxedChartFrame
@@ -45,6 +47,7 @@ const ui = (
       dashboardContext={{ ...dashboardContext, theme }}
       onLog={vi.fn()}
       onIdleChange={onIdleChange}
+      cover={cover}
     />
   </DesignSystemProvider>
 );
@@ -117,6 +120,27 @@ describe("given a sandboxed chart frame", () => {
       rerender(ui("B", "light", onIdleChange));
 
       expect(onIdleChange).toHaveBeenLastCalledWith(false);
+    });
+  });
+
+  describe("when it is given a cover", () => {
+    /** @scenario "The loading skeleton covers a running frame, never its restart notice" */
+    it("draws the cover over the running iframe", () => {
+      const { container } = render(ui("A", "light", undefined, <p>Loading cover</p>));
+
+      expect(container.querySelector("iframe")).not.toBeNull();
+      expect(screen.getByText("Loading cover")).toBeTruthy();
+    });
+
+    /** @scenario "The loading skeleton covers a running frame, never its restart notice" */
+    it("draws no cover while the frame is restarting", () => {
+      render(ui("A", "light", undefined, <p>Loading cover</p>));
+      const options = bridgeMock.mock.calls.at(-1)?.[0] as { onTeardown: () => void };
+
+      act(() => options.onTeardown());
+
+      expect(screen.getByText("The chart stopped responding. Restarting…")).toBeTruthy();
+      expect(screen.queryByText("Loading cover")).toBeNull();
     });
   });
 });
