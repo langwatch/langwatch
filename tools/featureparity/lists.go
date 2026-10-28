@@ -61,6 +61,7 @@ var (
 		"tools/migrationorder",
 		"tools/linkcheck",
 		"tools/chartpush",
+		"tools/slacknotify",
 		"tools/chartheap",
 		"tools/matrixseed",
 		"cmd/linkcheck",
