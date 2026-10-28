@@ -10344,6 +10344,27 @@ func (e PostConnectedAgentFramesJSONBodyFrames2Type) Valid() bool {
 	}
 }
 
+// Defines values for PollConnectedAgentInstance200JSONResponseBodyFrames0Kind.
+const (
+	PollConnectedAgentInstance200JSONResponseBodyFrames0KindSetup    PollConnectedAgentInstance200JSONResponseBodyFrames0Kind = "setup"
+	PollConnectedAgentInstance200JSONResponseBodyFrames0KindTeardown PollConnectedAgentInstance200JSONResponseBodyFrames0Kind = "teardown"
+	PollConnectedAgentInstance200JSONResponseBodyFrames0KindTurn     PollConnectedAgentInstance200JSONResponseBodyFrames0Kind = "turn"
+)
+
+// Valid indicates whether the value is a known member of the PollConnectedAgentInstance200JSONResponseBodyFrames0Kind enum.
+func (e PollConnectedAgentInstance200JSONResponseBodyFrames0Kind) Valid() bool {
+	switch e {
+	case PollConnectedAgentInstance200JSONResponseBodyFrames0KindSetup:
+		return true
+	case PollConnectedAgentInstance200JSONResponseBodyFrames0KindTeardown:
+		return true
+	case PollConnectedAgentInstance200JSONResponseBodyFrames0KindTurn:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PollConnectedAgentInstance200JSONResponseBodyFrames0Protocol.
 const (
 	PollConnectedAgentInstance200JSONResponseBodyFrames0ProtocolN1 PollConnectedAgentInstance200JSONResponseBodyFrames0Protocol = 1
@@ -10917,6 +10938,27 @@ func (e ReplaceAgent200JSONResponseBodyType) Valid() bool {
 	}
 }
 
+// Defines values for CallConnectedAgentJSONBodyKind.
+const (
+	CallConnectedAgentJSONBodyKindSetup    CallConnectedAgentJSONBodyKind = "setup"
+	CallConnectedAgentJSONBodyKindTeardown CallConnectedAgentJSONBodyKind = "teardown"
+	CallConnectedAgentJSONBodyKindTurn     CallConnectedAgentJSONBodyKind = "turn"
+)
+
+// Valid indicates whether the value is a known member of the CallConnectedAgentJSONBodyKind enum.
+func (e CallConnectedAgentJSONBodyKind) Valid() bool {
+	switch e {
+	case CallConnectedAgentJSONBodyKindSetup:
+		return true
+	case CallConnectedAgentJSONBodyKindTeardown:
+		return true
+	case CallConnectedAgentJSONBodyKindTurn:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiAnalyticsJSONBodySeriesAggregation.
 const (
 	PostApiAnalyticsJSONBodySeriesAggregationAvg         PostApiAnalyticsJSONBodySeriesAggregation = "avg"
@@ -11016,6 +11058,21 @@ const (
 func (e PostApiAnalyticsJSONBodyTimeScale0) Valid() bool {
 	switch e {
 	case PostApiAnalyticsJSONBodyTimeScale0Full:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess.
+const (
+	PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccessTrue PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess = true
+)
+
+// Valid indicates whether the value is a known member of the PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess enum.
+func (e PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess) Valid() bool {
+	switch e {
+	case PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccessTrue:
 		return true
 	default:
 		return false
@@ -12291,15 +12348,1722 @@ func (e PostApiCheckupRun200JSONResponseBodyRowsVerdict2Outcome) Valid() bool {
 	}
 }
 
-// Defines values for PutApiDashboardsReorder200JSONResponseBodySuccess.
+// Defines values for GetApiDashboards200JSONResponseBodyDataScope.
 const (
-	PutApiDashboardsReorder200JSONResponseBodySuccessTrue PutApiDashboardsReorder200JSONResponseBodySuccess = true
+	GetApiDashboards200JSONResponseBodyDataScopeORGANIZATION GetApiDashboards200JSONResponseBodyDataScope = "ORGANIZATION"
+	GetApiDashboards200JSONResponseBodyDataScopePRIVATE      GetApiDashboards200JSONResponseBodyDataScope = "PRIVATE"
+	GetApiDashboards200JSONResponseBodyDataScopePROJECT      GetApiDashboards200JSONResponseBodyDataScope = "PROJECT"
 )
 
-// Valid indicates whether the value is a known member of the PutApiDashboardsReorder200JSONResponseBodySuccess enum.
-func (e PutApiDashboardsReorder200JSONResponseBodySuccess) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiDashboards200JSONResponseBodyDataScope enum.
+func (e GetApiDashboards200JSONResponseBodyDataScope) Valid() bool {
 	switch e {
-	case PutApiDashboardsReorder200JSONResponseBodySuccessTrue:
+	case GetApiDashboards200JSONResponseBodyDataScopeORGANIZATION:
+		return true
+	case GetApiDashboards200JSONResponseBodyDataScopePRIVATE:
+		return true
+	case GetApiDashboards200JSONResponseBodyDataScopePROJECT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboards400JSONResponseBodyFault.
+const (
+	GetApiDashboards400JSONResponseBodyFaultCustomer         GetApiDashboards400JSONResponseBodyFault = "customer"
+	GetApiDashboards400JSONResponseBodyFaultPlatform         GetApiDashboards400JSONResponseBodyFault = "platform"
+	GetApiDashboards400JSONResponseBodyFaultPresumedPlatform GetApiDashboards400JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboards400JSONResponseBodyFaultProvider         GetApiDashboards400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboards400JSONResponseBodyFault enum.
+func (e GetApiDashboards400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboards400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboards400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboards400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboards400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboards401JSONResponseBodyFault.
+const (
+	GetApiDashboards401JSONResponseBodyFaultCustomer         GetApiDashboards401JSONResponseBodyFault = "customer"
+	GetApiDashboards401JSONResponseBodyFaultPlatform         GetApiDashboards401JSONResponseBodyFault = "platform"
+	GetApiDashboards401JSONResponseBodyFaultPresumedPlatform GetApiDashboards401JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboards401JSONResponseBodyFaultProvider         GetApiDashboards401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboards401JSONResponseBodyFault enum.
+func (e GetApiDashboards401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboards401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboards401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboards401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboards401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboards403JSONResponseBodyFault.
+const (
+	GetApiDashboards403JSONResponseBodyFaultCustomer         GetApiDashboards403JSONResponseBodyFault = "customer"
+	GetApiDashboards403JSONResponseBodyFaultPlatform         GetApiDashboards403JSONResponseBodyFault = "platform"
+	GetApiDashboards403JSONResponseBodyFaultPresumedPlatform GetApiDashboards403JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboards403JSONResponseBodyFaultProvider         GetApiDashboards403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboards403JSONResponseBodyFault enum.
+func (e GetApiDashboards403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboards403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboards403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboards403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboards403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboards500JSONResponseBodyFault.
+const (
+	GetApiDashboards500JSONResponseBodyFaultCustomer         GetApiDashboards500JSONResponseBodyFault = "customer"
+	GetApiDashboards500JSONResponseBodyFaultPlatform         GetApiDashboards500JSONResponseBodyFault = "platform"
+	GetApiDashboards500JSONResponseBodyFaultPresumedPlatform GetApiDashboards500JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboards500JSONResponseBodyFaultProvider         GetApiDashboards500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboards500JSONResponseBodyFault enum.
+func (e GetApiDashboards500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboards500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboards500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboards500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboards500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboards201JSONResponseBodyScope.
+const (
+	PostApiDashboards201JSONResponseBodyScopeORGANIZATION PostApiDashboards201JSONResponseBodyScope = "ORGANIZATION"
+	PostApiDashboards201JSONResponseBodyScopePRIVATE      PostApiDashboards201JSONResponseBodyScope = "PRIVATE"
+	PostApiDashboards201JSONResponseBodyScopePROJECT      PostApiDashboards201JSONResponseBodyScope = "PROJECT"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboards201JSONResponseBodyScope enum.
+func (e PostApiDashboards201JSONResponseBodyScope) Valid() bool {
+	switch e {
+	case PostApiDashboards201JSONResponseBodyScopeORGANIZATION:
+		return true
+	case PostApiDashboards201JSONResponseBodyScopePRIVATE:
+		return true
+	case PostApiDashboards201JSONResponseBodyScopePROJECT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboards400JSONResponseBodyFault.
+const (
+	PostApiDashboards400JSONResponseBodyFaultCustomer         PostApiDashboards400JSONResponseBodyFault = "customer"
+	PostApiDashboards400JSONResponseBodyFaultPlatform         PostApiDashboards400JSONResponseBodyFault = "platform"
+	PostApiDashboards400JSONResponseBodyFaultPresumedPlatform PostApiDashboards400JSONResponseBodyFault = "presumed_platform"
+	PostApiDashboards400JSONResponseBodyFaultProvider         PostApiDashboards400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboards400JSONResponseBodyFault enum.
+func (e PostApiDashboards400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiDashboards400JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiDashboards400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiDashboards400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiDashboards400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboards401JSONResponseBodyFault.
+const (
+	PostApiDashboards401JSONResponseBodyFaultCustomer         PostApiDashboards401JSONResponseBodyFault = "customer"
+	PostApiDashboards401JSONResponseBodyFaultPlatform         PostApiDashboards401JSONResponseBodyFault = "platform"
+	PostApiDashboards401JSONResponseBodyFaultPresumedPlatform PostApiDashboards401JSONResponseBodyFault = "presumed_platform"
+	PostApiDashboards401JSONResponseBodyFaultProvider         PostApiDashboards401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboards401JSONResponseBodyFault enum.
+func (e PostApiDashboards401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiDashboards401JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiDashboards401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiDashboards401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiDashboards401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboards403JSONResponseBodyFault.
+const (
+	PostApiDashboards403JSONResponseBodyFaultCustomer         PostApiDashboards403JSONResponseBodyFault = "customer"
+	PostApiDashboards403JSONResponseBodyFaultPlatform         PostApiDashboards403JSONResponseBodyFault = "platform"
+	PostApiDashboards403JSONResponseBodyFaultPresumedPlatform PostApiDashboards403JSONResponseBodyFault = "presumed_platform"
+	PostApiDashboards403JSONResponseBodyFaultProvider         PostApiDashboards403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboards403JSONResponseBodyFault enum.
+func (e PostApiDashboards403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiDashboards403JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiDashboards403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiDashboards403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiDashboards403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboards500JSONResponseBodyFault.
+const (
+	PostApiDashboards500JSONResponseBodyFaultCustomer         PostApiDashboards500JSONResponseBodyFault = "customer"
+	PostApiDashboards500JSONResponseBodyFaultPlatform         PostApiDashboards500JSONResponseBodyFault = "platform"
+	PostApiDashboards500JSONResponseBodyFaultPresumedPlatform PostApiDashboards500JSONResponseBodyFault = "presumed_platform"
+	PostApiDashboards500JSONResponseBodyFaultProvider         PostApiDashboards500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboards500JSONResponseBodyFault enum.
+func (e PostApiDashboards500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiDashboards500JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiDashboards500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiDashboards500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiDashboards500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardId400JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardId400JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardId400JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardId400JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardId400JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardId400JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardId400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardId400JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardId400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardId400JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardId400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardId400JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardId400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardId401JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardId401JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardId401JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardId401JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardId401JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardId401JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardId401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardId401JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardId401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardId401JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardId401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardId401JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardId401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardId403JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardId403JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardId403JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardId403JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardId403JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardId403JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardId403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardId403JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardId403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardId403JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardId403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardId403JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardId403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardId404JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardId404JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardId404JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardId404JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardId404JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardId404JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardId404JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardId404JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardId404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardId404JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardId404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardId404JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardId404JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardId500JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardId500JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardId500JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardId500JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardId500JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardId500JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardId500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardId500JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardId500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardId500JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardId500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardId500JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardId500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardId500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardId200JSONResponseBodyScope.
+const (
+	GetApiDashboardsByDashboardId200JSONResponseBodyScopeORGANIZATION GetApiDashboardsByDashboardId200JSONResponseBodyScope = "ORGANIZATION"
+	GetApiDashboardsByDashboardId200JSONResponseBodyScopePRIVATE      GetApiDashboardsByDashboardId200JSONResponseBodyScope = "PRIVATE"
+	GetApiDashboardsByDashboardId200JSONResponseBodyScopePROJECT      GetApiDashboardsByDashboardId200JSONResponseBodyScope = "PROJECT"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardId200JSONResponseBodyScope enum.
+func (e GetApiDashboardsByDashboardId200JSONResponseBodyScope) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardId200JSONResponseBodyScopeORGANIZATION:
+		return true
+	case GetApiDashboardsByDashboardId200JSONResponseBodyScopePRIVATE:
+		return true
+	case GetApiDashboardsByDashboardId200JSONResponseBodyScopePROJECT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardId400JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardId400JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardId400JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardId400JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardId400JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardId400JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardId400JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardId400JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardId400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardId400JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardId400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardId400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardId400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardId400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardId400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardId401JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardId401JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardId401JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardId401JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardId401JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardId401JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardId401JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardId401JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardId401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardId401JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardId401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardId401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardId401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardId401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardId401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardId403JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardId403JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardId403JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardId403JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardId403JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardId403JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardId403JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardId403JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardId403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardId403JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardId403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardId403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardId403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardId403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardId403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardId404JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardId404JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardId404JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardId404JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardId404JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardId404JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardId404JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardId404JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardId404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardId404JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardId404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardId404JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardId404JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardId404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardId404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardId500JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardId500JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardId500JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardId500JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardId500JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardId500JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardId500JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardId500JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardId500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardId500JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardId500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardId500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardId500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardId500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardId500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardId200JSONResponseBodyScope.
+const (
+	PatchApiDashboardsByDashboardId200JSONResponseBodyScopeORGANIZATION PatchApiDashboardsByDashboardId200JSONResponseBodyScope = "ORGANIZATION"
+	PatchApiDashboardsByDashboardId200JSONResponseBodyScopePRIVATE      PatchApiDashboardsByDashboardId200JSONResponseBodyScope = "PRIVATE"
+	PatchApiDashboardsByDashboardId200JSONResponseBodyScopePROJECT      PatchApiDashboardsByDashboardId200JSONResponseBodyScope = "PROJECT"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardId200JSONResponseBodyScope enum.
+func (e PatchApiDashboardsByDashboardId200JSONResponseBodyScope) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardId200JSONResponseBodyScopeORGANIZATION:
+		return true
+	case PatchApiDashboardsByDashboardId200JSONResponseBodyScopePRIVATE:
+		return true
+	case PatchApiDashboardsByDashboardId200JSONResponseBodyScopePROJECT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardId400JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardId400JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardId400JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardId400JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardId400JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardId400JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardId400JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardId400JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardId400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardId400JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardId400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardId400JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardId400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardId401JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardId401JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardId401JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardId401JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardId401JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardId401JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardId401JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardId401JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardId401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardId401JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardId401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardId401JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardId401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardId403JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardId403JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardId403JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardId403JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardId403JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardId403JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardId403JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardId403JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardId403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardId403JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardId403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardId403JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardId403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardId404JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardId404JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardId404JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardId404JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardId404JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardId404JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardId404JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardId404JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardId404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardId404JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardId404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardId404JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardId404JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardId500JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardId500JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardId500JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardId500JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardId500JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardId500JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardId500JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardId500JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardId500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardId500JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardId500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardId500JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardId500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardId500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType.
+const (
+	GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersTypeBoolean GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType = "boolean"
+	GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersTypeNumber  GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType = "number"
+	GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersTypeString  GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType enum.
+func (e GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersTypeBoolean:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersTypeNumber:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0Kind.
+const (
+	GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0KindCatalogue GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0Kind enum.
+func (e GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0Kind) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1Kind.
+const (
+	GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1KindLangy GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1Kind enum.
+func (e GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1Kind) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2Kind.
+const (
+	GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2KindCode GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2Kind enum.
+func (e GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2Kind) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3Kind.
+const (
+	GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3KindApi GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3Kind enum.
+func (e GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3Kind) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType.
+const (
+	PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersTypeBoolean PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType = "boolean"
+	PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersTypeNumber  PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType = "number"
+	PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersTypeString  PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType enum.
+func (e PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersTypeBoolean:
+		return true
+	case PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersTypeNumber:
+		return true
+	case PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgetsJSONBodySource0Kind.
+const (
+	PostApiDashboardsByDashboardIdWidgetsJSONBodySource0KindCatalogue PostApiDashboardsByDashboardIdWidgetsJSONBodySource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgetsJSONBodySource0Kind enum.
+func (e PostApiDashboardsByDashboardIdWidgetsJSONBodySource0Kind) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgetsJSONBodySource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgetsJSONBodySource1Kind.
+const (
+	PostApiDashboardsByDashboardIdWidgetsJSONBodySource1KindLangy PostApiDashboardsByDashboardIdWidgetsJSONBodySource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgetsJSONBodySource1Kind enum.
+func (e PostApiDashboardsByDashboardIdWidgetsJSONBodySource1Kind) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgetsJSONBodySource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgetsJSONBodySource2Kind.
+const (
+	PostApiDashboardsByDashboardIdWidgetsJSONBodySource2KindCode PostApiDashboardsByDashboardIdWidgetsJSONBodySource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgetsJSONBodySource2Kind enum.
+func (e PostApiDashboardsByDashboardIdWidgetsJSONBodySource2Kind) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgetsJSONBodySource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgetsJSONBodySource3Kind.
+const (
+	PostApiDashboardsByDashboardIdWidgetsJSONBodySource3KindApi PostApiDashboardsByDashboardIdWidgetsJSONBodySource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgetsJSONBodySource3Kind enum.
+func (e PostApiDashboardsByDashboardIdWidgetsJSONBodySource3Kind) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgetsJSONBodySource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType.
+const (
+	PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersTypeBoolean PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType = "boolean"
+	PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersTypeNumber  PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType = "number"
+	PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersTypeString  PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType enum.
+func (e PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersTypeBoolean:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersTypeNumber:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0Kind.
+const (
+	PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0KindCatalogue PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0Kind enum.
+func (e PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0Kind) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1Kind.
+const (
+	PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1KindLangy PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1Kind enum.
+func (e PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1Kind) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2Kind.
+const (
+	PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2KindCode PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2Kind enum.
+func (e PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2Kind) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3Kind.
+const (
+	PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3KindApi PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3Kind enum.
+func (e PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3Kind) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault.
+const (
+	PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultCustomer         PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault = "customer"
+	PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultPlatform         PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault = "platform"
+	PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultPresumedPlatform PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault = "presumed_platform"
+	PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultProvider         PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault enum.
+func (e PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault.
+const (
+	PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultCustomer         PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault = "customer"
+	PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultPlatform         PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault = "platform"
+	PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultPresumedPlatform PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault = "presumed_platform"
+	PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultProvider         PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault enum.
+func (e PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault.
+const (
+	PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultCustomer         PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault = "customer"
+	PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultPlatform         PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault = "platform"
+	PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultPresumedPlatform PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault = "presumed_platform"
+	PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultProvider         PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault enum.
+func (e PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault.
+const (
+	PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultCustomer         PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault = "customer"
+	PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultPlatform         PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault = "platform"
+	PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultPresumedPlatform PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault = "presumed_platform"
+	PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultProvider         PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault enum.
+func (e PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault.
+const (
+	PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultCustomer         PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault = "customer"
+	PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultPlatform         PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault = "platform"
+	PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultPresumedPlatform PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault = "presumed_platform"
+	PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultProvider         PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault enum.
+func (e PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault.
+const (
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultCustomer         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "customer"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPlatform         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultProvider         DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault enum.
+func (e DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultCustomer:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeBoolean GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType = "boolean"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeNumber  GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType = "number"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeString  GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeBoolean:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeNumber:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0KindCatalogue GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1KindLangy GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2KindCode GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3KindApi GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault.
+const (
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultCustomer         GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "customer"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPlatform         GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "presumed_platform"
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultProvider         GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault enum.
+func (e GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersTypeBoolean PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType = "boolean"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersTypeNumber  PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType = "number"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersTypeString  PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersTypeBoolean:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersTypeNumber:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0Kind.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0KindCatalogue PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0Kind enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0Kind) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1Kind.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1KindLangy PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1Kind enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1Kind) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2Kind.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2KindCode PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2Kind enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2Kind) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3Kind.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3KindApi PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3Kind enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3Kind) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeBoolean PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType = "boolean"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeNumber  PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType = "number"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeString  PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeBoolean:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeNumber:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0KindCatalogue PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1KindLangy PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2KindCode PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3KindApi PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault.
+const (
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultCustomer         PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "customer"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPlatform         PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "presumed_platform"
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultProvider         PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault enum.
+func (e PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
@@ -16905,141 +18669,141 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault) Vali
 	}
 }
 
-// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope.
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopeORGANIZATION GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope = "ORGANIZATION"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopePRIVATE      GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope = "PRIVATE"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopePROJECT      GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope = "PROJECT"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScopeORGANIZATION GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope = "ORGANIZATION"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScopePRIVATE      GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope = "PRIVATE"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScopePROJECT      GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope = "PROJECT"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope enum.
-func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope) Valid() bool {
 	switch e {
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopeORGANIZATION:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScopeORGANIZATION:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopePRIVATE:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScopePRIVATE:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopePROJECT:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScopePROJECT:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault.
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault = "presumed_platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault = "provider"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault enum.
-func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultCustomer:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFaultCustomer:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFaultPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultPresumedPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFaultPresumedPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultProvider:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault.
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault = "presumed_platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault = "provider"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault enum.
-func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultCustomer:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFaultCustomer:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFaultPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultPresumedPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFaultPresumedPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFaultProvider:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault.
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault = "presumed_platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault = "provider"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault enum.
-func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultCustomer:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFaultCustomer:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFaultPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultPresumedPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFaultPresumedPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFaultProvider:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault.
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault = "presumed_platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault = "provider"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault enum.
-func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultCustomer:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFaultCustomer:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFaultPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultPresumedPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFaultPresumedPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFaultProvider:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault.
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault = "presumed_platform"
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault = "provider"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault enum.
-func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultCustomer:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFaultCustomer:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFaultPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultPresumedPlatform:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFaultPresumedPlatform:
 		return true
-	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFaultProvider:
+	case GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
@@ -19071,6 +20835,264 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScopeORGANIZATION GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope = "ORGANIZATION"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScopePRIVATE      GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope = "PRIVATE"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScopePROJECT      GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope = "PROJECT"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScopeORGANIZATION:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScopePRIVATE:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScopePROJECT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScopeORGANIZATION GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope = "ORGANIZATION"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScopePRIVATE      GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope = "PRIVATE"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScopePROJECT      GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope = "PROJECT"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScopeORGANIZATION:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScopePRIVATE:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScopePROJECT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
@@ -24302,22 +26324,22 @@ func (e GetApiV1QuerySchema403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema500JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema500JSONResponseBodyFaultCustomer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPlatform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultProvider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
+	Customer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
+	Platform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
+	PresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
+	Provider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema500JSONResponseBodyFault enum.
 func (e GetApiV1QuerySchema500JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema500JSONResponseBodyFaultCustomer:
+	case Customer:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPlatform:
+	case Platform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform:
+	case PresumedPlatform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultProvider:
+	case Provider:
 		return true
 	default:
 		return false
@@ -32928,8 +34950,9 @@ type DatasetPostEntries struct {
 
 // Evaluation defines model for Evaluation.
 type Evaluation struct {
-	Details *string `json:"details,omitempty"`
-	Error   *struct {
+	Attempts *int    `json:"attempts,omitempty"`
+	Details  *string `json:"details,omitempty"`
+	Error    *struct {
 		HasError   EvaluationErrorHasError `json:"has_error"`
 		Message    string                  `json:"message"`
 		Stacktrace []string                `json:"stacktrace"`
@@ -32940,6 +34963,7 @@ type Evaluation struct {
 	Inputs             *map[string]interface{} `json:"inputs,omitempty"`
 	IsGuardrail        *bool                   `json:"is_guardrail,omitempty"`
 	Label              *string                 `json:"label,omitempty"`
+	LastAttemptError   *string                 `json:"last_attempt_error,omitempty"`
 	Name               string                  `json:"name"`
 	Passed             *bool                   `json:"passed,omitempty"`
 	Retries            *float32                `json:"retries,omitempty"`
@@ -32978,6 +35002,8 @@ type EvaluationTimestamps struct {
 	FinishedAt              *float32 `json:"finished_at,omitempty"`
 	IgnoreTimestampsOnWrite *bool    `json:"ignore_timestamps_on_write,omitempty"`
 	InsertedAt              *float32 `json:"inserted_at,omitempty"`
+	LastAttemptAt           *int     `json:"last_attempt_at,omitempty"`
+	NextAttemptAt           *int     `json:"next_attempt_at,omitempty"`
 	StartedAt               *float32 `json:"started_at,omitempty"`
 	UpdatedAt               *float32 `json:"updated_at,omitempty"`
 }
@@ -38104,6 +40130,7 @@ type PostConnectedAgentFramesJSONBodyFrames1 struct {
 	Output   *PostConnectedAgentFramesJSONBody_Frames_1_Output `json:"output,omitempty"`
 	Protocol PostConnectedAgentFramesJSONBodyFrames1Protocol   `json:"protocol"`
 	Session  interface{}                                       `json:"session,omitempty"`
+	State    *map[string]interface{}                           `json:"state,omitempty"`
 	Type     PostConnectedAgentFramesJSONBodyFrames1Type       `json:"type"`
 }
 
@@ -38163,6 +40190,7 @@ type PollConnectedAgentInstance200JSONResponseBodyFrames0 struct {
 	AgentId     string                                                                                        `json:"agentId"`
 	CallId      string                                                                                        `json:"callId"`
 	DeadlineAt  int                                                                                           `json:"deadlineAt"`
+	Kind        PollConnectedAgentInstance200JSONResponseBodyFrames0Kind                                      `json:"kind"`
 	Messages    []PollConnectedAgentInstance200JSONResponseBody_Frames_0_Messages_Item                        `json:"messages"`
 	NewMessages []PollConnectedAgentInstance200JSONResponseBody_Frames_0_NewMessages_Item                     `json:"newMessages"`
 	Params      map[string]PollConnectedAgentInstance200JSONResponseBody_Frames_0_Params_AdditionalProperties `json:"params"`
@@ -38173,10 +40201,14 @@ type PollConnectedAgentInstance200JSONResponseBodyFrames0 struct {
 		ScenarioRunId *string `json:"scenarioRunId,omitempty"`
 	} `json:"run"`
 	Session     interface{}                                              `json:"session,omitempty"`
+	State       *map[string]interface{}                                  `json:"state,omitempty"`
 	ThreadId    string                                                   `json:"threadId"`
 	Traceparent *string                                                  `json:"traceparent"`
 	Type        PollConnectedAgentInstance200JSONResponseBodyFrames0Type `json:"type"`
 }
+
+// PollConnectedAgentInstance200JSONResponseBodyFrames0Kind defines parameters for PollConnectedAgentInstance.
+type PollConnectedAgentInstance200JSONResponseBodyFrames0Kind string
 
 // PollConnectedAgentInstance200JSONResponseBody_Frames_0_Messages_Item defines parameters for PollConnectedAgentInstance.
 type PollConnectedAgentInstance200JSONResponseBody_Frames_0_Messages_Item struct {
@@ -38231,12 +40263,16 @@ type PollConnectedAgentInstance200JSONResponseBody_Frames_Item struct {
 // RegisterConnectedAgentInstanceJSONBody defines parameters for RegisterConnectedAgentInstance.
 type RegisterConnectedAgentInstanceJSONBody struct {
 	Agents []struct {
-		Concurrency *int                    `json:"concurrency,omitempty"`
-		Environment string                  `json:"environment"`
-		Name        string                  `json:"name"`
-		Parameters  *map[string]interface{} `json:"parameters,omitempty"`
-		Sticky      *bool                   `json:"sticky,omitempty"`
-		TimeoutMs   *int                    `json:"timeoutMs,omitempty"`
+		Concurrency *int   `json:"concurrency,omitempty"`
+		Environment string `json:"environment"`
+		Hooks       *struct {
+			Setup    bool `json:"setup"`
+			Teardown bool `json:"teardown"`
+		} `json:"hooks,omitempty"`
+		Name       string                  `json:"name"`
+		Parameters *map[string]interface{} `json:"parameters,omitempty"`
+		Sticky     *bool                   `json:"sticky,omitempty"`
+		TimeoutMs  *int                    `json:"timeoutMs,omitempty"`
 	} `json:"agents"`
 	Instance struct {
 		Hostname        string    `json:"hostname"`
@@ -38557,6 +40593,9 @@ type ReplaceAgent200JSONResponseBodyType string
 
 // CallConnectedAgentJSONBody defines parameters for CallConnectedAgent.
 type CallConnectedAgentJSONBody struct {
+	// Kind A turn, or a scenario run's setup or teardown hook. Defaults to a turn.
+	Kind *CallConnectedAgentJSONBodyKind `json:"kind,omitempty"`
+
 	// Messages The whole conversation so far, OpenAI style.
 	Messages []CallConnectedAgentJSONBody_Messages_Item `json:"messages"`
 
@@ -38576,12 +40615,21 @@ type CallConnectedAgentJSONBody struct {
 	// Session The session the agent returned on its previous turn of this conversation, echoed back as is.
 	Session interface{} `json:"session,omitempty"`
 
+	// State The scenario run's test data: what setup returned, or a turn's latest update.
+	State *CallConnectedAgentJSONBody_State `json:"state,omitempty"`
+
 	// ThreadId The conversation id. Turns of one conversation share it; a new id starts a new one.
 	ThreadId *string `json:"threadId,omitempty"`
+
+	// TimeoutMs A setup or teardown hook's budget in milliseconds. A turn runs under the agent's own timeout.
+	TimeoutMs *int `json:"timeoutMs,omitempty"`
 
 	// Traceparent The W3C trace context the agent adopts, so its spans join this turn's trace.
 	Traceparent *string `json:"traceparent,omitempty"`
 }
+
+// CallConnectedAgentJSONBodyKind defines parameters for CallConnectedAgent.
+type CallConnectedAgentJSONBodyKind string
 
 // CallConnectedAgentJSONBody_Messages_Item defines parameters for CallConnectedAgent.
 type CallConnectedAgentJSONBody_Messages_Item struct {
@@ -38609,6 +40657,14 @@ type CallConnectedAgentJSONBody_Params_AdditionalProperties struct {
 	union json.RawMessage
 }
 
+// CallConnectedAgentJSONBodyState0 defines parameters for CallConnectedAgent.
+type CallConnectedAgentJSONBodyState0 map[string]interface{}
+
+// CallConnectedAgentJSONBody_State defines parameters for CallConnectedAgent.
+type CallConnectedAgentJSONBody_State struct {
+	union json.RawMessage
+}
+
 // CallConnectedAgent200JSONResponseBodyOutput0 defines parameters for CallConnectedAgent.
 type CallConnectedAgent200JSONResponseBodyOutput0 = string
 
@@ -38629,6 +40685,14 @@ type CallConnectedAgent200JSONResponseBody_Output_2_Item struct {
 
 // CallConnectedAgent200JSONResponseBody_Output defines parameters for CallConnectedAgent.
 type CallConnectedAgent200JSONResponseBody_Output struct {
+	union json.RawMessage
+}
+
+// CallConnectedAgent200JSONResponseBodyState0 defines parameters for CallConnectedAgent.
+type CallConnectedAgent200JSONResponseBodyState0 map[string]interface{}
+
+// CallConnectedAgent200JSONResponseBody_State defines parameters for CallConnectedAgent.
+type CallConnectedAgent200JSONResponseBody_State struct {
 	union json.RawMessage
 }
 
@@ -39578,6 +41642,24 @@ type PostApiAnalyticsJSONBodyTimeScale1 = int
 // PostApiAnalyticsJSONBody_TimeScale defines parameters for PostApiAnalytics.
 type PostApiAnalyticsJSONBody_TimeScale struct {
 	union json.RawMessage
+}
+
+// PostApiV1AnalyticsReportsJSONBody defines parameters for PostApiV1AnalyticsReports.
+type PostApiV1AnalyticsReportsJSONBody struct {
+	Name string `json:"name"`
+}
+
+// PutApiV1AnalyticsReportsReorderJSONBody defines parameters for PutApiV1AnalyticsReportsReorder.
+type PutApiV1AnalyticsReportsReorderJSONBody struct {
+	DashboardIds []string `json:"dashboardIds"`
+}
+
+// PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess defines parameters for PutApiV1AnalyticsReportsReorder.
+type PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess bool
+
+// PatchApiV1AnalyticsReportsByReportIdJSONBody defines parameters for PatchApiV1AnalyticsReportsByReportId.
+type PatchApiV1AnalyticsReportsByReportIdJSONBody struct {
+	Name string `json:"name"`
 }
 
 // PostApiAnalyticsTimeseriesJSONBody defines parameters for PostApiAnalyticsTimeseries.
@@ -40983,23 +43065,538 @@ type GetApiCodingAgentSessionsBySessionIdEventsParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// GetApiDashboards200JSONResponseBodyDataScope defines parameters for GetApiDashboards.
+type GetApiDashboards200JSONResponseBodyDataScope string
+
+// GetApiDashboards400JSONResponseBodyFault defines parameters for GetApiDashboards.
+type GetApiDashboards400JSONResponseBodyFault string
+
+// GetApiDashboards401JSONResponseBodyFault defines parameters for GetApiDashboards.
+type GetApiDashboards401JSONResponseBodyFault string
+
+// GetApiDashboards403JSONResponseBodyFault defines parameters for GetApiDashboards.
+type GetApiDashboards403JSONResponseBodyFault string
+
+// GetApiDashboards500JSONResponseBodyFault defines parameters for GetApiDashboards.
+type GetApiDashboards500JSONResponseBodyFault string
+
 // PostApiDashboardsJSONBody defines parameters for PostApiDashboards.
 type PostApiDashboardsJSONBody struct {
 	Name string `json:"name"`
 }
 
-// PutApiDashboardsReorderJSONBody defines parameters for PutApiDashboardsReorder.
-type PutApiDashboardsReorderJSONBody struct {
-	DashboardIds []string `json:"dashboardIds"`
+// PostApiDashboards201JSONResponseBodyScope defines parameters for PostApiDashboards.
+type PostApiDashboards201JSONResponseBodyScope string
+
+// PostApiDashboards400JSONResponseBodyFault defines parameters for PostApiDashboards.
+type PostApiDashboards400JSONResponseBodyFault string
+
+// PostApiDashboards401JSONResponseBodyFault defines parameters for PostApiDashboards.
+type PostApiDashboards401JSONResponseBodyFault string
+
+// PostApiDashboards403JSONResponseBodyFault defines parameters for PostApiDashboards.
+type PostApiDashboards403JSONResponseBodyFault string
+
+// PostApiDashboards500JSONResponseBodyFault defines parameters for PostApiDashboards.
+type PostApiDashboards500JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardId400JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardId.
+type DeleteApiDashboardsByDashboardId400JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardId401JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardId.
+type DeleteApiDashboardsByDashboardId401JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardId403JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardId.
+type DeleteApiDashboardsByDashboardId403JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardId404JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardId.
+type DeleteApiDashboardsByDashboardId404JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardId500JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardId.
+type DeleteApiDashboardsByDashboardId500JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardId200JSONResponseBodyScope defines parameters for GetApiDashboardsByDashboardId.
+type GetApiDashboardsByDashboardId200JSONResponseBodyScope string
+
+// GetApiDashboardsByDashboardId400JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardId.
+type GetApiDashboardsByDashboardId400JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardId401JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardId.
+type GetApiDashboardsByDashboardId401JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardId403JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardId.
+type GetApiDashboardsByDashboardId403JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardId404JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardId.
+type GetApiDashboardsByDashboardId404JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardId500JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardId.
+type GetApiDashboardsByDashboardId500JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardIdJSONBody defines parameters for PatchApiDashboardsByDashboardId.
+type PatchApiDashboardsByDashboardIdJSONBody struct {
+	Description     *string   `json:"description,omitempty"`
+	ExcludedOrigins *[]string `json:"excludedOrigins,omitempty"`
+	Name            *string   `json:"name,omitempty"`
 }
 
-// PutApiDashboardsReorder200JSONResponseBodySuccess defines parameters for PutApiDashboardsReorder.
-type PutApiDashboardsReorder200JSONResponseBodySuccess bool
+// PatchApiDashboardsByDashboardId200JSONResponseBodyScope defines parameters for PatchApiDashboardsByDashboardId.
+type PatchApiDashboardsByDashboardId200JSONResponseBodyScope string
 
-// PatchApiDashboardsByIdJSONBody defines parameters for PatchApiDashboardsById.
-type PatchApiDashboardsByIdJSONBody struct {
-	Name string `json:"name"`
+// PatchApiDashboardsByDashboardId400JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardId.
+type PatchApiDashboardsByDashboardId400JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardId401JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardId.
+type PatchApiDashboardsByDashboardId401JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardId403JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardId.
+type PatchApiDashboardsByDashboardId403JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardId404JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardId.
+type PatchApiDashboardsByDashboardId404JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardId500JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardId.
+type PatchApiDashboardsByDashboardId500JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0 defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0 = string
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1 defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1 = float32
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2 defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2 = bool
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default struct {
+	union json.RawMessage
 }
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType string
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0 defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0 struct {
+	CatalogueId string                                                                           `json:"catalogueId"`
+	Kind        GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0Kind `json:"kind"`
+}
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0Kind defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0Kind string
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1 defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1 struct {
+	Kind GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1Kind `json:"kind"`
+}
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1Kind defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1Kind string
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2 defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2 struct {
+	Kind GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2Kind `json:"kind"`
+}
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2Kind defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2Kind string
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3 defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3 struct {
+	Kind GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3Kind `json:"kind"`
+}
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3Kind defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3Kind string
+
+// GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source struct {
+	union json.RawMessage
+}
+
+// GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgets.
+type GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault string
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBody defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBody struct {
+	Code        string  `json:"code"`
+	Description *string `json:"description,omitempty"`
+	Name        string  `json:"name"`
+	Prompt      *string `json:"prompt,omitempty"`
+	Queries     []struct {
+		Name       string `json:"name"`
+		Parameters *[]struct {
+			Default *PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default `json:"default,omitempty"`
+			Name    string                                                                    `json:"name"`
+			Type    PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType        `json:"type"`
+		} `json:"parameters,omitempty"`
+		Sql string `json:"sql"`
+	} `json:"queries"`
+	Source *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source `json:"source,omitempty"`
+}
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0 = string
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1 = float32
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2 = bool
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default struct {
+	union json.RawMessage
+}
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersType string
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodySource0 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodySource0 struct {
+	CatalogueId string                                                   `json:"catalogueId"`
+	Kind        PostApiDashboardsByDashboardIdWidgetsJSONBodySource0Kind `json:"kind"`
+}
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodySource0Kind defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodySource0Kind string
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodySource1 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodySource1 struct {
+	Kind PostApiDashboardsByDashboardIdWidgetsJSONBodySource1Kind `json:"kind"`
+}
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodySource1Kind defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodySource1Kind string
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodySource2 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodySource2 struct {
+	Kind PostApiDashboardsByDashboardIdWidgetsJSONBodySource2Kind `json:"kind"`
+}
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodySource2Kind defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodySource2Kind string
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodySource3 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodySource3 struct {
+	Kind PostApiDashboardsByDashboardIdWidgetsJSONBodySource3Kind `json:"kind"`
+}
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBodySource3Kind defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBodySource3Kind string
+
+// PostApiDashboardsByDashboardIdWidgetsJSONBody_Source defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgetsJSONBody_Source struct {
+	union json.RawMessage
+}
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0 = string
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1 = float32
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2 = bool
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default struct {
+	union json.RawMessage
+}
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType string
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0 struct {
+	CatalogueId string                                                                        `json:"catalogueId"`
+	Kind        PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0Kind `json:"kind"`
+}
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0Kind defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0Kind string
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1 struct {
+	Kind PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1Kind `json:"kind"`
+}
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1Kind defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1Kind string
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2 struct {
+	Kind PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2Kind `json:"kind"`
+}
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2Kind defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2Kind string
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3 defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3 struct {
+	Kind PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3Kind `json:"kind"`
+}
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3Kind defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3Kind string
+
+// PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source struct {
+	union json.RawMessage
+}
+
+// PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault string
+
+// PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault string
+
+// PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault string
+
+// PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault string
+
+// PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault defines parameters for PostApiDashboardsByDashboardIdWidgets.
+type PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId.
+type DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId.
+type DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId.
+type DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId.
+type DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault string
+
+// DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault defines parameters for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId.
+type DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 = string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 = float32
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 = bool
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default struct {
+	union json.RawMessage
+}
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 struct {
+	CatalogueId string                                                                                 `json:"catalogueId"`
+	Kind        GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind `json:"kind"`
+}
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 struct {
+	Kind GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind `json:"kind"`
+}
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 struct {
+	Kind GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind `json:"kind"`
+}
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 struct {
+	Kind GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind `json:"kind"`
+}
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source struct {
+	union json.RawMessage
+}
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault string
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault defines parameters for GetApiDashboardsByDashboardIdWidgetsByWidgetId.
+type GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody struct {
+	Code        *string `json:"code,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Queries     *[]struct {
+		Name       string `json:"name"`
+		Parameters *[]struct {
+			Default *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default `json:"default,omitempty"`
+			Name    string                                                                               `json:"name"`
+			Type    PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType        `json:"type"`
+		} `json:"parameters,omitempty"`
+		Sql string `json:"sql"`
+	} `json:"queries,omitempty"`
+	Source *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source `json:"source,omitempty"`
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0 = string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1 = float32
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2 = bool
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default struct {
+	union json.RawMessage
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersType string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0 struct {
+	CatalogueId string                                                              `json:"catalogueId"`
+	Kind        PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0Kind `json:"kind"`
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0Kind defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0Kind string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1 struct {
+	Kind PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1Kind `json:"kind"`
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1Kind defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1Kind string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2 struct {
+	Kind PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2Kind `json:"kind"`
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2Kind defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2Kind string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3 struct {
+	Kind PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3Kind `json:"kind"`
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3Kind defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3Kind string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source struct {
+	union json.RawMessage
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 = string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 = float32
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 = bool
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default struct {
+	union json.RawMessage
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 struct {
+	CatalogueId string                                                                                   `json:"catalogueId"`
+	Kind        PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind `json:"kind"`
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 struct {
+	Kind PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind `json:"kind"`
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 struct {
+	Kind PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind `json:"kind"`
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 struct {
+	Kind PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind `json:"kind"`
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source struct {
+	union json.RawMessage
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault string
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault defines parameters for PatchApiDashboardsByDashboardIdWidgetsByWidgetId.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault string
 
 // GetApiDatasetParams defines parameters for GetApiDataset.
 type GetApiDatasetParams struct {
@@ -43517,23 +46114,23 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault string
 // GetApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoards.
 type GetApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault string
 
-// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
-type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope string
+// GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope string
 
-// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
-type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault string
+// GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault string
 
-// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
-type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault string
+// GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault string
 
-// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
-type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault string
+// GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault string
 
-// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
-type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault string
+// GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault string
 
-// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
-type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault string
+// GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault string
 
 // GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsCharts.
 type GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault string
@@ -44163,6 +46760,39 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboards.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboards.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboards.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboards.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboards.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault string
 
 // GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType defines parameters for GetApiPrompts.
 type GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType string
@@ -46305,7 +48935,7 @@ type PostApiScenariosJSONBody struct {
 	// Fields The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field.
 	Fields *map[string]PostApiScenariosJSONBody_Fields_AdditionalProperties `json:"fields,omitempty"`
 
-	// JudgeModel Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+	// JudgeModel Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
 	JudgeModel *PostApiScenariosJSONBody_JudgeModel `json:"judgeModel,omitempty"`
 	Labels     *[]string                            `json:"labels,omitempty"`
 
@@ -46327,7 +48957,7 @@ type PostApiScenariosJSONBody struct {
 		Type         *PostApiScenariosJSONBodyParametersType             `json:"type,omitempty"`
 	} `json:"parameters,omitempty"`
 
-	// SimulatorModel Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.
+	// SimulatorModel Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.
 	SimulatorModel *PostApiScenariosJSONBody_SimulatorModel `json:"simulatorModel,omitempty"`
 	Situation      string                                   `json:"situation"`
 
@@ -46541,7 +49171,7 @@ type PatchApiScenariosByIdJSONBody struct {
 	// Fields The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value.
 	Fields *map[string]PatchApiScenariosByIdJSONBody_Fields_AdditionalProperties `json:"fields,omitempty"`
 
-	// JudgeModel Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+	// JudgeModel Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
 	JudgeModel *PatchApiScenariosByIdJSONBody_JudgeModel `json:"judgeModel,omitempty"`
 	Labels     *[]string                                 `json:"labels,omitempty"`
 
@@ -46563,7 +49193,7 @@ type PatchApiScenariosByIdJSONBody struct {
 		Type         *PatchApiScenariosByIdJSONBodyParametersType             `json:"type,omitempty"`
 	} `json:"parameters,omitempty"`
 
-	// SimulatorModel Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.
+	// SimulatorModel Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.
 	SimulatorModel *PatchApiScenariosByIdJSONBody_SimulatorModel `json:"simulatorModel,omitempty"`
 	Situation      *string                                       `json:"situation,omitempty"`
 
@@ -46716,7 +49346,7 @@ type PutApiScenariosByIdJSONBody struct {
 	// Fields The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value.
 	Fields *map[string]PutApiScenariosByIdJSONBody_Fields_AdditionalProperties `json:"fields,omitempty"`
 
-	// JudgeModel Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+	// JudgeModel Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
 	JudgeModel *PutApiScenariosByIdJSONBody_JudgeModel `json:"judgeModel,omitempty"`
 	Labels     *[]string                               `json:"labels,omitempty"`
 
@@ -46738,7 +49368,7 @@ type PutApiScenariosByIdJSONBody struct {
 		Type         *PutApiScenariosByIdJSONBodyParametersType             `json:"type,omitempty"`
 	} `json:"parameters,omitempty"`
 
-	// SimulatorModel Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.
+	// SimulatorModel Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.
 	SimulatorModel *PutApiScenariosByIdJSONBody_SimulatorModel `json:"simulatorModel,omitempty"`
 	Situation      *string                                     `json:"situation,omitempty"`
 
@@ -51587,6 +54217,15 @@ type CallConnectedAgentJSONRequestBody CallConnectedAgentJSONBody
 // PostApiAnalyticsJSONRequestBody defines body for PostApiAnalytics for application/json ContentType.
 type PostApiAnalyticsJSONRequestBody PostApiAnalyticsJSONBody
 
+// PostApiV1AnalyticsReportsJSONRequestBody defines body for PostApiV1AnalyticsReports for application/json ContentType.
+type PostApiV1AnalyticsReportsJSONRequestBody PostApiV1AnalyticsReportsJSONBody
+
+// PutApiV1AnalyticsReportsReorderJSONRequestBody defines body for PutApiV1AnalyticsReportsReorder for application/json ContentType.
+type PutApiV1AnalyticsReportsReorderJSONRequestBody PutApiV1AnalyticsReportsReorderJSONBody
+
+// PatchApiV1AnalyticsReportsByReportIdJSONRequestBody defines body for PatchApiV1AnalyticsReportsByReportId for application/json ContentType.
+type PatchApiV1AnalyticsReportsByReportIdJSONRequestBody PatchApiV1AnalyticsReportsByReportIdJSONBody
+
 // PostApiAnalyticsTimeseriesJSONRequestBody defines body for PostApiAnalyticsTimeseries for application/json ContentType.
 type PostApiAnalyticsTimeseriesJSONRequestBody PostApiAnalyticsTimeseriesJSONBody
 
@@ -51644,11 +54283,14 @@ type PostApiCheckupRunJSONRequestBody PostApiCheckupRunJSONBody
 // PostApiDashboardsJSONRequestBody defines body for PostApiDashboards for application/json ContentType.
 type PostApiDashboardsJSONRequestBody PostApiDashboardsJSONBody
 
-// PutApiDashboardsReorderJSONRequestBody defines body for PutApiDashboardsReorder for application/json ContentType.
-type PutApiDashboardsReorderJSONRequestBody PutApiDashboardsReorderJSONBody
+// PatchApiDashboardsByDashboardIdJSONRequestBody defines body for PatchApiDashboardsByDashboardId for application/json ContentType.
+type PatchApiDashboardsByDashboardIdJSONRequestBody PatchApiDashboardsByDashboardIdJSONBody
 
-// PatchApiDashboardsByIdJSONRequestBody defines body for PatchApiDashboardsById for application/json ContentType.
-type PatchApiDashboardsByIdJSONRequestBody PatchApiDashboardsByIdJSONBody
+// PostApiDashboardsByDashboardIdWidgetsJSONRequestBody defines body for PostApiDashboardsByDashboardIdWidgets for application/json ContentType.
+type PostApiDashboardsByDashboardIdWidgetsJSONRequestBody PostApiDashboardsByDashboardIdWidgetsJSONBody
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONRequestBody defines body for PatchApiDashboardsByDashboardIdWidgetsByWidgetId for application/json ContentType.
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONRequestBody PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody
 
 // PostApiDatasetJSONRequestBody defines body for PostApiDataset for application/json ContentType.
 type PostApiDatasetJSONRequestBody PostApiDatasetJSONBody
@@ -76154,6 +78796,42 @@ func (t *CallConnectedAgentJSONBody_Params_AdditionalProperties) UnmarshalJSON(b
 	return err
 }
 
+// AsCallConnectedAgentJSONBodyState0 returns the union data inside the CallConnectedAgentJSONBody_State as a CallConnectedAgentJSONBodyState0
+func (t CallConnectedAgentJSONBody_State) AsCallConnectedAgentJSONBodyState0() (CallConnectedAgentJSONBodyState0, error) {
+	var body CallConnectedAgentJSONBodyState0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCallConnectedAgentJSONBodyState0 overwrites any union data inside the CallConnectedAgentJSONBody_State as the provided CallConnectedAgentJSONBodyState0
+func (t *CallConnectedAgentJSONBody_State) FromCallConnectedAgentJSONBodyState0(v CallConnectedAgentJSONBodyState0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCallConnectedAgentJSONBodyState0 performs a merge with any union data inside the CallConnectedAgentJSONBody_State, using the provided CallConnectedAgentJSONBodyState0
+func (t *CallConnectedAgentJSONBody_State) MergeCallConnectedAgentJSONBodyState0(v CallConnectedAgentJSONBodyState0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CallConnectedAgentJSONBody_State) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CallConnectedAgentJSONBody_State) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsCallConnectedAgent200JSONResponseBodyOutput0 returns the union data inside the CallConnectedAgent200JSONResponseBody_Output as a CallConnectedAgent200JSONResponseBodyOutput0
 func (t CallConnectedAgent200JSONResponseBody_Output) AsCallConnectedAgent200JSONResponseBodyOutput0() (CallConnectedAgent200JSONResponseBodyOutput0, error) {
 	var body CallConnectedAgent200JSONResponseBodyOutput0
@@ -76238,6 +78916,42 @@ func (t CallConnectedAgent200JSONResponseBody_Output) MarshalJSON() ([]byte, err
 }
 
 func (t *CallConnectedAgent200JSONResponseBody_Output) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsCallConnectedAgent200JSONResponseBodyState0 returns the union data inside the CallConnectedAgent200JSONResponseBody_State as a CallConnectedAgent200JSONResponseBodyState0
+func (t CallConnectedAgent200JSONResponseBody_State) AsCallConnectedAgent200JSONResponseBodyState0() (CallConnectedAgent200JSONResponseBodyState0, error) {
+	var body CallConnectedAgent200JSONResponseBodyState0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCallConnectedAgent200JSONResponseBodyState0 overwrites any union data inside the CallConnectedAgent200JSONResponseBody_State as the provided CallConnectedAgent200JSONResponseBodyState0
+func (t *CallConnectedAgent200JSONResponseBody_State) FromCallConnectedAgent200JSONResponseBodyState0(v CallConnectedAgent200JSONResponseBodyState0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCallConnectedAgent200JSONResponseBodyState0 performs a merge with any union data inside the CallConnectedAgent200JSONResponseBody_State, using the provided CallConnectedAgent200JSONResponseBodyState0
+func (t *CallConnectedAgent200JSONResponseBody_State) MergeCallConnectedAgent200JSONResponseBodyState0(v CallConnectedAgent200JSONResponseBodyState0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CallConnectedAgent200JSONResponseBody_State) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CallConnectedAgent200JSONResponseBody_State) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -87082,6 +89796,1218 @@ func (t PostApiCheckupRun200JSONResponseBody_Rows_Verdict) MarshalJSON() ([]byte
 }
 
 func (t *PostApiCheckupRun200JSONResponseBody_Rows_Verdict) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0 returns the union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default as a GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0
+func (t GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0() (GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0, error) {
+	var body GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default as the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default, using the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1 returns the union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default as a GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1
+func (t GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1() (GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1, error) {
+	var body GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default as the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default, using the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2 returns the union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default as a GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2
+func (t GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2() (GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2, error) {
+	var body GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default as the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default, using the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0 returns the union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source as a GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0
+func (t GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0() (GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0, error) {
+	var body GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source as the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source, using the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1 returns the union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source as a GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1
+func (t GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1() (GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1, error) {
+	var body GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source as the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source, using the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2 returns the union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source as a GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2
+func (t GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2() (GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2, error) {
+	var body GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source as the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source, using the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3 returns the union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source as a GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3
+func (t GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) AsGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3() (GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3, error) {
+	var body GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source as the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) FromGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source, using the provided GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) MergeGetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3(v GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0 returns the union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default as a PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0
+func (t PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) AsPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0() (PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0, error) {
+	var body PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default as the provided PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) FromPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0(v PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default, using the provided PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) MergePostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0(v PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1 returns the union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default as a PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1
+func (t PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) AsPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1() (PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1, error) {
+	var body PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default as the provided PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) FromPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1(v PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default, using the provided PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) MergePostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1(v PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2 returns the union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default as a PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2
+func (t PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) AsPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2() (PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2, error) {
+	var body PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default as the provided PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) FromPostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2(v PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default, using the provided PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) MergePostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2(v PostApiDashboardsByDashboardIdWidgetsJSONBodyQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgetsJSONBodySource0 returns the union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source as a PostApiDashboardsByDashboardIdWidgetsJSONBodySource0
+func (t PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) AsPostApiDashboardsByDashboardIdWidgetsJSONBodySource0() (PostApiDashboardsByDashboardIdWidgetsJSONBodySource0, error) {
+	var body PostApiDashboardsByDashboardIdWidgetsJSONBodySource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgetsJSONBodySource0 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source as the provided PostApiDashboardsByDashboardIdWidgetsJSONBodySource0
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) FromPostApiDashboardsByDashboardIdWidgetsJSONBodySource0(v PostApiDashboardsByDashboardIdWidgetsJSONBodySource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgetsJSONBodySource0 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source, using the provided PostApiDashboardsByDashboardIdWidgetsJSONBodySource0
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) MergePostApiDashboardsByDashboardIdWidgetsJSONBodySource0(v PostApiDashboardsByDashboardIdWidgetsJSONBodySource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgetsJSONBodySource1 returns the union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source as a PostApiDashboardsByDashboardIdWidgetsJSONBodySource1
+func (t PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) AsPostApiDashboardsByDashboardIdWidgetsJSONBodySource1() (PostApiDashboardsByDashboardIdWidgetsJSONBodySource1, error) {
+	var body PostApiDashboardsByDashboardIdWidgetsJSONBodySource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgetsJSONBodySource1 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source as the provided PostApiDashboardsByDashboardIdWidgetsJSONBodySource1
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) FromPostApiDashboardsByDashboardIdWidgetsJSONBodySource1(v PostApiDashboardsByDashboardIdWidgetsJSONBodySource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgetsJSONBodySource1 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source, using the provided PostApiDashboardsByDashboardIdWidgetsJSONBodySource1
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) MergePostApiDashboardsByDashboardIdWidgetsJSONBodySource1(v PostApiDashboardsByDashboardIdWidgetsJSONBodySource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgetsJSONBodySource2 returns the union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source as a PostApiDashboardsByDashboardIdWidgetsJSONBodySource2
+func (t PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) AsPostApiDashboardsByDashboardIdWidgetsJSONBodySource2() (PostApiDashboardsByDashboardIdWidgetsJSONBodySource2, error) {
+	var body PostApiDashboardsByDashboardIdWidgetsJSONBodySource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgetsJSONBodySource2 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source as the provided PostApiDashboardsByDashboardIdWidgetsJSONBodySource2
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) FromPostApiDashboardsByDashboardIdWidgetsJSONBodySource2(v PostApiDashboardsByDashboardIdWidgetsJSONBodySource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgetsJSONBodySource2 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source, using the provided PostApiDashboardsByDashboardIdWidgetsJSONBodySource2
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) MergePostApiDashboardsByDashboardIdWidgetsJSONBodySource2(v PostApiDashboardsByDashboardIdWidgetsJSONBodySource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgetsJSONBodySource3 returns the union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source as a PostApiDashboardsByDashboardIdWidgetsJSONBodySource3
+func (t PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) AsPostApiDashboardsByDashboardIdWidgetsJSONBodySource3() (PostApiDashboardsByDashboardIdWidgetsJSONBodySource3, error) {
+	var body PostApiDashboardsByDashboardIdWidgetsJSONBodySource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgetsJSONBodySource3 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source as the provided PostApiDashboardsByDashboardIdWidgetsJSONBodySource3
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) FromPostApiDashboardsByDashboardIdWidgetsJSONBodySource3(v PostApiDashboardsByDashboardIdWidgetsJSONBodySource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgetsJSONBodySource3 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgetsJSONBody_Source, using the provided PostApiDashboardsByDashboardIdWidgetsJSONBodySource3
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) MergePostApiDashboardsByDashboardIdWidgetsJSONBodySource3(v PostApiDashboardsByDashboardIdWidgetsJSONBodySource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiDashboardsByDashboardIdWidgetsJSONBody_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0 returns the union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default as a PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0() (PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0, error) {
+	var body PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default as the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default, using the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1 returns the union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default as a PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1() (PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1, error) {
+	var body PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default as the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default, using the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2 returns the union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default as a PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2() (PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2, error) {
+	var body PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default as the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default, using the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0 returns the union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source as a PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0
+func (t PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0() (PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0, error) {
+	var body PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source as the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source, using the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1 returns the union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source as a PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1
+func (t PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1() (PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1, error) {
+	var body PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source as the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source, using the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2 returns the union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source as a PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2
+func (t PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2() (PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2, error) {
+	var body PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source as the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source, using the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3 returns the union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source as a PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3
+func (t PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) AsPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3() (PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3, error) {
+	var body PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3 overwrites any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source as the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) FromPostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3 performs a merge with any union data inside the PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source, using the provided PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) MergePostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3(v PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 returns the union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as a GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0() (GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0, error) {
+	var body GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default, using the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 returns the union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as a GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1() (GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1, error) {
+	var body GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default, using the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 returns the union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as a GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2() (GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2, error) {
+	var body GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default, using the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 returns the union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as a GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0() (GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0, error) {
+	var body GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 returns the union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as a GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1() (GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1, error) {
+	var body GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 returns the union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as a GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2() (GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2, error) {
+	var body GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 returns the union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as a GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3() (GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3, error) {
+	var body GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 overwrites any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 performs a merge with any union data inside the GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergeGetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3(v GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default as a PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0() (PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default as a PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1() (PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default as a PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2() (PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodyQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source as a PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0() (PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source as a PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1() (PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source as a PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2() (PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source as a PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3() (PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3(v PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBodySource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONBody_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as a PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0() (PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as a PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1() (PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as a PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2() (PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as a PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0() (PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as a PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1() (PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as a PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2() (PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 returns the union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as a PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3() (PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3, error) {
+	var body PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 overwrites any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromPatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 performs a merge with any union data inside the PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergePatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3(v PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -112651,6 +116577,30 @@ type ClientInterface interface {
 
 	PostApiAnalytics(ctx context.Context, body PostApiAnalyticsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiV1AnalyticsReports request
+	GetApiV1AnalyticsReports(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiV1AnalyticsReportsWithBody request with any body
+	PostApiV1AnalyticsReportsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiV1AnalyticsReports(ctx context.Context, body PostApiV1AnalyticsReportsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutApiV1AnalyticsReportsReorderWithBody request with any body
+	PutApiV1AnalyticsReportsReorderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PutApiV1AnalyticsReportsReorder(ctx context.Context, body PutApiV1AnalyticsReportsReorderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteApiV1AnalyticsReportsByReportId request
+	DeleteApiV1AnalyticsReportsByReportId(ctx context.Context, reportId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiV1AnalyticsReportsByReportId request
+	GetApiV1AnalyticsReportsByReportId(ctx context.Context, reportId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchApiV1AnalyticsReportsByReportIdWithBody request with any body
+	PatchApiV1AnalyticsReportsByReportIdWithBody(ctx context.Context, reportId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PatchApiV1AnalyticsReportsByReportId(ctx context.Context, reportId string, body PatchApiV1AnalyticsReportsByReportIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiAnalyticsTimeseriesWithBody request with any body
 	PostApiAnalyticsTimeseriesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -112818,21 +116768,35 @@ type ClientInterface interface {
 
 	PostApiDashboards(ctx context.Context, body PostApiDashboardsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutApiDashboardsReorderWithBody request with any body
-	PutApiDashboardsReorderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteApiDashboardsByDashboardId request
+	DeleteApiDashboardsByDashboardId(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PutApiDashboardsReorder(ctx context.Context, body PutApiDashboardsReorderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetApiDashboardsByDashboardId request
+	GetApiDashboardsByDashboardId(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteApiDashboardsById request
-	DeleteApiDashboardsById(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// PatchApiDashboardsByDashboardIdWithBody request with any body
+	PatchApiDashboardsByDashboardIdWithBody(ctx context.Context, dashboardId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetApiDashboardsById request
-	GetApiDashboardsById(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PatchApiDashboardsByDashboardId(ctx context.Context, dashboardId string, body PatchApiDashboardsByDashboardIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PatchApiDashboardsByIdWithBody request with any body
-	PatchApiDashboardsByIdWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetApiDashboardsByDashboardIdWidgets request
+	GetApiDashboardsByDashboardIdWidgets(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PatchApiDashboardsById(ctx context.Context, id string, body PatchApiDashboardsByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// PostApiDashboardsByDashboardIdWidgetsWithBody request with any body
+	PostApiDashboardsByDashboardIdWidgetsWithBody(ctx context.Context, dashboardId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiDashboardsByDashboardIdWidgets(ctx context.Context, dashboardId string, body PostApiDashboardsByDashboardIdWidgetsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteApiDashboardsByDashboardIdWidgetsByWidgetId request
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetId(ctx context.Context, dashboardId string, widgetId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiDashboardsByDashboardIdWidgetsByWidgetId request
+	GetApiDashboardsByDashboardIdWidgetsByWidgetId(ctx context.Context, dashboardId string, widgetId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithBody request with any body
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithBody(ctx context.Context, dashboardId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetId(ctx context.Context, dashboardId string, widgetId string, body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetApiDataset request
 	GetApiDataset(ctx context.Context, params *GetApiDatasetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -113363,8 +117327,8 @@ type ClientInterface interface {
 	// GetApiV1ProjectsByProjectIdAnalyticsBoards request
 	GetApiV1ProjectsByProjectIdAnalyticsBoards(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId request
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId request
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId(ctx context.Context, projectId string, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetApiV1ProjectsByProjectIdAnalyticsCharts request
 	GetApiV1ProjectsByProjectIdAnalyticsCharts(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -113416,6 +117380,12 @@ type ClientInterface interface {
 	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardWithBody(ctx context.Context, projectId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard(ctx context.Context, projectId string, widgetId string, body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiV1ProjectsByProjectIdAnalyticsDashboards request
+	GetApiV1ProjectsByProjectIdAnalyticsDashboards(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId request
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId(ctx context.Context, projectId string, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetApiPrompts request
 	GetApiPrompts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -115151,6 +119121,114 @@ func (c *Client) PostApiAnalytics(ctx context.Context, body PostApiAnalyticsJSON
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetApiV1AnalyticsReports(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiV1AnalyticsReportsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiV1AnalyticsReportsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiV1AnalyticsReportsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiV1AnalyticsReports(ctx context.Context, body PostApiV1AnalyticsReportsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiV1AnalyticsReportsRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PutApiV1AnalyticsReportsReorderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutApiV1AnalyticsReportsReorderRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PutApiV1AnalyticsReportsReorder(ctx context.Context, body PutApiV1AnalyticsReportsReorderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutApiV1AnalyticsReportsReorderRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteApiV1AnalyticsReportsByReportId(ctx context.Context, reportId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteApiV1AnalyticsReportsByReportIdRequest(c.Server, reportId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiV1AnalyticsReportsByReportId(ctx context.Context, reportId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiV1AnalyticsReportsByReportIdRequest(c.Server, reportId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchApiV1AnalyticsReportsByReportIdWithBody(ctx context.Context, reportId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiV1AnalyticsReportsByReportIdRequestWithBody(c.Server, reportId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchApiV1AnalyticsReportsByReportId(ctx context.Context, reportId string, body PatchApiV1AnalyticsReportsByReportIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiV1AnalyticsReportsByReportIdRequest(c.Server, reportId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) PostApiAnalyticsTimeseriesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiAnalyticsTimeseriesRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -115895,8 +119973,8 @@ func (c *Client) PostApiDashboards(ctx context.Context, body PostApiDashboardsJS
 	return c.Client.Do(req)
 }
 
-func (c *Client) PutApiDashboardsReorderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutApiDashboardsReorderRequestWithBody(c.Server, contentType, body)
+func (c *Client) DeleteApiDashboardsByDashboardId(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteApiDashboardsByDashboardIdRequest(c.Server, dashboardId)
 	if err != nil {
 		return nil, err
 	}
@@ -115907,8 +119985,8 @@ func (c *Client) PutApiDashboardsReorderWithBody(ctx context.Context, contentTyp
 	return c.Client.Do(req)
 }
 
-func (c *Client) PutApiDashboardsReorder(ctx context.Context, body PutApiDashboardsReorderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutApiDashboardsReorderRequest(c.Server, body)
+func (c *Client) GetApiDashboardsByDashboardId(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiDashboardsByDashboardIdRequest(c.Server, dashboardId)
 	if err != nil {
 		return nil, err
 	}
@@ -115919,8 +119997,8 @@ func (c *Client) PutApiDashboardsReorder(ctx context.Context, body PutApiDashboa
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteApiDashboardsById(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteApiDashboardsByIdRequest(c.Server, id)
+func (c *Client) PatchApiDashboardsByDashboardIdWithBody(ctx context.Context, dashboardId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiDashboardsByDashboardIdRequestWithBody(c.Server, dashboardId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -115931,8 +120009,8 @@ func (c *Client) DeleteApiDashboardsById(ctx context.Context, id string, reqEdit
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetApiDashboardsById(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetApiDashboardsByIdRequest(c.Server, id)
+func (c *Client) PatchApiDashboardsByDashboardId(ctx context.Context, dashboardId string, body PatchApiDashboardsByDashboardIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiDashboardsByDashboardIdRequest(c.Server, dashboardId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -115943,8 +120021,8 @@ func (c *Client) GetApiDashboardsById(ctx context.Context, id string, reqEditors
 	return c.Client.Do(req)
 }
 
-func (c *Client) PatchApiDashboardsByIdWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPatchApiDashboardsByIdRequestWithBody(c.Server, id, contentType, body)
+func (c *Client) GetApiDashboardsByDashboardIdWidgets(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiDashboardsByDashboardIdWidgetsRequest(c.Server, dashboardId)
 	if err != nil {
 		return nil, err
 	}
@@ -115955,8 +120033,68 @@ func (c *Client) PatchApiDashboardsByIdWithBody(ctx context.Context, id string, 
 	return c.Client.Do(req)
 }
 
-func (c *Client) PatchApiDashboardsById(ctx context.Context, id string, body PatchApiDashboardsByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPatchApiDashboardsByIdRequest(c.Server, id, body)
+func (c *Client) PostApiDashboardsByDashboardIdWidgetsWithBody(ctx context.Context, dashboardId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDashboardsByDashboardIdWidgetsRequestWithBody(c.Server, dashboardId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDashboardsByDashboardIdWidgets(ctx context.Context, dashboardId string, body PostApiDashboardsByDashboardIdWidgetsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDashboardsByDashboardIdWidgetsRequest(c.Server, dashboardId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteApiDashboardsByDashboardIdWidgetsByWidgetId(ctx context.Context, dashboardId string, widgetId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteApiDashboardsByDashboardIdWidgetsByWidgetIdRequest(c.Server, dashboardId, widgetId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiDashboardsByDashboardIdWidgetsByWidgetId(ctx context.Context, dashboardId string, widgetId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiDashboardsByDashboardIdWidgetsByWidgetIdRequest(c.Server, dashboardId, widgetId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithBody(ctx context.Context, dashboardId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiDashboardsByDashboardIdWidgetsByWidgetIdRequestWithBody(c.Server, dashboardId, widgetId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchApiDashboardsByDashboardIdWidgetsByWidgetId(ctx context.Context, dashboardId string, widgetId string, body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiDashboardsByDashboardIdWidgetsByWidgetIdRequest(c.Server, dashboardId, widgetId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -118319,8 +122457,8 @@ func (c *Client) GetApiV1ProjectsByProjectIdAnalyticsBoards(ctx context.Context,
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdRequest(c.Server, projectId, boardId)
+func (c *Client) GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId(ctx context.Context, projectId string, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdRequest(c.Server, projectId, dashboardId)
 	if err != nil {
 		return nil, err
 	}
@@ -118549,6 +122687,30 @@ func (c *Client) PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId
 
 func (c *Client) PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard(ctx context.Context, projectId string, widgetId string, body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRequest(c.Server, projectId, widgetId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiV1ProjectsByProjectIdAnalyticsDashboards(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiV1ProjectsByProjectIdAnalyticsDashboardsRequest(c.Server, projectId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId(ctx context.Context, projectId string, dashboardId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdRequest(c.Server, projectId, dashboardId)
 	if err != nil {
 		return nil, err
 	}
@@ -124349,6 +128511,228 @@ func NewPostApiAnalyticsRequestWithBody(server string, contentType string, body 
 	return req, nil
 }
 
+// NewGetApiV1AnalyticsReportsRequest generates requests for GetApiV1AnalyticsReports
+func NewGetApiV1AnalyticsReportsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/analytics/reports")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiV1AnalyticsReportsRequest calls the generic PostApiV1AnalyticsReports builder with application/json body
+func NewPostApiV1AnalyticsReportsRequest(server string, body PostApiV1AnalyticsReportsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiV1AnalyticsReportsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostApiV1AnalyticsReportsRequestWithBody generates requests for PostApiV1AnalyticsReports with any type of body
+func NewPostApiV1AnalyticsReportsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/analytics/reports")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPutApiV1AnalyticsReportsReorderRequest calls the generic PutApiV1AnalyticsReportsReorder builder with application/json body
+func NewPutApiV1AnalyticsReportsReorderRequest(server string, body PutApiV1AnalyticsReportsReorderJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutApiV1AnalyticsReportsReorderRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPutApiV1AnalyticsReportsReorderRequestWithBody generates requests for PutApiV1AnalyticsReportsReorder with any type of body
+func NewPutApiV1AnalyticsReportsReorderRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/analytics/reports/reorder")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteApiV1AnalyticsReportsByReportIdRequest generates requests for DeleteApiV1AnalyticsReportsByReportId
+func NewDeleteApiV1AnalyticsReportsByReportIdRequest(server string, reportId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "reportId", reportId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/analytics/reports/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiV1AnalyticsReportsByReportIdRequest generates requests for GetApiV1AnalyticsReportsByReportId
+func NewGetApiV1AnalyticsReportsByReportIdRequest(server string, reportId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "reportId", reportId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/analytics/reports/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPatchApiV1AnalyticsReportsByReportIdRequest calls the generic PatchApiV1AnalyticsReportsByReportId builder with application/json body
+func NewPatchApiV1AnalyticsReportsByReportIdRequest(server string, reportId string, body PatchApiV1AnalyticsReportsByReportIdJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchApiV1AnalyticsReportsByReportIdRequestWithBody(server, reportId, "application/json", bodyReader)
+}
+
+// NewPatchApiV1AnalyticsReportsByReportIdRequestWithBody generates requests for PatchApiV1AnalyticsReportsByReportId with any type of body
+func NewPatchApiV1AnalyticsReportsByReportIdRequestWithBody(server string, reportId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "reportId", reportId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/analytics/reports/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewPostApiAnalyticsTimeseriesRequest calls the generic PostApiAnalyticsTimeseries builder with application/json body
 func NewPostApiAnalyticsTimeseriesRequest(server string, body PostApiAnalyticsTimeseriesJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -126129,53 +130513,13 @@ func NewPostApiDashboardsRequestWithBody(server string, contentType string, body
 	return req, nil
 }
 
-// NewPutApiDashboardsReorderRequest calls the generic PutApiDashboardsReorder builder with application/json body
-func NewPutApiDashboardsReorderRequest(server string, body PutApiDashboardsReorderJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutApiDashboardsReorderRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPutApiDashboardsReorderRequestWithBody generates requests for PutApiDashboardsReorder with any type of body
-func NewPutApiDashboardsReorderRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/dashboards/reorder")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewDeleteApiDashboardsByIdRequest generates requests for DeleteApiDashboardsById
-func NewDeleteApiDashboardsByIdRequest(server string, id string) (*http.Request, error) {
+// NewDeleteApiDashboardsByDashboardIdRequest generates requests for DeleteApiDashboardsByDashboardId
+func NewDeleteApiDashboardsByDashboardIdRequest(server string, dashboardId string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
 	if err != nil {
 		return nil, err
 	}
@@ -126203,13 +130547,13 @@ func NewDeleteApiDashboardsByIdRequest(server string, id string) (*http.Request,
 	return req, nil
 }
 
-// NewGetApiDashboardsByIdRequest generates requests for GetApiDashboardsById
-func NewGetApiDashboardsByIdRequest(server string, id string) (*http.Request, error) {
+// NewGetApiDashboardsByDashboardIdRequest generates requests for GetApiDashboardsByDashboardId
+func NewGetApiDashboardsByDashboardIdRequest(server string, dashboardId string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
 	if err != nil {
 		return nil, err
 	}
@@ -126237,24 +130581,24 @@ func NewGetApiDashboardsByIdRequest(server string, id string) (*http.Request, er
 	return req, nil
 }
 
-// NewPatchApiDashboardsByIdRequest calls the generic PatchApiDashboardsById builder with application/json body
-func NewPatchApiDashboardsByIdRequest(server string, id string, body PatchApiDashboardsByIdJSONRequestBody) (*http.Request, error) {
+// NewPatchApiDashboardsByDashboardIdRequest calls the generic PatchApiDashboardsByDashboardId builder with application/json body
+func NewPatchApiDashboardsByDashboardIdRequest(server string, dashboardId string, body PatchApiDashboardsByDashboardIdJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPatchApiDashboardsByIdRequestWithBody(server, id, "application/json", bodyReader)
+	return NewPatchApiDashboardsByDashboardIdRequestWithBody(server, dashboardId, "application/json", bodyReader)
 }
 
-// NewPatchApiDashboardsByIdRequestWithBody generates requests for PatchApiDashboardsById with any type of body
-func NewPatchApiDashboardsByIdRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+// NewPatchApiDashboardsByDashboardIdRequestWithBody generates requests for PatchApiDashboardsByDashboardId with any type of body
+func NewPatchApiDashboardsByDashboardIdRequestWithBody(server string, dashboardId string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
 	if err != nil {
 		return nil, err
 	}
@@ -126265,6 +130609,223 @@ func NewPatchApiDashboardsByIdRequestWithBody(server string, id string, contentT
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/dashboards/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiDashboardsByDashboardIdWidgetsRequest generates requests for GetApiDashboardsByDashboardIdWidgets
+func NewGetApiDashboardsByDashboardIdWidgetsRequest(server string, dashboardId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dashboards/%s/widgets", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiDashboardsByDashboardIdWidgetsRequest calls the generic PostApiDashboardsByDashboardIdWidgets builder with application/json body
+func NewPostApiDashboardsByDashboardIdWidgetsRequest(server string, dashboardId string, body PostApiDashboardsByDashboardIdWidgetsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiDashboardsByDashboardIdWidgetsRequestWithBody(server, dashboardId, "application/json", bodyReader)
+}
+
+// NewPostApiDashboardsByDashboardIdWidgetsRequestWithBody generates requests for PostApiDashboardsByDashboardIdWidgets with any type of body
+func NewPostApiDashboardsByDashboardIdWidgetsRequestWithBody(server string, dashboardId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dashboards/%s/widgets", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteApiDashboardsByDashboardIdWidgetsByWidgetIdRequest generates requests for DeleteApiDashboardsByDashboardIdWidgetsByWidgetId
+func NewDeleteApiDashboardsByDashboardIdWidgetsByWidgetIdRequest(server string, dashboardId string, widgetId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "widgetId", widgetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dashboards/%s/widgets/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiDashboardsByDashboardIdWidgetsByWidgetIdRequest generates requests for GetApiDashboardsByDashboardIdWidgetsByWidgetId
+func NewGetApiDashboardsByDashboardIdWidgetsByWidgetIdRequest(server string, dashboardId string, widgetId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "widgetId", widgetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dashboards/%s/widgets/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPatchApiDashboardsByDashboardIdWidgetsByWidgetIdRequest calls the generic PatchApiDashboardsByDashboardIdWidgetsByWidgetId builder with application/json body
+func NewPatchApiDashboardsByDashboardIdWidgetsByWidgetIdRequest(server string, dashboardId string, widgetId string, body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchApiDashboardsByDashboardIdWidgetsByWidgetIdRequestWithBody(server, dashboardId, widgetId, "application/json", bodyReader)
+}
+
+// NewPatchApiDashboardsByDashboardIdWidgetsByWidgetIdRequestWithBody generates requests for PatchApiDashboardsByDashboardIdWidgetsByWidgetId with any type of body
+func NewPatchApiDashboardsByDashboardIdWidgetsByWidgetIdRequestWithBody(server string, dashboardId string, widgetId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "widgetId", widgetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dashboards/%s/widgets/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -132360,8 +136921,8 @@ func NewGetApiV1ProjectsByProjectIdAnalyticsBoardsRequest(server string, project
 	return req, nil
 }
 
-// NewGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdRequest generates requests for GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId
-func NewGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdRequest(server string, projectId string, boardId string) (*http.Request, error) {
+// NewGetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdRequest generates requests for GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId
+func NewGetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdRequest(server string, projectId string, dashboardId string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -132373,7 +136934,7 @@ func NewGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdRequest(server string
 
 	var pathParam1 string
 
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "boardId", boardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
 	if err != nil {
 		return nil, err
 	}
@@ -132980,6 +137541,81 @@ func NewPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiV1ProjectsByProjectIdAnalyticsDashboardsRequest generates requests for GetApiV1ProjectsByProjectIdAnalyticsDashboards
+func NewGetApiV1ProjectsByProjectIdAnalyticsDashboardsRequest(server string, projectId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "projectId", projectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s/analytics/dashboards", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdRequest generates requests for GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId
+func NewGetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdRequest(server string, projectId string, dashboardId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "projectId", projectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "dashboardId", dashboardId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s/analytics/dashboards/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -138566,6 +143202,30 @@ type ClientWithResponsesInterface interface {
 
 	PostApiAnalyticsWithResponse(ctx context.Context, body PostApiAnalyticsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiAnalyticsResponse, error)
 
+	// GetApiV1AnalyticsReportsWithResponse request
+	GetApiV1AnalyticsReportsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1AnalyticsReportsResponse, error)
+
+	// PostApiV1AnalyticsReportsWithBodyWithResponse request with any body
+	PostApiV1AnalyticsReportsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1AnalyticsReportsResponse, error)
+
+	PostApiV1AnalyticsReportsWithResponse(ctx context.Context, body PostApiV1AnalyticsReportsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1AnalyticsReportsResponse, error)
+
+	// PutApiV1AnalyticsReportsReorderWithBodyWithResponse request with any body
+	PutApiV1AnalyticsReportsReorderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutApiV1AnalyticsReportsReorderResponse, error)
+
+	PutApiV1AnalyticsReportsReorderWithResponse(ctx context.Context, body PutApiV1AnalyticsReportsReorderJSONRequestBody, reqEditors ...RequestEditorFn) (*PutApiV1AnalyticsReportsReorderResponse, error)
+
+	// DeleteApiV1AnalyticsReportsByReportIdWithResponse request
+	DeleteApiV1AnalyticsReportsByReportIdWithResponse(ctx context.Context, reportId string, reqEditors ...RequestEditorFn) (*DeleteApiV1AnalyticsReportsByReportIdResponse, error)
+
+	// GetApiV1AnalyticsReportsByReportIdWithResponse request
+	GetApiV1AnalyticsReportsByReportIdWithResponse(ctx context.Context, reportId string, reqEditors ...RequestEditorFn) (*GetApiV1AnalyticsReportsByReportIdResponse, error)
+
+	// PatchApiV1AnalyticsReportsByReportIdWithBodyWithResponse request with any body
+	PatchApiV1AnalyticsReportsByReportIdWithBodyWithResponse(ctx context.Context, reportId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiV1AnalyticsReportsByReportIdResponse, error)
+
+	PatchApiV1AnalyticsReportsByReportIdWithResponse(ctx context.Context, reportId string, body PatchApiV1AnalyticsReportsByReportIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiV1AnalyticsReportsByReportIdResponse, error)
+
 	// PostApiAnalyticsTimeseriesWithBodyWithResponse request with any body
 	PostApiAnalyticsTimeseriesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiAnalyticsTimeseriesResponse, error)
 
@@ -138733,21 +143393,35 @@ type ClientWithResponsesInterface interface {
 
 	PostApiDashboardsWithResponse(ctx context.Context, body PostApiDashboardsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDashboardsResponse, error)
 
-	// PutApiDashboardsReorderWithBodyWithResponse request with any body
-	PutApiDashboardsReorderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutApiDashboardsReorderResponse, error)
+	// DeleteApiDashboardsByDashboardIdWithResponse request
+	DeleteApiDashboardsByDashboardIdWithResponse(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*DeleteApiDashboardsByDashboardIdResponse, error)
 
-	PutApiDashboardsReorderWithResponse(ctx context.Context, body PutApiDashboardsReorderJSONRequestBody, reqEditors ...RequestEditorFn) (*PutApiDashboardsReorderResponse, error)
+	// GetApiDashboardsByDashboardIdWithResponse request
+	GetApiDashboardsByDashboardIdWithResponse(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*GetApiDashboardsByDashboardIdResponse, error)
 
-	// DeleteApiDashboardsByIdWithResponse request
-	DeleteApiDashboardsByIdWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteApiDashboardsByIdResponse, error)
+	// PatchApiDashboardsByDashboardIdWithBodyWithResponse request with any body
+	PatchApiDashboardsByDashboardIdWithBodyWithResponse(ctx context.Context, dashboardId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByDashboardIdResponse, error)
 
-	// GetApiDashboardsByIdWithResponse request
-	GetApiDashboardsByIdWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetApiDashboardsByIdResponse, error)
+	PatchApiDashboardsByDashboardIdWithResponse(ctx context.Context, dashboardId string, body PatchApiDashboardsByDashboardIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByDashboardIdResponse, error)
 
-	// PatchApiDashboardsByIdWithBodyWithResponse request with any body
-	PatchApiDashboardsByIdWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByIdResponse, error)
+	// GetApiDashboardsByDashboardIdWidgetsWithResponse request
+	GetApiDashboardsByDashboardIdWidgetsWithResponse(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*GetApiDashboardsByDashboardIdWidgetsResponse, error)
 
-	PatchApiDashboardsByIdWithResponse(ctx context.Context, id string, body PatchApiDashboardsByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByIdResponse, error)
+	// PostApiDashboardsByDashboardIdWidgetsWithBodyWithResponse request with any body
+	PostApiDashboardsByDashboardIdWidgetsWithBodyWithResponse(ctx context.Context, dashboardId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDashboardsByDashboardIdWidgetsResponse, error)
+
+	PostApiDashboardsByDashboardIdWidgetsWithResponse(ctx context.Context, dashboardId string, body PostApiDashboardsByDashboardIdWidgetsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDashboardsByDashboardIdWidgetsResponse, error)
+
+	// DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse request
+	DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse(ctx context.Context, dashboardId string, widgetId string, reqEditors ...RequestEditorFn) (*DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error)
+
+	// GetApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse request
+	GetApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse(ctx context.Context, dashboardId string, widgetId string, reqEditors ...RequestEditorFn) (*GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error)
+
+	// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithBodyWithResponse request with any body
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithBodyWithResponse(ctx context.Context, dashboardId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error)
+
+	PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse(ctx context.Context, dashboardId string, widgetId string, body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error)
 
 	// GetApiDatasetWithResponse request
 	GetApiDatasetWithResponse(ctx context.Context, params *GetApiDatasetParams, reqEditors ...RequestEditorFn) (*GetApiDatasetResponse, error)
@@ -139278,8 +143952,8 @@ type ClientWithResponsesInterface interface {
 	// GetApiV1ProjectsByProjectIdAnalyticsBoardsWithResponse request
 	GetApiV1ProjectsByProjectIdAnalyticsBoardsWithResponse(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse, error)
 
-	// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse request
-	GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse, error)
+	// GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdWithResponse request
+	GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdWithResponse(ctx context.Context, projectId string, dashboardId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse, error)
 
 	// GetApiV1ProjectsByProjectIdAnalyticsChartsWithResponse request
 	GetApiV1ProjectsByProjectIdAnalyticsChartsWithResponse(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsChartsResponse, error)
@@ -139331,6 +144005,12 @@ type ClientWithResponsesInterface interface {
 	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardWithBodyWithResponse(ctx context.Context, projectId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse, error)
 
 	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardWithResponse(ctx context.Context, projectId string, widgetId string, body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse, error)
+
+	// GetApiV1ProjectsByProjectIdAnalyticsDashboardsWithResponse request
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsWithResponse(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse, error)
+
+	// GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdWithResponse request
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdWithResponse(ctx context.Context, projectId string, dashboardId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse, error)
 
 	// GetApiPromptsWithResponse request
 	GetApiPromptsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiPromptsResponse, error)
@@ -139906,6 +144586,7 @@ type GetApiCodingAgentPullRequestUsageResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		ModelBreakdown []struct {
+			AiUnits             *float32 `json:"aiUnits"`
 			CacheCreationTokens float32  `json:"cacheCreationTokens"`
 			CacheReadTokens     float32  `json:"cacheReadTokens"`
 			CostUsd             *float32 `json:"costUsd"`
@@ -146202,6 +150883,9 @@ type CallConnectedAgentResponse struct {
 
 		// Session The agent's per-conversation memory, to send on the next turn.
 		Session interface{} `json:"session,omitempty"`
+
+		// State Setup's state, a turn's state update, or the object teardown returned.
+		State *CallConnectedAgent200JSONResponseBody_State `json:"state,omitempty"`
 	}
 }
 
@@ -146305,6 +150989,236 @@ func (r PostApiAnalyticsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PostApiAnalyticsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiV1AnalyticsReportsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []struct {
+			CreatedAt   time.Time `json:"createdAt"`
+			GraphCount  int       `json:"graphCount"`
+			Id          string    `json:"id"`
+			Name        string    `json:"name"`
+			Order       int       `json:"order"`
+			PlatformUrl string    `json:"platformUrl"`
+			UpdatedAt   time.Time `json:"updatedAt"`
+		} `json:"data"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiV1AnalyticsReportsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiV1AnalyticsReportsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiV1AnalyticsReportsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiV1AnalyticsReportsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		CreatedAt   time.Time `json:"createdAt"`
+		Id          string    `json:"id"`
+		Name        string    `json:"name"`
+		Order       int       `json:"order"`
+		PlatformUrl string    `json:"platformUrl"`
+		UpdatedAt   time.Time `json:"updatedAt"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiV1AnalyticsReportsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiV1AnalyticsReportsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiV1AnalyticsReportsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutApiV1AnalyticsReportsReorderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Success PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess `json:"success"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PutApiV1AnalyticsReportsReorderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutApiV1AnalyticsReportsReorderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutApiV1AnalyticsReportsReorderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteApiV1AnalyticsReportsByReportIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteApiV1AnalyticsReportsByReportIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteApiV1AnalyticsReportsByReportIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteApiV1AnalyticsReportsByReportIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiV1AnalyticsReportsByReportIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		CreatedAt time.Time `json:"createdAt"`
+		Graphs    []struct {
+			ColSpan     int                     `json:"colSpan"`
+			CreatedAt   time.Time               `json:"createdAt"`
+			DashboardId *string                 `json:"dashboardId"`
+			Filters     *map[string]interface{} `json:"filters"`
+			Graph       map[string]interface{}  `json:"graph"`
+			GridColumn  int                     `json:"gridColumn"`
+			GridRow     int                     `json:"gridRow"`
+			Id          string                  `json:"id"`
+			Name        string                  `json:"name"`
+			ProjectId   string                  `json:"projectId"`
+			RowSpan     int                     `json:"rowSpan"`
+			UpdatedAt   time.Time               `json:"updatedAt"`
+		} `json:"graphs"`
+		Id          string    `json:"id"`
+		Name        string    `json:"name"`
+		Order       int       `json:"order"`
+		PlatformUrl string    `json:"platformUrl"`
+		UpdatedAt   time.Time `json:"updatedAt"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiV1AnalyticsReportsByReportIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiV1AnalyticsReportsByReportIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiV1AnalyticsReportsByReportIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchApiV1AnalyticsReportsByReportIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		CreatedAt   time.Time `json:"createdAt"`
+		Id          string    `json:"id"`
+		Name        string    `json:"name"`
+		Order       int       `json:"order"`
+		PlatformUrl string    `json:"platformUrl"`
+		UpdatedAt   time.Time `json:"updatedAt"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchApiV1AnalyticsReportsByReportIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchApiV1AnalyticsReportsByReportIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchApiV1AnalyticsReportsByReportIdResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -148355,6 +153269,7 @@ type GetPullRequestUsageResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		ModelBreakdown []struct {
+			AiUnits             *float32 `json:"aiUnits"`
 			CacheCreationTokens float32  `json:"cacheCreationTokens"`
 			CacheReadTokens     float32  `json:"cacheReadTokens"`
 			CostUsd             *float32 `json:"costUsd"`
@@ -148547,14 +153462,93 @@ type GetApiDashboardsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Data []struct {
-			CreatedAt   time.Time `json:"createdAt"`
-			GraphCount  int       `json:"graphCount"`
-			Id          string    `json:"id"`
-			Name        string    `json:"name"`
-			Order       int       `json:"order"`
-			PlatformUrl string    `json:"platformUrl"`
-			UpdatedAt   time.Time `json:"updatedAt"`
+			CreatedAt       string                                       `json:"createdAt"`
+			CreatedById     *string                                      `json:"createdById"`
+			Description     *string                                      `json:"description"`
+			ExcludedOrigins *[]string                                    `json:"excludedOrigins"`
+			Id              string                                       `json:"id"`
+			Name            string                                       `json:"name"`
+			PlatformUrl     string                                       `json:"platformUrl"`
+			Scope           GetApiDashboards200JSONResponseBodyDataScope `json:"scope"`
+			UpdatedAt       string                                       `json:"updatedAt"`
+			WidgetCount     int                                          `json:"widgetCount"`
 		} `json:"data"`
+	}
+	JSON400 *struct {
+		Code      string                                    `json:"code"`
+		DocsUrl   *string                                   `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboards400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                    `json:"message"`
+		Meta      *map[string]interface{}                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                            `json:"reasons,omitempty"`
+		Retryable bool                                      `json:"retryable"`
+		SpanId    *string                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                    `json:"code"`
+		DocsUrl   *string                                   `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboards401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                    `json:"message"`
+		Meta      *map[string]interface{}                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                            `json:"reasons,omitempty"`
+		Retryable bool                                      `json:"retryable"`
+		SpanId    *string                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                    `json:"code"`
+		DocsUrl   *string                                   `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboards403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                    `json:"message"`
+		Meta      *map[string]interface{}                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                            `json:"reasons,omitempty"`
+		Retryable bool                                      `json:"retryable"`
+		SpanId    *string                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                    `json:"code"`
+		DocsUrl   *string                                   `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboards500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                    `json:"message"`
+		Meta      *map[string]interface{}                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                            `json:"reasons,omitempty"`
+		Retryable bool                                      `json:"retryable"`
+		SpanId    *string                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -148586,12 +153580,91 @@ type PostApiDashboardsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
-		CreatedAt   time.Time `json:"createdAt"`
-		Id          string    `json:"id"`
-		Name        string    `json:"name"`
-		Order       int       `json:"order"`
-		PlatformUrl string    `json:"platformUrl"`
-		UpdatedAt   time.Time `json:"updatedAt"`
+		CreatedAt       string                                    `json:"createdAt"`
+		CreatedById     *string                                   `json:"createdById"`
+		Description     *string                                   `json:"description"`
+		ExcludedOrigins *[]string                                 `json:"excludedOrigins"`
+		Id              string                                    `json:"id"`
+		Name            string                                    `json:"name"`
+		PlatformUrl     string                                    `json:"platformUrl"`
+		Scope           PostApiDashboards201JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                    `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Code      string                                     `json:"code"`
+		DocsUrl   *string                                    `json:"docs_url,omitempty"`
+		Fault     *PostApiDashboards400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                     `json:"message"`
+		Meta      *map[string]interface{}                    `json:"meta,omitempty"`
+		Reasons   *[]interface{}                             `json:"reasons,omitempty"`
+		Retryable bool                                       `json:"retryable"`
+		SpanId    *string                                    `json:"span_id,omitempty"`
+		Tips      *[]string                                  `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                     `json:"code"`
+		DocsUrl   *string                                    `json:"docs_url,omitempty"`
+		Fault     *PostApiDashboards401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                     `json:"message"`
+		Meta      *map[string]interface{}                    `json:"meta,omitempty"`
+		Reasons   *[]interface{}                             `json:"reasons,omitempty"`
+		Retryable bool                                       `json:"retryable"`
+		SpanId    *string                                    `json:"span_id,omitempty"`
+		Tips      *[]string                                  `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                     `json:"code"`
+		DocsUrl   *string                                    `json:"docs_url,omitempty"`
+		Fault     *PostApiDashboards403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                     `json:"message"`
+		Meta      *map[string]interface{}                    `json:"meta,omitempty"`
+		Reasons   *[]interface{}                             `json:"reasons,omitempty"`
+		Retryable bool                                       `json:"retryable"`
+		SpanId    *string                                    `json:"span_id,omitempty"`
+		Tips      *[]string                                  `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                     `json:"code"`
+		DocsUrl   *string                                    `json:"docs_url,omitempty"`
+		Fault     *PostApiDashboards500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                     `json:"message"`
+		Meta      *map[string]interface{}                    `json:"meta,omitempty"`
+		Reasons   *[]interface{}                             `json:"reasons,omitempty"`
+		Retryable bool                                       `json:"retryable"`
+		SpanId    *string                                    `json:"span_id,omitempty"`
+		Tips      *[]string                                  `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -148619,49 +153692,112 @@ func (r PostApiDashboardsResponse) ContentType() string {
 	return ""
 }
 
-type PutApiDashboardsReorderResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		Success PutApiDashboardsReorder200JSONResponseBodySuccess `json:"success"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r PutApiDashboardsReorderResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PutApiDashboardsReorderResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r PutApiDashboardsReorderResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type DeleteApiDashboardsByIdResponse struct {
+type DeleteApiDashboardsByDashboardIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Id   string `json:"id"`
 		Name string `json:"name"`
 	}
+	JSON400 *struct {
+		Code      string                                                    `json:"code"`
+		DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                    `json:"message"`
+		Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+		Retryable bool                                                      `json:"retryable"`
+		SpanId    *string                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                    `json:"code"`
+		DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                    `json:"message"`
+		Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+		Retryable bool                                                      `json:"retryable"`
+		SpanId    *string                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                    `json:"code"`
+		DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                    `json:"message"`
+		Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+		Retryable bool                                                      `json:"retryable"`
+		SpanId    *string                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                    `json:"code"`
+		DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                    `json:"message"`
+		Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+		Retryable bool                                                      `json:"retryable"`
+		SpanId    *string                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                    `json:"code"`
+		DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                    `json:"message"`
+		Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+		Retryable bool                                                      `json:"retryable"`
+		SpanId    *string                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteApiDashboardsByIdResponse) Status() string {
+func (r DeleteApiDashboardsByDashboardIdResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -148669,7 +153805,7 @@ func (r DeleteApiDashboardsByIdResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteApiDashboardsByIdResponse) StatusCode() int {
+func (r DeleteApiDashboardsByDashboardIdResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -148677,42 +153813,126 @@ func (r DeleteApiDashboardsByIdResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DeleteApiDashboardsByIdResponse) ContentType() string {
+func (r DeleteApiDashboardsByDashboardIdResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
 	return ""
 }
 
-type GetApiDashboardsByIdResponse struct {
+type GetApiDashboardsByDashboardIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		CreatedAt time.Time `json:"createdAt"`
-		Graphs    []struct {
-			ColSpan     int                     `json:"colSpan"`
-			CreatedAt   time.Time               `json:"createdAt"`
-			DashboardId *string                 `json:"dashboardId"`
-			Filters     *map[string]interface{} `json:"filters"`
-			Graph       map[string]interface{}  `json:"graph"`
-			GridColumn  int                     `json:"gridColumn"`
-			GridRow     int                     `json:"gridRow"`
-			Id          string                  `json:"id"`
-			Name        string                  `json:"name"`
-			ProjectId   string                  `json:"projectId"`
-			RowSpan     int                     `json:"rowSpan"`
-			UpdatedAt   time.Time               `json:"updatedAt"`
-		} `json:"graphs"`
-		Id          string    `json:"id"`
-		Name        string    `json:"name"`
-		Order       int       `json:"order"`
-		PlatformUrl string    `json:"platformUrl"`
-		UpdatedAt   time.Time `json:"updatedAt"`
+		CreatedAt       string                                                `json:"createdAt"`
+		CreatedById     *string                                               `json:"createdById"`
+		Description     *string                                               `json:"description"`
+		ExcludedOrigins *[]string                                             `json:"excludedOrigins"`
+		Id              string                                                `json:"id"`
+		Name            string                                                `json:"name"`
+		PlatformUrl     string                                                `json:"platformUrl"`
+		Scope           GetApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                                `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Code      string                                                 `json:"code"`
+		DocsUrl   *string                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                 `json:"message"`
+		Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+		Retryable bool                                                   `json:"retryable"`
+		SpanId    *string                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                 `json:"code"`
+		DocsUrl   *string                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                 `json:"message"`
+		Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+		Retryable bool                                                   `json:"retryable"`
+		SpanId    *string                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                 `json:"code"`
+		DocsUrl   *string                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                 `json:"message"`
+		Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+		Retryable bool                                                   `json:"retryable"`
+		SpanId    *string                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                 `json:"code"`
+		DocsUrl   *string                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                 `json:"message"`
+		Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+		Retryable bool                                                   `json:"retryable"`
+		SpanId    *string                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                 `json:"code"`
+		DocsUrl   *string                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                 `json:"message"`
+		Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+		Retryable bool                                                   `json:"retryable"`
+		SpanId    *string                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
 // Status returns HTTPResponse.Status
-func (r GetApiDashboardsByIdResponse) Status() string {
+func (r GetApiDashboardsByDashboardIdResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -148720,7 +153940,7 @@ func (r GetApiDashboardsByIdResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetApiDashboardsByIdResponse) StatusCode() int {
+func (r GetApiDashboardsByDashboardIdResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -148728,28 +153948,126 @@ func (r GetApiDashboardsByIdResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetApiDashboardsByIdResponse) ContentType() string {
+func (r GetApiDashboardsByDashboardIdResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
 	return ""
 }
 
-type PatchApiDashboardsByIdResponse struct {
+type PatchApiDashboardsByDashboardIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		CreatedAt   time.Time `json:"createdAt"`
-		Id          string    `json:"id"`
-		Name        string    `json:"name"`
-		Order       int       `json:"order"`
-		PlatformUrl string    `json:"platformUrl"`
-		UpdatedAt   time.Time `json:"updatedAt"`
+		CreatedAt       string                                                  `json:"createdAt"`
+		CreatedById     *string                                                 `json:"createdById"`
+		Description     *string                                                 `json:"description"`
+		ExcludedOrigins *[]string                                               `json:"excludedOrigins"`
+		Id              string                                                  `json:"id"`
+		Name            string                                                  `json:"name"`
+		PlatformUrl     string                                                  `json:"platformUrl"`
+		Scope           PatchApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                                  `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Code      string                                                   `json:"code"`
+		DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                   `json:"message"`
+		Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+		Retryable bool                                                     `json:"retryable"`
+		SpanId    *string                                                  `json:"span_id,omitempty"`
+		Tips      *[]string                                                `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                   `json:"code"`
+		DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                   `json:"message"`
+		Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+		Retryable bool                                                     `json:"retryable"`
+		SpanId    *string                                                  `json:"span_id,omitempty"`
+		Tips      *[]string                                                `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                   `json:"code"`
+		DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                   `json:"message"`
+		Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+		Retryable bool                                                     `json:"retryable"`
+		SpanId    *string                                                  `json:"span_id,omitempty"`
+		Tips      *[]string                                                `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                   `json:"code"`
+		DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                   `json:"message"`
+		Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+		Retryable bool                                                     `json:"retryable"`
+		SpanId    *string                                                  `json:"span_id,omitempty"`
+		Tips      *[]string                                                `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                   `json:"code"`
+		DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                   `json:"message"`
+		Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+		Retryable bool                                                     `json:"retryable"`
+		SpanId    *string                                                  `json:"span_id,omitempty"`
+		Tips      *[]string                                                `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
 // Status returns HTTPResponse.Status
-func (r PatchApiDashboardsByIdResponse) Status() string {
+func (r PatchApiDashboardsByDashboardIdResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -148757,7 +154075,7 @@ func (r PatchApiDashboardsByIdResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PatchApiDashboardsByIdResponse) StatusCode() int {
+func (r PatchApiDashboardsByDashboardIdResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -148765,7 +154083,742 @@ func (r PatchApiDashboardsByIdResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r PatchApiDashboardsByIdResponse) ContentType() string {
+func (r PatchApiDashboardsByDashboardIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiDashboardsByDashboardIdWidgetsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []struct {
+			ColSpan     int     `json:"colSpan"`
+			CreatedAt   string  `json:"createdAt"`
+			DashboardId *string `json:"dashboardId"`
+			Definition  struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
+					Name       string `json:"name"`
+					Parameters *[]struct {
+						Default *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+						Name    string                                                                                              `json:"name"`
+						Type    GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType          `json:"type"`
+					} `json:"parameters,omitempty"`
+					Sql string `json:"sql"`
+				} `json:"queries"`
+				Source  *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source `json:"source,omitempty"`
+				Version float32                                                                         `json:"version"`
+			} `json:"definition"`
+			GridColumn  int    `json:"gridColumn"`
+			GridRow     int    `json:"gridRow"`
+			Id          string `json:"id"`
+			Name        string `json:"name"`
+			PlatformUrl string `json:"platformUrl"`
+			RowSpan     int    `json:"rowSpan"`
+			UpdatedAt   string `json:"updatedAt"`
+		} `json:"data"`
+	}
+	JSON400 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiDashboardsByDashboardIdWidgetsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiDashboardsByDashboardIdWidgetsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiDashboardsByDashboardIdWidgetsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiDashboardsByDashboardIdWidgetsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		ColSpan     int     `json:"colSpan"`
+		CreatedAt   string  `json:"createdAt"`
+		DashboardId *string `json:"dashboardId"`
+		Definition  struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
+				Name       string `json:"name"`
+				Parameters *[]struct {
+					Default *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+					Name    string                                                                                          `json:"name"`
+					Type    PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
+				} `json:"parameters,omitempty"`
+				Sql string `json:"sql"`
+			} `json:"queries"`
+			Source  *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source `json:"source,omitempty"`
+			Version float32                                                                     `json:"version"`
+		} `json:"definition"`
+		GridColumn  int    `json:"gridColumn"`
+		GridRow     int    `json:"gridRow"`
+		Id          string `json:"id"`
+		Name        string `json:"name"`
+		PlatformUrl string `json:"platformUrl"`
+		RowSpan     int    `json:"rowSpan"`
+		UpdatedAt   string `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Code      string                                                         `json:"code"`
+		DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+		Fault     *PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                         `json:"message"`
+		Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+		Retryable bool                                                           `json:"retryable"`
+		SpanId    *string                                                        `json:"span_id,omitempty"`
+		Tips      *[]string                                                      `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                         `json:"code"`
+		DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+		Fault     *PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                         `json:"message"`
+		Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+		Retryable bool                                                           `json:"retryable"`
+		SpanId    *string                                                        `json:"span_id,omitempty"`
+		Tips      *[]string                                                      `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                         `json:"code"`
+		DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+		Fault     *PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                         `json:"message"`
+		Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+		Retryable bool                                                           `json:"retryable"`
+		SpanId    *string                                                        `json:"span_id,omitempty"`
+		Tips      *[]string                                                      `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                         `json:"code"`
+		DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+		Fault     *PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                         `json:"message"`
+		Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+		Retryable bool                                                           `json:"retryable"`
+		SpanId    *string                                                        `json:"span_id,omitempty"`
+		Tips      *[]string                                                      `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                         `json:"code"`
+		DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+		Fault     *PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                         `json:"message"`
+		Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+		Retryable bool                                                           `json:"retryable"`
+		SpanId    *string                                                        `json:"span_id,omitempty"`
+		Tips      *[]string                                                      `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiDashboardsByDashboardIdWidgetsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiDashboardsByDashboardIdWidgetsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiDashboardsByDashboardIdWidgetsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *interface{}
+	JSON400      *struct {
+		Code      string                                                                     `json:"code"`
+		DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                     `json:"message"`
+		Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+		Retryable bool                                                                       `json:"retryable"`
+		SpanId    *string                                                                    `json:"span_id,omitempty"`
+		Tips      *[]string                                                                  `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                     `json:"code"`
+		DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                     `json:"message"`
+		Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+		Retryable bool                                                                       `json:"retryable"`
+		SpanId    *string                                                                    `json:"span_id,omitempty"`
+		Tips      *[]string                                                                  `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                     `json:"code"`
+		DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                     `json:"message"`
+		Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+		Retryable bool                                                                       `json:"retryable"`
+		SpanId    *string                                                                    `json:"span_id,omitempty"`
+		Tips      *[]string                                                                  `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                                     `json:"code"`
+		DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                     `json:"message"`
+		Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+		Retryable bool                                                                       `json:"retryable"`
+		SpanId    *string                                                                    `json:"span_id,omitempty"`
+		Tips      *[]string                                                                  `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                     `json:"code"`
+		DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+		Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                     `json:"message"`
+		Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+		Retryable bool                                                                       `json:"retryable"`
+		SpanId    *string                                                                    `json:"span_id,omitempty"`
+		Tips      *[]string                                                                  `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ColSpan     int     `json:"colSpan"`
+		CreatedAt   string  `json:"createdAt"`
+		DashboardId *string `json:"dashboardId"`
+		Definition  struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
+				Name       string `json:"name"`
+				Parameters *[]struct {
+					Default *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+					Name    string                                                                                                   `json:"name"`
+					Type    GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
+				} `json:"parameters,omitempty"`
+				Sql string `json:"sql"`
+			} `json:"queries"`
+			Source  *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+			Version float32                                                                              `json:"version"`
+		} `json:"definition"`
+		GridColumn  int    `json:"gridColumn"`
+		GridRow     int    `json:"gridRow"`
+		Id          string `json:"id"`
+		Name        string `json:"name"`
+		PlatformUrl string `json:"platformUrl"`
+		RowSpan     int    `json:"rowSpan"`
+		UpdatedAt   string `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Code      string                                                                  `json:"code"`
+		DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                  `json:"message"`
+		Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+		Retryable bool                                                                    `json:"retryable"`
+		SpanId    *string                                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                  `json:"code"`
+		DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                  `json:"message"`
+		Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+		Retryable bool                                                                    `json:"retryable"`
+		SpanId    *string                                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                  `json:"code"`
+		DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                  `json:"message"`
+		Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+		Retryable bool                                                                    `json:"retryable"`
+		SpanId    *string                                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                                  `json:"code"`
+		DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                  `json:"message"`
+		Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+		Retryable bool                                                                    `json:"retryable"`
+		SpanId    *string                                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                  `json:"code"`
+		DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                  `json:"message"`
+		Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+		Retryable bool                                                                    `json:"retryable"`
+		SpanId    *string                                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ColSpan     int     `json:"colSpan"`
+		CreatedAt   string  `json:"createdAt"`
+		DashboardId *string `json:"dashboardId"`
+		Definition  struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
+				Name       string `json:"name"`
+				Parameters *[]struct {
+					Default *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+					Name    string                                                                                                     `json:"name"`
+					Type    PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
+				} `json:"parameters,omitempty"`
+				Sql string `json:"sql"`
+			} `json:"queries"`
+			Source  *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+			Version float32                                                                                `json:"version"`
+		} `json:"definition"`
+		GridColumn  int    `json:"gridColumn"`
+		GridRow     int    `json:"gridRow"`
+		Id          string `json:"id"`
+		Name        string `json:"name"`
+		PlatformUrl string `json:"platformUrl"`
+		RowSpan     int    `json:"rowSpan"`
+		UpdatedAt   string `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Code      string                                                                    `json:"code"`
+		DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                    `json:"message"`
+		Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+		Retryable bool                                                                      `json:"retryable"`
+		SpanId    *string                                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                    `json:"code"`
+		DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                    `json:"message"`
+		Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+		Retryable bool                                                                      `json:"retryable"`
+		SpanId    *string                                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                    `json:"code"`
+		DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                    `json:"message"`
+		Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+		Retryable bool                                                                      `json:"retryable"`
+		SpanId    *string                                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                                    `json:"code"`
+		DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                    `json:"message"`
+		Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+		Retryable bool                                                                      `json:"retryable"`
+		SpanId    *string                                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                    `json:"code"`
+		DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+		Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                    `json:"message"`
+		Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+		Retryable bool                                                                      `json:"retryable"`
+		SpanId    *string                                                                   `json:"span_id,omitempty"`
+		Tips      *[]string                                                                 `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -153649,6 +159702,11 @@ type GetApiModelDefaultsResponse struct {
 				Scope  *string `json:"scope"`
 				Source string  `json:"source"`
 			} `json:"FAST"`
+			INSTANTEVALS *struct {
+				Model  string  `json:"model"`
+				Scope  *string `json:"scope"`
+				Source string  `json:"source"`
+			} `json:"INSTANT_EVALS"`
 		} `json:"effective"`
 		Scope struct {
 			OrganizationId   *string `json:"organizationId"`
@@ -153997,6 +160055,11 @@ type GetApiMonitorsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]struct {
+		// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+		AutoPausedAt *string `json:"autoPausedAt"`
+
+		// AutoPausedReason Why the monitor paused itself.
+		AutoPausedReason  *string                                        `json:"autoPausedReason"`
 		CheckType         string                                         `json:"checkType"`
 		CreatedAt         string                                         `json:"createdAt"`
 		Enabled           bool                                           `json:"enabled"`
@@ -154044,6 +160107,11 @@ type PostApiMonitorsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
+		// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+		AutoPausedAt *string `json:"autoPausedAt"`
+
+		// AutoPausedReason Why the monitor paused itself.
+		AutoPausedReason  *string                                         `json:"autoPausedReason"`
 		CheckType         string                                          `json:"checkType"`
 		CreatedAt         string                                          `json:"createdAt"`
 		Enabled           bool                                            `json:"enabled"`
@@ -154128,6 +160196,11 @@ type GetApiMonitorsByIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+		AutoPausedAt *string `json:"autoPausedAt"`
+
+		// AutoPausedReason Why the monitor paused itself.
+		AutoPausedReason  *string                                            `json:"autoPausedReason"`
 		CheckType         string                                             `json:"checkType"`
 		CreatedAt         string                                             `json:"createdAt"`
 		Enabled           bool                                               `json:"enabled"`
@@ -154179,6 +160252,11 @@ type PatchApiMonitorsByIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+		AutoPausedAt *string `json:"autoPausedAt"`
+
+		// AutoPausedReason Why the monitor paused itself.
+		AutoPausedReason  *string                                              `json:"autoPausedReason"`
 		CheckType         string                                               `json:"checkType"`
 		CreatedAt         string                                               `json:"createdAt"`
 		Enabled           bool                                                 `json:"enabled"`
@@ -155256,14 +161334,16 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		Data []struct {
-			CreatedAt   string                                                                 `json:"createdAt"`
-			Description *string                                                                `json:"description"`
-			Id          string                                                                 `json:"id"`
-			Name        string                                                                 `json:"name"`
-			PlatformUrl string                                                                 `json:"platformUrl"`
-			Scope       GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope `json:"scope"`
-			UpdatedAt   string                                                                 `json:"updatedAt"`
-			WidgetCount int                                                                    `json:"widgetCount"`
+			CreatedAt       string                                                                 `json:"createdAt"`
+			CreatedById     *string                                                                `json:"createdById"`
+			Description     *string                                                                `json:"description"`
+			ExcludedOrigins *[]string                                                              `json:"excludedOrigins"`
+			Id              string                                                                 `json:"id"`
+			Name            string                                                                 `json:"name"`
+			PlatformUrl     string                                                                 `json:"platformUrl"`
+			Scope           GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope `json:"scope"`
+			UpdatedAt       string                                                                 `json:"updatedAt"`
+			WidgetCount     int                                                                    `json:"widgetCount"`
 		} `json:"data"`
 	}
 	JSON400 *struct {
@@ -155368,28 +161448,30 @@ func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse) ContentType() string
 	return ""
 }
 
-type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
+type GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		CreatedAt   string                                                                      `json:"createdAt"`
-		Description *string                                                                     `json:"description"`
-		Id          string                                                                      `json:"id"`
-		Name        string                                                                      `json:"name"`
-		PlatformUrl string                                                                      `json:"platformUrl"`
-		Scope       GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope `json:"scope"`
-		UpdatedAt   string                                                                      `json:"updatedAt"`
+		CreatedAt       string                                                                          `json:"createdAt"`
+		CreatedById     *string                                                                         `json:"createdById"`
+		Description     *string                                                                         `json:"description"`
+		ExcludedOrigins *[]string                                                                       `json:"excludedOrigins"`
+		Id              string                                                                          `json:"id"`
+		Name            string                                                                          `json:"name"`
+		PlatformUrl     string                                                                          `json:"platformUrl"`
+		Scope           GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                                                          `json:"updatedAt"`
 	}
 	JSON400 *struct {
-		Code      string                                                                       `json:"code"`
-		DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault `json:"fault,omitempty"`
-		Message   string                                                                       `json:"message"`
-		Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-		Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-		Retryable bool                                                                         `json:"retryable"`
-		SpanId    *string                                                                      `json:"span_id,omitempty"`
-		Tips      *[]string                                                                    `json:"tips,omitempty"`
+		Code      string                                                                           `json:"code"`
+		DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                           `json:"message"`
+		Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                                             `json:"retryable"`
+		SpanId    *string                                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                                        `json:"tips,omitempty"`
 		Trace     *struct {
 			LogsUrl  *string `json:"logsUrl,omitempty"`
 			SpanId   *string `json:"spanId,omitempty"`
@@ -155400,15 +161482,15 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
 		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
-		Code      string                                                                       `json:"code"`
-		DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault `json:"fault,omitempty"`
-		Message   string                                                                       `json:"message"`
-		Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-		Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-		Retryable bool                                                                         `json:"retryable"`
-		SpanId    *string                                                                      `json:"span_id,omitempty"`
-		Tips      *[]string                                                                    `json:"tips,omitempty"`
+		Code      string                                                                           `json:"code"`
+		DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                           `json:"message"`
+		Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                                             `json:"retryable"`
+		SpanId    *string                                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                                        `json:"tips,omitempty"`
 		Trace     *struct {
 			LogsUrl  *string `json:"logsUrl,omitempty"`
 			SpanId   *string `json:"spanId,omitempty"`
@@ -155419,15 +161501,15 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
 		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
-		Code      string                                                                       `json:"code"`
-		DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault `json:"fault,omitempty"`
-		Message   string                                                                       `json:"message"`
-		Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-		Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-		Retryable bool                                                                         `json:"retryable"`
-		SpanId    *string                                                                      `json:"span_id,omitempty"`
-		Tips      *[]string                                                                    `json:"tips,omitempty"`
+		Code      string                                                                           `json:"code"`
+		DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                           `json:"message"`
+		Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                                             `json:"retryable"`
+		SpanId    *string                                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                                        `json:"tips,omitempty"`
 		Trace     *struct {
 			LogsUrl  *string `json:"logsUrl,omitempty"`
 			SpanId   *string `json:"spanId,omitempty"`
@@ -155438,15 +161520,15 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
 		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
-		Code      string                                                                       `json:"code"`
-		DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault `json:"fault,omitempty"`
-		Message   string                                                                       `json:"message"`
-		Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-		Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-		Retryable bool                                                                         `json:"retryable"`
-		SpanId    *string                                                                      `json:"span_id,omitempty"`
-		Tips      *[]string                                                                    `json:"tips,omitempty"`
+		Code      string                                                                           `json:"code"`
+		DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                           `json:"message"`
+		Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                                             `json:"retryable"`
+		SpanId    *string                                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                                        `json:"tips,omitempty"`
 		Trace     *struct {
 			LogsUrl  *string `json:"logsUrl,omitempty"`
 			SpanId   *string `json:"spanId,omitempty"`
@@ -155457,15 +161539,15 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
 		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
-		Code      string                                                                       `json:"code"`
-		DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault `json:"fault,omitempty"`
-		Message   string                                                                       `json:"message"`
-		Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-		Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-		Retryable bool                                                                         `json:"retryable"`
-		SpanId    *string                                                                      `json:"span_id,omitempty"`
-		Tips      *[]string                                                                    `json:"tips,omitempty"`
+		Code      string                                                                           `json:"code"`
+		DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                           `json:"message"`
+		Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                                             `json:"retryable"`
+		SpanId    *string                                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                                        `json:"tips,omitempty"`
 		Trace     *struct {
 			LogsUrl  *string `json:"logsUrl,omitempty"`
 			SpanId   *string `json:"spanId,omitempty"`
@@ -155478,7 +161560,7 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse) Status() string {
+func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -155486,7 +161568,7 @@ func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse) Status() st
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse) StatusCode() int {
+func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -155494,7 +161576,7 @@ func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse) StatusCode(
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse) ContentType() string {
+func (r GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -157268,6 +163350,260 @@ func (r PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []struct {
+			CreatedAt       string                                                                     `json:"createdAt"`
+			CreatedById     *string                                                                    `json:"createdById"`
+			Description     *string                                                                    `json:"description"`
+			ExcludedOrigins *[]string                                                                  `json:"excludedOrigins"`
+			Id              string                                                                     `json:"id"`
+			Name            string                                                                     `json:"name"`
+			PlatformUrl     string                                                                     `json:"platformUrl"`
+			Scope           GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope `json:"scope"`
+			UpdatedAt       string                                                                     `json:"updatedAt"`
+			WidgetCount     int                                                                        `json:"widgetCount"`
+		} `json:"data"`
+	}
+	JSON400 *struct {
+		Code      string                                                                  `json:"code"`
+		DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                  `json:"message"`
+		Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+		Retryable bool                                                                    `json:"retryable"`
+		SpanId    *string                                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                  `json:"code"`
+		DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                  `json:"message"`
+		Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+		Retryable bool                                                                    `json:"retryable"`
+		SpanId    *string                                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                  `json:"code"`
+		DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                  `json:"message"`
+		Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+		Retryable bool                                                                    `json:"retryable"`
+		SpanId    *string                                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                  `json:"code"`
+		DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                  `json:"message"`
+		Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+		Retryable bool                                                                    `json:"retryable"`
+		SpanId    *string                                                                 `json:"span_id,omitempty"`
+		Tips      *[]string                                                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		CreatedAt       string                                                                              `json:"createdAt"`
+		CreatedById     *string                                                                             `json:"createdById"`
+		Description     *string                                                                             `json:"description"`
+		ExcludedOrigins *[]string                                                                           `json:"excludedOrigins"`
+		Id              string                                                                              `json:"id"`
+		Name            string                                                                              `json:"name"`
+		PlatformUrl     string                                                                              `json:"platformUrl"`
+		Scope           GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+		UpdatedAt       string                                                                              `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Code      string                                                                               `json:"code"`
+		DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                               `json:"message"`
+		Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+		Retryable bool                                                                                 `json:"retryable"`
+		SpanId    *string                                                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                               `json:"code"`
+		DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                               `json:"message"`
+		Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+		Retryable bool                                                                                 `json:"retryable"`
+		SpanId    *string                                                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                               `json:"code"`
+		DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                               `json:"message"`
+		Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+		Retryable bool                                                                                 `json:"retryable"`
+		SpanId    *string                                                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                                                               `json:"code"`
+		DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                               `json:"message"`
+		Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+		Retryable bool                                                                                 `json:"retryable"`
+		SpanId    *string                                                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                               `json:"code"`
+		DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+		Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                               `json:"message"`
+		Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+		Retryable bool                                                                                 `json:"retryable"`
+		SpanId    *string                                                                              `json:"span_id,omitempty"`
+		Tips      *[]string                                                                            `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -165009,6 +171345,84 @@ func (c *ClientWithResponses) PostApiAnalyticsWithResponse(ctx context.Context, 
 	return ParsePostApiAnalyticsResponse(rsp)
 }
 
+// GetApiV1AnalyticsReportsWithResponse request returning *GetApiV1AnalyticsReportsResponse
+func (c *ClientWithResponses) GetApiV1AnalyticsReportsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1AnalyticsReportsResponse, error) {
+	rsp, err := c.GetApiV1AnalyticsReports(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiV1AnalyticsReportsResponse(rsp)
+}
+
+// PostApiV1AnalyticsReportsWithBodyWithResponse request with arbitrary body returning *PostApiV1AnalyticsReportsResponse
+func (c *ClientWithResponses) PostApiV1AnalyticsReportsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1AnalyticsReportsResponse, error) {
+	rsp, err := c.PostApiV1AnalyticsReportsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiV1AnalyticsReportsResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiV1AnalyticsReportsWithResponse(ctx context.Context, body PostApiV1AnalyticsReportsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1AnalyticsReportsResponse, error) {
+	rsp, err := c.PostApiV1AnalyticsReports(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiV1AnalyticsReportsResponse(rsp)
+}
+
+// PutApiV1AnalyticsReportsReorderWithBodyWithResponse request with arbitrary body returning *PutApiV1AnalyticsReportsReorderResponse
+func (c *ClientWithResponses) PutApiV1AnalyticsReportsReorderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutApiV1AnalyticsReportsReorderResponse, error) {
+	rsp, err := c.PutApiV1AnalyticsReportsReorderWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutApiV1AnalyticsReportsReorderResponse(rsp)
+}
+
+func (c *ClientWithResponses) PutApiV1AnalyticsReportsReorderWithResponse(ctx context.Context, body PutApiV1AnalyticsReportsReorderJSONRequestBody, reqEditors ...RequestEditorFn) (*PutApiV1AnalyticsReportsReorderResponse, error) {
+	rsp, err := c.PutApiV1AnalyticsReportsReorder(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutApiV1AnalyticsReportsReorderResponse(rsp)
+}
+
+// DeleteApiV1AnalyticsReportsByReportIdWithResponse request returning *DeleteApiV1AnalyticsReportsByReportIdResponse
+func (c *ClientWithResponses) DeleteApiV1AnalyticsReportsByReportIdWithResponse(ctx context.Context, reportId string, reqEditors ...RequestEditorFn) (*DeleteApiV1AnalyticsReportsByReportIdResponse, error) {
+	rsp, err := c.DeleteApiV1AnalyticsReportsByReportId(ctx, reportId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteApiV1AnalyticsReportsByReportIdResponse(rsp)
+}
+
+// GetApiV1AnalyticsReportsByReportIdWithResponse request returning *GetApiV1AnalyticsReportsByReportIdResponse
+func (c *ClientWithResponses) GetApiV1AnalyticsReportsByReportIdWithResponse(ctx context.Context, reportId string, reqEditors ...RequestEditorFn) (*GetApiV1AnalyticsReportsByReportIdResponse, error) {
+	rsp, err := c.GetApiV1AnalyticsReportsByReportId(ctx, reportId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiV1AnalyticsReportsByReportIdResponse(rsp)
+}
+
+// PatchApiV1AnalyticsReportsByReportIdWithBodyWithResponse request with arbitrary body returning *PatchApiV1AnalyticsReportsByReportIdResponse
+func (c *ClientWithResponses) PatchApiV1AnalyticsReportsByReportIdWithBodyWithResponse(ctx context.Context, reportId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiV1AnalyticsReportsByReportIdResponse, error) {
+	rsp, err := c.PatchApiV1AnalyticsReportsByReportIdWithBody(ctx, reportId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchApiV1AnalyticsReportsByReportIdResponse(rsp)
+}
+
+func (c *ClientWithResponses) PatchApiV1AnalyticsReportsByReportIdWithResponse(ctx context.Context, reportId string, body PatchApiV1AnalyticsReportsByReportIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiV1AnalyticsReportsByReportIdResponse, error) {
+	rsp, err := c.PatchApiV1AnalyticsReportsByReportId(ctx, reportId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchApiV1AnalyticsReportsByReportIdResponse(rsp)
+}
+
 // PostApiAnalyticsTimeseriesWithBodyWithResponse request with arbitrary body returning *PostApiAnalyticsTimeseriesResponse
 func (c *ClientWithResponses) PostApiAnalyticsTimeseriesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiAnalyticsTimeseriesResponse, error) {
 	rsp, err := c.PostApiAnalyticsTimeseriesWithBody(ctx, contentType, body, reqEditors...)
@@ -165548,56 +171962,100 @@ func (c *ClientWithResponses) PostApiDashboardsWithResponse(ctx context.Context,
 	return ParsePostApiDashboardsResponse(rsp)
 }
 
-// PutApiDashboardsReorderWithBodyWithResponse request with arbitrary body returning *PutApiDashboardsReorderResponse
-func (c *ClientWithResponses) PutApiDashboardsReorderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutApiDashboardsReorderResponse, error) {
-	rsp, err := c.PutApiDashboardsReorderWithBody(ctx, contentType, body, reqEditors...)
+// DeleteApiDashboardsByDashboardIdWithResponse request returning *DeleteApiDashboardsByDashboardIdResponse
+func (c *ClientWithResponses) DeleteApiDashboardsByDashboardIdWithResponse(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*DeleteApiDashboardsByDashboardIdResponse, error) {
+	rsp, err := c.DeleteApiDashboardsByDashboardId(ctx, dashboardId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePutApiDashboardsReorderResponse(rsp)
+	return ParseDeleteApiDashboardsByDashboardIdResponse(rsp)
 }
 
-func (c *ClientWithResponses) PutApiDashboardsReorderWithResponse(ctx context.Context, body PutApiDashboardsReorderJSONRequestBody, reqEditors ...RequestEditorFn) (*PutApiDashboardsReorderResponse, error) {
-	rsp, err := c.PutApiDashboardsReorder(ctx, body, reqEditors...)
+// GetApiDashboardsByDashboardIdWithResponse request returning *GetApiDashboardsByDashboardIdResponse
+func (c *ClientWithResponses) GetApiDashboardsByDashboardIdWithResponse(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*GetApiDashboardsByDashboardIdResponse, error) {
+	rsp, err := c.GetApiDashboardsByDashboardId(ctx, dashboardId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePutApiDashboardsReorderResponse(rsp)
+	return ParseGetApiDashboardsByDashboardIdResponse(rsp)
 }
 
-// DeleteApiDashboardsByIdWithResponse request returning *DeleteApiDashboardsByIdResponse
-func (c *ClientWithResponses) DeleteApiDashboardsByIdWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteApiDashboardsByIdResponse, error) {
-	rsp, err := c.DeleteApiDashboardsById(ctx, id, reqEditors...)
+// PatchApiDashboardsByDashboardIdWithBodyWithResponse request with arbitrary body returning *PatchApiDashboardsByDashboardIdResponse
+func (c *ClientWithResponses) PatchApiDashboardsByDashboardIdWithBodyWithResponse(ctx context.Context, dashboardId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByDashboardIdResponse, error) {
+	rsp, err := c.PatchApiDashboardsByDashboardIdWithBody(ctx, dashboardId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteApiDashboardsByIdResponse(rsp)
+	return ParsePatchApiDashboardsByDashboardIdResponse(rsp)
 }
 
-// GetApiDashboardsByIdWithResponse request returning *GetApiDashboardsByIdResponse
-func (c *ClientWithResponses) GetApiDashboardsByIdWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetApiDashboardsByIdResponse, error) {
-	rsp, err := c.GetApiDashboardsById(ctx, id, reqEditors...)
+func (c *ClientWithResponses) PatchApiDashboardsByDashboardIdWithResponse(ctx context.Context, dashboardId string, body PatchApiDashboardsByDashboardIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByDashboardIdResponse, error) {
+	rsp, err := c.PatchApiDashboardsByDashboardId(ctx, dashboardId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetApiDashboardsByIdResponse(rsp)
+	return ParsePatchApiDashboardsByDashboardIdResponse(rsp)
 }
 
-// PatchApiDashboardsByIdWithBodyWithResponse request with arbitrary body returning *PatchApiDashboardsByIdResponse
-func (c *ClientWithResponses) PatchApiDashboardsByIdWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByIdResponse, error) {
-	rsp, err := c.PatchApiDashboardsByIdWithBody(ctx, id, contentType, body, reqEditors...)
+// GetApiDashboardsByDashboardIdWidgetsWithResponse request returning *GetApiDashboardsByDashboardIdWidgetsResponse
+func (c *ClientWithResponses) GetApiDashboardsByDashboardIdWidgetsWithResponse(ctx context.Context, dashboardId string, reqEditors ...RequestEditorFn) (*GetApiDashboardsByDashboardIdWidgetsResponse, error) {
+	rsp, err := c.GetApiDashboardsByDashboardIdWidgets(ctx, dashboardId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePatchApiDashboardsByIdResponse(rsp)
+	return ParseGetApiDashboardsByDashboardIdWidgetsResponse(rsp)
 }
 
-func (c *ClientWithResponses) PatchApiDashboardsByIdWithResponse(ctx context.Context, id string, body PatchApiDashboardsByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByIdResponse, error) {
-	rsp, err := c.PatchApiDashboardsById(ctx, id, body, reqEditors...)
+// PostApiDashboardsByDashboardIdWidgetsWithBodyWithResponse request with arbitrary body returning *PostApiDashboardsByDashboardIdWidgetsResponse
+func (c *ClientWithResponses) PostApiDashboardsByDashboardIdWidgetsWithBodyWithResponse(ctx context.Context, dashboardId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDashboardsByDashboardIdWidgetsResponse, error) {
+	rsp, err := c.PostApiDashboardsByDashboardIdWidgetsWithBody(ctx, dashboardId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePatchApiDashboardsByIdResponse(rsp)
+	return ParsePostApiDashboardsByDashboardIdWidgetsResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiDashboardsByDashboardIdWidgetsWithResponse(ctx context.Context, dashboardId string, body PostApiDashboardsByDashboardIdWidgetsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDashboardsByDashboardIdWidgetsResponse, error) {
+	rsp, err := c.PostApiDashboardsByDashboardIdWidgets(ctx, dashboardId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDashboardsByDashboardIdWidgetsResponse(rsp)
+}
+
+// DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse request returning *DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse
+func (c *ClientWithResponses) DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse(ctx context.Context, dashboardId string, widgetId string, reqEditors ...RequestEditorFn) (*DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error) {
+	rsp, err := c.DeleteApiDashboardsByDashboardIdWidgetsByWidgetId(ctx, dashboardId, widgetId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp)
+}
+
+// GetApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse request returning *GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse
+func (c *ClientWithResponses) GetApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse(ctx context.Context, dashboardId string, widgetId string, reqEditors ...RequestEditorFn) (*GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error) {
+	rsp, err := c.GetApiDashboardsByDashboardIdWidgetsByWidgetId(ctx, dashboardId, widgetId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp)
+}
+
+// PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithBodyWithResponse request with arbitrary body returning *PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse
+func (c *ClientWithResponses) PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithBodyWithResponse(ctx context.Context, dashboardId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error) {
+	rsp, err := c.PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithBody(ctx, dashboardId, widgetId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp)
+}
+
+func (c *ClientWithResponses) PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse(ctx context.Context, dashboardId string, widgetId string, body PatchApiDashboardsByDashboardIdWidgetsByWidgetIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error) {
+	rsp, err := c.PatchApiDashboardsByDashboardIdWidgetsByWidgetId(ctx, dashboardId, widgetId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp)
 }
 
 // GetApiDatasetWithResponse request returning *GetApiDatasetResponse
@@ -167305,13 +173763,13 @@ func (c *ClientWithResponses) GetApiV1ProjectsByProjectIdAnalyticsBoardsWithResp
 	return ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp)
 }
 
-// GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse request returning *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse
-func (c *ClientWithResponses) GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse(ctx context.Context, projectId string, boardId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse, error) {
-	rsp, err := c.GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId(ctx, projectId, boardId, reqEditors...)
+// GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdWithResponse request returning *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse
+func (c *ClientWithResponses) GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdWithResponse(ctx context.Context, projectId string, dashboardId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse, error) {
+	rsp, err := c.GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId(ctx, projectId, dashboardId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp)
+	return ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse(rsp)
 }
 
 // GetApiV1ProjectsByProjectIdAnalyticsChartsWithResponse request returning *GetApiV1ProjectsByProjectIdAnalyticsChartsResponse
@@ -167477,6 +173935,24 @@ func (c *ClientWithResponses) PostApiV1ProjectsByProjectIdAnalyticsDashboardWidg
 		return nil, err
 	}
 	return ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse(rsp)
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardsWithResponse request returning *GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse
+func (c *ClientWithResponses) GetApiV1ProjectsByProjectIdAnalyticsDashboardsWithResponse(ctx context.Context, projectId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse, error) {
+	rsp, err := c.GetApiV1ProjectsByProjectIdAnalyticsDashboards(ctx, projectId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse(rsp)
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdWithResponse request returning *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse
+func (c *ClientWithResponses) GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdWithResponse(ctx context.Context, projectId string, dashboardId string, reqEditors ...RequestEditorFn) (*GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse, error) {
+	rsp, err := c.GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId(ctx, projectId, dashboardId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse(rsp)
 }
 
 // GetApiPromptsWithResponse request returning *GetApiPromptsResponse
@@ -169011,6 +175487,7 @@ func ParseGetApiCodingAgentPullRequestUsageResponse(rsp *http.Response) (*GetApi
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			ModelBreakdown []struct {
+				AiUnits             *float32 `json:"aiUnits"`
 				CacheCreationTokens float32  `json:"cacheCreationTokens"`
 				CacheReadTokens     float32  `json:"cacheReadTokens"`
 				CostUsd             *float32 `json:"costUsd"`
@@ -176084,6 +182561,9 @@ func ParseCallConnectedAgentResponse(rsp *http.Response) (*CallConnectedAgentRes
 
 			// Session The agent's per-conversation memory, to send on the next turn.
 			Session interface{} `json:"session,omitempty"`
+
+			// State Setup's state, a turn's state update, or the object teardown returned.
+			State *CallConnectedAgent200JSONResponseBody_State `json:"state,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -176175,6 +182655,212 @@ func ParsePostApiAnalyticsResponse(rsp *http.Response) (*PostApiAnalyticsRespons
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiV1AnalyticsReportsResponse parses an HTTP response from a GetApiV1AnalyticsReportsWithResponse call
+func ParseGetApiV1AnalyticsReportsResponse(rsp *http.Response) (*GetApiV1AnalyticsReportsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiV1AnalyticsReportsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []struct {
+				CreatedAt   time.Time `json:"createdAt"`
+				GraphCount  int       `json:"graphCount"`
+				Id          string    `json:"id"`
+				Name        string    `json:"name"`
+				Order       int       `json:"order"`
+				PlatformUrl string    `json:"platformUrl"`
+				UpdatedAt   time.Time `json:"updatedAt"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiV1AnalyticsReportsResponse parses an HTTP response from a PostApiV1AnalyticsReportsWithResponse call
+func ParsePostApiV1AnalyticsReportsResponse(rsp *http.Response) (*PostApiV1AnalyticsReportsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiV1AnalyticsReportsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			CreatedAt   time.Time `json:"createdAt"`
+			Id          string    `json:"id"`
+			Name        string    `json:"name"`
+			Order       int       `json:"order"`
+			PlatformUrl string    `json:"platformUrl"`
+			UpdatedAt   time.Time `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutApiV1AnalyticsReportsReorderResponse parses an HTTP response from a PutApiV1AnalyticsReportsReorderWithResponse call
+func ParsePutApiV1AnalyticsReportsReorderResponse(rsp *http.Response) (*PutApiV1AnalyticsReportsReorderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutApiV1AnalyticsReportsReorderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Success PutApiV1AnalyticsReportsReorder200JSONResponseBodySuccess `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteApiV1AnalyticsReportsByReportIdResponse parses an HTTP response from a DeleteApiV1AnalyticsReportsByReportIdWithResponse call
+func ParseDeleteApiV1AnalyticsReportsByReportIdResponse(rsp *http.Response) (*DeleteApiV1AnalyticsReportsByReportIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteApiV1AnalyticsReportsByReportIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Id   string `json:"id"`
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiV1AnalyticsReportsByReportIdResponse parses an HTTP response from a GetApiV1AnalyticsReportsByReportIdWithResponse call
+func ParseGetApiV1AnalyticsReportsByReportIdResponse(rsp *http.Response) (*GetApiV1AnalyticsReportsByReportIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiV1AnalyticsReportsByReportIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			CreatedAt time.Time `json:"createdAt"`
+			Graphs    []struct {
+				ColSpan     int                     `json:"colSpan"`
+				CreatedAt   time.Time               `json:"createdAt"`
+				DashboardId *string                 `json:"dashboardId"`
+				Filters     *map[string]interface{} `json:"filters"`
+				Graph       map[string]interface{}  `json:"graph"`
+				GridColumn  int                     `json:"gridColumn"`
+				GridRow     int                     `json:"gridRow"`
+				Id          string                  `json:"id"`
+				Name        string                  `json:"name"`
+				ProjectId   string                  `json:"projectId"`
+				RowSpan     int                     `json:"rowSpan"`
+				UpdatedAt   time.Time               `json:"updatedAt"`
+			} `json:"graphs"`
+			Id          string    `json:"id"`
+			Name        string    `json:"name"`
+			Order       int       `json:"order"`
+			PlatformUrl string    `json:"platformUrl"`
+			UpdatedAt   time.Time `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchApiV1AnalyticsReportsByReportIdResponse parses an HTTP response from a PatchApiV1AnalyticsReportsByReportIdWithResponse call
+func ParsePatchApiV1AnalyticsReportsByReportIdResponse(rsp *http.Response) (*PatchApiV1AnalyticsReportsByReportIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchApiV1AnalyticsReportsByReportIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			CreatedAt   time.Time `json:"createdAt"`
+			Id          string    `json:"id"`
+			Name        string    `json:"name"`
+			Order       int       `json:"order"`
+			PlatformUrl string    `json:"platformUrl"`
+			UpdatedAt   time.Time `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	}
 
@@ -178702,6 +185388,7 @@ func ParseGetPullRequestUsageResponse(rsp *http.Response) (*GetPullRequestUsageR
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			ModelBreakdown []struct {
+				AiUnits             *float32 `json:"aiUnits"`
 				CacheCreationTokens float32  `json:"cacheCreationTokens"`
 				CacheReadTokens     float32  `json:"cacheReadTokens"`
 				CostUsd             *float32 `json:"costUsd"`
@@ -178934,19 +185621,122 @@ func ParseGetApiDashboardsResponse(rsp *http.Response) (*GetApiDashboardsRespons
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			Data []struct {
-				CreatedAt   time.Time `json:"createdAt"`
-				GraphCount  int       `json:"graphCount"`
-				Id          string    `json:"id"`
-				Name        string    `json:"name"`
-				Order       int       `json:"order"`
-				PlatformUrl string    `json:"platformUrl"`
-				UpdatedAt   time.Time `json:"updatedAt"`
+				CreatedAt       string                                       `json:"createdAt"`
+				CreatedById     *string                                      `json:"createdById"`
+				Description     *string                                      `json:"description"`
+				ExcludedOrigins *[]string                                    `json:"excludedOrigins"`
+				Id              string                                       `json:"id"`
+				Name            string                                       `json:"name"`
+				PlatformUrl     string                                       `json:"platformUrl"`
+				Scope           GetApiDashboards200JSONResponseBodyDataScope `json:"scope"`
+				UpdatedAt       string                                       `json:"updatedAt"`
+				WidgetCount     int                                          `json:"widgetCount"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                    `json:"code"`
+			DocsUrl   *string                                   `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboards400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                    `json:"message"`
+			Meta      *map[string]interface{}                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                            `json:"reasons,omitempty"`
+			Retryable bool                                      `json:"retryable"`
+			SpanId    *string                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                    `json:"code"`
+			DocsUrl   *string                                   `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboards401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                    `json:"message"`
+			Meta      *map[string]interface{}                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                            `json:"reasons,omitempty"`
+			Retryable bool                                      `json:"retryable"`
+			SpanId    *string                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                    `json:"code"`
+			DocsUrl   *string                                   `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboards403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                    `json:"message"`
+			Meta      *map[string]interface{}                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                            `json:"reasons,omitempty"`
+			Retryable bool                                      `json:"retryable"`
+			SpanId    *string                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                    `json:"code"`
+			DocsUrl   *string                                   `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboards500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                    `json:"message"`
+			Meta      *map[string]interface{}                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                            `json:"reasons,omitempty"`
+			Retryable bool                                      `json:"retryable"`
+			SpanId    *string                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
@@ -178969,60 +185759,135 @@ func ParsePostApiDashboardsResponse(rsp *http.Response) (*PostApiDashboardsRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
-			CreatedAt   time.Time `json:"createdAt"`
-			Id          string    `json:"id"`
-			Name        string    `json:"name"`
-			Order       int       `json:"order"`
-			PlatformUrl string    `json:"platformUrl"`
-			UpdatedAt   time.Time `json:"updatedAt"`
+			CreatedAt       string                                    `json:"createdAt"`
+			CreatedById     *string                                   `json:"createdById"`
+			Description     *string                                   `json:"description"`
+			ExcludedOrigins *[]string                                 `json:"excludedOrigins"`
+			Id              string                                    `json:"id"`
+			Name            string                                    `json:"name"`
+			PlatformUrl     string                                    `json:"platformUrl"`
+			Scope           PostApiDashboards201JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                    `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON201 = &dest
 
-	}
-
-	return response, nil
-}
-
-// ParsePutApiDashboardsReorderResponse parses an HTTP response from a PutApiDashboardsReorderWithResponse call
-func ParsePutApiDashboardsReorderResponse(rsp *http.Response) (*PutApiDashboardsReorderResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PutApiDashboardsReorderResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest struct {
-			Success PutApiDashboardsReorder200JSONResponseBodySuccess `json:"success"`
+			Code      string                                     `json:"code"`
+			DocsUrl   *string                                    `json:"docs_url,omitempty"`
+			Fault     *PostApiDashboards400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                     `json:"message"`
+			Meta      *map[string]interface{}                    `json:"meta,omitempty"`
+			Reasons   *[]interface{}                             `json:"reasons,omitempty"`
+			Retryable bool                                       `json:"retryable"`
+			SpanId    *string                                    `json:"span_id,omitempty"`
+			Tips      *[]string                                  `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON200 = &dest
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                     `json:"code"`
+			DocsUrl   *string                                    `json:"docs_url,omitempty"`
+			Fault     *PostApiDashboards401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                     `json:"message"`
+			Meta      *map[string]interface{}                    `json:"meta,omitempty"`
+			Reasons   *[]interface{}                             `json:"reasons,omitempty"`
+			Retryable bool                                       `json:"retryable"`
+			SpanId    *string                                    `json:"span_id,omitempty"`
+			Tips      *[]string                                  `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                     `json:"code"`
+			DocsUrl   *string                                    `json:"docs_url,omitempty"`
+			Fault     *PostApiDashboards403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                     `json:"message"`
+			Meta      *map[string]interface{}                    `json:"meta,omitempty"`
+			Reasons   *[]interface{}                             `json:"reasons,omitempty"`
+			Retryable bool                                       `json:"retryable"`
+			SpanId    *string                                    `json:"span_id,omitempty"`
+			Tips      *[]string                                  `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                     `json:"code"`
+			DocsUrl   *string                                    `json:"docs_url,omitempty"`
+			Fault     *PostApiDashboards500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                     `json:"message"`
+			Meta      *map[string]interface{}                    `json:"meta,omitempty"`
+			Reasons   *[]interface{}                             `json:"reasons,omitempty"`
+			Retryable bool                                       `json:"retryable"`
+			SpanId    *string                                    `json:"span_id,omitempty"`
+			Tips      *[]string                                  `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
 	return response, nil
 }
 
-// ParseDeleteApiDashboardsByIdResponse parses an HTTP response from a DeleteApiDashboardsByIdWithResponse call
-func ParseDeleteApiDashboardsByIdResponse(rsp *http.Response) (*DeleteApiDashboardsByIdResponse, error) {
+// ParseDeleteApiDashboardsByDashboardIdResponse parses an HTTP response from a DeleteApiDashboardsByDashboardIdWithResponse call
+func ParseDeleteApiDashboardsByDashboardIdResponse(rsp *http.Response) (*DeleteApiDashboardsByDashboardIdResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteApiDashboardsByIdResponse{
+	response := &DeleteApiDashboardsByDashboardIdResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -179038,20 +185903,145 @@ func ParseDeleteApiDashboardsByIdResponse(rsp *http.Response) (*DeleteApiDashboa
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                    `json:"code"`
+			DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                    `json:"message"`
+			Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+			Retryable bool                                                      `json:"retryable"`
+			SpanId    *string                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                    `json:"code"`
+			DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                    `json:"message"`
+			Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+			Retryable bool                                                      `json:"retryable"`
+			SpanId    *string                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                    `json:"code"`
+			DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                    `json:"message"`
+			Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+			Retryable bool                                                      `json:"retryable"`
+			SpanId    *string                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                    `json:"code"`
+			DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                    `json:"message"`
+			Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+			Retryable bool                                                      `json:"retryable"`
+			SpanId    *string                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                    `json:"code"`
+			DocsUrl   *string                                                   `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                    `json:"message"`
+			Meta      *map[string]interface{}                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                            `json:"reasons,omitempty"`
+			Retryable bool                                                      `json:"retryable"`
+			SpanId    *string                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
 	}
 
 	return response, nil
 }
 
-// ParseGetApiDashboardsByIdResponse parses an HTTP response from a GetApiDashboardsByIdWithResponse call
-func ParseGetApiDashboardsByIdResponse(rsp *http.Response) (*GetApiDashboardsByIdResponse, error) {
+// ParseGetApiDashboardsByDashboardIdResponse parses an HTTP response from a GetApiDashboardsByDashboardIdWithResponse call
+func ParseGetApiDashboardsByDashboardIdResponse(rsp *http.Response) (*GetApiDashboardsByDashboardIdResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetApiDashboardsByIdResponse{
+	response := &GetApiDashboardsByDashboardIdResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -179059,46 +186049,160 @@ func ParseGetApiDashboardsByIdResponse(rsp *http.Response) (*GetApiDashboardsByI
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			CreatedAt time.Time `json:"createdAt"`
-			Graphs    []struct {
-				ColSpan     int                     `json:"colSpan"`
-				CreatedAt   time.Time               `json:"createdAt"`
-				DashboardId *string                 `json:"dashboardId"`
-				Filters     *map[string]interface{} `json:"filters"`
-				Graph       map[string]interface{}  `json:"graph"`
-				GridColumn  int                     `json:"gridColumn"`
-				GridRow     int                     `json:"gridRow"`
-				Id          string                  `json:"id"`
-				Name        string                  `json:"name"`
-				ProjectId   string                  `json:"projectId"`
-				RowSpan     int                     `json:"rowSpan"`
-				UpdatedAt   time.Time               `json:"updatedAt"`
-			} `json:"graphs"`
-			Id          string    `json:"id"`
-			Name        string    `json:"name"`
-			Order       int       `json:"order"`
-			PlatformUrl string    `json:"platformUrl"`
-			UpdatedAt   time.Time `json:"updatedAt"`
+			CreatedAt       string                                                `json:"createdAt"`
+			CreatedById     *string                                               `json:"createdById"`
+			Description     *string                                               `json:"description"`
+			ExcludedOrigins *[]string                                             `json:"excludedOrigins"`
+			Id              string                                                `json:"id"`
+			Name            string                                                `json:"name"`
+			PlatformUrl     string                                                `json:"platformUrl"`
+			Scope           GetApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                                `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                 `json:"code"`
+			DocsUrl   *string                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                 `json:"message"`
+			Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+			Retryable bool                                                   `json:"retryable"`
+			SpanId    *string                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                 `json:"code"`
+			DocsUrl   *string                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                 `json:"message"`
+			Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+			Retryable bool                                                   `json:"retryable"`
+			SpanId    *string                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                 `json:"code"`
+			DocsUrl   *string                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                 `json:"message"`
+			Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+			Retryable bool                                                   `json:"retryable"`
+			SpanId    *string                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                 `json:"code"`
+			DocsUrl   *string                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                 `json:"message"`
+			Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+			Retryable bool                                                   `json:"retryable"`
+			SpanId    *string                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                 `json:"code"`
+			DocsUrl   *string                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                 `json:"message"`
+			Meta      *map[string]interface{}                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                         `json:"reasons,omitempty"`
+			Retryable bool                                                   `json:"retryable"`
+			SpanId    *string                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
 	}
 
 	return response, nil
 }
 
-// ParsePatchApiDashboardsByIdResponse parses an HTTP response from a PatchApiDashboardsByIdWithResponse call
-func ParsePatchApiDashboardsByIdResponse(rsp *http.Response) (*PatchApiDashboardsByIdResponse, error) {
+// ParsePatchApiDashboardsByDashboardIdResponse parses an HTTP response from a PatchApiDashboardsByDashboardIdWithResponse call
+func ParsePatchApiDashboardsByDashboardIdResponse(rsp *http.Response) (*PatchApiDashboardsByDashboardIdResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PatchApiDashboardsByIdResponse{
+	response := &PatchApiDashboardsByDashboardIdResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -179106,17 +186210,1010 @@ func ParsePatchApiDashboardsByIdResponse(rsp *http.Response) (*PatchApiDashboard
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			CreatedAt   time.Time `json:"createdAt"`
-			Id          string    `json:"id"`
-			Name        string    `json:"name"`
-			Order       int       `json:"order"`
-			PlatformUrl string    `json:"platformUrl"`
-			UpdatedAt   time.Time `json:"updatedAt"`
+			CreatedAt       string                                                  `json:"createdAt"`
+			CreatedById     *string                                                 `json:"createdById"`
+			Description     *string                                                 `json:"description"`
+			ExcludedOrigins *[]string                                               `json:"excludedOrigins"`
+			Id              string                                                  `json:"id"`
+			Name            string                                                  `json:"name"`
+			PlatformUrl     string                                                  `json:"platformUrl"`
+			Scope           PatchApiDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                                  `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                   `json:"code"`
+			DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                   `json:"message"`
+			Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+			Retryable bool                                                     `json:"retryable"`
+			SpanId    *string                                                  `json:"span_id,omitempty"`
+			Tips      *[]string                                                `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                   `json:"code"`
+			DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                   `json:"message"`
+			Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+			Retryable bool                                                     `json:"retryable"`
+			SpanId    *string                                                  `json:"span_id,omitempty"`
+			Tips      *[]string                                                `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                   `json:"code"`
+			DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                   `json:"message"`
+			Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+			Retryable bool                                                     `json:"retryable"`
+			SpanId    *string                                                  `json:"span_id,omitempty"`
+			Tips      *[]string                                                `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                   `json:"code"`
+			DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                   `json:"message"`
+			Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+			Retryable bool                                                     `json:"retryable"`
+			SpanId    *string                                                  `json:"span_id,omitempty"`
+			Tips      *[]string                                                `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                   `json:"code"`
+			DocsUrl   *string                                                  `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                   `json:"message"`
+			Meta      *map[string]interface{}                                  `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                           `json:"reasons,omitempty"`
+			Retryable bool                                                     `json:"retryable"`
+			SpanId    *string                                                  `json:"span_id,omitempty"`
+			Tips      *[]string                                                `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiDashboardsByDashboardIdWidgetsResponse parses an HTTP response from a GetApiDashboardsByDashboardIdWidgetsWithResponse call
+func ParseGetApiDashboardsByDashboardIdWidgetsResponse(rsp *http.Response) (*GetApiDashboardsByDashboardIdWidgetsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiDashboardsByDashboardIdWidgetsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []struct {
+				ColSpan     int     `json:"colSpan"`
+				CreatedAt   string  `json:"createdAt"`
+				DashboardId *string `json:"dashboardId"`
+				Definition  struct {
+					Code        string  `json:"code"`
+					Description *string `json:"description,omitempty"`
+					Prompt      *string `json:"prompt,omitempty"`
+					Queries     []struct {
+						Name       string `json:"name"`
+						Parameters *[]struct {
+							Default *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+							Name    string                                                                                              `json:"name"`
+							Type    GetApiDashboardsByDashboardIdWidgets200JSONResponseBodyDataDefinitionQueriesParametersType          `json:"type"`
+						} `json:"parameters,omitempty"`
+						Sql string `json:"sql"`
+					} `json:"queries"`
+					Source  *GetApiDashboardsByDashboardIdWidgets200JSONResponseBody_Data_Definition_Source `json:"source,omitempty"`
+					Version float32                                                                         `json:"version"`
+				} `json:"definition"`
+				GridColumn  int    `json:"gridColumn"`
+				GridRow     int    `json:"gridRow"`
+				Id          string `json:"id"`
+				Name        string `json:"name"`
+				PlatformUrl string `json:"platformUrl"`
+				RowSpan     int    `json:"rowSpan"`
+				UpdatedAt   string `json:"updatedAt"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiDashboardsByDashboardIdWidgetsResponse parses an HTTP response from a PostApiDashboardsByDashboardIdWidgetsWithResponse call
+func ParsePostApiDashboardsByDashboardIdWidgetsResponse(rsp *http.Response) (*PostApiDashboardsByDashboardIdWidgetsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiDashboardsByDashboardIdWidgetsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			ColSpan     int     `json:"colSpan"`
+			CreatedAt   string  `json:"createdAt"`
+			DashboardId *string `json:"dashboardId"`
+			Definition  struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
+					Name       string `json:"name"`
+					Parameters *[]struct {
+						Default *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+						Name    string                                                                                          `json:"name"`
+						Type    PostApiDashboardsByDashboardIdWidgets201JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
+					} `json:"parameters,omitempty"`
+					Sql string `json:"sql"`
+				} `json:"queries"`
+				Source  *PostApiDashboardsByDashboardIdWidgets201JSONResponseBody_Definition_Source `json:"source,omitempty"`
+				Version float32                                                                     `json:"version"`
+			} `json:"definition"`
+			GridColumn  int    `json:"gridColumn"`
+			GridRow     int    `json:"gridRow"`
+			Id          string `json:"id"`
+			Name        string `json:"name"`
+			PlatformUrl string `json:"platformUrl"`
+			RowSpan     int    `json:"rowSpan"`
+			UpdatedAt   string `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                         `json:"code"`
+			DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+			Fault     *PostApiDashboardsByDashboardIdWidgets400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                         `json:"message"`
+			Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+			Retryable bool                                                           `json:"retryable"`
+			SpanId    *string                                                        `json:"span_id,omitempty"`
+			Tips      *[]string                                                      `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                         `json:"code"`
+			DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+			Fault     *PostApiDashboardsByDashboardIdWidgets401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                         `json:"message"`
+			Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+			Retryable bool                                                           `json:"retryable"`
+			SpanId    *string                                                        `json:"span_id,omitempty"`
+			Tips      *[]string                                                      `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                         `json:"code"`
+			DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+			Fault     *PostApiDashboardsByDashboardIdWidgets403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                         `json:"message"`
+			Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+			Retryable bool                                                           `json:"retryable"`
+			SpanId    *string                                                        `json:"span_id,omitempty"`
+			Tips      *[]string                                                      `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                         `json:"code"`
+			DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+			Fault     *PostApiDashboardsByDashboardIdWidgets404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                         `json:"message"`
+			Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+			Retryable bool                                                           `json:"retryable"`
+			SpanId    *string                                                        `json:"span_id,omitempty"`
+			Tips      *[]string                                                      `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                         `json:"code"`
+			DocsUrl   *string                                                        `json:"docs_url,omitempty"`
+			Fault     *PostApiDashboardsByDashboardIdWidgets500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                         `json:"message"`
+			Meta      *map[string]interface{}                                        `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                 `json:"reasons,omitempty"`
+			Retryable bool                                                           `json:"retryable"`
+			SpanId    *string                                                        `json:"span_id,omitempty"`
+			Tips      *[]string                                                      `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse parses an HTTP response from a DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse call
+func ParseDeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp *http.Response) (*DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteApiDashboardsByDashboardIdWidgetsByWidgetIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                     `json:"code"`
+			DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                     `json:"message"`
+			Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+			Retryable bool                                                                       `json:"retryable"`
+			SpanId    *string                                                                    `json:"span_id,omitempty"`
+			Tips      *[]string                                                                  `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                     `json:"code"`
+			DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                     `json:"message"`
+			Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+			Retryable bool                                                                       `json:"retryable"`
+			SpanId    *string                                                                    `json:"span_id,omitempty"`
+			Tips      *[]string                                                                  `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                     `json:"code"`
+			DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                     `json:"message"`
+			Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+			Retryable bool                                                                       `json:"retryable"`
+			SpanId    *string                                                                    `json:"span_id,omitempty"`
+			Tips      *[]string                                                                  `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                                     `json:"code"`
+			DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                     `json:"message"`
+			Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+			Retryable bool                                                                       `json:"retryable"`
+			SpanId    *string                                                                    `json:"span_id,omitempty"`
+			Tips      *[]string                                                                  `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                     `json:"code"`
+			DocsUrl   *string                                                                    `json:"docs_url,omitempty"`
+			Fault     *DeleteApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                     `json:"message"`
+			Meta      *map[string]interface{}                                                    `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                             `json:"reasons,omitempty"`
+			Retryable bool                                                                       `json:"retryable"`
+			SpanId    *string                                                                    `json:"span_id,omitempty"`
+			Tips      *[]string                                                                  `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse parses an HTTP response from a GetApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse call
+func ParseGetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp *http.Response) (*GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ColSpan     int     `json:"colSpan"`
+			CreatedAt   string  `json:"createdAt"`
+			DashboardId *string `json:"dashboardId"`
+			Definition  struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
+					Name       string `json:"name"`
+					Parameters *[]struct {
+						Default *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+						Name    string                                                                                                   `json:"name"`
+						Type    GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
+					} `json:"parameters,omitempty"`
+					Sql string `json:"sql"`
+				} `json:"queries"`
+				Source  *GetApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+				Version float32                                                                              `json:"version"`
+			} `json:"definition"`
+			GridColumn  int    `json:"gridColumn"`
+			GridRow     int    `json:"gridRow"`
+			Id          string `json:"id"`
+			Name        string `json:"name"`
+			PlatformUrl string `json:"platformUrl"`
+			RowSpan     int    `json:"rowSpan"`
+			UpdatedAt   string `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                  `json:"code"`
+			DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                  `json:"message"`
+			Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+			Retryable bool                                                                    `json:"retryable"`
+			SpanId    *string                                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                  `json:"code"`
+			DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                  `json:"message"`
+			Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+			Retryable bool                                                                    `json:"retryable"`
+			SpanId    *string                                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                  `json:"code"`
+			DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                  `json:"message"`
+			Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+			Retryable bool                                                                    `json:"retryable"`
+			SpanId    *string                                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                                  `json:"code"`
+			DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                  `json:"message"`
+			Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+			Retryable bool                                                                    `json:"retryable"`
+			SpanId    *string                                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                  `json:"code"`
+			DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                  `json:"message"`
+			Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+			Retryable bool                                                                    `json:"retryable"`
+			SpanId    *string                                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse parses an HTTP response from a PatchApiDashboardsByDashboardIdWidgetsByWidgetIdWithResponse call
+func ParsePatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse(rsp *http.Response) (*PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ColSpan     int     `json:"colSpan"`
+			CreatedAt   string  `json:"createdAt"`
+			DashboardId *string `json:"dashboardId"`
+			Definition  struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
+					Name       string `json:"name"`
+					Parameters *[]struct {
+						Default *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+						Name    string                                                                                                     `json:"name"`
+						Type    PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
+					} `json:"parameters,omitempty"`
+					Sql string `json:"sql"`
+				} `json:"queries"`
+				Source  *PatchApiDashboardsByDashboardIdWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+				Version float32                                                                                `json:"version"`
+			} `json:"definition"`
+			GridColumn  int    `json:"gridColumn"`
+			GridRow     int    `json:"gridRow"`
+			Id          string `json:"id"`
+			Name        string `json:"name"`
+			PlatformUrl string `json:"platformUrl"`
+			RowSpan     int    `json:"rowSpan"`
+			UpdatedAt   string `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                    `json:"code"`
+			DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                    `json:"message"`
+			Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+			Retryable bool                                                                      `json:"retryable"`
+			SpanId    *string                                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                    `json:"code"`
+			DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                    `json:"message"`
+			Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+			Retryable bool                                                                      `json:"retryable"`
+			SpanId    *string                                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                    `json:"code"`
+			DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                    `json:"message"`
+			Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+			Retryable bool                                                                      `json:"retryable"`
+			SpanId    *string                                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                                    `json:"code"`
+			DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                    `json:"message"`
+			Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+			Retryable bool                                                                      `json:"retryable"`
+			SpanId    *string                                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                    `json:"code"`
+			DocsUrl   *string                                                                   `json:"docs_url,omitempty"`
+			Fault     *PatchApiDashboardsByDashboardIdWidgetsByWidgetId500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                    `json:"message"`
+			Meta      *map[string]interface{}                                                   `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                            `json:"reasons,omitempty"`
+			Retryable bool                                                                      `json:"retryable"`
+			SpanId    *string                                                                   `json:"span_id,omitempty"`
+			Tips      *[]string                                                                 `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
@@ -183939,6 +192036,11 @@ func ParseGetApiModelDefaultsResponse(rsp *http.Response) (*GetApiModelDefaultsR
 					Scope  *string `json:"scope"`
 					Source string  `json:"source"`
 				} `json:"FAST"`
+				INSTANTEVALS *struct {
+					Model  string  `json:"model"`
+					Scope  *string `json:"scope"`
+					Source string  `json:"source"`
+				} `json:"INSTANT_EVALS"`
 			} `json:"effective"`
 			Scope struct {
 				OrganizationId   *string `json:"organizationId"`
@@ -184413,6 +192515,11 @@ func ParseGetApiMonitorsResponse(rsp *http.Response) (*GetApiMonitorsResponse, e
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest []struct {
+			// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+			AutoPausedAt *string `json:"autoPausedAt"`
+
+			// AutoPausedReason Why the monitor paused itself.
+			AutoPausedReason  *string                                        `json:"autoPausedReason"`
 			CheckType         string                                         `json:"checkType"`
 			CreatedAt         string                                         `json:"createdAt"`
 			Enabled           bool                                           `json:"enabled"`
@@ -184456,6 +192563,11 @@ func ParsePostApiMonitorsResponse(rsp *http.Response) (*PostApiMonitorsResponse,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
+			// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+			AutoPausedAt *string `json:"autoPausedAt"`
+
+			// AutoPausedReason Why the monitor paused itself.
+			AutoPausedReason  *string                                         `json:"autoPausedReason"`
 			CheckType         string                                          `json:"checkType"`
 			CreatedAt         string                                          `json:"createdAt"`
 			Enabled           bool                                            `json:"enabled"`
@@ -184538,6 +192650,11 @@ func ParseGetApiMonitorsByIdResponse(rsp *http.Response) (*GetApiMonitorsByIdRes
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+			AutoPausedAt *string `json:"autoPausedAt"`
+
+			// AutoPausedReason Why the monitor paused itself.
+			AutoPausedReason  *string                                            `json:"autoPausedReason"`
 			CheckType         string                                             `json:"checkType"`
 			CreatedAt         string                                             `json:"createdAt"`
 			Enabled           bool                                               `json:"enabled"`
@@ -184591,6 +192708,11 @@ func ParsePatchApiMonitorsByIdResponse(rsp *http.Response) (*PatchApiMonitorsByI
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// AutoPausedAt When the monitor paused itself because its evaluations mostly failed.
+			AutoPausedAt *string `json:"autoPausedAt"`
+
+			// AutoPausedReason Why the monitor paused itself.
+			AutoPausedReason  *string                                              `json:"autoPausedReason"`
 			CheckType         string                                               `json:"checkType"`
 			CreatedAt         string                                               `json:"createdAt"`
 			Enabled           bool                                                 `json:"enabled"`
@@ -185579,14 +193701,16 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp *http.Response)
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			Data []struct {
-				CreatedAt   string                                                                 `json:"createdAt"`
-				Description *string                                                                `json:"description"`
-				Id          string                                                                 `json:"id"`
-				Name        string                                                                 `json:"name"`
-				PlatformUrl string                                                                 `json:"platformUrl"`
-				Scope       GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope `json:"scope"`
-				UpdatedAt   string                                                                 `json:"updatedAt"`
-				WidgetCount int                                                                    `json:"widgetCount"`
+				CreatedAt       string                                                                 `json:"createdAt"`
+				CreatedById     *string                                                                `json:"createdById"`
+				Description     *string                                                                `json:"description"`
+				ExcludedOrigins *[]string                                                              `json:"excludedOrigins"`
+				Id              string                                                                 `json:"id"`
+				Name            string                                                                 `json:"name"`
+				PlatformUrl     string                                                                 `json:"platformUrl"`
+				Scope           GetApiV1ProjectsByProjectIdAnalyticsBoards200JSONResponseBodyDataScope `json:"scope"`
+				UpdatedAt       string                                                                 `json:"updatedAt"`
+				WidgetCount     int                                                                    `json:"widgetCount"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -185699,15 +193823,15 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp *http.Response)
 	return response, nil
 }
 
-// ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse parses an HTTP response from a GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdWithResponse call
-func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.Response) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse, error) {
+// ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse parses an HTTP response from a GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdWithResponse call
+func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse(rsp *http.Response) (*GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse{
+	response := &GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardIdResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -185715,13 +193839,15 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			CreatedAt   string                                                                      `json:"createdAt"`
-			Description *string                                                                     `json:"description"`
-			Id          string                                                                      `json:"id"`
-			Name        string                                                                      `json:"name"`
-			PlatformUrl string                                                                      `json:"platformUrl"`
-			Scope       GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope `json:"scope"`
-			UpdatedAt   string                                                                      `json:"updatedAt"`
+			CreatedAt       string                                                                          `json:"createdAt"`
+			CreatedById     *string                                                                         `json:"createdById"`
+			Description     *string                                                                         `json:"description"`
+			ExcludedOrigins *[]string                                                                       `json:"excludedOrigins"`
+			Id              string                                                                          `json:"id"`
+			Name            string                                                                          `json:"name"`
+			PlatformUrl     string                                                                          `json:"platformUrl"`
+			Scope           GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                                                          `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -185730,15 +193856,15 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest struct {
-			Code      string                                                                       `json:"code"`
-			DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault `json:"fault,omitempty"`
-			Message   string                                                                       `json:"message"`
-			Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-			Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-			Retryable bool                                                                         `json:"retryable"`
-			SpanId    *string                                                                      `json:"span_id,omitempty"`
-			Tips      *[]string                                                                    `json:"tips,omitempty"`
+			Code      string                                                                           `json:"code"`
+			DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                           `json:"message"`
+			Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                                             `json:"retryable"`
+			SpanId    *string                                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                                        `json:"tips,omitempty"`
 			Trace     *struct {
 				LogsUrl  *string `json:"logsUrl,omitempty"`
 				SpanId   *string `json:"spanId,omitempty"`
@@ -185755,15 +193881,15 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest struct {
-			Code      string                                                                       `json:"code"`
-			DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId401JSONResponseBodyFault `json:"fault,omitempty"`
-			Message   string                                                                       `json:"message"`
-			Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-			Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-			Retryable bool                                                                         `json:"retryable"`
-			SpanId    *string                                                                      `json:"span_id,omitempty"`
-			Tips      *[]string                                                                    `json:"tips,omitempty"`
+			Code      string                                                                           `json:"code"`
+			DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                           `json:"message"`
+			Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                                             `json:"retryable"`
+			SpanId    *string                                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                                        `json:"tips,omitempty"`
 			Trace     *struct {
 				LogsUrl  *string `json:"logsUrl,omitempty"`
 				SpanId   *string `json:"spanId,omitempty"`
@@ -185780,15 +193906,15 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
 		var dest struct {
-			Code      string                                                                       `json:"code"`
-			DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId403JSONResponseBodyFault `json:"fault,omitempty"`
-			Message   string                                                                       `json:"message"`
-			Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-			Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-			Retryable bool                                                                         `json:"retryable"`
-			SpanId    *string                                                                      `json:"span_id,omitempty"`
-			Tips      *[]string                                                                    `json:"tips,omitempty"`
+			Code      string                                                                           `json:"code"`
+			DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                           `json:"message"`
+			Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                                             `json:"retryable"`
+			SpanId    *string                                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                                        `json:"tips,omitempty"`
 			Trace     *struct {
 				LogsUrl  *string `json:"logsUrl,omitempty"`
 				SpanId   *string `json:"spanId,omitempty"`
@@ -185805,15 +193931,15 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest struct {
-			Code      string                                                                       `json:"code"`
-			DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId404JSONResponseBodyFault `json:"fault,omitempty"`
-			Message   string                                                                       `json:"message"`
-			Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-			Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-			Retryable bool                                                                         `json:"retryable"`
-			SpanId    *string                                                                      `json:"span_id,omitempty"`
-			Tips      *[]string                                                                    `json:"tips,omitempty"`
+			Code      string                                                                           `json:"code"`
+			DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                           `json:"message"`
+			Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                                             `json:"retryable"`
+			SpanId    *string                                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                                        `json:"tips,omitempty"`
 			Trace     *struct {
 				LogsUrl  *string `json:"logsUrl,omitempty"`
 				SpanId   *string `json:"spanId,omitempty"`
@@ -185830,15 +193956,15 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest struct {
-			Code      string                                                                       `json:"code"`
-			DocsUrl   *string                                                                      `json:"docs_url,omitempty"`
-			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId500JSONResponseBodyFault `json:"fault,omitempty"`
-			Message   string                                                                       `json:"message"`
-			Meta      *map[string]interface{}                                                      `json:"meta,omitempty"`
-			Reasons   *[]interface{}                                                               `json:"reasons,omitempty"`
-			Retryable bool                                                                         `json:"retryable"`
-			SpanId    *string                                                                      `json:"span_id,omitempty"`
-			Tips      *[]string                                                                    `json:"tips,omitempty"`
+			Code      string                                                                           `json:"code"`
+			DocsUrl   *string                                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsBoardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                           `json:"message"`
+			Meta      *map[string]interface{}                                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                                             `json:"retryable"`
+			SpanId    *string                                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                                        `json:"tips,omitempty"`
 			Trace     *struct {
 				LogsUrl  *string `json:"logsUrl,omitempty"`
 				SpanId   *string `json:"spanId,omitempty"`
@@ -187926,6 +196052,306 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse parses an HTTP response from a GetApiV1ProjectsByProjectIdAnalyticsDashboardsWithResponse call
+func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse(rsp *http.Response) (*GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiV1ProjectsByProjectIdAnalyticsDashboardsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []struct {
+				CreatedAt       string                                                                     `json:"createdAt"`
+				CreatedById     *string                                                                    `json:"createdById"`
+				Description     *string                                                                    `json:"description"`
+				ExcludedOrigins *[]string                                                                  `json:"excludedOrigins"`
+				Id              string                                                                     `json:"id"`
+				Name            string                                                                     `json:"name"`
+				PlatformUrl     string                                                                     `json:"platformUrl"`
+				Scope           GetApiV1ProjectsByProjectIdAnalyticsDashboards200JSONResponseBodyDataScope `json:"scope"`
+				UpdatedAt       string                                                                     `json:"updatedAt"`
+				WidgetCount     int                                                                        `json:"widgetCount"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                  `json:"code"`
+			DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboards400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                  `json:"message"`
+			Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+			Retryable bool                                                                    `json:"retryable"`
+			SpanId    *string                                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                  `json:"code"`
+			DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboards401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                  `json:"message"`
+			Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+			Retryable bool                                                                    `json:"retryable"`
+			SpanId    *string                                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                  `json:"code"`
+			DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboards403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                  `json:"message"`
+			Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+			Retryable bool                                                                    `json:"retryable"`
+			SpanId    *string                                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                  `json:"code"`
+			DocsUrl   *string                                                                 `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboards500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                  `json:"message"`
+			Meta      *map[string]interface{}                                                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                          `json:"reasons,omitempty"`
+			Retryable bool                                                                    `json:"retryable"`
+			SpanId    *string                                                                 `json:"span_id,omitempty"`
+			Tips      *[]string                                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse parses an HTTP response from a GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdWithResponse call
+func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse(rsp *http.Response) (*GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			CreatedAt       string                                                                              `json:"createdAt"`
+			CreatedById     *string                                                                             `json:"createdById"`
+			Description     *string                                                                             `json:"description"`
+			ExcludedOrigins *[]string                                                                           `json:"excludedOrigins"`
+			Id              string                                                                              `json:"id"`
+			Name            string                                                                              `json:"name"`
+			PlatformUrl     string                                                                              `json:"platformUrl"`
+			Scope           GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId200JSONResponseBodyScope `json:"scope"`
+			UpdatedAt       string                                                                              `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                               `json:"code"`
+			DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                               `json:"message"`
+			Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+			Retryable bool                                                                                 `json:"retryable"`
+			SpanId    *string                                                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                               `json:"code"`
+			DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                               `json:"message"`
+			Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+			Retryable bool                                                                                 `json:"retryable"`
+			SpanId    *string                                                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                               `json:"code"`
+			DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                               `json:"message"`
+			Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+			Retryable bool                                                                                 `json:"retryable"`
+			SpanId    *string                                                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                                                               `json:"code"`
+			DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                               `json:"message"`
+			Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+			Retryable bool                                                                                 `json:"retryable"`
+			SpanId    *string                                                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                                                            `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                               `json:"code"`
+			DocsUrl   *string                                                                              `json:"docs_url,omitempty"`
+			Fault     *GetApiV1ProjectsByProjectIdAnalyticsDashboardsByDashboardId500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                               `json:"message"`
+			Meta      *map[string]interface{}                                                              `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                                       `json:"reasons,omitempty"`
+			Retryable bool                                                                                 `json:"retryable"`
+			SpanId    *string                                                                              `json:"span_id,omitempty"`
+			Tips      *[]string                                                                            `json:"tips,omitempty"`
 			Trace     *struct {
 				LogsUrl  *string `json:"logsUrl,omitempty"`
 				SpanId   *string `json:"spanId,omitempty"`

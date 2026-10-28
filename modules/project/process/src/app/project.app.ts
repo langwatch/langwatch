@@ -24,6 +24,7 @@ import {
   type ArchivedProject,
   type Project,
   type ProjectIdentity,
+  type ProjectLegacyKeyStatus,
   type ProjectWithTeam,
   type PaginatedProjects,
   type TraceDestinationDecision,
@@ -198,6 +199,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       factsBackfill: ProjectFactsBackfillService.create({
         projects: repositories.projects,
         lifecycle,
+        logger: createLogger("langwatch:project:facts-backfill"),
       }),
       authorization: dependencies.authorization,
       dataPrivacy: dependencies.dataPrivacy,
@@ -285,7 +287,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#requests.archiveOtherProject(input);
   }
 
-  getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }> {
+  getLegacyKeyStatus(input: { projectId: string }): Promise<ProjectLegacyKeyStatus> {
     return this.#operations.getLegacyKeyStatus(input);
   }
 
@@ -593,6 +595,10 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
 
   findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null> {
     return this.#projectService.findIdByLegacyApiKey(input);
+  }
+
+  markLegacyApiKeyUsed(input: Readonly<{ projectId: string }>): Promise<void> {
+    return this.#projectService.markLegacyApiKeyUsed(input);
   }
 
   /** Both kill switches a trace share is minted under, read off this module's rows. */

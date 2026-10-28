@@ -135,7 +135,7 @@ async def support_agent(
     messages: list[dict],
     thread_id: str,
     *,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-6-luna",
 ) -> str:
     result = await SupportAgent(model=model).run(messages, conversation_id=thread_id)
     return result.output_text
@@ -154,7 +154,7 @@ connectAgent(
   {
     name: "support-agent",
     parameters: z.object({
-      model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+      model: z.enum(["gpt-6-sol", "gpt-6-luna"]).default("gpt-6-luna"),
     }),
   },
   async ({ messages, threadId, params }) => {
@@ -190,7 +190,7 @@ from typing import Literal
 async def support_agent(
     messages: list[dict],
     *,
-    model: Literal["gpt-5", "gpt-5-mini"] = "gpt-5-mini",
+    model: Literal["gpt-6-sol", "gpt-6-luna"] = "gpt-6-luna",
     plan: str = "free",
     max_tools: int = 5,
 ) -> str:
@@ -206,7 +206,7 @@ TypeScript declares them with a zod schema in `parameters`, the way Step 3 shows
 
 Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
 
-valibot and arktype work the same way, and so does any other Standard Schema object that has a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`), or a plain JSON Schema object.
+valibot and arktype work the same way, and so does any other Standard Schema object that has a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-6-sol", "gpt-6-luna"], default: "gpt-6-luna" } }`), or a plain JSON Schema object.
 
 Declare a parameter for a value the tests must vary: a model, a plan, a tenant, a fixture id. `Literal` and `Enum` in Python, and `z.enum` in TypeScript, become a closed list that the run dialog offers as choices and the platform refuses a value outside of.
 
@@ -286,7 +286,7 @@ langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
-- Repeat `--target` to compare two environments, or the same agent with two parameter values: `--target 'connected:support-agent@production?model=gpt-5'`.
+- Repeat `--target` to compare two environments, or the same agent with two parameter values: `--target 'connected:support-agent@production?model=gpt-6-sol'`.
 - `--wait` blocks until the run finishes and exits non-zero when it fails. Use it here: the report in Step 6 needs the result.
 - Keep the agent process running for the whole run. A run against an agent with no connected instance is refused with `agent_offline`.
 
@@ -294,8 +294,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent?model=gpt-5' \
-  --target 'connected:support-agent?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-6-sol' \
+  --target 'connected:support-agent?model=gpt-6-luna' \
   --name 'Smoke: model comparison' --format json
 ```
 
@@ -514,7 +514,7 @@ Write a small function beside the code that starts your service. This is the ada
         messages: list[dict],
         thread_id: str,
         *,
-        model: str = "gpt-5-mini",
+        model: str = "gpt-6-luna",
     ) -> str:
         result = await SupportAgent(model=model).run(messages, conversation_id=thread_id)
         return result.output_text
@@ -536,7 +536,7 @@ Write a small function beside the code that starts your service. This is the ada
       {
         name: "support-agent",
         parameters: z.object({
-          model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+          model: z.enum(["gpt-6-sol", "gpt-6-luna"]).default("gpt-6-luna"),
         }),
       },
       async ({ messages, threadId, params }) => {
@@ -600,6 +600,7 @@ The platform sends the same fields on every call. They describe the turn, and th
 | `new_messages` | `newMessages` | The messages added since the previous turn |
 | `thread_id` | `threadId` | The platform's conversation id, the same on every turn of one run |
 | `session` | `session` | What the function returned as `session` on the previous turn, empty on the first |
+| `state` | `state` | The scenario's state: what the [setup hook](/agent-testing/setup-and-teardown-hooks) returned, as the latest turn updated it, empty without one |
 | `trace_id` | `traceId` | The id of the turn's trace |
 
 In Python the SDK reads the signature once, at decoration, and passes exactly the names the function declares. A function that declares `messages` and `thread_id` receives those two. A function that declares `**kwargs` receives all of them. A first parameter annotated `langwatch.AgentCall` receives one object with every field and the parameter values:
@@ -610,7 +611,7 @@ async def support_agent(call: langwatch.AgentCall) -> str:
     return await run_my_agent(call.messages, tenant=call.parameters["tenant"])
 ```
 
-In TypeScript the handler receives one object, `{ messages, newMessages, threadId, session, params, traceId }`.
+In TypeScript the handler receives one object, `{ messages, newMessages, threadId, session, state, params, traceId }`.
 
 The function returns a string, one message, a list of messages, or a reply with a session value: `langwatch.AgentReply(output, session=...)` in Python, `{ output, session }` in TypeScript.
 
@@ -636,7 +637,7 @@ A run parameter is a value a run supplies, so one scenario covers several condit
     async def support_agent(
         messages: list[dict],
         *,
-        model: Literal["gpt-5", "gpt-5-mini"] = "gpt-5-mini",
+        model: Literal["gpt-6-sol", "gpt-6-luna"] = "gpt-6-luna",
         plan: str = "free",
         max_tools: int = 5,
         tenant: Annotated[str, langwatch.Param(description="Which tenant to answer for")] = "acme",
@@ -665,13 +666,13 @@ A run parameter is a value a run supplies, so one scenario covers several condit
       {
         name: "support-agent",
         parameters: z.object({
-          model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+          model: z.enum(["gpt-6-sol", "gpt-6-luna"]).default("gpt-6-luna"),
           plan: z.string().default("free").describe("Customer plan"),
           maxTools: z.number().int().default(5),
         }),
       },
       async ({ messages, params }) => {
-        // params is typed: { model: "gpt-5" | "gpt-5-mini"; plan: string; maxTools: number }
+        // params is typed: { model: "gpt-6-sol" | "gpt-6-luna"; plan: string; maxTools: number }
         return await runMyAgent(messages, { model: params.model });
       },
     );
@@ -692,7 +693,7 @@ A run parameter is a value a run supplies, so one scenario covers several condit
 
     ```typescript
     parameters: {
-      model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" },
+      model: { options: ["gpt-6-sol", "gpt-6-luna"], default: "gpt-6-luna" },
       plan: { default: "free", description: "Customer plan" },
       maxTools: { type: "number", default: 5 },
     }
@@ -774,6 +775,10 @@ To keep the state in your own process instead, use an in-memory map. Key it by `
 With `sticky`, a conversation whose instance goes away fails with `agent_instance_lost` instead of restarting somewhere else. A session value is limited to 64 kilobytes.
 
 An agent that reads the whole `messages` list on every turn needs neither of these.
+
+## Test data for each run
+
+If a scenario needs data that exists before the conversation starts, such as a customer with an order to refund, declare a setup hook that creates it and a teardown hook that deletes it. Both run in this same process, and the agent receives what setup returned as `state` on every turn. See [Setup and teardown hooks](/agent-testing/setup-and-teardown-hooks).
 
 ## Environments and personal agents
 
@@ -947,6 +952,9 @@ The run settings also record which instance served each run, so a result from a 
   </Card>
   <Card title="Run parameters" icon="sliders" href="/agent-testing/run-parameters">
     Declare values a run supplies, and offer them in the run dialog
+  </Card>
+  <Card title="Setup and teardown hooks" icon="database" href="/agent-testing/setup-and-teardown-hooks">
+    Create test data before the first turn and delete it after the last
   </Card>
   <Card title="Other ways to connect" icon="plug" href="/agent-testing/other-ways-to-connect">
     HTTP agents, the local tunnel, and code agents

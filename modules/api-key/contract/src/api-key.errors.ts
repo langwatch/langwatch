@@ -125,6 +125,28 @@ export class ApiKeyPermissionDeniedError extends HandledError {
   }
 }
 
+/** A legacy project key (`Project.apiKey`) asked beyond ingestion and its project's scopes. */
+export class LegacyProjectKeyIngestionOnlyError extends HandledError {
+  declare readonly code: "legacy_project_key_ingestion_only";
+
+  constructor(options: { permission?: string; meta?: Record<string, unknown> } = {}) {
+    super(
+      "legacy_project_key_ingestion_only",
+      "This legacy project key is limited to ingestion and the scopes enabled for its project. Create an API key with the permissions this call needs and send it instead.",
+      {
+        meta: {
+          ...(options.permission ? { permission: options.permission } : {}),
+          ...options.meta,
+        },
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("legacy_project_key_ingestion_only"),
+      },
+    );
+    this.name = "LegacyProjectKeyIngestionOnlyError";
+  }
+}
+
 export class ApiKeyPermissionNotDelegableError extends HandledError {
   declare readonly code: "api_key_permission_not_delegable";
 

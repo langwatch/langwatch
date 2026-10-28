@@ -6,7 +6,7 @@ The server half of [monitor](../README.md). Monitors: the checks that run an eva
 
 ## Installation
 
-`defineProcessModule("monitor").withRepositories(monitorRepositories).withApi(MonitorModule).withTransports(…, monitorTrpcTransport).provideMiddlewareContext(…).withEventing(monitorEvaluatorCleanupEventing)`, `src/monitor.module.ts:15`.
+`defineProcessModule("monitor").withRepositories(monitorRepositories).withApi(MonitorModule).withTransports(…, monitorTrpcTransport).provideMiddlewareContext(…).withEventing(monitorEvaluatorCleanupEventing).withEventing(monitorAutoPauseEventing)`, `src/monitor.module.ts:16`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -168,7 +168,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<Mo
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/monitor.rest.ts:73`       |
+| Declared at | `src/transport/monitor.rest.ts:92`       |
 | Base URL    | `/api/monitors`, twin `/api/v1/monitors` |
 | Addressing  | dated                                    |
 | Credential  | project                                  |
@@ -178,19 +178,19 @@ countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<Mo
 
 List all online evaluation monitors for the project
 
-Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:77`.
+Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:96`.
 
 Answers at `/api/monitors`, `/api/v1/monitors`; also, undocumented, `/api/monitors/2026-08-07`, `/api/v1/monitors/2026-08-07`, `/api/monitors/latest`, `/api/v1/monitors/latest`.
 
 ```typescript
-// Response: z.array(monitorRestResponseSchema) (inline, src/transport/monitor.rest.ts:79)
+// Response: z.array(monitorRestResponseSchema) (inline, src/transport/monitor.rest.ts:98)
 ```
 
 #### `GET /:id` · `getApiMonitorsById`
 
 Get a monitor by its ID
 
-Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:91`.
+Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:110`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
@@ -199,51 +199,51 @@ Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/ap
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:73
+type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:78
 ```
 
 #### `POST /` · `postApiMonitors`
 
 Create a new online evaluation monitor
 
-Permission `evaluations:create`. Declared at `src/transport/monitor.rest.ts:113`.
+Permission `evaluations:create`. Declared at `src/transport/monitor.rest.ts:132`.
 
 Answers at `/api/monitors`, `/api/v1/monitors`; also, undocumented, `/api/monitors/2026-08-07`, `/api/v1/monitors/2026-08-07`, `/api/monitors/latest`, `/api/v1/monitors/latest`.
 
 ```typescript
-type Body = z.infer<typeof monitorRestCreateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:92
-type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:73
+type Body = z.infer<typeof monitorRestCreateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:97
+type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:78
 ```
 
 #### `PATCH /:id` · `patchApiMonitorsById`
 
 Update a monitor (name, enabled state, settings, etc.)
 
-Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:146`.
+Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:166`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
 ```typescript
 type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:14
-type Body = z.infer<typeof monitorRestUpdateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:111
-type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:73
+type Body = z.infer<typeof monitorRestUpdateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:116
+type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:78
 ```
 
 #### `POST /:id/toggle` · `postApiMonitorsByIdToggle`
 
 Enable or disable a monitor
 
-Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:169`.
+Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:191`.
 
 Answers at `/api/monitors/:id/toggle`, `/api/v1/monitors/:id/toggle`; also, undocumented, `/api/monitors/2026-08-07/:id/toggle`, `/api/v1/monitors/2026-08-07/:id/toggle`, `/api/monitors/latest/:id/toggle`, `/api/v1/monitors/latest/:id/toggle`.
 
 ```typescript
 type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:14
-// Body: monitorRestToggleInputSchema, ../contract/src/monitor-rest.schemas.ts:118
+// Body: monitorRestToggleInputSchema, ../contract/src/monitor-rest.schemas.ts:123
 interface Body {
   enabled: boolean;
 }
-// Response: monitorRestToggledSchema, ../contract/src/monitor-rest.schemas.ts:124
+// Response: monitorRestToggledSchema, ../contract/src/monitor-rest.schemas.ts:129
 interface Response {
   id: string;
   enabled: boolean;
@@ -254,13 +254,13 @@ interface Response {
 
 Delete a monitor
 
-Permission `evaluations:manage`. Declared at `src/transport/monitor.rest.ts:187`.
+Permission `evaluations:manage`. Declared at `src/transport/monitor.rest.ts:210`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
 ```typescript
 type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:14
-// Response: monitorRestDeletedSchema, ../contract/src/monitor-rest.schemas.ts:130
+// Response: monitorRestDeletedSchema, ../contract/src/monitor-rest.schemas.ts:135
 interface Response {
   id: string;
   deleted: boolean;
@@ -298,7 +298,7 @@ interface Input {
   id: string;
   projectId: string;
 }
-type Output = z.infer<typeof monitorWithEvaluatorSchema>; // ../contract/src/monitor.ts:98
+type Output = z.infer<typeof monitorWithEvaluatorSchema>; // ../contract/src/monitor.ts:102
 
 // monitors.isNameAvailable
 // Input: monitorApiNameAvailabilityInputSchema, ../contract/src/monitor-trpc.schemas.ts:67
@@ -314,11 +314,11 @@ interface Output {
 
 // monitors.create
 type Input = z.infer<typeof monitorApiCreateInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:98
-type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:88
+type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:92
 
 // monitors.update
 type Input = z.infer<typeof monitorApiUpdateInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:120
-type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:88
+type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:92
 
 // monitors.toggle
 // Input: monitorApiToggleInputSchema, ../contract/src/monitor-trpc.schemas.ts:43
@@ -343,7 +343,7 @@ interface Input {
   projectId: string;
   sourceProjectId: string;
 }
-type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:88
+type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:92
 ```
 
 ## Sockets
@@ -351,6 +351,14 @@ type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:88
 None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
+
+### Pipeline `monitor_auto_pause` (aggregate `global`)
+
+Declared at `src/eventing/monitor-auto-pause.pipeline.ts:31`.
+
+| Kind            | Name                       | Handles                                                                                   | Declared at                                      |
+| --------------- | -------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| peer subscriber | `monitorErrorRateExceeded` | `lw.evaluation.monitor_error_rate_exceeded` from [evaluation](../../evaluation/README.md) | `src/eventing/monitor-auto-pause.pipeline.ts:38` |
 
 ### Pipeline `monitor_evaluator_cleanup` (aggregate `global`)
 

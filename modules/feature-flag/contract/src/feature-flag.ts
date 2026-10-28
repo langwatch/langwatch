@@ -154,6 +154,13 @@ export const FEATURE_FLAGS = [
       "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. On the hosted service this releases an enterprise organization only: a self-serve one is released by switching them on itself from the search bar, whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals alone, and this never releases it; only a development checkout that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
   },
   {
+    key: "release_instant_evals_own_decision_model",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). Off by default; enable per organization via a targeting rule. Off, the column offers LangWatch Instant Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
+  },
+  {
     key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,
@@ -325,6 +332,94 @@ export const FEATURE_FLAGS = [
     defaultValue: true,
     description:
       "Lets an organization set enterprise single sign-on up itself on the hosted service: register the identity provider, claim a domain, and prove it with a record it publishes once a LangWatch operator has approved the claim (spec: specs/identity/sso-onboarding-tiers.feature). Default on, so every organization may set it up itself; a rule at /ops/feature-flags turns it off for one. Off = the settings entry is not offered and every self-serve command is refused by name, pointing the reader at talking to us. Self-hosted installations do not consult it. Their license is the authorization there.",
+  },
+  {
+    key: "legacy_project_key_full_access",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key, the one stored on the project itself rather than an API key, do everything in its project, with no outside-scope or census log line. Off by default: a legacy key can send traces, logs, metrics and tracked events, plus the routes the legacy_project_key_* scope flags open for its project. Anything else is allowed and logged, or, for a project on legacy_project_key_scope_enforced, refused with legacy_project_key_ingestion_only. List the projects in one rule, { projectId: [ids] }; remove an id from the list to end it for that project. A self-hosted install can set LEGACY_PROJECT_KEY_FULL_ACCESS=1 to keep full access for every legacy key (spec: modules/auth/specs/legacy-project-key-scope.feature).",
+  },
+  {
+    key: "legacy_project_key_scope_enforced",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Legacy project keys",
+    description:
+      "Refuses a project's legacy key outside its scopes. Off by default: a legacy key on any route beyond ingestion that no scope flag opens for its project, a route that asks no permission, the key door, the hosted MCP and the project-keyed health probes are all allowed as before, and each such request is logged as 'legacy project key outside its scopes' with enforced: false. On for a project, the same requests are refused with legacy_project_key_ingestion_only and logged with enforced: true. Seed the legacy_project_key_* scope flags from the census first, then list projects here in one rule, { projectId: [ids] }, in small batches. legacy_project_key_full_access wins over it. A self-hosted install can set LEGACY_PROJECT_KEY_SCOPE_ENFORCED=1 to refuse for every project (spec: modules/auth/specs/legacy-project-key-scope.feature).",
+  },
+  {
+    key: "legacy_project_key_prompts_read",
+    scope: "PRODUCT",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key read prompts, as the SDK prompts.get does: the prompt list, a prompt, its versions and the tag list. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it as the legacyKey of their withPermission. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+  },
+  {
+    key: "legacy_project_key_prompts_write",
+    scope: "PRODUCT",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key create, update, restore, sync and tag prompts. Deleting a prompt or a tag still needs full access. It does not grant reads; pair it with legacy_project_key_prompts_read. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it as the legacyKey of their withPermission. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+  },
+  {
+    key: "legacy_project_key_traces_read",
+    scope: "PRODUCT",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key read and search traces and threads over REST. Sharing, metadata updates and coding-agent reads still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it as the legacyKey of their withPermission. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+  },
+  {
+    key: "legacy_project_key_annotations_read",
+    scope: "PRODUCT",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key list and read annotations, a project's or a trace's, over REST. Creating, updating and deleting an annotation still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it as the legacyKey of their withPermission. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+  },
+  {
+    key: "legacy_project_key_scenarios",
+    scope: "PRODUCT",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key report scenario events, offer a scenario browser tab and read simulation runs. Scenario, suite and run plan routes still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it as the legacyKey of their withPermission. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+  },
+  {
+    key: "legacy_project_key_evaluations",
+    scope: "PRODUCT",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key run evaluators and guardrails over REST and read evaluators. Evaluator and monitor writes still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it as the legacyKey of their withPermission. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+  },
+  {
+    key: "legacy_project_key_experiments",
+    scope: "PRODUCT",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key run CI/CD experiments and read their runs, manage experiments and their workbench state, log SDK experiment, DSPy and batch evaluation results, evaluate a dataset or a workflow, run evaluators, and read datasets. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it as the legacyKey of their withPermission. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
+  },
+  {
+    key: "legacy_project_key_connected_agents",
+    scope: "PRODUCT",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Legacy project keys",
+    description:
+      "Lets a project's legacy key connect agents (register, poll, post frames and open the connect socket) and read the project's model providers. Agent, scenario and suite routes still need full access. Off by default. List the projects in one rule, { projectId: [ids] }; remove an id to end it for that project. The routes it opens name it as the legacyKey of their withPermission. Internal flag store only; a self-hosted install uses LEGACY_PROJECT_KEY_FULL_ACCESS instead.",
   },
   // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
   // delivery channel is offered to every project, so there is no picker card,

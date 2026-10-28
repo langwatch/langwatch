@@ -9,11 +9,12 @@ import {
   bindMiddlewareContext,
   canonicalErrorResponse,
   createRestRuntime,
+  recordProjectCredential,
   type RestMountOptions,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
-import type { Actor } from "@langwatch/authorization";
+import type { Actor, RestResolvedProjectCredential } from "@langwatch/authorization";
 import {
   MY_DASHBOARD_NAME,
   type DashboardApi,
@@ -105,13 +106,38 @@ const PROJECT_KEY: Actor = { type: "api_key", id: "key-1" };
 const NOBODY = null;
 const keyOf = (userId: string): Actor => ({ type: "user", id: userId });
 
+/** What the project door resolves a key that names nobody to: an API key with no owner. */
+const ownerlessKeyOf = (projectId: string): RestResolvedProjectCredential => ({
+  type: "apiKey",
+  apiKeyId: "key-nobody",
+  userId: null,
+  organizationId: "organization-1",
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  project: {
+    id: projectId,
+    slug: projectId,
+    name: projectId,
+    teamId: "team-1",
+    organizationId: "organization-1",
+    isPersonal: false,
+    ownerUserId: null,
+    kind: "application",
+  },
+});
+
 /** The credential doors: boards, graphs, widgets and saved charts with one project's API key. */
 function credentialDoors(app: DashboardApi, projectId: string, actor: Actor | null = PROJECT_KEY) {
   const caller = { actor, scope: { tier: "project" as const, id: projectId } };
+  // The door states what it resolved, so a key that names nobody reads on its own project's proof.
+  const admit = ({ request }: { request: Request }) => {
+    if (actor === NOBODY) recordProjectCredential(request, ownerlessKeyOf(projectId));
+    return caller;
+  };
   const runtime = createRestRuntime({
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
-    identity: { authenticate: () => caller, identify: () => caller },
+    identity: { authenticate: admit, identify: admit },
   });
   const mount = (
     family: { router: () => RestTransportDeclaration<DashboardApi> },
@@ -125,7 +151,7 @@ function credentialDoors(app: DashboardApi, projectId: string, actor: Actor | nu
   const families = [
     { under: "/analytics/dashboard-widgets", hono: mount(dashboardWidgetRest, WIDGET_CONTEXT) },
     { under: "/analytics/charts", hono: mount(savedWorkbenchChartRest, CHART_CONTEXT) },
-    { under: "/api/dashboards", hono: mount(dashboardRest) },
+    { under: "/api/v1/analytics/reports", hono: mount(dashboardRest) },
     { under: "/api/graphs", hono: mount(graphRest) },
   ];
 
@@ -325,7 +351,7 @@ describe("board scope at the doors", () => {
         scopeProjects: "dashboard_not_found",
         star: "dashboard_not_found",
         widgets: "dashboard_not_found",
-        addWidget: "dashboard_widget_not_found",
+        addWidget: "dashboard_not_found",
         editWidget: "dashboard_widget_not_found",
         deleteWidget: "dashboard_widget_not_found",
       });
@@ -451,7 +477,7 @@ describe("board scope at the doors", () => {
       { key: "a key that names nobody", actor: NOBODY },
     ])("makes a Reports board with no author, at Project, for $key", async ({ actor }) => {
       const { app, call } = appWith();
-      const created = await credentialDoors(app, HOME, actor)("POST", "/api/dashboards", {
+      const created = await credentialDoors(app, HOME, actor)("POST", "/api/v1/analytics/reports", {
         name: MY_DASHBOARD_NAME,
       });
       const board = (await call(AUTHOR, "dashboards.getById", {
@@ -477,7 +503,7 @@ describe("board scope at the doors", () => {
       const { app, call, boardId } = await boardAt("PROJECT");
       const send = credentialDoors(app, HOME, actor);
 
-      const renamed = await send("PATCH", `/api/dashboards/${boardId}`, {
+      const renamed = await send("PATCH", `/api/v1/analytics/reports/${boardId}`, {
         name: "Renamed",
         scope: "PRIVATE",
       });
@@ -662,7 +688,10 @@ describe("the Dashboards and Analytics Reports boards at the doors", () => {
       projectId: HOME,
       dashboardId: mixed.id,
     });
-    const overRest = await credentialDoors(app, HOME)("DELETE", `/api/dashboards/${reports.id}`);
+    const overRest = await credentialDoors(app, HOME)(
+      "DELETE",
+      `/api/v1/analytics/reports/${reports.id}`,
+    );
 
     expect({
       removed: (removed as { id: string }).id,
@@ -727,10 +756,12 @@ describe("the Dashboards and Analytics Reports boards at the doors", () => {
       addGraph: await codeOf(
         call(AUTHOR, "graphs.create", { projectId: HOME, ...GRAPH, dashboardId }),
       ),
-      restRename: (await send("PATCH", `/api/dashboards/${dashboardId}`, { name: "X" })).status,
-      restDelete: (await send("DELETE", `/api/dashboards/${dashboardId}`)).status,
-      restReorder: (await send("PUT", "/api/dashboards/reorder", { dashboardIds: [dashboardId] }))
+      restRename: (await send("PATCH", `/api/v1/analytics/reports/${dashboardId}`, { name: "X" }))
         .status,
+      restDelete: (await send("DELETE", `/api/v1/analytics/reports/${dashboardId}`)).status,
+      restReorder: (
+        await send("PUT", "/api/v1/analytics/reports/reorder", { dashboardIds: [dashboardId] })
+      ).status,
     });
 
     expect(await asked(board.id)).toEqual(await asked("no-such-board"));

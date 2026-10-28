@@ -1638,6 +1638,22 @@ containers:
 {{- printf "%s|%s|%s" .Chart.Version (.Chart.AppVersion | default "") (toJson .Values) | sha256sum -}}
 {{- end -}}
 
+{{- /* Node sizes its heap at about half the memory it sees, so a 4Gi process
+       died of heap exhaustion with 2 GiB of its container free. Three quarters
+       leaves a quarter outside the heap. Only with a limit (without one the
+       percentage is of the node), and never beside an operator's NODE_OPTIONS.
+       specs/setup/helm-heap-ceiling.feature */}}
+{{- define "langwatch.heapCeilingEnv" -}}
+{{- $operatorNodeOptions := false }}
+{{- range .extraEnvs }}
+{{- if eq (toString .name) "NODE_OPTIONS" }}{{- $operatorNodeOptions = true }}{{- end }}
+{{- end }}
+{{- if and (dig "limits" "memory" "" (.resources | default dict)) (not $operatorNodeOptions) }}
+- name: NODE_OPTIONS
+  value: "--max-old-space-size-percentage=75"
+{{- end }}
+{{- end }}
+
 {{/* The worker container: the workers Deployment, or a sidecar in each app pod when workers.enabled is false. */}}
 {{- define "langwatch.workersContainer" -}}
 - name: {{ .Release.Name }}-workers
@@ -1657,6 +1673,7 @@ containers:
       value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
     - name: LANGWATCH_ENDPOINT
       value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+    {{- include "langwatch.heapCeilingEnv" (dict "resources" .Values.workers.resources "extraEnvs" (concat (default (list) .Values.app.extraEnvs) (default (list) .Values.workers.extraEnvs))) | nindent 4 }}
     {{- /* Everything the app is given beyond its port and its own address:
            the worker parses the same config over the same modules (Alex,
            2026-09-30), including the Langy pair its turns are dispatched
@@ -2017,6 +2034,10 @@ here, once, by name, so both consuming templates agree.
 - name: TRUSTED_PROXY_ADDRESSES
   value: {{ . | quote }}
 {{- end }}
+{{- if .Values.app.trustCloudflareClientIp }}
+- name: TRUST_CLOUDFLARE_CLIENT_IP
+  value: "true"
+{{- end }}
 
 # Content-hashed asset base (ADR-086). Empty by default → assets are
 # served same-origin from the pod. Set to a commit-prefixed CDN base
@@ -2334,4 +2355,31 @@ envFrom:
 {{- with .extraEnvFrom }}
 {{ toYaml . | indent 2 }}
 {{- end }}
+{{- end }}
+
+{{/* Redis --maxmemory in bytes: redis.master.maxmemory when set, else half of
+     redis.master.resources.limits.memory, so a snapshot's copied pages still
+     fit under the container limit. Renders nothing with no limit and no
+     override; a numeric 0 still counts as set. Accepts bytes, k/M/G/T, Ki/Mi/Gi/Ti.
+     A values file hands numbers over as floats, printed as whole bytes. */}}
+{{- define "langwatch.redisMaxmemory" -}}
+{{- $override := "" -}}
+{{- if hasKey .Values.redis.master "maxmemory" -}}{{- $override = .Values.redis.master.maxmemory -}}{{- end -}}
+{{- if kindIs "invalid" $override -}}{{- $override = "" -}}{{- end -}}
+{{- if kindIs "float64" $override -}}{{- $override = printf "%.0f" $override -}}{{- end -}}
+{{- $override = toString $override -}}
+{{- $limit := dig "limits" "memory" "" (.Values.redis.master.resources | default dict) -}}
+{{- if kindIs "float64" $limit -}}{{- $limit = printf "%.0f" $limit -}}{{- end -}}
+{{- $limit = toString $limit -}}
+{{- $source := ternary $override $limit (ne $override "") -}}
+{{- if ne $source "" -}}
+{{- if not (regexMatch "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi|Ti|k|M|G|T)?$" $source) -}}
+{{- fail (printf "redis.master memory %q is not a size: use bytes or a k, M, G, T, Ki, Mi, Gi or Ti suffix" $source) -}}
+{{- end -}}
+{{- $unit := regexFind "[A-Za-z]+$" $source -}}
+{{- $multipliers := dict "" 1.0 "k" 1000.0 "M" 1000000.0 "G" 1000000000.0 "T" 1000000000000.0 "Ki" 1024.0 "Mi" 1048576.0 "Gi" 1073741824.0 "Ti" 1099511627776.0 -}}
+{{- $bytes := mulf (float64 (trimSuffix $unit $source)) (get $multipliers $unit) -}}
+{{- if eq $override "" -}}{{- $bytes = divf $bytes 2.0 -}}{{- end -}}
+{{- printf "%d" (int64 (floor $bytes)) -}}
+{{- end -}}
 {{- end }}

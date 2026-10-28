@@ -1,4 +1,4 @@
-import type { DashboardWidget } from "@langwatch/analytics-contract";
+import { type DashboardWidget, DashboardWidgetNotFoundError } from "@langwatch/analytics-contract";
 import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 /**
  * Dashboard widgets under `/api/v1/projects/:projectId/analytics/dashboard-widgets`,
@@ -13,6 +13,7 @@ import {
   MANAGEMENT_API_VERSION,
   resolver,
   type RouteResponse,
+  nameUnlessMissing,
 } from "@langwatch/api/rest";
 import {
   assignDashboardWidgetToDashboardSchema,
@@ -26,7 +27,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
-import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+import { viewerOfActor, viewerOfOwner } from "../rules/dashboard-viewer.rules.ts";
 
 /**
  * The deep link back into the dashboards page for the project this credential
@@ -55,8 +56,20 @@ const widgetNotFoundResponse: Record<404, RouteResponse> = {
   },
 };
 
-/** The widget as the API publishes it. */
-function widgetResource(
+/** The not-found answer of adding a widget to a board, which either id can cause. */
+const widgetOrBoardNotFoundResponse: Record<404, RouteResponse> = {
+  404: {
+    description:
+      "No dashboard widget with this id, or no dashboard with this id, in this project. A dashboard made by POST /api/v1/analytics/reports is an Analytics Report and is not found here.",
+    content: { "application/json": { schema: resolver(apiErrorSchema) } },
+  },
+};
+
+/**
+ * The widget as the API publishes it. `platformUrl` is the Dashboards list; a widget on a board
+ * links to that board's page.
+ */
+export function widgetResource(
   widget: DashboardWidget,
   platformUrl: string,
 ): z.infer<typeof dashboardWidgetResourceSchema> {
@@ -66,7 +79,9 @@ function widgetResource(
     definition: { ...widget.definition, queries: [...widget.definition.queries] },
     createdAt: widget.createdAt.toString(),
     updatedAt: widget.updatedAt.toString(),
-    platformUrl,
+    platformUrl: widget.dashboardId
+      ? `${platformUrl}/${encodeURIComponent(widget.dashboardId)}`
+      : platformUrl,
     dashboardId: widget.dashboardId,
     gridColumn: widget.gridColumn,
     gridRow: widget.gridRow,
@@ -117,6 +132,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets",
     "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets",
   )
+  .keepsRecords()
   .withAudit("dashboardWidgets.create")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetProjectParamsSchema)
@@ -185,6 +201,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId",
     "patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
   )
+  .keepsRecords()
   .withAudit("dashboardWidgets.update")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
@@ -224,6 +241,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId/dashboard",
     "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard",
   )
+  .keepsRecords()
   .withAudit("dashboardWidgets.assignDashboard")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
@@ -238,7 +256,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
-      ...widgetNotFoundResponse,
+      ...widgetOrBoardNotFoundResponse,
       200: { description: "The widget was added to the dashboard" },
     },
   })
@@ -262,6 +280,17 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
   .withPermission("analytics:delete")
+  .withConfirmation({
+    resource: "dashboard widget",
+    action: "delete",
+    idParam: "widgetId",
+    name: ({ app, projectId, id, ownerUserId }) =>
+      nameUnlessMissing({
+        read: app.getDashboardWidget({ projectId, id, ...viewerOfOwner({ ownerUserId }) }),
+        missing: DashboardWidgetNotFoundError,
+        nameOf: (widget) => widget.name,
+      }),
+  })
   .withOutput(z.void())
   .withDocs({
     summary: "Delete a dashboard widget",

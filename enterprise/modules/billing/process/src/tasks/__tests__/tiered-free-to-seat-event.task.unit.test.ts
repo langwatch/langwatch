@@ -1,6 +1,7 @@
 /**
  * @see enterprise/modules/billing/specs/billing.feature
  */
+import type { OrganizationIdPageInput } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -19,7 +20,7 @@ function peersWith(orgs: Org[]) {
   const byId = new Map(sorted.map((org) => [org.id, org]));
   const peers: TieredFreeToSeatEventMigrationPeers = {
     organizations: {
-      listIds: async ({ after, limit = sorted.length } = {}) => {
+      listIds: async ({ after, limit = sorted.length }: OrganizationIdPageInput = {}) => {
         pages.push(after);
         const rest = sorted.filter((org) => after === undefined || org.id > after);
         const ids = rest.slice(0, limit).map((org) => org.id);

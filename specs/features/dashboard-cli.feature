@@ -1,30 +1,21 @@
 Feature: Dashboard CLI Commands
-  As a developer managing analytics dashboards
-  I want to create and manage dashboards via CLI
-  So that I can set up monitoring without using the UI
+  As a developer or an agent building dashboards
+  I want one `langwatch dashboard` command group for dashboards and their widgets
+  So that I manage them from the terminal without the UI
 
-  Background:
-    Given I have a valid LANGWATCH_API_KEY configured
+  The group speaks /api/v1/dashboards, where the project comes from the API key.
+  The older Analytics Reports live under `langwatch analytics-report`
+  (specs/features/analytics-report-cli.feature).
 
-  Scenario: List dashboards
-    Given my project has dashboards
-    When I run "langwatch dashboard list"
-    Then I see a table of dashboards with name, ID, graph count, and last updated
+  @unit
+  Scenario: The dashboard group manages dashboards and the widgets on them
+    Given the langwatch CLI
+    Then `langwatch dashboard` offers list, get, create, update and delete
+    And `langwatch dashboard widget` offers schema, list, get, add, update and delete
+    And `langwatch dashboard widget add <dashboardId>` creates the widget on that dashboard
+    And every one of them answers in the format `-f` names
 
-  Scenario: List dashboards as JSON
-    When I run "langwatch dashboard list -f json"
-    Then I see raw JSON with dashboard data
-
-  Scenario: Create a dashboard
-    When I run "langwatch dashboard create 'Performance Overview'"
-    Then a new dashboard is created and I see confirmation with its name and ID
-
-  Scenario: Delete a dashboard
-    Given my project has a dashboard with ID "dash_123"
-    When I run "langwatch dashboard delete dash_123"
-    Then the dashboard is deleted and I see confirmation
-
-  Scenario: Run dashboard command without API key
-    Given LANGWATCH_API_KEY is not set
-    When I run "langwatch dashboard list"
-    Then I see an error prompting me to configure my API key
+  @unit
+  Scenario: A dashboard update refuses a new description and clearing it at once
+    When I run "langwatch dashboard update d_1 --description x --clear-description"
+    Then the CLI refuses the two options together and sends no request

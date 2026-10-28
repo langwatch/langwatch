@@ -5,9 +5,8 @@ on:
     # ready_for_review is NOT a default activity type, and the two heaviest
     # jobs below skip on a draft. Without it, taking a PR out of draft fires
     # no event at all and they would never get their non-draft run.
-    # `labeled` fires for every label; a run starts only for `ci:full`, which
-    # also lifts the draft gate. Any other label is skipped by the gates below.
-    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
@@ -15,6 +14,8 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      - "tools/chartheap/**"
+      - "cmd/chartheap/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -51,6 +52,8 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      - "tools/chartheap/**"
+      - "cmd/chartheap/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -85,13 +88,12 @@ on:
 # The e2e jobs here are the most expensive in the repo — `e2e: infra` runs to
 # 697s and `e2e: overlays` to 348s — and without a group every push to a chart
 # PR left its predecessors running to completion alongside it. Same rule as
-# langwatch-app-ci: supersede on a PR branch, never on main, because every
-# commit that lands on main has to keep its own validation.
+# langwatch-app-ci: a newer commit supersedes an older run.
 concurrency:
-  # A label event for any label but `ci:full` gets its own group, so it neither
-  # cancels a running full run nor is cancelled by one.
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A newer commit supersedes an older run, on main too: the newest verdict
+  # covers the commits before it. Image and release builds keep their own rule.
+  cancel-in-progress: true
 
 jobs:
   # One runner renders every published preset and runs every rendered-output
@@ -109,8 +111,6 @@ jobs:
   # next four.
   render:
     name: "render + assertions"
-    # Skipped for a label event other than `ci:full`, like every job here.
-    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older cache copies.
     permissions:
@@ -127,12 +127,21 @@ jobs:
       # deploy: the charts, the images, or how the workspace installs. A
       # lockfile, package.json or config-declaration change still runs every
       # render assertion here, and main runs the kind legs on every merge.
+
+      # dorny diffs a pull request from the event's base commit, which can be
+      # older than the main this merge commit is built on, and so counts main's
+      # newer commits as changed. Diff from the merge commit's first parent.
+      - name: Diff from the main the merge commit is built on
+        if: github.event_name == 'pull_request'
+        id: diff-base
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/pull-request-diff-base.sh" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name == 'pull_request'
         id: e2e-paths
         with:
           # Empty: diff with git, never the files API (specs/ci/path-filters.feature).
           token: ""
+          base: ${{ steps.diff-base.outputs.sha }}
           filters: |
             e2e:
               - "charts/langwatch/**"
@@ -217,6 +226,17 @@ jobs:
         if: "!cancelled()"
         run: ./tests/langevals-sizing.sh
 
+      - name: "assert the redis-valkey overlay swaps only the image"
+        if: "!cancelled()"
+        run: ./tests/redis-valkey.sh
+
+      # An install taking existing agent objects over in place needs the
+      # chart to render their selector, which can never change on a live
+      # Deployment. The default presets never set these values.
+      - name: "assert the langyagent takeover values render"
+        if: "!cancelled()"
+        run: ./tests/langyagent-takeover.sh
+
       # Static on purpose, and helm being installed here changes nothing.
       # Every `lookup` in the render step runs against no cluster and so
       # returns empty, which is exactly what a lookup the installer is
@@ -258,6 +278,25 @@ jobs:
       - name: "assert ClickHouse pool sizing follows fleet capacity"
         if: "!cancelled()"
         run: ./tests/clickhouse-pool-sizing.sh
+
+      # Redis is started with a memory ceiling at half its limit so a snapshot
+      # fits under the container limit. Only the render shows the byte count,
+      # and a number written in a values file arrives as a float.
+      - name: "assert Redis memory ceiling is half the limit"
+        if: "!cancelled()"
+        run: ./tests/redis-maxmemory.sh
+
+      # The app's and the worker's heap ceiling follows the memory limit, so a heavy
+      # request or job does not exhaust a half-size heap with the container half empty.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: "!cancelled()"
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      - name: "assert app and worker heap ceiling follows the memory limit"
+        if: "!cancelled()"
+        working-directory: .
+        run: go run ./cmd/chartheap -prove-node infra/docker/Dockerfile
 
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
@@ -363,12 +402,11 @@ jobs:
   # every behavioral guarantee while CI stays green.
   behavioral:
     name: "behavioral (rendered-output assertions)"
-    # Skipped on a draft, like the e2e legs below, unless the PR is labelled
+    # Skipped on a draft or release-please PR, like the e2e legs below, unless labelled
     # `ci:full`. No `changes` gate to read `heavy` from, so the check is inline.
     if: >-
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false
+      (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
        || contains(github.event.pull_request.labels.*.name, 'ci:full'))
-      && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older cache copies.
     permissions:
@@ -421,9 +459,8 @@ jobs:
     # read it from, which left it the last heavy thing running on a version
     # bump.
     if: >-
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false
+      (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
        || contains(github.event.pull_request.labels.*.name, 'ci:full'))
-      && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
       && (github.event_name != 'pull_request' || needs.render.outputs.e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     needs: render

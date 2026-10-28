@@ -52,6 +52,7 @@ const rawQuestionSchema = z
     options: z.unknown().optional(),
     multiple: z.unknown().optional(),
     custom: z.unknown().optional(),
+    allowOther: z.unknown().optional(),
     bare: z.unknown().optional(),
   })
   .loose();
@@ -144,8 +145,11 @@ function buildQuestionCardPart({
     options,
     ...(raw.multiple === true ? { multiSelect: true } : {}),
     // `custom: false` closes the typed-answer door, and so does a bare
-    // question: its free-text route is the quiet option the ask provides.
-    ...(raw.custom !== false && raw.bare !== true ? { allowOther: true } : {}),
+    // question: its free-text route is the quiet option the ask provides. A
+    // card the platform asked itself says `allowOther: false`, its own spelling.
+    ...(raw.custom !== false && raw.allowOther !== false && raw.bare !== true
+      ? { allowOther: true }
+      : {}),
     ...(raw.bare === true ? { bare: true } : {}),
   };
   return parseLangyCardPart({

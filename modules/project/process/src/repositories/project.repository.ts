@@ -59,6 +59,14 @@ export type ProjectBackfillRow = Readonly<{
   adminUserId: string | null;
 }>;
 
+/**
+ * One row of the projects table for the facts step: a whole project, or an orphan whose team or
+ * organization is gone, so nothing can be recorded for it.
+ */
+export type ProjectBackfillEntry =
+  | Readonly<{ kind: "whole"; project: ProjectBackfillRow }>
+  | Readonly<{ kind: "orphan"; id: string }>;
+
 /** Persistence owned by the Project module. It never crosses into a caller. */
 export interface ProjectRepository {
   findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
@@ -97,8 +105,11 @@ export interface ProjectRepository {
   touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
-  /** Every project, archived ones included, in id order after `afterId`. */
-  findBackfillPage(input: { afterId: string | null; limit: number }): Promise<ProjectBackfillRow[]>;
+  /** Every project, archived ones included, in id order after `afterId`; empty at the end. */
+  findBackfillPage(input: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<ProjectBackfillEntry[]>;
   findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(input: {
     query: string;
@@ -144,6 +155,9 @@ export interface ProjectRepository {
   findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
   /** The live project the legacy `apiKey` column names, or nothing. */
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
+  markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void>;
+  /** When the legacy key last authenticated, or nothing when no use was stamped. */
+  findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
   /** Creates a team's personal project once and answers its id; a second call creates nothing. */
@@ -179,7 +193,10 @@ export interface ProjectRepository {
   }): Promise<string[]>;
   /** Every project id, archived included, ordered by id and paged by cursor. */
   listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
-  /** Every project with its team's organisation, archived included, paged like `listAllIds`. */
+  /**
+   * Every project with its team's organisation, archived included, paged like `listAllIds`; a
+   * project whose team is gone is named in `orphanIds` instead.
+   */
   listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
   listAllWithPrivateS3(input?: ProjectIdPageInput): Promise<ProjectPrivateS3Page>;
   listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;

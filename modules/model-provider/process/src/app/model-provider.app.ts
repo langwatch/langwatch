@@ -6,6 +6,7 @@ import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contr
  * The model-provider feature's application: what `modelProvider.*`, `llmModelCost.*` and
  * `translate.*` all call, so caller attribution and Codex-role defaults are written once.
  */
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   CODEX_DEFAULT_MODEL,
   findFeatureByKey,
@@ -59,6 +60,7 @@ import {
   type ModelProviderPlaygroundRequest,
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
+  type DecisionModelResolution,
   type ModelProviderResolution,
   type ModelProviderSummary,
   type TranslateInput,
@@ -217,6 +219,7 @@ export class ModelProviderModule implements ModelProviderApi {
     dataPrivacy: DataPrivacyApi,
     managed: ManagedProviderApi,
     secrets: SecretApi,
+    featureFlags: FeatureFlagApi,
   };
   static readonly config = modelProviderConfig;
   /**
@@ -243,6 +246,8 @@ export class ModelProviderModule implements ModelProviderApi {
   /** What the module's own operations spend, never a platform provider credential. */
   static readonly operationalSecrets = {
     openRouter: Secret.load("OPENROUTER_API_KEY", { optional: true }),
+    /** Doubleword's platform key, which reads its model list and prices for the catalog sync. */
+    doublewordCatalog: Secret.load("DOUBLEWORD_API_KEY", { optional: true }),
     /** The engine hop's shared credential: the same handle the process owner holds. */
     nlpInternal: nlpInternalSecret,
   } as const;
@@ -458,6 +463,11 @@ export class ModelProviderModule implements ModelProviderApi {
       ids: infrastructure.ids,
       codexTokenRefresher: infrastructure.codexTokenRefresher,
       connectionRateLimiter: infrastructure.connectionRateLimiter,
+      isOwnDecisionModelAllowed: ({ organizationId }) =>
+        dependencies.featureFlags.isEnabled("release_instant_evals_own_decision_model", {
+          kind: "organization",
+          organizationId,
+        }),
     });
     this.#providerAuthorization = ModelProviderWriteAuthorizationService.create(
       ModelProviderAuthorizationService.create(dependencies.permissions),
@@ -751,6 +761,10 @@ export class ModelProviderModule implements ModelProviderApi {
 
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution> {
     return this.#modelProviders.resolveModelForFeature(input);
+  }
+
+  resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution> {
+    return this.#modelProviders.resolveDecisionModel(input);
   }
 
   findAlternateModel(input: {

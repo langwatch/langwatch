@@ -9,6 +9,8 @@ import type { EvaluationProcessingPipeline } from "../eventing/evaluation-proces
 
 /** Main's trace-trigger dedup: outlasts trace's 5-minute deferred origin window by a minute. */
 const TRACE_EVALUATION_DEDUP_TTL_MS = 6 * 60 * 1000;
+/** How long a retried attempt's job id still absorbs a resend once it has run. */
+const RETRY_DEDUP_MARGIN_MS = 60 * 1000;
 
 /**
  * evaluation_processing's own command senders, which exist only once the
@@ -47,6 +49,32 @@ export class EvaluationCommandDispatcherService {
     }
 
     await this.#commands.executeEvaluation.send(data, traceEvaluationSendOptions(data));
+  }
+
+  /** Sends `data`'s attempt again after `delayMs`; a redelivered send of it is absorbed. */
+  async retryEvaluation({
+    data,
+    delayMs,
+  }: {
+    data: ExecuteEvaluationCommandData;
+    delayMs: number;
+  }): Promise<void> {
+    if (!this.#commands) {
+      throw new Error(
+        "evaluation_processing registered no executeEvaluation sender; this process hosts no evaluation pipeline",
+      );
+    }
+
+    const makeId = (payload: ExecuteEvaluationCommandData): string =>
+      ExecuteEvaluationCommand.makeRetryJobId(payload);
+    await this.#commands.executeEvaluation.send(data, {
+      delay: delayMs,
+      deduplication: {
+        makeId,
+        ttlMs: delayMs + RETRY_DEDUP_MARGIN_MS,
+        shouldSurviveDispatch: true,
+      },
+    });
   }
 }
 

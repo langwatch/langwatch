@@ -87,6 +87,7 @@
       "ignoredDependencies": [
         "@langwatch/authorization",
         "@langwatch/authz-contract",
+        "@langwatch/clickhouse-migrations",
         "@langwatch/module",
         "@langwatch/process-stores",
         "@langwatch/secrets",

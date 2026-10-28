@@ -63,6 +63,8 @@ export interface ProjectOrganizationRef {
 
 export interface ProjectOrganizationPage {
   projects: ProjectOrganizationRef[];
+  /** Projects on the page whose team is gone, so no organisation owns them or routes their data. */
+  orphanIds: string[];
   next: string | null;
 }
 
@@ -195,6 +197,8 @@ export interface ProjectApi {
   archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }>;
   /** The live project a legacy `apiKey` column names, or nothing. */
   findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null>;
+  /** Stamps when the project's legacy `apiKey` last authenticated a request. */
+  markLegacyApiKeyUsed(input: Readonly<{ projectId: string }>): Promise<void>;
   /**
    * Whether the organisation and the project both still allow trace sharing.
    * Nothing when the project is not there to read the two switches from.

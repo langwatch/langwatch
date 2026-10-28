@@ -124,7 +124,8 @@
                   "agent-testing/scenarios",
                   "agent-testing/test-suites",
                   "agent-testing/evaluators",
-                  "agent-testing/run-parameters"
+                  "agent-testing/run-parameters",
+                  "agent-testing/setup-and-teardown-hooks"
                 ]
               },
               {
@@ -569,7 +570,13 @@
               "integration/go/integrations/groq",
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
-              "integration/go/integrations/openrouter",
+              {
+                "group": "OpenRouter",
+                "pages": [
+                  "integration/openrouter-broadcast",
+                  "integration/go/integrations/openrouter"
+                ]
+              },
               {
                 "group": "LiteLLM",
                 "pages": [
@@ -679,6 +686,7 @@
               "ai-gateway/providers/groq",
               "ai-gateway/providers/cerebras",
               "ai-gateway/providers/deepseek",
+              "ai-gateway/providers/doubleword",
               "ai-gateway/providers/voyage",
               "ai-gateway/providers/elevenlabs",
               "ai-gateway/providers/openai-account",
@@ -1413,11 +1421,27 @@
             "pages": [
               "api-reference/dashboards/overview",
               "api-reference/dashboards/list-dashboards",
-              "api-reference/dashboards/create-dashboards",
-              "api-reference/dashboards/get-dashboards",
-              "api-reference/dashboards/put-update-reorder-reorder",
-              "api-reference/dashboards/update-dashboards",
-              "api-reference/dashboards/delete-dashboards"
+              "api-reference/dashboards/create-a-dashboard",
+              "api-reference/dashboards/get-a-dashboard",
+              "api-reference/dashboards/list-a-dashboard-s-widgets",
+              "api-reference/dashboards/get-a-widget-on-a-dashboard",
+              "api-reference/dashboards/update-a-dashboard",
+              "api-reference/dashboards/update-a-widget-on-a-dashboard",
+              "api-reference/dashboards/create-a-widget-on-a-dashboard",
+              "api-reference/dashboards/delete-a-dashboard",
+              "api-reference/dashboards/delete-a-widget-on-a-dashboard"
+            ]
+          },
+          {
+            "group": "Reports",
+            "pages": [
+              "api-reference/reports/overview",
+              "api-reference/reports/list-reports",
+              "api-reference/reports/create-reports",
+              "api-reference/reports/get-reports",
+              "api-reference/reports/update-reorder",
+              "api-reference/reports/update-reports",
+              "api-reference/reports/delete-reports"
             ]
           },
           {
@@ -1487,10 +1511,18 @@
               "api-reference/projects/get-project",
               "api-reference/projects/get-api-key",
               "api-reference/projects/list-dashboards-boards",
-              "api-reference/projects/get-a-dashboards-board",
+              "api-reference/projects/get-a-dashboard-boards",
+              "api-reference/projects/list-dashboard-widgets",
+              "api-reference/projects/get-a-dashboard-widget",
+              "api-reference/projects/list-dashboards",
+              "api-reference/projects/get-a-dashboard",
               "api-reference/projects/update-project",
+              "api-reference/projects/update-a-dashboard-widget",
               "api-reference/projects/regenerate-api-key",
-              "api-reference/projects/archive-project"
+              "api-reference/projects/create-a-dashboard-widget",
+              "api-reference/projects/add-a-dashboard-widget-to-a-dashboard",
+              "api-reference/projects/archive-project",
+              "api-reference/projects/delete-a-dashboard-widget"
             ]
           },
           {
@@ -1740,7 +1772,11 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1792386659",
+      "source": "/api-reference/projects/get-a-dashboards-board",
+      "destination": "/api-reference/projects/get-a-dashboard"
+    },
+    {
+      "source": "/ci/cache/busted/1793122734",
       "destination": "/introduction"
     },
     {
@@ -2202,6 +2238,34 @@
     {
       "source": "/better-agents/overview",
       "destination": "/skills/directory"
+    },
+    {
+      "source": "/api-reference/dashboards/overview",
+      "destination": "/api-reference/reports/overview"
+    },
+    {
+      "source": "/api-reference/dashboards/list-dashboards",
+      "destination": "/api-reference/reports/list-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/create-dashboards",
+      "destination": "/api-reference/reports/create-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/get-dashboards",
+      "destination": "/api-reference/reports/get-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/put-update-reorder-reorder",
+      "destination": "/api-reference/reports/update-reorder"
+    },
+    {
+      "source": "/api-reference/dashboards/update-dashboards",
+      "destination": "/api-reference/reports/update-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/delete-dashboards",
+      "destination": "/api-reference/reports/delete-reports"
     }
   ]
 }

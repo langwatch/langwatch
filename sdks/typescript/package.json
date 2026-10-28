@@ -1,6 +1,6 @@
 {
   "name": "langwatch",
-  "version": "1.19.0",
+  "version": "1.20.0",
   "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
   "license": "MIT",
   "author": "LangWatch",
@@ -113,7 +113,6 @@
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^5.0.1",
     "chalk": "catalog:",
-    "cloudflared": "0.7.1",
     "commander": "catalog:",
     "dotenv": "catalog:",
     "dotenv-cli": "^11.0.0",
@@ -183,7 +182,7 @@
     }
   },
   "engines": {
-    "node": ">=22",
+    "node": "^22.23.4 || ^24.22.1 || >=26.12.1",
     "pnpm": ">=8"
   },
   "nx": {

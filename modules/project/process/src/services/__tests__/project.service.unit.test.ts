@@ -28,7 +28,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProjectRepository } from "../../repositories/project.repository.ts";
+import type {
+  ProjectBackfillEntry,
+  ProjectRepository,
+} from "../../repositories/project.repository.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import { ProjectCredentials } from "../project-credentials.service.ts";
 import { ProjectService } from "../project.service.ts";
@@ -144,7 +147,7 @@ class StubRepository implements ProjectRepository {
   countWithTraces = vi.fn(async () => 0);
   findSharedProjectSlugs = vi.fn(async (): Promise<string[]> => []);
   listAllIds = vi.fn(async () => ({ ids: [], next: null }));
-  listAllWithOrganization = vi.fn(async () => ({ projects: [], next: null }));
+  listAllWithOrganization = vi.fn(async () => ({ projects: [], orphanIds: [], next: null }));
   listAllWithPrivateS3 = vi.fn(async () => ({ projects: [], next: null }));
   listLwqlKeys = vi.fn(async () => ({ projects: [], next: null }));
   create = vi.fn(async () => applicationProject);
@@ -158,7 +161,7 @@ class StubRepository implements ProjectRepository {
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
   findWithOrgAdmin = vi.fn(async () => null);
-  findBackfillPage = vi.fn(async () => []);
+  findBackfillPage = vi.fn(async (): Promise<ProjectBackfillEntry[]> => []);
   findTraceSharingConfig = vi.fn(async () => null);
   searchByQuery = vi.fn(async () => []);
   update = vi.fn(async () => applicationProject);
@@ -181,6 +184,8 @@ class StubRepository implements ProjectRepository {
   findTraceDestination = vi.fn(async () => null);
   findTraceDestinations = vi.fn(async () => []);
   findIdByLegacyApiKey = vi.fn(async (): Promise<string | null> => null);
+  markLegacyApiKeyUsed = vi.fn(async (): Promise<void> => undefined);
+  findLegacyApiKeyLastUsedAt = vi.fn(async () => null);
   rotateLegacyApiKey = vi.fn(async () => true);
   findPersonalProjectOwner = vi.fn(
     async (): Promise<{ ownerUserId: string | null } | null> => null,

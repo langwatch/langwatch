@@ -1,10 +1,12 @@
 import {
+  idIndexRetentionRaiseInputSchema,
   ScopeTargetNotFoundError,
   platformDefaultRetentionDaysSchema,
   resolveRetention,
   resolveScopeChain,
   retentionDaysInputSchema,
   retroactiveRetentionUpdateInputSchema,
+  type IdIndexRetentionRaiseInput,
   type KillRetroactiveMutationInput,
   type ResolvedRetention,
   type RetentionCategory,
@@ -22,7 +24,6 @@ import {
 import {
   AggregateProjectIsReadOnlyError,
   isAggregateProjectKind,
-  ProjectNotFoundError,
 } from "@langwatch/project-contract";
 
 import type { DataRetentionCacheRepository } from "../repositories/data-retention-cache.repository.ts";
@@ -48,6 +49,9 @@ type DataRetentionServiceOptions = Readonly<{
   storageMeter: StorageMeterService;
 }>;
 
+/** Projects whose placements one retention lookup reads at once. */
+const RETENTION_LOOKUP_CHUNK = 1_000;
+
 export class DataRetentionService {
   static create(options: DataRetentionServiceOptions): DataRetentionService {
     return new DataRetentionService({
@@ -69,9 +73,10 @@ export class DataRetentionService {
       return cached.value;
     }
 
-    // A project with no row is refused, never cached: the job retries until the row exists.
+    // A project with no row (deleted, or not yet visible) gets the default, never cached,
+    // so a job for it neither retries forever nor keeps the default once the row exists.
     const context = await this.findProjectContext(input.projectId);
-    if (!context) throw new ProjectNotFoundError();
+    if (!context) return this.defaultRetention();
     const chain = resolveScopeChain(context);
     const resolved = resolveRetention({
       rows: await this.options.policies.findForProjectChain({
@@ -251,12 +256,79 @@ export class DataRetentionService {
     await this.options.retroactive.killMutation(input);
   }
 
+  /**
+   * Raises one target's id indexes to each tenant's resolved retention, never lowering a row; a
+   * tenant whose project is gone keeps what it has. Answers the tables raised: none while the
+   * target holds no index yet.
+   */
+  async raiseIdIndexRetention(input: IdIndexRetentionRaiseInput): Promise<{ tables: string[] }> {
+    const { organizationId, indexes } = idIndexRetentionRaiseInputSchema.parse(input);
+    const target = organizationId === undefined ? {} : { organizationId };
+    const held = await this.options.retroactive.findHeldIdIndexes({ ...target, indexes });
+    if (held.length === 0) return { tables: [] };
+
+    const tenantIds = await this.options.retroactive.findIdIndexTenantIds({
+      ...target,
+      indexes: held,
+    });
+    // The marker rows sit under the empty tenant, which is no project.
+    const retentionByTenant = await this.resolveForProjects({
+      projectIds: tenantIds.filter((tenantId) => tenantId !== ""),
+    });
+    const tables = await this.options.retroactive.raiseIdIndexRetention({
+      ...target,
+      indexes: held,
+      retentionByTenant,
+    });
+    return { tables };
+  }
+
   getTotalStorageBytes(input: { tenantId: string }): Promise<number> {
     return this.options.storageMeter.getTotalStorageBytes(input);
   }
 
   getTotalStorageBytesForTenants(input: { tenantIds: string[] }): Promise<number> {
     return this.options.storageMeter.getTotalStorageBytesForTenants(input);
+  }
+
+  /**
+   * Many projects' retention from batched reads, a chunk of projects at a time: their placements,
+   * then their organisations' rules. A project with no row is left out, as `getResolvedForProject`
+   * refuses it.
+   */
+  private async resolveForProjects({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<Map<string, ResolvedRetention>> {
+    const resolved = new Map<string, ResolvedRetention>();
+    for (let start = 0; start < projectIds.length; start += RETENTION_LOOKUP_CHUNK) {
+      const placements = await this.options.projectScopes.findProjectPlacements({
+        projectIds: projectIds.slice(start, start + RETENTION_LOOKUP_CHUNK),
+      });
+      const policies = await this.options.policies.findAllInOrganizations({
+        organizationIds: [...new Set(placements.map((each) => each.organizationId))],
+      });
+      for (const placement of placements) {
+        const chain = resolveScopeChain(placement);
+        const rows = policies.filter(
+          (policy) =>
+            policy.organizationId === placement.organizationId &&
+            chain.some(
+              (scope) => scope.scopeType === policy.scopeType && scope.scopeId === policy.scopeId,
+            ),
+        );
+        resolved.set(
+          placement.projectId,
+          resolveRetention({
+            rows,
+            chain,
+            defaultRetentionDays: this.options.defaultRetentionDays,
+          }),
+        );
+      }
+    }
+    return resolved;
   }
 
   private defaultRetention(): ResolvedRetention {

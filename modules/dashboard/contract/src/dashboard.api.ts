@@ -10,6 +10,7 @@ import type { Trigger } from "@langwatch/automation-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type {
+  Board,
   BoardSummary,
   Dashboard,
   DashboardScope,
@@ -103,16 +104,16 @@ export interface DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
   /**
    * A Dashboards board at the scope Project; `createdById` is its author, absent for a project
    * credential. A member's own My dashboard starts starred for them, at Only me (AC160b, AC170).
    * `dashboards_not_enabled` while `release_dashboards` is off (AC189).
    */
-  createBoard(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
+  createBoard(input: { projectId: string; name: string; createdById?: string }): Promise<Board>;
   /**
-   * The board's name and description, an absent field left as it is; `dashboards_not_enabled`
-   * while `release_dashboards` is off.
+   * The board's name, description and left-out origins (`null` restores the default, AC200), an
+   * absent field left as it is; `dashboards_not_enabled` while `release_dashboards` is off.
    */
   updateBoard(input: {
     projectId: string;
@@ -120,7 +121,8 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
-  }): Promise<Dashboard>;
+    excludedOrigins?: readonly string[] | null;
+  }): Promise<Board>;
   /**
    * The board, its widgets, every star on it and its stale legacy copy (AC199b);
    * `dashboards_not_enabled` while `release_dashboards` is off.
@@ -129,7 +131,7 @@ export interface DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
 
   /** The member's stars for this project, boards and templates, in their own order. */
   listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]>;
@@ -162,7 +164,7 @@ export interface DashboardApi {
     dashboardId: string;
     scope: DashboardScope;
     viewer: DashboardViewer;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
   /** Dashboards area: how many other members starred the author's board. */
   getDashboardScopeImpact(input: {
     projectId: string;
@@ -233,9 +235,11 @@ export interface DashboardApi {
     dashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget[]>;
+  /** With `onDashboardId`, a widget on any other board, or on none, is not found. */
   getDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget>;
   /** Placed on `dashboardId` when named, otherwise on the unplaced authoring grid. */
@@ -247,10 +251,12 @@ export interface DashboardApi {
       viewer?: DashboardViewer;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget>;
+  /** With `onDashboardId`, a widget on any other board, or on none, is not found. */
   updateDashboardWidget(
     input: {
       projectId: string;
       id: string;
+      onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
     } & Partial<DashboardWidgetDefinitionInput>,
@@ -261,9 +267,11 @@ export interface DashboardApi {
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget>;
+  /** With `onDashboardId`, a widget on any other board, or on none, is not found. */
   deleteDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<void>;
   /** Moves or resizes one widget; an id naming no widget here changes nothing. */

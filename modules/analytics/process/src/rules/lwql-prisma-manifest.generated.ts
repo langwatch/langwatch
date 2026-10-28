@@ -75,6 +75,7 @@ export interface LwqlPrismaRows {
     readonly passkeyNudgeDismissedAt: "DateTime?";
     readonly joinOfferDismissedDomains: "String[]";
     readonly notificationPreferences: "Json";
+    readonly passwordResetRequiredAt: "DateTime?";
   };
   readonly VerificationToken: {
     readonly id: "String";
@@ -578,6 +579,7 @@ export interface LwqlPrismaRows {
     readonly name: "String";
     readonly slug: "String";
     readonly apiKey: "String";
+    readonly legacyApiKeyLastUsedAt: "DateTime?";
     readonly lwqlKey: "String";
     readonly teamId: "String";
     readonly language: "String";
@@ -665,6 +667,8 @@ export interface LwqlPrismaRows {
     readonly threadIdleTimeout: "Int?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+    readonly autoPausedAt: "DateTime?";
+    readonly autoPausedReason: "String?";
   };
   readonly Cost: {
     readonly id: "String";
@@ -752,6 +756,7 @@ export interface LwqlPrismaRows {
     readonly createdById: "String?";
     readonly scope: "DashboardScope";
     readonly organizationId: "String?";
+    readonly excludedOrigins: "Json?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
@@ -1774,6 +1779,10 @@ export interface LwqlPrismaRows {
     readonly seeded: "Boolean";
     readonly evaluationCount: "Int";
     readonly simulationRunCount: "Int";
+    readonly codingFirstSessionAt: "DateTime?";
+    readonly codingAgentTypes: "String[]";
+    readonly codingActiveDays: "Int";
+    readonly codingLastActiveDay: "String?";
     readonly updatedAt: "DateTime";
   };
   readonly BillingMeterCheckpoint: {
@@ -2428,6 +2437,7 @@ export interface LwqlPrismaRows {
     readonly lastReportError: "String?";
     readonly optionalMetricsOptOut: "Boolean";
     readonly hostnameOptOut: "Boolean";
+    readonly upgradeDiagnosticsOptOut: "Boolean";
   };
   readonly SelfHostedInstance: {
     readonly id: "String";
@@ -2451,6 +2461,34 @@ export interface LwqlPrismaRows {
     readonly reportCount: "Int";
     readonly lastUnknownFields: "Int";
     readonly raisedSignals: "String[]";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly SelfHostedInstanceDiagnostic: {
+    readonly id: "String";
+    readonly instanceId: "String";
+    readonly stepId: "String";
+    readonly stepDescription: "String?";
+    readonly release: "String?";
+    readonly attempt: "Int";
+    readonly trigger: "String";
+    readonly byteLength: "Int";
+    readonly objectKey: "String";
+    readonly receivedAt: "DateTime";
+    readonly expiresAt: "DateTime";
+    readonly slackAnnouncedAt: "DateTime?";
+  };
+  readonly SelfHostedNotice: {
+    readonly id: "String";
+    readonly severity: "String";
+    readonly title: "String";
+    readonly body: "String";
+    readonly url: "String?";
+    readonly fixedIn: "String?";
+    readonly status: "String";
+    readonly expiresAt: "DateTime?";
+    readonly publishedAt: "DateTime?";
+    readonly publishedBy: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };

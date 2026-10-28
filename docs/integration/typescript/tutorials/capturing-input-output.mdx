@@ -129,7 +129,7 @@ await tracer.withActiveSpan("ChatbotInteraction", async (span) => {
   // Create a child span for LLM call
   await tracer.withActiveSpan("LLMCall", async (llmSpan) => {
     llmSpan.setType("llm");
-    llmSpan.setRequestModel("gpt-5-mini");
+    llmSpan.setRequestModel("gpt-6-luna");
 
     // Set input as chat messages
     llmSpan.setInput("chat_messages", [userMessage]);
@@ -225,7 +225,7 @@ await tracer.withActiveSpan("AdvancedChat", async (span) => {
 
   await tracer.withActiveSpan("GetWeatherToolCall", async (llmSpan) => {
     llmSpan.setType("llm");
-    llmSpan.setRequestModel("gpt-5-mini");
+    llmSpan.setRequestModel("gpt-6-luna");
     llmSpan.setInput("chat_messages", messages);
 
     // Simulate model deciding to call a tool
@@ -277,7 +277,7 @@ await tracer.withActiveSpan("AdvancedChat", async (span) => {
 
   await tracer.withActiveSpan("FinalLLMResponse", async (finalLlmSpan) => {
     finalLlmSpan.setType("llm");
-    finalLlmSpan.setRequestModel("gpt-5-mini");
+    finalLlmSpan.setRequestModel("gpt-6-luna");
     finalLlmSpan.setInput("chat_messages", messages);
 
     const finalAssistantContent = "The weather in London is 15°C and cloudy.";

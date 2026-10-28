@@ -1,5 +1,6 @@
 import type { IntentContext, IntentExecutor, IntentSpec } from "@langwatch/eventing";
 import { defineCommand } from "@langwatch/eventing";
+import { HandledError } from "@langwatch/handled-error";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -22,6 +23,16 @@ import { z } from "zod";
 const logger = createLogger("langwatch:topic-clustering:process-effects");
 
 /**
+ * Refusals for a coding-assistant-only clustering model, at selection or at
+ * execution. Matched by code, since the error may have crossed a process
+ * boundary.
+ */
+const MODEL_RESTRICTED_CODES: ReadonlySet<string> = new Set([
+  "model_restricted_for_feature",
+  "model_restricted_for_execution",
+]);
+
+/**
  * Classifies a clustering failure by TYPE, never by message text (ADR-051;
  * see topic-clustering.errors.ts for why).
  */
@@ -36,6 +47,12 @@ export function classifyClusteringError(error: unknown): ClassifiedClusteringErr
   if (error instanceof ModelNotConfiguredError) {
     return {
       code: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+      isUserActionable: true,
+    };
+  }
+  if (HandledError.isHandled(error) && MODEL_RESTRICTED_CODES.has(error.code)) {
+    return {
+      code: CLUSTERING_ERROR_CODES.MODEL_RESTRICTED,
       isUserActionable: true,
     };
   }

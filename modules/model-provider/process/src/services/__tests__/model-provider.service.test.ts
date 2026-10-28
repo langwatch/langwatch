@@ -839,6 +839,7 @@ function service(
   defaults = new Defaults(),
 ) {
   return ModelProviderService.create({
+    isOwnDecisionModelAllowed: () => Promise.resolve(false),
     repository: providers,
     projects: createProjects(),
     organizations: organizationApi(),
@@ -1386,6 +1387,7 @@ describe("ModelProviderService", () => {
       },
     ];
     const modelProviders = ModelProviderService.create({
+      isOwnDecisionModelAllowed: () => Promise.resolve(false),
       repository: new Providers(),
       projects: createProjects(),
       organizations: organizationApi(),
@@ -1420,6 +1422,7 @@ describe("ModelProviderService", () => {
     ];
     const managed = new ManagedCatalog();
     const modelProviders = ModelProviderService.create({
+      isOwnDecisionModelAllowed: () => Promise.resolve(false),
       repository: providers,
       projects: createProjects(),
       organizations: organizationApi(),
@@ -1849,6 +1852,7 @@ describe("ModelProviderService", () => {
     providers.rows = [];
     const defaults = new Defaults();
     const modelProviders = ModelProviderService.create({
+      isOwnDecisionModelAllowed: () => Promise.resolve(false),
       repository: providers,
       projects: createProjects(),
       organizations: organizationApi(),
@@ -1899,6 +1903,7 @@ describe("ModelProviderService", () => {
     ];
 
     await ModelProviderService.create({
+      isOwnDecisionModelAllowed: () => Promise.resolve(false),
       repository: providers,
       projects: createProjects(),
       organizations: organizationApi(),

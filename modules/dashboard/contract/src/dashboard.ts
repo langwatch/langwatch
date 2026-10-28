@@ -76,6 +76,28 @@ export interface DashboardSchema extends Named<typeof dashboardSchemaDefinition>
 export const dashboardSchema: DashboardSchema = dashboardSchemaDefinition;
 export type Dashboard = z.infer<typeof dashboardSchema>;
 
+/**
+ * The trace origins a Dashboards board leaves out of every widget, such as `langy`. Bounded as the
+ * LangWatchQL query door bounds `excludeOrigins`, so a stored list never fails a widget's query.
+ */
+const boardExcludedOriginsSchemaDefinition = z.array(z.string().trim().min(1).max(64)).max(20);
+export interface BoardExcludedOriginsSchema extends Named<
+  typeof boardExcludedOriginsSchemaDefinition
+> {}
+export const boardExcludedOriginsSchema: BoardExcludedOriginsSchema =
+  boardExcludedOriginsSchemaDefinition;
+
+/**
+ * A Dashboards board (DashboardsV2). `excludedOrigins` is null until a member sets it, so the
+ * board keeps its default: Langy's out, none in a personal project (dashboards-v2 AC200).
+ */
+const boardSchemaDefinition = z
+  .object({ ...dashboardSchema.shape, excludedOrigins: boardExcludedOriginsSchema.nullable() })
+  .strict();
+export interface BoardSchema extends Named<typeof boardSchemaDefinition> {}
+export const boardSchema: BoardSchema = boardSchemaDefinition;
+export type Board = z.infer<typeof boardSchema>;
+
 /** A project as a board names it: who owns the board, or whose data it can show. */
 const dashboardProjectSchemaDefinition = z
   .object({ id: projectIdSchema, name: z.string(), slug: z.string() })
@@ -95,7 +117,8 @@ export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 /** A Dashboards board in a list: `graphCount` is its widgets, with the reader's star. */
 const boardSummarySchemaDefinition = z
   .object({
-    ...dashboardSummarySchema.shape,
+    ...boardSchema.shape,
+    graphCount: dashboardSummarySchema.shape.graphCount,
     /** Whether the member reading the list has starred this board. */
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
@@ -149,18 +172,19 @@ export type DashboardStar = z.infer<typeof dashboardStarSchema>;
 
 /** One of the member's stars, in their order: a board with its row, or a template by id. */
 const starredDashboardSchemaDefinition = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("board"), dashboard: dashboardSchema }).strict(),
+  z.object({ kind: z.literal("board"), dashboard: boardSchema }).strict(),
   z.object({ kind: z.literal("template"), templateId: dashboardTemplateIdSchema }).strict(),
 ]);
 export interface StarredDashboardSchema extends Named<typeof starredDashboardSchemaDefinition> {}
 export const starredDashboardSchema: StarredDashboardSchema = starredDashboardSchemaDefinition;
 export type StarredDashboard = z.infer<typeof starredDashboardSchema>;
 
-/** A board's name and description, as the inline editor saves them. */
+/** A board's name, description and left-out origins; `excludedOrigins: null` is the default. */
 const dashboardDetailsUpdateSchemaDefinition = z
   .object({
     name: dashboardNameSchema.optional(),
     description: dashboardDescriptionSchema.nullable().optional(),
+    excludedOrigins: boardExcludedOriginsSchema.nullable().optional(),
   })
   .strict();
 export interface DashboardDetailsUpdateSchema extends Named<
@@ -206,7 +230,7 @@ export const dashboardSourcePresenceSchema: DashboardSourcePresenceSchema =
   dashboardSourcePresenceSchemaDefinition;
 export type DashboardSourcePresence = z.infer<typeof dashboardSourcePresenceSchema>;
 
-// -- what `/api/dashboards` accepts ------------------------------------------
+// -- what `/api/v1/analytics/reports` accepts ------------------------------
 
 const dashboardRestNameSchemaDefinition = z.object({
   name: z.string().min(1, "name is required").max(255),
@@ -229,3 +253,8 @@ export interface DashboardRestParamsSchema extends Named<
 > {}
 export const dashboardRestParamsSchema: DashboardRestParamsSchema =
   dashboardRestParamsSchemaDefinition;
+
+/** `/api/v1/analytics/reports/:reportId`: a Reports dashboard named for what it is there. */
+const reportRestParamsSchemaDefinition = z.object({ reportId: z.string().min(1) });
+export interface ReportRestParamsSchema extends Named<typeof reportRestParamsSchemaDefinition> {}
+export const reportRestParamsSchema: ReportRestParamsSchema = reportRestParamsSchemaDefinition;

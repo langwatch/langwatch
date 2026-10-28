@@ -49,6 +49,7 @@ import {
   type RestAddressing,
   type RestAddressingOptions,
 } from "./addressing.ts";
+import { assertConfirmationMark, type RestConfirmation } from "./confirmation.ts";
 import type { RestIdempotency } from "./idempotency.ts";
 import {
   isKeyDoor,
@@ -185,6 +186,12 @@ export const browserSessionContext = defineMiddlewareContext(
   z.object({ id: z.string().min(1) }).nullable(),
 );
 
+/**
+ * The caller's address as the door resolved it (ClientAddress), or null where none was. Each module
+ * whose routes name it provides it with `callerAddressOfRequest`; no route reads a proxy header.
+ */
+export const callerAddressContext = defineMiddlewareContext("callerAddress", z.string().nullable());
+
 /** What a superseded family or route answers with, and what replaces it. */
 export type RestDeprecation = Readonly<{
   /** The path of the family or route that replaces this one. */
@@ -306,6 +313,11 @@ type PublicHandlerArguments<Input, App> = Omit<
   readonly actor: null;
   readonly scope: null;
   readonly target: null;
+  /**
+   * Names the key the handler resolved on the request's access record, by id and kind only: a
+   * public route that authenticates in its handler has no door to record it.
+   */
+  readonly recordKey: (key: RestKeyCredential) => void;
 };
 /**
  * A route the door answers with or without a credential: both halves of the
@@ -366,6 +378,8 @@ export type StoredHandlerArguments<Api> = Readonly<{
   /** The producer for the kind a route declared; undefined everywhere else. */
   response: RestProducerFor<RestResponseKind> | undefined;
   request: Request;
+  /** A public route's handler names the key it resolved; undefined on every other route. */
+  recordKey?: ((key: RestKeyCredential) => void) | undefined;
 }>;
 type StoredHandler<Api> = {
   invoke(args: StoredHandlerArguments<Api>, ...context: unknown[]): unknown;
@@ -533,6 +547,24 @@ export type RestPermissionPlatform = PlatformPermissionTarget;
  */
 export type RestPermissionReach = Readonly<{ at: "grants" | "organization" }>;
 
+/**
+ * The operator flags that open the permission to a legacy project key whose project they list,
+ * on top of ingestion and full access: one flag, or several where any of them opens it.
+ */
+export type RestLegacyKeyScopes = string | readonly [string, ...string[]];
+
+/**
+ * Where the permission is asked, and the legacy key scopes that open it. The scopes ride on the
+ * permission they open, so a route that asks none has nowhere to name them.
+ */
+export type RestPermissionOptions<
+  Where extends RestPermissionTarget | RestPermissionReach =
+    | RestPermissionTarget
+    | RestPermissionReach,
+> =
+  | (Where & Readonly<{ legacyKey?: RestLegacyKeyScopes }>)
+  | Readonly<{ at?: never; legacyKey: RestLegacyKeyScopes }>;
+
 export type RestTransportRoute<Api> = Readonly<{
   readonly method: HttpMethod;
   readonly path: string;
@@ -582,6 +614,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly mintsCredential?: AuthzPermission;
   /** Present exactly when the route is refused on an aggregate though its permission is exempt. */
   readonly refusedOnAggregate?: true;
+  /** Present exactly when operator flags open the route to a legacy project key. */
+  readonly legacyKeyScopes?: readonly [string, ...string[]];
   /** Present exactly when the route's create is replayable under a caller key. */
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
@@ -608,6 +642,12 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly audit?: string;
   /** Present exactly when the route declared it leaves no trail, and why. */
   readonly auditExempt?: string;
+  /** Present exactly when a Langy key needs the person's click before the route runs. */
+  readonly confirmation?: RestConfirmation<Api>;
+  /** Present exactly when a route that removes something says why it asks for no click. */
+  readonly confirmationExempt?: string;
+  /** Present exactly when a write route declared it never removes or disables a record. */
+  readonly keepsRecords?: true;
   readonly handler: StoredHandler<Api>;
 }>;
 
@@ -625,6 +665,8 @@ export type RestTransportDeclaration<
   readonly addressing: RestAddressing;
   /** Whether the family's `dated` addresses also answer under `/api/v1`. */
   readonly v1Twin: boolean;
+  /** Every answer at the bare `/api/<namespace>` path names the `/api/v1` twin as successor. */
+  readonly bareDeprecated?: true;
   /** The generation a `v1-in-path` family names in its own path. */
   readonly generation: string;
   /**
@@ -660,6 +702,7 @@ type RouteState = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   refusedOnAggregate?: true;
+  legacyKeyScopes?: readonly [string, ...string[]];
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
@@ -687,6 +730,9 @@ type RouteState = Readonly<{
   session?: z.ZodType;
   audit?: string;
   auditExempt?: string;
+  confirmation?: RestConfirmation<never>;
+  confirmationExempt?: string;
+  keepsRecords?: true;
 }>;
 
 type RouteReady<
@@ -1123,21 +1169,21 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   /** A proof-bearing permission: the door mints the proof and the handler is handed it. */
   withPermission(
     permission: ProofBearingPermission,
-    target?: RestPermissionTarget,
+    target?: RestPermissionOptions<RestPermissionTarget>,
   ): RouteBuilder<Api, With<S, { permission: true; proof: true }>>;
   /**
    * The permission this route demands, and where it is asked. `{ at: "route", param }` asks at
    * the scope the route's own path names, for a credential one tier wider than the resource.
-   * `{ at: "grants" }` and `{ at: "organization" }` are the key door's (RestPermissionReach).
+   * `{ at: "grants" | "organization" }` are the key door's; `legacyKey` opens it to a legacy key.
    */
   withPermission(
     permission: AuthzPermission,
-    target?: RestPermissionTarget | RestPermissionReach,
+    target?: RestPermissionOptions,
   ): RouteBuilder<Api, With<S, { permission: true }>>;
   /** Every one of them, asked in this order before the handler; naming an array says AND (E2). */
   withPermission(
     permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]],
-    target?: RestPermissionTarget | RestPermissionReach,
+    target?: RestPermissionOptions,
   ): RouteBuilder<Api, With<S, { permission: true }>>;
   /**
    * The permission the parsed input chooses (`permissionBy`, E3): the door only identifies, and
@@ -1157,12 +1203,13 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   ): RouteBuilder<Api, With<S, { permission: true }>>;
   withPermission(
     declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
-    target?: RestPermissionTarget | RestPermissionReach | RestPermissionPlatform,
+    target?: RestPermissionOptions | RestPermissionPlatform,
   ): unknown {
     if (target?.at === "platform") return this.#platformPermission(declared, target);
 
     const reach = target?.at === "grants" || target?.at === "organization" ? target.at : void 0;
-    const scoped = target && "param" in target ? target : void 0;
+    const scoped = target && "param" in target ? withoutLegacyKey(target) : void 0;
+    const legacyKey = target?.legacyKey;
 
     if (typeof declared === "string") {
       assertNotPlatformPermission({ address: `REST ${this.operation}`, permissions: [declared] });
@@ -1178,6 +1225,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
         ...permissionParts({ operation: this.operation, declared, reach }),
         ...(scoped ? { permissionTarget: scoped } : {}),
         ...(reach ? { permissionReach: reach } : {}),
+        ...(legacyKey ? { legacyKeyScopes: legacyKeyScopesOf(legacyKey) } : {}),
       },
     });
   }
@@ -1650,6 +1698,54 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   }
 
   /**
+   * The route removes or disables a record, so a Langy session key runs it only once the person
+   * clicked Yes on a card for that record (spec: specs/langy/langy-delete-confirmation.feature).
+   * Every other credential is not asked.
+   */
+  withConfirmation(mark: RestConfirmation<Api>): RouteBuilder<Api, S> {
+    assertConfirmationMark({ address: `REST ${this.operation}`, mark });
+    assertConfirmationUndeclared(this.state);
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, confirmation: mark },
+    });
+  }
+
+  /** The route removes something, yet a Langy key never reaches it; the reason says why. */
+  withoutConfirmation(reason: string): RouteBuilder<Api, S> {
+    if (reason.trim().length === 0) throw new Error("REST withoutConfirmation needs a reason");
+    assertConfirmationUndeclared(this.state);
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, confirmationExempt: reason },
+    });
+  }
+
+  /**
+   * The write route never removes or disables a record, whatever its body says, so no click is
+   * asked. A route that can switch something off declares withConfirmation with a `when` instead.
+   */
+  keepsRecords(): RouteBuilder<Api, S> {
+    assertConfirmationUndeclared(this.state);
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, keepsRecords: true },
+    });
+  }
+
+  /**
    * The route leaves no audit row, and the reason says why: ingestion, a read sent as a POST,
    * a run, or another service's webhook. A write route declares this or `withAudit`.
    */
@@ -1685,6 +1781,47 @@ function assertAuditDeclared({
   throw new Error(
     `REST ${operation} is a write route: declare withAudit("<action>") or withoutAudit("<reason>")`,
   );
+}
+
+/** What an audit action names when the route removes or disables a record. */
+/**
+ * Every write route declares withConfirmation, withoutConfirmation or keepsRecords; nothing is
+ * guessed from names. A DELETE always removes. Spec: specs/langy/langy-delete-confirmation.feature
+ */
+function assertConfirmationDeclared({
+  method,
+  operation,
+  state,
+}: {
+  method: HttpMethod;
+  operation: string;
+  state: RouteState;
+}): void {
+  const methods = state.methods ?? [method];
+  if (state.keepsRecords && methods.includes("delete")) {
+    throw new Error(`REST ${operation} is a DELETE, so it cannot declare keepsRecords()`);
+  }
+  if (!methods.some((each) => WRITE_METHODS.has(each))) return;
+  if (state.confirmation !== void 0 || state.confirmationExempt !== void 0) return;
+  if (state.keepsRecords) return;
+
+  throw new Error(
+    `REST ${operation} is a write route: declare withConfirmation({...}), ` +
+      'withoutConfirmation("<why a Langy key never reaches it>") or keepsRecords()',
+  );
+}
+
+/** A route says once whether it asks for a click. */
+function assertConfirmationUndeclared(state: RouteState): void {
+  if (
+    state.confirmation !== void 0 ||
+    state.confirmationExempt !== void 0 ||
+    state.keepsRecords !== void 0
+  ) {
+    throw new Error(
+      "REST route already declared withConfirmation(), withoutConfirmation() or keepsRecords()",
+    );
+  }
 }
 
 /** A route says once whether it leaves a trail. */
@@ -1760,17 +1897,36 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
   };
 }
 
+/** Where the permission is asked, without the legacy key scopes that ride beside it. */
+function withoutLegacyKey(
+  target: RestPermissionTarget & Readonly<{ legacyKey?: RestLegacyKeyScopes }>,
+): RestPermissionTarget {
+  const { legacyKey: _, ...where } = target;
+  return where;
+}
+
+/** The legacy key scopes as the route stores them: always a non-empty list. */
+function legacyKeyScopesOf(scopes: RestLegacyKeyScopes): readonly [string, ...string[]] {
+  return typeof scopes === "string" ? [scopes] : scopes;
+}
+
 /** What the door reads of a route beyond its permission: gates, credential, audit. */
 function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.refusedOnAggregate ? { refusedOnAggregate: state.refusedOnAggregate } : {}),
+    ...(state.legacyKeyScopes ? { legacyKeyScopes: state.legacyKeyScopes } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
     ...(state.audit ? { audit: state.audit } : {}),
     ...(state.auditExempt ? { auditExempt: state.auditExempt } : {}),
+    ...(state.confirmation
+      ? { confirmation: state.confirmation as RestConfirmation<unknown> }
+      : {}),
+    ...(state.confirmationExempt ? { confirmationExempt: state.confirmationExempt } : {}),
+    ...(state.keepsRecords ? { keepsRecords: true as const } : {}),
   };
 }
 
@@ -1822,6 +1978,7 @@ class RestTransportRouter<
   private root = false;
   private generation = DEFAULT_GENERATION;
   private deprecated: RestDeprecation | undefined;
+  private bareDeprecated = false;
 
   private readonly api: FeatureApiWitness<Api>;
   readonly namespace: string;
@@ -1875,6 +2032,7 @@ class RestTransportRouter<
     router.root = this.root;
     router.generation = this.generation;
     router.deprecated = this.deprecated;
+    router.bareDeprecated = this.bareDeprecated;
 
     return router;
   }
@@ -1898,6 +2056,7 @@ class RestTransportRouter<
     this.v1Twin = options.v1Twin ?? true;
     this.root = options.root ?? false;
     this.generation = options.generation ?? DEFAULT_GENERATION;
+    this.bareDeprecated = options.bareDeprecated ?? false;
 
     return this;
   }
@@ -1924,6 +2083,7 @@ class RestTransportRouter<
       version: this.version,
       addressing: this.addressing,
       v1Twin: this.v1Twin,
+      ...(this.bareDeprecated ? { bareDeprecated: true as const } : {}),
       generation: this.generation,
       credential: this.credential,
       ...(this.deprecated ? { deprecated: this.deprecated } : {}),
@@ -2287,6 +2447,7 @@ function assertRouteReady({
 
   assertPublicRouteConstraints({ operation, state });
   assertAuditDeclared({ method, operation, state });
+  assertConfirmationDeclared({ method, operation, state });
 
   if (state.answers && state.status !== void 0) {
     throw new Error(`REST ${operation} declares responds(), so its status is the answer's own`);

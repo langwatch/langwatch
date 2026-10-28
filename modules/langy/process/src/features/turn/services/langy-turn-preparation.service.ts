@@ -254,15 +254,14 @@ export class LangyTurnPreparationService {
     probeWorker: () => Promise<boolean>,
   ) {
     // A read-only turn never borrows a running worker's key, which may hold writes.
-    if (!args.readOnly && (await probeWorker())) {
-      return;
-    }
+    if (!args.readOnly && (await probeWorker())) return;
 
     const minted = await this.deps.sessionKeys.mint({
       session: args.session,
       projectId: args.projectId,
       organizationId: args.credentials.organizationId,
       ...(args.readOnly ? { ceiling: "unattended" as const } : {}),
+      conversation: { id: args.conversation.id, turnId: args.turnId },
     });
     args.credentials.langwatchApiKey = minted.token;
     args.credentials.langwatchApiKeyId = minted.apiKeyId;

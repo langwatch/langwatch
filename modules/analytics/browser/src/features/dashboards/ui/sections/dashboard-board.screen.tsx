@@ -24,7 +24,8 @@ import {
 import { useBoardAccess } from "../../behavior/use-board-access.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
-import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useBoardOrigins } from "../../behavior/use-board-origins.ts";
+import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
@@ -42,11 +43,13 @@ import { curatedBoardPath, dashboardTemplatesPath, myDashboardId } from "../../m
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
 import { AddBlockCard, EmptyBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
+import { BoardLangyControl } from "../blocks/board-langy-control.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
 import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
 import { BoardUnavailable } from "../blocks/board-unavailable.tsx";
+import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardWidgetEditor } from "./board-widget-editor.tsx";
@@ -73,6 +76,29 @@ function AddWidgetButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+/** The header's Langy setting; a pick that changes it refreshes every widget (AC200b). */
+function BoardLangySetting({
+  origins,
+  canEdit,
+  onChanged,
+}: {
+  origins: ReturnType<typeof useBoardOrigins>;
+  canEdit: boolean;
+  onChanged: () => void;
+}) {
+  if (!canEdit) return <BoardLangyControl includesLangy={origins.includesLangy} />;
+  return (
+    <BoardLangyControl
+      includesLangy={origins.includesLangy}
+      isSaving={origins.isSaving}
+      onPick={(includeLangy) => {
+        // A frame re-runs on a refresh, not on new origins alone.
+        if (origins.setIncludesLangy(includeLangy)) onChanged();
+      }}
+    />
+  );
+}
+
 function OpenBoard({ board }: { board: SavedBoard }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
@@ -89,7 +115,17 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     dashboardId: board.id,
     stored: board.description,
   });
-  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
+  const { range } = useBoardRange();
+  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
+  const origins = useBoardOrigins({
+    dashboardId: board.id,
+    stored: board.excludedOrigins,
+    onFailed: () => autoRefresh.refreshNow(),
+  });
+  const { grain, period, setRange, setGrain } = useBoardPeriod({
+    refreshedAt: autoRefresh.refreshedAt,
+    excludedOrigins: origins.excludedOrigins,
+  });
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
   const { widgets } = boardWidgets;
@@ -97,7 +133,6 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const langy = useLangyAsk();
   useBoardLangyChip(boardContextChip({ board: subject, range, period }));
   const editor = useBoardEditor({ board: subject, period, widgets });
-  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
 
   const openPicker = () => {
     if (!picker.isOpen) picker.open();
@@ -146,6 +181,13 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 ),
               }
             : {})}
+          langyControl={
+            <BoardLangySetting
+              origins={origins}
+              canEdit={canEdit}
+              onChanged={autoRefresh.refreshNow}
+            />
+          }
           periodControl={
             <BoardPeriodControl
               range={range}
@@ -273,7 +315,12 @@ function Board() {
   // A deleted board and one set to Only me read the same: the server tells neither apart.
   if (!board) return <BoardUnavailable />;
   // Keyed so a board's in-flight edits never leak into the next board.
-  return <OpenBoard key={board.id} board={board} />;
+  return (
+    <>
+      <OldAnalyticsBanner />
+      <OpenBoard key={board.id} board={board} />
+    </>
+  );
 }
 
 export default function DashboardBoardScreen() {

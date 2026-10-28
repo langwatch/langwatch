@@ -178,6 +178,8 @@ export const prismaTableCatalogue = {
   "ConnectedStatement": "ConnectedStatement",
   "InstanceIdentity": "InstanceIdentity",
   "SelfHostedInstance": "SelfHostedInstance",
+  "SelfHostedInstanceDiagnostic": "SelfHostedInstanceDiagnostic",
+  "SelfHostedNotice": "SelfHostedNotice",
   "SelfHostedInstanceReport": "SelfHostedInstanceReport",
   "WebPushSubscription": "WebPushSubscription",
   "WebPushVapidKey": "WebPushVapidKey",
@@ -269,6 +271,7 @@ export const prismaModelFieldCatalogue = {
     "passkeyNudgeDismissedAt",
     "joinOfferDismissedDomains",
     "notificationPreferences",
+    "passwordResetRequiredAt",
     "Annotation",
     "shareLinks",
     "Workflow",
@@ -854,6 +857,7 @@ export const prismaModelFieldCatalogue = {
     "name",
     "slug",
     "apiKey",
+    "legacyApiKeyLastUsedAt",
     "lwqlKey",
     "teamId",
     "team",
@@ -980,7 +984,9 @@ export const prismaModelFieldCatalogue = {
     "level",
     "threadIdleTimeout",
     "createdAt",
-    "updatedAt"
+    "updatedAt",
+    "autoPausedAt",
+    "autoPausedReason"
   ],
   "Cost": [
     "id",
@@ -1079,6 +1085,7 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "scope",
     "organizationId",
+    "excludedOrigins",
     "createdAt",
     "updatedAt"
   ],
@@ -2237,6 +2244,10 @@ export const prismaModelFieldCatalogue = {
     "seeded",
     "evaluationCount",
     "simulationRunCount",
+    "codingFirstSessionAt",
+    "codingAgentTypes",
+    "codingActiveDays",
+    "codingLastActiveDay",
     "updatedAt"
   ],
   "BillingMeterCheckpoint": [
@@ -2930,7 +2941,8 @@ export const prismaModelFieldCatalogue = {
     "lastReportAt",
     "lastReportError",
     "optionalMetricsOptOut",
-    "hostnameOptOut"
+    "hostnameOptOut",
+    "upgradeDiagnosticsOptOut"
   ],
   "SelfHostedInstance": [
     "id",
@@ -2954,6 +2966,34 @@ export const prismaModelFieldCatalogue = {
     "reportCount",
     "lastUnknownFields",
     "raisedSignals",
+    "createdAt",
+    "updatedAt"
+  ],
+  "SelfHostedInstanceDiagnostic": [
+    "id",
+    "instanceId",
+    "stepId",
+    "stepDescription",
+    "release",
+    "attempt",
+    "trigger",
+    "byteLength",
+    "objectKey",
+    "receivedAt",
+    "expiresAt",
+    "slackAnnouncedAt"
+  ],
+  "SelfHostedNotice": [
+    "id",
+    "severity",
+    "title",
+    "body",
+    "url",
+    "fixedIn",
+    "status",
+    "expiresAt",
+    "publishedAt",
+    "publishedBy",
     "createdAt",
     "updatedAt"
   ],
@@ -3584,6 +3624,8 @@ export const prismaRelationCatalogue = {
   "ConnectedStatement": {},
   "InstanceIdentity": {},
   "SelfHostedInstance": {},
+  "SelfHostedInstanceDiagnostic": {},
+  "SelfHostedNotice": {},
   "SelfHostedInstanceReport": {},
   "WebPushSubscription": {},
   "WebPushVapidKey": {},

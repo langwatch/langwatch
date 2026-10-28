@@ -316,8 +316,11 @@ describe.each(storages)("a single-file dataset in $name", (storage) => {
       });
 
       const page = await app.getDatasetPage({ slugOrId: copy.id, projectId, page: 1, limit: 10 });
-      expect(page.datasetRecords.map((record) => record.entry)).toEqual(
-        previousReleaseFile.map((record) => record.entry),
+      // The scenario promises the same entries, not their order (the read sorts by copied ids).
+      const entries = page.datasetRecords.map((record) => record.entry);
+      expect(entries).toHaveLength(previousReleaseFile.length);
+      expect(entries).toEqual(
+        expect.arrayContaining(previousReleaseFile.map((record) => record.entry)),
       );
     });
   });

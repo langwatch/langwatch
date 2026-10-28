@@ -113,7 +113,7 @@ services:
           cpus: "0.25"
 
   clickhouse:
-    image: langwatch/clickhouse-serverless:0.2.0
+    image: langwatch/clickhouse-serverless:0.4.0
     environment:
       CLICKHOUSE_PASSWORD: langwatch
     # No host port - accessed via docker network as "clickhouse:8123"
@@ -141,7 +141,7 @@ services:
   # =============================================================================
 
   init:
-    image: node:24
+    image: node:24.22.1
     working_dir: /
     volumes:
       # The container mirrors the repo layout rooted at `/` (ADR-076: one pnpm
@@ -206,7 +206,7 @@ services:
   # that wants the API without the proxy hop.
 
   ui:
-    image: node:24
+    image: node:24.22.1
     restart: unless-stopped
     working_dir: /apps/ui
     volumes:
@@ -240,7 +240,7 @@ services:
       # BASE_HOST/NEXTAUTH_URL intentionally override .env so
       # worktree-isolated dev gets the correct dynamic APP_PORT (each
       # worktree picks a different free port). Set shell vars to point at
-      # a proxied URL (e.g. BASE_HOST=https://langwatch-main.boxd.sh) —
+      # a proxied URL (e.g. BASE_HOST=https://langwatch-main.example.com) —
       # shell wins over the localhost fallback.
       BASE_HOST: ${BASE_HOST:-http://localhost:${APP_PORT:-5560}}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-5560}}
@@ -277,7 +277,7 @@ services:
   # against a half-migrated database.
 
   api:
-    image: node:24
+    image: node:24.22.1
     restart: unless-stopped
     working_dir: /apps/api
     volumes:
@@ -351,7 +351,7 @@ services:
   # it never runs an application, so no workers.
 
   workers:
-    image: node:24
+    image: node:24.22.1
     working_dir: /apps/worker
     profiles: [workers, scenarios, full]
     volumes:

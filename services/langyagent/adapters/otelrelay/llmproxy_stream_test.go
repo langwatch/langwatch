@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 )
@@ -110,10 +111,13 @@ func TestLLMProxyStreamCut_BareJSONErrorBody(t *testing.T) {
 	relay := startRelay(t)
 	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-bare-json", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
 
-	// The body passes through untouched for the worker's SDK.
+	// The body reaches the worker's SDK untouched, as the 400 it stands for.
 	resp := rateLimitCall(t, relay, token)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("call answered %d, want the 200 passed through", resp.StatusCode)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("call answered %d, want 400 so the SDK does not retry a refusal", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
 	}
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != bareJSONErrorBody {
@@ -179,7 +183,14 @@ func TestLLMProxyStreamCut_CleanStreamClears(t *testing.T) {
 	}
 	_, _ = io.ReadAll(cleanPass.Body)
 
-	if _, ok := relay.LastLLMError(token); ok {
+	// The proxy clears the capture when it reads the upstream EOF, which can
+	// land just after the client has read a Content-Length body to its end.
+	cleared := false
+	for deadline := time.Now().Add(time.Second); !cleared && time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+		_, captured := relay.LastLLMError(token)
+		cleared = !captured
+	}
+	if !cleared {
 		t.Error("the clean stream must clear the captured cause")
 	}
 	final := rateLimitCall(t, relay, token)

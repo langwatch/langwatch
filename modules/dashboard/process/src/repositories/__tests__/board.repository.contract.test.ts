@@ -5,7 +5,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import type { DashboardStar } from "@langwatch/dashboard-contract";
+import { DashboardNotFoundError, type DashboardStar } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
 import type { BoardReach } from "../board.repository.ts";
@@ -48,7 +48,29 @@ function contractCases(backend: DashboardBackend): void {
       await expect(boards.updateBoard({ ...absent, data: { name: "Renamed" } })).rejects.toThrow(
         Error,
       );
-      await expect(boards.deleteBoard(absent)).rejects.toThrow(Error);
+      await expect(boards.deleteBoard(absent)).rejects.toThrow(DashboardNotFoundError);
+    });
+  });
+
+  describe("when a widget is placed on a board the project does not own", () => {
+    /** @scenario "The memory and Postgres dashboard repositories answer alike" */
+    it("refuses it as a missing board", async () => {
+      const foreign = await board("Theirs", backend.otherProjectId());
+
+      await expect(widget("dash_absent")).rejects.toThrow(DashboardNotFoundError);
+      await expect(widget(foreign.id)).rejects.toThrow(DashboardNotFoundError);
+    });
+
+    it("refuses to move a widget onto it as a missing board", async () => {
+      const foreign = await board("Theirs", backend.otherProjectId());
+      const placed = await widget();
+      const assign = (dashboardId: string) =>
+        backend
+          .widgets()
+          .assignToDashboard({ id: placed.id, projectId: backend.projectId(), dashboardId });
+
+      await expect(assign("dash_absent")).rejects.toThrow(DashboardNotFoundError);
+      await expect(assign(foreign.id)).rejects.toThrow(DashboardNotFoundError);
     });
   });
 
@@ -96,6 +118,26 @@ function contractCases(backend: DashboardBackend): void {
           dashboardIds: [created.id, "dash_absent"],
         }),
       ).resolves.toMatchObject([{ id: created.id, name: "Renamed" }]);
+    });
+
+    /** @scenario "AC200e Langy setting: the API reads and sets the origins a board leaves out" */
+    it("stores no origins until written, keeps the empty list apart from null, and clears it", async () => {
+      const boards = backend.boards();
+      const created = await board("Langy");
+      const ref = { projectId: backend.projectId(), dashboardId: created.id };
+
+      const included = await boards.updateBoard({ ...ref, data: { excludedOrigins: [] } });
+      const renamed = await boards.updateBoard({ ...ref, data: { name: "Langy too" } });
+      const cleared = await boards.updateBoard({ ...ref, data: { excludedOrigins: null } });
+      const [read] = await boards.findBoardsByIds({ ...ref, dashboardIds: [created.id] });
+
+      expect({
+        created: created.excludedOrigins,
+        included: included.excludedOrigins,
+        renamed: renamed.excludedOrigins,
+        cleared: cleared.excludedOrigins,
+        read: read?.excludedOrigins,
+      }).toEqual({ created: null, included: [], renamed: [], cleared: null, read: null });
     });
 
     it("counts the widgets placed on each board, and no unplaced one", async () => {
