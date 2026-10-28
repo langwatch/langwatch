@@ -9,12 +9,12 @@ Feature: GroupQueue hands back a job the worker has no handler for
   that handed it back to the group's record. Each worker in the record passes the
   group over for two signal waits from its own hand-back, so a peer asleep in its
   wait claims the job first; meanwhile it waits for that pass-over to lapse rather
-  than polling the group. The job's completion clears the record. Each entry's
-  expiry is the only other bound: the only worker, or one whose peers are gone,
-  takes the job back once its own entry lapses. A job handed back for longer than
-  the hand-back window falls back to spending attempts, logged at error, so a kind
-  no worker knows still surfaces and is dead-lettered once its attempts are spent
-  (#9148).
+  than polling the group. The completion of that job, not of a sibling, clears the
+  record. Each entry's expiry is the only other bound: the only worker, or one
+  whose peers are gone, takes the job back once its own entry lapses. A job handed
+  back for longer than the hand-back window falls back to spending attempts,
+  logged at error, so a kind no worker knows still surfaces and is dead-lettered
+  once its attempts are spent (#9148).
 
   @unit
   Scenario: A handed-back job keeps its attempt count and its group is not blocked
@@ -95,11 +95,18 @@ Feature: GroupQueue hands back a job the worker has no handler for
     And the other still passes it over
 
   @integration
-  Scenario: A completion clears the hand-back record
+  Scenario: The handed-back job's completion clears the hand-back record
     Given a job one worker handed back
     When another worker claims it and completes it
     Then the group holds no record of who handed it back
     And the worker that handed it back claims the group's next job
+
+  @integration
+  Scenario: A sibling's completion leaves the hand-back record
+    Given a job one worker handed back, and a sibling staged ahead of its new due time
+    When another worker claims and completes the sibling
+    Then the worker that handed the job back still passes it over
+    And the record clears when the handed-back job completes
 
   @integration
   Scenario: An ordinary retry is not passed over

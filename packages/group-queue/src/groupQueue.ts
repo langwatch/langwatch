@@ -270,9 +270,9 @@ export const GROUP_QUEUE_CONFIG = {
 } as const;
 
 /**
- * A handed-back job waits `delayMs`; once handed back for over `windowMs`, it spends attempts. Each
- * worker that handed it back passes its group over for `passOverMs`, two signal waits, so a peer
- * asleep in one claims it first (#9148). That expiry, or the job completing, is the only bound.
+ * A handed-back job waits `delayMs`; past `windowMs` it spends attempts. Each worker that handed it
+ * back passes its group over for `passOverMs`, two signal waits (#9148). The re-stage holds the
+ * group ~3s, leaving a peer ~7s against its 5s wait: a longer `delayMs` needs a longer pass-over.
  */
 export const HAND_BACK_CONFIG = {
   delayMs: 1_000,

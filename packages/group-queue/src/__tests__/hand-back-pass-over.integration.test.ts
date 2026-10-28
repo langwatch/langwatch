@@ -166,7 +166,7 @@ describe("given a job two workers handed back, one of whose pass-overs is short"
 
 describe("given a job one worker handed back", () => {
   describe("when another worker claims it and completes it", () => {
-    /** @scenario "A completion clears the hand-back record" */
+    /** @scenario "The handed-back job's completion clears the hand-back record" */
     it("clears the record, so the worker that handed it back claims the group's next job", async () => {
       await stage({ groupId: "group-a", stagedJobId: "job-1" });
       await claimAndReturn({ workerId: OLDER });
@@ -185,6 +185,36 @@ describe("given a job one worker handed back", () => {
       expect(await redis.exists(handedBackKey("group-a"))).toBe(0);
       const next = await claimAs({ workerId: OLDER });
       expect(next.claims.map((each) => each.stagedJobId)).toEqual(["job-2"]);
+    });
+  });
+});
+
+describe("given a job one worker handed back, and a sibling staged ahead of its new due time", () => {
+  describe("when another worker claims and completes the sibling", () => {
+    /** @scenario "A sibling's completion leaves the hand-back record" */
+    it("keeps the record, so the worker that handed the job back still passes it over", async () => {
+      await stage({ groupId: "group-a", stagedJobId: "job-a" });
+      await claimAndReturn({ workerId: OLDER });
+      // Re-staged at 1_200: a sibling at 1_100 runs ahead of it.
+      await stage({ groupId: "group-a", stagedJobId: "job-b", dispatchAfterMs: 1_100 });
+
+      const sibling = await claimAs({ workerId: NEWER });
+      expect(sibling.claims.map((claim) => claim.stagedJobId)).toEqual(["job-b"]);
+      await scripts.complete({
+        groupId: "group-a",
+        stagedJobId: "job-b",
+        claimToken: sibling.claims[0]!.claimToken,
+      });
+
+      expect((await claimAs({ workerId: OLDER })).claims).toEqual([]);
+      const handedBack = await claimAs({ workerId: NEWER });
+      expect(handedBack.claims.map((claim) => claim.stagedJobId)).toEqual(["job-a"]);
+      await scripts.complete({
+        groupId: "group-a",
+        stagedJobId: "job-a",
+        claimToken: handedBack.claims[0]!.claimToken,
+      });
+      expect(await redis.exists(handedBackKey("group-a"))).toBe(0);
     });
   });
 });

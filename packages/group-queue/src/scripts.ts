@@ -1745,8 +1745,12 @@ gqReleaseClaimMarker(string.sub(activeKey, 1, #activeKey - 7) .. ":claim", ARGV[
 
 redis.call("DEL", claimedKey)
 redis.call("DEL", activeKey)
--- The job is done with, so no worker that handed it back passes the group over any longer (#9148).
-redis.call("DEL", string.sub(activeKey, 1, #activeKey - 7) .. ":handed-back-by")
+-- The handed-back job is done with, so no worker that handed it back passes the group over any
+-- longer (#9148). A sibling that ran ahead of it leaves the record.
+local groupKeyPrefix = string.sub(activeKey, 1, #activeKey - 7)
+if redis.call("GET", groupKeyPrefix .. ":handed-back-job") == stagedJobId then
+  redis.call("DEL", groupKeyPrefix .. ":handed-back-by", groupKeyPrefix .. ":handed-back-job")
+end
 if endsRetryChain then
   redis.call("DEL", failStreakKey, attemptKey)
 end
@@ -2049,13 +2053,15 @@ if attempt ~= "" then
 end
 
 -- 1c. A hand-back adds its worker to the group's record, scored by when that worker's pass-over
---     lapses on its own clock; the key outlives its longest entry (#9148). A retry adds nobody.
+--     lapses on its own clock, and names the job whose completion clears it. Both keys outlive the
+--     longest entry (#9148). A retry adds nobody.
 local handedBackBy = ARGV[15] or ""
 local passOverMs = tonumber(ARGV[16]) or 0
 if handedBackBy ~= "" and passOverMs > 0 then
   local handedBackKey = keyPrefix .. "group:" .. groupId .. ":handed-back-by"
   redis.call("ZADD", handedBackKey, nowMs + passOverMs, handedBackBy)
   if redis.call("PTTL", handedBackKey) < passOverMs then redis.call("PEXPIRE", handedBackKey, passOverMs) end
+  redis.call("SET", keyPrefix .. "group:" .. groupId .. ":handed-back-job", newStagedJobId, "PX", redis.call("PTTL", handedBackKey))
 end
 
 -- 2. Re-stage job with future score (backoff delay)
@@ -2198,7 +2204,7 @@ export interface GroupRetryRestage {
   /** Recorded on the group's retry chain in the same atomic step. */
   attempt: number;
   attemptTtlSec: number;
-  /** A hand-back: `workerId` passes the group over for `ttlMs`, or until the job completes. */
+  /** A hand-back: `workerId` passes the group over for `ttlMs`, or until this job completes. */
   passOver?: { workerId: string; ttlMs: number };
 }
 
