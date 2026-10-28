@@ -102,7 +102,7 @@ Reusable framework decisions live with their packages:
 | [183](./183-vitest-workers-cache-module-loading.md)                    | Vitest workers cache how they load installed packages                                                                      | Proposed                  |
 | [184](./184-isolated-jsdom-files-share-a-worker.md)                    | Isolated jsdom test files share a worker instead of starting a process each                                                | Proposed                  |
 | [186](./186-test-changed-runs-the-tests-an-edit-reaches.md)            | `test:changed` runs the tests an edit reaches, from a kept import graph                                                    | Proposed                  |
-| [189](./189-instant-eval-result-storage.md)                            | Where instant eval results live                                                                                            | Proposed                  |
+| [189](./189-instant-eval-result-storage.md)                            | One table for all eval results, recalled before judging                                                                    | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
