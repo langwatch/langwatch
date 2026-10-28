@@ -894,13 +894,27 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          sparse-checkout: .github
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      # A repeat counts a failed or cancelled (timed-out) job in the previous
+      # finished main run, so a timeout posts once too (tools/slacknotify).
       - name: Notify Slack on failure
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh "package-suites (1/1)"
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+        run: go run ./cmd/slacknotify -workflow langwatch-app-ci.yml -job "package-suites (1/1)"
 
   lint:
     needs: changes

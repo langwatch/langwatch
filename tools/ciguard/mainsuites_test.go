@@ -80,14 +80,37 @@ func TestMainRunsThePackageSuitesAsOneQueuedJob(t *testing.T) {
 	})
 }
 
+func TestMainSuitesReportsRatherThanFailsOnOtherLegalShapes(t *testing.T) {
+	good := realAppCI(t)
+	for name, swap := range map[string][2]string{
+		"a scalar concurrency group": {
+			"concurrency:\n",
+			"concurrency: one-group\nx-old-concurrency:\n",
+		},
+		"a literal shard list": {
+			"shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}",
+			"shard: [1, 2, 3, 4, 5, 6, 7, 8]",
+		},
+		"a numeric timeout": {
+			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}",
+			"timeout-minutes: 45",
+		},
+	} {
+		t.Run(name+" is a problem, not an error", func(t *testing.T) {
+			require.Contains(t, good, swap[0])
+			assert.NotEmpty(t, mainSuitesProblems(t, strings.Replace(good, swap[0], swap[1], 1)))
+		})
+	}
+}
+
 // @scenario "A red package-suites run on main posts to Slack"
 func TestARedOrTimedOutMainSuitesRunPostsToSlack(t *testing.T) {
 	good := realAppCI(t)
 
 	breakEach(t, good, map[string][2]string{
 		"no Slack job": {
-			`bash .github/scripts/notify-slack-job-failure.sh "package-suites (1/1)"`,
-			`echo skipped`,
+			"go run ./cmd/slacknotify",
+			"echo skipped",
 		},
 		"a timeout that does not post": {
 			" || needs.package-suites.result == 'cancelled')",

@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/langwatch/langwatch/pkg/ciscan"
 )
 
 // A push to main runs package-suites as one job, queues behind the run before
@@ -20,24 +22,24 @@ const (
 	oneJobFlag     = "needs.changes.outputs.suites-one-job == 'true'"
 	mainQueues     = "${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}"
 	sharedCacheKey = "nx-suites-all-"
-	notifyScript   = "notify-slack-job-failure.sh"
+	notifyCommand  = "go run ./cmd/slacknotify"
 )
 
+// Every field a workflow may write as a scalar, a list or a mapping is a
+// yaml.Node, so any legal shape decodes and only the wrong one is reported.
 type suitesWorkflow struct {
-	Concurrency struct {
-		CancelInProgress string `yaml:"cancel-in-progress"`
-	} `yaml:"concurrency"`
-	Jobs map[string]suitesJob `yaml:"jobs"`
+	Concurrency ciscan.Concurrency   `yaml:"concurrency"`
+	Jobs        map[string]suitesJob `yaml:"jobs"`
 }
 
 type suitesJob struct {
-	Needs    yaml.Node         `yaml:"needs"`
-	If       string            `yaml:"if"`
-	Name     string            `yaml:"name"`
-	Timeout  string            `yaml:"timeout-minutes"`
-	Outputs  map[string]string `yaml:"outputs"`
+	Needs    yaml.Node            `yaml:"needs"`
+	If       string               `yaml:"if"`
+	Name     string               `yaml:"name"`
+	Timeout  yaml.Node            `yaml:"timeout-minutes"`
+	Outputs  map[string]yaml.Node `yaml:"outputs"`
 	Strategy struct {
-		Matrix map[string]string `yaml:"matrix"`
+		Matrix map[string]yaml.Node `yaml:"matrix"`
 	} `yaml:"strategy"`
 	Steps []suitesStep `yaml:"steps"`
 }
@@ -62,10 +64,10 @@ func MainSuites(repoRoot string) ([]string, error) {
 	}
 
 	var problems []string
-	if wf.Concurrency.CancelInProgress != mainQueues {
+	if cancel, _ := wf.Concurrency.CancelInProgress.(string); cancel != mainQueues {
 		problems = append(problems, "cancel-in-progress must be "+mainQueues+", so a push to main queues behind the run before it")
 	}
-	if wf.Jobs["changes"].Outputs["suites-one-job"] != oneJobOutput {
+	if output := wf.Jobs["changes"].Outputs["suites-one-job"]; output.Value != oneJobOutput {
 		problems = append(problems, "changes must output suites-one-job: "+oneJobOutput)
 	}
 	problems = append(problems, oneJobProblems(wf.Jobs["package-suites"])...)
@@ -76,10 +78,10 @@ func MainSuites(repoRoot string) ([]string, error) {
 
 func oneJobProblems(job suitesJob) []string {
 	var problems []string
-	if !strings.Contains(job.Strategy.Matrix["shard"], oneJobFlag+" && '[1]'") {
+	if shard := job.Strategy.Matrix["shard"]; !strings.Contains(shard.Value, oneJobFlag+" && '[1]'") {
 		problems = append(problems, "package-suites must run one shard when suites-one-job is true")
 	}
-	if !strings.Contains(job.Timeout, oneJobFlag) {
+	if !strings.Contains(job.Timeout.Value, oneJobFlag) {
 		problems = append(problems, "package-suites must lengthen its timeout when suites-one-job is true")
 	}
 	if !strings.Contains(job.Name, "strategy.job-total") {
@@ -109,7 +111,7 @@ func oneJobProblems(job suitesJob) []string {
 func notifyProblems(jobs map[string]suitesJob) []string {
 	for name := range jobs {
 		job := jobs[name]
-		if !needsJob(job.Needs, "package-suites") || !runsScript(job.Steps, notifyScript) {
+		if !needsJob(job.Needs, "package-suites") || !runsScript(job.Steps, notifyCommand) {
 			continue
 		}
 		var problems []string
@@ -122,7 +124,7 @@ func notifyProblems(jobs map[string]suitesJob) []string {
 		return problems
 	}
 
-	return []string{"no job after package-suites runs " + notifyScript}
+	return []string{"no job after package-suites runs " + notifyCommand}
 }
 
 func needsJob(needs yaml.Node, name string) bool {

@@ -201,7 +201,8 @@ Feature: A package's integration suite runs in CI when it declares one
       When the package suites job runs it
       Then it runs through pnpm, every time
 
-  # Bound by tools/ciguard/mainsuites_test.go against the workflow's shape (#9146).
+  # Bound by tools/ciguard/mainsuites_test.go (the workflow's shape) and
+  # tools/slacknotify/slacknotify_test.go (the post) (#9146).
   Rule: Main runs every suite in one job and tells Slack when it fails
 
     @unit
@@ -214,6 +215,12 @@ Feature: A package's integration suite runs in CI when it declares one
 
     @unit
     Scenario: A red package-suites run on main posts to Slack
-      Given package-suites fails or times out on main and passed in the latest failed run before it
+      Given package-suites fails or times out on main and was not red in the previous finished run
       When the run reaches its Slack job
       Then Slack gets the job, the commit and a link to the run
+
+    @unit
+    Scenario: A repeat failure or timeout on main posts once
+      Given package-suites failed or was cancelled in the previous finished run on main
+      When it is red again
+      Then Slack gets nothing new
