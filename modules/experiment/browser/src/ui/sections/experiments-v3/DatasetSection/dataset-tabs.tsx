@@ -20,7 +20,7 @@ import type { DatasetReference } from "../../../../model/experiments-v3/types.ts
 import {
   DatasetVersionSubmenu,
   datasetVersionBadge,
-} from "../../../elements/experiments-v3/dataset-version-select.tsx";
+} from "../../../elements/experiments-v3/dataset-version-submenu.tsx";
 
 type DatasetTabsProps = {
   onSelectExisting: () => void;

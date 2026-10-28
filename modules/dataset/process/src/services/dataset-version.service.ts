@@ -190,8 +190,18 @@ export class DatasetVersionService {
       rows: dataset.rowCount,
       bytes: dataset.sizeBytes === null ? null : Number(dataset.sizeBytes),
     });
+    // A postgres-layout dataset records no counts, so the current rows
+    // are also bounded as they stream.
+    const { maxRows, maxBytes } = await this.deps.wholeReadBounds(input.projectId);
     const current: DatasetVersionRow[] = [];
-    for await (const row of this.#currentRows(dataset)) current.push(row);
+    let bytes = 0;
+    for await (const row of this.#currentRows(dataset)) {
+      bytes += Buffer.byteLength(JSON.stringify(row.entry));
+      if (current.length >= maxRows || bytes > maxBytes) {
+        throw new DatasetVersionTooLargeError({ maxRows, maxBytes });
+      }
+      current.push(row);
+    }
     return compareDatasetContents({
       version: version.version,
       before,
