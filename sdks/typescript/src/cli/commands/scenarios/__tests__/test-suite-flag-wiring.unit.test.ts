@@ -62,3 +62,16 @@ describe("scenario update, given both test suite flags on one line", () => {
     expect(reported.join("\n")).toContain("cannot be used together");
   }, 30000);
 });
+
+describe("scenario create --help", () => {
+  it("tells the caller to list test suites first and when --test-suite may be left out", () => {
+    const create = buildProgram()
+      .commands.find((c) => c.name() === "scenario")
+      ?.commands.find((c) => c.name() === "create");
+    const help = create?.helpInformation().replace(/\s+/g, " ") ?? "";
+
+    expect(help).toContain("langwatch test-suite list");
+    expect(help).toContain("the suite that fits (or ask the user)");
+    expect(help).toContain("no suite besides Default");
+  });
+});
