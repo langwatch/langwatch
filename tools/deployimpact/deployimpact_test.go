@@ -60,7 +60,7 @@ func TestNonBreakingFactsAreListed(t *testing.T) {
 	assert.False(t, report.Blocked())
 	assert.Equal(t, "helm value", factAbout(t, report, valuesFile+": app").Kind)
 	assert.Equal(t, "migration", factAbout(t, report, migration).Kind)
-	assert.Equal(t, "image", factAbout(t, report, "apps/api/Dockerfile").Kind)
+	assert.Equal(t, "image build changed", factAbout(t, report, "apps/api/Dockerfile").Detail)
 	assert.Len(t, report.Facts, 3, "an errors file under a migrations folder is not a migration")
 }
 

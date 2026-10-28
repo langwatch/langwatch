@@ -13,8 +13,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 jobs:
   # Its own job, outside the concurrency group below: it runs only when the pull
@@ -22,6 +20,9 @@ jobs:
   issue-link:
     if: github.event.action == 'opened'
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
     timeout-minutes: 5
     steps:
       # A branch named issue<number>/<slug> gets "Resolves #<number>" in its body
@@ -66,6 +67,10 @@ jobs:
     name: pr conventions
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Write only for the impact map comment; it runs the pull request's own code, as before.
+    permissions:
+      contents: read
+      pull-requests: write
     # Every check reads the pull request as it is now, so a newer event supersedes
     # an older run, and two runs would race to post the impact map. Not
     # `pr-conventions-<n>`: main's old title check holds that group until this merges.
@@ -160,15 +165,19 @@ jobs:
         run: |
           set -o pipefail
           # 2 is a fact that breaks an install, reported after the impact map; 1 is an error.
+          # Built, not `go run`: go run turns every failing exit into 1.
+          go build -o "$RUNNER_TEMP/deployimpact" ./cmd/deployimpact
           status=0
-          go run ./cmd/deployimpact -base "$BASE_SHA" -head "$HEAD_SHA" -acknowledged="$ACKNOWLEDGED" \
+          "$RUNNER_TEMP/deployimpact" -base "$BASE_SHA" -head "$HEAD_SHA" -acknowledged="$ACKNOWLEDGED" \
             -out "$RUNNER_TEMP/deploy-impact.md" | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
           if [ "$status" -eq 2 ]; then echo "blocked=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           exit "$status"
 
       # A fork's token is read-only, so its comment would 403; it still gets the job summary.
+      # Describes the diff, never judges it: a failed post must not block a merge.
       - name: Post the impact map
         if: ${{ !cancelled() && env.DIFF_EVENT == 'true' && github.event.pull_request.head.repo.full_name == github.repository }}
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |

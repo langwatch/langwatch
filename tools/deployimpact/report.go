@@ -83,11 +83,14 @@ func changeFacts(changes []Change) []Fact {
 		case change.Status == "A" && isMigration(change.Path):
 			facts = append(facts, Fact{Kind: "migration", Subject: change.Path, Detail: "runs on upgrade"})
 		case strings.HasPrefix(path.Base(change.Path), "Dockerfile"):
-			facts = append(facts, Fact{Kind: "image", Subject: change.Path, Detail: "image build changed"})
+			facts = append(facts, Fact{Kind: "image", Subject: change.Path, Detail: imageChange[change.Status]})
 		}
 	}
 	return facts
 }
+
+// imageChange says what a Dockerfile change does to the image it builds.
+var imageChange = map[string]string{"A": "new image build", "M": "image build changed", "D": "image build removed"}
 
 // isSource is whether path is product code in one of exts, not a test or fixture.
 func isSource(path string, exts ...string) bool {

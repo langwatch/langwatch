@@ -59,11 +59,11 @@ func (g GitTree) Grep(pattern string) ([]string, error) {
 
 // Read returns a file's content at the revision, or an empty string when it is absent.
 func (g GitTree) Read(path string) (string, error) {
-	out, err := git(g.Ctx, "show", g.Rev+":"+path)
-	if err != nil && (strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "but not in")) {
-		return "", nil
+	listed, err := git(g.Ctx, "ls-tree", "-z", "--name-only", g.Rev, "--", path)
+	if err != nil || listed == "" {
+		return "", err
 	}
-	return out, err
+	return git(g.Ctx, "show", g.Rev+":"+path)
 }
 
 // Changes lists the files that differ between base and head, renames as a delete and an add.
