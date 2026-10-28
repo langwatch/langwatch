@@ -64,6 +64,7 @@ var (
 		"tools/chartheap",
 		"tools/matrixseed",
 		"cmd/linkcheck",
+		"tools/lambdaboot",
 		"cmd/service",
 		"tools/upgradelab",
 		"services/sims/telemetrysim",

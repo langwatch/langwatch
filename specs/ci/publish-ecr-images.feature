@@ -6,8 +6,9 @@ Feature: Publish every deployable image to the artifacts registry
   # These scenarios describe .github/workflows/publish-docker-ecr.yml. How a
   # Lambda image gets its tag is .github/scripts/publish-lambda-tag.sh, bound
   # by .github/scripts/__tests__/publish-lambda-tag.test.sh. The path filters
-  # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, and where a Lambda
-  # image starts by tools/ciguard/lambdaworkdir_test.go. The rest is the
+  # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, where a Lambda
+  # image starts by tools/ciguard/lambdaworkdir_test.go, and the boot check a
+  # Lambda image passes before it is pushed by tools/lambdaboot. The rest is the
   # workflow's own build steps, which no test suite can run: those scenarios
   # are @unimplemented and are proved by the first run on main.
 
@@ -87,3 +88,52 @@ Feature: Publish every deployable image to the artifacts registry
     Given a Lambda image whose base sets a home directory only its own user may enter
     When the image's Dockerfile is checked
     Then its runtime stage sets a working directory outside every home directory
+
+  # The Dockerfile check above reads one known cause. The boot check runs the
+  # built image the way Lambda does, as a user that is not the image's own,
+  # with a read-only root and only /tmp writable, so any cause that stops it
+  # starting fails the run before the image is pushed. Docker enters the
+  # working directory before it drops to that user and Lambda does not, so a
+  # boot alone cannot see a working directory the user may not enter: the
+  # check reads the image's directory modes for it first.
+  @unit
+  Scenario: The boot check refuses a working directory a foreign user cannot enter
+    Given a built Lambda image whose working directory, or a directory above it, only its own user may enter
+    When the boot check runs
+    Then it fails, naming the directory and saying permission was denied
+    And it starts no container to boot the image
+
+  @unit
+  Scenario: The boot check passes an image that serves its health check as a foreign user
+    Given a built Lambda image that starts as a user other than its own
+    When the boot check runs
+    Then it passes once the health check answers 200 within the bound
+
+  @unit
+  Scenario: The boot check fails an image that cannot start as a foreign user
+    Given a built Lambda image that docker cannot start as that user
+    When the boot check runs
+    Then it fails and names the image
+
+  @unit
+  Scenario: The boot check fails at once when the image's process exits
+    Given a built Lambda image whose process exits soon after it starts
+    When the boot check runs
+    Then it fails without waiting out the bound
+    And the failure shows the container's own output
+
+  @unit
+  Scenario: The boot check fails an image that never answers its health check
+    Given a built Lambda image that keeps running but never answers its health check
+    When the boot check runs
+    Then it fails once the bound has passed
+    And the failure shows the container's own output
+
+  # The ordering itself is the workflow's: the build loads the image without
+  # pushing it, the boot check runs, and only then does the push step run.
+  @unimplemented
+  Scenario: A Lambda image is pushed only after it passes the boot check
+    Given publish-docker-ecr builds a Lambda image for a commit
+    When the boot check fails for that image
+    Then the run fails before its push step
+    And the registry has no tag or digest for that build
