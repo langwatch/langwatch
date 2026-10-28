@@ -14,7 +14,7 @@ import { isLockoutCountedPath } from "../../../rules/sign-in-identifier-hash.rul
 import {
   answerAuthRefusalByRegisteredCode,
   refuseDirectTwoStepDisable,
-  releaseHandledRefusal,
+  AUTH_API_ERROR_HANDLING,
   twoFactorPlugin,
 } from "../http.better-auth.channel.ts";
 
@@ -33,7 +33,7 @@ function twoStepHarness() {
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter(database),
     emailAndPassword: { enabled: true },
-    onAPIError: { onError: releaseHandledRefusal },
+    onAPIError: AUTH_API_ERROR_HANDLING,
     plugins: [
       twoFactorPlugin(),
       {

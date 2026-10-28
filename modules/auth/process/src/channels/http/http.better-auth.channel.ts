@@ -17,7 +17,6 @@ import {
   type AuthApi,
   type SocialProviderBases,
 } from "@langwatch/auth-contract";
-import { HandledError } from "@langwatch/handled-error";
 import {
   type AssertedEmailVerification,
   assertedEmailVerification,
@@ -27,6 +26,7 @@ import {
   type SsoAssertionApi,
   ssoSamlIdpConfigSchema,
 } from "@langwatch/identity-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { fromDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
@@ -332,13 +332,28 @@ export function answerAuthRefusalByRegisteredCode(ctx: {
 }
 
 /**
- * better-auth's router error hook: a handled refusal leaves its handler for the host's
- * renderer; every other failure keeps better-auth's own answer and is logged here.
+ * better-auth's router error handling. better-auth swallows a throw from an `onError` hook, so
+ * failures leave it instead: an APIError still gets better-auth's own answer from its router,
+ * and anything else reaches {@link answerEscapedAuthFailure}.
  */
-export function releaseHandledRefusal(error: unknown): void {
+export const AUTH_API_ERROR_HANDLING = { throw: true } as const;
+
+/**
+ * A failure that left better-auth: a handled refusal goes on to the host's renderer at its own
+ * status; anything else is logged and answered as a bare 500, which the auth door lands.
+ */
+export function answerEscapedAuthFailure(error: unknown): Response {
   if (HandledError.isHandled(error)) throw error;
-  if (error instanceof APIError && error.status !== "INTERNAL_SERVER_ERROR") return;
   logger.error({ error }, "an auth endpoint failed");
+  return new Response(null, { status: 500, statusText: "Internal Server Error" });
+}
+
+/** An endpoint that answered with a server error is logged; refusals are expected traffic. */
+export function logFailedAuthEndpoint(ctx: { context?: { returned?: unknown } }): void {
+  const returned = ctx.context?.returned;
+  if (returned instanceof APIError && returned.status === "INTERNAL_SERVER_ERROR") {
+    logger.error({ error: returned }, "an auth endpoint failed");
+  }
 }
 
 /**
@@ -544,7 +559,7 @@ export const createAuthOptions = ({
    */
   onAPIError: {
     errorURL: `${deployment.baseUrl}/auth/error`,
-    onError: releaseHandledRefusal,
+    ...AUTH_API_ERROR_HANDLING,
   },
 
   // Map BetterAuth's expected models to the existing capitalized Prisma tables.
@@ -846,6 +861,7 @@ export const createAuthOptions = ({
     after: createAuthMiddleware(async (ctx) => {
       await passwordResetSession?.signInAfterPasswordReset(ctx);
       await countSignInAttempt({ ctx, signInLockout });
+      logFailedAuthEndpoint(ctx);
       answerAuthRefusalByRegisteredCode(ctx);
     }),
   },
@@ -1202,6 +1218,9 @@ export const createBetterAuthTransport = (
   const instance = betterAuth(transportOptions({ ...options, callbackEvidence }));
   return {
     ...instance,
-    handler: (request: Request) => callbackEvidence.runWithScope(() => instance.handler(request)),
+    handler: (request: Request) =>
+      callbackEvidence.runWithScope(() =>
+        instance.handler(request).catch(answerEscapedAuthFailure),
+      ),
   };
 };

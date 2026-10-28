@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { releaseHandledRefusal } from "../http.better-auth.channel.ts";
+import { AUTH_API_ERROR_HANDLING } from "../http.better-auth.channel.ts";
 import {
   signUpConfirmationPlugin,
   type SignUpAddressConfirmation,
@@ -45,7 +45,7 @@ function harness(answer: (token: string) => Confirmed) {
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter({ user: [], session: [], account: [], verification: [] }),
     emailAndPassword: { enabled: true },
-    onAPIError: { onError: releaseHandledRefusal },
+    onAPIError: AUTH_API_ERROR_HANDLING,
     plugins: [
       signUpConfirmationPlugin({
         verification,

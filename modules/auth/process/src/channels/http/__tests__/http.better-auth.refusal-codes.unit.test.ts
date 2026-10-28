@@ -3,6 +3,7 @@
  * @see modules/auth/specs/forced-password-reset.feature
  */
 import { createErrorHandler } from "@langwatch/api";
+import { IdentitySignInRefusedError } from "@langwatch/auth-contract";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -13,7 +14,8 @@ import { findRegisteredRefusals } from "../../../rules/better-auth-error-code.ru
 import { PASSWORD_RESET_REQUIRED_CODE } from "../http.better-auth-hooks.channel.ts";
 import {
   answerAuthRefusalByRegisteredCode,
-  releaseHandledRefusal,
+  answerEscapedAuthFailure,
+  AUTH_API_ERROR_HANDLING,
 } from "../http.better-auth.channel.ts";
 
 const BASE = "http://localhost:3000/api/auth";
@@ -24,7 +26,7 @@ function refusalHarness({ passwordResetRequired = false } = {}) {
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter({ user: [], session: [], account: [], verification: [] }),
     emailAndPassword: { enabled: true },
-    onAPIError: { onError: releaseHandledRefusal },
+    onAPIError: AUTH_API_ERROR_HANDLING,
     databaseHooks: {
       session: {
         create: {
@@ -285,7 +287,7 @@ describe("given a passkey ceremony fails for a reason nothing anticipated", () =
   });
 });
 
-describe("releaseHandledRefusal", () => {
+describe("when better-auth answers a refusal itself", () => {
   /** @scenario "A refusal better-auth answers itself keeps better-auth's answer" */
   it("keeps an untranslated refusal inside better-auth's own answer", async () => {
     const post = refusalHarness();
@@ -294,5 +296,24 @@ describe("releaseHandledRefusal", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).not.toHaveProperty("retryable");
+  });
+});
+
+describe("given a failure that left better-auth", () => {
+  describe("when it is a handled refusal", () => {
+    it("passes it on to the host's renderer", () => {
+      const refusal = new IdentitySignInRefusedError("/sign-in/email refused");
+
+      expect(() => answerEscapedAuthFailure(refusal)).toThrow(refusal);
+    });
+  });
+
+  describe("when it is anything else", () => {
+    it("answers a bare 500 the auth door can land", async () => {
+      const response = answerEscapedAuthFailure(new Error("sealed row with no key"));
+
+      expect(response.status).toBe(500);
+      expect(await response.text()).toBe("");
+    });
   });
 });

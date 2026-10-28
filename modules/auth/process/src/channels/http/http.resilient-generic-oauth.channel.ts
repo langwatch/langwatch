@@ -112,7 +112,7 @@ async function initProvider({
 
 /**
  * The real plugin checks `iat` only under a maximum age it never sets, so the claim is checked
- * here; `exp` and `nbf` get the same clock tolerance (patches/@better-auth__core@1.7.1.patch).
+ * here; `exp` and `nbf` get the same clock tolerance (patches/@better-auth__core@1.7.12.patch).
  */
 function withIssuedAtCheck(provider: GenericProvider): GenericProvider {
   const idToken = provider.idToken;

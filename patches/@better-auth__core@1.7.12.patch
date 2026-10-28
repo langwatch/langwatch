@@ -1,9 +1,9 @@
 diff --git a/dist/oauth2/oauth-provider.d.mts b/dist/oauth2/oauth-provider.d.mts
-index 66ba333..de69d80 100644
+index 4eb09bc4f7892b018f6e222ef2ec00be94cf79b7..32a54f33b9f566f2ae3921d8dfed3256cd4618d1 100644
 --- a/dist/oauth2/oauth-provider.d.mts
 +++ b/dist/oauth2/oauth-provider.d.mts
-@@ -22,6 +22,8 @@ type OAuthIdTokenConfig = {
-   audience: string | string[]; /** Permitted JWS algorithms. Defaults to the token's `alg` header. */
+@@ -26,6 +26,8 @@ type OAuthIdTokenConfig = {
+    */
    algorithms?: string[] | undefined; /** Maximum token age passed to jose (e.g. `"1h"`). */
    maxTokenAge?: string | undefined;
 +  /** Clock skew tolerance passed to jose for `exp`, `nbf` and `iat` (e.g. `120` or `"2m"`). */
@@ -12,16 +12,15 @@ index 66ba333..de69d80 100644
     * How the `nonce` claim is compared to the expected nonce.
     * - `"exact"` (default): strict equality.
 diff --git a/dist/oauth2/verify-id-token.mjs b/dist/oauth2/verify-id-token.mjs
-index 7103418..c6fd938 100644
+index 91511073f809e3d82b09e8e389225f8c7f977933..ed8dc890c020d8292393e31981e22b95c2f90977 100644
 --- a/dist/oauth2/verify-id-token.mjs
 +++ b/dist/oauth2/verify-id-token.mjs
-@@ -49,7 +49,8 @@ async function verifyProviderIdToken(provider, token, nonce, ctx) {
- 			issuer: config.issuer,
- 			audience: config.audience,
- 			algorithms: config.algorithms ?? (alg ? [alg] : void 0),
--			maxTokenAge: config.maxTokenAge
-+			maxTokenAge: config.maxTokenAge,
-+			clockTolerance: config.clockTolerance
- 		});
- 		if (nonce && !await nonceMatches(payload.nonce, nonce, config.nonceComparison)) return false;
- 		if (config.verifyClaims && !config.verifyClaims(payload)) return false;
+@@ -30,7 +30,7 @@ function getIdTokenVerifyOptions(options) {
+ 		algorithms: options.algorithms,
+ 		maxTokenAge: options.maxTokenAge,
+ 		requiredClaims: ID_TOKEN_REQUIRED_CLAIMS,
+-		clockTolerance: ID_TOKEN_CLOCK_TOLERANCE_SECONDS
++		clockTolerance: options.clockTolerance ?? ID_TOKEN_CLOCK_TOLERANCE_SECONDS
+ 	};
+ }
+ async function sha256Hex(value) {

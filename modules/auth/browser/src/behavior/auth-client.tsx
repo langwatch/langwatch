@@ -429,9 +429,9 @@ export const safeRedirectTarget = (
 };
 
 /**
- * Relative callbackURLs better-auth 1.7.1 accepts (`trusted-origins.mjs`); it
- * 403s any other with "Invalid callbackURL", and app paths with `:`, `#`, `~`,
- * `,` or `%` fall outside it. Re-check on every better-auth upgrade.
+ * Relative callbackURLs better-auth accepts (`trusted-origins.mjs`): its 1.7.1 pattern,
+ * which 1.7.12's URL-parsing `isSafeRelativeURL` still admits in full. App paths with `:`,
+ * `#`, `~`, `,` or `%` fall outside it and take the resume page. Re-check on every upgrade.
  */
 const BETTER_AUTH_CALLBACK_PATTERN = /^\/(?!\/|\\|%2f|%5c)[\w.+/@-]*(?:\?[\w.+/=&%@-]*)?$/;
 
