@@ -15,6 +15,7 @@ import {
   boardPeriodGranularity,
   boardWindowEnd,
   defaultBoardExcludedOrigins,
+  queriesReadLangyTraces,
 } from "../model/board-period.ts";
 
 const NOW = Date.UTC(2026, 8, 28);
@@ -173,5 +174,33 @@ describe("boardOriginsWithLangy", () => {
   it("adds langy when the member leaves it out", () => {
     expect(boardOriginsWithLangy({ excluded: [], includeLangy: false })).toEqual(["langy"]);
     expect(boardIncludesLangy({ excluded: ["langy"] })).toBe(false);
+  });
+});
+
+describe("queriesReadLangyTraces", () => {
+  const reads = (sql: string) => queriesReadLangyTraces({ sqls: [sql] });
+
+  describe("given a query that filters on Langy's traces", () => {
+    /** @scenario "AC200h Langy setting: a widget that reads Langy's traces on a board that leaves them out is flagged" */
+    it.each([
+      "SELECT count() FROM trace_metrics WHERE Origin = 'langy'",
+      "SELECT count() FROM trace_metrics WHERE origin IN ('application', 'langy')",
+      "SELECT count() FROM trace_metrics WHERE TraceName = 'langy.turn'",
+      "SELECT count() FROM traces WHERE TraceName IN ('langy.turn')",
+    ])("finds it in %s", (sql) => {
+      expect(reads(sql)).toBe(true);
+    });
+  });
+
+  describe("given a query that leaves Langy's traces out or never names them", () => {
+    /** @scenario "AC200h Langy setting: a widget that reads Langy's traces on a board that leaves them out is flagged" */
+    it.each([
+      "SELECT count() FROM trace_metrics",
+      "SELECT count() FROM trace_metrics WHERE Origin != 'langy'",
+      "SELECT count() FROM trace_metrics WHERE Origin NOT IN ('langy')",
+      "SELECT count() FROM trace_metrics WHERE TraceName <> 'langy.turn'",
+    ])("finds nothing in %s", (sql) => {
+      expect(reads(sql)).toBe(false);
+    });
   });
 });

@@ -7,13 +7,34 @@
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Lock, Plug, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
 
-/** The query found nothing in the board's period at all: "No traces in this period". */
-export function WidgetNoTrafficFace({ unit }: { unit: string }) {
+/**
+ * The query found nothing in the board's period at all: "No traces in this period". On a board
+ * that leaves Langy's traces out it says so, since they may be the rows the reader expected.
+ */
+export function WidgetNoTrafficFace({
+  unit,
+  langyLeftOut,
+}: {
+  unit: string;
+  /** Set on a board that leaves Langy's traces out; `onInclude` where the reader may edit it. */
+  langyLeftOut?: { onInclude?: () => void };
+}) {
   return (
-    <VStack height="full" justify="center" paddingX={4}>
+    <VStack height="full" justify="center" gap={1} paddingX={4}>
       <Text textStyle="bodySm" color="fg.muted">
         No {unit} in this period
       </Text>
+      {langyLeftOut && (
+        <Text textStyle="caption" color="fg.subtle">
+          Langy traces are left out of this dashboard.
+        </Text>
+      )}
+      {langyLeftOut?.onInclude && (
+        <Button size="xs" variant="outline" marginTop={1} onClick={langyLeftOut.onInclude}>
+          <Sparkles size={13} aria-hidden />
+          Include Langy traces
+        </Button>
+      )}
     </VStack>
   );
 }

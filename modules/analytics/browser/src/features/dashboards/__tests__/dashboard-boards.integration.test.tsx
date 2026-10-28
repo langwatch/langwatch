@@ -640,6 +640,7 @@ describe("a member's board", () => {
                 periodStart: Date.UTC(2026, 8, 1),
                 periodEnd: Date.UTC(2026, 8, 8),
                 granularitySeconds: 86_400,
+                excludeOrigins: ["langy"],
               }}
               onAddWidgets={(question) => {
                 added.push(question.id);
@@ -728,6 +729,7 @@ describe("a member's board", () => {
             periodStart: Date.UTC(2026, 8, 1),
             periodEnd: Date.UTC(2026, 8, 8),
             granularitySeconds: 86_400,
+            excludeOrigins: ["langy"],
           }}
           onAddWidgets={() => Promise.resolve(true)}
           onSkip={() => setIsOpen(false)}

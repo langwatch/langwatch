@@ -20,6 +20,7 @@ export function BoardWidgetsGrid({
   period,
   isWriting,
   langyFor,
+  onIncludeLangy,
   onEdit,
   onDuplicate,
   onDelete,
@@ -34,6 +35,8 @@ export function BoardWidgetsGrid({
   isWriting: boolean;
   /** What each card may ask Langy; absent when Langy is not available. */
   langyFor?: (widget: BoardWidget) => WidgetCardLangy;
+  /** Sets the board to count Langy's traces; absent where the reader may not edit the board. */
+  onIncludeLangy?: () => void;
   /** These four are absent on a board the reader cannot edit: the grid is then view-only. */
   onEdit?: (input: { widget: BoardWidget; withLangy: boolean }) => void;
   onDuplicate?: (widget: BoardWidget) => void;
@@ -61,6 +64,7 @@ export function BoardWidgetsGrid({
             period={period}
             isWriting={isWriting}
             {...(langyFor ? { langy: langyFor(widget) } : {})}
+            {...(onIncludeLangy ? { onIncludeLangy } : {})}
             onEdit={onEdit && (({ withLangy }) => onEdit({ widget, withLangy }))}
             onDuplicate={onDuplicate && (() => onDuplicate(widget))}
             onDelete={onDelete && (() => onDelete(widget))}

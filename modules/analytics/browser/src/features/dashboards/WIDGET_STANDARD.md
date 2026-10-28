@@ -50,6 +50,12 @@ A widget with several queries shows one state for all of them:
   for a comparison) may be empty while the main one is not, so it never empties the card.
 - Otherwise the worst state wins: `missing`, then `partial`, then `complete`.
 
+On a board that leaves Langy's traces out (dashboards-v2 AC200), `no_traffic` also says
+"Langy traces are left out of this dashboard.", and a member who may edit the board gets
+"Include Langy traces", which sets the board's "Langy traces" setting as its header does. A card
+whose query asks for Langy's traces (origin `langy`, trace name `langy.turn`) on such a board
+carries a hint beside its title, since a widget's own empty state cannot say why.
+
 So widget code does not draw its own error, no-traffic or setup face. It draws its loading state
 and its chart.
 

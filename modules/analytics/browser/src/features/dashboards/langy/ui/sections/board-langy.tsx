@@ -4,7 +4,7 @@
  * chips ask Langy, when the member has it. A read-only board without Langy shows no bar.
  */
 
-import type { BoardPeriod } from "../../../model/board-period.ts";
+import type { BoardQueryContext } from "../../../model/board-period.ts";
 import { useLangyAsk } from "../../behavior/use-board-langy.ts";
 import {
   type BoardSubject,
@@ -21,7 +21,7 @@ export function BoardLangy({
   onOpenPicker,
 }: {
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
   /** On an empty board: the suggested questions under the bar. */
   withSuggestions?: boolean;
   /** Absent on a read-only board, which takes no widgets. */

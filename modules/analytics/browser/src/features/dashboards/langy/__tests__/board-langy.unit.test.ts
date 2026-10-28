@@ -18,6 +18,7 @@ const PERIOD = {
   periodStart: Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds,
   periodEnd: Temporal.Instant.from("2026-09-08T00:00:00Z").epochMilliseconds,
   granularitySeconds: 86_400 as const,
+  excludeOrigins: ["langy"],
 };
 
 describe("the context a board hands Langy", () => {
@@ -118,6 +119,34 @@ describe("the chip a board shows in Langy", () => {
       });
 
       expect(chip.label).toBe("dashboard: Costs · Live · 1m");
+    });
+  });
+});
+
+describe("the origins the board context names", () => {
+  const board = boardSubject({ board: { id: "board-9", name: "Costs" }, widgets: [] });
+
+  describe("given a board that leaves out Langy's conversations", () => {
+    /** @scenario "AC200g Langy setting: Langy's board context names the origins the board leaves out" */
+    it("names langy as an excluded origin, in the chip and in every question", () => {
+      const chip = boardContextChip({ board, range: "30d", period: PERIOD });
+      const question = boardQuestion({ question: "Why is it empty?", board, period: PERIOD });
+
+      expect(chip.ref).toContain("excluded origins: langy");
+      expect(question.context[0]?.ref).toContain("excluded origins: langy");
+    });
+  });
+
+  describe("given a board set to include Langy", () => {
+    /** @scenario "AC200g Langy setting: Langy's board context names the origins the board leaves out" */
+    it("says no origin is excluded", () => {
+      const chip = boardContextChip({
+        board,
+        range: "30d",
+        period: { ...PERIOD, excludeOrigins: [] },
+      });
+
+      expect(chip.ref).toContain("excluded origins: none");
     });
   });
 });

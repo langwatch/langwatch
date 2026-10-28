@@ -36,7 +36,7 @@ import {
 } from "../../langy/model/board-langy.ts";
 import { AskField } from "../../langy/ui/blocks/ask-field.tsx";
 import { LANGY_EDGE } from "../../langy/ui/elements/ask-bar-shell.tsx";
-import type { BoardPeriod } from "../../model/board-period.ts";
+import type { BoardQueryContext } from "../../model/board-period.ts";
 import {
   type CatalogueFilters,
   filterCatalogue,
@@ -76,7 +76,7 @@ export function BlockPickerDialog({
 }: {
   /** The board the picker opened on, attached as Langy's context. */
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
   /** Adds the picked question's widget(s), shown at once; resolves false when refused. */
   onAddWidgets: (question: WidgetQuestion) => Promise<boolean>;
   /** Opens the widget editor on a new widget instead; the caller closes the picker with it. */

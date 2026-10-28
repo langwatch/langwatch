@@ -17,6 +17,7 @@ const PERIOD = {
   periodStart: Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds,
   periodEnd: Temporal.Instant.from("2026-09-08T00:00:00Z").epochMilliseconds,
   granularitySeconds: 86_400 as const,
+  excludeOrigins: [] as readonly string[],
 };
 
 describe("the picker's questions", () => {

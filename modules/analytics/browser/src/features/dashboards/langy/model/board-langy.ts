@@ -12,7 +12,7 @@ import type {
   AnalyticsLangyContext,
   AnalyticsLangyDraftAbout,
 } from "../../../../model/analytics-host.ts";
-import type { BoardPeriod, BoardPeriodRange } from "../../model/board-period.ts";
+import type { BoardPeriod, BoardPeriodRange, BoardQueryContext } from "../../model/board-period.ts";
 import type { WidgetShape } from "../../model/widget-shape.ts";
 
 /** The rollout flag that gives a project Langy at all. */
@@ -90,6 +90,11 @@ function shortGrainText(granularitySeconds: number): string {
   return `${granularitySeconds / found.seconds}${found.short}`;
 }
 
+/** Already resolved: a board that stores none carries its default here, never "none". */
+function excludedText(origins: readonly string[]): string {
+  return origins.length > 0 ? origins.join(", ") : "none";
+}
+
 function context({ ref, label }: { ref: string; label: string }): AnalyticsLangyContext {
   return {
     kind: "dashboard",
@@ -98,13 +103,13 @@ function context({ ref, label }: { ref: string; label: string }): AnalyticsLangy
   };
 }
 
-/** The board as the agent reads it: which one, what is on it, over when. */
+/** The board as the agent reads it: which one, what is on it, over when, and what it leaves out. */
 export function boardAskContext({
   board,
   period,
 }: {
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyContext {
   const widgets = board.widgetNames.length > 0 ? board.widgetNames.join(", ") : "none yet";
   const which =
@@ -116,6 +121,7 @@ export function boardAskContext({
       which,
       `widgets: ${widgets}`,
       `period: ${periodText(period)}, one bucket per ${grainText(period.granularitySeconds)}`,
+      `excluded origins: ${excludedText(period.excludeOrigins)}`,
     ].join("; "),
     label: board.name,
   });
@@ -132,7 +138,7 @@ export function boardContextChip({
 }: {
   board: BoardSubject;
   range: BoardPeriodRange;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): LangyContextChip {
   const shown = `${range === "live" ? "Live" : range} · ${shortGrainText(period.granularitySeconds)}`;
   return {
@@ -151,7 +157,7 @@ export function boardQuestion({
 }: {
   question: string;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   return { question: question.trim(), context: [boardAskContext({ board, period })] };
 }
@@ -162,16 +168,27 @@ export function boardOpen({
   period,
 }: {
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   return { context: [boardAskContext({ board, period })] };
 }
 
 /** A prompt with the board's concrete window and grain appended. */
-function promptWithWindow({ prompt, period }: { prompt: string; period: BoardPeriod }): string {
+function promptWithWindow({
+  prompt,
+  period,
+}: {
+  prompt: string;
+  period: BoardQueryContext;
+}): string {
+  const leftOut =
+    period.excludeOrigins.length > 0
+      ? ` Dashboard leaves out traces with origin ${period.excludeOrigins.join(", ")}: ` +
+        "its widgets do not count them."
+      : "";
   const window =
     `Dashboard period: ${periodText(period)} (UTC). ` +
-    `Dashboard grain: one bucket per ${grainText(period.granularitySeconds)}.`;
+    `Dashboard grain: one bucket per ${grainText(period.granularitySeconds)}.${leftOut}`;
   return `${prompt}\n\n${window}`;
 }
 
@@ -186,7 +203,7 @@ export function boardPromptDraft({
 }: {
   prompt: string;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   return {
     draft: promptWithWindow({ prompt, period }),
@@ -266,7 +283,7 @@ export function widgetPromptDraft({
 }: {
   widget: WidgetSubject;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   return widgetDraft({
     prompt: widget.definition.prompt ?? fallbackPrompt(widget.name),
@@ -304,7 +321,7 @@ export function widgetSetupDraft({
   setup: WidgetSetup;
   widget: WidgetSubject;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   return widgetDraft({ prompt: SETUP_PROMPTS[setup](widget.name), widget, board, period });
 }
@@ -322,7 +339,7 @@ export function widgetMissingDataDraft({
   missing: { field: string; label: string };
   widget: WidgetSubject;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   const prompt =
     `Help me send ${missing.label} on my traces. "${widget.name}" needs it (the ` +
@@ -356,7 +373,7 @@ export function widgetEditorContext({
 }: {
   widget: EditedWidget;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyContext {
   const which =
     widget.id === void 0
@@ -376,7 +393,7 @@ export function widgetEditorOpened({
 }: {
   widget: EditedWidget;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   return { context: [widgetEditorContext({ widget, board, period })] };
 }
@@ -393,7 +410,7 @@ export function widgetBuildQuestion({
 }: {
   widget: EditedWidget;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   const others = board.widgetNames.length > 0 ? board.widgetNames.join(", ") : "nothing yet";
   const prompt =
@@ -455,7 +472,7 @@ export function widgetAskDraft({
   ask: WidgetAsk;
   widget: EditedWidget;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   const prompt =
     widget.id === void 0
@@ -476,7 +493,7 @@ function editorDraft({
   prompt: string;
   widget: EditedWidget;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): AnalyticsLangyAskRequest {
   return widgetDraft({
     prompt,
@@ -499,7 +516,7 @@ function widgetDraft({
   prompt: string;
   widget: WidgetSubject;
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
   about?: AnalyticsLangyDraftAbout;
   /** What rides with the draft: the board, or the widget open in the editor. */
   attached?: AnalyticsLangyContext;
@@ -515,7 +532,7 @@ function widgetText({
 }: {
   prompt: string;
   widget: WidgetSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }): string {
   const textWith = (sqls: readonly string[]) =>
     promptWithWindow({ prompt: `${prompt}\n\n${widgetBlock({ widget, sqls })}`, period });

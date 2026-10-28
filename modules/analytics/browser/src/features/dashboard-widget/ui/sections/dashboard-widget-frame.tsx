@@ -9,6 +9,7 @@ import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/c
 import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
+import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
@@ -87,6 +88,7 @@ export function DashboardWidgetFrameOverWindow({
   timeWindow,
   granularitySeconds,
   excludeOrigins,
+  onIncludeLangy,
   onAskLangyToSetUp,
   onFaceChange,
   onExportChange,
@@ -95,6 +97,8 @@ export function DashboardWidgetFrameOverWindow({
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   /** Trace origins the board leaves out of every query this widget runs. */
   readonly excludeOrigins?: readonly string[];
+  /** Sets the board to count Langy's traces; absent where the reader may not change that. */
+  readonly onIncludeLangy?: () => void;
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   /** Told which face the frame draws, so the card offers only what that face allows. */
@@ -189,6 +193,9 @@ export function DashboardWidgetFrameOverWindow({
     name: widgetName ?? "this widget",
     onRetry: retry,
     onAskLangyToSetUp,
+    ...(excludeOrigins?.includes(LANGY_TRACE_ORIGIN)
+      ? { langyLeftOut: onIncludeLangy ? { onInclude: onIncludeLangy } : {} }
+      : {}),
   });
 
   // The frame stays mounted under a face, so a new period can bring the chart back.
@@ -222,11 +229,14 @@ function faceInPlaceOfChart({
   name,
   onRetry,
   onAskLangyToSetUp,
+  langyLeftOut,
 }: {
   face: WidgetFace;
   name: string;
   onRetry: () => void;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  /** Set when the widget's queries leave Langy's traces out. */
+  langyLeftOut?: { onInclude?: () => void };
 }) {
   switch (face.kind) {
     case "no_access":
@@ -234,7 +244,7 @@ function faceInPlaceOfChart({
     case "failed":
       return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
     case "no_traffic":
-      return <WidgetNoTrafficFace unit={face.unit} />;
+      return <WidgetNoTrafficFace unit={face.unit} langyLeftOut={langyLeftOut} />;
     case "missing":
       return (
         <WidgetSetupFace

@@ -21,6 +21,7 @@ const PERIOD = {
   periodStart: Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds,
   periodEnd: Temporal.Instant.from("2026-09-08T00:00:00Z").epochMilliseconds,
   granularitySeconds: 86_400 as const,
+  excludeOrigins: [] as readonly string[],
 };
 const BOARD = boardSubject({
   board: { id: "board-1", name: "Weekly review" },
@@ -220,5 +221,21 @@ describe("editor drafts and starting prompts", () => {
     expect(saved.about).toEqual({ ref: "board-1", itemRef: "w-1" });
     expect(fresh.draft?.startsWith("Show the top 10. Build it as a new widget")).toBe(true);
     expect(fresh.about).toEqual({ ref: "board-1", itemRef: "new" });
+  });
+});
+
+describe("a widget draft on a board that leaves out Langy's conversations", () => {
+  /** @scenario "AC200g Langy setting: Langy's board context names the origins the board leaves out" */
+  it("says the board's widgets do not count traces with origin langy", () => {
+    const request = widgetPromptDraft({
+      widget: widget({ prompt: PROMPT }),
+      board: BOARD,
+      period: { ...PERIOD, excludeOrigins: ["langy"] },
+    });
+
+    expect(request.draft).toContain(
+      "Dashboard leaves out traces with origin langy: its widgets do not count them.",
+    );
+    expect(request.context[0]?.ref).toContain("excluded origins: langy");
   });
 });

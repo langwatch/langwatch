@@ -72,6 +72,17 @@ export function boardOriginsWithLangy({
   return includeLangy ? others : [...others, LANGY_TRACE_ORIGIN];
 }
 
+/** Origin "langy" or Langy's turn name, asked for with `=` or `IN`; never `!=` or `NOT IN`. */
+const LANGY_TRACE_FILTERS = [
+  /\bOrigin\s*(?:==?\s*'langy'|\s+IN\s*\([^)]*'langy')/i,
+  /\bTraceName\s*(?:==?\s*'langy\.turn'|\s+IN\s*\([^)]*'langy\.turn')/i,
+];
+
+/** Whether a widget's queries ask for Langy's traces, which a board leaving Langy out drops. */
+export function queriesReadLangyTraces({ sqls }: { sqls: readonly string[] }): boolean {
+  return sqls.some((sql) => LANGY_TRACE_FILTERS.some((filter) => filter.test(sql)));
+}
+
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";
 export const DEFAULT_BOARD_PERIOD_GRAIN: BoardPeriodGrain = "auto";
 

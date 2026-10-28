@@ -15,7 +15,11 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
-import type { BoardQueryContext } from "../../model/board-period.ts";
+import {
+  type BoardQueryContext,
+  boardIncludesLangy,
+  queriesReadLangyTraces,
+} from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
@@ -32,6 +36,8 @@ export interface WidgetCardLangy {
   readonly setUpMissing: (missing: { field: string; label: string }) => void;
 }
 
+const LANGY_LEFT_OUT_HINT = "Reads Langy traces, which this dashboard leaves out";
+
 export function BoardWidgetCard({
   widget,
   projectId,
@@ -41,6 +47,7 @@ export function BoardWidgetCard({
   period,
   isWriting,
   langy,
+  onIncludeLangy,
   onEdit,
   onDuplicate,
   onDelete,
@@ -54,6 +61,8 @@ export function BoardWidgetCard({
   period: BoardQueryContext;
   isWriting: boolean;
   langy?: WidgetCardLangy;
+  /** Sets the board to count Langy's traces, as its header does; absent where it may not. */
+  onIncludeLangy?: () => void;
   /**
    * Opens the board's editor on this widget, drafting the edit in Langy when asked to. Absent,
    * with the two below, on a board the reader cannot edit: the card is then view-only.
@@ -70,6 +79,9 @@ export function BoardWidgetCard({
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
   const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
+  const leavesOutLangyItReads =
+    !boardIncludesLangy({ excluded: excludeOrigins }) &&
+    queriesReadLangyTraces({ sqls: widget.definition.queries.map(({ sql }) => sql) });
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],
@@ -79,6 +91,7 @@ export function BoardWidgetCard({
     <WidgetCardShell
       name={widget.name}
       description={widget.definition.description}
+      {...(leavesOutLangyItReads ? { hint: LANGY_LEFT_OUT_HINT } : {})}
       controls={
         <>
           {onEdit && (
@@ -127,6 +140,7 @@ export function BoardWidgetCard({
         excludeOrigins={excludeOrigins}
         onFaceChange={setFace}
         onExportChange={csvExport.onExportChange}
+        {...(onIncludeLangy ? { onIncludeLangy } : {})}
         {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
       />
     </WidgetCardShell>

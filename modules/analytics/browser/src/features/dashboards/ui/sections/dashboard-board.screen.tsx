@@ -76,27 +76,38 @@ function AddWidgetButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** The header's Langy setting; a pick that changes it refreshes every widget (AC200b). */
+/** The header's Langy setting, picked through `onPick`. */
 function BoardLangySetting({
   origins,
   canEdit,
-  onChanged,
+  onPick,
 }: {
   origins: ReturnType<typeof useBoardOrigins>;
   canEdit: boolean;
-  onChanged: () => void;
+  onPick: (includeLangy: boolean) => void;
 }) {
   if (!canEdit) return <BoardLangyControl includesLangy={origins.includesLangy} />;
   return (
     <BoardLangyControl
       includesLangy={origins.includesLangy}
       isSaving={origins.isSaving}
-      onPick={(includeLangy) => {
-        // A frame re-runs on a refresh, not on new origins alone.
-        if (origins.setIncludesLangy(includeLangy)) onChanged();
-      }}
+      onPick={onPick}
     />
   );
+}
+
+/** Saves a Langy pick; one that changes the setting refreshes every widget (AC200b). */
+function saveLangyPick({
+  origins,
+  includeLangy,
+  refresh,
+}: {
+  origins: ReturnType<typeof useBoardOrigins>;
+  includeLangy: boolean;
+  refresh: () => void;
+}) {
+  // A frame re-runs on a refresh, not on new origins alone.
+  if (origins.setIncludesLangy(includeLangy)) refresh();
 }
 
 function OpenBoard({ board }: { board: SavedBoard }) {
@@ -126,6 +137,9 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     refreshedAt: autoRefresh.refreshedAt,
     excludedOrigins: origins.excludedOrigins,
   });
+  /** The header's pick and an empty widget's "Include Langy traces" (AC200b, AC200f). */
+  const pickLangy = (includeLangy: boolean) =>
+    saveLangyPick({ origins, includeLangy, refresh: autoRefresh.refreshNow });
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
   const { widgets } = boardWidgets;
@@ -182,11 +196,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
               }
             : {})}
           langyControl={
-            <BoardLangySetting
-              origins={origins}
-              canEdit={canEdit}
-              onChanged={autoRefresh.refreshNow}
-            />
+            <BoardLangySetting origins={origins} canEdit={canEdit} onPick={pickLangy} />
           }
           periodControl={
             <BoardPeriodControl
@@ -256,6 +266,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 }
                 {...(canEdit
                   ? {
+                      onIncludeLangy: () => pickLangy(true),
                       onEdit: editor.open,
                       onDuplicate: (widget) => void boardWidgets.duplicateWidget(widget),
                       onDelete: (widget) => void boardWidgets.removeWidget(widget),

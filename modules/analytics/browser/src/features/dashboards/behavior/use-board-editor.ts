@@ -17,7 +17,7 @@ import {
   widgetEditorOpened,
 } from "../langy/model/board-langy.ts";
 import { BLANK_WIDGET } from "../model/blank-widget.ts";
-import type { BoardPeriod } from "../model/board-period.ts";
+import type { BoardQueryContext } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { widgetShape } from "../model/widget-shape.ts";
 import { useWidgetEditorAddress } from "./use-widget-editor-address.ts";
@@ -49,7 +49,7 @@ export function useBoardEditor({
   widgets,
 }: {
   board: BoardSubject;
-  period: BoardPeriod;
+  period: BoardQueryContext;
   /** The board's widgets; an address naming none of them opens nothing. */
   widgets: readonly BoardWidget[];
 }) {

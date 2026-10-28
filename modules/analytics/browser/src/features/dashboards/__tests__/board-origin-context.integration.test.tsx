@@ -6,6 +6,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
+import type { QueryCompleteness } from "@langwatch/analytics-contract";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { act, cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -74,14 +75,24 @@ const WIDGET = {
   rowSpan: 3,
 };
 
+const NO_TRAFFIC: QueryCompleteness = { state: "no_traffic", unit: "traces", total: 0, fields: [] };
+
 /**
  * One stored board with one widget, and a query door that answers no rows; calls are kept.
  * `boards.update` stores the origins it is sent, as the server does, unless it refuses.
+ * `completeness` is the report each run answers with; `sql` replaces the widget's query.
  */
 function boardServer({
   excludedOrigins = null,
   refusesUpdate = false,
-}: { excludedOrigins?: string[] | null; refusesUpdate?: boolean } = {}) {
+  completeness,
+  sql,
+}: {
+  excludedOrigins?: string[] | null;
+  refusesUpdate?: boolean;
+  completeness?: QueryCompleteness;
+  sql?: string;
+} = {}) {
   const calls: UiProcedureCall[] = [];
   const stored = { ...BOARD, excludedOrigins };
   let refuse: (() => void) | undefined;
@@ -102,16 +113,20 @@ function boardServer({
       }
       case "boards.listStarred":
         return Promise.resolve([]);
-      case "dashboardWidgets.list":
-        return Promise.resolve([structuredClone(WIDGET)]);
+      case "dashboardWidgets.list": {
+        const widget = structuredClone(WIDGET);
+        if (sql !== undefined) widget.graph.queries = [{ name: "main", sql }];
+        return Promise.resolve([widget]);
+      }
       case "analytics.lwql.query":
         return Promise.resolve({
           columns: [{ name: "n", type: "UInt64" }],
           rows: [],
           statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
           diagnostics: [],
-          followsTimeWindow: false,
+          followsTimeWindow: completeness !== undefined,
           followsGranularity: false,
+          ...(completeness ? { completeness } : {}),
         });
       default:
         return NO_PROCEDURES(call);
@@ -186,13 +201,22 @@ function openBoard({
   excludedOrigins = null,
   permissions = MEMBER,
   refusesUpdate = false,
+  completeness,
+  sql,
 }: {
   isPersonal?: boolean;
   excludedOrigins?: string[] | null;
   permissions?: readonly string[];
   refusesUpdate?: boolean;
+  completeness?: QueryCompleteness;
+  sql?: string;
 } = {}) {
-  const server = boardServer({ excludedOrigins, refusesUpdate });
+  const server = boardServer({
+    excludedOrigins,
+    refusesUpdate,
+    ...(completeness ? { completeness } : {}),
+    ...(sql === undefined ? {} : { sql }),
+  });
   const host = new AddressedHost({
     flags: FLAGS,
     permissions,
@@ -362,6 +386,102 @@ describe("given a stored board's Langy traces setting", () => {
       await screen.findByText("Langy traces: Left out");
 
       expect(screen.queryByRole("button", { name: /Langy traces/ })).toBeNull();
+    });
+  });
+});
+
+const LEFT_OUT = "Langy traces are left out of this dashboard.";
+
+/** The face the widget draws in place of its chart, once its query has answered. */
+async function emptyFace() {
+  await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+  return screen.findByTestId("widget-state-face");
+}
+
+describe("given a widget whose query finds no traffic on a stored board", () => {
+  describe("when the board leaves out Langy's conversations and the member may edit it", () => {
+    /** @scenario "AC200f Langy setting: an empty widget on a board that leaves Langy out says so" */
+    it("says Langy traces are left out, and including them works as the header's pick does", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = openBoard({ completeness: NO_TRAFFIC });
+      const face = await emptyFace();
+
+      expect(within(face).getByText("No traces in this period")).toBeTruthy();
+      expect(within(face).getByText(LEFT_OUT)).toBeTruthy();
+      await user.click(within(face).getByRole("button", { name: "Include Langy traces" }));
+      await screen.findByRole("button", { name: "Langy traces: Included" });
+      await frameRuns({ frame: screen.getByTestId("sandboxed-frame"), queryName: "main" });
+
+      expect(server.updates()).toEqual([
+        { projectId: PROJECT.id, dashboardId: BOARD.id, excludedOrigins: [] },
+      ]);
+      expect(server.runs().map((run) => run.excludeOrigins)).toEqual([["langy"], []]);
+      expect(screen.queryByText(LEFT_OUT)).toBeNull();
+    });
+  });
+
+  describe("when the member may not edit the board", () => {
+    /** @scenario "AC200f Langy setting: an empty widget on a board that leaves Langy out says so" */
+    it("says Langy traces are left out, with no button", async () => {
+      openBoard({
+        completeness: NO_TRAFFIC,
+        permissions: MEMBER.filter((grant) => grant !== "analytics:update"),
+      });
+      const face = await emptyFace();
+
+      expect(within(face).getByText(LEFT_OUT)).toBeTruthy();
+      expect(within(face).queryByRole("button", { name: "Include Langy traces" })).toBeNull();
+    });
+  });
+
+  describe("when the board includes Langy", () => {
+    /** @scenario "AC200f Langy setting: an empty widget on a board that leaves Langy out says so" */
+    it("shows the empty widget alone", async () => {
+      openBoard({ completeness: NO_TRAFFIC, excludedOrigins: [] });
+      const face = await emptyFace();
+
+      expect(within(face).getByText("No traces in this period")).toBeTruthy();
+      expect(within(face).queryByText(LEFT_OUT)).toBeNull();
+      expect(within(face).queryByRole("button", { name: "Include Langy traces" })).toBeNull();
+    });
+  });
+});
+
+describe("given a member asks Langy about a widget on a board that stores no origins", () => {
+  /** @scenario "AC200g Langy setting: Langy's board context names the origins the board leaves out" */
+  it("hands Langy the default, langy, as the origins the board leaves out", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const server = openBoard();
+
+    await user.click(await screen.findByRole("button", { name: "Ask Langy about Traces" }));
+
+    const [ask] = server.host.langyAsks;
+    expect(ask?.context[0]?.ref).toContain("excluded origins: langy");
+    expect(ask?.draft).toContain("Dashboard leaves out traces with origin langy");
+  });
+});
+
+describe("given a widget whose query filters on Langy's traces", () => {
+  const LANGY_SQL = "SELECT count() AS n FROM trace_metrics WHERE Origin = 'langy'";
+  const HINT = "Reads Langy traces, which this dashboard leaves out";
+
+  describe("when the board leaves out Langy's conversations", () => {
+    /** @scenario "AC200h Langy setting: a widget that reads Langy's traces on a board that leaves them out is flagged" */
+    it("flags it in the widget's header", async () => {
+      openBoard({ sql: LANGY_SQL });
+
+      expect(await screen.findByRole("button", { name: HINT })).toBeTruthy();
+    });
+  });
+
+  describe("when the board includes Langy", () => {
+    /** @scenario "AC200h Langy setting: a widget that reads Langy's traces on a board that leaves them out is flagged" */
+    it("shows no hint", async () => {
+      openBoard({ sql: LANGY_SQL, excludedOrigins: [] });
+      await screen.findByRole("button", { name: "Langy traces: Included" });
+      await screen.findByTestId("sandboxed-frame");
+
+      expect(screen.queryByRole("button", { name: HINT })).toBeNull();
     });
   });
 });

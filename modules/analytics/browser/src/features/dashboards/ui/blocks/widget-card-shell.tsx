@@ -4,7 +4,9 @@
  * body publishes what its data is missing here, and the info tip says it.
  */
 
-import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { EyeOff } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { WidgetCompletenessSinkContext } from "../../../../behavior/widget-completeness-sink.ts";
@@ -29,11 +31,14 @@ export function widgetBodyHeightPx(rowSpan: number): number {
 export function WidgetCardShell({
   name,
   description,
+  hint,
   controls,
   children,
 }: {
   name: string;
   description?: string;
+  /** A short warning beside the title, as an icon whose hover says it. */
+  hint?: string;
   /** Absent when the widget offers no action, as on a read-only board without Langy. */
   controls?: ReactNode;
   children: ReactNode;
@@ -68,6 +73,20 @@ export function WidgetCardShell({
         </Text>
         {(description || hasNotes) && (
           <WidgetInfoTip name={name} description={description} completeness={completeness} />
+        )}
+        {hint && (
+          <Tooltip content={hint} showArrow positioning={{ placement: "bottom-start" }}>
+            <IconButton
+              aria-label={hint}
+              variant="ghost"
+              size="xs"
+              flexShrink={0}
+              color="fg.warning"
+              _hover={{ background: "bg.muted" }}
+            >
+              <EyeOff size={13} aria-hidden />
+            </IconButton>
+          </Tooltip>
         )}
         {controls && (
           <HStack
