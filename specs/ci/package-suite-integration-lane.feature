@@ -238,3 +238,27 @@ Feature: A package's integration suite runs in CI when it declares one
       Given a package's integration or browser script
       When the package suites job runs it
       Then it runs through pnpm, every time
+
+  # Bound by tools/ciguard/mainsuites_test.go (the workflow's shape) and
+  # tools/slacknotify/slacknotify_test.go (the post) (#9146).
+  Rule: Main runs every suite in one job and tells Slack when it fails
+
+    @unit
+    Scenario: A push to main runs the package suites as one job
+      Given a merge to main
+      When langwatch-app-ci runs for that commit
+      Then package-suites runs as one job holding every suite
+      And a newer merge waits for that run instead of cancelling it
+      And a pull request still splits its suites over eight jobs
+
+    @unit
+    Scenario: A red package-suites run on main posts to Slack
+      Given package-suites fails or times out on main and was not red in the previous finished run
+      When the run reaches its Slack job
+      Then Slack gets the job, the commit and a link to the run
+
+    @unit
+    Scenario: A repeat failure or timeout on main posts once
+      Given package-suites failed or was cancelled in the previous finished run on main
+      When it is red again
+      Then Slack gets nothing new

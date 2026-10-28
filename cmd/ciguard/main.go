@@ -49,6 +49,7 @@ func main() {
 		{name: "publish-shape", run: ciguard.PublishShape},
 		{name: "transform-cache", run: ciguard.TransformCacheProblems},
 		{name: "vitest-transform-flag", run: ciguard.UncachedVitestScripts},
+		{name: "main-suites", run: ciguard.MainSuites},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {

@@ -267,6 +267,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The ECR chart push: which package it pushes and which digest it reports
   // for the deploy to pin (specs/ci/publish-prerelease-charts-to-ecr.feature).
   "tools/chartpush",
+  // The main-red Slack post (specs/ci/package-suite-integration-lane.feature).
+  "tools/slacknotify",
   "tools/chartheap",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).
