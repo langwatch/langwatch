@@ -1,6 +1,6 @@
 // Command deployimpact writes a pull request's deployment impact, read from its
-// diff, and fails when a fact breaks an existing install and the pull request
-// does not carry the operator-action label.
+// diff. It exits 2 when a fact breaks an existing install and the pull request
+// does not carry the operator-action label, and 1 when it could not read the diff.
 //
 // Usage (in a clone holding both revisions):
 //
@@ -30,12 +30,12 @@ func main() {
 	blocked, err := run(ctx, options{base: *base, head: *head, acknowledged: *acknowledged, out: *out})
 	cancel()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "::error::deployimpact: %v\n", err)
+		fmt.Fprintf(os.Stderr, "::error::Could not compute the deployment impact: %v\n", err)
 		os.Exit(1)
 	}
 	if blocked {
 		fmt.Fprintf(os.Stderr, "::error::This pull request breaks an existing install; see the deployment impact report. Change the code, or have a maintainer add the %s label.\n", deployimpact.Label)
-		os.Exit(1)
+		os.Exit(2)
 	}
 }
 

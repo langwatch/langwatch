@@ -11,38 +11,22 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened, labeled, unlabeled]
 
-# Every check reads the pull request as it is now, so a newer event supersedes
-# an older run, and two runs would race to post the impact map.
-concurrency:
-  group: pr-conventions-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
   pull-requests: write
   issues: write
 
 jobs:
-  pr-conventions:
-    name: pr conventions
+  # Its own job, outside the concurrency group below: it runs only when the pull
+  # request opens, and an edit straight after opening would otherwise cancel it.
+  issue-link:
+    if: github.event.action == 'opened'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      # Full history: the deployment impact and the impact map read both ends of the diff.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-          sparse-checkout: |
-            /*
-            !/docs/media/
-            !/docs/images/
-          sparse-checkout-cone-mode: false
-
       # A branch named issue<number>/<slug> gets "Resolves #<number>" in its body
       # and its author assigned to the issue. Best-effort: a fork's token is read-only.
       - name: Link the issue the branch names
-        if: github.event.action == 'opened'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -78,6 +62,34 @@ jobs:
               core.warning(`could not assign @${pr.user.login} to #${issueNumber}: ${e.message}`);
             }
 
+  pr-conventions:
+    name: pr conventions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Every check reads the pull request as it is now, so a newer event supersedes
+    # an older run, and two runs would race to post the impact map. Not
+    # `pr-conventions-<n>`: main's old title check holds that group until this merges.
+    concurrency:
+      group: pr-checks-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    # Edits and unrelated labels rerun only what they can change: the title, and the
+    # breaking-change scope for its label. The diff steps wait for new commits or
+    # the operator-action label.
+    env:
+      SCOPE_EVENT: ${{ (github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'multi-component-major' }}
+      DIFF_EVENT: ${{ contains(fromJSON('["opened", "synchronize", "reopened"]'), github.event.action) || github.event.label.name == 'operator-action' }}
+    steps:
+      # Full history when the diff steps run: they read both ends of the diff.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: ${{ env.DIFF_EVENT == 'true' && '0' || '1' }}
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
       - name: Check the title
         if: ${{ !cancelled() }}
         uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6
@@ -112,7 +124,7 @@ jobs:
       # the body, so those are where a breaking marker reaches main from. Both reach the
       # guard as JSON strings, one per line, so a crafted title cannot escape into the shell.
       - name: Check a breaking change stays in one release component
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.SCOPE_EVENT == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -131,7 +143,7 @@ jobs:
             . "$RUNNER_TEMP/changed-files.txt" "$RUNNER_TEMP/commit-messages.txt"
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.DIFF_EVENT == 'true' }}
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
@@ -140,20 +152,23 @@ jobs:
       # clears it. The verdict waits for the impact map below, so the report is posted first.
       - name: Report the deployment impact
         id: deploy
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.DIFF_EVENT == 'true' }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           ACKNOWLEDGED: ${{ contains(github.event.pull_request.labels.*.name, 'operator-action') }}
         run: |
           set -o pipefail
+          # 2 is a fact that breaks an install, reported after the impact map; 1 is an error.
+          status=0
           go run ./cmd/deployimpact -base "$BASE_SHA" -head "$HEAD_SHA" -acknowledged="$ACKNOWLEDGED" \
-            -out "$RUNNER_TEMP/deploy-impact.md" | tee -a "$GITHUB_STEP_SUMMARY" \
-            || echo "failed=true" >> "$GITHUB_OUTPUT"
+            -out "$RUNNER_TEMP/deploy-impact.md" | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          if [ "$status" -eq 2 ]; then echo "blocked=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          exit "$status"
 
       # A fork's token is read-only, so its comment would 403; it still gets the job summary.
       - name: Post the impact map
-        if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository }}
+        if: ${{ !cancelled() && env.DIFF_EVENT == 'true' && github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -333,7 +348,7 @@ jobs:
             }
 
       - name: Fail when the deployment impact breaks an existing install
-        if: ${{ !cancelled() && steps.deploy.outputs.failed == 'true' }}
+        if: ${{ !cancelled() && steps.deploy.outputs.blocked == 'true' }}
         run: |
           echo "::error::The deployment impact report lists a fact that breaks an existing install. Change the code, or have a maintainer add the operator-action label."
           exit 1

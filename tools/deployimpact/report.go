@@ -3,7 +3,6 @@ package deployimpact
 import (
 	"fmt"
 	"path"
-	"sort"
 	"strings"
 )
 
@@ -44,7 +43,6 @@ type Change struct {
 func Compute(base, head Tree, changes []Change) (Report, error) {
 	var report Report
 	steps := []func() ([]Fact, error){
-		func() ([]Fact, error) { return settingFacts(base, head) },
 		func() ([]Fact, error) { return valueFacts(base, head) },
 		func() ([]Fact, error) { return changeFacts(changes), nil },
 	}
@@ -56,81 +54,6 @@ func Compute(base, head Tree, changes []Change) (Report, error) {
 		report.Facts = append(report.Facts, facts...)
 	}
 	return report, nil
-}
-
-func settingFacts(base, head Tree) ([]Fact, error) {
-	before, err := settings(base)
-	if err != nil {
-		return nil, err
-	}
-	after, err := settings(head)
-	if err != nil {
-		return nil, err
-	}
-	var facts []Fact
-	for _, name := range sortedNames(after) {
-		fact, err := newSettingFact(head, name, settingChange{before: before[name], after: after[name]})
-		if err != nil {
-			return nil, err
-		}
-		facts = append(facts, fact...)
-	}
-	for _, name := range sortedNames(before) {
-		if _, kept := after[name]; kept {
-			continue
-		}
-		fact, err := droppedSettingFact(head, name)
-		if err != nil {
-			return nil, err
-		}
-		facts = append(facts, fact)
-	}
-	return facts, nil
-}
-
-// settingChange is one variable's reading before and after the pull request.
-type settingChange struct {
-	before, after setting
-}
-
-func newSettingFact(head Tree, name string, change settingChange) ([]Fact, error) {
-	before, after := change.before, change.after
-	existed := len(before.Paths) > 0
-	if !after.Required || before.Required {
-		if existed {
-			return nil, nil
-		}
-		return []Fact{{Kind: "setting", Subject: name, Detail: "new, optional: read in " + after.Paths[0]}}, nil
-	}
-	setBy, err := setIn(head, name, "charts/")
-	if err != nil {
-		return nil, err
-	}
-	detail := "new and required: read in " + after.Paths[0]
-	if existed {
-		detail = "now required: read in " + after.Paths[0]
-	}
-	if len(setBy) > 0 {
-		return []Fact{{Kind: "required setting", Subject: name, Detail: detail + "; set by " + strings.Join(setBy, ", ")}}, nil
-	}
-	return []Fact{{Kind: "required setting", Subject: name, Blocks: true,
-		Detail: detail + "; no chart sets it, so an install upgraded without it fails to start"}}, nil
-}
-
-func droppedSettingFact(head Tree, name string) (Fact, error) {
-	stillRead, err := readElsewhere(head, name)
-	if err != nil || stillRead {
-		return Fact{Kind: "setting", Subject: name, Detail: "no longer a config leaf; other code still reads it"}, err
-	}
-	setBy, err := setIn(head, name, "charts/", ".env.example")
-	if err != nil {
-		return Fact{}, err
-	}
-	if len(setBy) == 0 {
-		return Fact{Kind: "setting", Subject: name, Detail: "no longer read"}, nil
-	}
-	return Fact{Kind: "dropped setting", Subject: name, Blocks: true,
-		Detail: "no longer read, but still set by " + strings.Join(setBy, ", ") + "; an operator setting it changes nothing"}, nil
 }
 
 func valueFacts(base, head Tree) ([]Fact, error) {
@@ -166,6 +89,21 @@ func changeFacts(changes []Change) []Fact {
 	return facts
 }
 
+// isSource is whether path is product code in one of exts, not a test or fixture.
+func isSource(path string, exts ...string) bool {
+	for _, skip := range []string{"node_modules/", "__tests__/", "__fixtures__/", "testdata/", "tests/", "e2e/", ".test.", ".spec.", ".fixtures.", "_test.go"} {
+		if strings.Contains(path, skip) {
+			return false
+		}
+	}
+	for _, ext := range exts {
+		if strings.HasSuffix(path, ext) {
+			return true
+		}
+	}
+	return false
+}
+
 // isMigration is whether path is a Postgres, ClickHouse or module migration.
 func isMigration(path string) bool {
 	return isSource(path, ".sql", ".ts") && (strings.Contains(path, "/prisma/migrations/") ||
@@ -173,58 +111,12 @@ func isMigration(path string) bool {
 		strings.Contains(path, "/process/src/migrations/"))
 }
 
-// setIn lists the files under any of places that set name.
-func setIn(tree Tree, name string, places ...string) ([]string, error) {
-	files, err := mentions(tree, name)
-	if err != nil {
-		return nil, err
-	}
-	var found []string
-	for _, file := range files {
-		for _, place := range places {
-			if strings.HasPrefix(file, place) {
-				found = append(found, file)
-				break
-			}
-		}
-	}
-	return found, nil
-}
-
-// readElsewhere is whether code outside the charts and env files still names the variable.
-func readElsewhere(tree Tree, name string) (bool, error) {
-	files, err := mentions(tree, name)
-	if err != nil {
-		return false, err
-	}
-	for _, file := range files {
-		if isSource(file, ".ts", ".tsx", ".mts", ".js", ".mjs", ".cjs", ".go", ".py", ".sh") && !strings.HasPrefix(file, "charts/") {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-// mentions lists the files naming the variable whole, or as the suffix of a prefixed one.
-func mentions(tree Tree, name string) ([]string, error) {
-	return tree.Grep(`(^|[^A-Za-z0-9_])([A-Z0-9_]*_)?` + name + `([^A-Za-z0-9_]|$)`)
-}
-
-func sortedNames(found readings) []string {
-	names := make([]string, 0, len(found))
-	for name := range found {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
-}
-
 // Render writes the report as the impact map's deployment section.
 func Render(report Report, acknowledged bool) string {
 	var b strings.Builder
 	b.WriteString("### Deployment impact\n\n")
 	if len(report.Facts) == 0 {
-		b.WriteString("No deployment impact: this pull request touches no setting, helm value, migration or image.\n")
+		b.WriteString("No deployment impact: this pull request touches no helm value, migration or image.\n")
 		return b.String()
 	}
 	b.WriteString(verdict(report.Blocked(), acknowledged))

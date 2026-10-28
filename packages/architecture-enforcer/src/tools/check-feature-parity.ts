@@ -261,6 +261,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
   "tools/deployimpact",
+  "tools/operatornotes",
   "tools/migrationorder",
   // The README link checker, for the same reason: specs/ci/readme-link-check.feature
   // describes what CI asserts about the README, and only these Go tests assert it.

@@ -59,6 +59,7 @@ var (
 		"tools/herrgen",
 		"tools/ciguard",
 		"tools/deployimpact",
+		"tools/operatornotes",
 		"tools/migrationorder",
 		"tools/linkcheck",
 		"tools/chartpush",

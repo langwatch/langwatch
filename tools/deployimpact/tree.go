@@ -1,5 +1,5 @@
 // Package deployimpact computes a pull request's deployment impact from its
-// diff: the settings, helm values and migrations an operator meets on upgrade,
+// diff: the helm values, migrations and images an operator meets on upgrade,
 // and which of them break an existing install.
 //
 // Spec: specs/ci/deployment-impact-report.feature
