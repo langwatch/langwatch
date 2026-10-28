@@ -20,6 +20,8 @@ const TARGET_FILES = new Set([
   "errors.ts",
   "handler-arguments.ts",
   "json-text-field.ts",
+  // What a transport answers when a handler's value breaks its output schema.
+  "output-salvage.ts",
   "ports.ts",
   "schema.ts",
   "websocket.ts",

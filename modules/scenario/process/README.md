@@ -1091,7 +1091,7 @@ interface Input {
   projectId: string;
   ids: string[];
 }
-// Output: scenarioBatchArchiveResultSchema, ../contract/src/scenario.responses.ts:89
+// Output: scenarioBatchArchiveResultSchema, ../contract/src/scenario.responses.ts:90
 interface Output {
   archived: string[];
   failed: {
@@ -1108,7 +1108,7 @@ interface Input {
   limit?: number;
   cursor?: number;
 }
-type Output = z.infer<typeof scenarioVersionPageSchema>; // ../contract/src/scenario.responses.ts:34
+type Output = z.infer<typeof scenarioVersionPageSchema>; // ../contract/src/scenario.responses.ts:35
 
 // scenarios.getVersion
 // Input: inline, ../contract/src/scenario.trpc.ts:244
@@ -1130,7 +1130,7 @@ type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:63
 
 // scenarios.run
 type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:157
-// Output: scenarioRunScheduledSchema, ../contract/src/scenario.responses.ts:75
+// Output: scenarioRunScheduledSchema, ../contract/src/scenario.responses.ts:76
 interface Output {
   scheduled: true;
   setId: string;
@@ -1147,7 +1147,7 @@ interface Input {
   scenarioRunId: string;
   scenarioId: string;
 }
-// Output: scenarioCancelJobResultSchema, ../contract/src/scenario.responses.ts:45
+// Output: scenarioCancelJobResultSchema, ../contract/src/scenario.responses.ts:46
 interface Output {
   cancelled: boolean;
 }
@@ -1159,7 +1159,7 @@ interface Input {
   scenarioSetId: string;
   batchRunId: string;
 }
-// Output: scenarioCancelBatchRunResultSchema, ../contract/src/scenario.responses.ts:59
+// Output: scenarioCancelBatchRunResultSchema, ../contract/src/scenario.responses.ts:60
 interface Output {
   cancelledCount: number;
   skippedCount: number;
@@ -1358,11 +1358,11 @@ interface Input {
   outcome?: "passed" | "failed" | "not_scored" | "pending";
   groupBy: "plan" | "scenario" | "target" | "none";
 }
-type Output = z.infer<typeof resultsOverviewSchema>; // ../contract/src/scenario.responses.ts:179
+type Output = z.infer<typeof resultsOverviewSchema>; // ../contract/src/scenario.responses.ts:194
 
 // scenarios.getResultAtoms
 // Input: z.object({ ...resultsFilterSchema.shape, limit: z.number().int().min(1).max(MAX_ATOM_PAGE… (inline, ../contract/src/scenario.trpc.ts:466)
-type Output = z.infer<typeof resultAtomsPageSchema>; // ../contract/src/scenario.responses.ts:130
+type Output = z.infer<typeof resultAtomsPageSchema>; // ../contract/src/scenario.responses.ts:145
 
 // scenarios.getRunConfigurations
 // Input: inline, ../contract/src/scenario.trpc.ts:480
