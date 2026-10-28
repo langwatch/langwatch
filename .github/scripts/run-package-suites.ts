@@ -349,10 +349,9 @@ export const laneOf = (script: string): "integration" | "browser" | "shared" =>
 export const KEEPS_LAUNCHER_WORKERS: ReadonlySet<string> = new Set(["@langwatch/design-system"]);
 
 /**
- * What a job adds to its environment. A heavy suite runs alone, and with the
- * launcher's two workers it left half of a four-core runner idle for most of a
- * shard, so a heavy unit suite takes every core. Integration and browser lanes
- * keep their own counts: their files share a datastore or an apt lock.
+ * What a job adds to its environment. A heavy unit suite runs alone, so it takes
+ * every core rather than the launcher's two. Integration and browser lanes keep
+ * their own counts: their files share a datastore or an apt lock.
  */
 export const workerEnvFor = ({
   job,

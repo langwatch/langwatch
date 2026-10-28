@@ -38,17 +38,15 @@ export function assertSerialWorkerSlot(env: NodeJS.ProcessEnv): void {
 const LAUNCHER_DEFAULT_WORKERS = "2";
 
 /**
- * Runs a suite's files `workers` at a time in CI, and asks for concurrency by name so the
- * serial guards above stand down. Only for a suite whose files cannot see one another's
- * state, and heavy enough that run-package-suites.ts gives it its shard alone. Off CI the
- * launcher's own count stands, so a laptop starts no more containers than it did. A
- * count someone exported deliberately, anything but the launcher's default, stands too.
+ * Runs a suite's files `workers` at a time in CI and stands the serial guards above down.
+ * Only for a suite whose files share no state and that has its shard alone. Off CI, or
+ * when someone exported a count other than the launcher's default, the count stands.
  */
 export function raiseWorkerCountInCI({
-  env,
+  env = process.env,
   workers,
 }: {
-  env: NodeJS.ProcessEnv;
+  env?: NodeJS.ProcessEnv;
   workers: number;
 }): void {
   if (!env.CI || env.CI === "false" || env.CI === "0") return;
