@@ -1,8 +1,8 @@
 /** How long a dialled call may wait for Twilio's media upgrade: 60 s ring timeout plus margin. */
 export const PENDING_VOICE_CALL_TTL_SECONDS = 120;
 
-/** How long a claimed run keeps its call SID, so a late cancel can still end the call. */
-export const CLAIMED_VOICE_CALL_TTL_SECONDS = 3600;
+/** How long a claimed or cancelled run stays on record: a late cancel, put or SID is still seen. */
+export const VOICE_CALL_RECORD_TTL_SECONDS = 3600;
 
 /** A call placed and waiting for Twilio to dial its media stream back. */
 export type PendingVoiceCall = {
@@ -19,7 +19,9 @@ export type VoiceCallCancelOutcome = {
   callSid?: string;
 };
 
-export type PendingVoiceCallPutResult = { stored: true } | { stored: false; reason: "cancelled" };
+export type PendingVoiceCallPutResult =
+  | { stored: true }
+  | { stored: false; reason: "cancelled" | "claimed" };
 export type PendingVoiceCallPeekResult = { found: true; call: PendingVoiceCall } | { found: false };
 export type PendingVoiceCallClaimResult =
   | { claimed: true; call: PendingVoiceCall }

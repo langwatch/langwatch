@@ -124,6 +124,26 @@ describe("MemoryPendingVoiceCallRepository", () => {
     });
   });
 
+  describe("given a claimed run", () => {
+    /** @scenario "A claimed run cannot be put again" */
+    it("refuses a second put as claimed and keeps the call SID", async () => {
+      const { repository } = createClock();
+      const call = freshPendingVoiceCall();
+      await repository.put({ call, ttlSeconds: 60 });
+      await repository.attachCallSid({ scenarioRunId: call.scenarioRunId, callSid: "CA-9" });
+      await repository.claim({ scenarioRunId: call.scenarioRunId, nonce: call.nonce });
+
+      const put = await repository.put({ call, ttlSeconds: 60 });
+      const cancelled = await repository.cancel({
+        scenarioRunId: call.scenarioRunId,
+        tombstoneTtlSeconds: 600,
+      });
+
+      expect(put).toEqual({ stored: false, reason: "claimed" });
+      expect(cancelled).toEqual({ state: "claimed", callSid: "CA-9" });
+    });
+  });
+
   describe("given a cancelled run", () => {
     /** @scenario "A cancelled run's tombstone lapses" */
     it("reads as absent once the tombstone lifetime passes", async () => {

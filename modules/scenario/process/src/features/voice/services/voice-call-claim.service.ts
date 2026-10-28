@@ -14,11 +14,19 @@ import { isValidTwilioSignature } from "../../../rules/twilio-signature.rules.ts
 
 const logger = createLogger("langwatch:voice:call-claim");
 
-const UPGRADE_PATH = /^\/twilio\/([^/]+)\/([^/]+)$/;
+const UPGRADE_PATH = /^\/twilio\/(?<scenarioRunId>[^/]+)\/(?<nonce>[^/]+)$/;
 const FORBIDDEN = "HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n";
 
 /** A claimed run's child, or the cancel that beat the spawn to it. */
 type ClaimedRun = { child?: ChildProcess; cancelled: boolean };
+
+type VoiceCallClaimDeps = {
+  pending: PendingVoiceCallRepository;
+  cancellations: ScenarioCancellationRepository;
+  authTokenFor: (input: { projectId: string }) => Promise<string>;
+  publicBaseUrl: string;
+  spawnChild: (call: PendingVoiceCall) => ChildProcess;
+};
 
 /**
  * The worker Twilio dials claims the call: the pending call must exist, Twilio's signature must
@@ -26,28 +34,14 @@ type ClaimedRun = { child?: ChildProcess; cancelled: boolean };
  * signature never spends the nonce. A cancel for a claimed run kills its child.
  */
 export class VoiceCallClaimService {
-  static create(input: {
-    pending: PendingVoiceCallRepository;
-    cancellations: ScenarioCancellationRepository;
-    authTokenFor: (input: { projectId: string }) => Promise<string>;
-    publicBaseUrl: string;
-    spawnChild: (call: PendingVoiceCall) => ChildProcess;
-  }): VoiceCallClaimService {
+  static create(input: VoiceCallClaimDeps): VoiceCallClaimService {
     return new VoiceCallClaimService(input);
   }
 
   private readonly claimed = new Map<string, ClaimedRun>();
   private subscription: Promise<() => Promise<void>> | undefined;
 
-  private constructor(
-    private readonly input: {
-      pending: PendingVoiceCallRepository;
-      cancellations: ScenarioCancellationRepository;
-      authTokenFor: (input: { projectId: string }) => Promise<string>;
-      publicBaseUrl: string;
-      spawnChild: (call: PendingVoiceCall) => ChildProcess;
-    },
-  ) {}
+  private constructor(private readonly input: VoiceCallClaimDeps) {}
 
   /** Stops listening for cancellations. */
   async close(): Promise<void> {
@@ -85,7 +79,8 @@ export class VoiceCallClaimService {
     const pathname = new URL(url, "http://door.invalid").pathname;
     const match = UPGRADE_PATH.exec(pathname);
     if (!match) return this.refuse({ socket, url, reason: "unrecognised path" });
-    const key = { scenarioRunId: match[1]!, nonce: match[2]! };
+    const { scenarioRunId, nonce } = match.groups as { scenarioRunId: string; nonce: string };
+    const key = { scenarioRunId, nonce };
 
     const peeked = await this.input.pending.peek(key);
     if (!peeked.found) return this.refuse({ socket, url, reason: "no pending call" });
@@ -105,13 +100,13 @@ export class VoiceCallClaimService {
     }
     const run: ClaimedRun = { cancelled: false };
     this.claimed.set(key.scenarioRunId, run);
-    await this.listenForCancellations();
-    const result = await this.input.pending.claim(key);
-    if (!result.claimed) {
-      this.forget({ scenarioRunId: key.scenarioRunId, run });
-      return this.refuse({ socket, url, reason: result.reason });
-    }
     try {
+      await this.listenForCancellations();
+      const result = await this.input.pending.claim(key);
+      if (!result.claimed) {
+        this.forget({ scenarioRunId: key.scenarioRunId, run });
+        return this.refuse({ socket, url, reason: result.reason });
+      }
       await this.spawnAndHandOff({ upgrade, socket, call: result.call, run });
     } catch (error) {
       this.forget({ scenarioRunId: key.scenarioRunId, run });
@@ -140,6 +135,7 @@ export class VoiceCallClaimService {
     child.once("exit", () => this.forget({ scenarioRunId: call.scenarioRunId, run }));
     child.once("error", (error: Error) => {
       logger.error({ error, nonce: upgrade.nonce }, "voice child failed to spawn");
+      this.forget({ scenarioRunId: call.scenarioRunId, run });
       socket.destroy();
     });
     try {
@@ -167,12 +163,19 @@ export class VoiceCallClaimService {
 
   /** One subscription for the worker, opened no later than the first claim. */
   private async listenForCancellations(): Promise<void> {
-    this.subscription ??= this.input.cancellations.subscribe(({ scenarioRunId }) => {
-      const run = this.claimed.get(scenarioRunId);
-      if (!run) return;
-      run.cancelled = true;
-      run.child?.kill();
-    });
-    await this.subscription;
+    const subscription = (this.subscription ??= this.input.cancellations.subscribe(
+      ({ scenarioRunId }) => {
+        const run = this.claimed.get(scenarioRunId);
+        if (!run) return;
+        run.cancelled = true;
+        run.child?.kill();
+      },
+    ));
+    try {
+      await subscription;
+    } catch (error) {
+      if (this.subscription === subscription) this.subscription = undefined;
+      throw error;
+    }
   }
 }

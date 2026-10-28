@@ -1,5 +1,5 @@
 import {
-  CLAIMED_VOICE_CALL_TTL_SECONDS,
+  VOICE_CALL_RECORD_TTL_SECONDS,
   type PendingVoiceCall,
   type PendingVoiceCallAttachResult,
   type PendingVoiceCallClaimResult,
@@ -32,8 +32,9 @@ export class MemoryPendingVoiceCallRepository implements PendingVoiceCallReposit
     ttlSeconds: number;
   }): Promise<PendingVoiceCallPutResult> {
     const { call, ttlSeconds } = input;
-    if (this.live(call.scenarioRunId)?.state === "cancelled") {
-      return { stored: false, reason: "cancelled" } as const;
+    const state = this.live(call.scenarioRunId)?.state;
+    if (state === "cancelled" || state === "claimed") {
+      return { stored: false, reason: state } as const;
     }
     this.runs.set(call.scenarioRunId, {
       state: "pending",
@@ -58,7 +59,7 @@ export class MemoryPendingVoiceCallRepository implements PendingVoiceCallReposit
     this.runs.set(scenarioRunId, {
       state: "claimed",
       callSid: record.callSid,
-      expiresAt: this.expiry(CLAIMED_VOICE_CALL_TTL_SECONDS),
+      expiresAt: this.expiry(VOICE_CALL_RECORD_TTL_SECONDS),
     });
     return { claimed: true, call } as const;
   }

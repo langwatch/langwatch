@@ -1,7 +1,7 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import {
-  CLAIMED_VOICE_CALL_TTL_SECONDS,
+  VOICE_CALL_RECORD_TTL_SECONDS,
   type PendingVoiceCall,
   type PendingVoiceCallAttachResult,
   type PendingVoiceCallClaimResult,
@@ -20,7 +20,9 @@ const stateKey = (scenarioRunId: string): string => `${KEY_PREFIX}{${scenarioRun
 
 // KEYS: pending, state. ARGV: call JSON, ttl.
 const PUT = `
-if redis.call('HGET', KEYS[2], 'state') == 'cancelled' then return 0 end
+local state = redis.call('HGET', KEYS[2], 'state')
+if state == 'cancelled' then return 0 end
+if state == 'claimed' then return 2 end
 redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
 redis.call('DEL', KEYS[2])
 redis.call('HSET', KEYS[2], 'state', 'pending')
@@ -75,9 +77,8 @@ export class RedisPendingVoiceCallRepository implements PendingVoiceCallReposito
       JSON.stringify(call),
       ttlSeconds,
     );
-    return stored === 1
-      ? ({ stored: true } as const)
-      : ({ stored: false, reason: "cancelled" } as const);
+    if (stored === 1) return { stored: true } as const;
+    return { stored: false, reason: stored === 2 ? "claimed" : "cancelled" } as const;
   }
 
   async peek({ scenarioRunId, nonce }: PendingVoiceCallKey): Promise<PendingVoiceCallPeekResult> {
@@ -95,7 +96,7 @@ export class RedisPendingVoiceCallRepository implements PendingVoiceCallReposito
       pendingKey(scenarioRunId),
       stateKey(scenarioRunId),
       nonce,
-      CLAIMED_VOICE_CALL_TTL_SECONDS,
+      VOICE_CALL_RECORD_TTL_SECONDS,
     )) as [string, string?];
     if (status === "claimed") {
       return { claimed: true, call: JSON.parse(raw!) as PendingVoiceCall } as const;

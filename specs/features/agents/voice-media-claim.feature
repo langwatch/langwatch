@@ -39,6 +39,13 @@ Feature: Voice agents: the pod that Twilio dials claims the call
     And storing another call for the run is refused as cancelled
 
   @unit
+  Scenario: A claimed run cannot be put again
+    Given a claimed run with a call SID
+    When another call is put for the run
+    Then the put is refused as claimed
+    And the run keeps its call SID
+
+  @unit
   Scenario: A cancel reports the state the run was in
     Given runs that are pending, claimed with a call SID, and unknown
     When each is cancelled

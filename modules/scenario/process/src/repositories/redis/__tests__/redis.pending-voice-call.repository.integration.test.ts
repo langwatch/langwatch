@@ -11,7 +11,7 @@ import {
 } from "../../__tests__/pending-voice-call.repository.contract.ts";
 import { RedisPendingVoiceCallRepository } from "../redis.pending-voice-call.repository.ts";
 
-const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
+const redisUrl = process.env.REDIS_URL;
 const LIFETIME_SECONDS = 60;
 
 /** Redis Cluster's CRC16 (XMODEM) over the hash tag, modulo 16384. */
@@ -34,11 +34,15 @@ describe.skipIf(!redisUrl)("RedisPendingVoiceCallRepository", () => {
   let repository: RedisPendingVoiceCallRepository;
 
   beforeAll(() => {
-    connection = new RedisConnectionService().connect({
+    const connected = new RedisConnectionService().connect({
       url: redisUrl,
-      clusterEndpoints: undefined,
-      dbIndex: undefined,
-    })!;
+      clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+      dbIndex: process.env.REDIS_DB_INDEX,
+    });
+    if (!connected) {
+      throw new Error("These tests need a real Redis; run them through the integration suite");
+    }
+    connection = connected;
     repository = RedisPendingVoiceCallRepository.create(connection);
   });
 
@@ -65,6 +69,25 @@ describe.skipIf(!redisUrl)("RedisPendingVoiceCallRepository", () => {
       });
     });
 
+    describe("when the run is claimed and another call is put for it", () => {
+      /** @scenario "A claimed run cannot be put again" */
+      it("refuses the put as claimed and keeps the call SID", async () => {
+        const call = freshPendingVoiceCall();
+        await repository.put({ call, ttlSeconds: LIFETIME_SECONDS });
+        await repository.attachCallSid({ scenarioRunId: call.scenarioRunId, callSid: "CA-9" });
+        await repository.claim({ scenarioRunId: call.scenarioRunId, nonce: call.nonce });
+
+        const put = await repository.put({ call, ttlSeconds: LIFETIME_SECONDS });
+        const cancelled = await repository.cancel({
+          scenarioRunId: call.scenarioRunId,
+          tombstoneTtlSeconds: 60,
+        });
+
+        expect(put).toEqual({ stored: false, reason: "claimed" });
+        expect(cancelled).toEqual({ state: "claimed", callSid: "CA-9" });
+      });
+    });
+
     describe("when its key's remaining time is read", () => {
       /** @scenario "Redis keeps a pending call for its lifetime and no longer" */
       it("is positive and no longer than the lifetime", async () => {
@@ -74,6 +97,7 @@ describe.skipIf(!redisUrl)("RedisPendingVoiceCallRepository", () => {
 
         const ttls = await Promise.all(keys.map((key) => connection.ttl(key)));
 
+        expect(keys.length).toBeGreaterThan(0);
         expect(ttls.every((ttl) => ttl > 0 && ttl <= LIFETIME_SECONDS)).toBe(true);
       });
     });
@@ -113,8 +137,11 @@ describe.skipIf(!redisUrl)("RedisPendingVoiceCallRepository", () => {
       it("hashes every key to one cluster slot", async () => {
         const entries = await keysWritten();
 
-        const slots = new Set(entries.map((entry) => clusterSlot(entry.split("|")[0]!)));
+        const keys = entries.map((entry) => entry.split("|")[0]!);
+        const slots = new Set(keys.map(clusterSlot));
 
+        expect(keys.some((key) => key.endsWith(":pending"))).toBe(true);
+        expect(keys.some((key) => key.endsWith(":state"))).toBe(true);
         expect(slots.size).toBe(1);
       });
     });

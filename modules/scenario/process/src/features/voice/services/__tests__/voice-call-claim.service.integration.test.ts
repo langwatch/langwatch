@@ -464,15 +464,53 @@ describe("VoiceCallClaimService", () => {
           const port = await listen();
           const { ws } = await dial({ port, signature: validSignature() });
 
-          await cancellations.publish({ projectId: CALL.projectId, scenarioRunId: "run-other" });
-          await new Promise((resolve) => setTimeout(resolve, 300));
-          ws?.close();
+          ws?.on("error", () => {});
 
-          expect(hasExited(children[0]!)).toBe(false);
+          await cancellations.publish({ projectId: CALL.projectId, scenarioRunId: "run-other" });
+          const aliveAfterOther = !hasExited(children[0]!);
+          await cancellations.publish({
+            projectId: CALL.projectId,
+            scenarioRunId: CALL.scenarioRunId,
+          });
+          await exited(children[0]!);
+
+          expect(aliveAfterOther).toBe(true);
         },
         TEST_TIMEOUT_MS,
       );
     });
+  });
+
+  describe("given the cancellation subscription fails once", () => {
+    const SECOND: PendingVoiceCall = { ...CALL, scenarioRunId: "run-b", nonce: "nonce-b" };
+
+    it(
+      "refuses the first upgrade and claims a fresh run on the next",
+      async () => {
+        await pending.put({ call: CALL, ttlSeconds: 60 });
+        await pending.put({ call: SECOND, ttlSeconds: 60 });
+        let failures = 1;
+        const subscribe = cancellations.subscribe.bind(cancellations);
+        cancellations.subscribe = async (onCancellation) => {
+          if (failures-- > 0) throw new Error("subscribe failed");
+          return subscribe(onCancellation);
+        };
+        const port = await listen();
+        const secondPath = `/twilio/${SECOND.scenarioRunId}/${SECOND.nonce}`;
+
+        const first = await dial({ port, signature: validSignature() }).catch(() => undefined);
+        const second = await dial({
+          port,
+          path: secondPath,
+          signature: sign({ authToken: AUTH_TOKEN, path: secondPath }),
+        });
+        second.ws?.close();
+
+        expect(first?.status).not.toBe(101);
+        expect(second.status).toBe(101);
+      },
+      TEST_TIMEOUT_MS,
+    );
   });
 
   describe("given no pending call for the path", () => {

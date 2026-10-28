@@ -1,13 +1,13 @@
 import type { TwilioCallControlChannel } from "../../../channels/twilio-call-control.channels.ts";
-import type { PendingVoiceCallRepository } from "../../../repositories/pending-voice-call.repository.ts";
-
-/** Long enough to outlast the call, so a late claim, put or call SID still reads as cancelled. */
-const TOMBSTONE_TTL_SECONDS = 3600;
+import {
+  type PendingVoiceCallRepository,
+  VOICE_CALL_RECORD_TTL_SECONDS,
+} from "../../../repositories/pending-voice-call.repository.ts";
 
 /**
- * Cancels a run's phone call: tombstones the pending record, then ends the call at Twilio when
- * its SID is known. A SID not known yet is refused later by the repository, so the dialler
- * hangs up itself.
+ * Cancels a run's call: tombstones the record, then ends the call at Twilio when its SID is known.
+ * The run-cancel path publishes the `scenario:cancel` broadcast that kills a claimed child;
+ * slice 3 wires this service beside it.
  */
 export class VoiceCallCancelService {
   static create(input: {
@@ -25,7 +25,7 @@ export class VoiceCallCancelService {
   async cancel(input: { projectId: string; scenarioRunId: string }): Promise<void> {
     const outcome = await this.pending.cancel({
       scenarioRunId: input.scenarioRunId,
-      tombstoneTtlSeconds: TOMBSTONE_TTL_SECONDS,
+      tombstoneTtlSeconds: VOICE_CALL_RECORD_TTL_SECONDS,
     });
     const live = outcome.state === "pending" || outcome.state === "claimed";
     if (live && outcome.callSid !== undefined) {
