@@ -35,10 +35,10 @@ var storedAWSKey = regexp.MustCompile(`(?i)\b(?:secrets|vars)\s*(?:\.\s*|\[\s*['
 	`|\bos\.environ\[\s*['"]` + awsKeyName + `['"]\s*\]\s*=(?:[^=]|$)` +
 	`|\bSetEnvironmentVariable\(\s*['"]` + awsKeyName + `|\bSet-Item\b.*\bEnv:` + awsKeyName)
 
-// IsStoredAWSKeyLine reports whether a non-comment line sets an AWS key from
+// isStoredAWSKeyLine reports whether a non-comment line sets an AWS key from
 // anything but an OIDC session, or names a stored key outright. A tripwire for
 // copied snippets, not a boundary: a key relayed under a neutral name passes.
-func IsStoredAWSKeyLine(line string) bool {
+func isStoredAWSKeyLine(line string) bool {
 	if strings.HasPrefix(strings.TrimSpace(line), "#") {
 		return false
 	}
@@ -83,7 +83,7 @@ func StaticCloudKeys(repoRoot string) ([]string, error) {
 func storedKeyLines(text string) []int {
 	var lines []int
 	for i, line := range strings.Split(text, "\n") {
-		if IsStoredAWSKeyLine(line) {
+		if isStoredAWSKeyLine(line) {
 			lines = append(lines, i+1)
 		}
 	}

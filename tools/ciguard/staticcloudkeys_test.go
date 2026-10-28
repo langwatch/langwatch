@@ -88,7 +88,7 @@ func TestStaticCloudKeysRejectsAStoredKey(t *testing.T) {
 	assert.Equal(t, 2, strings.Count(strings.Join(problems, "\n"), ": stored AWS key:"))
 }
 
-// @scenario "A workflow that reads a stored AWS key fails CI"
+// @scenario "Reading or relaying an OIDC session passes"
 func TestStaticCloudKeysAllowsAnOIDCSessionExport(t *testing.T) {
 	step := "      - env:\n          AWS_ACCESS_KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}\n          KEY_ID: ${{ steps.creds.outputs.aws-access-key-id }}\n        run: |\n          aws configure --profile p set aws_access_key_id \"${KEY_ID}\"\n"
 	workflow := strings.Replace(oidcOnlyWorkflow, "      - run: aws s3 ls \"$AWS_ACCESS_KEY_ID\"\n", step, 1)
