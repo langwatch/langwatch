@@ -23,6 +23,7 @@ import {
   parseWeights,
   runJobs,
   scriptsFor,
+  shardCostOf,
   shardOf,
   staleEntries,
   summarise,
@@ -687,6 +688,29 @@ void describe("given the job is split into shards", () => {
         ["c", "slow"],
         ["a", "b", "mid"],
       ]);
+    });
+
+    /** @scenario "Shards are balanced by the wall time each package adds" */
+    void it("weighs a heavy package whole and a light one by its share of the concurrency", () => {
+      const seconds = new Map([
+        ["heavy", 200],
+        ["l1", 90],
+        ["l2", 90],
+        ["l3", 90],
+        ["l4", 90],
+      ]);
+      const lights = ["l1", "l2", "l3", "l4"].map((name) => ({ name }));
+      const costOf = (p: { name: string }) =>
+        shardCostOf({ weight: seconds.get(p.name) ?? 0, concurrency: 2 });
+      assert.equal(costOf({ name: "heavy" }), 200);
+      assert.equal(costOf({ name: "l1" }), 45);
+      const items = [{ name: "heavy" }, ...lights];
+      const groups = balanceShards({ items, weightOf: costOf, total: 2 });
+      // By raw seconds l4 joined the heavy package: 200 + 90/2 against 270/2.
+      assert.deepEqual(
+        groups.map((g) => g.map((p) => p.name)),
+        [["heavy"], ["l1", "l2", "l3", "l4"]],
+      );
     });
 
     /** @scenario "Every shard computes the same split" */

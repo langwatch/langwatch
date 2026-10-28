@@ -165,6 +165,21 @@ export const isHeavyPackage = ({
   pkg: DiscoveredPackage;
 }): boolean => weightOf(pkg) >= HEAVY_SECONDS;
 
+/**
+ * The seconds a package adds to its shard's wall time, which is what the split
+ * balances. A heavy package runs alone and adds all of its weight; a light one
+ * shares the shard with `concurrency - 1` others and adds its share. Splitting
+ * by the raw weight alone, a shard holding 737s of heavy suites ran 1073s
+ * while one holding 211s ran 473s (wall time is heavy + light / concurrency).
+ */
+export const shardCostOf = ({
+  weight,
+  concurrency,
+}: {
+  weight: number;
+  concurrency: number;
+}): number => (weight >= HEAVY_SECONDS ? weight : weight / concurrency);
+
 /** Seconds a package costs when the weights file does not name it. */
 export const DEFAULT_WEIGHT_SECONDS = 5;
 
@@ -704,8 +719,18 @@ if (isEntrypoint()) {
   // An excluded package runs nothing, so it adds nothing to a shard's time.
   const weightOf = (pkg: DiscoveredPackage): number =>
     excluded.has(pkg.name) ? 0 : (parsedWeights.weights.get(pkg.name) ?? DEFAULT_WEIGHT_SECONDS);
-  const assigned = shardOf({ items: reached, weightOf, shard });
-  const expected = assigned.reduce((sum, pkg) => sum + weightOf(pkg), 0);
+  let concurrency: number;
+  try {
+    concurrency = parseConcurrency(process.env.PACKAGE_SUITES_CONCURRENCY);
+  } catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  // Every shard reads the same concurrency from the job's env, so they agree.
+  const costOf = (pkg: DiscoveredPackage): number =>
+    shardCostOf({ weight: weightOf(pkg), concurrency });
+  const assigned = shardOf({ items: reached, weightOf: costOf, shard });
+  const expected = assigned.reduce((sum, pkg) => sum + costOf(pkg), 0);
   console.log(
     `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages, ` +
       `about ${Math.round(expected)}s of suites.`,
@@ -726,13 +751,6 @@ if (isEntrypoint()) {
         : undefined,
     });
   };
-  let concurrency: number;
-  try {
-    concurrency = parseConcurrency(process.env.PACKAGE_SUITES_CONCURRENCY);
-  } catch (error) {
-    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
-  }
   for (const line of exclusionNotices(assigned, excluded)) console.log(line);
   // Each suite keeps its own configured worker count. VITEST_MAX_WORKERS would
   // outrank it, and an integration suite's serial files would then overlap.

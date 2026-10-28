@@ -268,6 +268,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // for the deploy to pin (specs/ci/publish-prerelease-charts-to-ecr.feature).
   "tools/chartpush",
   "tools/chartheap",
+  // How the package-suites weights are measured from main's job logs
+  // (specs/ci/package-suites-weights.feature).
+  "tools/suiteweights",
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
