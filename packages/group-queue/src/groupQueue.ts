@@ -196,12 +196,6 @@ export function getBackoffMs(attempt: number): number {
  */
 export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil((JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3);
 
-/** A handed-back job waits `delayMs`; once handed back for over `windowMs`, it spends attempts. */
-export const HAND_BACK_CONFIG = {
-  delayMs: 1_000,
-  windowMs: 30 * 60_000,
-} as const;
-
 /** Whether a job no worker has handled yet is handed back again, or has waited long enough. */
 export function handBackOutcome({
   handedBackSince,
@@ -273,6 +267,17 @@ export const GROUP_QUEUE_CONFIG = {
   metricsIntervalMs: 15000,
   /** Default maximum time to wait for graceful consumer shutdown. */
   shutdownTimeoutMs: 25_000,
+} as const;
+
+/**
+ * A handed-back job waits `delayMs`; past `windowMs` it spends attempts. Each worker that handed it
+ * back passes its group over for `passOverMs`, two signal waits (#9148). The re-stage holds the
+ * group ~3s, leaving a peer ~7s against its 5s wait: a longer `delayMs` needs a longer pass-over.
+ */
+export const HAND_BACK_CONFIG = {
+  delayMs: 1_000,
+  windowMs: 30 * 60_000,
+  passOverMs: 2 * GROUP_QUEUE_CONFIG.signalTimeoutSec * 1000,
 } as const;
 
 /** Default TTL for deduplication in milliseconds */
@@ -668,6 +673,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           : undefined,
         groupBatch: () => this.groupBatching(),
         claimGuardWorkerId: () => this.claimGuardWorkerId(),
+        workerId: this.workerId,
       });
       this.dispatcher.start();
       this.adaptiveSlots.start();
@@ -2363,7 +2369,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
   /**
    * Returns a job this worker has no handler for to the queue unspent: same attempt, no failure
-   * streak, no audit. A short delay keeps this worker from taking it straight back.
+   * streak, no audit. This worker passes the group over meanwhile, so a peer takes it first.
    */
   private async handBackClaimedJob({
     job,
@@ -2422,6 +2428,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       attempt,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
       claimToken,
+      passOver: { workerId: this.workerId, ttlMs: HAND_BACK_CONFIG.passOverMs },
     });
     if (restaged) {
       await this.blobLifecycle.transferLease({
