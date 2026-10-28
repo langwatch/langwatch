@@ -37,11 +37,12 @@ func TestSupersededKeepsTheNewestCopy(t *testing.T) {
 	assert.Equal(t, []int64{1, 2}, ids(cachesweep.Superseded(entries)))
 }
 
-// @scenario "Copies keyed by a lockfile hash and the commit share one group"
-func TestSupersededGroupsAcrossLockfileHashes(t *testing.T) {
+// @scenario "Each lockfile hash keeps its own newest copy"
+func TestSupersededKeepsOneCopyPerLockfileHash(t *testing.T) {
 	entries := []cachesweep.Entry{
-		entry(1, "go-build-Linux-X64-race-"+lock("a")+"-"+sha("1"), 20),
-		entry(2, "go-build-Linux-X64-race-"+lock("b")+"-"+sha("2"), 26),
+		entry(1, "Linux-pkg-dist-"+lock("a")+"-"+sha("1"), 20),
+		entry(2, "Linux-pkg-dist-"+lock("a")+"-"+sha("2"), 22),
+		entry(3, "Linux-pkg-dist-"+lock("b")+"-"+sha("3"), 26),
 	}
 	assert.Equal(t, []int64{1}, ids(cachesweep.Superseded(entries)))
 }

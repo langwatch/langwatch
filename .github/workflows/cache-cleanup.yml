@@ -39,7 +39,7 @@ jobs:
           done
 
   sweep-main:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.repository == 'langwatch/langwatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -48,6 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           sparse-checkout: |
             /*
             !/docs/media/

@@ -24,7 +24,7 @@ import (
 func main() {
 	ctx := context.Background()
 	out, err := exec.CommandContext(ctx, "gh", "cache", "list", "--ref", "refs/heads/main",
-		"--limit", "1000", "--json", "id,key,createdAt").Output()
+		"--limit", "1000", "--sort", "created_at", "--order", "desc", "--json", "id,key,createdAt").Output()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "::error::Could not list main's caches: %v\n", err)
 		os.Exit(1)

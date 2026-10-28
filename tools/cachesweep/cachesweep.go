@@ -17,9 +17,11 @@ type Entry struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-// commitKeyed matches the tail prune-caches accepts: optional 64-hex hashFiles
-// segments, then the 40-hex commit. The first group names the cache.
-var commitKeyed = regexp.MustCompile(`^(.+?-)((?:[0-9a-f]{64}-)*[0-9a-f]{40})$`)
+// commitKeyed matches a key ending in the 40-hex commit. Everything before it,
+// hashFiles segments included, names the cache: a pull request branched before
+// a lockfile bump restores from main's copy under the old hash, and some of
+// those restore keys are pinned to the hash with no wider fallback.
+var commitKeyed = regexp.MustCompile(`^(.+-)[0-9a-f]{40}$`)
 
 // Superseded returns the entries a newer copy of the same cache makes redundant.
 // Entries whose key does not end in a commit are never returned.

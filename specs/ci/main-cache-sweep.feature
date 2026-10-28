@@ -19,12 +19,16 @@ Feature: Main keeps one copy of each per-commit cache
     Then the two older copies are deleted
     And the newest copy stays
 
+  # A pull request branched before a lockfile bump still restores from main's
+  # copy under the old hash, and the package dist cache has no fallback wider
+  # than the hash, so each hash keeps its newest copy until it expires.
   @unit
-  Scenario: Copies keyed by a lockfile hash and the commit share one group
-    Given main holds copies of a cache keyed by a lockfile hash and the commit
-    And the copies carry different lockfile hashes
+  Scenario: Each lockfile hash keeps its own newest copy
+    Given main holds two copies of a cache under one lockfile hash
+    And one copy under a newer lockfile hash
     When the sweep runs
-    Then only the newest copy stays
+    Then the older copy under the first hash is deleted
+    And the newest copy under each hash stays
 
   @unit
   Scenario: Caches with different names before the commit are kept apart
