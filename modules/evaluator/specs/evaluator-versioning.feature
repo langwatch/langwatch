@@ -60,6 +60,13 @@ Feature: Evaluator versions and deploy labels
 
   # --- Protection ---
 
+  @unit
+  Scenario: An unattributed credential cannot bypass the deploy check
+    Given a request whose only actor is an internal proof actor, such as an ownerless project key
+    When its caller is resolved for a version write or a delete
+    Then it is unattributed and holds no deploy permission
+    And a named system actor still runs without the check
+
   @integration
   Scenario: Moving a label needs the deploy permission
     Given a user whose custom role holds "evaluations:manage" but not "evaluators:deploy"
@@ -160,6 +167,13 @@ Feature: Evaluator versions and deploy labels
     When the user opens its version history
     Then the versions are listed newest first with author, date and labels
     And "Deploy" opens a dialog with latest, production and staging rows
+
+  @integration
+  Scenario: A failed label save shows the registered error and reads the labels again
+    Given the deploy dialog is open for an evaluator
+    When saving a label is refused by the server
+    Then the dialog stays open and shows the error's registered copy, never its code
+    And the evaluator's labels are read again so a retry starts from what was saved
 
   @integration
   Scenario: The deploy dialog adds a custom label and refuses a reserved one

@@ -28,6 +28,14 @@ Feature: Agent versions and deploy labels
     And version 1 still carries the old config
     And reading the agent with no label or version returns the version 2 config
 
+  @integration
+  Scenario: A system config write appends a version too
+    Given an agent bound to a workflow at version 1
+    When the workflow sync rewrites its config
+    And the credential move rewrites it while the row is unchanged
+    Then the agent has versions 1, 2 and 3, each with the config written
+    And a credential move against a row that changed since it read is refused
+
   @unit
   Scenario: An update by an API key records the key as the author kind
     Given an agent "Support bot" at version 1
@@ -100,6 +108,13 @@ Feature: Agent versions and deploy labels
     Then the latest version is returned
 
   # --- Protection ---
+
+  @unit
+  Scenario: An unattributed credential cannot bypass the deploy check
+    Given a request whose only actor is an internal proof actor, such as an ownerless project key
+    When its caller is resolved for a version write or a delete
+    Then it is unattributed and holds no deploy permission
+    And a named system actor still runs without the check
 
   @integration
   Scenario: Moving a label needs the deploy permission
@@ -197,6 +212,13 @@ Feature: Agent versions and deploy labels
     Then the versions are listed newest first with author, date and labels
     And "Deploy" opens a dialog with latest, production and staging rows
     And saving the dialog assigns the chosen versions
+
+  @integration
+  Scenario: A failed label save shows the registered error and reads the labels again
+    Given the deploy dialog is open for an agent
+    When saving a label is refused by the server
+    Then the dialog stays open and shows the error's registered copy, never its code
+    And the agent's labels are read again so a retry starts from what was saved
 
   @integration
   Scenario: The deploy dialog adds a custom label and refuses a reserved one

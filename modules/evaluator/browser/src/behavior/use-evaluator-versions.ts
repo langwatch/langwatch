@@ -1,4 +1,6 @@
 import { evaluatorClient } from "@langwatch/evaluator-client";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useCallback, useMemo, useState } from "react";
 
 /** The label a deploy row names, and the version it points at; null when unassigned. */
@@ -46,7 +48,9 @@ export function useEvaluatorVersions(input: { projectId: string; evaluatorId: st
       await utils.evaluators.listVersions.invalidate({ projectId, evaluatorId });
       return true;
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "The labels could not be saved.");
+      setSaveError(labelSaveErrorOf(error));
+      // Earlier label calls may have landed: read the labels again; the edits stay on top.
+      await utils.evaluators.listVersions.invalidate({ projectId, evaluatorId });
       return false;
     } finally {
       setIsSaving(false);
@@ -95,4 +99,12 @@ function selectionsOf(versions: {
   labels: { label: string; version: number }[];
 }): EvaluatorLabelSelections {
   return Object.fromEntries(versions.labels.map((label) => [label.label, label.version]));
+}
+
+/** A failed label save in words: the handled error's registered copy, never its wire text. */
+function labelSaveErrorOf(error: unknown): string {
+  const handled = readHandledError(error);
+  if (!handled) return "The labels could not be saved.";
+  const { title, description } = explainHandledError(handled);
+  return description ? `${title}. ${description}` : title;
 }

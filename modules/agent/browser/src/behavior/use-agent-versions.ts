@@ -1,4 +1,6 @@
 import type { AgentVersions } from "@langwatch/agent-contract";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { AgentClient } from "../model/agent-client.ts";
@@ -59,7 +61,12 @@ export function useAgentVersions(input: {
       await reload();
       return true;
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "The labels could not be saved.");
+      setSaveError(labelSaveErrorOf(error));
+      // Earlier label calls may have landed: read the labels again, keeping the edits on screen.
+      await agents
+        .listVersions({ projectId, agentId })
+        .then(setData)
+        .catch(() => undefined);
       return false;
     } finally {
       setIsSaving(false);
@@ -107,4 +114,12 @@ async function applyLabelChanges(input: {
 
 function selectionsOf(versions: AgentVersions): AgentLabelSelections {
   return Object.fromEntries(versions.labels.map((label) => [label.label, label.version]));
+}
+
+/** A failed label save in words: the handled error's registered copy, never its wire text. */
+function labelSaveErrorOf(error: unknown): string {
+  const handled = readHandledError(error);
+  if (!handled) return "The labels could not be saved.";
+  const { title, description } = explainHandledError(handled);
+  return description ? `${title}. ${description}` : title;
 }
