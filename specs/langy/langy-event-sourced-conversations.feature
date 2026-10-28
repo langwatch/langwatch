@@ -238,20 +238,25 @@ Feature: Langy conversations are an event-sourced projection
   # ============================================================================
 
   @unit
-  Scenario: A turn send that loses a write conflict is retried and admitted
-    Given another send races mine and my admission transaction loses a write conflict
-    When the admission is attempted again
-    Then my turn is admitted on the later attempt
+  Scenario: A send that races another send is still admitted
+    Given another send races mine for the same conversation
+    When my send loses the race
+    Then my turn is still admitted
 
   @unit
-  Scenario: A turn send that clashes on the receipt unique key is retried
-    Given a racing send created the receipt first
-    And my admission transaction fails on the receipt unique key
-    When the claim runs
-    Then it retries the claim and returns the retry's answer instead of failing
+  Scenario: A racing send that created the receipt first does not fail my send
+    Given a racing send already recorded the same send
+    When my send is submitted
+    Then I get the answer to that send instead of an error
 
   @unit
-  Scenario: A turn send that keeps losing write conflicts is refused as unavailable
-    Given every admission attempt for my send loses a write conflict
-    When the retry limit is reached
-    Then the send is refused with the "langy_agent_unavailable" error
+  Scenario: A send that cannot get through a burst of sends is told Langy is unavailable
+    Given many sends race mine and none lets it through
+    When my send keeps losing
+    Then I am told Langy is unavailable with the "langy_agent_unavailable" error
+
+  @unit
+  Scenario: A turn send that fails for another reason is surfaced without retry
+    Given my send fails for a reason unrelated to a race
+    When my send is submitted
+    Then I see that failure straight away and the send is not attempted again
