@@ -3,20 +3,24 @@
  * Chromium: jsdom drops the media-conditioned margin that once covered the yield.
  */
 
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import {
+  LANGY_ABSENT_SURFACE,
+  LANGY_STORE_SLICE,
+  type LangySliceSurface,
+} from "@langwatch/langy-contract";
 import { cleanup, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 
 import { Drawer } from "../drawer.tsx";
 
-const langy = vi.hoisted(() => ({
-  state: { isOpen: false, panelMode: "sidebar" as "sidebar" | "floating" },
-}));
-
-vi.mock("../../../behavior/langy/langy.store.ts", () => ({
-  useLangyStore: <T,>(select: (state: typeof langy.state) => T) => select(langy.state),
-}));
+// Stand in for Langy, the owner of the slice, which this package only reads.
+const langy = defineSlice<LangySliceSurface>({
+  name: LANGY_STORE_SLICE,
+  create: () => ({ ...LANGY_ABSENT_SURFACE }),
+});
 
 /** The docked panel's width plus the drawer's own 8px margin and the 12px gap between cards. */
 const DOCKED_YIELD_PX = 8 + 392 + 12;
@@ -43,13 +47,13 @@ beforeEach(async () => {
 
 afterEach(() => {
   cleanup();
-  langy.state = { isOpen: false, panelMode: "sidebar" };
+  langy.setState({ isOpen: false, panelMode: "sidebar" });
 });
 
 describe("given the Langy panel is open and docked on a wide screen", () => {
   /** @scenario "An open drawer sits beside the open Langy panel instead of under it" */
   it("the trace drawer sits to the left of the panel, not under it", async () => {
-    langy.state = { isOpen: true, panelMode: "sidebar" };
+    langy.setState({ isOpen: true, panelMode: "sidebar" });
 
     const drawer = await renderTraceDrawer();
 

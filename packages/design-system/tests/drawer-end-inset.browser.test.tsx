@@ -77,6 +77,25 @@ describe("given a docked side panel keeps room on the right edge of a wide scree
     expect(drawer.getBoundingClientRect().top).toBeCloseTo(48, 0);
   });
 
+  it("a phone keeps the header offset above the full-screen sheet", async () => {
+    await page.viewport(600, 800);
+    renderWithDesignSystem(
+      <DrawerOffsetProvider value={{ marginTop: 48 }}>
+        <Drawer.Root open placement="end">
+          <Drawer.Content data-testid="drawer">
+            <Drawer.Body>
+              <Text>body</Text>
+            </Drawer.Body>
+          </Drawer.Content>
+        </Drawer.Root>
+      </DrawerOffsetProvider>,
+    );
+    const drawer = await screen.findByTestId("drawer");
+    await restingGapToRightEdge(drawer);
+
+    expect(drawer.getBoundingClientRect().top).toBeCloseTo(48, 0);
+  });
+
   /** @scenario "An open drawer sits beside the open Langy panel instead of under it" */
   it("a phone still shows the drawer as a full-screen sheet", async () => {
     await page.viewport(600, 800);
