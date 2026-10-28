@@ -5,11 +5,13 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type IntentSpec,
   type Projection,
   type StaticPipelineDefinition,
+  type WakeHandler,
 } from "@langwatch/eventing";
 import { USER_ERASED_EVENT_TYPE, userErasedPayloadSchema } from "@langwatch/identity-contract";
-import type { z } from "zod";
+import { z } from "zod";
 
 import type { DatasetModule } from "../app/dataset.app.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
@@ -21,13 +23,6 @@ import {
   datasetAutosaveStateSchema,
   datasetAutosaveWake,
 } from "./dataset-autosave.process.ts";
-import {
-  DATASET_VERSION_RETENTION_INTERVAL_MS,
-  DATASET_VERSION_RETENTION_PROCESS_NAME,
-  datasetVersionRetentionIntentSchema,
-  datasetVersionRetentionStateSchema,
-  datasetVersionRetentionWake,
-} from "./dataset-version-retention.process.ts";
 import {
   DATASET_HISTORY_AGGREGATE_TYPE,
   datasetContentEditedEventSchema,
@@ -42,6 +37,21 @@ import {
 } from "./dataset-versions.commands.ts";
 
 const DATASET_VERSIONS_PIPELINE_NAME = "dataset_versions";
+const DATASET_VERSION_RETENTION_PROCESS_NAME = "datasetVersionRetention";
+
+/** How often the retention sweep walks every dataset's history. */
+const DATASET_VERSION_RETENTION_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+const datasetVersionRetentionStateSchema = z.object({ lastSweepAt: z.number().nullable() });
+const datasetVersionRetentionIntentSchema = z.object({ scheduledFor: z.number().int() });
+
+const datasetVersionRetentionWake: WakeHandler<
+  z.infer<typeof datasetVersionRetentionStateSchema>,
+  { sweep: IntentSpec<typeof datasetVersionRetentionIntentSchema> }
+> = (_state, ctx) => ({
+  state: { lastSweepAt: ctx.at },
+  intents: [ctx.intent("sweep", `sweep:${ctx.at}`, { scheduledFor: ctx.at })],
+});
 
 /** What the pipeline needs of the app: the autosave, the retention sweep and erasure. */
 export type DatasetVersionWork = {

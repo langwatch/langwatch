@@ -7,11 +7,8 @@ import {
   ExperimentNotFoundError,
   ExperimentRunLoopUnavailableError,
   ExperimentRunNotFoundError as RunNotFoundError,
-  InvalidExperimentConfigurationError,
   generateHumanReadableId,
-  persistedEvaluationsV3StateSchema,
   runsSavedDataset,
-  type ExecutionScope,
   type ExperimentRunWithItems,
   type RunResultsRequest,
   type RunStatusAnswer,
@@ -21,7 +18,6 @@ import {
   type SavedRunRequest,
   type WorkbenchRunAnswer,
   type executionRequestSchema,
-  ExperimentEvaluationInputError,
 } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -35,19 +31,12 @@ import type {
 } from "../../../repositories/experiment-run-fold.repository.ts";
 import type { ExperimentRunRefusal } from "../../../rules/experiment-run-availability.rules.ts";
 import { getRunUrl } from "../../../rules/experiment-run-url.rules.ts";
-import {
-  datasetVersionAuthorFrom,
-  workbenchActorFrom,
-} from "../../../rules/experiment-workbench-actor.rules.ts";
+import { workbenchActorFrom } from "../../../rules/experiment-workbench-actor.rules.ts";
 import { workbenchRunState } from "../../../rules/experiment-workbench-run-state.rules.ts";
-import { ExperimentBoardRowsService } from "../../../services/experiment-board-rows.service.ts";
-import {
-  ExperimentExecutionDataService,
-  type LoadedExecutionData,
-} from "../../../services/experiment-execution-data.service.ts";
-import { ExperimentSavedStateExecutionService } from "../../../services/experiment-saved-state-execution.service.ts";
+import { ExperimentExecutionDataService } from "../../../services/experiment-execution-data.service.ts";
 import type { ExperimentService } from "../../../services/experiment.service.ts";
 import { ExperimentRunPlanService } from "../../run/services/experiment-run-plan.service.ts";
+import { ExperimentSavedRunPreparationService } from "./experiment-saved-run-preparation.service.ts";
 import type { ExperimentWorkbenchObserver } from "./experiment-workbench-observer.service.ts";
 import {
   ExperimentWorkbenchPipelineRunService,
@@ -84,7 +73,9 @@ export class ExperimentWorkbenchRunService {
   /** `POST /:slug/run`: a polled run by default, a streamed one when the caller accepts events. */
   async startSavedRun(input: SavedRunRequest): Promise<SavedRunAnswer> {
     const { projectId, slug } = input;
-    const saved = await this.#prepareSavedRun(input);
+    const saved = await ExperimentSavedRunPreparationService.create({
+      experiments: this.experiments,
+    }).prepare({ input, runs: this.#pipeline() });
 
     logger.info(
       { projectId, slug, isSSE: input.acceptsEvents, rowCount: saved.data.datasetRows.length },
@@ -138,80 +129,6 @@ export class ExperimentWorkbenchRunService {
     await this.#runsOn().startRun(run);
 
     return { kind: "started", runId, status: "running", total: run.start.total, runUrl };
-  }
-
-  /** The saved workbench, the body's run inputs and the data they load, or main's refusals. */
-  async #prepareSavedRun(input: SavedRunRequest) {
-    const { projectId, slug } = input;
-    const runs = this.#pipeline();
-    const savedExperiment = await this.experiments.findBySlugAndType({
-      projectId,
-      slug,
-      type: "EVALUATIONS_V3",
-    });
-    if (!savedExperiment) throw new ExperimentNotFoundError(slug);
-
-    const parseResult = persistedEvaluationsV3StateSchema.safeParse(savedExperiment.workbenchState);
-    if (!parseResult.success) {
-      logger.error({ slug, errors: parseResult.error.issues }, "Invalid workbenchState");
-      throw new InvalidExperimentConfigurationError(slug);
-    }
-    if (!parseResult.data.datasets[0]) {
-      throw new ExperimentEvaluationInputError({ status: 400, reason: "No dataset configured" });
-    }
-    const savedState = ExperimentSavedStateExecutionService.create();
-    const runInputs = savedState.parseRunInputs({ body: input.body });
-    const prepared = await savedState.prepareSavedStateExecution({
-      experiments: this.experiments,
-      services: runs.services,
-      projectId,
-      slug,
-      runInputs: {
-        data: runInputs.data,
-        datasetId: runInputs.dataset_id,
-        ...(runInputs.dataset_version !== undefined
-          ? { datasetVersion: runInputs.dataset_version }
-          : {}),
-        by: datasetVersionAuthorFrom({ credential: input.credential }),
-        parameters: runInputs.parameters,
-      },
-    });
-    const scope: ExecutionScope = runInputs.row_indices
-      ? { type: "rows", rowIndices: runInputs.row_indices }
-      : { type: "full" };
-    // A run over another version than the board shows writes back onto the rows with its ids.
-    const boardRowIndices =
-      prepared.pinnedVersionRowIds && prepared.datasetVersion && runsSavedDataset(runInputs)
-        ? await ExperimentBoardRowsService.create({
-            datasets: runs.services.datasets,
-          }).boardRowIndices({
-            projectId,
-            datasetId: prepared.datasetVersion.datasetId,
-            runRowIds: prepared.pinnedVersionRowIds,
-          })
-        : undefined;
-    const data: LoadedExecutionData = {
-      datasetRows: prepared.datasetRows,
-      datasetColumns: prepared.datasetColumns,
-      loadedPrompts: prepared.loadedPrompts,
-      loadedAgents: prepared.loadedAgents,
-      loadedEvaluators: prepared.loadedEvaluators,
-      loadedWorkflows: prepared.loadedWorkflows,
-      ...(prepared.datasetVersion ? { datasetVersion: prepared.datasetVersion } : {}),
-    };
-    return {
-      experimentId: prepared.experiment.id,
-      state: prepared.state,
-      data,
-      scope,
-      runInputs,
-      ...(boardRowIndices ? { boardRowIndices } : {}),
-      carriedOverCells: savedState.planSavedRunCarryOver({
-        prepared,
-        scope,
-        ...(boardRowIndices ? { boardRowIndices } : {}),
-      }),
-    };
   }
 
   /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */
