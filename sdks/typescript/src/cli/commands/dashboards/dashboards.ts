@@ -145,7 +145,7 @@ export const updateDashboardCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
   const description = options.clearDescription ? null : options.description;
-  const changesLangy = options.includeLangyTraces || options.excludeLangyTraces;
+  const changesLangy = Boolean(options.includeLangyTraces) || Boolean(options.excludeLangyTraces);
   if (
     options.name === undefined &&
     description === undefined &&
@@ -163,14 +163,15 @@ export const updateDashboardCommand = async (
 
   try {
     const service = new DashboardsApiService();
-    const excludedOrigins = changesLangy
-      ? langyTracesList({
-          stored: (await service.get(dashboardId)).excludedOrigins,
-          includeLangy: Boolean(options.includeLangyTraces),
-        })
-      : options.resetLangyTraces
-        ? null
-        : undefined;
+    let excludedOrigins: string[] | null | undefined;
+    if (changesLangy) {
+      excludedOrigins = langyTracesList({
+        stored: (await service.get(dashboardId)).excludedOrigins,
+        includeLangy: Boolean(options.includeLangyTraces),
+      });
+    } else if (options.resetLangyTraces) {
+      excludedOrigins = null;
+    }
     const dashboard = await service.update({
       dashboardId,
       ...(options.name === undefined ? {} : { name: options.name }),
