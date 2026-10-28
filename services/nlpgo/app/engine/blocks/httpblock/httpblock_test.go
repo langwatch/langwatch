@@ -158,9 +158,39 @@ func TestSSRF_AllowListEntryIsMatchedAsTheSameHostname(t *testing.T) {
 		require.NoError(t, err, spelling)
 		_ = conn.Close()
 	}
-	opts.AllowedHosts = []string{"agent.corp.local:" + port}
-	require.ErrorIs(t, httpblock.CheckURL("http://agent.corp.local:"+port+"/", opts), httpblock.ErrSSRFBlocked,
-		"an entry carrying a port never matches")
+}
+
+// @scenario "The HTTP block matches no hostname for an allowlist entry carrying a port"
+func TestSSRF_AnAllowlistEntryWithAPortMatchesNothing(t *testing.T) {
+	opts := httpblock.SSRFOptions{
+		AllowedHosts: []string{"agent.corp.local:8080"},
+		Resolver: func(string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("10.0.0.5")}, nil
+		},
+	}
+	require.ErrorIs(t, httpblock.CheckURL("http://agent.corp.local:8080/", opts), httpblock.ErrSSRFBlocked)
+}
+
+// @scenario "The HTTP block resolves a fully-qualified name as written"
+func TestSSRF_ResolvesAFullyQualifiedNameAsWritten(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	var looked []string
+	opts := httpblock.SSRFOptions{
+		AllowedHosts: []string{"api.example.com"},
+		Resolver: func(name string) ([]net.IP, error) {
+			looked = append(looked, name)
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		},
+	}
+	require.NoError(t, httpblock.CheckURL("http://api.example.com.:"+port+"/", opts))
+	conn, err := httpblock.SafeDialer(opts)(context.Background(), "tcp", net.JoinHostPort("api.example.com.", port))
+	require.NoError(t, err)
+	_ = conn.Close()
+	assert.Equal(t, []string{"api.example.com.", "api.example.com."}, looked)
 }
 
 // @scenario "The HTTP block judges a metadata hostname with a trailing dot as the same name"
@@ -174,11 +204,23 @@ func TestSSRF_TrailingDotDoesNotHideAMetadataName(t *testing.T) {
 	require.ErrorIs(t, httpblock.CheckURL("http://metadata.google.internal./computeMetadata/v1/", opts), httpblock.ErrSSRFBlocked)
 	_, err := httpblock.SafeDialer(opts)(context.Background(), "tcp", "metadata.google.internal.:80")
 	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
-	require.ErrorIs(t, httpblock.CheckURL("http://metadata../", opts), httpblock.ErrSSRFBlocked,
-		"a doubled trailing dot is refused, not resolved")
 }
 
-// @scenario "The HTTP block matches an allowlist entry whatever its case, spaces or trailing dot"
+// @scenario "The HTTP block refuses a hostname that still ends in a dot without a lookup"
+func TestSSRF_ADoubledTrailingDotIsRefusedWithoutALookup(t *testing.T) {
+	looked := false
+	opts := httpblock.SSRFOptions{
+		AllowLocal: true,
+		Resolver: func(string) ([]net.IP, error) {
+			looked = true
+			return []net.IP{net.ParseIP("93.184.216.34")}, nil
+		},
+	}
+	require.ErrorIs(t, httpblock.CheckURL("http://metadata../", opts), httpblock.ErrSSRFBlocked)
+	assert.False(t, looked, "no DNS lookup was attempted")
+}
+
+// @scenario "The HTTP block matches no hostname for a blank or lone-dot allowlist entry"
 func TestSSRF_ABlankOrDotEntryMatchesNothing(t *testing.T) {
 	opts := httpblock.SSRFOptions{
 		AllowedHosts: []string{".", "  "},

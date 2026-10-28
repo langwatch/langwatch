@@ -101,7 +101,10 @@ func CheckURL(raw string, opts SSRFOptions) error {
 	if err != nil {
 		return ErrSSRFBlocked
 	}
-	host := normaliseHost(u.Hostname())
+	// Policy reads the normalised host; DNS gets the name as written, so a
+	// trailing dot keeps the resolver's search list out of it.
+	written := strings.ToLower(u.Hostname())
+	host := normaliseHost(written)
 	if host == "" {
 		return ErrSSRFBlocked
 	}
@@ -111,7 +114,7 @@ func CheckURL(raw string, opts SSRFOptions) error {
 	}
 	if allow {
 		// A name that does not resolve is left to fail at dial time, as below.
-		if ips, err := addrsOf(host, opts); err == nil && anyMetadata(ips, opts, host) {
+		if ips, err := addrsOf(host, written, opts); err == nil && anyMetadata(ips, opts, host) {
 			return ErrSSRFBlocked
 		}
 		return nil
@@ -122,7 +125,7 @@ func CheckURL(raw string, opts SSRFOptions) error {
 		}
 		return nil
 	}
-	ips, err := resolveHost(host, opts)
+	ips, err := resolveHost(written, opts)
 	if err != nil {
 		// DNS failed — let the actual request fail with a network
 		// error so the customer sees a real upstream message instead
@@ -153,13 +156,14 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 		if err != nil {
 			return nil, err
 		}
-		host = normaliseHost(host)
+		written := strings.ToLower(host)
+		host = normaliseHost(written)
 		allow, deny := hostPolicy(host, opts)
 		if deny {
 			return nil, ErrSSRFBlocked
 		}
 		if allow {
-			ips, err := addrsOf(host, opts)
+			ips, err := addrsOf(host, written, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -168,7 +172,7 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 			}
 			return checkedAddrs{ips: ips, port: port}.dial(ctx, base, network)
 		}
-		ips, err := addrsOf(host, opts)
+		ips, err := addrsOf(host, written, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -214,12 +218,13 @@ func (c checkedAddrs) dial(ctx context.Context, base *net.Dialer, network string
 	return nil, lastErr
 }
 
-// addrsOf is the literal address, or what the name resolves to.
-func addrsOf(host string, opts SSRFOptions) ([]net.IP, error) {
-	if ip := net.ParseIP(host); ip != nil {
+// addrsOf is the judged host as a literal address, or what the name resolves
+// to when looked up as written.
+func addrsOf(judged, written string, opts SSRFOptions) ([]net.IP, error) {
+	if ip := net.ParseIP(judged); ip != nil {
 		return []net.IP{ip}, nil
 	}
-	return resolveHost(host, opts)
+	return resolveHost(written, opts)
 }
 
 // anyMetadata reports whether an allow-listed host reaches cloud metadata,
