@@ -1,6 +1,7 @@
 /**
  * Reading a widget's LWQL text for the origins it names: whether it reads Langy's traces, reads
- * only rollups, or pins its own origins. @see modules/dashboard/specs/dashboards-v1.feature
+ * only views origin scoping skips, or pins its own origins.
+ * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -10,10 +11,11 @@ import {
   SPEND_BY_SOURCE_SQL,
   WASTE_SQL,
 } from "../catalogue/widgets/flight-deck-costs-queries.ts";
+import { FLAKY_SCENARIOS_SQL } from "../catalogue/widgets/release-queries.ts";
 import {
   queriesPinOriginsWithoutLangy,
   queriesReadLangyTraces,
-  queriesReadOnlyRollups,
+  queriesReadOnlyUnscopedViews,
 } from "../model/board-query-origins.ts";
 
 describe("queriesReadLangyTraces", () => {
@@ -51,13 +53,16 @@ describe("queriesReadLangyTraces", () => {
   });
 });
 
-describe("queriesReadOnlyRollups", () => {
-  const only = (...sqls: string[]) => queriesReadOnlyRollups({ sqls });
+describe("queriesReadOnlyUnscopedViews", () => {
+  const only = (...sqls: string[]) => queriesReadOnlyUnscopedViews({ sqls });
 
   /** @scenario "AC195 Langy: per-minute rollups cannot leave Langy out yet" */
   it.each([
     ["one rollup", ["SELECT sum(TraceCount) FROM trace_metrics_by_minute"]],
     ["a qualified rollup", ["SELECT 1 FROM analytics.model_usage_by_minute"]],
+    ["simulations", ["SELECT count() FROM simulations WHERE Verdict IS NOT NULL"]],
+    ["the flaky scenarios widget", [FLAKY_SCENARIOS_SQL]],
+    ["an evaluation rollup", ["SELECT sum(Count) FROM evaluation_metrics_by_minute"]],
     [
       "two rollups",
       ["SELECT 1 FROM trace_metrics_by_minute", "SELECT 1 FROM model_usage_by_minute"],
@@ -77,6 +82,7 @@ describe("queriesReadOnlyRollups", () => {
       "one rollup query and one trace query",
       ["SELECT 1 FROM model_usage_by_minute", "SELECT 1 FROM traces"],
     ],
+    ["simulations joined to traces", ["SELECT 1 FROM simulations JOIN traces ON 1 = 1"]],
     ["no query", []],
     ["a view named only in a comment", ["SELECT 1 FROM traces -- FROM trace_metrics_by_minute"]],
     [
@@ -116,6 +122,7 @@ describe("queriesPinOriginsWithoutLangy", () => {
   /** @scenario "AC200i Langy setting: an empty widget that pins its own origins does not blame the board" */
   it.each([
     ["no filter on origin", ["SELECT 1 FROM traces"]],
+    ["simulations joined to traces", ["SELECT 1 FROM simulations JOIN traces ON 1 = 1"]],
     ["no query", []],
     ["an IN list holding langy", ["SELECT 1 WHERE Origin IN ('application', 'langy')"]],
     ["an equality on langy", ["SELECT 1 WHERE Origin = 'langy'"]],

@@ -1710,7 +1710,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
-    Given a widget that reads trace_metrics_by_minute or model_usage_by_minute
+    Given a widget that reads only views with no origin, such as trace_metrics_by_minute, model_usage_by_minute or simulations
     When it runs on a board
     Then it still counts Langy's spans
     # Known gap: the rollups are written per span before a trace's origin is known, so they

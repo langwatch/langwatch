@@ -5,7 +5,7 @@
 
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
-import { BOARD_ROLLUP_VIEWS } from "./board-lwql-views.ts";
+import { BOARD_UNSCOPED_VIEWS } from "./board-lwql-views.ts";
 
 const COMMENTS = /\/\*[\s\S]*?\*\/|--[^\n]*/g;
 
@@ -33,12 +33,12 @@ export function queriesReadLangyTraces({ sqls }: { sqls: readonly string[] }): b
 
 const VIEW_READ = /\b(?:FROM|JOIN)\s+(?:\w+\.)?(\w+)/gi;
 
-/** Whether every view the queries name is a per-minute rollup, which origin scoping skips. */
-export function queriesReadOnlyRollups({ sqls }: { sqls: readonly string[] }): boolean {
+/** Whether every view the queries name is one origin scoping skips, such as a per-minute rollup. */
+export function queriesReadOnlyUnscopedViews({ sqls }: { sqls: readonly string[] }): boolean {
   const views = sqls.flatMap((sql) =>
     [...sql.replace(COMMENTS, " ").matchAll(VIEW_READ)].map((match) => match[1]),
   );
-  return views.length > 0 && views.every((view) => BOARD_ROLLUP_VIEWS.includes(view ?? ""));
+  return views.length > 0 && views.every((view) => BOARD_UNSCOPED_VIEWS.includes(view ?? ""));
 }
 
 const ORIGIN_FILTER = /(?<!\bNOT\s*\(?\s*)\bOrigin\s*(?:==?\s*'[^']*'|\s+IN\s*\([^)]*\))/gi;
@@ -98,7 +98,7 @@ export function queriesPinOriginsWithoutLangy({ sqls }: { sqls: readonly string[
   );
 }
 
-/** Whether the board's Langy setting changes nothing here: rollup-only or origin-pinned. */
+/** Whether the board's Langy setting changes nothing here: unscoped-views-only or origin-pinned. */
 export function queriesIgnoreBoardOrigins({ sqls }: { sqls: readonly string[] }): boolean {
-  return queriesReadOnlyRollups({ sqls }) || queriesPinOriginsWithoutLangy({ sqls });
+  return queriesReadOnlyUnscopedViews({ sqls }) || queriesPinOriginsWithoutLangy({ sqls });
 }

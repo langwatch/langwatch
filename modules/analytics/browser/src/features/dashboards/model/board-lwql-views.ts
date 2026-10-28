@@ -16,8 +16,15 @@ export const BOARD_LWQL_VIEWS = [
   "traces",
 ] as const;
 
-/** Per-minute rollups: no Origin and no TraceId, so a board's origin scoping never reaches them. */
-export const BOARD_ROLLUP_VIEWS: readonly string[] = [
+/**
+ * Views with neither an `Origin` nor a `TraceId` column, which the server's
+ * `buildOriginPredicates` (langwatch-ql-query-scope.rules.ts) never scopes. Mirror it by hand.
+ */
+export const BOARD_UNSCOPED_VIEWS: readonly string[] = [
+  "coding_sessions",
+  "evaluation_metrics_by_minute",
   "model_usage_by_minute",
+  "simulations",
+  "topics",
   "trace_metrics_by_minute",
 ];

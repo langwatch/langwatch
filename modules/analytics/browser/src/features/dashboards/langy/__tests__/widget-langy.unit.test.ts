@@ -234,7 +234,7 @@ describe("a widget draft on a board that leaves out Langy's conversations", () =
     });
 
     expect(request.draft).toContain(
-      "Dashboard leaves out traces with origin langy: widgets reading per-minute rollups still count them.",
+      "Dashboard leaves out traces with origin langy: widgets reading views without an origin, such as per-minute rollups and simulations, still count them.",
     );
     expect(request.context[0]?.ref).toContain("excluded origins: langy");
   });

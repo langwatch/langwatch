@@ -184,7 +184,7 @@ function promptWithWindow({
   const leftOut =
     period.excludeOrigins.length > 0
       ? ` Dashboard leaves out traces with origin ${period.excludeOrigins.join(", ")}: ` +
-        "widgets reading per-minute rollups still count them."
+        "widgets reading views without an origin, such as per-minute rollups and simulations, still count them."
       : "";
   const window =
     `Dashboard period: ${periodText(period)} (UTC). ` +
