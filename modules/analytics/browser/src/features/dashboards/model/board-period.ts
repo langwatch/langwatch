@@ -72,15 +72,26 @@ export function boardOriginsWithLangy({
   return includeLangy ? others : [...others, LANGY_TRACE_ORIGIN];
 }
 
-/** Origin "langy" or Langy's turn name, asked for with `=` or `IN`; never `!=` or `NOT IN`. */
+/** Langy's traces: column names fold case, values do not, as ClickHouse matches them exactly. */
 const LANGY_TRACE_FILTERS = [
-  /\bOrigin\s*(?:==?\s*'langy'|\s+IN\s*\([^)]*'langy')/i,
-  /\bTraceName\s*(?:==?\s*'langy\.turn'|\s+IN\s*\([^)]*'langy\.turn')/i,
-];
+  { column: "Origin", value: LANGY_TRACE_ORIGIN },
+  { column: "TraceName", value: "langy.turn" },
+].map(({ column, value }) => ({
+  value: `'${value}'`,
+  pattern: new RegExp(
+    `(?<!\\bNOT\\s*\\(?\\s*)\\b${column}\\s*(?:==?\\s*'[^']*'|\\s+IN\\s*\\([^)]*\\))`,
+    "gi",
+  ),
+}));
 
-/** Whether a widget's queries ask for Langy's traces, which a board leaving Langy out drops. */
+/** Whether a widget's queries ask for Langy's traces with `=` or `IN`; never `!=`, `NOT`. */
 export function queriesReadLangyTraces({ sqls }: { sqls: readonly string[] }): boolean {
-  return sqls.some((sql) => LANGY_TRACE_FILTERS.some((filter) => filter.test(sql)));
+  return sqls.some((sql) => {
+    const code = sql.replace(/--[^\n]*/g, "");
+    return LANGY_TRACE_FILTERS.some(({ value, pattern }) =>
+      [...code.matchAll(pattern)].some((match) => match[0].includes(value)),
+    );
+  });
 }
 
 export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";

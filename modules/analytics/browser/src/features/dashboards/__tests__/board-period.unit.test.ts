@@ -187,6 +187,7 @@ describe("queriesReadLangyTraces", () => {
       "SELECT count() FROM trace_metrics WHERE origin IN ('application', 'langy')",
       "SELECT count() FROM trace_metrics WHERE TraceName = 'langy.turn'",
       "SELECT count() FROM traces WHERE TraceName IN ('langy.turn')",
+      "SELECT count() FROM trace_metrics WHERE Origin = 'app' OR Origin = 'langy'",
     ])("finds it in %s", (sql) => {
       expect(reads(sql)).toBe(true);
     });
@@ -199,6 +200,11 @@ describe("queriesReadLangyTraces", () => {
       "SELECT count() FROM trace_metrics WHERE Origin != 'langy'",
       "SELECT count() FROM trace_metrics WHERE Origin NOT IN ('langy')",
       "SELECT count() FROM trace_metrics WHERE TraceName <> 'langy.turn'",
+      "SELECT count() FROM trace_metrics WHERE Origin = 'LANGY'",
+      "SELECT count() FROM trace_metrics WHERE NOT Origin = 'langy'",
+      "SELECT count() FROM trace_metrics WHERE NOT (Origin = 'langy')",
+      'SELECT count() FROM trace_metrics WHERE Origin = "langy"',
+      "-- Origin = 'langy'\nSELECT count() FROM trace_metrics",
     ])("finds nothing in %s", (sql) => {
       expect(reads(sql)).toBe(false);
     });
