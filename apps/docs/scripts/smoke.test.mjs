@@ -85,8 +85,10 @@ async function checkVariant({ browser, base, width, mode }) {
     const errors = [];
     let apiCalls = 0;
     page.on("pageerror", (error) => errors.push(error.message));
+    /* The session frame loads from the app too; only a request under /api is an API call. */
     await page.route("https://app.langwatch.ai/**", (route) => {
-      apiCalls += 1;
+      const { pathname } = new URL(route.request().url());
+      if (pathname.startsWith("/api/")) apiCalls += 1;
       return route.abort();
     });
     for (const slug of pages) await checkPage({ page, base, slug, width, mode });

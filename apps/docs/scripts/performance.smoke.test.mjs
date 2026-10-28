@@ -310,7 +310,10 @@ await it("loads the playground on demand and sends an isolated request", async (
       try {
         const page = await context.newPage();
         const calls = [];
+        /* The session frame loads from the app too; only requests under /api are counted. */
         await page.route("https://app.langwatch.ai/**", async (route) => {
+          const { pathname } = new URL(route.request().url());
+          if (!pathname.startsWith("/api/")) return route.abort();
           calls.push({
             url: route.request().url(),
             method: route.request().method(),

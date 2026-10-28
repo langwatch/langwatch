@@ -73,7 +73,8 @@ await it("connects, disconnects, sends as the member, and loses access when the 
     );
     const pageHolds = await page.evaluate(
       () =>
-        JSON.stringify({ ...localStorage, ...sessionStorage }) + document.documentElement.outerHTML,
+        JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]) +
+        document.documentElement.outerHTML,
     );
     assert.ok(!pageHolds.includes(headers["x-auth-token"]), "the docs page never holds the key");
 

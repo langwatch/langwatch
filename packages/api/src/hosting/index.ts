@@ -31,10 +31,6 @@ export {
 } from "./http-mux.ts";
 export { BrowserBundle, type PublicConfigHead, type DocumentAccess } from "./browser-bundle.ts";
 
-export {
-  EmbeddedDocument,
-  FramedDocument,
-  type EmbeddedDocumentSelection,
-  type FramedDocumentSelection,
-} from "./framed-document.ts";
+export { EmbeddedDocument, type EmbeddedDocumentSelection } from "./embedded-document.ts";
+export { FramedDocument, type FramedDocumentSelection } from "./framed-document.ts";
 export { TransportSelection, type SurfacePolicy } from "./transport-selection.ts";

@@ -17,4 +17,3 @@ export * from "./api-key.device-label.ts";
 export * from "./api-key.session-ceiling.ts";
 export * from "./api-key.docs-session.ts";
 export * from "./api-key.config.ts";
-export * from "./api-key.docs-session-frame.ts";

@@ -6,7 +6,8 @@ import {
 } from "../policy/defaults.ts";
 import type { SecurityHeaders } from "../policy/security-headers.ts";
 import type { DocumentAccess } from "./browser-bundle.ts";
-import type { EmbeddedDocumentSelection, FramedDocumentSelection } from "./framed-document.ts";
+import type { EmbeddedDocumentSelection } from "./embedded-document.ts";
+import type { FramedDocumentSelection } from "./framed-document.ts";
 
 export type SurfacePolicy = (defaults: SecurityHeaders) => SecurityHeaders;
 export type BundleSelection = Readonly<{

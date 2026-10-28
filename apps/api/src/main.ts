@@ -5,7 +5,7 @@ import {
   buildDocsSessionFrameDocument,
   buildDocsSessionFrameRefusal,
   DOCS_SESSION_FRAME_PATH,
-} from "@langwatch/api-key-contract";
+} from "@langwatch/api-key-contract/docs-session-frame";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { type HealthRoute, processConfig, Server, type ProcessServer } from "@langwatch/process";
 import { servingUpgradeGate } from "@langwatch/upgrade/gate";

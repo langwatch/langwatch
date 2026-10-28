@@ -3,7 +3,7 @@
  * The docs session frame's runtime, run as served: its inline script executes in a window at
  * the app's origin, with the docs page and the consent popup as real windows beside it.
  */
-import { buildDocsSessionFrameDocument } from "@langwatch/api-key-contract";
+import { buildDocsSessionFrameDocument } from "@langwatch/api-key-contract/docs-session-frame";
 // @ts-expect-error -- jsdom ships no types and the workspace has none; its slice is typed below.
 import { JSDOM as UntypedJSDOM } from "jsdom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -146,9 +146,14 @@ describe("the docs session frame", () => {
     it("carries the answer's nonce on every inline tag, so its own policy runs it", () => {
       const html = buildDocsSessionFrameDocument({ nonce: "n0nce", embedder: DOCS });
 
-      expect(html.match(/<(script|style)\b[^>]*>/g)).toEqual([
-        '<style nonce="n0nce">',
-        '<script nonce="n0nce">',
+      const { document } = new JSDOM(html, { url: APP }).window;
+      const inline = [...document.querySelectorAll("script, style")].map((tag) => [
+        tag.tagName,
+        [...tag.attributes].map(({ name, value }) => `${name}=${value}`),
+      ]);
+      expect(inline).toEqual([
+        ["STYLE", ["nonce=n0nce"]],
+        ["SCRIPT", ["nonce=n0nce"]],
       ]);
       expect(html).not.toMatch(/\son[a-z]+=|javascript:|<script[^>]+src=/i);
       expect(() => buildDocsSessionFrameDocument({ nonce: '"><b>', embedder: DOCS })).toThrow(

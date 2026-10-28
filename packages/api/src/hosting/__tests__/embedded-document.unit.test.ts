@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { SecurityHeaders } from "../../policy/security-headers.ts";
-import { EmbeddedDocument } from "../framed-document.ts";
+import { EmbeddedDocument } from "../embedded-document.ts";
 import { HttpMux } from "../http-mux.ts";
 
 const DOCS = "https://langwatch.ai";
