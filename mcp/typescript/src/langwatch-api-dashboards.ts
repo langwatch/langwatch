@@ -45,7 +45,10 @@ export async function createDashboard({ name }: { name: string }): Promise<Dashb
   return makeRequest("POST", "/api/v1/dashboards", { name }) as Promise<Dashboard>;
 }
 
-/** A field left out keeps its value; a `null` description clears it, a `null` excludedOrigins resets it. */
+/**
+ * A field left out keeps its value; a `null` description clears it, and a `null` excludedOrigins
+ * resets it.
+ */
 export async function updateDashboard({
   dashboardId,
   ...changes
