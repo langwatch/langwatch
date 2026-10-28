@@ -112,5 +112,6 @@ describe("given a docked side panel keeps room on the right edge of a wide scree
     const drawer = await screen.findByTestId("drawer");
 
     expect(await restingGapToRightEdge(drawer)).toBeCloseTo(0, 0);
+    expect(drawer.getBoundingClientRect().left).toBeCloseTo(0, 0);
   });
 });
