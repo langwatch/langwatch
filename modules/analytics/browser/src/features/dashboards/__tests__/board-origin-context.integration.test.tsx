@@ -6,6 +6,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC200
  */
 
+import { DEFAULT_WIDGET_SOURCES } from "@langwatch/analytics-contract";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { act, cleanup, screen, within } from "@testing-library/react";
@@ -98,7 +99,7 @@ const LANGY_TURN_ROWS = [
   { day: "2026-10-20", n: 2 },
   { day: "2026-10-21", n: 9 },
 ];
-function langyTurnRows(input: { sql: string; sources?: readonly string[] }) {
+function langyTurnRows(input: { sql: string; sources?: readonly string[] | null }) {
   const counted = input.sources?.includes("langy") === true;
   return input.sql === LANGY_TURN_SQL && counted ? LANGY_TURN_ROWS : [];
 }
@@ -149,7 +150,7 @@ function boardServer({ widgets = [WIDGET] }: { widgets?: readonly (typeof WIDGET
       case "analytics.lwql.query":
         return Promise.resolve({
           columns: [{ name: "n", type: "UInt64" }],
-          rows: langyTurnRows(call.input as { sql: string; sources?: readonly string[] }),
+          rows: langyTurnRows(call.input as { sql: string; sources?: readonly string[] | null }),
           statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
           diagnostics: [],
           followsTimeWindow: false,
@@ -329,7 +330,7 @@ const sourcesOf = (runs: ReturnType<ReturnType<typeof boardServer>["runs"]>) =>
 
 describe("given a stored widget whose query stores no sources", () => {
   /** @scenario "AC200f Sources: a query that stores none counts application traces" */
-  it("runs the card and the preview with application, and the pills show the same set", async () => {
+  it("runs the card and the preview with the server's default, and the pills show that set", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     const server = openBoard();
     await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
@@ -340,8 +341,9 @@ describe("given a stored widget whose query stores no sources", () => {
       queryName: "main",
     });
 
-    expect(sourcesOf(server.runs())).toEqual([["application"], ["application"]]);
-    expect(pickedSources(drawer)).toEqual(["application"]);
+    // The run asks the server for the default; the pills show that same default.
+    expect(sourcesOf(server.runs())).toEqual([null, null]);
+    expect(pickedSources(drawer)).toEqual([...DEFAULT_WIDGET_SOURCES]);
     expect(server.runs().every((run) => run.excludeOrigins === undefined)).toBe(true);
   });
 
@@ -395,7 +397,7 @@ describe("given a member changes a query's sources in the editor", () => {
 
     expect(picked).toEqual(["application", "langy"]);
     expect(server.updates()[0]?.queries[0]?.sources).toEqual(["application", "langy"]);
-    expect(sourcesOf(server.runs())).toEqual([["application", "langy"], ["application"]]);
+    expect(sourcesOf(server.runs())).toEqual([["application", "langy"], null]);
   });
 
   /** @scenario "AC200g Sources: changing them runs the preview again" */
@@ -417,7 +419,7 @@ describe("given a member changes a query's sources in the editor", () => {
     await user.click(within(drawer).getByTestId("analytics-widget-cancel"));
     await vi.waitFor(() => expect(screen.queryByRole("tab", { name: "API / MCP" })).toBeNull());
 
-    expect(sourcesOf(server.runs())).toEqual([["application"], ["application", "simulation"]]);
+    expect(sourcesOf(server.runs())).toEqual([null, ["application", "simulation"]]);
     expect(server.updates()).toEqual([]);
   });
 
@@ -560,12 +562,12 @@ describe("given a widget counting Langy's turns, stored from the gateway with or
 
   describe("when its query stores no sources", () => {
     /** @scenario "AC201b Widget data: a query left at the default leaves Langy's turns out" */
-    it("sends application and reads none of the turns, in a personal project too", async () => {
+    it("asks for the default and reads none of the turns, in a personal project too", async () => {
       const server = openBoard({ isPersonal: true, widgets: [LANGY_TURN_WIDGET] });
 
       const answer = await runTurns();
 
-      expect(sourcesOf(server.runs())).toEqual([["application"]]);
+      expect(sourcesOf(server.runs())).toEqual([null]);
       expect(answer?.rows).toEqual([]);
     });
   });

@@ -43,8 +43,9 @@ and only the nine fixed names are ever written into a statement.
 Only the tRPC `analytics.lwql.query` door accepts the field. `POST /api/v1/query` still runs
 what it is sent. Each Dashboards widget query stores its own `sources` in its definition, set in
 the widget editor as the query's first parameter and through the widget API and CLI
-(`--sources`). A query that stores none runs with `DEFAULT_WIDGET_SOURCES`, `["application"]`,
-in every project; a new widget's query is stored with it (owner, 2026-10-28). A From LangWatch
+(`--sources`). A query that stores none is sent with `sources: null`, and the scope rule
+reads that as `DEFAULT_WIDGET_SOURCES`, `["application"]`, on the server, in every project; a
+run that is no widget's sends no `sources` and reads every origin, as before; a new widget's query is stored with it (owner, 2026-10-28). A From LangWatch
 board's catalogue widgets name every source but `langy`. This replaces the board-wide
 `excludeOrigins` list, its "Langy traces" header control and the board column behind them
 (owner, 2026-10-28).

@@ -10,7 +10,7 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
-  type TraceSource,
+  type RunSources,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
@@ -55,7 +55,7 @@ type LangWatchQLExecutionInput = {
   readonly granularity: LangWatchQLGranularityResolution;
   readonly tenantCapability: string;
   /** The origins a dashboard query counts; every origin when absent. */
-  readonly sources?: readonly TraceSource[] | undefined;
+  readonly sources?: RunSources | undefined;
   /** An aggregate's members and where each is read from; absent on a plain project. */
   readonly memberWindows?: readonly LangWatchQLMemberWindow[];
   /** The window the statement follows, which bounds the origin lookup; absent, none does. */

@@ -65,7 +65,7 @@ async function statementsSent({
     sql,
     timeWindow: WINDOW,
     ...(leftOut ? { sources: TRACE_SOURCES.filter((source) => !leftOut.includes(source)) } : {}),
-    ...(sources ? { sources } : {}),
+    ...(sources === undefined ? {} : { sources }),
   });
 
   return executor.requests.map((request) => request.sql);
@@ -131,5 +131,18 @@ describe("given a dashboard query that names its sources", () => {
 
     expect(statements).toHaveLength(2);
     expect(statements.every((statement) => statement.includes(keepsLangy))).toBe(true);
+  });
+});
+
+describe("given a stored widget's query that names no sources, run on the server", () => {
+  /** @scenario "AC200f Sources: a query that stores none counts application traces" */
+  it("scopes the statement and its report to application, as the card counts", async () => {
+    const statements = await statementsSent({ sql: WINDOWED_SQL, sources: null });
+    const keepsApplication =
+      "ifNull(TraceId, '') NOT IN (SELECT TraceId FROM analytics.trace_metrics " +
+      "WHERE ifNull(nullIf(Origin, ''), 'application') NOT IN ('application')";
+
+    expect(statements).toHaveLength(2);
+    expect(statements.every((statement) => statement.includes(keepsApplication))).toBe(true);
   });
 });

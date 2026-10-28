@@ -7,7 +7,7 @@
 import type {
   LangWatchQLQueryResult,
   LangWatchQLTimeWindow,
-  TraceSource,
+  RunSources,
 } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 
@@ -19,7 +19,7 @@ export interface LangWatchQLQueryInput {
   sql: string;
   parameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
   timeWindow?: LangWatchQLTimeWindow;
-  sources?: readonly TraceSource[];
+  sources?: RunSources;
 }
 
 const isoInstant = (epochMs: number): string =>

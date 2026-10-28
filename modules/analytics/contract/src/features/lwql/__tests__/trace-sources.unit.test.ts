@@ -78,6 +78,7 @@ describe("traceSourcesSchema", () => {
     const run = { projectId: "p", sql: "SELECT 1" };
 
     expect(lwqlQueryRequestSchema.validate({ ...run, sources: ["langy"] })).toBe(true);
+    expect(lwqlQueryRequestSchema.validate({ ...run, sources: null })).toBe(true);
     expect(lwqlQueryRequestSchema.validate({ ...run, sources: ["langy') OR 1"] })).toBe(false);
   });
 });

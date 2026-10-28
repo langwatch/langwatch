@@ -5,7 +5,6 @@
  */
 
 import {
-  effectiveSources,
   findLangWatchQLMissingGates,
   type LangWatchQLAcceptedGranularityStep,
   type LangWatchQLGranularityStep,
@@ -110,8 +109,8 @@ export function useDashboardWidgetExecutor(
           parameters: params,
           timeWindow: pageWindow,
           granularitySeconds,
-          // What the query stores, else the default its editor shows (dashboards-v2 AC200f).
-          sources: effectiveSources(query.sources),
+          // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
+          sources: query.sources ?? null,
         },
         // `execute` requires a signal; callers without one (e.g. `runStandalone`)
         // get a fresh controller's signal, which simply never aborts.

@@ -8,7 +8,7 @@ import type {
   LangWatchQLAcceptedGranularityStep,
   LangWatchQLQueryResult,
   LangWatchQLGranularityStep,
-  TraceSource,
+  RunSources,
 } from "@langwatch/analytics-contract";
 
 import {
@@ -39,7 +39,7 @@ export interface LangWatchQLExecuteRequest {
    */
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   /** The trace origins a dashboard query counts (AC200); every origin when absent. */
-  readonly sources?: readonly TraceSource[];
+  readonly sources?: RunSources;
 }
 
 /** How a submission reaches the server. */

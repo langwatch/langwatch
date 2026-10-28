@@ -230,6 +230,16 @@ describe("given a dashboard query's sources", () => {
     ).toBe(sql);
   });
 
+  /** @scenario "AC200f Sources: a query that stores none counts application traces" */
+  it("reads a widget query storing none (null) as the default, application, on the server", () => {
+    expect(scoped(null, "SELECT count() FROM trace_metrics")).toBe(
+      `SELECT count() FROM (SELECT * FROM trace_metrics WHERE ${ORIGIN} IN ('application')) AS trace_metrics`,
+    );
+    expect(scoped(null, "SELECT count() FROM trace_metrics")).toBe(
+      scoped(["application"], "SELECT count() FROM trace_metrics"),
+    );
+  });
+
   /** @scenario "AC200m Sources: a query with no source picked counts nothing and says so" */
   it("reads no row of any view when none is picked", () => {
     expect(scoped([], "SELECT count() FROM trace_metrics")).toBe(

@@ -6,7 +6,8 @@ import {
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
-  type TraceSource,
+  effectiveSources,
+  type RunSources,
   type TraceSourceScope,
   traceSourceScope,
 } from "@langwatch/analytics-contract";
@@ -232,9 +233,12 @@ export function assertNoUnsupportedTableModifiers({
   });
 }
 
-/** The scope a run's sources keep it to; a run naming none keeps every origin. */
-function scopeOfSources(sources: readonly TraceSource[] | undefined): TraceSourceScope {
-  return sources === undefined ? { kind: "every" } : traceSourceScope(sources);
+/**
+ * The scope a run's sources keep it to. A widget query storing none (`null`) counts the
+ * default here, on the server, so every door runs it alike; a run that is no widget's keeps all.
+ */
+function scopeOfSources(sources: RunSources | undefined): TraceSourceScope {
+  return sources === undefined ? { kind: "every" } : traceSourceScope(effectiveSources(sources));
 }
 
 /**
@@ -428,8 +432,8 @@ export function scopeLangWatchQL({
   memberWindows,
 }: {
   sql: string;
-  /** A dashboard query's sources, the origins it counts (AC200); absent, every origin. */
-  sources?: readonly TraceSource[] | undefined;
+  /** A widget query's sources (AC200), `null` for its default; absent, every origin. */
+  sources?: RunSources | undefined;
   /** Where unqualified view names resolve. */
   database: string;
   views: readonly LangWatchQLViewDefinition[];

@@ -53,6 +53,12 @@ export function traceSourceScope(sources: readonly TraceSource[]): TraceSourceSc
   return dropped.length === 0 ? { kind: "every" } : { kind: "exclude", origins: dropped };
 }
 
+/**
+ * What a run names: a widget query's stored list, `null` for a widget query storing none (the
+ * server counts {@link DEFAULT_WIDGET_SOURCES}), or absent for a run that is no widget's.
+ */
+export type RunSources = readonly TraceSource[] | null;
+
 /** A query's sources as it runs: what it stores, else {@link DEFAULT_WIDGET_SOURCES}. */
 export function effectiveSources(
   stored: readonly TraceSource[] | null | undefined,

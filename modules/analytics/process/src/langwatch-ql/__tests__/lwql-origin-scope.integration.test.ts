@@ -4,11 +4,7 @@
  * @see modules/analytics/adrs/003-lwql-origin-scope.md
  * @vitest-environment node
  */
-import {
-  KNOWN_TRACE_ORIGINS,
-  TRACE_SOURCES,
-  type TraceSource,
-} from "@langwatch/analytics-contract";
+import { KNOWN_TRACE_ORIGINS, TRACE_SOURCES, type RunSources } from "@langwatch/analytics-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
@@ -98,7 +94,7 @@ describe("given a project with its agent's traces and Langy's turns", () => {
     Number((await run(sql, leftOut)).rows[0]?.n);
 
   /** One statement run on the sources day with a query's picked sources. */
-  const countSources = async (sql: string, sources: readonly TraceSource[]) =>
+  const countSources = async (sql: string, sources: RunSources) =>
     Number(
       (
         await service.execute({
@@ -374,6 +370,15 @@ describe("given a project with its agent's traces and Langy's turns", () => {
       expect(await countSources(EVALUATION_METRIC_COUNT, ["application"])).toBe(1);
       expect(await countSources(EVALUATION_METRIC_COUNT, ["other"])).toBe(1);
       expect(await countSources(EVALUATION_METRIC_COUNT, ["langy"])).toBe(1);
+    });
+
+    /** @scenario "AC200f Sources: a query that stores none counts application traces" */
+    it("counts what application counts for a widget query storing none, as the card does", async () => {
+      expect(await countSources(METRIC_COUNT, null)).toBe(3);
+      expect(await countSources(TRACE_COUNT, null)).toBe(
+        await countSources(TRACE_COUNT, ["application"]),
+      );
+      expect(await countSources(EVALUATION_METRIC_COUNT, null)).toBe(1);
     });
 
     /** @scenario "AC200m Sources: a query with no source picked counts nothing and says so" */

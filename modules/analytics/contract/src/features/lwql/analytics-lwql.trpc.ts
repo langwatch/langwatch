@@ -33,12 +33,13 @@ export interface LwqlRunRequestSchema extends Named<typeof lwqlRunRequestSchemaD
 export const lwqlRunRequestSchema: LwqlRunRequestSchema = lwqlRunRequestSchemaDefinition;
 
 /**
- * One statement run for a dashboard query, kept to the trace origins it counts (its sources,
- * dashboards-v2 AC200). Only this door takes them: the REST query runs what it is sent.
+ * One statement run, kept to the trace origins a dashboard query counts (dashboards-v2 AC200):
+ * its stored list, or `null` when it stores none, which the server reads as the default. Absent,
+ * the run is no widget's and reads every origin. The REST query runs what it is sent.
  */
 const lwqlQueryRequestSchemaDefinition = z.object({
   ...lwqlRunRequestSchema.shape,
-  sources: traceSourcesSchema.readonly().optional(),
+  sources: traceSourcesSchema.readonly().nullable().optional(),
 });
 export interface LwqlQueryRequestSchema extends Named<typeof lwqlQueryRequestSchemaDefinition> {}
 export const lwqlQueryRequestSchema: LwqlQueryRequestSchema = lwqlQueryRequestSchemaDefinition;
