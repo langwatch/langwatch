@@ -177,6 +177,15 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     When the backend confirms the earlier stop
     Then the newer turn keeps its live lines and its working composer state
 
+  # The live stream that would close the card is the one Stop aborted, so the stop's
+  # own answer closes it. A reload already read it as closed; the live tab did not.
+  @integration
+  Scenario: The question card closes as soon as Stop is answered, without a reload
+    Given Langy asked a question and I clicked Stop before answering
+    When the backend confirms the stop
+    Then the question card's options can no longer be chosen
+    And a question card a newer turn raised stays open
+
   # The worker's abort only ends its own polling. A card or a command the turn left
   # on my machine would otherwise wait for an answer nobody reads (ADR-129).
   @unit

@@ -56,6 +56,11 @@ interface LangyLocalControlState {
      */
     source?: string;
   }) => void;
+  /**
+   * The stop of one turn was confirmed: its questions still waiting are cancelled, since the
+   * stream that would have said so is the one Stop aborted. Other turns' cards are left alone.
+   */
+  cancelTurnQuestions: (a: { conversationId: string; turnId: string }) => void;
   /** Open another conversation: everything here belonged to the last one. */
   reset: (conversationId: string | null) => void;
 }
@@ -66,6 +71,27 @@ function isForeign(
   conversationId: string | null | undefined,
 ): boolean {
   return !!conversationId && state.conversationId !== conversationId;
+}
+
+/** The entries with one turn's still-waiting questions cancelled, every other entry as it was. */
+function withTurnQuestionsCancelled({
+  state,
+  conversationId,
+  turnId,
+}: {
+  state: LangyLocalControlState;
+  conversationId: string;
+  turnId: string;
+}): Record<string, LangyLiveWait> {
+  if (isForeign(state, conversationId)) return state.waits;
+  return Object.fromEntries(
+    Object.entries(state.waits).map(([waitId, wait]) => [
+      waitId,
+      wait.kind === "question" && wait.turnId === turnId && wait.status === "pending"
+        ? { ...wait, status: "cancelled" as const }
+        : wait,
+    ]),
+  );
 }
 
 export const useLangyLocalControlStore = defineSlice<LangyLocalControlState>({
@@ -128,6 +154,9 @@ export const useLangyLocalControlStore = defineSlice<LangyLocalControlState>({
         },
       });
     },
+
+    cancelTurnQuestions: ({ conversationId, turnId }) =>
+      set({ waits: withTurnQuestionsCancelled({ state: get(), conversationId, turnId }) }),
 
     reset: (conversationId) =>
       set({

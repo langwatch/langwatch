@@ -151,14 +151,13 @@ function followNavigateInstruction({
 function recordLocalWait(
   entry: Extract<LangyStreamWireEntry, { type: "local_permission" | "question" }>,
 ): void {
+  const { activeConversationId, activeTurnId } = useLangyStore.getState();
+  const turn = activeTurnId ? { turnId: activeTurnId } : {};
   const wait =
     entry.type === "local_permission"
-      ? { ...entry, kind: "permission" as const }
-      : { ...entry, kind: "question" as const };
-  useLangyLocalControlStore.getState().recordWait({
-    conversationId: useLangyStore.getState().activeConversationId,
-    wait,
-  });
+      ? { ...entry, ...turn, kind: "permission" as const }
+      : { ...entry, ...turn, kind: "question" as const };
+  useLangyLocalControlStore.getState().recordWait({ conversationId: activeConversationId, wait });
 }
 
 function recordLocalWorkspace(

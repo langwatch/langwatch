@@ -3,6 +3,7 @@ import { isSendUnanswered } from "@langwatch/langy-contract";
 import { useCallback, useEffect } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { resolveLangyStopTarget } from "../../../../model/langy-stop-target.ts";
 import { useLangyDevLog } from "../stores/langy-dev-log.ts";
@@ -72,6 +73,11 @@ export function useLangyPanelStop({
         })
         .then(
           () => {
+            // Scoped to the stopped turn, so it holds even when the tab has moved on.
+            useLangyLocalControlStore.getState().cancelTurnQuestions({
+              conversationId: target.conversationId,
+              turnId: target.turnId,
+            });
             const store = useLangyStore.getState();
             // Another conversation, or a newer turn (even one still unnamed after
             // beginSend), keeps its own live lines.
