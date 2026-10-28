@@ -102,11 +102,14 @@ button:disabled { opacity: 0.6; cursor: default; }
 button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 button.small { min-height: 26px; padding: 0 10px; font-size: 12px; margin-left: auto; }
 p { margin: 0; }
-#status { flex: 1 1 220px; font-size: 12px; color: var(--muted); }
-#status.live::before {
-  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px;
+#status { flex: 1 1 220px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+#status-title { font-weight: 500; color: var(--ink); }
+#status-title:empty { display: none; }
+#status-title::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px;
   border-radius: 50%; background: var(--live); vertical-align: 1px;
 }
+#status-detail { font-size: 12px; color: var(--muted); }
 #confirm {
   display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 6px;
   border: 1px solid var(--line); border-left: 3px solid var(--brand); background: var(--brand-tint);
@@ -119,7 +122,7 @@ const FRAME_MARKUP = `
 <main>
   <div class="row">
     <button id="connect" type="button">Use my LangWatch account</button>
-    <p id="status" role="status" aria-live="polite">Or paste an API key below.</p>
+    <p id="status" role="status" aria-live="polite"><span id="status-title"></span><span id="status-detail">Or paste an API key below.</span></p>
     <button id="disconnect" class="small" type="button" hidden>Disconnect</button>
   </div>
   <div id="confirm" role="group" aria-labelledby="confirm-text" hidden>
@@ -159,7 +162,8 @@ const FRAME_RUNTIME = String.raw`function (config) {
   var byId = function (id) { return document.getElementById(id); };
   var connectButton = byId("connect");
   var disconnectButton = byId("disconnect");
-  var statusLine = byId("status");
+  var statusTitle = byId("status-title");
+  var statusDetail = byId("status-detail");
   var confirmPanel = byId("confirm");
   var confirmText = byId("confirm-text");
   var confirmSend = byId("confirm-send");
@@ -189,9 +193,9 @@ const FRAME_RUNTIME = String.raw`function (config) {
     connectButton.hidden = Boolean(session);
     disconnectButton.hidden = !session;
     connectButton.disabled = !embedded || Boolean(waiting);
-    statusLine.classList.toggle("live", Boolean(session));
-    statusLine.textContent = session
-      ? "Sending as you in " + session.project.name + ". Access ends within " + minutesLeft() + "." + (note ? " " + note : "")
+    statusTitle.textContent = session ? "Connected to " + session.project.name : "";
+    statusDetail.textContent = session
+      ? "Requests send as you · ends in " + minutesLeft() + (note ? ". " + note : "")
       : note || (embedded ? NOTES.idle : NOTES.notEmbedded);
     toParent({ kind: "state", connected: Boolean(session), project: session ? session.project.name : null });
   }

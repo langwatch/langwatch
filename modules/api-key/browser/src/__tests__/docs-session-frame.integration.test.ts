@@ -177,7 +177,7 @@ describe("the docs session frame", () => {
       fromPopup(grant());
 
       expect(states().at(-1)).toMatchObject({ connected: true, project: "Checkout" });
-      expect(byId("status").textContent).toMatch(/Sending as you in Checkout/);
+      expect(byId("status").textContent).toMatch(/^Connected to Checkout/);
       expect(toDocs.every((entry) => entry.targetOrigin === DOCS)).toBe(true);
       expect(JSON.stringify(toDocs)).not.toContain(TOKEN);
     });

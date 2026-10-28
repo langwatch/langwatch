@@ -47,7 +47,7 @@ await it("connects, disconnects, sends as the member, and loses access when the 
       ]);
       await popup.getByRole("button", { name: "Allow" }).click();
       await popup.waitForEvent("close");
-      await status.filter({ hasText: /^Sending as you in / }).waitFor();
+      await status.filter({ hasText: /^Connected to / }).waitFor();
     };
     await connect();
     await frame.getByRole("button", { name: "Disconnect" }).click();
