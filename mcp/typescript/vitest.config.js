@@ -4,6 +4,7 @@ import { defineConfig } from "vitest/config";
 // vitest.scenario.config.js; `pnpm test` never reaches either.
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     include: ["src/**/*.unit.test.ts"],
   },
 });

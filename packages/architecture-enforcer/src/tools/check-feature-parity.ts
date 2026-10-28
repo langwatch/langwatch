@@ -271,6 +271,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The main-red Slack post (specs/ci/package-suite-integration-lane.feature).
   "tools/slacknotify",
   "tools/chartheap",
+  // How the package-suites weights are measured from main's job logs
+  // (specs/ci/package-suites-weights.feature).
+  "tools/suiteweights",
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
