@@ -12,6 +12,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,9 +25,9 @@ import (
 func main() {
 	ctx := context.Background()
 	out, err := exec.CommandContext(ctx, "gh", "cache", "list", "--ref", "refs/heads/main",
-		"--limit", "1000", "--sort", "created_at", "--order", "desc", "--json", "id,key,createdAt").Output()
+		"--limit", "10000", "--sort", "created_at", "--order", "desc", "--json", "id,key,createdAt,version").Output()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "::error::Could not list main's caches: %v\n", err)
+		fmt.Fprintf(os.Stderr, "::error::Could not list main's caches: %v %s\n", err, stderrOf(err))
 		os.Exit(1)
 	}
 	var entries []cachesweep.Entry
@@ -36,12 +37,24 @@ func main() {
 	}
 
 	redundant := cachesweep.Superseded(entries)
+	deleted := 0
 	for _, entry := range redundant {
 		cmd := exec.CommandContext(ctx, "gh", "cache", "delete", strconv.FormatInt(entry.ID, 10)) //nolint:gosec // G204: integer id from gh's own listing
 		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 		if err := cmd.Run(); err != nil {
 			fmt.Printf("::warning::Could not delete cache %d (%s); continuing.\n", entry.ID, entry.Key)
+			continue
 		}
+		deleted++
 	}
-	fmt.Printf("Deleted %d superseded cache copies on main.\n", len(redundant))
+	fmt.Printf("Deleted %d of %d superseded cache copies on main.\n", deleted, len(redundant))
+}
+
+// stderrOf is what gh wrote to stderr before failing, when the error carries it.
+func stderrOf(err error) string {
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		return string(exit.Stderr)
+	}
+	return ""
 }

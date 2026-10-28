@@ -36,6 +36,14 @@ Feature: Main keeps one copy of each per-commit cache
     When the sweep runs
     Then both copies stay
 
+  # GitHub matches a restore on the cache version (its paths and compression)
+  # as well as the key, so a copy under another version is another cache.
+  @unit
+  Scenario: A cache saved under another version keeps its own newest copy
+    Given main holds two copies of a cache under one name and different versions
+    When the sweep runs
+    Then both copies stay
+
   @unit
   Scenario: Caches not keyed by a commit are left alone
     Given main holds Docker layer blobs and caches keyed only by a lockfile hash

@@ -56,6 +56,15 @@ func TestSupersededKeepsDifferentNamesApart(t *testing.T) {
 	assert.Empty(t, cachesweep.Superseded(entries))
 }
 
+// @scenario "A cache saved under another version keeps its own newest copy"
+func TestSupersededKeepsVersionsApart(t *testing.T) {
+	older := entry(1, "Linux-nx-build-"+sha("1"), 20)
+	older.Version = "zstd"
+	newer := entry(2, "Linux-nx-build-"+sha("2"), 26)
+	newer.Version = "gzip"
+	assert.Empty(t, cachesweep.Superseded([]cachesweep.Entry{older, newer}))
+}
+
 // @scenario "Caches not keyed by a commit are left alone"
 func TestSupersededLeavesOtherCachesAlone(t *testing.T) {
 	entries := []cachesweep.Entry{

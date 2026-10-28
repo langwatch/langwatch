@@ -10,11 +10,14 @@ import (
 	"time"
 )
 
-// Entry is one Actions cache as `gh cache list --json id,key,createdAt` prints it.
+// Entry is one Actions cache as `gh cache list --json id,key,createdAt,version` prints it.
 type Entry struct {
 	ID        int64     `json:"id"`
 	Key       string    `json:"key"`
 	CreatedAt time.Time `json:"createdAt"`
+	// Version is GitHub's hash of the cache's paths and compression. A restore
+	// matches it as well as the key, so two versions are two caches.
+	Version string `json:"version"`
 }
 
 // commitKeyed matches a key ending in the 40-hex commit. Everything before it,
@@ -36,11 +39,12 @@ func Superseded(entries []Entry) []Entry {
 		if match == nil {
 			continue
 		}
-		if seen[match[1]] {
+		name := match[1] + "\x00" + entry.Version
+		if seen[name] {
 			redundant = append(redundant, entry)
 			continue
 		}
-		seen[match[1]] = true
+		seen[name] = true
 	}
 	return redundant
 }
