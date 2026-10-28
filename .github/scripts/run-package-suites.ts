@@ -166,20 +166,87 @@ export const isHeavyPackage = ({
   pkg: DiscoveredPackage;
 }): boolean => weightOf(pkg) >= HEAVY_SECONDS;
 
+/** What a shard's packages add up to, per way they run. */
+export interface ShardLoad {
+  /** Heavy packages, which run alone. */
+  alone: number;
+  /** Every light suite, which shares the shard's concurrency slots. */
+  shared: number;
+  /** Light integration and browser suites, each lane one suite at a time. */
+  integration: number;
+  browser: number;
+}
+
+const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, integration: 0, browser: 0 };
+
 /**
- * The seconds a package adds to its shard's wall time, which is what the split
- * balances. A heavy package runs alone and adds all of its weight; a light one
- * shares the shard with `concurrency - 1` others and adds its share. Splitting
- * by the raw weight alone, a shard holding 737s of heavy suites ran 1073s
- * while one holding 211s ran 473s (wall time is heavy + light / concurrency).
+ * A shard's wall time, which is what the split balances. A heavy package runs
+ * alone and adds all of its weight. Light suites share `concurrency` slots, but
+ * the integration and browser lanes each run one suite at a time, so the light
+ * part takes whichever is longest. Splitting by raw weight, a shard holding 737s
+ * of heavy suites ran 1073s while one holding 211s ran 473s.
  */
-export const shardCostOf = ({
+export const wallTimeOf = ({ load, concurrency }: { load: ShardLoad; concurrency: number }) =>
+  load.alone + Math.max(load.shared / concurrency, load.integration, load.browser);
+
+/**
+ * `load` with one package added. The weights file records a package, not its
+ * scripts, so a light package's weight is spread evenly over its scripts' lanes.
+ */
+export const withPackage = ({
+  load,
   weight,
-  concurrency,
+  scripts,
 }: {
+  load: ShardLoad;
   weight: number;
+  scripts: readonly string[];
+}): ShardLoad => {
+  if (weight >= HEAVY_SECONDS) return { ...load, alone: load.alone + weight };
+  const next = { ...load, shared: load.shared + weight };
+  for (const script of scripts) {
+    const lane = laneOf(script);
+    if (lane !== "shared") next[lane] += weight / scripts.length;
+  }
+  return next;
+};
+
+/**
+ * Splits packages into `total` groups, heaviest first, each onto the group whose
+ * wall time it raises least. Every shard computes this alone, so ties break on
+ * name then lowest group: the answers must agree exactly or a package runs twice
+ * or not at all.
+ */
+export const balanceByWallTime = <T extends { name: string; scripts: readonly string[] }>({
+  items,
+  weightOf,
+  concurrency,
+  total,
+}: {
+  items: readonly T[];
+  weightOf: (item: T) => number;
   concurrency: number;
-}): number => (weight >= HEAVY_SECONDS ? weight : weight / concurrency);
+  total: number;
+}): { groups: T[][]; walls: number[] } => {
+  const loads: ShardLoad[] = Array.from({ length: total }, () => ({ ...EMPTY_LOAD }));
+  const groupOf = new Map<string, number>();
+  const byWeight = items
+    .map((item) => ({ item, weight: weightOf(item) }))
+    .toSorted((a, b) => b.weight - a.weight || a.item.name.localeCompare(b.item.name));
+  for (const { item, weight } of byWeight) {
+    const candidates = loads.map((load) =>
+      withPackage({ load, weight, scripts: item.scripts }),
+    );
+    const walls = candidates.map((load) => wallTimeOf({ load, concurrency }));
+    const best = walls.indexOf(Math.min(...walls));
+    groupOf.set(item.name, best);
+    loads[best] = candidates[best]!;
+  }
+  return {
+    groups: loads.map((_, group) => items.filter((item) => groupOf.get(item.name) === group)),
+    walls: loads.map((load) => wallTimeOf({ load, concurrency })),
+  };
+};
 
 /** Seconds a package costs when the weights file does not name it. */
 export const DEFAULT_WEIGHT_SECONDS = 5;
@@ -754,10 +821,9 @@ if (isEntrypoint()) {
     process.exit(1);
   }
   // Every shard reads the same concurrency from the job's env, so they agree.
-  const costOf = (pkg: DiscoveredPackage): number =>
-    shardCostOf({ weight: weightOf(pkg), concurrency });
-  const assigned = shardOf({ items: reached, weightOf: costOf, shard });
-  const expected = assigned.reduce((sum, pkg) => sum + costOf(pkg), 0);
+  const split = balanceByWallTime({ items: reached, weightOf, concurrency, total: shard.total });
+  const assigned = split.groups[shard.index - 1] ?? [];
+  const expected = split.walls[shard.index - 1] ?? 0;
   console.log(
     `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages, ` +
       `about ${Math.round(expected)}s of suites.`,

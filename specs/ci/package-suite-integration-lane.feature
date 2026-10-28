@@ -71,14 +71,16 @@ Feature: A package's integration suite runs in CI when it declares one
       Then the heaviest packages are placed first, each on the shard with the least weight so far
 
     # A shard's wall time is the sum of its heavy suites, which run alone, plus
-    # its light suites divided by the concurrency, since they share the shard.
-    # Measured on main that model is within 1% of every shard, and balancing raw
-    # seconds instead let one shard run 1073s while another ran 473s.
+    # its light suites divided by the concurrency, since they share the shard,
+    # unless its integration or browser lane is longer: each runs one suite at a
+    # time. Measured on main that model is within 1% of every shard, and
+    # balancing raw seconds instead let one shard run 1073s while another ran 473s.
     @unit
     Scenario: Shards are balanced by the wall time each package adds
       Given a heavy package that runs alone and light packages that share the shard
       When the packages are split over the shards
       Then a heavy package counts for all of its seconds and a light one for its share of the concurrency
+      And a shard's integration and browser lanes count at full weight, one suite at a time
 
     @unit
     Scenario: Every shard computes the same split

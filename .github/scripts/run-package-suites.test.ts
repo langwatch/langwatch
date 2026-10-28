@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 import {
   DEFAULT_WEIGHT_SECONDS,
+  balanceByWallTime,
   balanceShards,
   commandFor,
   createSuiteRunner,
@@ -24,10 +25,11 @@ import {
   runJobs,
   workerEnvFor,
   scriptsFor,
-  shardCostOf,
   shardOf,
   staleEntries,
   summarise,
+  wallTimeOf,
+  withPackage,
   type DiscoveredPackage,
   type SuiteJob,
   type SuiteOutcome,
@@ -731,18 +733,48 @@ void describe("given the job is split into shards", () => {
         ["l3", 90],
         ["l4", 90],
       ]);
-      const lights = ["l1", "l2", "l3", "l4"].map((name) => ({ name }));
-      const costOf = (p: { name: string }) =>
-        shardCostOf({ weight: seconds.get(p.name) ?? 0, concurrency: 2 });
-      assert.equal(costOf({ name: "heavy" }), 200);
-      assert.equal(costOf({ name: "l1" }), 45);
-      const items = [{ name: "heavy" }, ...lights];
-      const groups = balanceShards({ items, weightOf: costOf, total: 2 });
+      const items = ["heavy", "l1", "l2", "l3", "l4"].map((name) => ({ name, scripts: ["test"] }));
+      const weightOf = (p: { name: string }) => seconds.get(p.name) ?? 0;
+      const { groups, walls } = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 });
       // By raw seconds l4 joined the heavy package: 200 + 90/2 against 270/2.
       assert.deepEqual(
         groups.map((g) => g.map((p) => p.name)),
         [["heavy"], ["l1", "l2", "l3", "l4"]],
       );
+      assert.deepEqual(walls, [200, 180]);
+    });
+
+    /** @scenario "Shards are balanced by the wall time each package adds" */
+    void it("counts an integration lane at full weight, since it runs one suite at a time", () => {
+      const seconds = new Map([
+        ["heavy", 150],
+        ["i1", 90],
+        ["i2", 90],
+        ["i3", 90],
+      ]);
+      const items = [
+        { name: "heavy", scripts: ["test"] },
+        ...["i1", "i2", "i3"].map((name) => ({ name, scripts: ["test:integration"] })),
+      ];
+      const weightOf = (p: { name: string }) => seconds.get(p.name) ?? 0;
+      const { groups, walls } = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 });
+      // Counted at half weight, all three joined one shard and ran 270s back to back.
+      assert.deepEqual(
+        groups.map((g) => g.map((p) => p.name)),
+        [["heavy", "i3"], ["i1", "i2"]],
+      );
+      assert.deepEqual(walls, [240, 180]);
+    });
+
+    /** @scenario "Shards are balanced by the wall time each package adds" */
+    void it("spreads a light package's weight over its scripts' lanes", () => {
+      const load = withPackage({
+        load: { alone: 0, shared: 0, integration: 0, browser: 0 },
+        weight: 60,
+        scripts: ["test", "test:integration", "test:browser"],
+      });
+      assert.deepEqual(load, { alone: 0, shared: 60, integration: 20, browser: 20 });
+      assert.equal(wallTimeOf({ load, concurrency: 2 }), 30);
     });
 
     /** @scenario "Every shard computes the same split" */
