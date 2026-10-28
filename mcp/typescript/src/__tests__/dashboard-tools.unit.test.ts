@@ -149,21 +149,35 @@ describe("given the dashboard tools", () => {
   });
 
   /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
-  it("sends excludedOrigins as [], a list or null and shows the stored setting", async () => {
-    const calls = stubFetch({ answer: () => ({ ...dashboard, excludedOrigins: [] }) });
+  it("sends excludedOrigins as [], a list or null", async () => {
+    const calls = stubFetch();
 
     await handleRenameDashboard({ dashboardId: "b_1", excludedOrigins: [] });
     await handleRenameDashboard({ dashboardId: "b_1", excludedOrigins: ["langy"] });
-    const reset = await handleRenameDashboard({ dashboardId: "b_1", excludedOrigins: null });
-    const read = await handleGetDashboard({ dashboardId: "b_1" });
+    await handleRenameDashboard({ dashboardId: "b_1", excludedOrigins: null });
 
     expect(calls.filter(({ method }) => method === "PATCH").map(({ body }) => body)).toEqual([
       { excludedOrigins: [] },
       { excludedOrigins: ["langy"] },
       { excludedOrigins: null },
     ]);
-    expect(reset).toContain("**Langy traces**: included");
-    expect(read).toContain("**Langy traces**: included");
+  });
+
+  /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
+  it.each([
+    { stored: null, line: "default (left out, included in a personal project)" },
+    { stored: [], line: "included" },
+    { stored: ["langy"], line: "left out" },
+    { stored: ["langy", "eval"], line: "left out; also leaves out eval" },
+    { stored: ["eval"], line: "included; also leaves out eval" },
+  ])("words the stored $stored as the Langy traces line", async ({ stored, line }) => {
+    stubFetch({ answer: () => ({ ...dashboard, excludedOrigins: stored }) });
+
+    const read = await handleGetDashboard({ dashboardId: "b_1" });
+    const updated = await handleRenameDashboard({ dashboardId: "b_1", name: "Usage" });
+
+    expect(read).toContain(`**Langy traces**: ${line}`);
+    expect(updated).toContain(`**Langy traces**: ${line}`);
   });
 
   /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */

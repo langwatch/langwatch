@@ -108,7 +108,7 @@ export const createDashboardCommand = async (name: string): Promise<CommandResul
 const LANGY_ORIGIN = "langy";
 
 /** The stored origins a dashboard leaves out, in words; null is the project default. */
-export function describeLangyTraces(excludedOrigins: string[] | null | undefined): string {
+function describeLangyTraces(excludedOrigins: string[] | null | undefined): string {
   if (excludedOrigins == null) return "default (left out, included in a personal project)";
   if (excludedOrigins.length === 0) return "included";
   const others = excludedOrigins.filter((origin) => origin !== LANGY_ORIGIN);
@@ -116,16 +116,19 @@ export function describeLangyTraces(excludedOrigins: string[] | null | undefined
   return others.length === 0 ? langy : `${langy}; also leaves out ${others.join(", ")}`;
 }
 
-/** The `excludedOrigins` value the Langy traces flags send; undefined sends nothing. */
-function langyTracesSetting(options: {
-  includeLangyTraces?: boolean;
-  excludeLangyTraces?: boolean;
-  resetLangyTraces?: boolean;
-}): string[] | null | undefined {
-  if (options.includeLangyTraces) return [];
-  if (options.excludeLangyTraces) return [LANGY_ORIGIN];
-  if (options.resetLangyTraces) return null;
-  return undefined;
+/**
+ * The flags change only "langy" and keep the other origins, as the board does.
+ * A stored null counts as none: the default holds at most "langy", which the flag decides.
+ */
+function langyTracesList({
+  stored,
+  includeLangy,
+}: {
+  stored: string[] | null | undefined;
+  includeLangy: boolean;
+}): string[] {
+  const others = (stored ?? []).filter((origin) => origin !== LANGY_ORIGIN);
+  return includeLangy ? others : [...others, LANGY_ORIGIN];
 }
 
 /** A call naming nothing is refused locally, matching the API's own refusal. */
@@ -142,8 +145,13 @@ export const updateDashboardCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
   const description = options.clearDescription ? null : options.description;
-  const excludedOrigins = langyTracesSetting(options);
-  if (options.name === undefined && description === undefined && excludedOrigins === undefined) {
+  const changesLangy = options.includeLangyTraces || options.excludeLangyTraces;
+  if (
+    options.name === undefined &&
+    description === undefined &&
+    !changesLangy &&
+    !options.resetLangyTraces
+  ) {
     console.error(
       chalk.red(
         "Error: nothing to update — pass --name, --description, --clear-description, --include-langy-traces, --exclude-langy-traces or --reset-langy-traces",
@@ -154,7 +162,16 @@ export const updateDashboardCommand = async (
   const spinner = createSpinner(`Updating dashboard "${dashboardId}"...`).start();
 
   try {
-    const dashboard = await new DashboardsApiService().update({
+    const service = new DashboardsApiService();
+    const excludedOrigins = changesLangy
+      ? langyTracesList({
+          stored: (await service.get(dashboardId)).excludedOrigins,
+          includeLangy: Boolean(options.includeLangyTraces),
+        })
+      : options.resetLangyTraces
+        ? null
+        : undefined;
+    const dashboard = await service.update({
       dashboardId,
       ...(options.name === undefined ? {} : { name: options.name }),
       ...(description === undefined ? {} : { description }),

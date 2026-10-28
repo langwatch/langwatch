@@ -13,7 +13,7 @@ vi.mock("ora", () => ({
   default: () => ({ start: vi.fn().mockReturnThis(), succeed: vi.fn(), fail: vi.fn() }),
 }));
 
-import { describeLangyTraces, getDashboardCommand, updateDashboardCommand } from "../dashboards";
+import { getDashboardCommand, updateDashboardCommand } from "../dashboards";
 
 const dashboard = {
   id: "dashboard_v2",
@@ -52,37 +52,63 @@ describe("langwatch dashboard update, Langy traces flags", () => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
-
   /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
-  it("sends [] to include, [langy] to leave out and null to reset", async () => {
-    await updateDashboardCommand("dashboard_v2", { includeLangyTraces: true });
-    await updateDashboardCommand("dashboard_v2", { excludeLangyTraces: true });
+  it("sends null to reset without reading the board", async () => {
     await updateDashboardCommand("dashboard_v2", { resetLangyTraces: true });
 
-    expect(await sentBodies()).toEqual([
-      { excludedOrigins: [] },
-      { excludedOrigins: ["langy"] },
-      { excludedOrigins: null },
-    ]);
+    expect(await sentBodies()).toEqual([{ excludedOrigins: null }]);
+  });
+
+  /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
+  it.each([
+    { stored: null, include: [], exclude: ["langy"] },
+    { stored: [], include: [], exclude: ["langy"] },
+    { stored: ["langy"], include: [], exclude: ["langy"] },
+    { stored: ["eval"], include: ["eval"], exclude: ["eval", "langy"] },
+    { stored: ["langy", "eval"], include: ["eval"], exclude: ["eval", "langy"] },
+  ])("keeps the other origins of $stored", async ({ stored, include, exclude }) => {
+    fetchMock.mockImplementation(async () => json({ ...dashboard, excludedOrigins: stored }));
+
+    await updateDashboardCommand("dashboard_v2", { includeLangyTraces: true });
+    await updateDashboardCommand("dashboard_v2", { excludeLangyTraces: true });
+
+    const patches = (fetchMock.mock.calls as unknown as [Request][])
+      .map(([request]) => request)
+      .filter((request) => request.method === "PATCH");
+    const bodies = await Promise.all(patches.map((request) => request.clone().json()));
+    expect(bodies).toEqual([{ excludedOrigins: include }, { excludedOrigins: exclude }]);
   });
 
   /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
   it("sends the setting together with a rename", async () => {
     await updateDashboardCommand("dashboard_v2", { name: "Ops", includeLangyTraces: true });
 
-    expect(await sentBodies()).toEqual([{ name: "Ops", excludedOrigins: [] }]);
+    const patches = (fetchMock.mock.calls as unknown as [Request][])
+      .map(([request]) => request)
+      .filter((request) => request.method === "PATCH");
+    expect(await Promise.all(patches.map((request) => request.clone().json()))).toEqual([
+      { name: "Ops", excludedOrigins: [] },
+    ]);
   });
 
   /** @scenario "AC200f Langy setting: the CLI, MCP and Python SDK read and set the origins a board leaves out" */
-  it("returns the stored setting from get and words it for the table", async () => {
-    fetchMock.mockImplementation(async () => json({ ...dashboard, excludedOrigins: [] }));
+  it.each([
+    { stored: null, line: "default (left out, included in a personal project)" },
+    { stored: [], line: "included" },
+    { stored: ["langy"], line: "left out" },
+    { stored: ["eval"], line: "included; also leaves out eval" },
+    { stored: ["langy", "eval"], line: "left out; also leaves out eval" },
+  ])("prints the Langy traces line for $stored", async ({ stored, line }) => {
+    fetchMock.mockImplementation(async () => json({ ...dashboard, excludedOrigins: stored }));
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
     const result = await getDashboardCommand("dashboard_v2");
+    expect(result).toMatchObject({ data: { excludedOrigins: stored } });
+    if (result) result.table();
 
-    expect(result).toMatchObject({ data: { excludedOrigins: [] } });
-    expect(describeLangyTraces(null)).toContain("default");
-    expect(describeLangyTraces([])).toBe("included");
-    expect(describeLangyTraces(["langy"])).toBe("left out");
-    expect(describeLangyTraces(["eval"])).toBe("included; also leaves out eval");
+    const printed = log.mock.calls.map(([text]) => String(text));
+    expect(printed.some((text) => text.includes("Langy traces:") && text.endsWith(line))).toBe(
+      true,
+    );
   });
 });
