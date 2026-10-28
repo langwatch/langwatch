@@ -52,6 +52,9 @@ func suiteJobs(jobs []Job) ([]Job, bool) {
 // Collect measures the newest `want` runs on main whose package-suites shards
 // all passed, and returns their ids with every measurement of each.
 func Collect(src Source, want int) ([]int64, [][]Measurement, error) {
+	if want < 1 {
+		return nil, nil, fmt.Errorf("asked for %d runs; take the median over at least one", want)
+	}
 	runs, err := src.MainRuns()
 	if err != nil {
 		return nil, nil, err

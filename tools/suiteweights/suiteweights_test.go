@@ -141,6 +141,15 @@ func TestCollectRefusesTooFewGreenRuns(t *testing.T) {
 	assert.Contains(t, err.Error(), "found 1")
 }
 
+// @scenario "Asking for no runs is an error rather than an empty file"
+func TestCollectRefusesANonPositiveRunCount(t *testing.T) {
+	for _, want := range []int{0, -1} {
+		_, _, err := Collect(fakeSource{runs: []int64{1}}, want)
+
+		require.Error(t, err)
+	}
+}
+
 func TestARunMissingAShardIsNotComplete(t *testing.T) {
 	_, ok := suiteJobs([]Job{{ID: 1, Name: "package-suites (1/8)", Conclusion: "success"}})
 

@@ -62,6 +62,12 @@ Feature: The package-suites weights are refreshed by a command
       When runs are collected
       Then the command fails without writing the file
 
+    @unit
+    Scenario: Asking for no runs is an error rather than an empty file
+      Given the command is asked to take the median over zero runs
+      When runs are collected
+      Then the command fails without writing the file
+
   Rule: the file says where its numbers came from
 
     @unit
