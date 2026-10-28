@@ -26,7 +26,7 @@ CURRENT_HASH=$(echo "$CURRENT_FAILURES" | sort | md5sum | cut -d' ' -f1)
 echo "Current failures hash: $CURRENT_HASH"
 
 # Get previous main run's failures
-PREVIOUS_RUN_ID=$(gh run list --branch main --status failure --workflow "$GITHUB_WORKFLOW" --limit 2 --json databaseId --jq '.[1].databaseId // empty')
+PREVIOUS_RUN_ID=$(gh run list --branch main --status failure --workflow "$GITHUB_WORKFLOW" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
 
 if [ -n "$PREVIOUS_RUN_ID" ]; then
   echo "Checking previous run: $PREVIOUS_RUN_ID"

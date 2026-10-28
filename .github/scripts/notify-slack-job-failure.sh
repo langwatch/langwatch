@@ -20,8 +20,8 @@ fi
 if [ -n "$GH_TOKEN" ]; then
   echo "Checking if this is a new failure..."
 
-  # Get the previous run (second most recent failure for this workflow on main)
-  PREVIOUS_RUN_ID=$(gh run list --branch main --status failure --workflow "$GITHUB_WORKFLOW" --limit 2 --json databaseId --jq '.[1].databaseId // empty')
+  # The latest failed run on main: this run is still in progress, so it is not listed
+  PREVIOUS_RUN_ID=$(gh run list --branch main --status failure --workflow "$GITHUB_WORKFLOW" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
 
   if [ -n "$PREVIOUS_RUN_ID" ]; then
     # Check if the same job failed in the previous run

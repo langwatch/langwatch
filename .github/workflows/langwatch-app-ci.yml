@@ -43,10 +43,10 @@ env:
 concurrency:
   # A manual run (coverage, duration weights) has its own group, so a push cannot cancel it.
   group: langwatch-app-ci-${{ github.event_name }}-${{ github.ref }}
-  # A newer commit supersedes an older run, except on main: there package-suites
-  # runs as one long job (see `suites-one-job`), so a run finishes and the newest
-  # commit waits behind it. Image and release builds keep their own rule.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A newer commit supersedes an older run, except a push to main: there
+  # package-suites runs as one long job (see `suites-one-job`), so a run finishes
+  # and the newest commit waits behind it. Guarded by tools/ciguard/mainsuites.go.
+  cancel-in-progress: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -57,10 +57,10 @@ jobs:
       # Drafts and release-please PRs (rewritten on every merge) get lint, typecheck and
       # feature-parity only; `ci:full` lifts that. merge_group is never a draft and main
       # runs the full suite, so nothing lands without it.
+      heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
       # A push to main runs package-suites as one job: nobody waits on it, and one
       # setup instead of eight saves about a fifth of its Actions minutes (#9146).
       suites-one-job: ${{ github.event_name == 'push' }}
-      heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -883,12 +883,24 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --experimental-strip-types .github/scripts/check-test-reads.ts "$RUNNER_TEMP/test-reads"
 
+  # Its own job, so a run that times out (cancelled, no failed step) still posts.
+  package-suites-notify:
+    needs: [changes, package-suites]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.package-suites.result == 'failure' || needs.package-suites.result == 'cancelled')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
       - name: Notify Slack on failure
-        if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh "package-suites (${{ matrix.shard }}/${{ strategy.job-total }})"
+        run: bash .github/scripts/notify-slack-job-failure.sh "package-suites (1/1)"
 
   lint:
     needs: changes
