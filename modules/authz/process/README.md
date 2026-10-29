@@ -794,12 +794,12 @@ Contract `src/transport/authz.trpc.ts:30`, router `src/transport/authz.trpc.ts:8
 
 ```typescript
 // authz.effectivePermissions
-// Input: authzOwnStandingInputSchema, ../contract/src/authz.queries.ts:670
+// Input: authzOwnStandingInputSchema, ../contract/src/authz.queries.ts:688
 interface Input {
   projectId?: string;
   organizationId?: string;
 }
-// Output: authzOwnStandingSchema, ../contract/src/authz.queries.ts:654
+// Output: authzOwnStandingSchema, ../contract/src/authz.queries.ts:672
 interface Output {
   scope: {
     type: "project" | "team" | "organization" | "resource";

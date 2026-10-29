@@ -499,7 +499,7 @@ describe("given run_query's projects input", () => {
     expect(runQueryProjectsInput.validate(value)).toBe(true);
   });
 
-  it.each([["everything"], [[]], [[""]]])("refuses %s", (value) => {
+  it.each([["everything"], [[]], [[""]], [["p", "ALL"]]])("refuses %s", (value) => {
     expect(runQueryProjectsInput.validate(value)).toBe(false);
   });
 });

@@ -6,7 +6,10 @@ import {
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
-import { LWQL_MAX_MEMBER_PROJECTS } from "@langwatch/analytics-contract/langwatch-ql-limits";
+import {
+  LWQL_MAX_MEMBER_PROJECTS,
+  LWQL_MAX_WIDGET_PROJECTS,
+} from "@langwatch/analytics-contract/langwatch-ql-limits";
 /**
  * The query door's scope: the projects an API key may read and the protections to redact by.
  * The candidates are enumerated from the key's organization, never taken from the request, and
@@ -129,6 +132,10 @@ export class LangWatchQLQueryScopeService {
       await this.ownProject({ projectId: reach.projectId, requested: named });
       return;
     }
+    // A widget's union of lists is capped by no request schema, so the cap is held here.
+    if (named.length > LWQL_TENANT_CAPABILITY_MAX_PROJECTS) {
+      throw new ValidationError(`Name at most ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects.`);
+    }
     await this.readableProjects({ reach, only: named });
   }
 
@@ -150,10 +157,11 @@ export class LangWatchQLQueryScopeService {
     anchorProjectId: string;
     authorization?: Authorization;
   }): Promise<LangWatchQLQueryScope> {
-    if (dedupeInOrder(projectIds).length > LWQL_MAX_MEMBER_PROJECTS) {
+    const ids = dedupeInOrder(projectIds);
+    if (ids.length > LWQL_MAX_MEMBER_PROJECTS) {
       throw new ValidationError(`name at most ${LWQL_MAX_MEMBER_PROJECTS} projects`);
     }
-    const projects = await this.readableByMember({ userId, projectIds, anchorProjectId });
+    const projects = await this.judgeMembers({ userId, ids, anchorProjectId });
     const protections: LangWatchQLProtections[] = [];
     // One project at a time, for the same reason `resolve` reads protections one at a time.
     for (const { id: projectId } of projects) {
@@ -184,11 +192,29 @@ export class LangWatchQLQueryScopeService {
     anchorProjectId: string;
   }): Promise<LangWatchQLCaller[]> {
     const ids = dedupeInOrder(projectIds);
+    // A widget names a member list per query; a run's own 100 is held by `resolveMemberProjects`.
+    if (ids.length > LWQL_MAX_WIDGET_PROJECTS) {
+      throw new ValidationError(`name at most ${LWQL_MAX_WIDGET_PROJECTS} projects`);
+    }
+
+    return this.judgeMembers({ userId, ids, anchorProjectId });
+  }
+
+  /** The deduped ids, each proven live in the anchor's organization and readable by the member. */
+  private async judgeMembers({
+    userId,
+    ids,
+    anchorProjectId,
+  }: {
+    userId: string;
+    ids: readonly string[];
+    anchorProjectId: string;
+  }): Promise<LangWatchQLCaller[]> {
     if (ids.length === 0) return [];
     const organizationId = await this.dependencies.projects.findOrganizationId(anchorProjectId);
     if (organizationId === undefined) throw new LangWatchQLProjectNotFoundError();
-    // The read drops archived, governance and foreign-organization projects. Whatever the ids,
-    // the same two reads run, in the same order, so timing cannot tell the refusals apart.
+    // The read drops archived, governance and foreign-organization projects. The same reads run
+    // in the same order whatever the ids are; the grant read covers only the projects listed.
     const listed = await this.dependencies.projects.listByOrganization({
       organizationId,
       page: 1,
@@ -196,14 +222,15 @@ export class LangWatchQLQueryScopeService {
       projectIds: [...ids],
     });
     const live = new Map(listed.data.map((project) => [project.id, project]));
-    // One batched decision for the whole list; an authz outage propagates (a 5xx), and only a
-    // denial reads as not found.
+    // One batched decision for the list. It also applies the aggregate gate (ADR-177), which a
+    // single permission check did not: a member who is no admin is refused an aggregate project,
+    // as a missing one. An authz outage propagates (a 5xx); only a denial reads as not found.
     const decided = await this.dependencies.authz.canBatchByIds({
       principal: { type: "user", id: userId },
       permission: "analytics:view",
       organizationId,
       teams: [...new Set(listed.data.map(({ teamId }) => teamId))].map((teamId) => ({ teamId })),
-      projects: listed.data.map(({ id, teamId }) => ({ projectId: id, teamId })),
+      projects: listed.data.map(({ id, teamId, kind }) => ({ projectId: id, teamId, kind })),
     });
     const readable: LangWatchQLCaller[] = [];
     for (const id of ids) {

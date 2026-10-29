@@ -1,4 +1,7 @@
-import { LWQL_MAX_MEMBER_PROJECTS } from "@langwatch/analytics-contract/langwatch-ql-limits";
+import {
+  LWQL_MAX_MEMBER_PROJECTS,
+  LWQL_MAX_WIDGET_PROJECTS,
+} from "@langwatch/analytics-contract/langwatch-ql-limits";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
@@ -60,6 +63,7 @@ function scopeOver(input: {
   const orgOf = (id: string) => input.orgs?.[id] ?? ORGANIZATION_ID;
   const asked: { projectId: string; permission: string }[] = [];
   const batches: string[][] = [];
+  const kinds: Record<string, string | undefined> = {};
   const service = LangWatchQLQueryScopeService.create({
     projects: createApiFixture<ProjectApi>({
       findById: (id) => Promise.resolve(input.projects.find((p) => p.id === id) ?? null),
@@ -86,12 +90,14 @@ function scopeOver(input: {
       },
       canBatchByIds: ({ projects, permission }) => {
         batches.push(projects.map(({ projectId }) => projectId));
+        for (const { projectId, kind } of projects) kinds[projectId] = kind;
         return Promise.resolve({
           teams: new Map(),
+          // The real gate closes an aggregate to a member who is no admin (ADR-177).
           projects: new Map(
-            projects.map(({ projectId }) => [
+            projects.map(({ projectId, kind }) => [
               projectId,
-              input.grants[projectId]?.includes(permission) === true,
+              kind !== "aggregate" && input.grants[projectId]?.includes(permission) === true,
             ]),
           ),
           organizationRole: null,
@@ -130,7 +136,7 @@ function scopeOver(input: {
     }),
   });
 
-  return { service, asked, batches };
+  return { service, asked, batches, kinds };
 }
 
 describe("given an API key that reaches several projects of its organization", () => {
@@ -296,6 +302,18 @@ describe("given a run that names one project", () => {
       await expect(
         service.assertReadableByKey({ reach: KEY, projectIds: ["a", "b"] }),
       ).rejects.toMatchObject({ code: "project_not_found" });
+    });
+
+    it("refuses a widget union of more ids than a key can read", async () => {
+      const { service } = scopeOver({ projects: [project("a")], grants: {} });
+      const ids = Array.from(
+        { length: LWQL_TENANT_CAPABILITY_MAX_PROJECTS + 1 },
+        (_, index) => `p${index}`,
+      );
+
+      await expect(service.assertReadableByKey({ reach: KEY, projectIds: ids })).rejects.toThrow(
+        `Name at most ${LWQL_TENANT_CAPABILITY_MAX_PROJECTS} projects.`,
+      );
     });
 
     it("refuses a project outside its organization exactly like one that does not exist", async () => {
@@ -773,6 +791,42 @@ describe("given a member's card that names projects", () => {
 
     expect(body(await ask(["e"]))).toBe(missing);
     expect(body(await ask(["g"]))).toBe(missing);
+  });
+
+  /** @scenario "AC210f Compatibility: a member who is no admin cannot name an aggregate project in a widget" */
+  it("refuses an aggregate project to a member, as a missing one, and passes its kind", async () => {
+    const { service, kinds } = scopeOver({
+      projects: [project("a"), project("agg", { kind: "aggregate" as never })],
+      grants: { a: ["analytics:view"], agg: ["analytics:view"] },
+    });
+    const ask = (projectIds: string[]) =>
+      refusalOf(service.readableByMember({ userId: "user-1", anchorProjectId: "a", projectIds }));
+
+    const aggregate = await ask(["a", "agg"]);
+    const missing = await ask(["a", "nope"]);
+
+    expect(aggregate).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(body(aggregate)).toBe(body(missing));
+    expect(kinds.agg).toBe("aggregate");
+  });
+
+  it("accepts a widget's union of ids above a run's cap, and refuses one above the union cap", async () => {
+    const many = Array.from({ length: 120 }, (_, index) => project(`p${index}`));
+    const grants = Object.fromEntries(many.map(({ id }) => [id, ["analytics:view"]]));
+    const { service } = scopeOver({ projects: many, grants });
+    const ids = many.map(({ id }) => id);
+    const tooMany = Array.from({ length: LWQL_MAX_WIDGET_PROJECTS + 1 }, (_, index) => `x${index}`);
+
+    const read = await service.readableByMember({
+      userId: "user-1",
+      anchorProjectId: "p0",
+      projectIds: ids,
+    });
+
+    expect(read).toHaveLength(120);
+    await expect(
+      service.readableByMember({ userId: "user-1", anchorProjectId: "p0", projectIds: tooMany }),
+    ).rejects.toThrow(`name at most ${LWQL_MAX_WIDGET_PROJECTS} projects`);
   });
 
   it("decides every listed project in one batch, so an early miss costs the same", async () => {

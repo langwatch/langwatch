@@ -15,10 +15,11 @@ export function selectNamedProjects({
   projects,
 }: {
   projectId?: string | undefined;
-  projects?: readonly string[] | "all" | undefined;
+  projects?: readonly string[] | string | undefined;
 }): { named: readonly string[] | undefined; all: boolean; conflict: boolean } {
-  const all = projects === "all";
-  const list = all ? undefined : projects;
+  // A lone string is the word "all" in some case: the request schema admits no other.
+  const all = typeof projects === "string";
+  const list = typeof projects === "string" ? undefined : projects;
 
   return {
     named: list ?? (projectId === undefined ? undefined : [projectId]),

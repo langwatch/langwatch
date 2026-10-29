@@ -4,6 +4,8 @@
  */
 import { z } from "zod";
 
+const isAllWord = (id: string) => id.trim().toLowerCase() === "all";
+
 /** The sources the platform takes, "other" being every origin not listed before it. */
 export const WIDGET_SOURCES = [
   "application",
@@ -39,7 +41,6 @@ export const widgetSourcesInput = z
 const ALL_NOT_STORED = 'projects holds project ids; "all" is not stored in a widget';
 // run_query takes "all"; a widget stores ids. The refine carries the message for "all" as a
 // string or inside the array, and adds nothing to the tool's JSON Schema.
-const isAllWord = (id: string) => id.trim().toLowerCase() === "all";
 export const widgetProjectsInput = z
   .array(z.string().min(1), {
     error: (issue) =>
@@ -55,6 +56,11 @@ export const widgetProjectsInput = z
 
 /** run_query's `projects`: project ids, or the lone word "all" in any case. */
 export const runQueryProjectsInput = z.union([
-  z.string().refine((word) => word.trim().toLowerCase() === "all"),
-  z.array(z.string().min(1)).min(1),
+  z.string().refine(isAllWord),
+  z
+    .array(z.string().min(1))
+    .min(1)
+    .refine((ids) => !ids.some(isAllWord), {
+      message: '"all" stands alone; send it by itself, or list project ids',
+    }),
 ]);

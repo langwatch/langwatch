@@ -82,3 +82,9 @@ export const DEFAULT_LWQL_RESOURCE_LIMITS: LangWatchQLResourceLimits = {
   maxResultRows: LWQL_MAX_RESULT_ROWS,
   maxResultBytes: LWQL_MAX_RESULT_BYTES,
 };
+
+/** A widget holds at most this many queries, each naming its own projects. */
+export const LWQL_MAX_QUERIES_PER_WIDGET = 8;
+
+/** The ids one widget write may name across all its queries: a member list per query. */
+export const LWQL_MAX_WIDGET_PROJECTS = LWQL_MAX_MEMBER_PROJECTS * LWQL_MAX_QUERIES_PER_WIDGET;

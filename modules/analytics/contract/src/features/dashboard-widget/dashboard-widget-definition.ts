@@ -9,13 +9,13 @@ import { z } from "zod";
 
 import { lwqlMemberProjectsSchema } from "../lwql/analytics-lwql.schemas.ts";
 import { traceSourcesSchema } from "../lwql/analytics.lwql.ts";
-import { MAX_LWQL_LENGTH } from "../lwql/langwatch-ql-limits.ts";
+import { LWQL_MAX_QUERIES_PER_WIDGET, MAX_LWQL_LENGTH } from "../lwql/langwatch-ql-limits.ts";
 
 /** The version this build writes, and the only one it reads. */
 export const DASHBOARD_WIDGET_DEFINITION_VERSION = 1;
 
 /** A widget file rarely needs more than a couple of named queries. */
-const MAX_QUERIES_PER_WIDGET = 8;
+const MAX_QUERIES_PER_WIDGET = LWQL_MAX_QUERIES_PER_WIDGET;
 /** A query name is referenced from author code as `LW.query("name", ...)`. */
 const MAX_QUERY_NAME_LENGTH = 64;
 const QUERY_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;

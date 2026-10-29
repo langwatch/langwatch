@@ -301,7 +301,7 @@ export type LangWatchQLRunContext = Readonly<{
   /** A widget query's sources (AC200), `null` for its default; the default when absent. */
   sources?: RunSources;
   /** The projects a card names (AC207); absent, the board's project. */
-  projects?: readonly string[] | "all";
+  projects?: readonly string[] | string;
   /** The member a card's named projects are checked for; absent, none may be named. */
   userId?: string;
   /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */

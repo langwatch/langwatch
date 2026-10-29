@@ -18,7 +18,7 @@ const admin: CollectedBinding[] = [
   { roleKey: "admin", scopeType: "PROJECT", scopeId: PROJECT, viaGroupId: null },
 ];
 
-function makeAuthz({ role, kind }: { role: "ADMIN" | "MEMBER"; kind: string }) {
+function makeAuthz({ role, kind }: { role: "ADMIN" | "MEMBER"; kind: string }, lineage = vi.fn()) {
   return AuthzService.create({
     isOnEngine: async () => true,
     repository: makeReader({
@@ -26,9 +26,11 @@ function makeAuthz({ role, kind }: { role: "ADMIN" | "MEMBER"; kind: string }) {
       findUserBindings: vi.fn().mockResolvedValue(admin),
       findApiKeyBindings: vi.fn().mockResolvedValue(admin),
       findApiKeyOwner: vi.fn().mockResolvedValue({ userId: alice.id }),
-      findProjectLineage: vi
-        .fn()
-        .mockResolvedValue({ teamId: "team-1", organizationId: ORG, kind }),
+      findProjectLineage: lineage.mockResolvedValue({
+        teamId: "team-1",
+        organizationId: ORG,
+        kind,
+      }),
       findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
     }),
     listing: new StubAuthzListingRepository(),
@@ -70,6 +72,24 @@ describe("AuthzService batch decisions on an aggregate project", () => {
       const authz = makeAuthz({ role: "MEMBER", kind: "project" });
 
       expect(await askBatchPaths(authz)).toEqual([true, true]);
+    });
+  });
+
+  describe("when the caller passes the project's kind to canBatchByIds", () => {
+    it("closes the aggregate from the row, with no lineage read", async () => {
+      const lineage = vi.fn();
+      const authz = makeAuthz({ role: "MEMBER", kind: "aggregate" }, lineage);
+
+      const batch = await authz.canBatchByIds({
+        principal: alice,
+        permission: "traces:view",
+        organizationId: ORG,
+        teams: [],
+        projects: [{ projectId: PROJECT, teamId: "team-1", kind: "aggregate" }],
+      });
+
+      expect(batch.projects.get(PROJECT)).toBe(false);
+      expect(lineage).not.toHaveBeenCalled();
     });
   });
 

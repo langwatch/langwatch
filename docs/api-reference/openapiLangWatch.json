@@ -15738,7 +15738,8 @@
                     "description": "The projects to read, each one the key holds analytics:view on, or the string \"all\" for every project the key can read. A key that reaches several projects must name them or send \"all\"; a key that reads one project defaults to it. When the statement declares {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.",
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "^\\s*all\\s*$"
                       },
                       {
                         "minItems": 1,
