@@ -616,6 +616,33 @@ describe("given a judge call that carries a route", () => {
     });
   });
 
+  /** @scenario "A caller's stop keeps the legs already paid billed" */
+  it("records a stop under its own request id, so the redelivery with the same key bills too", async () => {
+    const { service, router, recorded, repositories, seed } = harness();
+    await seed();
+    const requestKey = "project-1:evaluation-1:execution";
+    const stop = new InstantEvalJudgeStoppedError({
+      inputTokens: 1000,
+      costNanoUsd: 5000,
+      cause: new DOMException("stopped", "AbortError"),
+    });
+    vi.spyOn(router, "classify").mockRejectedValueOnce(stop);
+    const routed = { ...call, requestKey, route: { job: "llm_judge" as const, tokens: 100 } };
+
+    await expect(service.judge(routed)).rejects.toBe(stop);
+    await service.judge(routed);
+
+    expect(recorded.map((fact) => fact.requestId)).toEqual([
+      "minted-1",
+      `instantevaljudge_${requestKey}`,
+    ]);
+    // Both rows are kept: the stopped legs and the full redelivered call were both paid.
+    const { spendNanoUsd } = await repositories.spend.getTotal({ organizationId: ORGANIZATION_ID });
+    expect(spendNanoUsd).toBe(
+      BigInt(5000 * INSTANT_EVAL_PRICING.markup + 1_000_000_000 * INSTANT_EVAL_PRICING.markup),
+    );
+  });
+
   /** @scenario "A routed judgement with a cost of zero is still routed" */
   it("prices a routed call that cost nothing at zero, under the router's model and rate", async () => {
     const { service, recorded, seed } = harness({ routeUsdPerMillion: 0 });

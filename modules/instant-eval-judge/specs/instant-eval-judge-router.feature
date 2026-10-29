@@ -193,6 +193,8 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When the caller stops it while a later leg is in flight
     Then the stop still reaches the caller as a stop
     And it carries what the paid legs spent, which the stopped batch bills
+    And a judge call records that spend under a request id of its own, never the retry key
+    And so the redelivery that completes under the same key is billed too
 
   @unit
   Scenario: Nothing answered gives the last backend's skip reason

@@ -142,7 +142,11 @@ export class InstantEvalJudgeService {
     return { outcome: "judged", judgement, priceUsd };
   }
 
-  /** One classify; a routed stop after paid legs records what they spent, then is rethrown. */
+  /**
+   * One classify; a routed stop after paid legs records what they spent, then is rethrown. The
+   * stop takes a freshly minted request id, never the retry key: the redelivery that completes
+   * keeps the key's row, since a spend row per request id is never rewritten.
+   */
   private async classifyRecordingStop({
     spend,
     call,
@@ -154,8 +158,9 @@ export class InstantEvalJudgeService {
       return await this.classifyOnce(call);
     } catch (error) {
       if (error instanceof InstantEvalJudgeStoppedError) {
+        const { organizationId, projectId } = spend;
         const { inputTokens, costNanoUsd } = error;
-        await this.priceAndRecord({ ...spend, inputTokens, costNanoUsd });
+        await this.priceAndRecord({ organizationId, projectId, inputTokens, costNanoUsd });
       }
       throw error;
     }
