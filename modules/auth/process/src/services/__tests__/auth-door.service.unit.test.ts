@@ -365,6 +365,31 @@ describe("AuthDoorService", () => {
     });
   });
 
+  describe("when an identity provider refuses the person with access_denied", () => {
+    /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
+    it("keeps the code on the redirect", async () => {
+      const world = door({
+        betterAuth: async () => ({
+          handler: async () =>
+            new Response(null, {
+              status: 302,
+              headers: {
+                location: `${BASE_URL}/auth/error?error=access_denied&error_description=User+is+not+assigned`,
+              },
+            }),
+        }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/sso/callback/conn_1?code=c`),
+      );
+
+      expect(new URL(answered.headers.get("location") ?? "").searchParams.get("error")).toBe(
+        "access_denied",
+      );
+    });
+  });
+
   describe("when an auth route that is not a callback fails on the server", () => {
     /** @scenario "A server error on an auth route that is not a callback keeps its status" */
     it("answers with the server error itself", async () => {

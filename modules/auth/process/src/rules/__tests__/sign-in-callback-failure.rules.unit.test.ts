@@ -70,6 +70,17 @@ describe("signInErrorRedirectOf", () => {
     });
   });
 
+  describe("given an identity provider that refused the person", () => {
+    /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
+    it("keeps the code, drops the description, and is not withheld", () => {
+      const redirect = redirectTo(
+        `${errorPageUrl}?error=access_denied&error_description=AADSTS50105+User+is+not+assigned`,
+      );
+
+      expect(redirect).toEqual({ kind: "provider_refused", code: "access_denied" });
+    });
+  });
+
   describe("given a sign-in that failed for a reason we have not written down", () => {
     /** @scenario "An unhandled failure crosses as one generic code" */
     it("sends the generic code with no description, keeping callbackUrl", () => {

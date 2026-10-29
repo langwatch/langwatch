@@ -250,6 +250,14 @@ function withholdInternalSignInError({
     traceId,
   });
   if (redirect.kind === "pass") return response;
+  if (redirect.kind === "provider_refused") {
+    // An expected, tenant-side refusal (e.g. Entra "Assignment required"): nothing for on-call.
+    logger.warn(
+      { code: redirect.code, traceId: traceId ?? null },
+      "an identity provider refused a sign-in; the person was told to ask their IT administrator",
+    );
+    return response;
+  }
 
   logger.error(
     { code: redirect.code, description: redirect.description, traceId: traceId ?? null },

@@ -29,9 +29,13 @@ export function signInFailureLocation({
   return target.toString();
 }
 
+/** The code an identity provider answers when it refuses the person (OAuth 2.0 `access_denied`). */
+const PROVIDER_REFUSAL_CODE = "access_denied";
+
 /** What the boundary does with one redirect Better Auth answered. */
 type SignInErrorRedirect =
   | { kind: "pass" }
+  | { kind: "provider_refused"; code: string }
   | { kind: "withhold"; code: string; description: string; location: string };
 
 /**
@@ -53,7 +57,11 @@ export function signInErrorRedirectOf({
   const [target] = errorPageTargetOf({ location, errorPageUrl });
   if (!target) return { kind: "pass" };
   const code = target.searchParams.get("error");
-  if (!code || signInErrorMayCross(code)) return { kind: "pass" };
+  if (!code) return { kind: "pass" };
+  // Crosses as itself, but is the tenant's own refusal, so the caller logs it at warn. Only the
+  // code is kept: the provider's description is caller-controlled text and is never logged.
+  if (code === PROVIDER_REFUSAL_CODE) return { kind: "provider_refused", code };
+  if (signInErrorMayCross(code)) return { kind: "pass" };
 
   const withheld = new URL(errorPageUrl);
   for (const carried of CARRIED_THROUGH) {

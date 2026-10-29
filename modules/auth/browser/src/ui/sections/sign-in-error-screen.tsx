@@ -65,6 +65,8 @@ const errorTitle = (error: string): string => {
       return "This sign-in method needs approval";
     case "state_mismatch":
       return "Your sign-in expired";
+    case "access_denied":
+      return "Your organization's sign-in refused you";
     default:
       return (
         cutoverSignInRefusal(error)?.title ??
@@ -312,6 +314,20 @@ function SignInErrorDescription({
           >
             Start again
           </Link>
+        </Button>
+      </VStack>
+    );
+  }
+
+  if (error === "access_denied") {
+    return (
+      <VStack gap={4} align="stretch">
+        <Text>
+          Your organization's identity provider refused this sign-in. Ask your IT administrator to
+          give you access to the LangWatch app, then try again.
+        </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <Link href="/auth/signin">Back to sign in</Link>
         </Button>
       </VStack>
     );
