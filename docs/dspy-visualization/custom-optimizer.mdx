@@ -29,6 +29,8 @@ metric = langwatch.dspy.track_metric(metric)
 Now at each step your optimizer progresses, call `langwatch.dspy.log_step` to capture the score at the current step index, optimizer info and predictors being used on this step evaluation:
 
 ```python
+import langwatch
+
 langwatch.dspy.log_step(
     optimizer=DSPyOptimizer(
         name="MyAwesomeOptimizer",

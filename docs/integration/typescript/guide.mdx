@@ -99,7 +99,7 @@ async function askAI(question: string) {
   return await tracer.withActiveSpan("ask-ai", async (span) => {
     // Make the LLM call using Vercel AI SDK
     const response = await generateText({
-      model: openai("gpt-5-mini"),
+      model: openai("gpt-6-luna"),
       prompt: question,
       maxTokens: 100,
       // The LangWatch SDK will automatically capture LLM data
@@ -184,7 +184,7 @@ async function chatWithAI(userMessage: string) {
   return await tracer.withActiveSpan("chat-with-ai", async (span) => {
     // Make the LLM call
     const response = await generateText({
-      model: openai("gpt-5-mini"),
+      model: openai("gpt-6-luna"),
       prompt: userMessage,
       experimental_telemetry: { isEnabled: true }, // Auto-captures LLM data
     });
@@ -286,6 +286,8 @@ const handle = setupObservability({
 
 <CodeGroup>
 ```typescript Development
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   serviceName: "my-laundry-startup",
   dataCapture: "all", // Capture everything in dev
@@ -296,6 +298,8 @@ const handle = setupObservability({
 ```
 
 ```typescript Production
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   serviceName: "my-laundry-startup",
   dataCapture: "output", // Capture only output data in production
@@ -316,6 +320,8 @@ The `setupObservability` function returns an `ObservabilityHandle` that provides
 By default, LangWatch flushes pending traces when your application receives `SIGINT` or `SIGTERM`, or when the event loop drains:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 // Automatic shutdown is enabled by default
 const handle = setupObservability({
   serviceName: "my-service",
@@ -353,6 +359,8 @@ not installed.
 For environments where you can't listen to `SIGTERM` or need custom shutdown logic, you can manually call the shutdown method:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   serviceName: "my-service",
   langwatch: {
@@ -422,6 +430,8 @@ npm run dev
 Enable console logging for local development:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   serviceName: "my-service",
   langwatch: {

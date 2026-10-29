@@ -3,6 +3,7 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
   spanInputOutputSchema,
+  spansForTraceSchema,
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -73,6 +74,32 @@ describe("TraceLegacySpanMappingService.mapNormalizedSpanToSpan", () => {
       expect(
         ((params.gen_ai as Record<string, unknown>).input as Record<string, unknown>).messages,
       ).toEqual([{ role: "user", content: "hello" }]);
+    });
+
+    // Prod 2026-10-29: Strands spans carried the customer's own `user.*` attributes, so
+    // `params.user` was an object where OpenAI's `user` param is a string, and the trace's
+    // spans did not match the declared output.
+    /** @scenario "A span whose own attributes share a name with a request param still reads" */
+    it("answers a span whose own attributes share a name with a request param", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "tool",
+          "user.org.id": "org-1",
+          "user.email": "person@example.com",
+          "user.name": "A Person",
+          "stop.reason": "done",
+        },
+      });
+
+      const parsed = spansForTraceSchema.safeParse([
+        TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span),
+      ]);
+
+      expect(parsed.error?.issues).toBeUndefined();
+      expect(parsed.data?.[0]?.params).toMatchObject({
+        user: { org: { id: "org-1" }, email: "person@example.com", name: "A Person" },
+        stop: { reason: "done" },
+      });
     });
 
     it("keeps keys without dots at top level", () => {

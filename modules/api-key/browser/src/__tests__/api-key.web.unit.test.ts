@@ -15,14 +15,22 @@ function browserDocument() {
 }
 
 describe("given a browser that installs api-key", () => {
-  describe("when the kernel renders with only a transport supplied", () => {
-    it("installs the module", async () => {
+  describe("when the kernel renders with a transport and the page's config supplied", () => {
+    /** The api process writes an "api-key" slice; a browser that refused it never booted. */
+    it("installs the module and projects the docs origins it claims", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
         .withModules([hostServiceFakes(), apiKeyWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
+        .withInjectedConfig(() => ({
+          process: { mode: "test", deployment: "self-hosted", nlp: true },
+          "api-key": { docsOrigins: ["https://docs.example.test"] },
+        }))
         .render();
 
       expect(installed.modules).toContain(apiKeyWeb);
+      expect(installed.config).toEqual({
+        "api-key": { docsOrigins: ["https://docs.example.test"] },
+      });
     });
   });
 
@@ -49,10 +57,11 @@ describe("given a browser that installs api-key", () => {
     });
 
     /** @scenario Every key the family claims is served by it */
-    it("names the API keys settings, authorize, MCP authorize and CLI auth screens, and no other", () => {
+    it("names the API keys settings, authorize, MCP authorize, CLI auth and docs connect screens, and no other", () => {
       expect(Object.keys(apiKeyWeb.installation.screens).toSorted()).toEqual([
         "pages/authorize",
         "pages/cli/auth",
+        "pages/connect/docs",
         "pages/mcp/authorize",
         "pages/settings/api-keys",
       ]);

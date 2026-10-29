@@ -19,6 +19,7 @@ import {
 import { CurrentDrawer, type UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host/navigation";
 import {
+  clearPersistedUiQueries,
   indexedDbQueryStore,
   persistUiQueries,
   sealedUiQueryStore,
@@ -172,7 +173,10 @@ const useUnavailableUiSession: UiSessionSource = () => ({
   scope: UNAVAILABLE_UI_SCOPE,
 });
 
-/** Mirrors the planned reads onto the sealed disk and syncs tabs; returns the stop. */
+/**
+ * Mirrors the planned reads onto the sealed disk and syncs tabs. The stop it returns settles once
+ * the writes already under way have landed; none starts after it.
+ */
 function startQueryMirror({
   queryClient,
   plan,
@@ -193,7 +197,7 @@ function startQueryMirror({
   store: UiQueryStore<unknown>;
   sessionQueryKey: readonly unknown[];
   versions: UiQueryVersions;
-}): () => void {
+}): () => Promise<void> {
   const sealed =
     cacheKey !== void 0 && plan.persisted.size > 0
       ? sealedUiQueryStore({ store, cacheKey, previousCacheKey })
@@ -219,6 +223,7 @@ function startQueryMirror({
   return () => {
     unsubscribe();
     stopSync();
+    return sealed?.close() ?? Promise.resolve();
   };
 }
 
@@ -307,10 +312,12 @@ export function createUiFeatureShell({
       input: { transport: sessionTransport, feedback, session: live.session, scope: live.scope },
     });
     const queryClient = useQueryClient();
-    const userId =
-      live.session === UNAVAILABLE_UI_SESSION ? void 0 : live.session.currentUser()?.id;
+    const actor = live.session === UNAVAILABLE_UI_SESSION ? void 0 : live.session.currentUser();
+    const userId = actor?.id;
+    const impersonating = Boolean(actor?.impersonator);
     const { cacheKey, previousCacheKey } = sealingKeysOf(queryClient.getQueryData(sessionQueryKey));
     const seen = useRef<SeenSession>({ userId: void 0, cacheKey: void 0 });
+    const lastMirrorLanded = useRef<Promise<void>>(Promise.resolve());
     // Declared ahead of the mirror: its cleanup has run, so nothing cleared is written back.
     useEffect(() => {
       const was = seen.current;
@@ -324,20 +331,31 @@ export function createUiFeatureShell({
     }, [queryClient, userId, cacheKey, previousCacheKey]);
     // The planned reads are mirrored per user, sealed under the session read's keys. No key, no
     // mirror. Sync runs for any signed-in user: the focus pass revalidates stale mounted reads.
+    // An impersonation reads a customer's data on an operator's device: the disk is wiped and
+    // nothing is mirrored, so none of it outlives the impersonation there.
     useEffect(() => {
       if (!userId) return;
-      return startQueryMirror({
+      const store = queryStore ?? indexedDbQueryStore;
+      if (impersonating) {
+        void lastMirrorLanded.current
+          .then(() => clearPersistedUiQueries({ store }))
+          .catch(() => void 0);
+      }
+      const stop = startQueryMirror({
         queryClient,
         plan: cachePlan,
         userId,
-        cacheKey,
+        cacheKey: impersonating ? void 0 : cacheKey,
         previousCacheKey,
         watch,
-        store: queryStore ?? indexedDbQueryStore,
+        store,
         sessionQueryKey,
         versions,
       });
-    }, [queryClient, userId, cacheKey, previousCacheKey, watch]);
+      return () => {
+        lastMirrorLanded.current = stop();
+      };
+    }, [queryClient, userId, impersonating, cacheKey, previousCacheKey, watch]);
     const resolved = useMemo(
       () =>
         resolveUiHostServices({

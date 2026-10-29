@@ -40,8 +40,8 @@
   "errors": {
     "404": {
       "redirect": false,
-      "title": "That page has moved or been retired",
-      "description": "Search above for what you were looking for, or start from the [introduction](/introduction). If a link on our own site sent you here, [tell us](/support) so we can fix it."
+      "title": "Page not found",
+      "description": "Most moved pages redirect on their own. If one of our own links sent you here, report it and we will fix it."
     }
   },
   "markdown": {
@@ -93,7 +93,8 @@
                 ]
               },
               "integration/cli",
-              "integration/mcp"
+              "integration/mcp",
+              "changelog"
             ]
           },
           {
@@ -359,6 +360,8 @@
           },
           {
             "group": "SDKs",
+            "root": "integration/overview",
+            "expanded": true,
             "pages": [
               {
                 "group": "Python",
@@ -373,7 +376,7 @@
               },
               {
                 "group": "TypeScript",
-                "icon": "square-js",
+                "icon": "typescript",
                 "pages": [
                   "integration/typescript/guide",
                   "integration/typescript/reference",
@@ -386,8 +389,8 @@
                 ]
               },
               {
-                "group": "Go",
-                "icon": "golang",
+                "group": "Go SDK",
+                "icon": "/images/logos/golang.svg",
                 "pages": [
                   "integration/go/guide",
                   "integration/go/reference"
@@ -480,9 +483,12 @@
           },
           {
             "group": "Frameworks",
+            "root": "integration/overview",
+            "expanded": true,
             "pages": [
               {
                 "group": "LangChain",
+                "expanded": true,
                 "pages": [
                   "integration/python/integrations/langchain",
                   "integration/typescript/integrations/langchain"
@@ -490,6 +496,7 @@
               },
               {
                 "group": "LangGraph",
+                "expanded": true,
                 "pages": [
                   "integration/python/integrations/langgraph",
                   "integration/typescript/integrations/langgraph"
@@ -526,10 +533,13 @@
           },
           {
             "group": "Model Providers",
+            "root": "integration/overview",
+            "expanded": true,
             "pages": [
               "integration/custom-models",
               {
                 "group": "OpenAI",
+                "expanded": true,
                 "pages": [
                   "integration/python/integrations/open-ai",
                   "integration/typescript/integrations/open-ai",
@@ -538,6 +548,7 @@
               },
               {
                 "group": "Anthropic (Claude)",
+                "expanded": true,
                 "pages": [
                   "integration/anthropic/claude-platform",
                   "integration/python/integrations/anthropic",
@@ -546,6 +557,7 @@
               },
               {
                 "group": "Microsoft Azure",
+                "expanded": true,
                 "pages": [
                   "integration/python/integrations/azure-ai",
                   "integration/python/integrations/open-ai-azure",
@@ -555,6 +567,7 @@
               },
               {
                 "group": "Google Cloud",
+                "expanded": true,
                 "pages": [
                   "integration/python/integrations/vertex-ai",
                   "integration/go/integrations/google-gemini"
@@ -562,6 +575,7 @@
               },
               {
                 "group": "Amazon Web Services",
+                "expanded": true,
                 "pages": [
                   "integration/python/integrations/aws-bedrock",
                   "integration/go/integrations/amazon-bedrock"
@@ -579,6 +593,7 @@
               },
               {
                 "group": "LiteLLM",
+                "expanded": true,
                 "pages": [
                   "integration/litellm-proxy",
                   "integration/python/integrations/lite-llm"
@@ -588,12 +603,15 @@
           },
           {
             "group": "Tools",
+            "expanded": true,
             "pages": [
               "integration/openclaw"
             ]
           },
           {
             "group": "No-Code Platforms",
+            "root": "integration/overview",
+            "expanded": true,
             "pages": [
               "integration/n8n",
               "integration/langflow",
@@ -602,6 +620,8 @@
           },
           {
             "group": "Direct Integrations",
+            "root": "integration/overview",
+            "expanded": true,
             "pages": [
               "integration/opentelemetry/guide",
               "integration/opentelemetry/multiple-providers",
@@ -634,9 +654,23 @@
               },
               {
                 "group": "TypeScript",
-                "icon": "square-js",
+                "icon": "typescript",
                 "pages": [
                   "ai-gateway/sdks/typescript"
+                ]
+              },
+              {
+                "group": "Go SDK",
+                "icon": "/images/logos/golang.svg",
+                "pages": [
+                  "ai-gateway/sdks/go"
+                ]
+              },
+              {
+                "group": "HTTP and other clients",
+                "icon": "globe",
+                "pages": [
+                  "ai-gateway/sdks/http"
                 ]
               }
             ]
@@ -1088,7 +1122,7 @@
             "group": "Traces",
             "pages": [
               "api-reference/traces/overview",
-              "api-reference/traces/discover-what-the-trace-filter-fields-ho",
+              "api-reference/traces/discover-what-the-trace-filter-fields-hold",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
               "api-reference/traces/get-transcript",
@@ -1105,7 +1139,7 @@
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
               "api-reference/datasets/create-attachments",
-              "api-reference/datasets/create-an-upload-for-an-image-or-file-ce",
+              "api-reference/datasets/create-an-upload-for-an-image-or-file-cell",
               "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-a-dataset-from-an-uploaded-file",
               "api-reference/datasets/create-upload",
@@ -1421,11 +1455,27 @@
             "pages": [
               "api-reference/dashboards/overview",
               "api-reference/dashboards/list-dashboards",
-              "api-reference/dashboards/create-dashboards",
-              "api-reference/dashboards/get-dashboards",
-              "api-reference/dashboards/put-update-reorder-reorder",
-              "api-reference/dashboards/update-dashboards",
-              "api-reference/dashboards/delete-dashboards"
+              "api-reference/dashboards/create-a-dashboard",
+              "api-reference/dashboards/get-a-dashboard",
+              "api-reference/dashboards/list-a-dashboard-s-widgets",
+              "api-reference/dashboards/get-a-widget-on-a-dashboard",
+              "api-reference/dashboards/update-a-dashboard",
+              "api-reference/dashboards/update-a-widget-on-a-dashboard",
+              "api-reference/dashboards/create-a-widget-on-a-dashboard",
+              "api-reference/dashboards/delete-a-dashboard",
+              "api-reference/dashboards/delete-a-widget-on-a-dashboard"
+            ]
+          },
+          {
+            "group": "Reports",
+            "pages": [
+              "api-reference/reports/overview",
+              "api-reference/reports/list-reports",
+              "api-reference/reports/create-reports",
+              "api-reference/reports/get-reports",
+              "api-reference/reports/update-reorder",
+              "api-reference/reports/update-reports",
+              "api-reference/reports/delete-reports"
             ]
           },
           {
@@ -1495,10 +1545,18 @@
               "api-reference/projects/get-project",
               "api-reference/projects/get-api-key",
               "api-reference/projects/list-dashboards-boards",
-              "api-reference/projects/get-a-dashboards-board",
+              "api-reference/projects/get-a-dashboard-boards",
+              "api-reference/projects/list-dashboard-widgets",
+              "api-reference/projects/get-a-dashboard-widget",
+              "api-reference/projects/list-dashboards",
+              "api-reference/projects/get-a-dashboard",
               "api-reference/projects/update-project",
+              "api-reference/projects/update-a-dashboard-widget",
               "api-reference/projects/regenerate-api-key",
-              "api-reference/projects/archive-project"
+              "api-reference/projects/create-a-dashboard-widget",
+              "api-reference/projects/add-a-dashboard-widget-to-a-dashboard",
+              "api-reference/projects/archive-project",
+              "api-reference/projects/delete-a-dashboard-widget"
             ]
           },
           {
@@ -1748,7 +1806,19 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1792948808",
+      "source": "/api-reference/traces/discover-what-the-trace-filter-fields-ho",
+      "destination": "/api-reference/traces/discover-what-the-trace-filter-fields-hold"
+    },
+    {
+      "source": "/api-reference/datasets/create-an-upload-for-an-image-or-file-ce",
+      "destination": "/api-reference/datasets/create-an-upload-for-an-image-or-file-cell"
+    },
+    {
+      "source": "/api-reference/projects/get-a-dashboards-board",
+      "destination": "/api-reference/projects/get-a-dashboard"
+    },
+    {
+      "source": "/ci/cache/busted/1793288524",
       "destination": "/introduction"
     },
     {
@@ -2210,6 +2280,30 @@
     {
       "source": "/better-agents/overview",
       "destination": "/skills/directory"
+    },
+    {
+      "source": "/api-reference/dashboards/create-dashboards",
+      "destination": "/api-reference/reports/create-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/get-dashboards",
+      "destination": "/api-reference/reports/get-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/put-update-reorder-reorder",
+      "destination": "/api-reference/reports/update-reorder"
+    },
+    {
+      "source": "/api-reference/dashboards/update-dashboards",
+      "destination": "/api-reference/reports/update-reports"
+    },
+    {
+      "source": "/api-reference/dashboards/delete-dashboards",
+      "destination": "/api-reference/reports/delete-reports"
+    },
+    {
+      "source": "/api-reference/dashboards",
+      "destination": "/api-reference/reports/overview"
     }
   ]
 }

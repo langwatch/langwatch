@@ -305,6 +305,8 @@ describe.skipIf(!databaseUrl)("the Dashboards v2 split migration", () => {
           createdById: source?.createdById,
           scope: source?.scope,
           organizationId: source?.organizationId,
+          // Unused since sources replaced it; the column stays until its drop lands.
+          excludedOrigins: null,
           createdAt: source?.createdAt,
           updatedAt: source?.updatedAt,
         });

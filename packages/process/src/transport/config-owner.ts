@@ -4,6 +4,7 @@ import { trustedHopRange } from "@langwatch/api/policy";
 import {
   Config,
   ConfigParseError,
+  docsOrigins,
   environmentBooleanSchema,
   type ProcessConfigOf,
 } from "@langwatch/config";
@@ -54,6 +55,8 @@ export const apiOwner = {
         .default(fileURLToPath(new URL("../../../../apps/ui/dist/client", import.meta.url))),
     ),
     assetBase: c.env("LANGWATCH_ASSET_BASE", z.string().optional()),
+    /** `LANGWATCH_DOCS_ORIGINS`, shared with api-key so the mint and CORS agree (ADR-185). */
+    docsOrigins,
   })),
   secrets: {
     instanceAdmin: Secret.load("LANGWATCH_INSTANCE_ADMIN_API_KEY", {

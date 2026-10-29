@@ -10,6 +10,7 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
+  type RunSources,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
@@ -53,8 +54,8 @@ type LangWatchQLExecutionInput = {
   readonly validation: ValidatedLangWatchQL;
   readonly granularity: LangWatchQLGranularityResolution;
   readonly tenantCapability: string;
-  /** The origins the surface leaves out of every view the statement reads. */
-  readonly excludeOrigins: readonly string[];
+  /** The origins a dashboard query counts; every origin when absent. */
+  readonly sources?: RunSources | undefined;
   /** An aggregate's members and where each is read from; absent on a plain project. */
   readonly memberWindows?: readonly LangWatchQLMemberWindow[];
   /** The window the statement follows, which bounds the origin lookup; absent, none does. */
@@ -81,7 +82,7 @@ export class LangWatchQLExecutionService {
     ...run
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
     const { database, views } = this.deps;
-    const { validation, granularity, excludeOrigins, memberWindows } = run;
+    const { validation, granularity, sources, memberWindows } = run;
     const execution = await this.runRestricted(run);
     const hydrationStartedMs = this.deps.stopwatch();
     const answer = await this.deps.extraction.hydrate({
@@ -119,7 +120,7 @@ export class LangWatchQLExecutionService {
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
-        excludeOrigins,
+        sources,
       },
       "LangWatchQL executed",
     );
@@ -148,7 +149,7 @@ export class LangWatchQLExecutionService {
     validation,
     granularity,
     tenantCapability,
-    excludeOrigins,
+    sources,
     memberWindows,
     timeWindow,
   }: Omit<
@@ -166,7 +167,7 @@ export class LangWatchQLExecutionService {
       // unbounded query is capped rather than streamed, and the origins the surface left out.
       sql: scopeLangWatchQL({
         sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: limits.maxRows }),
-        excludeOrigins,
+        sources,
         database,
         views,
         ...(timeWindow ? { timeWindow } : {}),

@@ -1,6 +1,6 @@
 // Classifies one changed path into a PR impact-map category and, for module
 // paths, names the module. First match wins, so order is load-bearing.
-// Used by pr-impact-map.yml; spec: specs/ci/pr-impact-map.feature
+// Used by pr-conventions.yml; spec: specs/ci/pr-impact-map.feature
 
 const MODULE = /^(?:enterprise\/)?modules\/([^/]+)\/(contract|process|browser|client)\//;
 

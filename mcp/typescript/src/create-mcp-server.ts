@@ -28,6 +28,7 @@ import {
   triggerActionSchema,
   validateActionParamsForAction,
 } from "./schemas/triggers.ts";
+import { widgetSourcesInput } from "./schemas/widget-sources.ts";
 import { handleExperimentResults } from "./tools/get-experiment-results.ts";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.ts";
 import { handleExperimentList } from "./tools/list-experiments.ts";
@@ -38,7 +39,7 @@ import { handleUpdateTestSuite } from "./tools/update-test-suite.ts";
 const modelSchema = z
   .string()
   .describe(
-    'Model in "provider/model-name" format, e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-5-20250929"',
+    'Model in "provider/model-name" format, e.g., "openai/gpt-6-luna", "anthropic/claude-sonnet-4-5-20250929"',
   );
 
 /**
@@ -91,6 +92,7 @@ function registerTools(server: McpServer): void {
   registerEvaluatorTools(server);
   registerModelProviderTools(server);
   registerAgentTools(server);
+  registerAnalyticsReportTools(server);
   registerDashboardTools(server);
   registerWorkflowTools(server);
   registerAnnotationTools(server);
@@ -1321,82 +1323,50 @@ function registerAgentTools(server: McpServer): void {
   );
 }
 
-// --- Platform Dashboard Tools (require API key) ---
-function registerDashboardTools(server: McpServer): void {
+// --- Platform Analytics Report Tools (require API key) ---
+function registerAnalyticsReportTools(server: McpServer): void {
   server.tool(
-    "platform_list_dashboards",
-    "List all analytics dashboards in the LangWatch project.",
+    "platform_list_analytics_reports",
+    "List the Analytics Reports in the LangWatch project (/api/v1/analytics/reports). Dashboards, which hold widgets, are listed by list_dashboards.",
     {},
-    withToolLogging("platform_list_dashboards", async () => {
+    withToolLogging("platform_list_analytics_reports", async () => {
       requireApiKey();
-      const { handleListDashboards } = await import("./tools/list-dashboards.ts");
+      const { handleListAnalyticsReports } = await import("./tools/list-analytics-reports.ts");
       return {
-        content: [{ type: "text", text: await handleListDashboards() }],
+        content: [{ type: "text", text: await handleListAnalyticsReports() }],
       };
     }),
   );
 
   server.tool(
-    "platform_get_dashboard",
-    "Get a dashboard by its ID, including its graphs.",
+    "platform_get_analytics_report",
+    "Get an Analytics Report by its ID, including its graphs. A Dashboards dashboard's ID is not found here; read it with get_dashboard.",
     {
-      id: z.string().describe("The dashboard ID"),
+      reportId: z.string().describe("The Analytics Report ID"),
     },
-    withToolLogging("platform_get_dashboard", async (params) => {
+    withToolLogging("platform_get_analytics_report", async (params) => {
       requireApiKey();
-      const { handleGetDashboard } = await import("./tools/get-dashboard.ts");
+      const { handleGetAnalyticsReport } = await import("./tools/get-analytics-report.ts");
       return {
-        content: [{ type: "text", text: await handleGetDashboard(params) }],
+        content: [{ type: "text", text: await handleGetAnalyticsReport(params) }],
       };
     }),
   );
 
   server.tool(
-    "platform_create_dashboard",
-    "Create a new analytics dashboard.",
+    "platform_create_analytics_report",
+    "Create a new Analytics Report.",
     {
-      name: z.string().describe("Dashboard name"),
+      name: z.string().describe("Analytics Report name"),
     },
-    withToolLogging("platform_create_dashboard", async (params) => {
+    withToolLogging("platform_create_analytics_report", async (params) => {
       requireApiKey();
-      const { handleCreateDashboard } = await import("./tools/create-dashboard.ts");
-      return {
-        content: [{ type: "text", text: await handleCreateDashboard(params) }],
-      };
-    }),
-  );
-
-  server.tool(
-    "platform_delete_dashboard",
-    "Delete a dashboard and all its graphs.",
-    {
-      id: z.string().describe("The dashboard ID to delete"),
-    },
-    withToolLogging("platform_delete_dashboard", async (params) => {
-      requireApiKey();
-      const { handleDeleteDashboard } = await import("./tools/delete-dashboard.ts");
-      return {
-        content: [{ type: "text", text: await handleDeleteDashboard(params) }],
-      };
-    }),
-  );
-
-  server.tool(
-    "platform_rename_dashboard",
-    "Rename a dashboard.",
-    {
-      id: z.string().describe("The dashboard ID to rename"),
-      name: z.string().describe("The new name for the dashboard"),
-    },
-    withToolLogging("platform_rename_dashboard", async (params) => {
-      requireApiKey();
-      const { renameDashboard } = await import("./langwatch-api-dashboards.ts");
-      const result = await renameDashboard(params.id, { name: params.name });
+      const { handleCreateAnalyticsReport } = await import("./tools/create-analytics-report.ts");
       return {
         content: [
           {
             type: "text",
-            text: `Dashboard "${result.name}" renamed successfully (ID: ${result.id}).`,
+            text: await handleCreateAnalyticsReport(params),
           },
         ],
       };
@@ -1404,14 +1374,59 @@ function registerDashboardTools(server: McpServer): void {
   );
 
   server.tool(
-    "list_dashboard_boards",
-    "Lists the project's boards in the Dashboards area, with each one's ID and widget count. Use an ID from here as the dashboardId of add_dashboard_widget and update_dashboard_widget; the analytics dashboards platform_list_dashboards lists hold no widgets.",
-    {},
-    withToolLogging("list_dashboard_boards", async () => {
+    "platform_delete_analytics_report",
+    "Delete an Analytics Report and all its graphs.",
+    {
+      reportId: z.string().describe("The Analytics Report ID to delete"),
+    },
+    withToolLogging("platform_delete_analytics_report", async (params) => {
       requireApiKey();
-      const { handleListDashboardBoards } = await import("./tools/list-dashboard-boards.js");
+      const { handleDeleteAnalyticsReport } = await import("./tools/delete-analytics-report.ts");
       return {
-        content: [{ type: "text", text: await handleListDashboardBoards() }],
+        content: [
+          {
+            type: "text",
+            text: await handleDeleteAnalyticsReport(params),
+          },
+        ],
+      };
+    }),
+  );
+
+  server.tool(
+    "platform_rename_analytics_report",
+    "Rename an Analytics Report.",
+    {
+      reportId: z.string().describe("The Analytics Report ID to rename"),
+      name: z.string().describe("The new name for the Analytics Report"),
+    },
+    withToolLogging("platform_rename_analytics_report", async (params) => {
+      requireApiKey();
+      const { renameAnalyticsReport } = await import("./langwatch-api-analytics-reports.ts");
+      const result = await renameAnalyticsReport({ reportId: params.reportId, name: params.name });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Analytics Report "${result.name}" renamed successfully (ID: ${result.id}).`,
+          },
+        ],
+      };
+    }),
+  );
+}
+
+// --- Dashboard Tools (require API key) ---
+function registerDashboardTools(server: McpServer): void {
+  server.tool(
+    "list_dashboards",
+    "Lists the project's dashboards in the Dashboards area, with each one's ID and widget count. Use an ID from here as the dashboardId of add_dashboard_widget and update_dashboard_widget; the Analytics Reports platform_list_analytics_reports lists hold no widgets.",
+    {},
+    withToolLogging("list_dashboards", async () => {
+      requireApiKey();
+      const { handleListDashboards } = await import("./tools/list-dashboards.js");
+      return {
+        content: [{ type: "text", text: await handleListDashboards() }],
       };
     }),
   );
@@ -1422,7 +1437,7 @@ function registerDashboardTools(server: McpServer): void {
     {
       dashboardId: z
         .string()
-        .describe("The Dashboards board to add the widget to, as list_dashboard_boards lists it"),
+        .describe("The dashboard to add the widget to, as list_dashboards lists it"),
       name: z.string().describe("The widget's display name"),
       code: z
         .string()
@@ -1444,6 +1459,7 @@ function registerDashboardTools(server: McpServer): void {
         .describe(
           "The widget's named LangWatchQL queries: either {name: sql} or an array of {name, sql}. Max 8. Validate each statement with run_query first.",
         ),
+      sources: widgetSourcesInput,
     },
     withToolLogging("add_dashboard_widget", async (params) => {
       requireApiKey();
@@ -1456,7 +1472,7 @@ function registerDashboardTools(server: McpServer): void {
 
   server.tool(
     "update_dashboard_widget",
-    "Changes one custom widget on a dashboard: its name, its TSX `code`, its named LangWatchQL `queries` or its `description`. Pass only the fields to change; every field left out keeps its stored value. Validate any new query's SQL with run_query first. Returns the updated widget.",
+    "Changes one custom widget on a dashboard: its name, its TSX `code`, its named LangWatchQL `queries`, its `description` or the `sources` its queries count. Pass only the fields to change; every field left out keeps its stored value. Validate any new query's SQL with run_query first. Returns the updated widget.",
     {
       dashboardId: z.string().describe("The dashboard the widget is on"),
       widgetId: z.string().describe("The widget to change, as add_dashboard_widget returned it"),
@@ -1487,6 +1503,7 @@ function registerDashboardTools(server: McpServer): void {
         .string()
         .optional()
         .describe("What the widget's info tip says: a sentence or two"),
+      sources: widgetSourcesInput,
     },
     withToolLogging("update_dashboard_widget", async (params) => {
       requireApiKey();
@@ -1494,6 +1511,87 @@ function registerDashboardTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleUpdateDashboardWidget(params) }],
       };
+    }),
+  );
+
+  registerDashboardCrudTools(server);
+}
+
+/** Dashboard CRUD and a dashboard's widgets, over `/api/v1/dashboards`. */
+function registerDashboardCrudTools(server: McpServer): void {
+  const dashboardId = z.string().describe("The dashboard's ID, as list_dashboards lists it");
+  const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
+
+  server.tool(
+    "get_dashboard",
+    "Reads one dashboard in the Dashboards area: its name, scope, description and address. An Analytics Report's ID is not found here; read it with platform_get_analytics_report.",
+    { dashboardId },
+    withToolLogging("get_dashboard", async (params) => {
+      requireApiKey();
+      const { handleGetDashboard } = await import("./tools/dashboards.js");
+      return text(await handleGetDashboard(params));
+    }),
+  );
+
+  server.tool(
+    "create_dashboard",
+    "Creates an empty dashboard in the Dashboards area. Add widgets to it with add_dashboard_widget.",
+    { name: z.string().describe("The dashboard's name") },
+    withToolLogging("create_dashboard", async (params) => {
+      requireApiKey();
+      const { handleCreateDashboard } = await import("./tools/dashboards.js");
+      return text(await handleCreateDashboard(params));
+    }),
+  );
+
+  server.tool(
+    "rename_dashboard",
+    "Changes a dashboard's name and/or description; a field left out keeps its value.",
+    {
+      dashboardId,
+      name: z.string().optional().describe("The dashboard's new name"),
+      description: z.string().optional().describe("The dashboard's new description"),
+    },
+    withToolLogging("rename_dashboard", async (params) => {
+      requireApiKey();
+      const { handleRenameDashboard } = await import("./tools/dashboards.js");
+      return text(await handleRenameDashboard(params));
+    }),
+  );
+
+  server.tool(
+    "delete_dashboard",
+    "Deletes a dashboard together with the widgets on it. This cannot be undone.",
+    { dashboardId },
+    withToolLogging("delete_dashboard", async (params) => {
+      requireApiKey();
+      const { handleDeleteDashboard } = await import("./tools/dashboards.js");
+      return text(await handleDeleteDashboard(params));
+    }),
+  );
+
+  server.tool(
+    "list_dashboard_widgets",
+    "Lists the custom widgets on one dashboard, with each widget's ID and query names.",
+    { dashboardId },
+    withToolLogging("list_dashboard_widgets", async (params) => {
+      requireApiKey();
+      const { handleListDashboardWidgets } = await import("./tools/dashboards.js");
+      return text(await handleListDashboardWidgets(params));
+    }),
+  );
+
+  server.tool(
+    "delete_dashboard_widget",
+    "Deletes one custom widget from a dashboard. A widget on another dashboard is not found.",
+    {
+      dashboardId,
+      widgetId: z.string().describe("The widget's ID, as list_dashboard_widgets lists it"),
+    },
+    withToolLogging("delete_dashboard_widget", async (params) => {
+      requireApiKey();
+      const { handleDeleteDashboardWidget } = await import("./tools/dashboards.js");
+      return text(await handleDeleteDashboardWidget(params));
     }),
   );
 }
@@ -2026,6 +2124,15 @@ function registerExperimentTools(server: McpServer): void {
     "Start an experiment run by slug. Returns a run ID for polling status.",
     {
       slug: z.string().describe("The experiment slug to run"),
+      concurrency: z
+        .number()
+        .int()
+        .min(1)
+        .max(24)
+        .optional()
+        .describe(
+          "Cells (one row against one target) to run at once, for this run only (default: the server's setting). Use 1 to run them one at a time, in order.",
+        ),
     },
     withToolLogging("platform_run_experiment", async (params) => {
       requireApiKey();

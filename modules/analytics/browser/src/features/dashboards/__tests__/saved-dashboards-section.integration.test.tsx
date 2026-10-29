@@ -239,7 +239,7 @@ describe("the Dashboards sidebar", () => {
         "true",
       );
       expect(FROM_LANGWATCH_ABOUT).toBe(
-        "Boards LangWatch made for you. They are read-only and improve over time. " +
+        "Dashboards LangWatch made for you. They are read-only and improve over time. " +
           "Duplicate one to make a copy you can edit.",
       );
     });
@@ -369,6 +369,31 @@ describe("the Dashboards sidebar", () => {
           {
             projectId: "proj-1",
             stars: [
+              { kind: "template", templateId: "release" },
+              { kind: "board", dashboardId: "board-2" },
+            ],
+          },
+        ]),
+      );
+    });
+
+    /** @scenario "AC155b Stars the section does not show keep their place in the star order" */
+    it("keeps a hidden My dashboard first in the saved order when a shown star moves", async () => {
+      const { user, calls } = renderSection({
+        stars: [{ kind: "board", dashboard: MINE }, ...STARS],
+      });
+      const starred = within(await listNamed("Starred dashboards"));
+      expect(await namesIn("Starred dashboards")).toEqual(["Latency", "Release check"]);
+
+      await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move Release check up" }));
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.reorderStars")).toEqual([
+          {
+            projectId: "proj-1",
+            stars: [
+              { kind: "board", dashboardId: "board-mine" },
               { kind: "template", templateId: "release" },
               { kind: "board", dashboardId: "board-2" },
             ],

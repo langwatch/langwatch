@@ -37,7 +37,7 @@ def generate_answer_from_context(contexts: list[str], user_query: str):
     response = f"Based on the context, the answer to '{user_query}' is..."
     # You can update the LLM span with model details, token counts, etc.
     langwatch.get_current_span().update(
-        model="gpt-5",
+        model="gpt-6-luna",
         prompt=f"Contexts: {contexts}\nQuery: {user_query}",
         completion=response
     )
@@ -150,7 +150,8 @@ langwatch_retriever_tool = create_retriever_tool(
 
 # 4. Use the wrapped retriever in your agent/chain
 tools = [langwatch_retriever_tool]
-model = ChatOpenAI(model="gpt-5", streaming=True)
+# gpt-6 models only accept function tools on Chat Completions with reasoning off
+model = ChatOpenAI(model="gpt-6-luna", reasoning_effort="none", streaming=True)
 prompt = ChatPromptTemplate.from_messages(
     [
         ("system", "You are a helpful assistant. Answer questions based on the retrieved context.\n{agent_scratchpad}"),
@@ -173,7 +174,7 @@ def run_langchain_rag(user_input: str):
         ),
     )
 
-    output = response.get("output", "No output found.")=
+    output = response.get("output", "No output found.")
     return output
 
 if __name__ == "__main__":

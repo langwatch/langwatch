@@ -6,13 +6,21 @@ name: gateway-matrix
 # run (31 cells: 5 canonical scenarios — simple, streamed,
 # tool_calling, structured_outputs, cache — across OpenAI/Anthropic/
 # Gemini/Bedrock/Azure/Vertex on cheap models, plus 1 OpenAI-only
-# streamed-auto-include-usage regression cell). Fires on gateway-
-# touching PRs (path-filtered, drafts skip, concurrency-locked
-# against shared matrix VKs to prevent double-spend on parallel
-# runs — ~$0.07/run × N gateway-touching PRs/day), the nightly
-# cron, and manual workflow_dispatch. Non-gateway PRs and fork PRs
-# (secrets stripped on forks by GitHub) fall back to the unit-test
-# layer that mocks providers at the bifrost adapter boundary.
+# streamed-auto-include-usage regression cell), plus the embeddings
+# and audio cells; image cells (live_images) run only when a dispatch
+# names them. Fires on gateway-touching PRs (path-filtered,
+# drafts skip, concurrency-locked so parallel runs don't stack spend
+# on the shared provider accounts — ~$0.07/run × N gateway-touching
+# PRs/day), the nightly cron, and manual workflow_dispatch. Non-gateway
+# PRs and fork PRs (secrets stripped on forks by GitHub) fall back to
+# the unit-test layer that mocks providers at the bifrost adapter
+# boundary.
+#
+# Every run seeds the stack it boots (cmd/matrixseed, spec
+# specs/ci/gateway-matrix-seed.feature): an organization and project
+# through the instance administrator API, then one model provider and
+# one virtual key per provider whose credentials this job holds. A
+# provider without credentials gets no key, so its cells skip.
 #
 # Touches needing this matrix:
 #   - services/aigateway/**          (gateway data plane)
@@ -32,7 +40,7 @@ on:
   workflow_dispatch:
     inputs:
       providers:
-        description: "Build tags (space-separated). Default = all six."
+        description: "Build tags (space-separated). Default = every live tag except live_images."
         type: string
         default: "live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio"
       run_id_label:
@@ -51,6 +59,7 @@ on:
       - "services/aigateway/**"
       - "pkg/**"
       - "cmd/**"
+      - "tools/matrixseed/**"
       - "*/go.mod"
       - "*/go.sum"
       - "modules/gateway/**"
@@ -65,8 +74,9 @@ permissions:
   pull-requests: read
 
 concurrency:
-  # Serialize runs against the shared matrix-* VKs and budgets so
-  # parallel invocations don't double-count spend on the same key.
+  # Serialize runs so parallel invocations don't stack spend and rate
+  # limits on the shared provider accounts. Each run mints its own
+  # virtual keys against its own database, so no key is shared.
   #
   # Only a run that dials providers needs that lock, so this group
   # lists exactly the same four exemptions as the job guard below and
@@ -144,35 +154,13 @@ jobs:
       VERTEX_PROJECT: langwatch
       VERTEX_LOCATION: us-central1
       VERTEX_ACCESS_TOKEN: ${{ secrets.MATRIX_VERTEX_ACCESS_TOKEN }}
-      # Gateway / control-plane shared secrets.
-      LW_GATEWAY_INTERNAL_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_INTERNAL_SECRET }}
-      LW_GATEWAY_JWT_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_JWT_SECRET }}
-      LW_VIRTUAL_KEY_PEPPER: ${{ secrets.MATRIX_LW_VIRTUAL_KEY_PEPPER }}
-      # VK secrets minted by the governance dogfood seed (not yet ported to
-      # this tree)
-      # against the long-lived matrix project — capture the script's
-      # final block once + paste into GH org secrets, not regenerate
-      # per-run (the seed mints fresh VKs only on first invocation per
-      # name; re-runs return "<existing; not re-emitted>" by design).
-      TEST_VK_OPENAI: ${{ secrets.MATRIX_TEST_VK_OPENAI }}
-      TEST_VK_ANTHROPIC: ${{ secrets.MATRIX_TEST_VK_ANTHROPIC }}
-      TEST_VK_GEMINI: ${{ secrets.MATRIX_TEST_VK_GEMINI }}
-      TEST_VK_BEDROCK: ${{ secrets.MATRIX_TEST_VK_BEDROCK }}
-      TEST_VK_AZURE: ${{ secrets.MATRIX_TEST_VK_AZURE }}
-      TEST_VK_VERTEX: ${{ secrets.MATRIX_TEST_VK_VERTEX }}
-      # Voyage VK + API key — used by the live_embeddings matrix once
-      # the Voyage direct-HTTP gateway adapter ships (Bifrost has no
-      # Voyage ModelProvider enum). The embeddings_test.go cell skips
-      # when VOYAGE_ENABLED is unset so this stays inert until then.
-      TEST_VK_VOYAGE: ${{ secrets.MATRIX_TEST_VK_VOYAGE }}
       VOYAGE_API_KEY: ${{ secrets.MATRIX_VOYAGE_API_KEY }}
-      # Audio cells (live_audio): ElevenLabs VK + a voice id for TTS. The
-      # audio_test.go cells t.Skip when unset, so this stays inert until
-      # the secrets are provisioned (by the audio VK seed, not yet ported to
-      # this tree).
-      TEST_VK_ELEVENLABS: ${{ secrets.MATRIX_TEST_VK_ELEVENLABS }}
+      # The ElevenLabs cells also need a voice id for text to speech; they
+      # skip without one.
       ELEVENLABS_VOICE_ID: ${{ secrets.MATRIX_ELEVENLABS_VOICE_ID }}
-      LW_PROJECT_API_KEY: ${{ secrets.MATRIX_LW_PROJECT_API_KEY }}
+      # The gateway/control-plane shared secrets, the instance administrator
+      # key, TEST_VK_* and LW_PROJECT_API_KEY are not set here: the steps
+      # below generate or mint them per run and export them to $GITHUB_ENV.
 
     services:
       postgres:
@@ -208,17 +196,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Bedrock cells. Both steps export the session into the job environment,
-      # which the gateway started below inherits. The gateway signs a Bedrock
-      # call with the virtual key's own access key when its credential carries
-      # one, and falls back to the AWS default credential chain (these
-      # variables) when it carries none, so the session only reaches Bedrock
-      # once TEST_VK_BEDROCK's credential is keyless. The role trusts this
-      # workflow on pull requests and on main, and can only invoke models.
-      # Setting the MATRIX_AWS_ROLE_ARN repository variable switches to it;
-      # the stored-key step goes after.
+      # The Bedrock cells sign with this OIDC session (exported into the job
+      # environment the gateway inherits); the seed stores Bedrock keyless and
+      # skips it with no session. The role, named by MATRIX_AWS_ROLE_ARN, trusts
+      # this workflow on pull requests and main and can only invoke models.
       - name: Configure AWS credentials (OIDC)
-        if: ${{ vars.MATRIX_AWS_ROLE_ARN != '' }}
         # A refused assumption fails only the Bedrock cells, not the matrix.
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
@@ -228,17 +210,6 @@ jobs:
           role-session-name: gateway-matrix-${{ github.run_id }}
           # The job runs for up to 30 minutes; leave headroom.
           role-duration-seconds: 3600
-
-      - name: Configure AWS credentials (stored key, until MATRIX_AWS_ROLE_ARN is set)
-        if: ${{ vars.MATRIX_AWS_ROLE_ARN == '' }}
-        # Before this step existed a missing key only failed the Bedrock
-        # cells; keep it that way rather than failing the whole matrix.
-        continue-on-error: true
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
-        with:
-          aws-region: eu-central-1
-          aws-access-key-id: ${{ secrets.MATRIX_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.MATRIX_AWS_SECRET_ACCESS_KEY }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -263,10 +234,20 @@ jobs:
       - name: Install Goose migration tool
         run: bash .github/scripts/install-goose.sh
 
-      - name: Generate a throwaway CREDENTIALS_SECRET
-        # The api refuses to boot without a 32-byte hex encryption key.
-        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
-        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - name: Generate the per-run stack secrets
+        # The api refuses to boot without a 32-byte hex encryption key, and the
+        # gateway and control plane must share the internal secret, JWT secret
+        # and virtual-key pepper. The instance administrator key is the seed's
+        # first credential. The database is empty on every run, so nothing
+        # needs these to outlive it. Generated per run: a committed hex
+        # literal reads as a leaked key to the scanner.
+        run: |
+          for name in CREDENTIALS_SECRET LW_GATEWAY_INTERNAL_SECRET LW_GATEWAY_JWT_SECRET \
+            LW_VIRTUAL_KEY_PEPPER LANGWATCH_INSTANCE_ADMIN_API_KEY; do
+            value=$(openssl rand -hex 32)
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
 
       - name: Apply DB migrations
         working-directory: apps/tasks
@@ -291,7 +272,57 @@ jobs:
             sleep 2
           done
 
+      # The gateway's traces reach ClickHouse through the event-sourcing
+      # pipeline the worker drains: without it every cell's cost readback
+      # waits out its budget.
+      - name: Start worker (background)
+        working-directory: apps/worker
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
+          REDIS_URL: redis://localhost:6379
+          CLICKHOUSE_HOST: http://localhost:8123
+          # The api's voice listener holds the default port; the worker needs none.
+          VOICE_TUNNEL: "false"
+          VOICE_WS_PORT: "0"
+          WORKER_METRICS_PORT: "2999"
+        # The seed's organization create waits on a grant projection the worker
+        # folds, so the worker must answer /readyz before the seed runs.
+        run: |
+          set -euo pipefail
+          pnpm start > /tmp/langwatch-worker.log 2>&1 &
+          echo $! > /tmp/langwatch-worker.pid
+          for attempt in $(seq 1 60); do
+            if ! kill -0 "$(cat /tmp/langwatch-worker.pid)" 2> /dev/null; then
+              echo "::error title=gateway-matrix::the worker exited before it was ready"
+              tail -n 200 /tmp/langwatch-worker.log
+              exit 1
+            fi
+            if curl -fsS -o /dev/null http://127.0.0.1:2999/readyz; then
+              echo "worker ready after ${attempt} probes"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error title=gateway-matrix::the worker never answered /readyz"
+          tail -n 200 /tmp/langwatch-worker.log
+          exit 1
+
+      # Mints LW_PROJECT_API_KEY and one TEST_VK_<PROVIDER> per provider with
+      # credentials into $GITHUB_ENV. Bedrock's model provider carries only
+      # the region, so the gateway signs with the session the AWS step above
+      # exported. A control-plane refusal fails this step after the other
+      # providers are seeded, and the matrix still runs on those.
+      - name: Seed the matrix project and virtual keys
+        id: seed
+        env:
+          VERTEX_SERVICE_ACCOUNT_JSON: ${{ secrets.MATRIX_VERTEX_SERVICE_ACCOUNT_JSON }}
+          ELEVENLABS_API_KEY: ${{ secrets.MATRIX_ELEVENLABS_API_KEY }}
+        run: go run ./cmd/matrixseed -base-url "$LW_BASE_URL"
+
+      # The matrix also runs after a seed refusal, on the providers that were
+      # seeded, so the gateway must start then too.
       - name: Start gateway (background)
+        if: ${{ success() || steps.seed.outcome == 'failure' }}
         run: |
           go build -o /tmp/aigateway ./cmd/service
           /tmp/aigateway aigateway > /tmp/aigateway.log 2>&1 &
@@ -302,6 +333,7 @@ jobs:
           done
 
       - name: Run provider matrix
+        if: ${{ success() || steps.seed.outcome == 'failure' }}
         working-directory: services/aigateway
         env:
           # Force-include all configured tags so a partial-creds run
@@ -309,7 +341,10 @@ jobs:
           # cell t.Skips with a clear reason instead of silently
           # being absent from the report.
           MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio' }}
+        # pipefail: without it the step takes tee's status and a failing cell
+        # leaves the job green.
         run: |
+          set -o pipefail
           go test -tags="$MATRIX_TAGS" -v -count=1 -timeout 1200s \
             ./tests/matrix/... 2>&1 | tee /tmp/matrix.log
 
@@ -331,6 +366,7 @@ jobs:
         run: |
           [ -f /tmp/aigateway.pid ] && kill $(cat /tmp/aigateway.pid) || true
           [ -f /tmp/langwatch.pid ] && kill $(cat /tmp/langwatch.pid) || true
+          [ -f /tmp/langwatch-worker.pid ] && kill "$(cat /tmp/langwatch-worker.pid)" || true
 
       - name: Upload logs on failure
         if: failure()
@@ -341,4 +377,5 @@ jobs:
             /tmp/matrix.log
             /tmp/aigateway.log
             /tmp/langwatch-dev.log
+            /tmp/langwatch-worker.log
           retention-days: 7

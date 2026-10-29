@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Tuple
 
 import httpx
 
-from langwatch.dashboards import DashboardsFacade
+from langwatch.analytics_reports import AnalyticsReportsFacade
 
 SDK_SRC = Path(__file__).resolve().parents[1] / "src" / "langwatch"
 GENERATED = SDK_SRC / "generated"
@@ -127,11 +127,11 @@ def test_generated_client_request_urls_are_v1_form() -> None:
 
 
 # @scenario "A dashboard read goes out at the canonical address"
-def test_dashboard_list_requests_the_canonical_address() -> None:
+def test_analytics_report_list_requests_the_canonical_address() -> None:
     calls: List[Tuple[str, str]] = []
-    facade = DashboardsFacade(FakeRestClient(calls))  # type: ignore[arg-type]
+    facade = AnalyticsReportsFacade(FakeRestClient(calls))  # type: ignore[arg-type]
 
     result: Dict[str, Any] = facade.list()
 
     assert result == {"dashboards": []}
-    assert calls == [("GET", "/api/v1/dashboards")]
+    assert calls == [("GET", "/api/v1/analytics/reports")]

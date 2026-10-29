@@ -37,7 +37,7 @@ const tracer = getLangWatchTracer("rag-example");
 async function generateAnswerFromContext(contexts: string[], userQuery: string): Promise<string> {
   return await tracer.withActiveSpan("GenerateAnswerFromContext", async (span) => {
     span.setType("llm");
-    span.setRequestModel("gpt-5-mini");
+    span.setRequestModel("gpt-6-luna");
 
     // Simulate LLM call using the contexts
     await new Promise(resolve => setTimeout(resolve, 500));

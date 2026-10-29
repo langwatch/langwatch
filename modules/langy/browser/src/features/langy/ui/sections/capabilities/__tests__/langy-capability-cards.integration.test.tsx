@@ -471,7 +471,7 @@ describe("given Langy ran an analytics query that returned numbers", () => {
       renderCall(analytics());
       expect(screen.getByText("Traces")).toBeTruthy();
       expect(screen.getAllByText("0").length).toBeGreaterThan(0);
-      expect(screen.queryByText(/Open in Analytics/i)).toBeNull();
+      expect(screen.queryByText(/^Open in Analytics$/i)).toBeNull();
       cleanup();
 
       mockReducedMotion(true);

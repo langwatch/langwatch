@@ -46,7 +46,7 @@ function LentList({ openPath }: SavedDashboardsProps) {
   return <div data-testid="saved-dashboards">Saved dashboards open:{openPath || "none"}</div>;
 }
 
-/** Stands in for analytics' lent starred group, which draws itself only when stars exist. */
+/** Stands in for analytics' lent Dashboards section, which decides itself what it draws. */
 function LentStarred() {
   return <div data-testid="starred-dashboards">Starred dashboards</div>;
 }
@@ -80,26 +80,31 @@ function renderSidebar({
   surface,
   pathname,
   permissions = ["analytics:view"],
+  dashboardsFlag = true,
+  dashboardsLoading = false,
+  organizationLoading = false,
+  kind,
   insightsOn = false,
-  dashboardsOn = true,
-  project = PROJECT,
 }: {
-  surface: "llm-ops" | "dashboards" | "gateway" | "me" | "settings" | "admin";
+  surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings" | "admin";
   pathname: string;
   permissions?: string[];
+  dashboardsFlag?: boolean;
+  dashboardsLoading?: boolean;
+  organizationLoading?: boolean;
+  kind?: string;
   insightsOn?: boolean;
-  dashboardsOn?: boolean;
-  project?: NavigationProject;
 }) {
   declarations.current = analyticsLends;
   return renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
-        project,
+        project: kind ? { ...PROJECT, kind } : PROJECT,
         pathname,
         permissions,
+        isLoading: organizationLoading,
         flags: {
-          release_dashboards: { enabled: dashboardsOn, isLoading: false },
+          release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading },
           release_insights: { enabled: insightsOn, isLoading: false },
         },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
@@ -247,7 +252,7 @@ describe("the Insights entry", () => {
         surface: "llm-ops",
         pathname: "/demo",
         insightsOn: true,
-        dashboardsOn: false,
+        dashboardsFlag: false,
       });
 
       await screen.findByRole("button", { name: "Quick Search" });
@@ -277,7 +282,7 @@ describe("the Insights entry", () => {
         surface: "dashboards",
         pathname: "/demo/dashboards",
         insightsOn: true,
-        project: { ...PROJECT, kind: "aggregate" },
+        kind: "aggregate",
       });
 
       await screen.findByTestId("saved-dashboards");
@@ -296,12 +301,96 @@ describe("the LLM Ops sidebar", () => {
       expect(screen.queryByTestId("saved-dashboards")).toBeNull();
     });
   });
+
+  describe("given the Analytics entry", () => {
+    /** @scenario "AC3b The Analytics entry opens Dashboards when the project can reach them" */
+    it("opens Dashboards with no pill when Dashboards is reachable", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo" });
+
+      const link = screen.getByRole("link", { name: "Analytics" });
+      expect(link).toHaveAttribute("href", "/demo/dashboards");
+      expect(within(link).queryByText("Legacy")).toBeNull();
+    });
+
+    /** @scenario "AC3k The Analytics entry waits for the Dashboards answer" */
+    it("shows no Analytics entry while the flag is still loading", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", dashboardsLoading: true });
+
+      expect(screen.queryByRole("link", { name: "Analytics" })).toBeNull();
+    });
+
+    /** @scenario "AC3p The Analytics entry waits for the permission read as well" */
+    it("shows no Analytics entry while the grant is still being read", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", organizationLoading: true });
+
+      expect(screen.queryByRole("link", { name: "Analytics" })).toBeNull();
+    });
+
+    /** @scenario "AC3p The Analytics entry waits for the permission read as well" */
+    it("never shows the analytics address on a project switch before the grant settles", () => {
+      const view = renderSidebar({
+        surface: "llm-ops",
+        pathname: "/demo",
+        permissions: [],
+        organizationLoading: true,
+      });
+      const seen = () =>
+        screen.queryByRole("link", { name: "Analytics" })?.getAttribute("href") ?? null;
+      expect(seen()).toBeNull();
+
+      view.unmount();
+      renderSidebar({ surface: "llm-ops", pathname: "/demo" });
+      expect(seen()).toBe("/demo/dashboards");
+    });
+
+    /** @scenario "AC3q An aggregate project keeps the Analytics entry on analytics" */
+    it("keeps an aggregate project on analytics even when Dashboards is reachable", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo/analytics", kind: "aggregate" });
+
+      const link = screen.getByRole("link", { name: "Analytics" });
+      expect(link).toHaveAttribute("href", "/demo/analytics");
+      expect(link).toHaveAttribute("aria-current", "page");
+    });
+
+    /** @scenario "AC3m The Analytics entry is not marked active on a legacy analytics page when it leads to Dashboards" */
+    it("is not marked active on a legacy analytics page when it leads to Dashboards", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo/analytics" });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).not.toHaveAttribute("aria-current");
+    });
+
+    /** @scenario "AC3n The Analytics entry is marked active on a legacy analytics page when it leads to analytics" */
+    it("is marked active on a legacy analytics page when it leads to analytics", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo/analytics", dashboardsFlag: false });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+
+    /** @scenario "AC3h The Analytics entry opens analytics when Dashboards is out of reach" */
+    it("opens analytics with no pill when Dashboards is not reachable", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", dashboardsFlag: false });
+
+      const link = screen.getByRole("link", { name: "Analytics" });
+      expect(link).toHaveAttribute("href", "/demo/analytics");
+      expect(within(link).queryByText("Legacy")).toBeNull();
+    });
+  });
 });
 
-describe("the starred dashboards group", () => {
+/** The lent section loads asynchronously, so its absence is only proven after a wait. */
+async function expectNoSection() {
+  await expect(screen.findByTestId("starred-dashboards", {}, { timeout: 300 })).rejects.toThrow(
+    "Unable to find an element",
+  );
+}
+
+describe("the Dashboards section analytics lends", () => {
   describe("given a member who can reach Dashboards, in LLM Ops", () => {
-    /** @scenario "Starred dashboards show in the other products' sidebars" */
-    it("draws analytics' starred group under the product's own pages", async () => {
+    /** @scenario "The LLM Ops sidebar has a Dashboards section listing the pinned dashboards" */
+    it("draws analytics' section under the product's own pages", async () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo" });
 
       expect(await screen.findByTestId("starred-dashboards")).toBeInTheDocument();
@@ -309,32 +398,35 @@ describe("the starred dashboards group", () => {
     });
   });
 
-  describe("given the Gateway sidebar", () => {
-    /** @scenario "Starred dashboards show in the other products' sidebars" */
-    it("draws the starred group there too", async () => {
-      renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
+  describe("given the same member, in Gateway, Governance or Me", () => {
+    /** @scenario "Only the LLM Ops sidebar shows the Dashboards section" */
+    it.each([
+      { surface: "gateway", pathname: "/gateway/virtual-keys" },
+      { surface: "governance", pathname: "/governance" },
+      { surface: "me", pathname: "/me" },
+    ] as const)("draws no section in $surface", async ({ surface, pathname }) => {
+      renderSidebar({ surface, pathname });
 
-      expect(await screen.findByTestId("starred-dashboards")).toBeInTheDocument();
+      await expectNoSection();
     });
   });
 
-  describe("given the Dashboards sidebar", () => {
-    /** @scenario "Starred dashboards show in the other products' sidebars" */
-    it("leaves the stars to the saved-dashboards list", async () => {
+  describe("given the same member, in Dashboards", () => {
+    /** @scenario "Only the LLM Ops sidebar shows the Dashboards section" */
+    it("leaves the boards to the saved-dashboards list", async () => {
       renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
 
-      await screen.findByTestId("saved-dashboards");
-      expect(screen.queryByTestId("starred-dashboards")).toBeNull();
+      expect(await screen.findByTestId("saved-dashboards")).toBeInTheDocument();
+      await expectNoSection();
     });
   });
 
-  describe("given a member who cannot reach Dashboards", () => {
-    /** @scenario "Starred dashboards show in the other products' sidebars" */
-    it("draws no starred group", async () => {
+  describe("given a member who cannot reach Dashboards, in LLM Ops", () => {
+    /** @scenario "The LLM Ops sidebar has a Dashboards section listing the pinned dashboards" */
+    it("draws no section", async () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo", permissions: [] });
 
-      await screen.findByRole("button", { name: "Quick Search" });
-      expect(screen.queryByTestId("starred-dashboards")).toBeNull();
+      await expectNoSection();
     });
   });
 });

@@ -13,7 +13,7 @@ Projects: finding them, their summaries and paths, and the departments they are 
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
 | Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:294` (53 operations) |
 | Other token    | `ProjectManagementApi`, `process/src/transport/project.rest.ts:87`                                     |
-| Other token    | `ProjectBrowserApi`, `process/src/transport/project.trpc.ts:69`                                        |
+| Other token    | `ProjectBrowserApi`, `process/src/transport/project.trpc.ts:76`                                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |
 
 ## What project owns
@@ -21,7 +21,7 @@ Projects: finding them, their summaries and paths, and the departments they are 
 | Kind            | Name               | Declared at                                                                        |
 | --------------- | ------------------ | ---------------------------------------------------------------------------------- |
 | Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.project-storage-settings.repository.ts:14` |
-| Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.project.repository.ts:52`                  |
+| Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.project.repository.ts:58`                  |
 | Stores required | prisma, encryption | `process/src/repositories/prisma/prisma.project.repositories.ts:13`                |
 
 Anything else project needs belongs to another module and is reached through its `*Api`.
