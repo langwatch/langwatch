@@ -251,18 +251,18 @@ function withholdInternalSignInError({
   });
   if (redirect.kind === "pass") return response;
   if (redirect.kind === "provider_refused") {
-    // An expected, tenant-side refusal (e.g. Entra "Assignment required"): nothing for on-call.
+    // An expected refusal (a cancelled consent, or e.g. Entra "Assignment required"): nothing
+    // for on-call.
     logger.warn(
       { code: redirect.code, traceId: traceId ?? null },
-      "an identity provider refused a sign-in; the person was told to ask their IT administrator",
+      "an identity provider refused a sign-in; the person was told why",
     );
-    return response;
+  } else {
+    logger.error(
+      { code: redirect.code, description: redirect.description, traceId: traceId ?? null },
+      "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
+    );
   }
-
-  logger.error(
-    { code: redirect.code, description: redirect.description, traceId: traceId ?? null },
-    "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
-  );
   const headers = new Headers(response.headers);
   headers.set("location", redirect.location);
   return new Response(response.body, { status: response.status, headers });

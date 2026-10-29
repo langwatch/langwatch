@@ -270,15 +270,15 @@ describe("given a sign-in fails for a reason the person has to act on", () => {
 
 describe("given an identity provider that refused the person", () => {
   /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
-  it("tells them to ask their IT administrator for access to the LangWatch app", () => {
+  it("says it was cancelled or refused, and when to ask their IT administrator", () => {
     expect(signInErrorMayCross("access_denied")).toBe(true);
 
     renderError("access_denied");
 
-    expect(screen.getByText("Your organization's sign-in refused you")).toBeTruthy();
+    expect(screen.getByText("Sign-in was refused")).toBeTruthy();
     expect(
       screen.getByText(
-        "Your organization's identity provider refused this sign-in. Ask your IT administrator to give you access to the LangWatch app, then try again.",
+        "The sign-in was cancelled, or your identity provider refused it. If you sign in through your company, ask your IT administrator to give you access to the LangWatch app.",
       ),
     ).toBeTruthy();
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);

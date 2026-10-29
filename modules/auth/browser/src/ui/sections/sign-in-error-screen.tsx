@@ -66,7 +66,7 @@ const errorTitle = (error: string): string => {
     case "state_mismatch":
       return "Your sign-in expired";
     case "access_denied":
-      return "Your organization's sign-in refused you";
+      return "Sign-in was refused";
     default:
       return (
         cutoverSignInRefusal(error)?.title ??
@@ -323,8 +323,8 @@ function SignInErrorDescription({
     return (
       <VStack gap={4} align="stretch">
         <Text>
-          Your organization's identity provider refused this sign-in. Ask your IT administrator to
-          give you access to the LangWatch app, then try again.
+          The sign-in was cancelled, or your identity provider refused it. If you sign in through
+          your company, ask your IT administrator to give you access to the LangWatch app.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
           <Link href="/auth/signin">Back to sign in</Link>

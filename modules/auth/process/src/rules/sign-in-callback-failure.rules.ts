@@ -35,7 +35,7 @@ const PROVIDER_REFUSAL_CODE = "access_denied";
 /** What the boundary does with one redirect Better Auth answered. */
 type SignInErrorRedirect =
   | { kind: "pass" }
-  | { kind: "provider_refused"; code: string }
+  | { kind: "provider_refused"; code: string; location: string }
   | { kind: "withhold"; code: string; description: string; location: string };
 
 /**
@@ -59,23 +59,42 @@ export function signInErrorRedirectOf({
   const code = target.searchParams.get("error");
   if (!code) return { kind: "pass" };
   // Crosses as itself, but is the tenant's own refusal, so the caller logs it at warn. Only the
-  // code is kept: the provider's description is caller-controlled text and is never logged.
-  if (code === PROVIDER_REFUSAL_CODE) return { kind: "provider_refused", code };
+  // code is kept: the provider's description is caller-controlled text, so it is neither logged
+  // nor left in the address bar.
+  if (code === PROVIDER_REFUSAL_CODE) {
+    const location = rebuiltLocation({ target, errorPageUrl, code, traceId });
+    return { kind: "provider_refused", code, location };
+  }
   if (signInErrorMayCross(code)) return { kind: "pass" };
 
-  const withheld = new URL(errorPageUrl);
-  for (const carried of CARRIED_THROUGH) {
-    const value = target.searchParams.get(carried);
-    if (value !== null) withheld.searchParams.set(carried, value);
-  }
-  withheld.searchParams.set("error", GENERIC_SIGN_IN_ERROR_CODE);
-  if (traceId) withheld.searchParams.set("trace", traceId);
   return {
     kind: "withhold",
     code,
     description: target.searchParams.get("error_description") ?? "",
-    location: withheld.toString(),
+    location: rebuiltLocation({ target, errorPageUrl, code: GENERIC_SIGN_IN_ERROR_CODE, traceId }),
   };
+}
+
+/** The error screen with `code`, the trace id and only the allowlisted parameters of `target`. */
+function rebuiltLocation({
+  target,
+  errorPageUrl,
+  code,
+  traceId,
+}: {
+  target: URL;
+  errorPageUrl: string;
+  code: string;
+  traceId: string | undefined;
+}): string {
+  const rebuilt = new URL(errorPageUrl);
+  for (const carried of CARRIED_THROUGH) {
+    const value = target.searchParams.get(carried);
+    if (value !== null) rebuilt.searchParams.set(carried, value);
+  }
+  rebuilt.searchParams.set("error", code);
+  if (traceId) rebuilt.searchParams.set("trace", traceId);
+  return rebuilt.toString();
 }
 
 /** The redirect target when it is the sign-in error page itself; a relative Location resolves. */

@@ -72,12 +72,21 @@ describe("signInErrorRedirectOf", () => {
 
   describe("given an identity provider that refused the person", () => {
     /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
-    it("keeps the code, drops the description, and is not withheld", () => {
+    it("keeps the code and callbackUrl, and drops the description from the Location", () => {
       const redirect = redirectTo(
-        `${errorPageUrl}?error=access_denied&error_description=AADSTS50105+User+is+not+assigned`,
+        `${errorPageUrl}?error=access_denied&error_description=AADSTS50105+User+is+not+assigned&callbackUrl=%2Fp&error_uri=https%3A%2F%2Fidp.example`,
       );
 
-      expect(redirect).toEqual({ kind: "provider_refused", code: "access_denied" });
+      expect(redirect.kind).toBe("provider_refused");
+      const location = new URL(redirect.kind === "provider_refused" ? redirect.location : "");
+      expect([...location.searchParams.keys()].toSorted()).toEqual([
+        "callbackUrl",
+        "error",
+        "trace",
+      ]);
+      expect(location.searchParams.get("error")).toBe("access_denied");
+      expect(location.searchParams.get("callbackUrl")).toBe("/p");
+      expect(location.searchParams.get("trace")).toBe("trace_1");
     });
   });
 

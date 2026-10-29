@@ -117,14 +117,16 @@ Feature: What a failed single sign-on is allowed to say
 
   # An identity provider answers `access_denied` when it turns the person away, e.g. Microsoft
   # Entra ID AADSTS50105 ("User is not assigned to the client application") when the enterprise
-  # app requires assignment. It is the tenant's own decision, not a fault of ours, so it neither
-  # becomes the generic code nor pages on-call. The provider's description is never logged.
+  # app requires assignment, and also when the person cancels a consent screen. Neither is a
+  # fault of ours, so it neither becomes the generic code nor pages on-call. The provider's
+  # description is neither logged nor left in the address bar. The same code arrives from social
+  # and SSO providers alike, so the screen's advice about an IT administrator is conditional.
   @unit
   Scenario: A provider's access_denied refusal crosses and is logged as a warning
     Given a provider sign-in that the identity provider refuses with "access_denied"
     When the person is sent to the sign-in error screen
     Then the code crosses as itself
     And the refusal is logged at warn with the code and the trace id, not at error
-    And the provider's description is not logged
-    And the screen says their organization's identity provider refused the sign-in
-    And it tells them to ask their IT administrator to give them access to the LangWatch app
+    And the provider's description is neither logged nor kept on the redirect
+    And the screen says the sign-in was cancelled or their identity provider refused it
+    And it tells them that, if they sign in through their company, their IT administrator can give them access
