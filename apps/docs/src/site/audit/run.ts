@@ -61,6 +61,7 @@ const optionsSchema = z.object({
   "form-factors": list.pipe(z.array(z.enum(FORM_FACTORS))).default([...FORM_FACTORS]),
   concurrency: z.coerce.number().int().min(1).optional(),
   runs: z.coerce.number().int().min(1).default(1),
+  "recheck-below": z.coerce.number().min(0).max(1).optional(),
   json: z.boolean().default(false),
   lhr: z.boolean().default(false),
   "static-only": z.boolean().default(false),
@@ -83,6 +84,7 @@ function readOptions() {
       "form-factors": { type: "string" },
       concurrency: { type: "string" },
       runs: { type: "string" },
+      "recheck-below": { type: "string" },
       json: { type: "boolean" },
       lhr: { type: "boolean" },
       "static-only": { type: "boolean" },
@@ -267,7 +269,15 @@ function agentReadiness({
   return { result, gate };
 }
 
-/** Lighthouse over the selected pages and form factors, the median of each page's runs. */
+/** Extra runs for a page whose first median falls under `--recheck-below`: three runs in all. */
+const RECHECK_RUNS = 2;
+
+type LighthouseTask = { page: PageBudget; formFactor: FormFactor; attempt: number };
+
+/**
+ * Lighthouse over the selected pages and form factors, the median of each page's runs. A page
+ * under `--recheck-below` runs again: shared CI cores swing its TBT from 0 to over a second.
+ */
 async function lighthouseRuns({
   options,
   pages,
@@ -292,36 +302,58 @@ async function lighthouseRuns({
     options.concurrency ?? Math.max(1, Math.min(4, Math.floor(os.availableParallelism() / 2)));
   const lhrDir = path.join(reportDir, "lighthouse");
   if (options.lhr) mkdirSync(lhrDir, { recursive: true });
+  const measure = (items: LighthouseTask[]) =>
+    pool({
+      items,
+      limit,
+      work: async ({ page, formFactor, attempt }) => {
+        const run = await runLighthouse({
+          url: `${origin}${basePath}${page.path}`,
+          page,
+          formFactor,
+          lhr: options.lhr
+            ? path.join(
+                lhrDir,
+                `${page.id.replace(/[^a-z0-9-]+/gi, "_")}-${formFactor}-${attempt}.json`,
+              )
+            : undefined,
+        });
+        log({
+          json,
+          message: `${page.id} ${formFactor}: ${run.runtimeError ?? `${Math.round(run.durationMs / 1000)} s`}`,
+        });
+        return run;
+      },
+    });
+  const medians = (all: AuditRun[]) =>
+    pages.flatMap((page) =>
+      options["form-factors"].map((formFactor) =>
+        medianRun({
+          runs: all.filter((run) => run.page === page.id && run.formFactor === formFactor),
+        }),
+      ),
+    );
   log({ json, message: `lighthouse: ${tasks.length} runs, ${limit} at a time` });
-  const all = await pool({
-    items: tasks,
-    limit,
-    work: async ({ page, formFactor, attempt }) => {
-      const run = await runLighthouse({
-        url: `${origin}${basePath}${page.path}`,
-        page,
-        formFactor,
-        lhr: options.lhr
-          ? path.join(
-              lhrDir,
-              `${page.id.replace(/[^a-z0-9-]+/gi, "_")}-${formFactor}-${attempt}.json`,
-            )
-          : undefined,
-      });
-      log({
-        json,
-        message: `${page.id} ${formFactor}: ${run.runtimeError ?? `${Math.round(run.durationMs / 1000)} s`}`,
-      });
-      return run;
-    },
+  const all = await measure(tasks);
+  const threshold = options["recheck-below"];
+  if (threshold === undefined) return medians(all);
+
+  const slow = medians(all).filter((run) => (run.scores.performance ?? 0) < threshold);
+  const rechecks = slow.flatMap((run) => {
+    const page = pages.find((candidate) => candidate.id === run.page);
+    if (!page) return [];
+    return Array.from({ length: RECHECK_RUNS }, (_, extra) => ({
+      page,
+      formFactor: run.formFactor,
+      attempt: options.runs + extra,
+    }));
   });
-  return pages.flatMap((page) =>
-    options["form-factors"].map((formFactor) =>
-      medianRun({
-        runs: all.filter((run) => run.page === page.id && run.formFactor === formFactor),
-      }),
-    ),
-  );
+  if (rechecks.length === 0) return medians(all);
+  log({
+    json,
+    message: `lighthouse: ${slow.length} pages under ${threshold}, ${rechecks.length} rechecks`,
+  });
+  return medians([...all, ...(await measure(rechecks))]);
 }
 
 /** Stops before any check when the build was made for another mount: every URL would be wrong. */
