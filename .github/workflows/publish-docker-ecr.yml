@@ -202,10 +202,11 @@ jobs:
           role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
           role-session-name: publish-docker-ecr-changes-${{ github.run_id }}
 
-      # The change set starts at the commit whose image create-manifest would
-      # re-tag as this commit's (tools/ecrtag.DiffBase), not at the previous
-      # push: a run replaced while it waited published nothing, so its commits
-      # must rebuild here. REPOSITORIES is create-manifest's list (ciguard).
+      # The change set starts at the oldest commit whose image create-manifest
+      # would re-tag as this commit's (tools/ecrtag.DiffBase), not the previous
+      # push: a replaced run published nothing. `rebuild` is every image whose
+      # re-tag would copy a newer one, which a revert can hide from the diff.
+      # REPOSITORIES is create-manifest's list (ciguard).
       - name: Find the last published commit
         id: base
         if: github.event_name == 'push'
@@ -218,16 +219,21 @@ jobs:
             langwatch-eval-openai langwatch-eval-presidio langwatch-eval-ragas langwatch-eval-topic_clustering
         run: |
           set -euo pipefail
-          TAG=$(go run ./cmd/ecrtag diffbase -repositories "${REPOSITORIES}" -tag "${IMAGE_TAG}" \
+          BASE=$(go run ./cmd/ecrtag diffbase -repositories "${REPOSITORIES}" -tag "${IMAGE_TAG}" \
             -revision "${GITHUB_SHA}" -custom="${CUSTOM_TAG}")
+          TAG=$(printf '%s' "${BASE}" | jq -r '.base')
+          REBUILD=$(printf '%s' "${BASE}" | jq -c '.rebuild')
           SHA=""
           if [ -n "${TAG}" ]; then
             SHA=$(git rev-parse --verify "${TAG#git-}^{commit}")
-            echo "Change set: ${TAG}..${GITHUB_SHA}" >> "$GITHUB_STEP_SUMMARY"
+            echo "Change set: ${TAG}..${GITHUB_SHA}; rebuilt whatever it says: ${REBUILD}" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "::notice::no image has been published from an ancestor; building every image"
           fi
-          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          {
+            echo "sha=${SHA}"
+            echo "rebuild=${REBUILD}"
+          } >> "$GITHUB_OUTPUT"
 
       # NO NEGATION PATTERNS — dorny ORs a filter's patterns, so a lone `!x`
       # matches everything. See specs/ci/path-filters.feature.
@@ -362,6 +368,7 @@ jobs:
         env:
           # No base on a dispatch, or before any image is published: build all.
           FILTERED: ${{ steps.base.outputs.sha != '' }}
+          REBUILD: ${{ steps.base.outputs.rebuild }}
           LANGWATCH_APP: ${{ steps.filter.outputs.langwatch-app }}
           LANGWATCH_NLP_SERVICE: ${{ steps.filter.outputs.langwatch-nlp-service }}
           LANGWATCH_LANGEVALS: ${{ steps.filter.outputs.langwatch-langevals }}
@@ -419,6 +426,7 @@ jobs:
               --arg langy "${LANGWATCH_LANGY_AGENT}" \
               --arg eval "${LANGWATCH_EVAL}" \
               --argjson lambdas "${LAMBDAS}" \
+              --argjson rebuild "${REBUILD}" \
               '[{"langwatch-app": $app,
                  "langwatch-nlp-service": $nlp,
                  "langwatch-langevals": $evals,
@@ -428,7 +436,8 @@ jobs:
                 | to_entries[] | select(.value == "true") | .key]
                + (if $eval == "true"
                   then [$lambdas[] | select(.evaluator != "") | .image]
-                  else [] end)')
+                  else [] end)
+               + $rebuild | unique')
           else
             BUILT=$(jq -cn --argjson all "${ALL}" --argjson lambdas "${LAMBDAS}" \
               '[$all[].image, $lambdas[].image] | unique')

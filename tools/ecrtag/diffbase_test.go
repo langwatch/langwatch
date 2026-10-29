@@ -44,7 +44,7 @@ const (
 
 var chain = []string{tagC, tagB, tagA, tagZ}
 
-func diffBase(t *testing.T, repos registries) string {
+func diffBase(t *testing.T, repos registries) ecrtag.Base {
 	t.Helper()
 	base, err := ecrtag.DiffBase{
 		Registry: repos, Ancestry: &fakeAncestry{history: chain},
@@ -62,33 +62,39 @@ func TestTheChangeSetStartsAtTheCommitAReTagWouldCopy(t *testing.T) {
 			"langwatch-app":        newRegistry().push(tagA, entry{}).push(tagZ, entry{}),
 			"langwatch-eval-ragas": newRegistry().push(tagA, entry{}),
 		})
-		assert.Equal(t, tagA, base, "B published nothing, so B's changes are in C's change set")
-	})
-	t.Run("at the furthest back of the images' sources", func(t *testing.T) {
-		base := diffBase(t, registries{
-			"langwatch-app":        newRegistry().push(tagB, entry{}).push(tagA, entry{}),
-			"langwatch-eval-ragas": newRegistry().push(tagA, entry{}),
-		})
-		assert.Equal(t, tagA, base, "the Lambda image would be re-tagged from A, so A..C decides whether it rebuilds")
+		assert.Equal(t, ecrtag.Base{Tag: tagA, Rebuild: []string{}}, base, "B published nothing, so B's changes are in C's change set")
 	})
 	t.Run("never at the commit's own tag, so a re-run diffs what the first run did", func(t *testing.T) {
 		base := diffBase(t, registries{
 			"langwatch-app":        newRegistry().push(tagC, entry{}).push(tagA, entry{}),
 			"langwatch-eval-ragas": newRegistry().push(tagC, entry{}).push(tagA, entry{}),
 		})
-		assert.Equal(t, tagA, base)
+		assert.Equal(t, ecrtag.Base{Tag: tagA, Rebuild: []string{}}, base)
 	})
 	t.Run("skipping an image that has never been published", func(t *testing.T) {
 		base := diffBase(t, registries{
 			"langwatch-app":        newRegistry().push(tagB, entry{}),
 			"langwatch-eval-ragas": newRegistry(),
 		})
-		assert.Equal(t, tagB, base)
+		assert.Equal(t, ecrtag.Base{Tag: tagB, Rebuild: []string{}}, base, "the unpublished image keeps today's warning")
 	})
 	t.Run("nowhere when no image has been published", func(t *testing.T) {
 		base := diffBase(t, registries{"langwatch-app": newRegistry(), "langwatch-eval-ragas": newRegistry()})
-		assert.Empty(t, base, "the run then builds every image")
+		assert.Equal(t, ecrtag.Base{Rebuild: []string{}}, base, "the run then builds every image")
 	})
+}
+
+// B changed the app and ragas, ragas's build failed so it stayed at A, and C
+// reverts B: A..C is empty, but the app's re-tag would copy B's reverted image.
+// @scenario "An image published after the change set's start is rebuilt even when a revert empties the diff"
+func TestAnImageWhoseSourceIsNewerThanTheBaseIsRebuilt(t *testing.T) {
+	base := diffBase(t, registries{
+		"langwatch-app":        newRegistry().push(tagB, entry{}).push(tagA, entry{}),
+		"langwatch-eval-ragas": newRegistry().push(tagA, entry{}),
+	})
+
+	assert.Equal(t, tagA, base.Tag, "ragas would be re-tagged from A, so A..C decides whether it rebuilds")
+	assert.Equal(t, []string{"langwatch-app"}, base.Rebuild, "the app's image is B's, which A..C cannot speak for")
 }
 
 func TestADiffBaseLookupThatDoesNotAnswerFails(t *testing.T) {

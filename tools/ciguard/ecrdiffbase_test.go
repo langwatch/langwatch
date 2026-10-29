@@ -25,6 +25,7 @@ func diffBaseProblems(t *testing.T, images string) []string {
 }
 
 // @scenario "A commit whose run was replaced while it waited still rebuilds what it changed"
+// @scenario "An image published after the change set's start is rebuilt even when a revert empties the diff"
 func TestTheImagesChangeSetStartsAtTheLastPublishedCommit(t *testing.T) {
 	root, err := ciscan.RepoRoot(".")
 	require.NoError(t, err)
@@ -51,6 +52,18 @@ func TestTheImagesChangeSetStartsAtTheLastPublishedCommit(t *testing.T) {
 		},
 		"a diffbase that skips an image create-manifest re-tags": func(s string) string {
 			return strings.Replace(s, "            langwatch-app langwatch-nlp-service", "            langwatch-nlp-service", 1)
+		},
+		"a select step gated on the event, which builds nothing without a base": func(s string) string {
+			return strings.Replace(s, "FILTERED: ${{ steps.base.outputs.sha != '' }}", "FILTERED: ${{ github.event_name == 'push' }}", 1)
+		},
+		"a rebuild list the base step never writes": func(s string) string {
+			return strings.Replace(s, `echo "rebuild=${REBUILD}"`, `echo "rebuilt=${REBUILD}"`, 1)
+		},
+		"a select step that does not read the rebuild list": func(s string) string {
+			return strings.Replace(s, "REBUILD: ${{ steps.base.outputs.rebuild }}", "REBUILD: '[]'", 1)
+		},
+		"a select step that drops the rebuild list": func(s string) string {
+			return strings.Replace(s, "               + $rebuild | unique')", "               | unique')", 1)
 		},
 	} {
 		t.Run(name+" fails", func(t *testing.T) {

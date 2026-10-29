@@ -15,16 +15,23 @@ const (
 	diffBaseSHA   = "${{ steps.base.outputs.sha }}"
 	diffBaseGate  = "steps.base.outputs.sha != ''"
 	diffBaseInput = `-repositories "${REPOSITORIES}"`
+	// The select step builds from the filter only with a base, and adds every
+	// image diffbase says the diff cannot speak for.
+	filteredWhen   = "${{ steps.base.outputs.sha != '' }}"
+	rebuildOutput  = "${{ steps.base.outputs.rebuild }}"
+	rebuildWritten = `echo "rebuild=${REBUILD}"`
+	rebuildArg     = `--argjson rebuild "${REBUILD}"`
+	rebuildAdded   = "+ $rebuild | unique"
 )
 
 // manifestLoop is the list of images create-manifest tags, one per pass.
 var manifestLoop = regexp.MustCompile(`for IMAGE in ([^;]*); do`)
 
 // ECRDiffBase reports a publish-docker-ecr.yml whose change set could start
-// anywhere but the commit a re-tag copies: a path filter with no base, or one
-// not from cmd/ecrtag diffbase, or diffbase asking about other images than
-// create-manifest tags. Without it a push diffs the previous push, and a
-// replaced run's change is re-tagged away. See specs/ci/publish-ecr-images.feature.
+// anywhere but the commit a re-tag copies (a filter with no base, or one not
+// from cmd/ecrtag diffbase, asking about other images than create-manifest
+// tags), or whose selection drops diffbase's forced rebuilds or its gate.
+// See specs/ci/publish-ecr-images.feature.
 func ECRDiffBase(repoRoot string) ([]string, error) {
 	wf, err := ciscan.Load(repoRoot, ImagesWorkflow)
 	if err != nil {
@@ -38,6 +45,7 @@ func ECRDiffBase(repoRoot string) ([]string, error) {
 	if filter == nil || fmt.Sprint(filter.With["base"]) != diffBaseSHA || strings.TrimSpace(filter.If) != diffBaseGate {
 		problems = append(problems, fmt.Sprintf("%s job %s: the paths filter must run with `base: %s` and `if: %s`; with no base a push diffs the previous push, which misses a replaced run's commits", ImagesWorkflow, changesJob, diffBaseSHA, diffBaseGate))
 	}
+	problems = append(problems, selectProblems(base, wf.Jobs[changesJob])...)
 	asked := strings.Fields(base.Env["REPOSITORIES"])
 	tagged := manifestImages(wf.Jobs[manifestJob])
 	slices.Sort(asked)
@@ -62,6 +70,29 @@ func diffBaseSteps(j ciscan.Job) (base, filter *ciscan.Step) {
 	}
 
 	return base, filter
+}
+
+// selectProblems: the select step filters only when there is a base, and adds
+// every image diffbase forces, so a revert hidden by the diff still rebuilds.
+func selectProblems(base *ciscan.Step, j ciscan.Job) []string {
+	var problems []string
+	if !strings.Contains(base.Run, rebuildWritten) {
+		problems = append(problems, fmt.Sprintf("%s job %s: the base step must write diffbase's rebuild list as an output (%s)", ImagesWorkflow, changesJob, rebuildWritten))
+	}
+	var sel *ciscan.Step
+	for i := range j.Steps {
+		if j.Steps[i].ID == "select" {
+			sel = &j.Steps[i]
+		}
+	}
+	if sel == nil || strings.TrimSpace(sel.Env["FILTERED"]) != filteredWhen {
+		problems = append(problems, fmt.Sprintf("%s job %s: the select step must set FILTERED: %s; any other gate either filters with no base or builds nothing", ImagesWorkflow, changesJob, filteredWhen))
+	}
+	if sel == nil || strings.TrimSpace(sel.Env["REBUILD"]) != rebuildOutput || !containsAll(sel.Run, []string{rebuildArg, rebuildAdded}) {
+		problems = append(problems, fmt.Sprintf("%s job %s: the select step must take REBUILD: %s and add it to the filter's images (%s ... %s)", ImagesWorkflow, changesJob, rebuildOutput, rebuildArg, rebuildAdded))
+	}
+
+	return problems
 }
 
 func manifestImages(j ciscan.Job) []string {

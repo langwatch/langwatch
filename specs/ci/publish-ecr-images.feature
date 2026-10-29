@@ -51,6 +51,15 @@ Feature: Publish every deployable image to the artifacts registry
     And that image is rebuilt for C rather than re-tagged from A's image
 
   @unit
+  Scenario: An image published after the change set's start is rebuilt even when a revert empties the diff
+    Given merge B changed the app and the evaluators, the app was published at B and an evaluator's build failed, so it stays at A
+    And merge C reverts B
+    When publish-docker-ecr selects the images to build for C
+    Then its change set starts at A, the oldest commit an image's re-tag would copy
+    And the app is rebuilt for C even though A..C shows no change, because its re-tag would copy B's reverted image
+    And an image whose re-tag would copy A's image follows the A..C diff
+
+  @unit
   Scenario: A .dockerignore change rebuilds every image
     Given a merge to main changes .dockerignore
     When publish-docker-ecr selects the images to build

@@ -10,8 +10,9 @@
 // published prints "true" when the tag is already there for this commit (skip
 // the push) and "false" when it is not there (push it); any other state fails.
 // lambda gives a Lambda image the tag (see tools/ecrtag.Lambda). diffbase
-// prints the tag a push run's change set starts at (tools/ecrtag.DiffBase), or
-// nothing when no repository has an image to re-tag. -registry is
+// prints {"base": tag, "rebuild": [repository]} (tools/ecrtag.DiffBase): where
+// a push run's change set starts, "" when no repository has an image to
+// re-tag, and the repositories it must rebuild whatever the diff says. -registry is
 // the registry host; -refuse-retag and lambda read git history from the
 // working directory. -refuse-retag fails on a tag naming the image a push
 // run's re-tag would copy; -built-from is the per-arch tag an index must name.
@@ -21,6 +22,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -179,7 +181,11 @@ func diffBase(ctx context.Context, o options) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(base)
+	out, err := json.Marshal(base)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(out))
 
 	return nil
 }
