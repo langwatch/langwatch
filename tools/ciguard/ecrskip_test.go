@@ -23,52 +23,76 @@ jobs:
     steps:
       - name: Check
         id: exists
-        run: EXISTS=$(go run ./cmd/ecrtag published -repository r -tag t -source label -revision s -custom="${C}")
+        env:
+          IMAGE: ${{ matrix.image }}
+          TAG: ${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
+        run: EXISTS=$(go run ./cmd/ecrtag published -repository "${IMAGE}" -tag "${TAG}" -source label -revision s -custom="${CUSTOM_TAG}")
       - name: Build
         if: steps.exists.outputs.exists != 'true'
         uses: docker/build-push-action@0000000000000000000000000000000000000000 # v7
         with:
           push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
       - name: Export
         uses: docker/build-push-action@0000000000000000000000000000000000000000 # v7
         with:
           push: false
+          outputs: type=local,dest=out
   build-and-push-lambda:
     runs-on: ubuntu-latest
     steps:
       - name: Check
         id: exists
-        run: EXISTS=$(go run ./cmd/ecrtag published -repository r -tag t -source label -revision s -custom="${C}" -accept-retag)
+        env:
+          IMAGE: ${{ matrix.image }}
+          TAG: ${{ needs.meta.outputs.image_tag }}
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
+          RETAG: ${{ github.event_name == 'push' && 'accept' || 'refuse' }}
+        run: EXISTS=$(go run ./cmd/ecrtag published -repository "${IMAGE}" -tag "${TAG}" -source label -revision s -custom="${CUSTOM_TAG}" -retag="${RETAG}")
       - name: Build
         if: steps.exists.outputs.exists != 'true'
         uses: docker/build-push-action@0000000000000000000000000000000000000000 # v7
         with:
           push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}
   create-manifest:
     runs-on: ubuntu-latest
     steps:
       - name: Publish
+        env:
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
         run: |
-          exists=$(go run ./cmd/ecrtag published -repository r -tag t \
-            -source annotation -revision s -custom="${C}")
-          go run ./cmd/ecrtag lambda -repository r -tag t -revision s -custom="${C}"
+          exists=$(go run ./cmd/ecrtag published -repository r -tag "${IMAGE_TAG}" \
+            -source annotation -revision s -custom="${CUSTOM_TAG}" -built-from "${IMAGE_TAG}-arm64")
+          docker buildx imagetools create -t "${repo}:${IMAGE_TAG}" src
+          go run ./cmd/ecrtag lambda -repository r -tag t -revision s -custom="${CUSTOM_TAG}"
 `
 
 const gatedPrivate = `name: publish-docker-private
 on:
   workflow_dispatch:
+env:
+  IMAGE: langwatch-app
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Check
         id: exists
-        run: EXISTS=$(go run ./cmd/ecrtag published -repository r -tag t -source label -revision s -custom="${C}")
+        env:
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+          CUSTOM_TAG: ${{ steps.meta.outputs.custom_tag }}
+        run: EXISTS=$(go run ./cmd/ecrtag published -repository "${IMAGE}" -tag "${IMAGE_TAG}" -source label -revision s -custom="${CUSTOM_TAG}")
       - name: Build
         if: steps.exists.outputs.exists != 'true'
         uses: docker/build-push-action@0000000000000000000000000000000000000000 # v7
         with:
           push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE }}:${{ steps.meta.outputs.image_tag }}
 `
 
 func skipRepo(t *testing.T, images, private string) []string {
@@ -108,7 +132,13 @@ func TestEveryECRPushAsksEcrtagFirst(t *testing.T) {
 			return strings.Replace(s, "        id: exists\n", "        id: lookup\n", 1)
 		},
 		"a check that does not say whether the tag is custom": func(s string) string {
-			return strings.Replace(s, ` -custom="${C}")`, ")", 1)
+			return strings.Replace(s, ` -custom="${CUSTOM_TAG}")`, ")", 1)
+		},
+		"a -custom not taken from the meta step": func(s string) string {
+			return strings.Replace(s, "          CUSTOM_TAG: ${{ ", "          CUSTOM_TAG: false\n          UNUSED: ${{ ", 1)
+		},
+		"a check of another tag than the build pushes": func(s string) string {
+			return strings.Replace(s, `-tag "${`, `-tag "${OTHER}" -x "${`, 1)
 		},
 	} {
 		t.Run(name+" in the private workflow is refused", func(t *testing.T) {
@@ -134,6 +164,22 @@ func TestEveryECRPushAsksEcrtagFirst(t *testing.T) {
 		"a docker push inside a shell function": func(s string) string {
 			return strings.Replace(s, "      - name: Build\n", "      - name: Push by hand\n        run: |\n          publish() {\n            docker push \"$1\"\n          }\n          publish r:t\n      - name: Build\n", 1)
 		},
+		"a build whose outputs go to a registry": func(s string) string {
+			s = strings.Replace(s, "        if: steps.exists.outputs.exists != 'true'\n", "", 1)
+			return strings.Replace(s, "          push: true\n", "          push: false\n          outputs: type=registry,name=r:t\n", 1)
+		},
+		"a buildx build -o type=registry in a run step": func(s string) string {
+			return strings.Replace(s, "      - name: Build\n", "      - name: Buildx\n        run: docker buildx build . -o type=registry,name=r:t\n      - name: Build\n", 1)
+		},
+		"a crane copy in a run step": func(s string) string {
+			return strings.Replace(s, "      - name: Build\n", "      - name: Crane\n        run: crane copy a b\n      - name: Build\n", 1)
+		},
+		"a skopeo copy in a run step": func(s string) string {
+			return strings.Replace(s, "      - name: Build\n", "      - name: Skopeo\n        run: skopeo copy docker://a docker://b\n      - name: Build\n", 1)
+		},
+		"an oras push in a run step": func(s string) string {
+			return strings.Replace(s, "      - name: Build\n", "      - name: Oras\n        run: oras push r:t file\n      - name: Build\n", 1)
+		},
 		"a buildx build --push in a run step": func(s string) string {
 			return strings.Replace(s, "      - name: Build\n", "      - name: Buildx\n        run: |\n          docker buildx build . \\\n            --push -t r:t\n      - name: Build\n", 1)
 		},
@@ -149,14 +195,19 @@ func TestEveryECRPushAsksEcrtagFirst(t *testing.T) {
 		assert.Empty(t, skipRepo(t, gatedImages, private))
 	})
 
-	t.Run("a Lambda check that refuses a re-tag is refused", func(t *testing.T) {
-		problems := skipRepo(t, strings.Replace(gatedImages, " -accept-retag", "", 1), gatedPrivate)
+	t.Run("a Lambda check that does not refuse a re-tag on a dispatch is refused", func(t *testing.T) {
+		problems := skipRepo(t, strings.Replace(gatedImages, "'accept' || 'refuse'", "'accept' || 'accept'", 1), gatedPrivate)
 		require.Len(t, problems, 1)
-		assert.Contains(t, problems[0], "-accept-retag")
+		assert.Contains(t, problems[0], "-retag")
+	})
+	t.Run("an index check that does not name this run's build is refused", func(t *testing.T) {
+		problems := skipRepo(t, strings.Replace(gatedImages, ` -built-from "${IMAGE_TAG}-arm64"`, "", 1), gatedPrivate)
+		require.Len(t, problems, 1)
+		assert.Contains(t, problems[0], "-built-from")
 	})
 	t.Run("an index tag written without asking ecrtag is refused", func(t *testing.T) {
 		problems := skipRepo(t, strings.Replace(gatedImages, "-source annotation", "-source label", 1), gatedPrivate)
-		require.Len(t, problems, 1)
+		require.NotEmpty(t, problems)
 		assert.Contains(t, problems[0], "create-manifest")
 	})
 }

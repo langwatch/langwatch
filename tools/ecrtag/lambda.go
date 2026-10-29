@@ -52,6 +52,15 @@ func (l Lambda) checkBuilt(ctx context.Context) error {
 	if !IsSingleManifest(img.MediaType) {
 		return fmt.Errorf("%s is %s, not a single manifest; see build-and-push-lambda", l.Ref, img.MediaType)
 	}
+	// A build labels its image with this commit; a push run's re-tag keeps
+	// the ancestor's label, and the tag cannot be moved to this build.
+	label, err := l.Registry.Label(ctx, l.Ref, RevisionKey)
+	if err != nil {
+		return err
+	}
+	if label != l.Revision {
+		return errRetagged(l.Ref)
+	}
 
 	return nil
 }

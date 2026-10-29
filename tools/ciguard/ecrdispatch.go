@@ -30,11 +30,7 @@ var ecrtagTag = regexp.MustCompile(`cmd/ecrtag\s+published\b[^\n]*?-tag\s+(\S+)`
 // which would let an already-published git-<sha> stop a new custom tag.
 // See specs/ci/publish-ecr-images.feature.
 func ECRDispatchTags(repoRoot string) ([]string, error) {
-	triggers, branches, err := imagesTriggers(repoRoot)
-	if err != nil {
-		return nil, err
-	}
-	wf, err := ciscan.Load(repoRoot, ImagesWorkflow)
+	wf, triggers, branches, err := loadImages(repoRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -81,29 +77,49 @@ func checksWhatItWrites(step *ciscan.Step) bool {
 	return len(checked) > 0
 }
 
-// imagesTriggers is the sorted event names of the workflow's on: and the
-// branches its push trigger lists.
-func imagesTriggers(repoRoot string) ([]string, []string, error) {
+// loadImages parses publish-docker-ecr.yml once: the workflow, the sorted
+// event names of its on: and the sorted branches its push trigger lists.
+func loadImages(repoRoot string) (*ciscan.Workflow, []string, []string, error) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot, ImagesWorkflow))
 	if err != nil {
-		return nil, nil, fmt.Errorf("read %s: %w", ImagesWorkflow, err)
+		return nil, nil, nil, fmt.Errorf("read %s: %w", ImagesWorkflow, err)
 	}
-	var doc struct {
-		On yaml.Node `yaml:"on"`
+	var doc yaml.Node
+	wf := &ciscan.Workflow{Path: ImagesWorkflow}
+	if err := yaml.Unmarshal(raw, &doc); err != nil || len(doc.Content) == 0 {
+		return nil, nil, nil, fmt.Errorf("parse %s: %w", ImagesWorkflow, err)
 	}
-	if err := yaml.Unmarshal(raw, &doc); err != nil {
-		return nil, nil, fmt.Errorf("parse %s: %w", ImagesWorkflow, err)
+	if err := doc.Decode(wf); err != nil {
+		return nil, nil, nil, fmt.Errorf("parse %s: %w", ImagesWorkflow, err)
 	}
-	if doc.On.Kind != yaml.MappingNode {
-		return []string{doc.On.Value}, nil, nil
+	on := valueOf(doc.Content[0], "on")
+	if on == nil || on.Kind != yaml.MappingNode {
+		return wf, scalarEvents(on), nil, nil
 	}
 	var events []string
-	for i := 0; i+1 < len(doc.On.Content); i += 2 {
-		events = append(events, doc.On.Content[i].Value)
+	for i := 0; i+1 < len(on.Content); i += 2 {
+		events = append(events, on.Content[i].Value)
 	}
 	slices.Sort(events)
 
-	return events, pushBranches(valueOf(&doc.On, "push")), nil
+	return wf, events, pushBranches(valueOf(on, "push")), nil
+}
+
+// scalarEvents is the events of an on: written as one name or a list.
+func scalarEvents(on *yaml.Node) []string {
+	if on == nil {
+		return nil
+	}
+	if on.Kind == yaml.SequenceNode {
+		var events []string
+		for _, e := range on.Content {
+			events = append(events, e.Value)
+		}
+		slices.Sort(events)
+		return events
+	}
+
+	return []string{on.Value}
 }
 
 // pushBranches is what push: lists. Anything but branches (tags, paths) is
@@ -120,6 +136,7 @@ func pushBranches(node *yaml.Node) []string {
 		}
 		branches = append(branches, values...)
 	}
+	slices.Sort(branches)
 
 	return branches
 }

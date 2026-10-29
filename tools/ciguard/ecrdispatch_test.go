@@ -102,6 +102,9 @@ func TestImagesRunOnlyOnAPushToMainAndADispatch(t *testing.T) {
 		"a tag push":               "on:\n  push:\n    branches: [main]\n    tags: ['langwatch@v*']\n  workflow_dispatch:\n",
 		"a push to another branch": "on:\n  push:\n    branches: [main, release]\n  workflow_dispatch:\n",
 		"a list of events":         "on: [push, workflow_dispatch, release]\n",
+		"a quoted on: key":         "\"on\":\n  push:\n    branches: [main]\n  workflow_dispatch:\n  release:\n    types: [published]\n",
+		"a single event":           "on: release\n",
+		"four-space indentation":   "on:\n    push:\n        branches: [main]\n    workflow_dispatch:\n    release:\n        types: [published]\n",
 	} {
 		t.Run(name+" is refused", func(t *testing.T) {
 			start := strings.Index(dispatchImages, "on:\n")

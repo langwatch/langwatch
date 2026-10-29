@@ -97,17 +97,31 @@ Feature: Publish every deployable image to the artifacts registry
   @unit
   Scenario: A re-run publishes nothing that is already there
     Given an earlier run published the git-<short sha> tags of a commit
-    When publish-docker-ecr runs again for that commit, by a re-run or a dispatch
+    When publish-docker-ecr runs again for that commit, by a re-run or by a dispatch after a run that built every image
     Then it builds, pushes and re-tags no image whose tag is already in the registry for that commit
     And every tag already there still names the image it named before
     And the run succeeds
 
   @unit
   Scenario: A dispatch with a custom tag that is already there fails the run
-    Given an image already has the tag a dispatcher typed as image_tag
+    Given an image already has the tag a dispatcher typed as image_tag, recording another commit or none
     When publish-docker-ecr is dispatched with that image_tag
-    Then it fails and asks for a new tag, even if the tag names this commit's image
+    Then it fails and asks for a new tag
     And it writes no tag to that image
+
+  @unit
+  Scenario: A re-run of a dispatch with a custom tag publishes nothing already there
+    Given a dispatch with a custom image_tag published some of its images and then failed
+    When that run is re-run for the same commit
+    Then each image whose custom tag records that commit is left as it is
+    And the images still missing the tag are published
+
+  @unit
+  Scenario: A dispatch that rebuilds an image a push run re-tagged fails the run
+    Given a push run re-tagged an unchanged ancestor image as this commit's git-<short sha>
+    When publish-docker-ecr is dispatched for that commit, rebuilding every image
+    Then it fails for that image, saying the tag names an ancestor's image and cannot be moved
+    And it does not count the tag as published
 
   @unit
   Scenario: A dispatch with a new custom tag over a published commit writes that tag
@@ -148,5 +162,5 @@ Feature: Publish every deployable image to the artifacts registry
   Scenario: A private build never reuses a custom tag
     Given publish-docker-private already published langwatch-app under a tag
     When it is dispatched again
-    Then with the default ref-<sha10> tag recording that commit it skips the build and succeeds
-    And with a custom tag, or a default tag recording another commit, it fails and asks for a new tag
+    Then with a tag recording that commit it skips the build and succeeds
+    And with a tag recording another commit, or none, it fails and asks for a new tag

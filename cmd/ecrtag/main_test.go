@@ -9,11 +9,12 @@ import (
 
 func TestParse(t *testing.T) {
 	t.Run("-head defaults to -revision", func(t *testing.T) {
-		o, err := parse("published", []string{"-repository", "r", "-tag", "t", "-revision", "abc", "-custom=true", "-accept-retag"})
+		o, err := parse("published", []string{"-repository", "r", "-tag", "t", "-revision", "abc", "-custom=true", "-retag", "refuse", "-built-from", "t-arm64"})
 		require.NoError(t, err)
 		assert.Equal(t, "abc", o.head)
 		assert.True(t, o.custom)
-		assert.True(t, o.acceptRetag)
+		assert.Equal(t, "refuse", o.retag)
+		assert.Equal(t, "t-arm64", o.builtFrom)
 		assert.Equal(t, "label", o.source)
 	})
 	t.Run("an explicit -head is kept", func(t *testing.T) {
@@ -28,6 +29,7 @@ func TestParse(t *testing.T) {
 		{"-repository", "r", "-revision", "abc"},
 		{"-repository", "r", "-tag", "t"},
 		{"-repository", "r", "-tag", "t", "-revision", "abc", "-custom=maybe"},
+		{"-repository", "r", "-tag", "t", "-revision", "abc", "-retag", "always"},
 	} {
 		_, err := parse("published", args)
 		assert.Error(t, err, args)

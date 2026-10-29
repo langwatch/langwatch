@@ -100,7 +100,7 @@ jobs:
           if [ "${#IMAGE_TAG}" -gt 128 ]; then
             echo "::error::image_tag is longer than 128 characters"; exit 1
           fi
-          # A custom tag may already name another build, so it is never skipped.
+          # Tells cmd/ecrtag the tag is the dispatcher's (see the check below).
           CUSTOM_TAG="false"
           if [ "${IMAGE_TAG}" != "ref-${SHA:0:10}" ]; then
             CUSTOM_TAG="true"
@@ -160,9 +160,9 @@ jobs:
           cache-dependency-path: "ci-tools/*/go.sum"
 
       # The tags are immutable. A second dispatch of the same ref finds its
-      # default ref-<sha10>, labelled with that commit, and skips the build; a
-      # custom tag already there, or a default one recording another commit,
-      # cannot be moved and fails (tools/ecrtag).
+      # tag, labelled with that commit, and skips the build; a tag already
+      # there recording another commit, or none, cannot be moved and fails
+      # (tools/ecrtag).
       - name: Check whether the tag is already published
         id: exists
         working-directory: ci-tools

@@ -127,14 +127,23 @@ func TestALambdaTagWithNoRevisionFailsClosed(t *testing.T) {
 
 // @scenario "A dispatch with a custom tag that is already there fails the run"
 func TestACustomLambdaTag(t *testing.T) {
-	t.Run("already there fails and writes nothing", func(t *testing.T) {
+	t.Run("already there for another commit fails and writes nothing", func(t *testing.T) {
 		run := withTags(map[string]entry{
 			"git-0000002": {digest: "sha256:mid", body: `{"mid":true}`},
-			"hotfix-1":    {digest: "sha256:mid", body: `{"mid":true}`, label: this},
+			"hotfix-1":    {digest: "sha256:mid", body: `{"mid":true}`, label: other},
 		})
 		_, err := run.publish("hotfix-1", false, true)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "pick a new image_tag")
+		assert.Empty(t, run.reg.puts)
+	})
+	t.Run("naming the re-tag's manifest but recording no commit fails", func(t *testing.T) {
+		run := withTags(map[string]entry{
+			"git-0000002": {digest: "sha256:mid", body: `{"mid":true}`},
+			"hotfix-1":    {digest: "sha256:mid", body: `{"mid":true}`},
+		})
+		_, err := run.publish("hotfix-1", false, true)
+		require.Error(t, err)
 		assert.Empty(t, run.reg.puts)
 	})
 	t.Run("not yet there is written", func(t *testing.T) {
@@ -221,7 +230,7 @@ func TestAFailedLookupOfARebuiltTagShowsTheRegistryError(t *testing.T) {
 }
 
 func TestARebuiltSingleManifestPasses(t *testing.T) {
-	run := withTags(map[string]entry{commitTag: {}})
+	run := withTags(map[string]entry{commitTag: {label: this}})
 
 	written, err := run.publish(commitTag, true, false)
 
@@ -240,4 +249,15 @@ func TestAnImageWithNoEarlierImageWarnsAndWritesNothing(t *testing.T) {
 	assert.Contains(t, run.log.String(), "::warning::")
 	assert.Contains(t, run.log.String(), "has no previous git-* image")
 	assert.Empty(t, run.reg.puts)
+}
+
+// @scenario "A dispatch that rebuilds an image a push run re-tagged fails the run"
+func TestARebuiltTagThatIsAPushRunsRetagFails(t *testing.T) {
+	// The build was skipped or failed; the tag is the ancestor's copy.
+	run := withTags(map[string]entry{commitTag: {label: other}})
+
+	_, err := run.publish(commitTag, true, false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "re-tagged by a push run")
 }

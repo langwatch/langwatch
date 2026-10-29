@@ -94,18 +94,35 @@ func TestATagRecordingNoCommitFailsClosed(t *testing.T) {
 }
 
 // @scenario "A dispatch with a custom tag that is already there fails the run"
+// @scenario "A re-run of a dispatch with a custom tag publishes nothing already there"
 // @scenario "A private build never reuses a custom tag"
-func TestACustomTagAlreadyThereFails(t *testing.T) {
-	c := check("hotfix-1", ecrtag.Label)
-	c.Custom = true
-	_, err := published(t, c)
-	require.Error(t, err, "even when it records this commit")
-	assert.Contains(t, err.Error(), "pick a new image_tag")
+func TestACustomTagAlreadyThere(t *testing.T) {
+	reg := registryOfTags().
+		push("hotfix-other", entry{label: other}).
+		push("hotfix-bare", entry{digest: "sha256:bare"})
+	custom := func(tag string) ecrtag.Check {
+		c := check(tag, ecrtag.Label)
+		c.Custom = true
+		return c
+	}
 
-	c.AcceptDigest = "sha256:hotfix"
-	_, err = published(t, c)
-	require.Error(t, err, "even when it names the manifest a re-tag would copy")
-	assert.Contains(t, err.Error(), "pick a new image_tag")
+	t.Run("recording this commit is a re-run of a partly failed dispatch, and is skipped", func(t *testing.T) {
+		done, err := ecrtag.Published(context.Background(), reg, custom("hotfix-1"))
+		require.NoError(t, err)
+		assert.True(t, done)
+	})
+	t.Run("recording another commit fails and asks for a new tag", func(t *testing.T) {
+		_, err := ecrtag.Published(context.Background(), reg, custom("hotfix-other"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "pick a new image_tag")
+	})
+	t.Run("recording no commit fails, even naming the manifest a re-tag would copy", func(t *testing.T) {
+		c := custom("hotfix-bare")
+		c.AcceptDigest = "sha256:bare"
+		_, err := ecrtag.Published(context.Background(), reg, c)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "pick a new image_tag")
+	})
 }
 
 // @scenario "A private build never reuses a custom tag"
@@ -160,4 +177,38 @@ func TestANewCustomTagOverAPublishedCommitIsWritten(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.False(t, done, "the custom tag is not there, so it is written")
+}
+
+// @scenario "A dispatch that rebuilds an image a push run re-tagged fails the run"
+func TestAnIndexTagMustNameTheManifestThisRunBuilt(t *testing.T) {
+	reg := newRegistry().
+		push("git-1111111-arm64", entry{digest: "sha256:built", label: this}).
+		push("git-1111111", entry{mediaType: index, body: `{"manifests":[{"digest":"sha256:built"}],` + annotated(this)[1:]}).
+		push("git-2222222-arm64", entry{digest: "sha256:built2", label: this}).
+		// A push run re-tagged the ancestor's index and annotated it with this commit.
+		push("git-2222222", entry{mediaType: index, body: `{"manifests":[{"digest":"sha256:ancestor"}],` + annotated(this)[1:]})
+	built := func(tag string) ecrtag.Check {
+		c := check(tag, ecrtag.Annotation)
+		c.BuiltFrom = tag + "-arm64"
+		return c
+	}
+
+	done, err := ecrtag.Published(context.Background(), reg, built("git-1111111"))
+	require.NoError(t, err)
+	assert.True(t, done, "an index over this run's build is skipped")
+
+	_, err = ecrtag.Published(context.Background(), reg, built("git-2222222"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "re-tagged by a push run")
+}
+
+// @scenario "A dispatch that rebuilds an image a push run re-tagged fails the run"
+func TestARefusedRetagFails(t *testing.T) {
+	c := check("git-1111113-arm64", ecrtag.Label)
+	c.RefuseDigest = "sha256:old"
+
+	_, err := published(t, c)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "re-tagged by a push run")
 }

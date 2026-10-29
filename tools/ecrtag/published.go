@@ -26,11 +26,23 @@ type Check struct {
 	// Revision is the full sha of the commit being published.
 	Revision string
 	// Custom is a dispatcher's tag rather than the default commit tag. One
-	// already there may name another commit's image, so it is never skipped.
+	// already there is skipped only when it records this commit.
 	Custom bool
 	// AcceptDigest, when set, is the manifest a re-tag for this commit would
 	// copy. A default tag naming exactly it is published without a revision.
 	AcceptDigest string
+	// RefuseDigest, when set, is that same manifest on a run that builds the
+	// image: a tag naming it was re-tagged by a push run and fails.
+	RefuseDigest string
+	// BuiltFrom, when set, is the per-arch tag this run built. An index tag
+	// already there must name exactly that manifest.
+	BuiltFrom string
+}
+
+// errRetagged is a tag a push run re-tagged from an ancestor, met by a run
+// that built the image: the tag cannot be moved to the new build.
+func errRetagged(ref Ref) error {
+	return fmt.Errorf("%s names an ancestor's image: it was re-tagged by a push run and cannot be moved to this build; ship a new commit or use a new image_tag", ref)
 }
 
 // Published reports false when the tag is not there (write it) and true when it
@@ -44,11 +56,11 @@ func Published(ctx context.Context, reg Registry, c Check) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("could not look up %s in ECR: %w", c.Ref, err)
 	}
-	if c.Custom {
-		return false, fmt.Errorf("%s already exists and ECR tags cannot be moved; pick a new image_tag", c.Ref)
+	if accepted, err := c.byDigest(img.Digest); err != nil || accepted {
+		return accepted, err
 	}
-	if c.AcceptDigest != "" && img.Digest == c.AcceptDigest {
-		return true, nil
+	if err := c.namesBuild(ctx, reg); err != nil {
+		return false, err
 	}
 	revision, err := recordedRevision(ctx, reg, c)
 	if err != nil {
@@ -60,6 +72,44 @@ func Published(ctx context.Context, reg Registry, c Check) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// byDigest decides by the tag's digest alone when it is a re-tag's copy.
+func (c Check) byDigest(digest string) (bool, error) {
+	if c.RefuseDigest != "" && digest == c.RefuseDigest {
+		return false, errRetagged(c.Ref)
+	}
+
+	return !c.Custom && c.AcceptDigest != "" && digest == c.AcceptDigest, nil
+}
+
+// namesBuild holds when BuiltFrom is unset, or the index tag names exactly
+// the one manifest BuiltFrom names.
+func (c Check) namesBuild(ctx context.Context, reg Registry) error {
+	if c.BuiltFrom == "" {
+		return nil
+	}
+	built, err := reg.Describe(ctx, Ref{Repository: c.Repository, Tag: c.BuiltFrom})
+	if err != nil {
+		return fmt.Errorf("look up %s:%s: %w", c.Repository, c.BuiltFrom, err)
+	}
+	m, err := reg.Manifest(ctx, c.Ref)
+	if err != nil {
+		return err
+	}
+	var index struct {
+		Manifests []struct {
+			Digest string `json:"digest"`
+		} `json:"manifests"`
+	}
+	if err := json.Unmarshal([]byte(m.Body), &index); err != nil {
+		return fmt.Errorf("parse the image index %s: %w", c.Ref, err)
+	}
+	if len(index.Manifests) != 1 || index.Manifests[0].Digest != built.Digest {
+		return errRetagged(c.Ref)
+	}
+
+	return nil
 }
 
 func recordedRevision(ctx context.Context, reg Registry, c Check) (string, error) {
@@ -90,13 +140,17 @@ func indexAnnotation(body string) (string, error) {
 }
 
 func matchRevision(c Check, revision string) error {
+	hint := "the short sha is shared"
+	if c.Custom {
+		hint = "pick a new image_tag"
+	}
 	if revision == "" {
-		return fmt.Errorf("%s is already in ECR but records no %s, so this run cannot tell whether it was built from %s; it was published before the revision was recorded, and the tag cannot be moved",
-			c.Ref, RevisionKey, c.Revision)
+		return fmt.Errorf("%s is already in ECR but records no %s, so this run cannot tell whether it was built from %s; it was published before the revision was recorded, and the tag cannot be moved; %s",
+			c.Ref, RevisionKey, c.Revision, hint)
 	}
 	if revision != c.Revision {
-		return fmt.Errorf("%s is already in ECR for commit %s, not %s; the short sha is shared, and the tag cannot be moved",
-			c.Ref, revision, c.Revision)
+		return fmt.Errorf("%s is already in ECR for commit %s, not %s, and the tag cannot be moved; %s",
+			c.Ref, revision, c.Revision, hint)
 	}
 
 	return nil

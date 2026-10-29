@@ -3,14 +3,15 @@
 //
 // Usage:
 //
-//	go run ./cmd/ecrtag published -repository R -tag T -source label|annotation -revision SHA [-custom] [-accept-retag]
+//	go run ./cmd/ecrtag published -repository R -tag T -source label|annotation -revision SHA [-custom] [-retag accept|refuse] [-built-from TAG]
 //	go run ./cmd/ecrtag lambda -repository R -tag T -revision SHA [-built] [-custom]
 //
 // published prints "true" when the tag is already there for this commit (skip
 // the push) and "false" when it is not there (push it); any other state fails.
 // lambda gives a Lambda image the tag (see tools/ecrtag.Lambda). -registry is
-// the registry host; -accept-retag and lambda read git history from the
-// working directory.
+// the registry host; -retag and lambda read git history from the working
+// directory. -retag accept counts a push run's re-tag as published, -retag
+// refuse fails on it; -built-from is the per-arch tag an index must name.
 //
 // Spec: specs/ci/publish-ecr-images.feature
 package main
@@ -28,8 +29,8 @@ import (
 const ancestorScript = ".github/scripts/nearest-ancestor-tag.sh"
 
 type options struct {
-	repository, tag, source, revision, host, head string
-	custom, built, acceptRetag                    bool
+	repository, tag, source, revision, host, head, retag, builtFrom string
+	custom, built                                                   bool
 }
 
 func main() {
@@ -66,7 +67,8 @@ func parse(command string, args []string) (options, error) {
 	fs.StringVar(&o.head, "head", "", "the commit whose history a re-tag reads (default -revision)")
 	fs.BoolVar(&o.custom, "custom", false, "the tag is a dispatcher's, not the default commit tag")
 	fs.BoolVar(&o.built, "built", false, "lambda: this run rebuilt the image and pushed the tag itself")
-	fs.BoolVar(&o.acceptRetag, "accept-retag", false, "published: a tag naming the image a re-tag would copy counts as this commit's")
+	fs.StringVar(&o.retag, "retag", "", "published: accept or refuse a tag naming the image a re-tag would copy")
+	fs.StringVar(&o.builtFrom, "built-from", "", "published: the per-arch tag this run built, which an index tag must name")
 	if err := fs.Parse(args); err != nil {
 		return o, err
 	}
@@ -75,6 +77,9 @@ func parse(command string, args []string) (options, error) {
 	}
 	if o.head == "" {
 		o.head = o.revision
+	}
+	if o.retag != "" && o.retag != "accept" && o.retag != "refuse" {
+		return o, fmt.Errorf("%s: -retag is accept or refuse, not %q", command, o.retag)
 	}
 
 	return o, nil
@@ -99,13 +104,17 @@ func ancestry() ecrtag.Script { return ecrtag.Script{Path: ancestorScript, Run: 
 
 func published(ctx context.Context, o options) error {
 	reg := o.registry()
-	c := ecrtag.Check{Ref: o.ref(), Source: ecrtag.Source(o.source), Revision: o.revision, Custom: o.custom}
-	if o.acceptRetag {
+	c := ecrtag.Check{Ref: o.ref(), Source: ecrtag.Source(o.source), Revision: o.revision, Custom: o.custom, BuiltFrom: o.builtFrom}
+	if o.retag != "" {
 		_, digest, err := ecrtag.Retag{Registry: reg, Ancestry: ancestry(), Ref: o.ref(), Head: o.head}.Source(ctx)
 		if err != nil {
 			return err
 		}
-		c.AcceptDigest = digest
+		if o.retag == "accept" {
+			c.AcceptDigest = digest
+		} else {
+			c.RefuseDigest = digest
+		}
 	}
 	done, err := ecrtag.Published(ctx, reg, c)
 	if err != nil {

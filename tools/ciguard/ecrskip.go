@@ -3,6 +3,7 @@ package ciguard
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/langwatch/langwatch/pkg/ciscan"
@@ -21,7 +22,16 @@ const (
 )
 
 // shellPush is a registry write from a run step, function bodies included.
-var shellPush = regexp.MustCompile(`\bdocker\s+push\b|\bbuildx\s+build\b[^\n]*\s--push\b|\bimagetools\s+create\b|\bput-image\b`)
+var shellPush = regexp.MustCompile(`\bdocker\s+push\b|\s--push\b|(?:\s-o|--output)[\s=]\S*type=registry|\bimagetools\s+create\b|\bput-image\b|\bcrane\s|\bskopeo\s|\boras\s`)
+
+// ecrtagArg is one quoted "${VAR}" argument of an ecrtag call.
+var ecrtagArg = regexp.MustCompile(`-(repository|tag)\s+"\$\{(\w+)\}"`)
+
+// The only values the -custom and -retag flags may be handed.
+var (
+	customSources = []string{"${{ needs.meta.outputs.custom_tag }}", "${{ steps.meta.outputs.custom_tag }}"}
+	retagByEvent  = "${{ github.event_name == 'push' && 'accept' || 'refuse' }}"
+)
 
 // ECRSkipGates reports every way a publish to the artifacts ECR, whose tags
 // are immutable, could push a tag without asking cmd/ecrtag first: a pushing
@@ -49,34 +59,76 @@ func ECRSkipGates(repoRoot string) ([]string, error) {
 
 func jobSkipGates(rel, job string, j ciscan.Job) []string {
 	var problems []string
-	checked := false
 	exempt := rel == ImagesWorkflow && job == manifestJob
+	var check *ciscan.Step
 	for i := range j.Steps {
 		step := &j.Steps[i]
 		problems = append(problems, customProblems(rel, job, step)...)
-		checked = checked || (step.ID == "exists" && strings.Contains(step.Run, ecrtagPublished))
-		if pushes(step, exempt) && (!checked || !gated(step.If)) {
-			problems = append(problems, fmt.Sprintf("%s job %s: %q pushes without an earlier `id: exists` step running %q and %#q as a top-level && term of its if:", rel, job, step.Name, ecrtagPublished, skipGate))
+		if check == nil && step.ID == "exists" && strings.Contains(step.Run, ecrtagPublished) {
+			check = step
+		}
+		if pushes(step, exempt) {
+			problems = append(problems, pushProblems(rel+" job "+job, check, step)...)
 		}
 	}
 
 	return problems
 }
 
-func customProblems(rel, job string, step *ciscan.Step) []string {
-	if strings.Contains(step.Run, "cmd/ecrtag") && !strings.Contains(step.Run, "-custom=") {
-		return []string{fmt.Sprintf("%s job %s: step %q calls cmd/ecrtag without -custom=", rel, job, step.Name)}
+func pushProblems(where string, check, step *ciscan.Step) []string {
+	if check == nil || !gated(step.If) {
+		return []string{fmt.Sprintf("%s: %q pushes without an earlier `id: exists` step running %q and %#q as a top-level && term of its if:", where, step.Name, ecrtagPublished, skipGate)}
+	}
+	if step.Run != "" {
+		return nil
+	}
+	if want := checkedImage(check); want == "" || !strings.Contains(fmt.Sprint(step.With["tags"]), "/"+want) {
+		return []string{fmt.Sprintf("%s: %q pushes tags %v, not the %q its exists step checked", where, step.Name, step.With["tags"], want)}
 	}
 
 	return nil
 }
 
-// pushes is a build whose push: is anything but literally false, or a run
-// step that writes to a registry outside the manifest job.
+// checkedImage is the "<repository>:<tag>" an exists step checks, written as
+// the expressions a build's tags: would use.
+func checkedImage(check *ciscan.Step) string {
+	args := map[string]string{}
+	for _, m := range ecrtagArg.FindAllStringSubmatch(check.Run, -1) {
+		value, ok := check.Env[m[2]]
+		if !ok {
+			value = "${{ env." + m[2] + " }}"
+		}
+		args[m[1]] = value
+	}
+	if args["repository"] == "" || args["tag"] == "" {
+		return ""
+	}
+
+	return args["repository"] + ":" + args["tag"]
+}
+
+// customProblems: every ecrtag call says whether the tag is custom, from the
+// meta step's own answer.
+func customProblems(rel, job string, step *ciscan.Step) []string {
+	if !strings.Contains(step.Run, "go run ./cmd/ecrtag") {
+		return nil
+	}
+	if !strings.Contains(step.Run, `-custom="${CUSTOM_TAG}"`) || !slices.Contains(customSources, step.Env["CUSTOM_TAG"]) {
+		return []string{fmt.Sprintf("%s job %s: step %q must pass -custom=\"${CUSTOM_TAG}\" with CUSTOM_TAG set to the meta step's custom_tag", rel, job, step.Name)}
+	}
+
+	return nil
+}
+
+// pushes is a build whose push: is anything but the boolean or string false,
+// or whose outputs go to a registry, or a run step that writes to a registry
+// outside the manifest job.
 func pushes(step *ciscan.Step, exempt bool) bool {
 	if strings.HasPrefix(step.Uses, "docker/build-push-action@") {
 		push, ok := step.With["push"]
-		return ok && push != false && push != "false"
+		output := fmt.Sprint(step.With["outputs"], step.With["output"])
+
+		return (ok && push != false && push != "false") || strings.Contains(output, "type=registry")
 	}
 	run := strings.ReplaceAll(step.Run, "\\\n", " ")
 
@@ -129,8 +181,11 @@ func imagesPublishCalls(wf *ciscan.Workflow) []string {
 	if !jobRuns(wf.Jobs[manifestJob], ecrtagPublished+" ", "-source annotation") || !jobRuns(wf.Jobs[manifestJob], ecrtagLambda+" ") {
 		problems = append(problems, ImagesWorkflow+" job create-manifest must check each index tag with `"+ecrtagPublished+" ... -source annotation` and publish each Lambda tag with `"+ecrtagLambda+"`")
 	}
-	if !jobRuns(wf.Jobs["build-and-push-lambda"], ecrtagPublished+" ", "-accept-retag") {
-		problems = append(problems, ImagesWorkflow+" job build-and-push-lambda must check with -accept-retag, or a dispatch fails on a tag a push run re-tagged")
+	if !jobRuns(wf.Jobs[manifestJob], ecrtagPublished+" ", `-built-from "${IMAGE_TAG}-arm64"`) {
+		problems = append(problems, ImagesWorkflow+" job create-manifest must pass -built-from \"${IMAGE_TAG}-arm64\", or an index a push run re-tagged passes for a rebuilt image")
+	}
+	if !jobHasStep(wf.Jobs["build-and-push-lambda"], retagsByEvent) {
+		problems = append(problems, ImagesWorkflow+" job build-and-push-lambda must check with -retag=\"${RETAG}\" and RETAG: "+retagByEvent+": a push run's re-run accepts its own re-tag, a dispatch refuses it")
 	}
 
 	return problems
@@ -154,4 +209,8 @@ func containsAll(s string, fragments []string) bool {
 	}
 
 	return true
+}
+
+func retagsByEvent(step *ciscan.Step) bool {
+	return strings.Contains(step.Run, ecrtagPublished) && strings.Contains(step.Run, `-retag="${RETAG}"`) && step.Env["RETAG"] == retagByEvent
 }
