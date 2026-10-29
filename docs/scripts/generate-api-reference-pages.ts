@@ -593,6 +593,9 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   },
 ];
 
+/** Longer summary slugs are cut at a whole word: a cut mid-word published `...-fields-ho`. */
+const SLUG_MAX = 48;
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -635,7 +638,7 @@ function getResourceName(apiPath: string): string {
 function generateFileName(method: string, apiPath: string, op: OpenAPIOperation): string {
   if (op.summary) {
     const s = slugify(op.summary);
-    return s.length > 40 ? s.substring(0, 40).replace(/-$/, "") : s;
+    return s.length > SLUG_MAX ? s.slice(0, SLUG_MAX + 1).replace(/-[^-]*$/, "") : s;
   }
 
   const resource = getResourceName(apiPath);

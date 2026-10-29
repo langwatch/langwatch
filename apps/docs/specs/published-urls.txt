@@ -211,6 +211,7 @@
 /api-reference/datasets/action-upload
 /api-reference/datasets/create-a-dataset-from-an-uploaded-file
 /api-reference/datasets/create-an-upload-for-an-image-or-file-ce
+/api-reference/datasets/create-an-upload-for-an-image-or-file-cell
 /api-reference/datasets/create-attachments
 /api-reference/datasets/create-dataset
 /api-reference/datasets/create-upload
@@ -546,6 +547,7 @@
 /api-reference/traces/action-share
 /api-reference/traces/action-unshare
 /api-reference/traces/discover-what-the-trace-filter-fields-ho
+/api-reference/traces/discover-what-the-trace-filter-fields-hold
 /api-reference/traces/get-trace
 /api-reference/traces/get-transcript
 /api-reference/traces/overview

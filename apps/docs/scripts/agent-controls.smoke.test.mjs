@@ -107,7 +107,7 @@ await it("makes API data, skill actions and selection movement readable", async 
         });
         try {
           await page.addInitScript((value) => localStorage.setItem("theme", value), theme);
-          await page.goto(base + "api-reference/traces/discover-what-the-trace-filter-fields-ho");
+          await page.goto(base + "api-reference/traces/discover-what-the-trace-filter-fields-hold");
           assert.equal(
             await page.getByRole("combobox", { name: "Preferred code language" }).count(),
             0,
@@ -201,7 +201,7 @@ await it("makes API data, skill actions and selection movement readable", async 
       }
       const page = await browser.newPage({ javaScriptEnabled: false });
       try {
-        await page.goto(base + "api-reference/traces/discover-what-the-trace-filter-fields-ho");
+        await page.goto(base + "api-reference/traces/discover-what-the-trace-filter-fields-hold");
         const errors = page.locator(".docs-response-schema:not([open])");
         assert.ok((await errors.count()) > 0);
         const index = await page

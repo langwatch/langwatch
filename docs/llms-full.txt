@@ -73574,7 +73574,7 @@ openapi: "POST /api/v1/dataset/imports"
 
 ---
 
-# FILE: ./api-reference/datasets/create-an-upload-for-an-image-or-file-ce.mdx
+# FILE: ./api-reference/datasets/create-an-upload-for-an-image-or-file-cell.mdx
 
 ---
 title: "Create an upload for an image or file cell"
@@ -78233,7 +78233,7 @@ openapi: "POST /api/trace/{id}/unshare"
 
 ---
 
-# FILE: ./api-reference/traces/discover-what-the-trace-filter-fields-ho.mdx
+# FILE: ./api-reference/traces/discover-what-the-trace-filter-fields-hold.mdx
 
 ---
 title: "Discover what the trace filter fields hold"
