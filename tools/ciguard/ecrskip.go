@@ -165,11 +165,12 @@ func ecrtagCalls(run string) []string {
 // repeatedFlag is a flag a call passes twice, "${from[@]}" counting as
 // -built-from, or "".
 func repeatedFlag(call string) string {
+	matches := ecrtagFlag.FindAllStringSubmatch(call, -1)
 	seen := map[string]int{"built-from": strings.Count(call, fromArgs)}
-	for _, m := range ecrtagFlag.FindAllStringSubmatch(call, -1) {
+	for _, m := range matches {
 		seen[m[1]]++
 	}
-	for _, m := range ecrtagFlag.FindAllStringSubmatch(call, -1) {
+	for _, m := range matches {
 		if seen[m[1]] > 1 {
 			return m[1]
 		}
