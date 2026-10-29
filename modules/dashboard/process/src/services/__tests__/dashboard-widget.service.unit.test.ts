@@ -67,7 +67,86 @@ describe("given the dashboard widget service over the memory repository", () => 
         }),
       ).rejects.toMatchObject({ code: "dashboard_widget_definition_refused", httpStatus: 422 });
       const read = await service.getById({ projectId: "project-1", id: created.id });
-      expect(read.definition.queries).toEqual(VALID);
+      expect(read.definition.queries).toEqual([{ ...QUERY, sources: ["application"] }]);
+    });
+  });
+});
+
+describe("given a query's sources", () => {
+  const scope = { projectId: "project-1" };
+
+  /** A widget saved before queries carried sources: stored straight, as the old build wrote it. */
+  async function unsetWidget(repository: MemoryDashboardWidgetRepository) {
+    return repository.createWidget({
+      ...scope,
+      id: "w-unset",
+      input: { name: "Old", code: CODE, queries: [QUERY] },
+    });
+  }
+
+  describe("when a widget is created with queries naming none", () => {
+    /** @scenario "AC200o Sources: a new widget's query counts application traces" */
+    it("stores application on each, and keeps a picked set as sent", async () => {
+      const { service } = setUp();
+
+      const created = await service.createWidget({
+        ...scope,
+        input: {
+          name: "Traces",
+          code: CODE,
+          queries: [QUERY, { ...QUERY, name: "turns", sources: ["langy"] }],
+        },
+      });
+
+      expect(created.definition.queries.map((query) => query.sources)).toEqual([
+        ["application"],
+        ["langy"],
+      ]);
+    });
+  });
+
+  describe("when a widget that stores none is read, or saved with another field changed", () => {
+    /** @scenario "AC200f Sources: a query that stores none counts application traces" */
+    it("is not rewritten: its queries still store no sources", async () => {
+      const { repository, service } = setUp();
+      const widget = await unsetWidget(repository);
+
+      const read = await service.getById({ ...scope, id: widget.id });
+      await service.updateWidget({ ...scope, id: widget.id, input: { name: "Renamed" } });
+      await service.updateWidget({
+        ...scope,
+        id: widget.id,
+        input: { code: CODE, queries: [QUERY] },
+      });
+      const after = await service.getById({ ...scope, id: widget.id });
+
+      expect(read.definition.queries).toEqual([QUERY]);
+      expect(after.definition.queries).toEqual([QUERY]);
+    });
+  });
+
+  describe("when an update sends a query without sources, or with null", () => {
+    /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+    it("keeps the sources stored under its name, and null clears them", async () => {
+      const { service } = setUp();
+      const created = await service.createWidget({
+        ...scope,
+        input: { name: "Traces", code: CODE, queries: [{ ...QUERY, sources: ["langy"] }] },
+      });
+
+      const kept = await service.updateWidget({
+        ...scope,
+        id: created.id,
+        input: { queries: [{ ...QUERY, sql: "SELECT 1" }] },
+      });
+      const cleared = await service.updateWidget({
+        ...scope,
+        id: created.id,
+        input: { queries: [{ ...QUERY, sources: null }] },
+      });
+
+      expect(kept.definition.queries[0]?.sources).toEqual(["langy"]);
+      expect(cleared.definition.queries[0]).not.toHaveProperty("sources");
     });
   });
 });

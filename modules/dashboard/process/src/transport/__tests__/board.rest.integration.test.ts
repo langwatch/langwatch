@@ -339,64 +339,6 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
     });
   });
 
-  describe("when an API key reads and sets the origins a board leaves out", () => {
-    /** @scenario "AC200e Langy setting: the API reads and sets the origins a board leaves out" */
-    it("reads null by default, stores the empty list, and null restores the default", async () => {
-      const { board, send } = await projectWithBothBoards();
-      const path = `${BOARDS}/${board.id}`;
-
-      const before = await send("dashboards", path);
-      const included = await send("dashboards", path, {
-        method: "PATCH",
-        body: { excludedOrigins: [] },
-      });
-      const listed = await send("dashboards", BOARDS);
-      const restored = await send("dashboards", path, {
-        method: "PATCH",
-        body: { excludedOrigins: null },
-      });
-      const after = await send("dashboards", path);
-
-      expect({
-        before: before.json?.excludedOrigins,
-        included: { status: included.status, excludedOrigins: included.json?.excludedOrigins },
-        listed: listed.json?.data?.[0]?.excludedOrigins,
-        restored: restored.json?.excludedOrigins,
-        after: after.json?.excludedOrigins,
-      }).toEqual({
-        before: null,
-        included: { status: 200, excludedOrigins: [] },
-        listed: [],
-        restored: null,
-        after: null,
-      });
-    });
-
-    /** @scenario "AC200e Langy setting: the API reads and sets the origins a board leaves out" */
-    it("refuses a list that is not of origin names", async () => {
-      const { board, send } = await projectWithBothBoards();
-
-      const refused = await send("dashboards", `${BOARDS}/${board.id}`, {
-        method: "PATCH",
-        body: { excludedOrigins: "langy" },
-      });
-
-      expect(refused.status).toBe(422);
-    });
-
-    /** @scenario "AC200e Langy setting: the API reads and sets the origins a board leaves out" */
-    it("refuses an origin longer than a widget query accepts", async () => {
-      const { board, send } = await projectWithBothBoards();
-
-      const refused = await send("dashboards", `${BOARDS}/${board.id}`, {
-        method: "PATCH",
-        body: { excludedOrigins: ["o".repeat(65)] },
-      });
-
-      expect(refused.status).toBe(422);
-    });
-  });
-
   describe("when a member creates their own My dashboard", () => {
     /** @scenario "AC199o Split: a member's REST create follows the board scope rules" */
     it("records them as its author, at Only me, starred for them", async () => {
@@ -477,6 +419,32 @@ describe("given two Dashboards boards, one holding a widget", () => {
       deleted: 204,
       after: { status: 404, code: "dashboard_widget_not_found" },
     });
+  });
+
+  /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+  it("stores application on a new query, a picked set as sent, and keeps it through a rename", async () => {
+    const { other, send } = await twoBoards();
+    const widgets = `${BOARDS}/${other.id}/widgets`;
+    const query = { name: "turns", sql: "SELECT count() FROM traces" };
+
+    const created = await send("dashboards", widgets, {
+      method: "POST",
+      body: { name: "Langy refusals", code: CODE, queries: [query] },
+    });
+    const path = `${widgets}/${created.json?.id}`;
+    const picked = await send("dashboards", path, {
+      method: "PATCH",
+      body: { queries: [{ ...query, sources: ["langy"] }] },
+    });
+    const renamed = await send("dashboards", path, { method: "PATCH", body: { name: "Refused" } });
+    const sources = (response: typeof created) =>
+      response.json?.definition?.queries?.map((q: { sources?: unknown }) => q.sources);
+
+    expect({
+      created: sources(created),
+      picked: sources(picked),
+      renamed: sources(renamed),
+    }).toEqual({ created: [["application"]], picked: [["langy"]], renamed: [["langy"]] });
   });
 
   /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */

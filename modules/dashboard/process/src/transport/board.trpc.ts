@@ -48,7 +48,6 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
         viewer: { userId: actor.id },
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.description === undefined ? {} : { description: input.description }),
-        ...(input.excludedOrigins === undefined ? {} : { excludedOrigins: input.excludedOrigins }),
       }),
     )
 

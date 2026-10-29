@@ -22,7 +22,7 @@ import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmen
 import { Select } from "@langwatch/design-system/select";
 import { SettingsField } from "@langwatch/design-system/settings-field";
 import { TriangleAlert } from "lucide-react";
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import {
@@ -392,7 +392,7 @@ export function CreateApiKeyDrawer({
   /** The key the form opens filled with, such as a legacy key's replacement; no expiry. */
   prefill?: Pick<CreateApiKeyInput, "name" | "description" | "scopeId" | "keyType">;
   /** A warning over the form, such as that the key being replaced already stopped working. */
-  notice?: { title: string; body: string };
+  notice?: ReactNode;
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
 }) {
@@ -552,15 +552,7 @@ export function CreateApiKeyDrawer({
     >
       <VStack gap={5} align="start">
         {accessBlocked && <AccessNote myBindings={myBindings} />}
-        {notice && (
-          <Banner
-            status="warning"
-            title={notice.title}
-            icon={<TriangleAlert size={16} aria-hidden="true" />}
-          >
-            {notice.body}
-          </Banner>
-        )}
+        {notice}
         {/* Key type — only admins can create service keys */}
         {isAdmin && (
           <KeyTypeField

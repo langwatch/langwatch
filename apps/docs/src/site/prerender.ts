@@ -1,0 +1,439 @@
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { cp, mkdir, readdir, readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { isMainThread, parentPort, workerData } from "node:worker_threads";
+
+import { z } from "zod";
+
+import { render } from "../app/entry-server.tsx";
+import { SPEC_FILES } from "../features/api-reference/compile.ts";
+import { extractPromptBodies, extractSkillPrompts } from "../features/content/compile.ts";
+import {
+  breadcrumbTrail,
+  discoveryFiles,
+  FONT_SOURCE,
+  llmsFull,
+  PAGE_EXPORT_EXTENSIONS,
+  pageHead,
+  pageMarkdown,
+  readAgentSkills,
+} from "../features/discovery/compile.ts";
+import {
+  buildNav,
+  isStaticRedirect,
+  pageLastModified,
+  redirectPage,
+  redirectTarget,
+  siteRedirects,
+} from "../features/navigation/compile.ts";
+import type { Nav } from "../features/navigation/model.ts";
+import { publishSearchIndex, searchEntry } from "../features/search/compile.ts";
+import { publicSlug, withBasePath } from "../lib/site-path.ts";
+import { appRoot, cacheRoot, docsRoot, readBuildOptions } from "../paths.ts";
+import { writeVersionedPages } from "./build-version.ts";
+import { compressedSearchIndex } from "./compressed-index.ts";
+import { inlinePageStyles } from "./css/page-styles.ts";
+import {
+  composeDocument,
+  islandHead,
+  NOT_FOUND_HEAD,
+  pageTargets,
+  extractStyles,
+} from "./document.ts";
+import { builtFontPaths, publishMedia } from "./hashed-assets.ts";
+import { optimisePageImages } from "./image-variants.ts";
+import { writeOutputFiles } from "./output-files.ts";
+import { authoredHeroPreload } from "./page-images.ts";
+import { renderCache, renderedPageSchema, type RenderedPage } from "./render-cache.ts";
+import { failOnSkippedPages } from "./render-failures.ts";
+import {
+  pageCacheKey,
+  PRERENDER_PLAN_FILE,
+  prerenderPlanSchema,
+  type PrerenderPlan,
+} from "./render-keys.ts";
+import { renderWorkerCount, runOnWorkers, type WorkerOutcome } from "./render-workers.ts";
+import { optimisePageVideos } from "./video-variants.ts";
+
+/* Runs as the SSR bundle (see build.ts) after the client build. The main thread reads one
+   build context, renders pages on worker threads of this same bundle (or reuses them from the
+   render cache), then writes every output file once, beside the client's hashed assets. */
+const STYLE_PLACEHOLDER = "/assets/prerender.css";
+const manifestSchema = z.record(
+  z.string(),
+  z.looseObject({
+    file: z.string(),
+    name: z.string().optional(),
+    isEntry: z.boolean().optional(),
+    css: z.array(z.string()).optional(),
+  }),
+);
+
+const styleLink = ({ href }: { href: string }) =>
+  `<link data-docs-style rel="stylesheet" href="${href}">`;
+
+/** The client build's stylesheets (linked from the template) and its script text. */
+async function clientStyles({
+  dist,
+  basePath,
+  template,
+}: {
+  dist: string;
+  basePath: string;
+  template: string;
+}) {
+  const manifest = manifestSchema.parse(
+    JSON.parse(await readFile(path.join(dist, ".vite/manifest.json"), "utf8")),
+  );
+  const cssFiles = [...new Set(Object.values(manifest).flatMap((entry) => entry.css ?? []))];
+  const clientLinks = cssFiles.flatMap((file) => {
+    const href = withBasePath({ basePath, path: `/${file}` });
+    return [...template.matchAll(/<link\b[^>]*>/g)]
+      .map(([tag]) => tag)
+      .filter((tag) => tag.includes(`href="${href}"`));
+  });
+  const clientCss = await Promise.all(
+    cssFiles
+      .filter((file) => clientLinks.some((tag) => tag.includes(`/${file}"`)))
+      .map((file) => readFile(path.join(dist, file), "utf8")),
+  );
+  const scripts = await Promise.all(
+    (await readdir(path.join(dist, "assets")))
+      .filter((file) => file.endsWith(".js"))
+      .map((file) => readFile(path.join(dist, "assets", file), "utf8")),
+  );
+  return { clientCss, clientLinks, scripts };
+}
+
+/** The one immutable context every page task reads. */
+type RenderContext = { template: string; islands: string; nav: Nav; basePath: string };
+
+async function renderPage({
+  slug,
+  context,
+}: {
+  slug: string;
+  context: RenderContext;
+}): Promise<RenderedPage> {
+  const { template, islands, nav } = context;
+  const placeholder = styleLink({ href: STYLE_PLACEHOLDER });
+  const result = await render({ slug });
+  const styled = extractStyles({ html: result.html });
+  if (slug === "404") {
+    const page = composeDocument({
+      template,
+      islands,
+      head: `${NOT_FOUND_HEAD}${placeholder}`,
+      app: styled.html,
+      slug,
+      operation: null,
+    });
+    return { page, rules: styled.rules, search: null };
+  }
+  const { html, title, description, operation, headings } = result;
+  const preload = authoredHeroPreload({ html });
+  const page = composeDocument({
+    template,
+    islands,
+    head: `${preload}${pageHead({ slug, title, description, trail: breadcrumbTrail({ sections: nav.anchors, slug, title }) })}${placeholder}`,
+    app: styled.html,
+    slug,
+    operation,
+  });
+  return { page, rules: styled.rules, search: searchEntry({ nav, slug, html, headings }) };
+}
+
+/** A worker thread: renders each slug it is sent with the context it was started with. */
+function serveRenders() {
+  const context = workerData as RenderContext;
+  parentPort?.on("message", async ({ index, job }: { index: number; job: string }) => {
+    try {
+      parentPort?.postMessage({ index, result: await renderPage({ slug: job, context }) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      parentPort?.postMessage({ index, error: message.split("\n")[0] });
+    }
+  });
+}
+
+/** The plan build.ts wrote beside this bundle; none when the bundle runs on its own. */
+function readPlan(): PrerenderPlan {
+  const file = fileURLToPath(new URL(PRERENDER_PLAN_FILE, import.meta.url));
+  if (!existsSync(file)) return { keys: {}, cacheDir: null };
+  return prerenderPlanSchema.parse(JSON.parse(readFileSync(file, "utf8")));
+}
+
+type Outcome = WorkerOutcome<RenderedPage>;
+
+/** The build context: client manifest islands, the page template and the navigation. */
+async function readContext({ dist, basePath }: { dist: string; basePath: string }) {
+  const manifestText = await readFile(path.join(dist, ".vite/manifest.json"), "utf8");
+  const sources = Object.fromEntries(
+    Object.values(manifestSchema.parse(JSON.parse(manifestText)))
+      .filter((entry) => entry.isEntry && entry.name && entry.name !== "index")
+      .map((entry) => [entry.name, withBasePath({ basePath, path: `/${entry.file}` })]),
+  );
+  const islands = islandHead({
+    sources,
+    build: createHash("sha256").update(manifestText).digest("hex").slice(0, 16),
+  });
+  const template = await readFile(path.join(dist, "index.html"), "utf8");
+  const context: RenderContext = { template, islands, nav: buildNav({ docsRoot }), basePath };
+  return context;
+}
+
+/** Each slug's outcome, reused from the cache when its key matches, else rendered on workers. */
+async function renderAll({
+  slugs,
+  context,
+  plan,
+}: {
+  slugs: string[];
+  context: RenderContext;
+  plan: PrerenderPlan;
+}) {
+  const keyOf = (slug: string) => {
+    const pageKey = plan.keys[slug];
+    return pageKey ? pageCacheKey({ pageKey, context: { context, STYLE_PLACEHOLDER } }) : null;
+  };
+  const cache = renderCache({ directory: plan.cacheDir });
+  const outcomes = new Map<string, Outcome>();
+  for (const slug of slugs) {
+    const key = keyOf(slug);
+    const hit = key ? await cache.read({ key }) : null;
+    if (hit) outcomes.set(slug, { result: hit });
+  }
+  const pending = slugs.filter((slug) => !outcomes.has(slug));
+  const workers = Math.min(renderWorkerCount({ requested: plan.workers }), pending.length);
+  const rendered = await runOnWorkers({
+    script: new URL(import.meta.url),
+    workerData: context,
+    jobs: pending,
+    workers,
+    parseResult: (value) => renderedPageSchema.parse(value),
+  });
+  for (const [index, slug] of pending.entries()) {
+    const outcome = rendered[index];
+    if (outcome === undefined) throw new Error(`No render outcome for ${slug}`);
+    outcomes.set(slug, outcome);
+    const key = keyOf(slug);
+    if (key && "result" in outcome) await cache.write({ key, page: outcome.result });
+  }
+  await cache.prune();
+  return { outcomes, reused: slugs.length - pending.length, rendered: pending.length, workers };
+}
+
+/* Pages, exports, search entries and one stylesheet, all in navigation order, so the output is
+   the same however the pages were split across workers or taken from the cache. */
+function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, Outcome> }) {
+  const styles = new Set<string>();
+  const pages = new Map<string, string>();
+  const files = new Map<string, string | Uint8Array>();
+  const searchIndex: unknown[] = [];
+  const markdown: string[] = [];
+  const skipped: { slug: string; reason: string }[] = [];
+  for (const slug of slugs) {
+    const outcome = outcomes.get(slug) ?? { error: "not rendered" };
+    if ("error" in outcome) {
+      skipped.push({ slug, reason: `render: ${outcome.error}` });
+      continue;
+    }
+    for (const rule of outcome.result.rules) styles.add(rule);
+    if (outcome.result.search) searchIndex.push(outcome.result.search);
+    const exported = exportsOf({ slug });
+    for (const [name, contents] of exported) files.set(name, contents);
+    if (exported.length > 0) markdown.push(pageMarkdown({ docsRoot, slug, instructions: "" }));
+    for (const target of slug === "404" ? ["404.html"] : pageTargets({ slug }))
+      pages.set(target, outcome.result.page);
+  }
+  return { styles: [...styles], pages, files, searchIndex, markdown, skipped };
+}
+
+/** A page's Markdown exports; the home page is also exported at the root. */
+function exportsOf({ slug }: { slug: string }): [string, string][] {
+  if (slug === "404") return [];
+  const markdown = pageMarkdown({ docsRoot, slug });
+  const names =
+    slug === "introduction" ? [slug, "index"] : [...new Set([slug, publicSlug({ slug })])];
+  return names.flatMap((name) =>
+    PAGE_EXPORT_EXTENSIONS.map((extension): [string, string] => [`${name}.${extension}`, markdown]),
+  );
+}
+
+/** Static redirect pages, except where a configured page already publishes the same path. */
+function redirectPages({
+  dist,
+  redirects,
+  pages,
+}: {
+  dist: string;
+  redirects: Record<string, string>;
+  pages: Map<string, string>;
+}) {
+  for (const [source, destination] of Object.entries(redirects)) {
+    const target = redirectTarget({ source });
+    const published = pages.has(target) || existsSync(path.join(dist, target));
+    if (!published && isStaticRedirect({ source }))
+      pages.set(target, redirectPage({ destination }));
+  }
+}
+
+/** Authored media pages reference (see hashed-assets.ts) and the OpenAPI specs, copied as files. */
+async function copySources({
+  dist,
+  copies,
+}: {
+  dist: string;
+  copies: ReadonlyMap<string, string>;
+}) {
+  for (const folder of new Set(
+    [...copies.keys()].map((name) => path.dirname(path.join(dist, name))),
+  ))
+    await mkdir(folder, { recursive: true });
+  await Promise.all([...copies].map(([name, file]) => cp(file, path.join(dist, name))));
+  for (const file of SPEC_FILES) {
+    await mkdir(path.dirname(path.join(dist, file)), { recursive: true });
+    await cp(path.join(docsRoot, file), path.join(dist, file));
+  }
+}
+
+const AGENT_TEXT = /\.(md|claude|agent|txt)$/;
+
+/* Screenshots become AVIF and WebP, videos AV1 and H.264 with a poster, then every authored file a
+   page or agent export still names is published under its content hash. Media caches live beside
+   the render cache, under their own root, so CI can restore them keyed on the media alone. */
+async function publishPageMedia({
+  dist,
+  pages,
+  files,
+  basePath,
+  cache,
+}: {
+  dist: string;
+  pages: ReadonlyMap<string, string>;
+  files: ReadonlyMap<string, string | Uint8Array>;
+  basePath: string;
+  cache: boolean;
+}) {
+  const mediaCache = (name: string) => (cache ? path.join(cacheRoot, "docs-media", name) : null);
+  const images = await optimisePageImages({
+    pages,
+    docsRoot,
+    basePath,
+    cacheDir: mediaCache("images"),
+  });
+  const videos = await optimisePageVideos({
+    pages: images.pages,
+    docsRoot,
+    basePath,
+    cacheDir: mediaCache("videos"),
+  });
+  const texts = new Map<string, string>();
+  for (const [name, contents] of files)
+    if (typeof contents === "string" && AGENT_TEXT.test(name)) texts.set(name, contents);
+  const fonts = builtFontPaths({
+    fonts: await readdir(path.join(appRoot, FONT_SOURCE)),
+    assets: await readdir(path.join(dist, "assets")),
+  });
+  const published = await publishMedia({
+    pages: videos.pages,
+    texts,
+    docsRoot,
+    basePath,
+    aliases: new Map([...images.aliases, ...videos.aliases, ...fonts]),
+  });
+  const output = new Map<string, string | Uint8Array>([
+    ...images.files,
+    ...videos.files,
+    ...published.texts,
+  ]);
+  if (videos.unencoded.length > 0)
+    console.warn(
+      `[docs-site] no ffmpeg with libx264 and an AV1 or VP9 encoder: ${videos.unencoded.length} videos published as authored`,
+    );
+  return {
+    pages: published.pages,
+    files: output,
+    copies: published.copies,
+    images: images.sources,
+    videos: videos.encoded,
+  };
+}
+
+async function generate() {
+  const started = performance.now();
+  const { outDir: dist, basePath } = readBuildOptions();
+  const context = await readContext({ dist, basePath });
+  /* Every configured page in navigation order, then the 404 page. */
+  const slugs = [...Object.keys(context.nav.pages), "404"];
+  const plan = readPlan();
+  const run = await renderAll({ slugs, context, plan });
+  const renderedAt = performance.now();
+  const { styles, pages, files, searchIndex, markdown, skipped } = assemble({
+    slugs,
+    outcomes: run.outcomes,
+  });
+  const notFound = skipped.find((entry) => entry.slug === "404");
+  if (notFound) throw new Error(`The 404 page failed to render: ${notFound.reason}`);
+  for (const [name, contents] of extractSkillPrompts({ pages })) files.set(name, contents);
+  for (const [name, contents] of extractPromptBodies({ pages, basePath }))
+    files.set(name, contents);
+
+  const redirects = siteRedirects({ docsRoot, slugs: Object.keys(context.nav.pages) });
+  files.set("redirects.json", JSON.stringify(redirects));
+  for (const [name, contents] of Object.entries(
+    discoveryFiles({
+      nav: context.nav,
+      lastModified: pageLastModified({ docsRoot }),
+      skills: readAgentSkills(),
+    }),
+  ))
+    files.set(name, contents);
+  files.set("llms-full.txt", llmsFull({ nav: context.nav, exports: markdown }));
+  const searchJson = publishSearchIndex({ entries: searchIndex });
+  files.set("search-index.json", searchJson);
+  for (const [name, contents] of await compressedSearchIndex({
+    json: searchJson,
+    cacheDir: plan.cacheDir ? path.join(path.dirname(plan.cacheDir), "compressed") : null,
+  }))
+    files.set(name, contents);
+  const client = await clientStyles({ dist, basePath, template: context.template });
+  const styled = inlinePageStyles({
+    rules: styles,
+    ...client,
+    pages,
+    placeholder: styleLink({ href: STYLE_PLACEHOLDER }),
+    href: (file) => withBasePath({ basePath, path: `/${file}` }),
+  });
+  for (const [name, contents] of styled.files) files.set(name, contents);
+  for (const [target, page] of styled.pages) pages.set(target, page);
+  const mediaStarted = performance.now();
+  const media = await publishPageMedia({
+    dist,
+    pages,
+    files,
+    basePath,
+    cache: plan.cacheDir !== null,
+  });
+  for (const [target, page] of media.pages) pages.set(target, page);
+  for (const [name, contents] of media.files) files.set(name, contents);
+  redirectPages({ dist, redirects, pages });
+  files.set("skipped.json", JSON.stringify(skipped, null, 2));
+  await writeOutputFiles({ root: dist, files });
+  await copySources({ dist, copies: media.copies });
+  console.log(
+    `[docs-site] media: ${media.images} images, ${media.videos} videos encoded, ${media.copies.size} authored files published in ${((performance.now() - mediaStarted) / 1000).toFixed(1)}s`,
+  );
+
+  const seconds = ((renderedAt - started) / 1000).toFixed(1);
+  console.log(
+    `\n[docs-site] compiled: ${slugs.length - 1 - skipped.length}, skipped: ${skipped.length}, reused: ${run.reused}, rendered: ${run.rendered} on ${run.workers} workers in ${seconds}s`,
+  );
+  failOnSkippedPages({ skipped });
+  await writeVersionedPages({ outDir: dist, pages });
+}
+
+if (isMainThread) await generate();
+else serveRenders();

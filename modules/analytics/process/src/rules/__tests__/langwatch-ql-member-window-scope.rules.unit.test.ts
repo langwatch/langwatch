@@ -7,6 +7,7 @@ import {
   type LangWatchQLMemberWindow,
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
+  TRACE_SOURCES,
 } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
@@ -43,17 +44,20 @@ const MEMBERS = `(TenantId IN ('project_a') OR ${B_FROM})`;
 function scope({
   sql,
   memberWindows,
-  excludeOrigins = [],
+  leftOut = [],
   timeWindow,
 }: {
   sql: string;
   memberWindows?: readonly LangWatchQLMemberWindow[];
-  excludeOrigins?: readonly string[];
+  /** The origins the run leaves out, sent as the sources left in. */
+  leftOut?: readonly string[];
   timeWindow?: { start: string; end: string };
 }): string {
   return scopeLangWatchQL({
     sql,
-    excludeOrigins,
+    ...(leftOut.length > 0
+      ? { sources: TRACE_SOURCES.filter((source) => !leftOut.includes(source)) }
+      : {}),
     database: "analytics",
     views: VIEWS,
     ...(memberWindows ? { memberWindows } : {}),
@@ -133,7 +137,7 @@ describe("scopeLangWatchQL with member windows", () => {
       const scoped = scope({
         sql: "SELECT count() FROM trace_metrics",
         memberWindows: [WHOLE_A, DATED_B],
-        excludeOrigins: ["langy"],
+        leftOut: ["langy"],
       });
 
       expect(scoped).toBe(
@@ -260,7 +264,6 @@ describe("scopeLangWatchQL with member windows", () => {
     it("reads no dated member's evaluations when the traces view is out of reach", () => {
       const scoped = scopeLangWatchQL({
         sql: "SELECT count() FROM evaluations",
-        excludeOrigins: [],
         database: "analytics",
         views: VIEWS.filter((view) => view.name !== "traces"),
         memberWindows: [WHOLE_A, DATED_B],
@@ -318,7 +321,7 @@ describe("scopeLangWatchQL with member windows", () => {
       const refusal = captureRefusal(() =>
         scope({
           sql: `SELECT count() FROM ${POSTGRES_VIEW.name} FINAL`,
-          excludeOrigins: ["langy"],
+          leftOut: ["langy"],
         }),
       );
 

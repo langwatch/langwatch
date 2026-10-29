@@ -109,6 +109,10 @@ func CheckURL(raw string, opts SSRFOptions) error {
 		return ErrSSRFBlocked
 	}
 	if allow {
+		// A name that does not resolve is left to fail at dial time, as below.
+		if ips, err := addrsOf(host, opts); err == nil && anyMetadata(ips, opts, host) {
+			return ErrSSRFBlocked
+		}
 		return nil
 	}
 	if ip := net.ParseIP(host); ip != nil {
@@ -138,10 +142,9 @@ func CheckURL(raw string, opts SSRFOptions) error {
 // otherwise resolve the host a second time inside the standard library
 // and could connect to a different IP than what CheckURL validated.
 //
-// allow-listed hosts skip the IP check entirely and are dialed via the
-// hostname (so the kernel resolver picks an address). The allow-list
-// is the customer-controlled escape hatch — same trust model as
-// CheckURL.
+// allow-listed hosts skip the private-range check but not the metadata
+// one: the name is resolved, refused if any address is cloud metadata,
+// and dialed at the address that was checked.
 func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	base := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -155,17 +158,18 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 			return nil, ErrSSRFBlocked
 		}
 		if allow {
-			return base.DialContext(ctx, network, addr)
-		}
-		var ips []net.IP
-		if ip := net.ParseIP(host); ip != nil {
-			ips = []net.IP{ip}
-		} else {
-			resolved, err := resolveHost(host, opts)
+			ips, err := addrsOf(host, opts)
 			if err != nil {
 				return nil, err
 			}
-			ips = resolved
+			if len(ips) == 0 || anyMetadata(ips, opts, host) {
+				return nil, ErrSSRFBlocked
+			}
+			return checkedAddrs{ips: ips, port: port}.dial(ctx, base, network)
+		}
+		ips, err := addrsOf(host, opts)
+		if err != nil {
+			return nil, err
 		}
 		if len(ips) == 0 {
 			return nil, ErrSSRFBlocked
@@ -175,10 +179,69 @@ func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string
 				return nil, ErrSSRFBlocked
 			}
 		}
-		// Dial against the IP we just validated — net/http's internal
+		// Dial against the IPs we just validated — net/http's internal
 		// resolver can't redirect us to an unchecked address.
-		return base.DialContext(ctx, network, net.JoinHostPort(ips[0].String(), port))
+		return checkedAddrs{ips: ips, port: port}.dial(ctx, base, network)
 	}
+}
+
+// checkedAddrs are addresses the policy has already passed, on one port.
+type checkedAddrs struct {
+	ips  []net.IP
+	port string
+}
+
+// dial tries each checked address in turn, falling back as a dial by name
+// would, and never reaches an address that was not checked.
+func (c checkedAddrs) dial(ctx context.Context, base *net.Dialer, network string) (net.Conn, error) {
+	// Each remaining address gets an equal share of the time left, as Go's own
+	// serial dial does, so one silent address cannot spend the whole timeout.
+	deadline := time.Now().Add(base.Timeout)
+	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+		deadline = d
+	}
+	var lastErr error
+	for i, ip := range c.ips {
+		attemptCtx, cancel := context.WithTimeout(ctx, time.Until(deadline)/time.Duration(len(c.ips)-i))
+		conn, err := base.DialContext(attemptCtx, network, net.JoinHostPort(ip.String(), c.port))
+		cancel()
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+// addrsOf is the literal address, or what the name resolves to.
+func addrsOf(host string, opts SSRFOptions) ([]net.IP, error) {
+	if ip := net.ParseIP(host); ip != nil {
+		return []net.IP{ip}, nil
+	}
+	return resolveHost(host, opts)
+}
+
+// anyMetadata reports whether an allow-listed host reaches cloud metadata,
+// which the allow-list never lifts. An unparseable address counts, failing closed.
+func anyMetadata(ips []net.IP, opts SSRFOptions, host string) bool {
+	for _, ip := range ips {
+		addr, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			opts.logger().Warn("ssrf_refused",
+				zap.String("host", host),
+				zap.String("reason", "unparseable_address"),
+			)
+			return true
+		}
+		if ssrf.Classify(addr.Unmap()) == ssrf.CategoryMetadata {
+			opts.logger().Warn("ssrf_refused",
+				zap.String("host", host),
+				zap.String("reason", "allowlisted_host_resolves_to_metadata"),
+			)
+			return true
+		}
+	}
+	return false
 }
 
 // ErrSSRFBlocked is returned when SSRF policy rejects a destination.
@@ -235,9 +298,9 @@ func allowsLocal(opts SSRFOptions) bool {
 //     NAT64, 6to4, benchmarking, documentation) is refused only under
 //     StrictPublicOnly. See that field for why it is opt-in.
 //
-// The AllowedHosts escape hatch bypasses this check entirely (see hostPolicy),
-// so an operator who does need one of these addresses has a way through
-// without widening the policy for every workflow.
+// The AllowedHosts escape hatch bypasses this check, except for cloud metadata
+// (see anyMetadata), so an operator who does need one of these addresses
+// has a way through without widening the policy for every workflow.
 func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {

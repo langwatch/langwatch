@@ -101,7 +101,9 @@ Reusable framework decisions live with their packages:
 | [181](./181-tsrs-runs-behind-tsc.md)                                           | tsrs runs behind `tsc`                                                                                                     | Proposed                  |
 | [183](./183-vitest-workers-cache-module-loading.md)                            | Vitest workers cache how they load installed packages                                                                      | Proposed                  |
 | [184](./184-isolated-jsdom-files-share-a-worker.md)                            | Isolated jsdom test files share a worker instead of starting a process each                                                | Proposed                  |
+| [185](./185-docs-session-credentials.md)                                       | Short-lived credentials for the documentation playground                                                                   | Accepted                  |
 | [186](./186-test-changed-runs-the-tests-an-edit-reaches.md)                    | `test:changed` runs the tests an edit reaches, from a kept import graph                                                    | Proposed                  |
+| [187](./187-async-inserts-waiting-for-a-slot-share-a-statement.md)             | Async inserts waiting for a statement slot share one statement                                                             | Proposed                  |
 | [190](./190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md) | A routed Instant Evals judgement is priced from the summed cost of its calls, at the one published markup                  | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework

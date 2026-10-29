@@ -10,6 +10,7 @@ import {
   SESSION_REDACTION_SUMMARY,
 } from "../internal/generated/redaction/sessionReport";
 import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
+import { TRACE_SOURCES } from "./commands/dashboards/definitionInput";
 import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
@@ -71,6 +72,13 @@ const NOTE_FLAG_HELP =
 
 /** Help for the `--test-suite` flag on the scenario write commands. */
 const TEST_SUITE_FLAG_HELP = "The test suite to file this scenario in, named by ID or by name.";
+
+/** How a caller of `scenario create` picks the suite; Langy reads `--help`, not only the skill. */
+const SCENARIO_CREATE_SUITE_PICK =
+  "Run `langwatch test-suite list` first and file the scenario in the suite that fits; if none fits, ask the user which suite (or whether to make a new one).";
+
+/** Help for `--test-suite` on `scenario create`: steers the pick before the write. */
+const SCENARIO_CREATE_TEST_SUITE_FLAG_HELP = `The test suite to file this scenario in, by ID or name. ${SCENARIO_CREATE_SUITE_PICK}`;
 
 /**
  * Help for the four scope flags of `run-plan run`. They answer one question,
@@ -1610,8 +1618,12 @@ function registerExperimentCommands(program: Command): void {
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option(
+        "--concurrency <n>",
+        "Cells (one row against one target) to run at once for this run only, 1 to 24 (default: the server's setting; 1 runs them in order)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean; param?: string[] }) => {
+    async (slug: string, options: { wait?: boolean; param?: string[]; concurrency?: string }) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },
@@ -2211,7 +2223,14 @@ function registerDashboardCommands(program: Command): void {
       .option("--description <description>", "What the widget shows")
       .option("--code <code>", "The widget's React source")
       .option("--code-file <path>", "Read the widget's React source from a file")
-      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }");
+      .option(
+        "--queries-file <path>",
+        "JSON file: an array of { name, sql, parameters?, sources? }",
+      )
+      .option(
+        "--sources <list>",
+        `Comma list of the trace origins every query counts: ${TRACE_SOURCES.join(", ")}`,
+      );
 
   emitsResult(
     format(
@@ -3634,11 +3653,11 @@ function registerScenarioCommands(program: Command): void {
   emitsResult(
     scenarioCmd
       .command("create <name>")
-      .description("Create a new scenario")
+      .description(`Create a new scenario. ${SCENARIO_CREATE_SUITE_PICK}`)
       .requiredOption("--situation <situation>", "The situation/context for the scenario")
       .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
       .option("--labels <labels>", "Comma-separated list of labels")
-      .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
+      .option("--test-suite <test-suite>", SCENARIO_CREATE_TEST_SUITE_FLAG_HELP)
       .option("--field <pair>", SCENARIO_FIELD_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (

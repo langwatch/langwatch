@@ -1,6 +1,6 @@
 ---
 title: Azure OpenAI Integration
-sidebarTitle: Go
+sidebarTitle: Go SDK
 description: Instrument Azure OpenAI API calls in Go using LangWatch to monitor model usage, latency, and AI agent evaluation metrics.
 icon: golang
 keywords: go, golang, azure, azure openai, instrumentation, langwatch, native
@@ -93,6 +93,12 @@ The middleware captures input and output content **by default** (`langwatch.Data
   The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
   when your application exits.
 </Warning>
+
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Azure OpenAI call as an LLM span carrying its input, output and token counts.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 

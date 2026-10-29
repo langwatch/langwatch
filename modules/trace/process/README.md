@@ -1492,7 +1492,7 @@ interface Input {
   traceId: string;
   withEditOverlay?: boolean;
 }
-type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:822
+type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:855
 
 // traces.getEvaluations
 // Input: inline, ../contract/src/traces.trpc.ts:191

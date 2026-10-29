@@ -7,14 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   BOARD_PERIOD_RANGES,
-  boardExcludedOrigins,
   boardGrainFits,
-  boardIncludesLangy,
-  boardOriginsWithLangy,
   boardPeriodBounds,
   boardPeriodGranularity,
   boardWindowEnd,
-  defaultBoardExcludedOrigins,
 } from "../model/board-period.ts";
 
 const NOW = Date.UTC(2026, 8, 28);
@@ -119,59 +115,5 @@ describe("fitGranularity", () => {
     expect(boardPeriodGranularity({ grain: "1d", periodStart: 0, periodEnd: thirtyYears })).toBe(
       WEEK_S,
     );
-  });
-});
-
-describe("defaultBoardExcludedOrigins", () => {
-  describe("given a project that holds the member's agent", () => {
-    /** @scenario "AC193 Langy: the origins a board leaves out are a list a board parameter can set later" */
-    it("leaves out Langy's conversations", () => {
-      expect(defaultBoardExcludedOrigins({ isPersonalProject: false })).toEqual(["langy"]);
-    });
-  });
-
-  describe("given a personal project", () => {
-    /** @scenario "AC198 Langy: a board in a personal project shows Langy's conversations" */
-    it("leaves out no origin", () => {
-      expect(defaultBoardExcludedOrigins({ isPersonalProject: true })).toEqual([]);
-    });
-  });
-});
-
-describe("boardExcludedOrigins", () => {
-  describe("given a board that stores no origins", () => {
-    /** @scenario "AC200 Langy setting: a board leaves Langy's conversations out until a member includes them" */
-    it("leaves out the project's default", () => {
-      expect(boardExcludedOrigins({ stored: null, isPersonalProject: false })).toEqual(["langy"]);
-    });
-
-    /** @scenario "AC200c Langy setting: a personal project's board still includes Langy by default" */
-    it("leaves out no origin in a personal project", () => {
-      expect(boardExcludedOrigins({ stored: null, isPersonalProject: true })).toEqual([]);
-    });
-  });
-
-  describe("given a board set to include Langy", () => {
-    /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
-    it("leaves out what it stores, the empty list, wherever it is", () => {
-      expect(boardExcludedOrigins({ stored: [], isPersonalProject: false })).toEqual([]);
-      expect(boardIncludesLangy({ excluded: [] })).toBe(true);
-    });
-  });
-});
-
-describe("boardOriginsWithLangy", () => {
-  /** @scenario "AC200b Langy setting: a board set to include Langy runs every widget with no origin left out" */
-  it("drops langy when the member includes it, and keeps other origins", () => {
-    expect(boardOriginsWithLangy({ excluded: ["langy"], includeLangy: true })).toEqual([]);
-    expect(boardOriginsWithLangy({ excluded: ["eval", "langy"], includeLangy: true })).toEqual([
-      "eval",
-    ]);
-  });
-
-  /** @scenario "AC200c Langy setting: a personal project's board still includes Langy by default" */
-  it("adds langy when the member leaves it out", () => {
-    expect(boardOriginsWithLangy({ excluded: [], includeLangy: false })).toEqual(["langy"]);
-    expect(boardIncludesLangy({ excluded: ["langy"] })).toBe(false);
   });
 });

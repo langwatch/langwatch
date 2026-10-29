@@ -43,6 +43,7 @@ import type {
   TranslateInput,
   TranslateOutput,
 } from "./model-provider.ts";
+import type { BuiltInModel } from "./model-selection.ts";
 
 export interface ModelProviderCaller {
   readonly id: string;
@@ -299,11 +300,16 @@ export interface ModelProviderApi {
   findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null>;
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution>;
   /**
-   * What the project's Instant Evals run on: LangWatch's classifier, or the organization's own
-   * decision model with its decrypted key. An own model that cannot run answers `own_unavailable`,
-   * never `langwatch` (ADR-182 decisions 4 and 5). The answer is kept a minute per project.
+   * What the project's Instant Evals run on, or `model` when a caller picked one: LangWatch's
+   * classifier, or the organization's own decision model with its key. One that cannot run
+   * answers `own_unavailable`, never `langwatch`; a non-decision model id is ignored (ADR-182).
    */
-  resolveDecisionModel(input: { projectId: string }): Promise<DecisionModelResolution>;
+  resolveDecisionModel(input: {
+    projectId: string;
+    model?: string;
+  }): Promise<DecisionModelResolution>;
+  /** The decision models this project may be offered, hosted first; see `resolveDecisionModel`. */
+  listDecisionModelsForProject(input: { projectId: string }): Promise<readonly BuiltInModel[]>;
   findAlternateModel(input: {
     projectId: string;
     featureKey: string;

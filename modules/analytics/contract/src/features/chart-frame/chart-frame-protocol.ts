@@ -191,6 +191,8 @@ export interface LwErrorMessage {
 
 export interface LwHeartbeatMessage {
   readonly type: "lw:heartbeat";
+  /** The widget's code has mounted and waits on nothing: no query open, no retry pending. */
+  readonly idle: boolean;
 }
 
 export type FrameToParentMessage =

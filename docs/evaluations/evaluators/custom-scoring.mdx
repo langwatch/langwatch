@@ -25,7 +25,7 @@ With custom scoring, you:
 2. Send the results (score, passed, label, details) to LangWatch
 3. View results in traces, analytics, and dashboards
 
-```
+```text
 Your Code → Your Evaluation Logic → Score/Pass/Fail → LangWatch
                                                           ↓
                                               Traces, Analytics, Alerts
@@ -189,6 +189,8 @@ At least one of `passed`, `score`, or `label` should be provided for meaningful 
 ### Code Quality Check
 
 ```python
+import langwatch
+
 def check_code_quality(generated_code: str) -> dict:
     # Your custom logic
     has_syntax_errors = check_syntax(generated_code)
@@ -268,6 +270,8 @@ def validate_response(response: str, context: dict) -> dict:
 You can use custom scoring alongside built-in evaluators:
 
 ```python
+import langwatch
+
 @langwatch.span()
 def my_llm_step(user_input: str):
     output = my_llm(user_input)

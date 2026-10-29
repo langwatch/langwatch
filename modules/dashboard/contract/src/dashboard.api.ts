@@ -10,7 +10,6 @@ import type { Trigger } from "@langwatch/automation-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type {
-  Board,
   BoardSummary,
   Dashboard,
   DashboardScope,
@@ -104,16 +103,16 @@ export interface DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Board>;
+  }): Promise<Dashboard>;
   /**
    * A Dashboards board at the scope Project; `createdById` is its author, absent for a project
    * credential. A member's own My dashboard starts starred for them, at Only me (AC160b, AC170).
    * `dashboards_not_enabled` while `release_dashboards` is off (AC189).
    */
-  createBoard(input: { projectId: string; name: string; createdById?: string }): Promise<Board>;
+  createBoard(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
   /**
-   * The board's name, description and left-out origins (`null` restores the default, AC200), an
-   * absent field left as it is; `dashboards_not_enabled` while `release_dashboards` is off.
+   * The board's name and description, an absent field left as it is; `dashboards_not_enabled`
+   * while `release_dashboards` is off.
    */
   updateBoard(input: {
     projectId: string;
@@ -121,8 +120,7 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
-    excludedOrigins?: readonly string[] | null;
-  }): Promise<Board>;
+  }): Promise<Dashboard>;
   /**
    * The board, its widgets, every star on it and its stale legacy copy (AC199b);
    * `dashboards_not_enabled` while `release_dashboards` is off.
@@ -131,7 +129,7 @@ export interface DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Board>;
+  }): Promise<Dashboard>;
 
   /** The member's stars for this project, boards and templates, in their own order. */
   listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]>;
@@ -164,7 +162,7 @@ export interface DashboardApi {
     dashboardId: string;
     scope: DashboardScope;
     viewer: DashboardViewer;
-  }): Promise<Board>;
+  }): Promise<Dashboard>;
   /** Dashboards area: how many other members starred the author's board. */
   getDashboardScopeImpact(input: {
     projectId: string;

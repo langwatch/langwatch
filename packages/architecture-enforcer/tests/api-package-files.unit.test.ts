@@ -20,6 +20,10 @@ const TARGET_FILES = new Set([
   "errors.ts",
   "handler-arguments.ts",
   "json-text-field.ts",
+  // What a transport answers when a handler's value breaks its output schema.
+  "output-salvage.ts",
+  // How that failure's issue path is logged: declared keys only.
+  "output-issue-path.ts",
   "ports.ts",
   "schema.ts",
   "websocket.ts",
@@ -38,6 +42,7 @@ const TARGET_FILES = new Set([
   "hosting/session-reader.ts",
   "hosting/api-discovery.ts",
   "hosting/browser-bundle.ts",
+  "hosting/embedded-document.ts",
   "hosting/framed-document.ts",
   "hosting/http-mux.ts",
   "hosting/openapi-document.ts",

@@ -354,7 +354,7 @@ type Response = z.infer<typeof queryReferenceSchema>; // ../contract/src/feature
 
 ### `analytics.lwql`
 
-Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:74`, router `src/transport/analytics-lwql.trpc.ts:76`.
+Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:76`, router `src/transport/analytics-lwql.trpc.ts:76`.
 
 | Procedure                     | Kind     | Gate                        | Input                    | Output                          |
 | ----------------------------- | -------- | --------------------------- | ------------------------ | ------------------------------- |
@@ -365,7 +365,7 @@ Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:74`, router `src/
 
 ```typescript
 // analytics.lwql.availability
-// Input: lwqlProjectScopeSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:24
+// Input: lwqlProjectScopeSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
 interface Input {
   projectId: string;
 }
@@ -376,11 +376,11 @@ interface Output {
 }
 
 // analytics.lwql.schema
-type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:24
+type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
 type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:212
 
 // analytics.lwql.validate
-// Input: lwqlRunRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:32
+// Input: lwqlRunRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:33
 interface Input {
   projectId: string;
   sql: string;
@@ -391,21 +391,10 @@ interface Input {
   };
   granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
 }
-type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:70
+type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:72
 
 // analytics.lwql.query
-// Input: lwqlQueryRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:43
-interface Input {
-  projectId: string;
-  sql: string;
-  parameters?: Record<string, string | number | boolean | null>;
-  timeWindow?: {
-    start: string | number | unknown;
-    end: string | number | unknown;
-  };
-  granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
-  excludeOrigins?: string[];
-}
+type Input = z.infer<typeof lwqlQueryRequestSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:45
 type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:111
 ```
 

@@ -332,3 +332,84 @@ describe("handleListDashboards()", () => {
     });
   });
 });
+
+describe("a widget's sources through the MCP widget tools", () => {
+  const QUERY = { name: "turns", sql: "SELECT count() FROM traces" };
+
+  /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+  it("creates a widget whose every query counts the sources the agent names", async () => {
+    await handleAddDashboardWidget({
+      dashboardId: "dash_1",
+      name: "Langy requests",
+      code: "export default () => null;",
+      queries: { turns: QUERY.sql },
+      sources: ["langy"],
+    });
+
+    expect(mockCreateWidgetOnDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({ queries: [{ ...QUERY, sources: ["langy"] }] }),
+    );
+  });
+
+  /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+  it("updates only the sources, sending the stored queries back with the new list", async () => {
+    mockGetWidgetOnDashboard.mockResolvedValue({
+      ...sampleWidget,
+      dashboardId: "dash_1",
+      definition: { ...sampleWidget.definition, queries: [QUERY] },
+    });
+    mockUpdateWidgetOnDashboard.mockResolvedValue({ ...sampleWidget, dashboardId: "dash_1" });
+
+    await handleUpdateDashboardWidget({
+      dashboardId: "dash_1",
+      widgetId: "widget_1",
+      sources: ["application", "langy"],
+    });
+
+    expect(mockUpdateWidgetOnDashboard).toHaveBeenCalledWith({
+      dashboardId: "dash_1",
+      widgetId: "widget_1",
+      queries: [{ ...QUERY, sources: ["application", "langy"] }],
+    });
+  });
+
+  /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+  it("clears the list with null, so each query counts the default again", async () => {
+    mockGetWidgetOnDashboard.mockResolvedValue({
+      ...sampleWidget,
+      dashboardId: "dash_1",
+      definition: { ...sampleWidget.definition, queries: [{ ...QUERY, sources: ["langy"] }] },
+    });
+    mockUpdateWidgetOnDashboard.mockResolvedValue({ ...sampleWidget, dashboardId: "dash_1" });
+
+    await handleUpdateDashboardWidget({
+      dashboardId: "dash_1",
+      widgetId: "widget_1",
+      sources: null,
+    });
+
+    expect(mockUpdateWidgetOnDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({ queries: [{ ...QUERY, sources: null }] }),
+    );
+  });
+
+  /** @scenario "AC200n Sources: an unknown source is refused at every door" */
+  it("refuses an unknown source at both tools' input, and takes every listed one", async () => {
+    const { createMcpServer } = await import("../create-mcp-server.ts");
+    const tools = (
+      createMcpServer() as unknown as {
+        _registeredTools: Record<string, { inputSchema: { parse(value: unknown): unknown } }>;
+      }
+    )._registeredTools;
+    const add = { dashboardId: "d", name: "n", code: "c", queries: { q: "SELECT 1" } };
+    const update = { dashboardId: "d", widgetId: "w" };
+    const parse = (tool: string, input: object) => () => tools[tool]?.inputSchema.parse(input);
+
+    expect(parse("add_dashboard_widget", { ...add, sources: ["Langy"] })).toThrow(/sources/);
+    expect(parse("update_dashboard_widget", { ...update, sources: ["langy') OR 1"] })).toThrow(
+      /sources/,
+    );
+    expect(parse("add_dashboard_widget", { ...add, sources: ["langy", "other"] })).not.toThrow();
+    expect(parse("update_dashboard_widget", { ...update, sources: null })).not.toThrow();
+  });
+});

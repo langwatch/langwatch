@@ -854,6 +854,9 @@ from .get_api_dashboards_by_dashboard_id_widgets_by_widget_id_response_200_defin
 from .get_api_dashboards_by_dashboard_id_widgets_by_widget_id_response_200_definition_queries_item_parameters_item_type import (
     GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItemType,
 )
+from .get_api_dashboards_by_dashboard_id_widgets_by_widget_id_response_200_definition_queries_item_sources_type_0_item import (
+    GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item,
+)
 from .get_api_dashboards_by_dashboard_id_widgets_by_widget_id_response_200_definition_source_type_0 import (
     GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionSourceType0,
 )
@@ -941,6 +944,9 @@ from .get_api_dashboards_by_dashboard_id_widgets_response_200_data_item_definiti
 )
 from .get_api_dashboards_by_dashboard_id_widgets_response_200_data_item_definition_queries_item_parameters_item_type import (
     GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionQueriesItemParametersItemType,
+)
+from .get_api_dashboards_by_dashboard_id_widgets_response_200_data_item_definition_queries_item_sources_type_0_item import (
+    GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionQueriesItemSourcesType0Item,
 )
 from .get_api_dashboards_by_dashboard_id_widgets_response_200_data_item_definition_source_type_0 import (
     GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionSourceType0,
@@ -2603,6 +2609,9 @@ from .get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id
 from .get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_queries_item_parameters_item_type import (
     GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItemType,
 )
+from .get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_queries_item_sources_type_0_item import (
+    GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item,
+)
 from .get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_0 import (
     GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0,
 )
@@ -2692,6 +2701,9 @@ from .get_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_200
 )
 from .get_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_200_data_item_definition_queries_item_parameters_item_type import (
     GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionQueriesItemParametersItemType,
+)
+from .get_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_200_data_item_definition_queries_item_sources_type_0_item import (
+    GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionQueriesItemSourcesType0Item,
 )
 from .get_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_200_data_item_definition_source_type_0 import (
     GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionSourceType0,
@@ -3454,6 +3466,9 @@ from .patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_body_queries_ite
 from .patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_body_queries_item_parameters_item_type import (
     PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItemParametersItemType,
 )
+from .patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_body_queries_item_sources_type_0_item import (
+    PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItemSourcesType0Item,
+)
 from .patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_body_source_type_0 import (
     PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodySourceType0,
 )
@@ -3480,6 +3495,9 @@ from .patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_response_200_def
 )
 from .patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_response_200_definition_queries_item_parameters_item_type import (
     PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItemType,
+)
+from .patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_response_200_definition_queries_item_sources_type_0_item import (
+    PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item,
 )
 from .patch_api_dashboards_by_dashboard_id_widgets_by_widget_id_response_200_definition_source_type_0 import (
     PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionSourceType0,
@@ -4011,6 +4029,9 @@ from .patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_
 from .patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_body_queries_item_parameters_item_type import (
     PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodyQueriesItemParametersItemType,
 )
+from .patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_body_queries_item_sources_type_0_item import (
+    PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodyQueriesItemSourcesType0Item,
+)
 from .patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_body_source_type_0 import (
     PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodySourceType0,
 )
@@ -4037,6 +4058,9 @@ from .patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_
 )
 from .patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_queries_item_parameters_item_type import (
     PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItemType,
+)
+from .patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_queries_item_sources_type_0_item import (
+    PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item,
 )
 from .patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_0 import (
     PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0,
@@ -5304,6 +5328,9 @@ from .post_api_dashboards_by_dashboard_id_widgets_body_queries_item_parameters_i
 from .post_api_dashboards_by_dashboard_id_widgets_body_queries_item_parameters_item_type import (
     PostApiDashboardsByDashboardIdWidgetsBodyQueriesItemParametersItemType,
 )
+from .post_api_dashboards_by_dashboard_id_widgets_body_queries_item_sources_type_0_item import (
+    PostApiDashboardsByDashboardIdWidgetsBodyQueriesItemSourcesType0Item,
+)
 from .post_api_dashboards_by_dashboard_id_widgets_body_source_type_0 import (
     PostApiDashboardsByDashboardIdWidgetsBodySourceType0,
 )
@@ -5328,6 +5355,9 @@ from .post_api_dashboards_by_dashboard_id_widgets_response_201_definition_querie
 )
 from .post_api_dashboards_by_dashboard_id_widgets_response_201_definition_queries_item_parameters_item_type import (
     PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItemParametersItemType,
+)
+from .post_api_dashboards_by_dashboard_id_widgets_response_201_definition_queries_item_sources_type_0_item import (
+    PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItemSourcesType0Item,
 )
 from .post_api_dashboards_by_dashboard_id_widgets_response_201_definition_source_type_0 import (
     PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionSourceType0,
@@ -7745,6 +7775,9 @@ from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_body_querie
 from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_body_queries_item_parameters_item_type import (
     PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodyQueriesItemParametersItemType,
 )
+from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_body_queries_item_sources_type_0_item import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodyQueriesItemSourcesType0Item,
+)
 from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_body_source_type_0 import (
     PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodySourceType0,
 )
@@ -7774,6 +7807,9 @@ from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_i
 )
 from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200_definition_queries_item_parameters_item_type import (
     PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemParametersItemType,
+)
+from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200_definition_queries_item_sources_type_0_item import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemSourcesType0Item,
 )
 from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_dashboard_response_200_definition_source_type_0 import (
     PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionSourceType0,
@@ -7861,6 +7897,9 @@ from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_20
 )
 from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition_queries_item_parameters_item_type import (
     PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItemParametersItemType,
+)
+from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition_queries_item_sources_type_0_item import (
+    PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItemSourcesType0Item,
 )
 from .post_api_v1_projects_by_project_id_analytics_dashboard_widgets_response_201_definition_source_type_0 import (
     PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionSourceType0,
@@ -8539,6 +8578,7 @@ from .rerun_run_plan_response_200_items_item_target_type import RerunRunPlanResp
 from .rerun_run_plan_response_200_skipped_archived import RerunRunPlanResponse200SkippedArchived
 from .rerun_run_plan_response_404 import RerunRunPlanResponse404
 from .revoke_api_key_response_200 import RevokeApiKeyResponse200
+from .revoke_docs_session_response_200 import RevokeDocsSessionResponse200
 from .revoke_grant_response_200 import RevokeGrantResponse200
 from .revoke_organization_invite_response_200 import RevokeOrganizationInviteResponse200
 from .revoke_scim_token_response_200 import RevokeScimTokenResponse200
@@ -9756,6 +9796,7 @@ __all__ = (
     "GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItem",
     "GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItem",
     "GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItemType",
+    "GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item",
     "GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionSourceType0",
     "GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionSourceType1",
     "GetApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionSourceType2",
@@ -9786,6 +9827,7 @@ __all__ = (
     "GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionQueriesItem",
     "GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionQueriesItemParametersItem",
     "GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionQueriesItemParametersItemType",
+    "GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionQueriesItemSourcesType0Item",
     "GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionSourceType0",
     "GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionSourceType1",
     "GetApiDashboardsByDashboardIdWidgetsResponse200DataItemDefinitionSourceType2",
@@ -10704,6 +10746,7 @@ __all__ = (
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItem",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItem",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItemType",
+    "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2",
@@ -10734,6 +10777,7 @@ __all__ = (
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionQueriesItem",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionQueriesItemParametersItem",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionQueriesItemParametersItemType",
+    "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionQueriesItemSourcesType0Item",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionSourceType0",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionSourceType1",
     "GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse200DataItemDefinitionSourceType2",
@@ -11160,6 +11204,7 @@ __all__ = (
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItem",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItemParametersItem",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItemParametersItemType",
+    "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodyQueriesItemSourcesType0Item",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodySourceType0",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodySourceType1",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdBodySourceType2",
@@ -11169,6 +11214,7 @@ __all__ = (
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItem",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItem",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItemType",
+    "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionSourceType0",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionSourceType1",
     "PatchApiDashboardsByDashboardIdWidgetsByWidgetIdResponse200DefinitionSourceType2",
@@ -11459,6 +11505,7 @@ __all__ = (
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodyQueriesItem",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodyQueriesItemParametersItem",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodyQueriesItemParametersItemType",
+    "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodyQueriesItemSourcesType0Item",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodySourceType0",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodySourceType1",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdBodySourceType2",
@@ -11468,6 +11515,7 @@ __all__ = (
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItem",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItem",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemParametersItemType",
+    "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItemSourcesType0Item",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1",
     "PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2",
@@ -11956,6 +12004,7 @@ __all__ = (
     "PostApiDashboardsByDashboardIdWidgetsBodyQueriesItem",
     "PostApiDashboardsByDashboardIdWidgetsBodyQueriesItemParametersItem",
     "PostApiDashboardsByDashboardIdWidgetsBodyQueriesItemParametersItemType",
+    "PostApiDashboardsByDashboardIdWidgetsBodyQueriesItemSourcesType0Item",
     "PostApiDashboardsByDashboardIdWidgetsBodySourceType0",
     "PostApiDashboardsByDashboardIdWidgetsBodySourceType1",
     "PostApiDashboardsByDashboardIdWidgetsBodySourceType2",
@@ -11965,6 +12014,7 @@ __all__ = (
     "PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItem",
     "PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItemParametersItem",
     "PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItemParametersItemType",
+    "PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionQueriesItemSourcesType0Item",
     "PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionSourceType0",
     "PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionSourceType1",
     "PostApiDashboardsByDashboardIdWidgetsResponse201DefinitionSourceType2",
@@ -13181,6 +13231,7 @@ __all__ = (
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodyQueriesItem",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodyQueriesItemParametersItem",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodyQueriesItemParametersItemType",
+    "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodyQueriesItemSourcesType0Item",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodySourceType0",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodySourceType1",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsBodySourceType2",
@@ -13191,6 +13242,7 @@ __all__ = (
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItem",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemParametersItem",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemParametersItemType",
+    "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionQueriesItemSourcesType0Item",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionSourceType0",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionSourceType1",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse200DefinitionSourceType2",
@@ -13220,6 +13272,7 @@ __all__ = (
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItem",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItemParametersItem",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItemParametersItemType",
+    "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionQueriesItemSourcesType0Item",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionSourceType0",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionSourceType1",
     "PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse201DefinitionSourceType2",
@@ -13655,6 +13708,7 @@ __all__ = (
     "RerunRunPlanResponse200SkippedArchived",
     "RerunRunPlanResponse404",
     "RevokeApiKeyResponse200",
+    "RevokeDocsSessionResponse200",
     "RevokeGrantResponse200",
     "RevokeOrganizationInviteResponse200",
     "RevokeScimTokenResponse200",
