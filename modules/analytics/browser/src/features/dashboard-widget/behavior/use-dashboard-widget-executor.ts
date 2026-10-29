@@ -32,7 +32,12 @@ import type { LangWatchQLParameterValue } from "../../../model/lwql-request-stat
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 /** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
-const LIMIT_DIAGNOSTIC_CODES: readonly string[] = ["SHARE_WINDOW_LIMITED", "FIELDS_REDACTED"];
+const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
+  "SHARE_WINDOW_LIMITED",
+  "FIELDS_REDACTED",
+  "SOURCES_IGNORED",
+  "GRANULARITY_COARSENED",
+];
 
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
 

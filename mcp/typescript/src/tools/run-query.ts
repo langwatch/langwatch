@@ -59,21 +59,11 @@ export async function handleRunQuery(params: {
   return lines.join("\n");
 }
 
-/**
- * What the run was bound to, as one line plus the JSON: read `followsSources` before `sources`,
- * since a statement that does not read the parameter counts every origin whatever `sources` says.
- */
+/** What the run was bound to: every placeholder the SQL declares, by its SQL name. */
 function describeParams(
   params: NonNullable<Awaited<ReturnType<typeof runQuery>>["params"]>,
 ): string {
-  const sources = params.followsSources
-    ? params.sources.join(", ")
-    : "all sources (the SQL does not read {dashboard_context_sources})";
-
-  return [
-    `Ran with sources: ${sources}; projects: ${params.projects.join(", ")}.`,
-    "```json",
-    JSON.stringify({ params }, null, 2),
-    "```",
-  ].join("\n");
+  return ["Ran with these placeholders:", "```json", JSON.stringify(params, null, 2), "```"].join(
+    "\n",
+  );
 }

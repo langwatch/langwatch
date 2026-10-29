@@ -25,16 +25,8 @@ export interface QueryRunResponse {
   };
   truncated: boolean;
   diagnostics: { code: string; message: string }[];
-  /** What the run was bound to; absent from a platform that predates it. */
-  params?: {
-    sources: string[];
-    followsSources: boolean;
-    projects: string[];
-    period?: { start: string; end: string };
-    granularitySeconds?: number;
-    coarsenedFromSeconds?: number;
-    parameters: Record<string, unknown>;
-  };
+  /** Each placeholder the SQL declares by its name, plus `period`; absent on an older platform. */
+  params?: Record<string, unknown>;
 }
 
 /** One published dataset. */

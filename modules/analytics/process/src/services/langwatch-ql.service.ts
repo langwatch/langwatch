@@ -35,9 +35,10 @@ import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.
 import {
   buildRunParams,
   resolveRunSources,
-  shareWindowDiagnostics,
+  runNotes,
 } from "../rules/langwatch-ql-run-params.rules.ts";
 import {
+  langWatchQLExecutionParameters,
   langWatchQLMissingParameters,
   type ValidatedLangWatchQL,
 } from "../rules/langwatch-ql-validation-shape.rules.ts";
@@ -406,17 +407,21 @@ export class LangWatchQLService {
     });
 
     const params = buildRunParams({
-      sources: boundSources,
-      followsSources: validation.followsSources,
-      projects: projectIds,
+      bound: langWatchQLExecutionParameters({ validation, granularity }),
       followedWindow,
-      granularity,
-      parameters,
     });
     const limited = {
       ...result,
       params,
-      diagnostics: [...result.diagnostics, ...shareWindowDiagnostics(memberWindows)],
+      diagnostics: [
+        ...result.diagnostics,
+        ...runNotes({
+          memberWindows,
+          sources,
+          followsSources: validation.followsSources,
+          granularity,
+        }),
+      ],
     };
     if (completeness.kind !== "reported") return limited;
     return { ...limited, completeness: completeness.completeness };

@@ -152,9 +152,9 @@ def sync_detailed(
     (404), with one body that names no id. Send `sources` to bind
     `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
     that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
-    the projects read. The answer's `params` lists what the run was bound to: `sources`,
-    `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and
-    `coarsenedFromSeconds` when the step was coarsened.
+    the projects read. The answer's `params` lists every placeholder the statement declares by its SQL
+    name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says
+    `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -232,9 +232,9 @@ def sync(
     (404), with one body that names no id. Send `sources` to bind
     `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
     that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
-    the projects read. The answer's `params` lists what the run was bound to: `sources`,
-    `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and
-    `coarsenedFromSeconds` when the step was coarsened.
+    the projects read. The answer's `params` lists every placeholder the statement declares by its SQL
+    name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says
+    `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -306,9 +306,9 @@ async def asyncio_detailed(
     (404), with one body that names no id. Send `sources` to bind
     `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
     that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
-    the projects read. The answer's `params` lists what the run was bound to: `sources`,
-    `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and
-    `coarsenedFromSeconds` when the step was coarsened.
+    the projects read. The answer's `params` lists every placeholder the statement declares by its SQL
+    name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says
+    `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it
@@ -384,9 +384,9 @@ async def asyncio(
     (404), with one body that names no id. Send `sources` to bind
     `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads
     that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to
-    the projects read. The answer's `params` lists what the run was bound to: `sources`,
-    `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and
-    `coarsenedFromSeconds` when the step was coarsened.
+    the projects read. The answer's `params` lists every placeholder the statement declares by its SQL
+    name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says
+    `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
 
     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the
     query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it

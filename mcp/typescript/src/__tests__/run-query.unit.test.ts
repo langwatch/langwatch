@@ -28,12 +28,7 @@ describe("given run_query is called with projects and sources", () => {
   it("passes them on and shows the params the platform answered with", async () => {
     mockRunQuery.mockResolvedValue({
       ...RESULT,
-      params: {
-        sources: ["application"],
-        followsSources: false,
-        projects: ["A"],
-        parameters: {},
-      },
+      params: { dashboard_context_projects: ["A"] },
     });
 
     const text = await handleRunQuery({
@@ -47,10 +42,7 @@ describe("given run_query is called with projects and sources", () => {
       projects: ["A"],
       sources: ["application"],
     });
-    expect(text).toContain(
-      "sources: all sources (the SQL does not read {dashboard_context_sources})",
-    );
-    expect(text).toContain('"projects": [\n      "A"\n    ]');
+    expect(text).toContain('"dashboard_context_projects": [\n    "A"\n  ]');
   });
 
   /** @scenario "QP29 Every door returns the limiting diagnostics" */
@@ -73,15 +65,10 @@ describe("given run_query is called with projects and sources", () => {
   it("shows the sources when the statement read them", async () => {
     mockRunQuery.mockResolvedValue({
       ...RESULT,
-      params: {
-        sources: ["application", "langy"],
-        followsSources: true,
-        projects: ["A"],
-        parameters: {},
-      },
+      params: { dashboard_context_sources: ["application", "langy"] },
     });
 
-    expect(await handleRunQuery({ sql: "SELECT 1" })).toContain("sources: application, langy");
+    expect(await handleRunQuery({ sql: "SELECT 1" })).toContain('"application",\n    "langy"');
   });
 });
 

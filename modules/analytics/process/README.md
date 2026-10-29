@@ -367,7 +367,7 @@ Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:78`, router `src/
 interface Input {
   projectId: string;
 }
-// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:508
+// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:500
 interface Output {
   available: boolean;
   reason?: "disabled" | "unprovisioned";
@@ -375,7 +375,7 @@ interface Output {
 
 // analytics.lwql.schema
 type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
-type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:238
+type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:230
 
 // analytics.lwql.validate
 // Input: lwqlRunRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:33
@@ -393,7 +393,7 @@ type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/fea
 
 // analytics.lwql.query
 type Input = z.infer<typeof lwqlQueryRequestSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:47
-type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:137
+type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:129
 ```
 
 ### `analytics`

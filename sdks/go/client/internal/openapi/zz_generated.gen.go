@@ -24329,12 +24329,14 @@ const (
 	APPFUNCTIONRESULTTRUNCATED PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_RESULT_TRUNCATED"
 	APPFUNCTIONUNRESOLVEDKEYS  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_UNRESOLVED_KEYS"
 	APPFUNCTIONVALUETRUNCATED  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_VALUE_TRUNCATED"
+	GRANULARITYCOARSENED       PostApiV1Query200JSONResponseBodyDiagnosticsCode = "GRANULARITY_COARSENED"
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
 	INSTANTEVALSKIPPED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INSTANT_EVAL_SKIPPED"
 	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
 	MULTIPROJECTRESULT         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
 	POSSIBLEFANOUT             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
 	SHAREWINDOWLIMITED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "SHARE_WINDOW_LIMITED"
+	SOURCESIGNORED             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "SOURCES_IGNORED"
 	UNBOUNDEDTIMERANGE         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "UNBOUNDED_TIME_RANGE"
 )
 
@@ -24347,6 +24349,8 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 		return true
 	case APPFUNCTIONVALUETRUNCATED:
 		return true
+	case GRANULARITYCOARSENED:
+		return true
 	case INCOMPLETECOMPARISONPERIOD:
 		return true
 	case INSTANTEVALSKIPPED:
@@ -24358,6 +24362,8 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	case POSSIBLEFANOUT:
 		return true
 	case SHAREWINDOWLIMITED:
+		return true
+	case SOURCESIGNORED:
 		return true
 	case UNBOUNDEDTIMERANGE:
 		return true
@@ -165648,23 +165654,12 @@ type PostApiV1QueryResponse struct {
 			Message string                                           `json:"message"`
 			Meta    *map[string]interface{}                          `json:"meta,omitempty"`
 		} `json:"diagnostics,omitempty"`
-		FollowsGranularity bool     `json:"followsGranularity"`
-		FollowsTimeWindow  bool     `json:"followsTimeWindow"`
-		GranularitySeconds *float32 `json:"granularitySeconds,omitempty"`
-		Params             *struct {
-			CoarsenedFromSeconds *float32               `json:"coarsenedFromSeconds,omitempty"`
-			FollowsSources       bool                   `json:"followsSources"`
-			GranularitySeconds   *float32               `json:"granularitySeconds,omitempty"`
-			Parameters           map[string]interface{} `json:"parameters"`
-			Period               *struct {
-				End   string `json:"end"`
-				Start string `json:"start"`
-			} `json:"period,omitempty"`
-			Projects *[]string `json:"projects,omitempty"`
-			Sources  *[]string `json:"sources,omitempty"`
-		} `json:"params,omitempty"`
-		Rows       *[]map[string]interface{} `json:"rows,omitempty"`
-		Statistics struct {
+		FollowsGranularity bool                      `json:"followsGranularity"`
+		FollowsTimeWindow  bool                      `json:"followsTimeWindow"`
+		GranularitySeconds *float32                  `json:"granularitySeconds,omitempty"`
+		Params             *map[string]interface{}   `json:"params,omitempty"`
+		Rows               *[]map[string]interface{} `json:"rows,omitempty"`
+		Statistics         struct {
 			BytesRead    float32 `json:"bytesRead"`
 			ElapsedMs    float32 `json:"elapsedMs"`
 			RowsRead     float32 `json:"rowsRead"`
@@ -198788,23 +198783,12 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 				Message string                                           `json:"message"`
 				Meta    *map[string]interface{}                          `json:"meta,omitempty"`
 			} `json:"diagnostics,omitempty"`
-			FollowsGranularity bool     `json:"followsGranularity"`
-			FollowsTimeWindow  bool     `json:"followsTimeWindow"`
-			GranularitySeconds *float32 `json:"granularitySeconds,omitempty"`
-			Params             *struct {
-				CoarsenedFromSeconds *float32               `json:"coarsenedFromSeconds,omitempty"`
-				FollowsSources       bool                   `json:"followsSources"`
-				GranularitySeconds   *float32               `json:"granularitySeconds,omitempty"`
-				Parameters           map[string]interface{} `json:"parameters"`
-				Period               *struct {
-					End   string `json:"end"`
-					Start string `json:"start"`
-				} `json:"period,omitempty"`
-				Projects *[]string `json:"projects,omitempty"`
-				Sources  *[]string `json:"sources,omitempty"`
-			} `json:"params,omitempty"`
-			Rows       *[]map[string]interface{} `json:"rows,omitempty"`
-			Statistics struct {
+			FollowsGranularity bool                      `json:"followsGranularity"`
+			FollowsTimeWindow  bool                      `json:"followsTimeWindow"`
+			GranularitySeconds *float32                  `json:"granularitySeconds,omitempty"`
+			Params             *map[string]interface{}   `json:"params,omitempty"`
+			Rows               *[]map[string]interface{} `json:"rows,omitempty"`
+			Statistics         struct {
 				BytesRead    float32 `json:"bytesRead"`
 				ElapsedMs    float32 `json:"elapsedMs"`
 				RowsRead     float32 `json:"rowsRead"`

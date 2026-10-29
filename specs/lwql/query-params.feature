@@ -9,7 +9,10 @@ Feature: Every query door takes the same parameters and says what it ran with
   # Where: the doors are tRPC `analytics.lwql.query` (card runs), REST `POST /api/v1/query`, the MCP
   # `run_query` tool and the CLI `langwatch query run`. They share one resolution step in Analytics.
   # What: a run's parameters are the period and grain (dashboard_context_*), `sources` and
-  # `projects`. The answer returns them as `params`.
+  # `projects`. The answer returns them as `params`, one flat map of every placeholder the
+  # statement declares by its SQL name, plus `period` (owner, 2026-10-29: "yes"). What a run
+  # ignored or coarsened comes back as the diagnostics SOURCES_IGNORED and GRANULARITY_COARSENED
+  # (owner, 2026-10-29: "ok"), not as params keys.
   # What is not a parameter: the row policy, the share windows and the redaction of captured
   # content come from the credential and its grants, never from the request.
   # Decided by the owner (2026-10-29): no hidden filter, so QP05 and QP06 stand ("why have a hidden
@@ -27,21 +30,21 @@ Feature: Every query door takes the same parameters and says what it ran with
     Scenario: QP01 A run that names no sources is bound to application
       When a run at any door, naming its projects where the key is not a project key, names no sources
       Then {dashboard_context_sources:Array(String)} is bound to ["application"]
-      And params.sources is ["application"]
+      And params.dashboard_context_sources is ["application"] where the statement reads it
       # Evidence: the four answers (tRPC, REST, MCP, CLI) quoted for one statement
 
     @unit @integration
     Scenario: QP02 A card run reads the board's project
       Given a board open in project "A"
       When a widget storing no projects runs through analytics.lwql.query
-      Then {dashboard_context_projects:Array(String)} is bound to ["A"] and params.projects is ["A"]
+      Then {dashboard_context_projects:Array(String)} is bound to ["A"] and params.dashboard_context_projects is ["A"] where the statement reads it
       # Evidence: the tRPC answer quoted, and a haven browser screenshot of the card
 
     @unit @integration
     Scenario: QP03 A project key reads its own project by default
       Given a project API key for project "A"
       When it runs a statement with no projects at REST, MCP or the CLI
-      Then params.projects is ["A"]
+      Then params.dashboard_context_projects is ["A"] where the statement reads it
       # Evidence: three answers quoted
 
     @unit @integration
@@ -51,7 +54,7 @@ Feature: Every query door takes the same parameters and says what it ran with
       Then it is refused with the status 422 and the code "projects_required"
       And the message is "Name the projects to query: send `projects`, a list of project ids"
       And the body holds no project id, and no statement reaches the store
-      And the same key naming ["A"] reads "A", and params.projects is ["A"]
+      And the same key naming ["A"] reads "A", and params.dashboard_context_projects is ["A"]
       # Evidence: a real curl answer for an organization key without projects, and one with ["A"]
 
     @unit @integration
@@ -66,7 +69,7 @@ Feature: Every query door takes the same parameters and says what it ran with
     Scenario: QP03c A key for a group project reads the group's members by default
       Given a key for group project "G" sharing "A" from the beginning and "B" from a date
       When it runs a statement with no projects through REST
-      Then it reads "A" and "B", "B" from its date only, and params.projects is ["A", "B"]
+      Then it reads "A" and "B", "B" from its date only, and params.dashboard_context_projects is ["A", "B"]
       # Evidence: the REST answer quoted, with the rows either side of the date
 
     @unit @integration
@@ -83,23 +86,24 @@ Feature: Every query door takes the same parameters and says what it ran with
       Given a statement with "WHERE Origin IN {dashboard_context_sources:Array(String)}"
       When it runs with sources ["application", "langy"]
       Then it returns the rows of those origins only
-      And params.sources is ["application", "langy"] and params.followsSources is true
+      And params.dashboard_context_sources is ["application", "langy"] and no SOURCES_IGNORED diagnostic is returned
       # Evidence: the REST answer quoted with seeded traces of each origin
 
     @unit @integration
-    Scenario: QP05 A statement that does not read the parameter counts every origin, and params says so
+    Scenario: QP05 A statement that does not read the parameter counts every origin, and a diagnostic says so
       Given a statement that does not contain {dashboard_context_sources:Array(String)}
       When it runs with sources ["application"]
       Then it returns the rows of every origin
-      And params.sources is ["application"] and params.followsSources is false
+      And params has no dashboard_context_sources key
+      And diagnostics holds SOURCES_IGNORED with the message "This query doesn't read {dashboard_context_sources}, so it counts every origin."
       # Evidence: the REST answer quoted with seeded traces of each origin
 
     @unit
-    Scenario: QP05b followsSources comes from the parsed statement, not from its text
+    Scenario: QP05b SOURCES_IGNORED comes from the parsed statement, not from its text
       Given a statement that names {dashboard_context_sources:Array(String)} only in a comment or in a string literal
       When it runs
-      Then params.followsSources is false
-      And a statement that reads the placeholder in an expression, in any clause or CTE, answers true
+      Then diagnostics holds SOURCES_IGNORED
+      And a statement that reads the placeholder in an expression, in any clause or CTE, returns no SOURCES_IGNORED
       # Evidence: three REST answers quoted
 
     @unit @integration
@@ -113,7 +117,7 @@ Feature: Every query door takes the same parameters and says what it ran with
     Scenario: QP07 An empty list of sources binds an empty array and counts nothing where the SQL reads it
       Given a statement reading {dashboard_context_sources:Array(String)}
       When it runs with sources []
-      Then it returns no row, and params.sources is []
+      Then it returns no row, and params.dashboard_context_sources is []
       # Evidence: the REST answer quoted
 
     @unit @integration
@@ -121,7 +125,7 @@ Feature: Every query door takes the same parameters and says what it ran with
       Given traces whose origin is missing, empty, NULL, unlisted, or each listed one
       When a statement filtering Source with the parameter runs with ["application"], ["other"] and each listed origin
       Then missing, empty and NULL count under "application" and an unlisted origin under "other" only
-      And params.sources is the list sent, in the order sent, a repeated source kept at its first place
+      And params.dashboard_context_sources is the list sent, in the order sent, a repeated source kept at its first place
       # Evidence: three REST answers quoted with their row counts over seeded traces
 
     @unit @integration
@@ -171,11 +175,11 @@ Feature: Every query door takes the same parameters and says what it ran with
       # Evidence: two answers quoted
 
     @integration
-    Scenario: QP11 params.projects is always a subset of the readable set
+    Scenario: QP11 params.dashboard_context_projects is always a subset of the readable set
       Given a widget saved when its owner read "A" and "C", and read access to "C" revoked since
       When the card, the dashboard API's widget run, an alert owner's run and the insight gate's run each execute it
-      Then each is refused with the code "project_not_found" while "C" is named, and none returns params.projects holding "C"
-      And a run naming ["A"] returns params.projects ["A"]
+      Then each is refused with the code "project_not_found" while "C" is named, and none returns params.dashboard_context_projects holding "C"
+      And a run naming ["A"] returns params.dashboard_context_projects ["A"]
       # Evidence: the four answers quoted
 
     @unit @integration
@@ -189,7 +193,7 @@ Feature: Every query door takes the same parameters and says what it ran with
     @unit @integration
     Scenario: QP12 A list that names one project twice reads it once, and params keeps the first place
       When a run names projects ["B", "A", "B"]
-      Then params.projects is ["B", "A"] and each project is read once
+      Then params.dashboard_context_projects is ["B", "A"] and each project is read once
       # Evidence: the REST answer quoted
 
     @unit
@@ -247,22 +251,23 @@ Feature: Every query door takes the same parameters and says what it ran with
       Then it is refused with the code "lwql_reserved_parameter_type" and the message names "Array(String)"
       # Evidence: the REST answer quoted
 
-  Rule: params names every input the run depended on, and no other key
+  Rule: params names every placeholder the statement declares, by its SQL name
 
     @unit
-    Scenario: QP17 The params object holds exactly these keys
+    Scenario: QP17 The params map holds the declared placeholders and the period, nothing else
       When a run succeeds
-      Then params holds sources, followsSources, projects, parameters, and, when the statement follows the period, period and granularitySeconds
-      And it holds coarsenedFromSeconds only when the grain was coarsened
-      And it holds no other key, in a snapshot test of the schema
+      Then params holds each placeholder the statement declares, by its SQL name, with the value it ran with, defaults included
+      And it holds period when the statement follows the period, and no key for a placeholder the statement does not declare
+      And it holds no nested parameters key and no short sources, projects or granularitySeconds key
       # Evidence: the schema snapshot and one answer quoted
 
     @unit @integration
-    Scenario: QP17b A coarsened grain is reported
+    Scenario: QP17b A coarsened grain is reported as a diagnostic
       Given a card run with onBudgetOverflow "coarsen" over a period whose 1-second buckets exceed the ceiling
       When the run succeeds
-      Then params.granularitySeconds is the step it ran at and params.coarsenedFromSeconds is the step asked for
-      And a run that was not coarsened carries no coarsenedFromSeconds
+      Then params.dashboard_context_granularity_seconds is the step it ran at
+      And diagnostics holds GRANULARITY_COARSENED with meta requestedSeconds (the step asked) and granularitySeconds (the step run)
+      And a run that was not coarsened carries no GRANULARITY_COARSENED
       # Evidence: the tRPC answer quoted for a 30-day period at one-second grain
 
     @unit @integration

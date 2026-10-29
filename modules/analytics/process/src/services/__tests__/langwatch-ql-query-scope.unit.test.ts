@@ -461,7 +461,7 @@ describe("given a member's card that names projects", () => {
     expect(body(gone)).toBe(body(unknown));
   });
 
-  /** @scenario "QP11 params.projects is always a subset of the readable set" */
+  /** @scenario "QP11 params.dashboard_context_projects is always a subset of the readable set" */
   it("refuses a widget's stored project once its read access is revoked, and reads the rest", async () => {
     const granted = scopeOver({
       projects: [project("a"), project("c")],

@@ -72,12 +72,7 @@ describe("given a result that carries params", () => {
     diagnostics: [],
     followsTimeWindow: false,
     followsGranularity: false,
-    params: {
-      sources: ["application"],
-      followsSources: true,
-      projects: ["A"],
-      parameters: { days: 7 },
-    },
+    params: { dashboard_context_projects: ["A"], days: 7, period: { start: "a", end: "b" } },
   };
 
   /** @scenario "QP18 tRPC, REST and MCP return equal params for the same run" */
@@ -85,8 +80,6 @@ describe("given a result that carries params", () => {
     const card = langWatchQLQueryResultSchema.parse(RESULT);
 
     expect(card.params).toEqual(RESULT.params);
-    expect(langWatchQLQueryResultSchema.validate({ ...RESULT, params: { sources: [] } })).toBe(
-      false,
-    );
+    expect(langWatchQLQueryResultSchema.validate({ ...RESULT, params: "all" })).toBe(false);
   });
 });

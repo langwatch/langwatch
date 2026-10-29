@@ -7976,8 +7976,6 @@ from .post_api_v1_query_response_200_diagnostics_item import PostApiV1QueryRespo
 from .post_api_v1_query_response_200_diagnostics_item_code import PostApiV1QueryResponse200DiagnosticsItemCode
 from .post_api_v1_query_response_200_diagnostics_item_meta import PostApiV1QueryResponse200DiagnosticsItemMeta
 from .post_api_v1_query_response_200_params import PostApiV1QueryResponse200Params
-from .post_api_v1_query_response_200_params_parameters import PostApiV1QueryResponse200ParamsParameters
-from .post_api_v1_query_response_200_params_period import PostApiV1QueryResponse200ParamsPeriod
 from .post_api_v1_query_response_200_rows_item import PostApiV1QueryResponse200RowsItem
 from .post_api_v1_query_response_200_statistics import PostApiV1QueryResponse200Statistics
 from .post_api_v1_query_response_400 import PostApiV1QueryResponse400
@@ -13312,8 +13310,6 @@ __all__ = (
     "PostApiV1QueryResponse200DiagnosticsItemCode",
     "PostApiV1QueryResponse200DiagnosticsItemMeta",
     "PostApiV1QueryResponse200Params",
-    "PostApiV1QueryResponse200ParamsParameters",
-    "PostApiV1QueryResponse200ParamsPeriod",
     "PostApiV1QueryResponse200RowsItem",
     "PostApiV1QueryResponse200Statistics",
     "PostApiV1QueryResponse400",

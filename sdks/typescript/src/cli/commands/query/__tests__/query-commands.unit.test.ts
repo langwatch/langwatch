@@ -406,19 +406,14 @@ describe("runQueryCommand with --projects and --sources", () => {
   it("prints what the run was bound to under the table", async () => {
     mockQuery.mockResolvedValue({
       ...RESULT,
-      params: {
-        sources: ["application"],
-        followsSources: false,
-        projects: ["A"],
-        parameters: {},
-      },
+      params: { dashboard_context_projects: ["A"] },
     });
 
     const result = await runQueryCommand("SELECT 1", { projects: "A" });
     (result as { table: () => void }).table();
 
     const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
-    expect(printed).toContain("sources: all (the SQL ignores sources); projects: A");
+    expect(printed).toContain('Ran with {"dashboard_context_projects":["A"]}');
   });
 
   /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
@@ -445,12 +440,7 @@ describe("runQueryCommand with --projects and --sources", () => {
 });
 
 describe("runQueryCommand with machine output", () => {
-  const PARAMS = {
-    sources: ["application"],
-    followsSources: true,
-    projects: ["A"],
-    parameters: {},
-  };
+  const PARAMS = { dashboard_context_sources: ["application"], dashboard_context_projects: ["A"] };
 
   /** @scenario "QP19 The CLI sends the parameters and prints the params" */
   it("keeps stdout to the rows and writes the params to stderr as one JSON line", async () => {

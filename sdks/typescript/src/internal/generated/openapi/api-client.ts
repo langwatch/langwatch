@@ -95,7 +95,7 @@ export interface paths {
          *
          *     A project API key reads its own project. A key for an organization, a team or a person must name the projects to read in `projects`, each one it can read `analytics:view` on; without them the run is refused with `projects_required` (422). Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic.
          *
-         *     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of another organization and a project that does not exist are all refused with `project_not_found` (404), with one body that names no id. Send `sources` to bind `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to the projects read. The answer's `params` lists what the run was bound to: `sources`, `followsSources`, `projects`, the `period` and `granularitySeconds` it followed, and `coarsenedFromSeconds` when the step was coarsened.
+         *     Send `projects`, a list of project ids, to name the projects to read; `projectId` (one id) still works, and sending both is a 422. A project the key cannot read `analytics:view` on, a project of another organization and a project that does not exist are all refused with `project_not_found` (404), with one body that names no id. Send `sources` to bind `{dashboard_context_sources:Array(String)}` (application when absent); only a statement that reads that placeholder is kept to those origins. `{dashboard_context_projects:Array(String)}` is bound to the projects read. The answer's `params` lists every placeholder the statement declares by its SQL name with the value it ran with, plus the `period` it followed. A `SOURCES_IGNORED` diagnostic says `sources` changed nothing; `GRANULARITY_COARSENED` says the step ran coarser than asked.
          *
          *     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
          *
@@ -3114,7 +3114,7 @@ export interface operations {
                         };
                         readonly diagnostics: {
                             /** @enum {string} */
-                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED" | "SHARE_WINDOW_LIMITED";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED" | "SHARE_WINDOW_LIMITED" | "SOURCES_IGNORED" | "GRANULARITY_COARSENED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
@@ -3144,18 +3144,7 @@ export interface operations {
                             };
                         };
                         params?: {
-                            readonly sources: string[];
-                            followsSources: boolean;
-                            readonly projects: string[];
-                            period?: {
-                                start: string;
-                                end: string;
-                            };
-                            granularitySeconds?: number;
-                            coarsenedFromSeconds?: number;
-                            parameters: {
-                                [key: string]: unknown;
-                            };
+                            [key: string]: unknown;
                         };
                     };
                 };

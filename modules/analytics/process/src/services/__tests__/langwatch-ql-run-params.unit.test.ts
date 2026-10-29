@@ -71,21 +71,19 @@ describe("given a statement that reads {dashboard_context_sources}", () => {
     const { request, result } = await run({ sql: READS_SOURCES });
 
     expect(request?.parameters?.dashboard_context_sources).toEqual(["application"]);
-    expect(result.params?.sources).toEqual(["application"]);
+    expect(result.params?.dashboard_context_sources).toEqual(["application"]);
   });
 
   /** @scenario "QP04 A statement reading the sources parameter counts the origins it is bound to" */
-  it("binds the named sources and reports that the statement followed them", async () => {
+  it("binds the named sources and reports no diagnostic", async () => {
     const { request, result } = await run({
       sql: READS_SOURCES,
       sources: ["application", "langy"],
     });
 
     expect(request?.parameters?.dashboard_context_sources).toEqual(["application", "langy"]);
-    expect(result.params).toMatchObject({
-      sources: ["application", "langy"],
-      followsSources: true,
-    });
+    expect(result.params).toMatchObject({ dashboard_context_sources: ["application", "langy"] });
+    expect(result.diagnostics.map((d) => d.code)).not.toContain("SOURCES_IGNORED");
   });
 
   /** @scenario "QP07 An empty list of sources binds an empty array and counts nothing where the SQL reads it" */
@@ -93,7 +91,7 @@ describe("given a statement that reads {dashboard_context_sources}", () => {
     const { request, result } = await run({ sql: READS_SOURCES, sources: [] });
 
     expect(request?.parameters?.dashboard_context_sources).toEqual([]);
-    expect(result.params?.sources).toEqual([]);
+    expect(result.params?.dashboard_context_sources).toEqual([]);
   });
 
   /** @scenario "QP07b The Source column keeps the meaning of other and of the unstamped origin, and params keeps the request's order" */
@@ -103,7 +101,7 @@ describe("given a statement that reads {dashboard_context_sources}", () => {
       sources: ["langy", "application", "langy", "other"],
     });
 
-    expect(result.params?.sources).toEqual(["langy", "application", "other"]);
+    expect(result.params?.dashboard_context_sources).toEqual(["langy", "application", "other"]);
   });
 
   /** @scenario "AC203 Sources: a query reading the parameter is kept to the list it stores" */
@@ -124,16 +122,20 @@ describe("given a statement that reads {dashboard_context_sources}", () => {
     const { request, result } = await run({ sql });
 
     expect(request?.parameters?.dashboard_context_projects).toEqual(["project-1"]);
-    expect(result.params?.projects).toEqual(["project-1"]);
+    expect(result.params?.dashboard_context_projects).toEqual(["project-1"]);
   });
 });
 
 describe("given a statement that does not read the sources parameter", () => {
-  /** @scenario "QP05 A statement that does not read the parameter counts every origin, and params says so" */
-  it("reports followsSources false and the sources the run was bound to", async () => {
+  /** @scenario "QP05 A statement that does not read the parameter counts every origin, and a diagnostic says so" */
+  it("answers SOURCES_IGNORED with its message and no sources key", async () => {
     const { result } = await run({ sql: READS_NOTHING, sources: ["application"] });
 
-    expect(result.params).toMatchObject({ sources: ["application"], followsSources: false });
+    expect(result.params).not.toHaveProperty("dashboard_context_sources");
+    expect(result.diagnostics).toContainEqual({
+      code: "SOURCES_IGNORED",
+      message: "This query doesn't read {dashboard_context_sources}, so it counts every origin.",
+    });
   });
 
   /** @scenario "QP06 The server adds no origin filter beneath the statement" */
@@ -144,14 +146,14 @@ describe("given a statement that does not read the sources parameter", () => {
   });
 
   /** @scenario "AC204 Sources: SQL that does not read the parameter counts every origin and says so" */
-  it("counts every origin and says so in params", async () => {
+  it("counts every origin and says so in a diagnostic", async () => {
     const { request, result } = await run({ sql: READS_NOTHING, sources: ["application"] });
 
     expect(request?.sql).not.toMatch(/WHERE|Origin|Source/);
-    expect(result.params?.followsSources).toBe(false);
+    expect(result.diagnostics.map((d) => d.code)).toContain("SOURCES_IGNORED");
   });
 
-  /** @scenario "QP05b followsSources comes from the parsed statement, not from its text" */
+  /** @scenario "QP05b SOURCES_IGNORED comes from the parsed statement, not from its text" */
   it.each([
     [
       "a comment",
@@ -161,19 +163,20 @@ describe("given a statement that does not read the sources parameter", () => {
       "a string literal",
       `SELECT '{dashboard_context_sources:Array(String)}' AS n FROM analytics.trace_metrics LIMIT 1`,
     ],
-  ])("answers false when the placeholder is only in %s", async (_where, sql) => {
-    const { result } = await run({ sql });
+  ])("answers SOURCES_IGNORED when the placeholder is only in %s", async (_where, sql) => {
+    const { result } = await run({ sql, sources: ["application"] });
 
-    expect(result.params?.followsSources).toBe(false);
+    expect(result.diagnostics.map((d) => d.code)).toContain("SOURCES_IGNORED");
   });
 
   /** @scenario "AC204c Sources: a placeholder only in a comment or a literal does not count as reading the parameter" */
   it("treats a commented placeholder as not read", async () => {
     const { result } = await run({
       sql: "SELECT count() AS n FROM analytics.trace_metrics /* {dashboard_context_sources:Array(String)} */ LIMIT 1",
+      sources: ["application"],
     });
 
-    expect(result.params?.followsSources).toBe(false);
+    expect(result.diagnostics.map((d) => d.code)).toContain("SOURCES_IGNORED");
   });
 });
 
@@ -207,9 +210,9 @@ describe("given a reserved list name", () => {
 
   /** @scenario "AC205b Params: a query cannot assign or alias a reserved name" */
   it("allows declaring the typed placeholder and reading it", async () => {
-    const { result } = await run({ sql: READS_SOURCES });
+    const { result } = await run({ sql: READS_SOURCES, sources: ["application"] });
 
-    expect(result.params?.followsSources).toBe(true);
+    expect(result.diagnostics.map((d) => d.code)).not.toContain("SOURCES_IGNORED");
   });
 
   /** @scenario "QP16 A statement declaring a reserved parameter with another type is refused" */
@@ -233,13 +236,29 @@ describe("given a reserved list name", () => {
 });
 
 describe("given the params a run answers with", () => {
-  /** @scenario "QP17 The params object holds exactly these keys" */
-  it("holds the keys of a run that follows no period", async () => {
+  /** @scenario "QP17 The params map holds the declared placeholders and the period, nothing else" */
+  it("holds no key for a placeholder the statement does not declare", async () => {
     const { result } = await run({ sql: READS_NOTHING, parameters: {} });
 
-    expect(Object.keys(result.params ?? {}).toSorted()).toEqual(
-      ["followsSources", "parameters", "projects", "sources"].toSorted(),
-    );
+    expect(result.params).toEqual({});
+  });
+
+  it("holds each declared placeholder by its SQL name, the period folded into period", async () => {
+    const sql =
+      "SELECT count() AS n FROM analytics.trace_metrics " +
+      "WHERE Source IN {dashboard_context_sources:Array(String)} " +
+      "AND TenantId IN {dashboard_context_projects:Array(String)} " +
+      "AND Model = {model:String} " +
+      "AND OccurredAt >= {dashboard_context_period_start:DateTime} " +
+      "AND OccurredAt < {dashboard_context_period_end:DateTime} LIMIT 1";
+    const { result } = await run({ sql, timeWindow: WINDOW, parameters: { model: "gpt-5-mini" } });
+
+    expect(result.params).toEqual({
+      dashboard_context_sources: ["application"],
+      dashboard_context_projects: ["project-1"],
+      model: "gpt-5-mini",
+      period: WINDOW,
+    });
   });
 
   /** @scenario "QP13 The share windows and the redaction hold when projects are named" */
@@ -258,8 +277,8 @@ describe("given the params a run answers with", () => {
     expect(result.params?.period).toEqual(WINDOW);
   });
 
-  /** @scenario "QP17b A coarsened grain is reported" */
-  it("reports the grain it coarsened from", async () => {
+  /** @scenario "QP17b A coarsened grain is reported as a diagnostic" */
+  it("answers GRANULARITY_COARSENED with both grains", async () => {
     const { result } = await run({
       sql: GRAIN_SQL,
       timeWindow: { start: "2026-01-01T00:00:00.000Z", end: "2026-02-01T00:00:00.000Z" },
@@ -267,10 +286,16 @@ describe("given the params a run answers with", () => {
       onBudgetOverflow: "coarsen",
     });
 
-    expect(result.params).toMatchObject({ granularitySeconds: 3600, coarsenedFromSeconds: 1 });
+    expect(result.params).toMatchObject({ dashboard_context_granularity_seconds: 3600 });
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "GRANULARITY_COARSENED",
+        meta: { requestedSeconds: 1, granularitySeconds: 3600 },
+      }),
+    );
   });
 
-  it("carries no coarsenedFromSeconds when the grain was kept", async () => {
+  it("answers no GRANULARITY_COARSENED when the grain was kept", async () => {
     const { result } = await run({
       sql: GRAIN_SQL,
       timeWindow: WINDOW,
@@ -278,7 +303,7 @@ describe("given the params a run answers with", () => {
       onBudgetOverflow: "coarsen",
     });
 
-    expect(result.params).not.toHaveProperty("coarsenedFromSeconds");
+    expect(result.diagnostics.map((d) => d.code)).not.toContain("GRANULARITY_COARSENED");
   });
 });
 
@@ -363,7 +388,7 @@ describe("given statements over views that keep no origin", () => {
     const { request, result } = await run({ sql: OWN, sources: ["application"] });
 
     expect(request?.sql).toBe(OWN);
-    expect(result.params?.followsSources).toBe(false);
+    expect(result.diagnostics.map((d) => d.code)).toContain("SOURCES_IGNORED");
   });
 
   /** @scenario "AC195 Langy: per-minute rollups cannot leave Langy out yet" */
@@ -371,7 +396,7 @@ describe("given statements over views that keep no origin", () => {
     const { request, result } = await run({ sql: ROLLUP, sources: ["application"] });
 
     expect(request?.sql).toBe(ROLLUP);
-    expect(result.params?.followsSources).toBe(false);
+    expect(result.diagnostics.map((d) => d.code)).toContain("SOURCES_IGNORED");
   });
 });
 
@@ -383,14 +408,14 @@ describe("given a card run in a group project", () => {
 
     const { result } = await run({ sql });
 
-    expect(result.params?.projects).toEqual(["project-1"]);
+    expect(result.params?.dashboard_context_projects).toEqual(["project-1"]);
   });
 
   /** @scenario "AC206b Project: a group project reads the members its grants share, each from its own date" */
   it("binds the members and cuts the dated one from its date", async () => {
     const from = Date.parse("2026-03-01T00:00:00.000Z");
     const { request, result } = await run({
-      sql: READS_NOTHING,
+      sql: "SELECT count() AS n FROM analytics.trace_metrics WHERE TenantId IN {dashboard_context_projects:Array(String)} LIMIT 1",
       projects: [
         { id: "A", lwqlKey: "ka" },
         { id: "B", lwqlKey: "kb" },
@@ -401,7 +426,7 @@ describe("given a card run in a group project", () => {
       ],
     });
 
-    expect(result.params?.projects).toEqual(["A", "B"]);
+    expect(result.params?.dashboard_context_projects).toEqual(["A", "B"]);
     expect(request?.sql).toContain(`TenantId IN ('A')`);
     expect(request?.sql).toContain(
       `TenantId = 'B' AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${from}))`,

@@ -90,12 +90,7 @@ function explainProjectsRequired(error: unknown): void {
 
 /** One line saying what the run was bound to, printed after a table. */
 function paramsLine(result: QueryRunResult): string {
-  const { params } = result;
-  if (!params) return "";
-  const sources = params.followsSources
-    ? params.sources.join(",")
-    : "all (the SQL ignores sources)";
-  return chalk.dim(`Ran with sources: ${sources}; projects: ${params.projects.join(",")}`);
+  return result.params ? chalk.dim(`Ran with ${JSON.stringify(result.params)}`) : "";
 }
 
 /** Where the next page of a keyset walk starts. */

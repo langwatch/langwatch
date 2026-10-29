@@ -88,10 +88,13 @@ A key for an organization, a team or a person must name the projects to read wit
 `--projects` (the `projects` field over REST and in `run_query`); without them the
 run is refused with `projects_required` (422): "Name the projects to query: send
 `projects`, a list of project ids". A project API key reads its own project and
-needs none. Every run answers with `params`: the `sources` and `projects` it was
-bound to, and `followsSources`, which is false when the statement does not read
-`{dashboard_context_sources:Array(String)}` and so counts every origin. `--sources`
-(`sources`) sets the origins that parameter is bound to; the default is
+needs none. Every run answers with `params`: each placeholder the statement declares, by its
+SQL name, with the value it ran with (for example
+`dashboard_context_sources` and `dashboard_context_projects`), plus the `period` it
+followed. A statement that does not read `{dashboard_context_sources:Array(String)}`
+counts every origin, and the answer says so with a `SOURCES_IGNORED` diagnostic. A step
+the period was too long for runs coarser, with a `GRANULARITY_COARSENED` diagnostic.
+`--sources` (`sources`) sets the origins that parameter is bound to; the default is
 `application`.
 
 The statement runs exactly as submitted. Filter on the dataset's time column, as

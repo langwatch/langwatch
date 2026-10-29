@@ -259,7 +259,7 @@ function registerObservabilityTools(server: McpServer): void {
         .array(z.string())
         .optional()
         .describe(
-          "The trace sources {dashboard_context_sources:Array(String)} is bound to (default application). Only a statement that reads that parameter is kept to them; the answer's params.followsSources says which",
+          "The trace sources {dashboard_context_sources:Array(String)} is bound to (default application). Only a statement that reads that parameter is kept to them; a SOURCES_IGNORED diagnostic says it did not",
         ),
     },
     withToolLogging("run_query", async (params) => {

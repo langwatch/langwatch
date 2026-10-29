@@ -46,6 +46,8 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "APP_FUNCTION_RESULT_TRUNCATED",
   "INSTANT_EVAL_SKIPPED",
   "SHARE_WINDOW_LIMITED",
+  "SOURCES_IGNORED",
+  "GRANULARITY_COARSENED",
 ] as const;
 export const langWatchQLDiagnosticCodeSchema = z.enum(LWQL_DIAGNOSTIC_CODES);
 export type LangWatchQLDiagnosticCode = z.infer<typeof langWatchQLDiagnosticCodeSchema>;
@@ -91,21 +93,11 @@ export type QueryCompleteness = z.infer<typeof queryCompletenessSchema>;
 export type QueryCompletenessState = QueryCompleteness["state"];
 
 /**
- * Every input a run depended on, answered with its success so an agent can read what ran: the
- * origins bound, whether the SQL read them, the projects read, and the period and step the
- * statement followed. Never holds a window, a protection or a key (permissions stay server-side).
+ * Every placeholder the statement declares, by its SQL name, with the value the run bound, plus
+ * the `period` it followed. A flat map, so the SQL name is the key an agent already knows. Never
+ * holds a protection or a key (permissions stay server-side).
  */
-const langWatchQLRunParamsSchemaDefinition = z
-  .object({
-    sources: z.array(z.string()).readonly(),
-    followsSources: z.boolean(),
-    projects: z.array(z.string()).readonly(),
-    period: z.object({ start: z.string(), end: z.string() }).strict().optional(),
-    granularitySeconds: z.number().optional(),
-    coarsenedFromSeconds: z.number().optional(),
-    parameters: z.record(z.string(), z.unknown()),
-  })
-  .strict();
+const langWatchQLRunParamsSchemaDefinition = z.record(z.string(), z.unknown());
 export interface LangWatchQLRunParamsSchema extends Named<
   typeof langWatchQLRunParamsSchemaDefinition
 > {}

@@ -1714,7 +1714,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC194 Langy: a query run outside a board is not scoped
     Given a LangWatchQL statement run from anywhere but a dashboard, such as the REST query API
     When its SQL does not read {dashboard_context_sources:Array(String)}
-    Then it counts every origin, Langy's conversations included, and params.followsSources is false
+    Then it counts every origin, Langy's conversations included, and the run answers a SOURCES_IGNORED diagnostic
     And when it reads the parameter and the run names no sources, the parameter is bound to ["application"]
     # Why: the Traces list keeps its own rule (ADR-061)
     # Evidence: two REST answers quoted with row counts
@@ -1723,7 +1723,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
     Given a widget that reads trace_metrics_by_minute or model_usage_by_minute
     When it runs on a board
-    Then it still counts Langy's spans and params.followsSources is false
+    Then it still counts Langy's spans and the run answers a SOURCES_IGNORED diagnostic
     And its card says "Sources don't apply: this widget reads a view that keeps no origin"
     # Known gap: the rollups are written per span before a trace's origin is known, so they
     # carry no origin; a follow-up would add one
@@ -1911,7 +1911,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a query that reads only exempt views is exempt, and the fixture names it with the view
     And a placeholder that appears only in a comment or a string literal does not count
     And the check names every stock query that fails, by widget and query name
-    # Evidence: the catalogue unit test output, and a call to POST /api/v1/query with a stock query's SQL showing params.followsSources true
+    # Evidence: the catalogue unit test output, and a call to POST /api/v1/query with a stock query's SQL showing no SOURCES_IGNORED diagnostic
 
   @unit
   Scenario: AC202b Stock widgets: each stock widget declares its own list of sources
@@ -1951,7 +1951,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a stock widget whose queries read only views with neither an Origin nor a TraceId, such as the per-minute rollups
     Then the fixture's exemption list names its views and its change table has a row for it
     And its card reads "Sources don't apply: this widget reads a view that keeps no origin"
-    And its run answers params.followsSources false
+    And its run answers a SOURCES_IGNORED diagnostic
     # Evidence: a haven browser screenshot of the card, and the answer's params quoted
 
   @unit @integration
@@ -1970,7 +1970,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the query counts every origin, with no hidden filter
     And the editor warns on that query: "This query ignores sources"
     And the card line reads "Sources: all sources"
-    And params.followsSources is false
+    And the run answers a SOURCES_IGNORED diagnostic
     # Why: the owner called a filter the SQL does not show a confusing surprise (2026-10-29)
     # Evidence: a haven browser screenshot of the editor warning and of the card line, and the answer's params from the same run
 
@@ -1985,7 +1985,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC204c Sources: a placeholder only in a comment or a literal does not count as reading the parameter
     Given a query whose SQL names {dashboard_context_sources:Array(String)} only in a comment or in a string literal
     When it runs
-    Then params.followsSources is false and the editor warns "This query ignores sources"
+    Then the run answers a SOURCES_IGNORED diagnostic and the editor warns "This query ignores sources"
     # Evidence: the answer's params quoted for both shapes
 
   @unit
@@ -2152,7 +2152,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit
   Scenario: AC212 Skill: the dashboard-widgets skill teaches projects, the reserved names and params
     Given Langy builds or edits a widget with the dashboard-widgets skill
-    Then the skill names {dashboard_context_sources} and {dashboard_context_projects} as reserved, the type Array(String), that a query is kept to its sources only where its SQL reads the first, that `projects` defaults to the board's project, and that every run answers with params, to be read with followsSources before sources, and diagnostics, which say when the server limited the run (FIELDS_REDACTED, SHARE_WINDOW_LIMITED)
+    Then the skill names {dashboard_context_sources} and {dashboard_context_projects} as reserved, the type Array(String), that a query is kept to its sources only where its SQL reads the first, that `projects` defaults to the board's project, and that every run answers with params, a flat map of each declared placeholder by its SQL name, and diagnostics, which say when the server limited the run or ignored a setting (FIELDS_REDACTED, SHARE_WINDOW_LIMITED, SOURCES_IGNORED, GRANULARITY_COARSENED)
     And it shows `--projects A,B` and the queries file's "projects"
     # Evidence: the compiled skill text, quoted
 
