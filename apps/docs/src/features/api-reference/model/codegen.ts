@@ -29,6 +29,7 @@ export function exampleFromSchema({
 }): unknown {
   if (!schema || depth > 5) return null;
   if (schema.example !== void 0) return schema.example;
+  if (schema.const !== void 0) return schema.const;
   if (schema.default !== void 0) return schema.default;
   if (schema.enum?.length) return schema.enum[0];
   const merged = mergeExampleSchema({ schema });

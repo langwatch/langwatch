@@ -4,6 +4,8 @@ import type { Schema } from "./operation.ts";
 
 const schema: z.ZodMiniType<Schema> = z.object({
   type: z.optional(z.union([z.string(), z.array(z.string())])),
+  title: z.optional(z.string()),
+  const: z.optional(z.unknown()),
   format: z.optional(z.string()),
   description: z.optional(z.string()),
   get properties() {

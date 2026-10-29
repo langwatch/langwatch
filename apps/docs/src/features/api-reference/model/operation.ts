@@ -4,6 +4,8 @@ import type { operationSchema } from "./operation-schema.ts";
 
 export type Schema = {
   type?: string | string[];
+  title?: string;
+  const?: unknown;
   format?: string;
   description?: string;
   properties?: Record<string, Schema>;

@@ -2031,6 +2031,11 @@ body {
 .docs-api-reference .docs-field-body p {
   margin-bottom: 4px;
 }
+/* An Expandable names what it does next: Show while closed, Hide while open. */
+.docs-expandable [data-part="item-trigger"][data-state="open"] > .docs-expandable-show,
+.docs-expandable [data-part="item-trigger"]:not([data-state="open"]) > .docs-expandable-hide {
+  display: none;
+}
 .docs-response-schema > summary::-webkit-details-marker {
   display: none;
 }

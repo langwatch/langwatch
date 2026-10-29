@@ -39,7 +39,23 @@ Feature: Generate documentation data from authored sources
     Given a response contains array items and alternative object schemas
     When the response reference is rendered
     Then item fields and every alternative are visible
+    And the alternatives form one "One of N" group of numbered options
     And all response media types retain their declared fields
+
+  @integration
+  Scenario: Render nested objects and union options as connected groups
+    Given a response field holds child attributes or a union of object shapes
+    When the response reference is rendered
+    Then the field's disclosure is a quiet text control that counts what it opens, as "Show 3 child attributes" or "Show 2 variants"
+    And it reads "Hide" in place of "Show" while open
+    And the opened children hang from a left rule under their parent
+    And a union option is named by the constant that tells it apart, as kind: "categorical"
+
+  @integration
+  Scenario: Render code spans in API descriptions
+    Given an operation, response or field description with backticked words
+    When the API reference renders it
+    Then those words show as inline code, without literal backticks
 
   @unit
   Scenario: Preserve authored navigation and API slugs
