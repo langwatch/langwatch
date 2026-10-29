@@ -1,10 +1,10 @@
-# ADR-189: One table for all eval results, recalled before judging
+# ADR-189: One table for instant eval results, recalled before judging
 
 **Date:** 2026-10-28
 
 **Status:** Accepted (Drew, 2026-10-29)
 
-> One line: every eval result is a row in one ClickHouse table, `eval_results`, linked to its trace and tagged with its source (ask, run, dashboard, monitor). Before judging, we look up the same trace, question and judge model, and reuse the row if it exists. The table is append-only and follows the trace's retention. Monitors move in as phase 2.
+> One line: every eval result is a row in one ClickHouse table, `eval_results`, linked to its trace and tagged with its source (ask, run, dashboard). Before judging, we look up the same trace, question and judge model, and reuse the row if it exists. The table is append-only and follows the trace's retention. Monitors are separate: they keep `evaluation_runs`.
 
 ## Context
 
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
     JudgeModel LowCardinality(String) CODEC(ZSTD(1)),
     InputHash String DEFAULT '' CODEC(ZSTD(1)),
 
-    -- Who asked: ask, run, dashboard or monitor, and the id of that query, run, widget or monitor.
+    -- Who asked: ask, run or dashboard, and the id of that query, run or widget.
     Source LowCardinality(String) CODEC(ZSTD(1)),
     SourceId String CODEC(ZSTD(1)),
 
@@ -125,7 +125,6 @@ Each trigger uses the same path:
 | Quick `eval()` ask | `ask`       | the query id    | A repeat question is free and stays the same answer.      |
 | Run                | `run`       | the run id      | A rerun pays only for traces it has not judged.           |
 | Dashboard widget   | `dashboard` | the widget id   | A refresh pays only for new traces. All viewers agree.    |
-| Monitor (phase 2)  | `monitor`   | the monitor id  | Results land beside the others and show on the same page. |
 
 ### 3. The trace page reads this table
 
@@ -143,20 +142,13 @@ Three changes make a result expire with its trace. Each follows a pattern alread
 
 Enrolment also adds the table to the storage meter (`PRODUCTION_STORAGE_METER_TABLES`, `retention-tables.ts:114-116`), which sums `_size_bytes`. We list `eval_results` in `TABLES_WITHOUT_SIZE_COLUMN` (`retention-tables.ts:107-112`), as the analytics tables are. A result holds no customer text, so the meter would count only small verdict rows.
 
-### 5. Monitors: phase 2 (decided: later)
+### 5. Monitors stay separate
 
-Monitors write `evaluation_runs` today. Moving them into `eval_results` is the real goal: one table, one trace-page read, one filter word. It is phase 2, after instant evals land.
+Monitors keep writing `evaluation_runs`, as today. `eval_results` holds instant eval results only. Drew decided this on 2026-10-29 (Laze): there is no reason to couple monitors and instant evals.
 
-- **The work.** A monitor's completed event also writes a row with `Source = monitor` (a dual write, additive). Then each reader moves: the trace drawer, the `evaluations.passed` filter, the built-in eval charts (`evaluation_analytics`, `evaluation_analytics_rollup`, migrations 00041 and 00040) and the triggers. Last, monitors stop writing results to `evaluation_runs`. For a monitor with a classic evaluator, `QuestionHash` hashes the evaluator type and its settings.
-- **Ownership.** One module owns a table (ARCHITECTURE section 7). Phase 2 decides whether `eval_results` stays with instant-eval, which the evaluation module then writes through `InstantEvalApi`, or moves to the evaluation module.
-- **Until then** the trace page reads two stores, `eval_results` and `evaluation_runs`, and labels the source.
-
-| When        | For                                                                          | Against                                                                                         |
-| ----------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Now         | One store from day one. No second read on the trace page.                   | Instant evals wait on a migration of charts, filters, triggers and the monitor lifecycle.       |
-| Later (rec) | Instant evals ship first. The phase 2 dual write is additive and reversible. | Two stores for a while. Two filter words (`evaluations.passed`, `eval:"q"`) until readers move. |
-
-Decided: later (Drew, 2026-10-29).
+- A monitor that uses the Instant Evals judge still writes `evaluation_runs` only. No dual write.
+- The trace page reads two stores, `eval_results` and `evaluation_runs`, and labels the source.
+- The filters stay two words: `evaluations.passed` for monitors, `eval:"q"` for instant evals.
 
 ## Alternatives considered
 
@@ -176,7 +168,7 @@ Rejected. The trace page and dashboards get no lasting result. When the cache ex
 
 Reuse the collector write-back path (`trace-collector-dispatch.service.ts:219`, `reportOneEvaluation`).
 
-Rejected for instant evals. A run of 100,000 rows and 10 questions is 1,000,000 events, each with fold and analytics rows, written one by one. The same run in `eval_results` is 200 bulk inserts of 5,000 rows. `evaluation_runs` is keyed by `EvaluationId`, so a recall by trace and question is not a prefix read. Its lifecycle columns (scheduled, started, attempts) do not apply to an instant verdict. Phase 2 goes the other way: monitors move into the one table.
+Rejected for instant evals. A run of 100,000 rows and 10 questions is 1,000,000 events, each with fold and analytics rows, written one by one. The same run in `eval_results` is 200 bulk inserts of 5,000 rows. `evaluation_runs` is keyed by `EvaluationId`, so a recall by trace and question is not a prefix read. Its lifecycle columns (scheduled, started, attempts) do not apply to an instant verdict.
 
 ## How others do it
 
@@ -191,9 +183,9 @@ From public documentation read on 2026-10-28. All four keep results beside the t
 
 ## Decisions on the open questions
 
-Drew accepted both on 2026-10-29 (Convoz ask 12563).
+Drew accepted both on 2026-10-29 (Convoz ask 12563, then Laze).
 
-1. **Monitors into the one table: now or later?** Later (section 5).
+1. **Monitors into the one table?** No. Monitors stay separate, for good (section 5). This replaces the first answer, "later".
 2. **Does changed judged text count as "something changed"?** Yes. The text is read anyway to judge, and a trace can gain spans after its first judgment. Without it, a recall can return a verdict on text that is no longer there.
 
 ## Risks
@@ -211,7 +203,7 @@ Drew accepted both on 2026-10-29 (Convoz ask 12563).
 - A dashboard widget with `eval()` pays only for new traces, and every viewer sees the same number.
 - A quick `eval()` now writes rows. It costs one recall read and one bulk insert per query.
 - Instant eval results follow the trace's retention, not "never expire".
-- Monitors keep writing `evaluation_runs` until phase 2.
+- Monitors keep writing `evaluation_runs`. They are not part of this record.
 
 ## References
 
