@@ -186,6 +186,8 @@ A Python parameter that is not a turn field is a run parameter. The platform off
 ```python
 from typing import Literal
 
+import langwatch
+
 @langwatch.connect_agent(name="support-agent")
 async def support_agent(
     messages: list[dict],
@@ -215,6 +217,8 @@ Declare a parameter for a value the tests must vary: a model, a plan, a tenant, 
 `thread_id` is the platform's conversation id. `session` is the agent's own memory of the conversation: any JSON value, `None` on the first turn, and whatever the function returns comes back on the next turn of the same conversation.
 
 ```python
+import langwatch
+
 @langwatch.connect_agent(name="support-agent")
 async def support_agent(messages: list[dict], session: str | None = None):
     conversation_id = session or await my_agent.create_conversation()
@@ -716,6 +720,8 @@ Scenario-declared parameters and agent-declared parameters share one list. See [
 <Tabs>
   <Tab title="Python">
     ```python
+    import langwatch
+
     @langwatch.connect_agent(name="support-agent")
     async def support_agent(messages: list[dict], session: str | None = None):
         conversation_id = session or await my_agent.create_conversation()
@@ -745,6 +751,8 @@ To keep the state in your own process instead, use an in-memory map. Key it by `
 <Tabs>
   <Tab title="Python">
     ```python
+    import langwatch
+
     SESSIONS: dict[str, str] = {}
 
     @langwatch.connect_agent(name="support-agent", sticky=True)

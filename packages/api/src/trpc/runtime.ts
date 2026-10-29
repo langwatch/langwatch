@@ -280,6 +280,21 @@ export const browserSessionContext = defineMiddlewareContext(
   z.string().nullable(),
 );
 
+/**
+ * The same browser session with its window: when it began and when it ends, as ISO instants.
+ * A credential minted for the session reads it to end no later than the session does.
+ */
+export const browserSessionWindowContext = defineMiddlewareContext(
+  "browserSessionWindow",
+  z
+    .object({
+      id: z.string(),
+      startedAt: z.iso.datetime().nullable(),
+      expiresAt: z.iso.datetime().nullable(),
+    })
+    .nullable(),
+);
+
 /** Where the request came from, as the process's own mount reads the address. */
 export const callerAddressContext = defineMiddlewareContext("callerAddress", z.string().nullable());
 

@@ -1331,6 +1331,11 @@ const presentations = {
     title: "That name is reserved",
     describe: () => "Pick a different name for this key.",
   },
+  docs_origin_not_registered: {
+    title: "This site can't connect to LangWatch",
+    describe: () =>
+      "The documentation site that opened this page is not registered with this LangWatch installation. Paste an API key into the playground instead.",
+  },
   api_key_scope_violation: {
     title: "You don't have access for this",
     describe: () =>
