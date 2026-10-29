@@ -3375,7 +3375,7 @@ html[data-docs-theme-change]::view-transition-new(root) {
   display: none !important;
 }
 
-/* The app's session frame sizes itself; this is its room until it says how tall it is. */
+/* The app's session frame sizes itself; this is its room from its first word until it says how tall. */
 .docs-session-frame {
   display: block;
   width: 100%;
@@ -3383,4 +3383,10 @@ html[data-docs-theme-change]::view-transition-new(root) {
   margin: 8px 0;
   border: 0;
   color-scheme: normal;
+}
+/* Until the frame first speaks it takes no room: a refused frame shows nothing at all. */
+.docs-session-frame:not([data-docs-frame-ready]) {
+  height: 0 !important;
+  margin: 0;
+  visibility: hidden;
 }

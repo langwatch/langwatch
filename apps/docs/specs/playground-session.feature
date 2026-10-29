@@ -6,9 +6,16 @@ Feature: Use my LangWatch account in the API playground
   @integration
   Scenario: Embed the app's session frame where a project key answers
     Given the docs were built with an app origin
+    And the page is on the published docs origin or the app's own origin
     When I open the playground on an endpoint that takes X-Auth-Token
     Then the app's session frame is embedded for this docs origin
     And the docs page never receives or holds a key
+
+  @integration
+  Scenario: Show the frame only once it speaks
+    Given the app's session frame is embedded
+    Then it takes no room and shows nothing until it sends its first message
+    And a frame the app refuses, or an app that does not serve it yet, leaves no blank strip
 
   @integration
   Scenario: Send through the frame while it is connected
@@ -58,6 +65,13 @@ Feature: Use my LangWatch account in the API playground
   Scenario: Offer only the pasted key when the build names no app
     Given the docs were built without an app origin
     Then the playground offers only the pasted API key
+
+  @unit
+  Scenario: Offer only the pasted key where the app would refuse to be framed
+    Given the app frames its session document only for registered docs origins
+    When the page is on another origin, such as the CDN origin, a preview or localhost
+    Then the playground embeds no frame and offers only the pasted API key
+    And the browser reports no framing violation
 
   @e2e
   Scenario: Connect and send through haven, where the docs share the app's address

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { readBuildOptions } from "../../../paths.ts";
 import {
+  appFramesPage,
   frameRequest,
   frameUrl,
   readFrameMessage,
@@ -80,6 +81,22 @@ describe("when the build names the app", () => {
     expect(() => readBuildOptions({ args: ["--app-origin", "app.example.test"] })).toThrow(
       /an app origin is self, none or an http\(s\) URL/,
     );
+  });
+});
+
+describe("where the app frames its session document", () => {
+  /** @scenario "Offer only the pasted key where the app would refuse to be framed" */
+  it("asks only from the published docs or the app's own origin", () => {
+    expect(appFramesPage({ appOrigin: APP, pageOrigin: "https://langwatch.ai" })).toBe(true);
+    expect(appFramesPage({ appOrigin: APP, pageOrigin: APP })).toBe(true);
+    for (const pageOrigin of [
+      "https://docs-origin.langwatch.ai",
+      "https://docs.langwatch.ai",
+      "http://localhost:5173",
+      "https://langwatch.ai.evil.example",
+    ])
+      expect(appFramesPage({ appOrigin: APP, pageOrigin })).toBe(false);
+    expect(appFramesPage({ appOrigin: "", pageOrigin: "https://langwatch.ai" })).toBe(false);
   });
 });
 

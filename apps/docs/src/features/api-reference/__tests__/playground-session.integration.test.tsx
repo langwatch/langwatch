@@ -14,6 +14,12 @@ const APP = "https://app.example.test";
 vi.hoisted(() => {
   /* The build defines the app the docs connect to; here the test names one. */
   Object.assign(globalThis, { __DOCS_APP_ORIGIN__: "https://app.example.test" });
+  /* The app frames its session document only for the published docs origin. */
+  (globalThis as unknown as { jsdom: { reconfigure(o: { url: string }): void } }).jsdom.reconfigure(
+    {
+      url: "https://langwatch.ai/docs/api-reference/traces/list",
+    },
+  );
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   Element.prototype.scrollIntoView = () => {};
   /* The form slides open with the Web Animations API, which jsdom lacks. */
@@ -135,6 +141,20 @@ describe("when I open the playground on an endpoint that takes X-Auth-Token", ()
     await send();
     expect(JSON.stringify(sends())).not.toMatch(/X-Auth-Token|Authorization|sk-lw/i);
     expect(fetches).toEqual([]);
+  });
+
+  /** @scenario "Show the frame only once it speaks" */
+  it("takes no room until the frame speaks", async () => {
+    await act(async () => document.dispatchEvent(new Event("docs:leaving")));
+    await act(async () => document.getElementById("try-it-button")?.click());
+    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(false);
+    fromFrame(
+      { kind: "state", connected: true, project: "Evil" },
+      { origin: "https://evil.example" },
+    );
+    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(false);
+    await connectedIn(null);
+    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(true);
   });
 
   /** @scenario "Embed the app's session frame where a project key answers" */

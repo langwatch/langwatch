@@ -1,5 +1,6 @@
 import { docsAppOrigin } from "../../../config.ts";
 import {
+  appFramesPage,
   FRAME_MESSAGE,
   FRAME_VERSION,
   frameUrl,
@@ -50,6 +51,8 @@ function onMessage(event: MessageEvent) {
   if (!frame || event.origin !== appOrigin() || event.source !== frame.contentWindow) return;
   const message = readFrameMessage({ data: event.data });
   if (!message) return;
+  /* The frame shows only once it speaks: a refused or missing frame never leaves a blank strip. */
+  frame.dataset.docsFrameReady = "";
   if (message.kind === "state")
     setConnected(
       message.connected && message.project !== null ? { project: message.project } : null,
@@ -61,9 +64,13 @@ function onMessage(event: MessageEvent) {
   }
 }
 
-/** Embeds the app's session frame in `container`, once; a later call keeps the one there. */
+/**
+ * Embeds the app's session frame in `container`, once; a later call keeps the one there. None
+ * where the app would refuse to be framed, which leaves the pasted key.
+ */
 export function mountFrame({ container }: { container: HTMLElement }) {
   if (frame?.isConnected) return;
+  if (!appFramesPage({ appOrigin: appOrigin(), pageOrigin: location.origin })) return;
   frame = document.createElement("iframe");
   frame.src = frameUrl({ appOrigin: appOrigin(), docsOrigin: location.origin });
   frame.title = "Use my LangWatch account";
