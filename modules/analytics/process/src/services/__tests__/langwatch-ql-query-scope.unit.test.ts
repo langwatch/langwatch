@@ -70,6 +70,8 @@ function scopeOver(input: {
         asked.push({ projectId: scope.id, permission });
         return Promise.resolve(input.grants[scope.id]?.includes(permission) === true);
       },
+      hasPermission: ({ permission, projectId }) =>
+        Promise.resolve(input.grants[projectId]?.includes(permission) === true),
       getScope: ({ projectId = "" }) =>
         Promise.resolve({
           type: "project",
@@ -387,5 +389,112 @@ describe("given a run that names projects", () => {
     await expect(
       service.resolve({ reach: { kind: "project", projectId: "a" }, projects: ["b"] }),
     ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
+  });
+});
+
+describe("given a member's card that names projects", () => {
+  const body = (refusal: unknown) => {
+    const { code, message, meta, httpStatus } = refusal as Record<string, unknown>;
+
+    return JSON.stringify({ code, message, meta, httpStatus });
+  };
+  const refusalOf = (run: Promise<unknown>) => run.catch((error: unknown) => error);
+
+  /** @scenario "AC208d Project: a crafted card run naming another organization's project is refused" */
+  it("refuses a project the member cannot read, with the body of a missing one", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("z")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    const foreign = await refusalOf(
+      service.readableByMember({ userId: "user-1", projectIds: ["a", "z"] }),
+    );
+    const missing = await refusalOf(
+      service.readableByMember({ userId: "user-1", projectIds: ["a", "nope"] }),
+    );
+
+    expect(foreign).toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    expect(body(foreign)).toBe(body(missing));
+  });
+
+  /** @scenario "QP10 A hand-made request naming another organization's project is refused" */
+  it("gives the key door and the card door the same body for the same refusal", async () => {
+    const { service } = scopeOver({
+      projects: [project("a"), project("z")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    const card = await refusalOf(service.readableByMember({ userId: "user-1", projectIds: ["z"] }));
+    const key = await refusalOf(service.resolve({ reach: KEY, projects: ["z"] }));
+
+    expect(body(card)).toBe(body(key));
+  });
+
+  /** @scenario "QP09c Every door gives the same refusal body for the same missing project" */
+  it("answers with the code and message alone, naming no project", async () => {
+    const { service } = scopeOver({ projects: [project("a")], grants: {} });
+
+    const refusal = await refusalOf(
+      service.readableByMember({ userId: "user-1", projectIds: ["a"] }),
+    );
+
+    expect(JSON.parse(body(refusal))).toEqual({
+      code: "project_not_found",
+      message: "Project not found",
+      meta: {},
+      httpStatus: 404,
+    });
+  });
+
+  /** @scenario "QP10b A deleted or archived project is refused like a missing one" */
+  it("refuses a project gone from the live list as it refuses an unknown id", async () => {
+    const archived = { ...project("e"), archivedAt: new Date() } as Project;
+    const { service } = scopeOver({
+      projects: [project("a"), archived],
+      grants: { a: ["analytics:view"], e: ["analytics:view"] },
+    });
+
+    const gone = await refusalOf(service.resolve({ reach: KEY, projects: ["a", "e"] }));
+    const unknown = await refusalOf(service.resolve({ reach: KEY, projects: ["a", "x"] }));
+
+    expect(body(gone)).toBe(body(unknown));
+  });
+
+  /** @scenario "QP11 params.projects is always a subset of the readable set" */
+  it("refuses a widget's stored project once its read access is revoked, and reads the rest", async () => {
+    const granted = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"], c: ["analytics:view"] },
+    });
+    const revoked = scopeOver({
+      projects: [project("a"), project("c")],
+      grants: { a: ["analytics:view"] },
+    });
+
+    expect(
+      (await granted.service.resolve({ reach: KEY, projects: ["a", "c"] })).projects,
+    ).toHaveLength(2);
+    await expect(
+      revoked.service.resolve({ reach: KEY, projects: ["a", "c"] }),
+    ).rejects.toMatchObject({
+      code: "project_not_found",
+    });
+    expect((await revoked.service.resolve({ reach: KEY, projects: ["a"] })).projects).toEqual([
+      { id: "a", lwqlKey: "lwql-a" },
+    ]);
+  });
+
+  /** @scenario "AC207d Project: a project that gets read access later is read without a new save" */
+  it("reads a stored project once the member is given access, with no new save", async () => {
+    const before = scopeOver({ projects: [project("c")], grants: {} });
+    const after = scopeOver({ projects: [project("c")], grants: { c: ["analytics:view"] } });
+
+    await expect(
+      before.service.readableByMember({ userId: "user-1", projectIds: ["c"] }),
+    ).rejects.toMatchObject({ code: "project_not_found" });
+    expect(await after.service.readableByMember({ userId: "user-1", projectIds: ["c"] })).toEqual([
+      { id: "c", lwqlKey: "lwql-c" },
+    ]);
   });
 });

@@ -321,3 +321,90 @@ describe("given a run limited by a dated member's window", () => {
     expect(JSON.stringify(result.diagnostics)).not.toMatch(/project-|secret|\d/);
   });
 });
+
+describe("given the validation the insight gate asks for", () => {
+  const PROTECTIONS = {
+    catalogue: EVERY_CATALOGUE_PERMISSION,
+    canSeeCosts: true,
+    canSeeCapturedInput: true,
+    canSeeCapturedOutput: true,
+  };
+  const validate = (sql: string) =>
+    LangWatchQLService.create({ executor: null, database: "analytics" }).validate({
+      projectId: "project-1",
+      protections: PROTECTIONS,
+      sql,
+      parameters: {},
+    });
+
+  /** @scenario "QP21 The insight gate validates a stored statement with the same binder, and refuses what the card refuses" */
+  it("keeps a statement reading the sources parameter, without a run's lists", () => {
+    expect(validate(READS_SOURCES).followsSources).toBe(true);
+  });
+
+  /** @scenario "AC211 Insight: the daily insight gate validates a statement with the card's binder" */
+  it.each([
+    ["assigns a reserved name", "WITH 'C' AS dashboard_context_projects SELECT 1 AS n"],
+    [
+      "declares it as String",
+      "SELECT count() AS n FROM analytics.trace_metrics WHERE Source = {dashboard_context_sources:String} LIMIT 1",
+    ],
+  ])("refuses a statement that %s, as the card does", (_why, sql) => {
+    expect(() => validate(sql)).toThrow(/reserved|Array\(String\)|dashboard_context/);
+  });
+});
+
+describe("given statements over views that keep no origin", () => {
+  const OWN = "SELECT count() AS n FROM analytics.langy_conversation_messages LIMIT 1";
+  const ROLLUP = "SELECT count() AS n FROM analytics.trace_metrics_by_minute LIMIT 1";
+
+  /** @scenario "AC192 Langy: data that is Langy's own is not filtered" */
+  it("sends Langy's own data as written", async () => {
+    const { request, result } = await run({ sql: OWN, sources: ["application"] });
+
+    expect(request?.sql).toBe(OWN);
+    expect(result.params?.followsSources).toBe(false);
+  });
+
+  /** @scenario "AC195 Langy: per-minute rollups keep no origin, so sources do not apply to them" */
+  it("sends a per-minute rollup as written, saying it follows no sources", async () => {
+    const { request, result } = await run({ sql: ROLLUP, sources: ["application"] });
+
+    expect(request?.sql).toBe(ROLLUP);
+    expect(result.params?.followsSources).toBe(false);
+  });
+});
+
+describe("given a card run in a group project", () => {
+  /** @scenario "QP02 A card run reads the board's project" */
+  it("binds the board's project when the card names none", async () => {
+    const sql =
+      "SELECT count() AS n FROM analytics.trace_metrics WHERE TenantId IN {dashboard_context_projects:Array(String)} LIMIT 1";
+
+    const { result } = await run({ sql });
+
+    expect(result.params?.projects).toEqual(["project-1"]);
+  });
+
+  /** @scenario "AC206b Project: a group project reads the members its grants share, each from its own date" */
+  it("binds the members and cuts the dated one from its date", async () => {
+    const from = Date.parse("2026-03-01T00:00:00.000Z");
+    const { request, result } = await run({
+      sql: READS_NOTHING,
+      projects: [
+        { id: "A", lwqlKey: "ka" },
+        { id: "B", lwqlKey: "kb" },
+      ],
+      memberWindows: [
+        { projectId: "A", from: 0 },
+        { projectId: "B", from },
+      ],
+    });
+
+    expect(result.params?.projects).toEqual(["A", "B"]);
+    expect(request?.sql).toContain(`TenantId IN ('A')`);
+    expect(request?.sql).toContain(
+      `TenantId = 'B' AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${from}))`,
+    );
+  });
+});

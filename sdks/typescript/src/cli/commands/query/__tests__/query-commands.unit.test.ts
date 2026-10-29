@@ -443,3 +443,24 @@ describe("runQueryCommand with --projects and --sources", () => {
     expect(printed).not.toMatch(/project_[a-z0-9]+/);
   });
 });
+
+describe("runQueryCommand with machine output", () => {
+  const PARAMS = {
+    sources: ["application"],
+    followsSources: true,
+    projects: ["A"],
+    parameters: {},
+  };
+
+  /** @scenario "QP19 The CLI sends the parameters and prints the params" */
+  it("keeps stdout to the rows and writes the params to stderr as one JSON line", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await runQueryCommand("SELECT 1", { projects: "A", format: "json" });
+
+    expect(stderr).toHaveBeenCalledWith(`${JSON.stringify({ params: PARAMS })}\n`);
+    const printed = stdoutWrite.mock.calls.map(([chunk]) => String(chunk)).join("");
+    expect(JSON.parse(printed)).toEqual(RESULT.rows);
+  });
+});

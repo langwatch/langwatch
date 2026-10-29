@@ -16,6 +16,7 @@ import {
 import { resolveCredentials } from "../../utils/apiKey";
 import { readCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { resolveOutputFormat } from "../../utils/outputScope";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { type QueryColumn, type QueryOutputFormat, type QueryRow, renderRows } from "./rows";
@@ -300,6 +301,12 @@ async function runSinglePage({
     `${rows.length} row${rows.length !== 1 ? "s" : ""} in ${result.statistics.elapsedMs}ms`,
   );
 
+  // Stdout stays exactly the rows a machine reads; what the run was bound to goes to stderr.
+  const machineOutput =
+    format !== "table" || output !== undefined || resolveOutputFormat() !== "text";
+  if (machineOutput && result.params) {
+    process.stderr.write(`${JSON.stringify({ params: result.params })}\n`);
+  }
   if (format !== "table" || output !== undefined) {
     return writeOrPrint({
       body: renderRows({

@@ -102,22 +102,21 @@ import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } fro
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
+import { namedProjects, narrowAggregate } from "../rules/langwatch-ql-run-params.rules.ts";
 import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
-import {
-  LangWatchQLAggregateScopeService,
-  type LangWatchQLAggregateScope,
-} from "../services/langwatch-ql-aggregate-scope.service.ts";
+import { LangWatchQLAggregateScopeService } from "../services/langwatch-ql-aggregate-scope.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../services/langwatch-ql-connection.service.ts";
 import { LwqlKeyMapService } from "../services/langwatch-ql-key-map.service.ts";
+import { LangWatchQLProjectSelectionService } from "../services/langwatch-ql-project-selection.service.ts";
 import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
@@ -364,6 +363,8 @@ type AnalyticsSetup = FeatureSetup<
  * The two reads hydration makes, in the Trace peer's own vocabulary: it names
  * traces and threads where hydration names keys.
  */
+const projectSelection = LangWatchQLProjectSelectionService.create();
+
 class TraceApiHydrationSource implements LangWatchQLTraceSource {
   constructor(private readonly traces: TraceApi) {}
 
@@ -745,10 +746,7 @@ export class AnalyticsModule
   ): Promise<LangWatchQLQueryResult> {
     const { reach, projectId, projects: named, sql, parameters, timeWindow } = input;
     const { granularitySeconds, sources, signal } = input;
-    if (projectId !== undefined && named !== undefined) {
-      throw new ValidationError("send projectId or projects, not both");
-    }
-    const wanted = named ?? (projectId === undefined ? undefined : [projectId]);
+    const { named: wanted } = projectSelection.select({ projectId, projects: named });
     const { projects, protections } = await this.#queryScope.resolve({
       reach,
       requireProjects: true,
@@ -856,7 +854,8 @@ export class AnalyticsModule
       shared.length > 0 ? await this.#aggregateScope.getMemberScope({ shared }) : undefined;
 
     if (aggregate) {
-      const members = named === undefined ? aggregate : narrowAggregate({ aggregate, named });
+      const members =
+        named === undefined ? aggregate : projectSelection.narrowAggregate({ aggregate, named });
       // A judged column is charged to one project, so an aggregate's statement may call none.
       return this.#dependencies.langWatchQL.executeForProjects({
         ...run,
@@ -1123,25 +1122,4 @@ export class AnalyticsModule
   assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void> {
     return this.#widgetAccess.assertEnabled(input);
   }
-}
-
-/**
- * An aggregate's members cut to the projects a card names. A name outside the aggregate refuses
- * the run with the one id-free answer, as an unreadable project does.
- */
-function narrowAggregate({
-  aggregate,
-  named,
-}: {
-  aggregate: LangWatchQLAggregateScope;
-  named: readonly string[];
-}): LangWatchQLAggregateScope {
-  const wanted = new Set(named);
-  const projects = aggregate.projects.filter((member) => wanted.has(member.id));
-  if (projects.length < wanted.size) throw new LangWatchQLProjectNotFoundError();
-
-  return {
-    projects,
-    memberWindows: aggregate.memberWindows.filter((window) => wanted.has(window.projectId)),
-  };
 }
