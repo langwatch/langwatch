@@ -42890,7 +42890,7 @@ origin, or pick one from **Add source**:
 A new widget counts `application`, and so does a widget saved before sources
 existed. A widget about Langy's failed requests adds `langy`. The preview runs
 again when you change the sources, and each card names its sources in a quiet
-line underneath. A query with no source picked counts nothing, and its widget
+line underneath. A query with no source picked returns no rows, and its widget
 says **No sources picked**. Widgets on From LangWatch dashboards count every
 origin except `langy`.
 
