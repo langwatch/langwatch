@@ -678,6 +678,19 @@ const presentations = {
     title: "Insights aren't switched on here",
     describe: () => "This project doesn't have Insights enabled yet.",
   },
+  insight_actions_not_enabled: {
+    title: "Insight actions aren't switched on here",
+    describe: () => "This project can't run actions from an insight yet.",
+  },
+  insight_action_not_found: {
+    title: "That action isn't on this insight",
+    describe: () => "The insight may have changed. Reload to see its current actions.",
+  },
+  insight_action_from_run: {
+    title: "This insight has no actions",
+    describe: () =>
+      "Actions aren't offered on insights from a scheduled run. Ask Langy about it instead.",
+  },
   dashboard_reorder_unknown_ids: {
     title: "Some of those dashboards are gone",
     describe: () =>
