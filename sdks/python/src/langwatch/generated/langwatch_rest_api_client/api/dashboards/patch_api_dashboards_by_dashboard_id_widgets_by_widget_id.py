@@ -138,7 +138,8 @@ def sync_detailed(
     """Update a widget on a dashboard
 
      Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its
-    stored value. A body with none of these fields is refused.
+    stored value; a query sent without `sources` keeps the sources stored under its name, and `sources:
+    null` clears them. A body with none of these fields is refused.
 
     Args:
         dashboard_id (str):
@@ -184,7 +185,8 @@ def sync(
     """Update a widget on a dashboard
 
      Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its
-    stored value. A body with none of these fields is refused.
+    stored value; a query sent without `sources` keeps the sources stored under its name, and `sources:
+    null` clears them. A body with none of these fields is refused.
 
     Args:
         dashboard_id (str):
@@ -224,7 +226,8 @@ async def asyncio_detailed(
     """Update a widget on a dashboard
 
      Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its
-    stored value. A body with none of these fields is refused.
+    stored value; a query sent without `sources` keeps the sources stored under its name, and `sources:
+    null` clears them. A body with none of these fields is refused.
 
     Args:
         dashboard_id (str):
@@ -268,7 +271,8 @@ async def asyncio(
     """Update a widget on a dashboard
 
      Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its
-    stored value. A body with none of these fields is refused.
+    stored value; a query sent without `sources` keeps the sources stored under its name, and `sources:
+    null` clears them. A body with none of these fields is refused.
 
     Args:
         dashboard_id (str):

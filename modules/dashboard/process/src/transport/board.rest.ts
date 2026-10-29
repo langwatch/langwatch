@@ -281,7 +281,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Create a widget on a dashboard",
     description:
-      "Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.",
+      'Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. Each query\'s `sources` lists the trace origins it counts; a query that names none counts `["application"]`.',
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -342,7 +342,7 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Update a widget on a dashboard",
     description:
-      "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.",
+      "Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value; a query sent without `sources` keeps the sources stored under its name, and `sources: null` clears them. A body with none of these fields is refused.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,

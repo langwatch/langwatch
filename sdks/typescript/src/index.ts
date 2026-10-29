@@ -44,6 +44,7 @@ export {
   type RunCallback,
   type RunContext,
   type RunWithResultsOptions,
+  type ExperimentConcurrencyOptions,
   type ExperimentRowResult,
   type ExperimentRunWithResults,
   ExperimentError,

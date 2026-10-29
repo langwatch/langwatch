@@ -11,6 +11,7 @@ import {
   langWatchQLAvailabilitySchema,
   langWatchQLQueryResultSchema,
   langWatchQLSchema,
+  traceSourcesSchema,
 } from "./analytics.lwql.ts";
 import {
   LWQL_CLAUSES,
@@ -32,12 +33,13 @@ export interface LwqlRunRequestSchema extends Named<typeof lwqlRunRequestSchemaD
 export const lwqlRunRequestSchema: LwqlRunRequestSchema = lwqlRunRequestSchemaDefinition;
 
 /**
- * One statement run for a surface that leaves trace origins out, as a Dashboards board leaves
- * out Langy's turns. Only this door takes it: the REST query runs what it is sent.
+ * One statement run, kept to the trace origins a dashboard query counts (dashboards-v2 AC200):
+ * its stored list, or `null` when it stores none, which the server reads as the default. Absent,
+ * the run is no widget's and reads every origin. The REST query runs what it is sent.
  */
 const lwqlQueryRequestSchemaDefinition = z.object({
   ...lwqlRunRequestSchema.shape,
-  excludeOrigins: z.array(z.string().min(1).max(64)).max(20).readonly().optional(),
+  sources: traceSourcesSchema.readonly().nullable().optional(),
 });
 export interface LwqlQueryRequestSchema extends Named<typeof lwqlQueryRequestSchemaDefinition> {}
 export const lwqlQueryRequestSchema: LwqlQueryRequestSchema = lwqlQueryRequestSchemaDefinition;

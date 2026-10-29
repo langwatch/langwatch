@@ -3,12 +3,14 @@ title: Dashboards
 description: Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
 ---
 
-## Turn on Dashboards
+## Open Dashboards
 
 Dashboards is a product in the product switcher at the top left of LangWatch.
-It sits behind the `release_dashboards` feature flag, which is off by default.
-Building and editing widgets on a dashboard also needs the `release_lwql_workbench`
-flag, which turns on LangWatchQL. No other flag is needed.
+On LangWatch Cloud, no setup is needed.
+
+On a self-hosted install, Dashboards stays off until an operator turns it on in
+**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards, and
+`release_lwql_workbench` to build and edit widgets on a dashboard.
 
 ## Your first dashboard
 
@@ -118,6 +120,26 @@ menu offers:
   schedule, that widget. Only when Langy is available.
 - **Duplicate**: adds a copy of the widget.
 - **Delete**: removes the widget.
+
+### What a widget's queries count
+
+Every query in a widget has a built-in **sources** parameter: the trace origins
+it counts. The widget editor shows it as the first row under **Parameters** on
+the **Queries** tab, one pill per source. Remove a pill to stop counting that
+origin, or pick one from **Add source**:
+
+- `application`: your own agent. A trace with no origin set counts here.
+- `simulation`, `evaluation`, `sample`, `coding_agent`, `ai_tool`, `gateway`,
+  `workflow`, `playground`: traces LangWatch itself produces.
+- `langy`: your conversations with Langy.
+- `other`: any origin not listed above.
+
+A new widget counts `application`, and so does a widget saved before sources
+existed. A widget about Langy's failed requests adds `langy`. The preview runs
+again when you change the sources, and each card names its sources in a quiet
+line underneath. A query with no source picked returns no rows, and its widget
+says **No sources picked**. Widgets on From LangWatch dashboards count every
+origin except `langy`.
 
 ## Who can see a dashboard
 
@@ -305,7 +327,7 @@ Treat an absent report as "unknown", not as "complete".
 
 ### Example prompt
 
-```
+```text
 Add a widget to my Agent health dashboard that shows p95 latency by model
 for the last 7 days.
 ```
@@ -326,8 +348,13 @@ curl -X PATCH "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/da
   -d '{"name": "Errors per day", "code": "<the widget code>"}'
 ```
 
-The body takes any of `name`, `code`, `queries` and `description`. The answer
-is the updated widget. Each widget also records where it came from in
+The body takes any of `name`, `code`, `queries` and `description`. Each query
+may carry `sources`, such as `["application", "langy"]`; a query sent without
+it keeps the sources stored under its name, and `"sources": null` returns it to
+`application`. A query renamed without `sources` has no stored list under its new
+name, so it counts `application`; send its `sources` with the rename to keep them.
+
+The answer is the updated widget. Each widget also records where it came from in
 `definition.source`: a catalogue template, Langy, the code editor or the API.
 A widget you create through the API without a `source` is recorded as `api`.
 
@@ -385,6 +412,14 @@ list|get|add|update|delete <dashboardId> [<widgetId>]`, and
 `createWidget`, `getWidget`, `updateWidget` and `deleteWidget` in the
 TypeScript SDK (`create_widget`, `get_widget`, `update_widget` and
 `delete_widget` in Python).
+
+### The REST API
+
+`/api/v1/dashboards` serves dashboards and their widgets from API version
+`2026-10-26`. A request pinned to an earlier `X-API-Version` gets a 404. See
+[API reference > Dashboards](/api-reference/dashboards/overview).
+
+Analytics Reports dashboards are at `/api/v1/analytics/reports`.
 
 ### Analytics Reports
 

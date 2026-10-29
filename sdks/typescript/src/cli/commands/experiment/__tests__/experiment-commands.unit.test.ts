@@ -106,6 +106,33 @@ describe("runExperimentCommand()", () => {
     });
   });
 
+  describe("when --concurrency is given", () => {
+    /** @scenario "The experiment run command passes its concurrency flag on the run" */
+    it("starts the run with that concurrency", async () => {
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 10 });
+
+      await runExperimentCommand("quality-check", { concurrency: "1" });
+
+      expect(mockStartRun).toHaveBeenCalledWith("quality-check", {
+        parameters: undefined,
+        concurrency: 1,
+      });
+    });
+  });
+
+  describe("when --concurrency is outside 1 to 24", () => {
+    for (const value of ["0", "25", "1.5", "many"]) {
+      /** @scenario "The experiment run command refuses a concurrency outside 1 to 24" */
+      it(`refuses "${value}" instead of starting a run`, async () => {
+        await expect(runExperimentCommand("quality-check", { concurrency: value })).rejects.toThrow(
+          ProcessExitError,
+        );
+
+        expect(mockStartRun).not.toHaveBeenCalled();
+      });
+    }
+  });
+
   describe("when a --param pair has no equals sign", () => {
     it("refuses the command instead of starting a run", async () => {
       await expect(

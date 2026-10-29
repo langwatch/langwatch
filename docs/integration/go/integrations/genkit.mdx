@@ -67,6 +67,12 @@ lwgenkit.RegisterLangWatch(g,
 LangWatch captures whatever `gen_ai.*` attributes Genkit records; there is no extra parsing in this package. If you build your own `sdktrace.TracerProvider`, use `lwgenkit.SpanProcessor(opts...)` to obtain the processor and register it yourself (Genkit reads the global tracer provider).
 </Note>
 
+## Check it worked
+
+Run one of your flows. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the spans Genkit recorded for the flow and its model calls.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
+
 ## Related
 
 - [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client

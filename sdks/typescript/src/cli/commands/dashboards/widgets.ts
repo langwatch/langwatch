@@ -7,12 +7,20 @@ import { formatTable, sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
-import { type DefinitionFlags, resolveDefinitionInput, WidgetInputError } from "./definitionInput";
+import {
+  type DefinitionFlags,
+  resolveDefinitionInput,
+  resolveSources,
+  WidgetInputError,
+} from "./definitionInput";
 
-/** The definition flags, resolved; a refusal ends the command before any request. */
-const definitionOf = (flags: DefinitionFlags) => {
+/** The flags `widget add` and `update` share beyond the definition. */
+type WidgetFlags = DefinitionFlags & { name?: string; description?: string; sources?: string };
+
+/** Ends the command on input refused before any request. */
+const refusedLocally = <T>(resolve: () => T): T => {
   try {
-    return resolveDefinitionInput(flags);
+    return resolve();
   } catch (error) {
     if (error instanceof WidgetInputError) {
       console.error(chalk.red(`Error: ${error.message}`));
@@ -20,6 +28,17 @@ const definitionOf = (flags: DefinitionFlags) => {
     }
     throw error;
   }
+};
+
+/** The definition flags and `--sources`, each parsed once; the sources set on every query given. */
+const definitionOf = (flags: WidgetFlags) => {
+  const parsed = refusedLocally(() => resolveDefinitionInput(flags));
+  const sources = refusedLocally(() => resolveSources(flags.sources));
+  const definition =
+    parsed && sources
+      ? { ...parsed, queries: parsed.queries.map((query) => ({ ...query, sources })) }
+      : parsed;
+  return { definition, sources };
 };
 
 /** `langwatch dashboard widget list <dashboardId>`: the widgets on one dashboard. */
@@ -89,10 +108,10 @@ export const getWidgetOnDashboardCommand = async (
 
 export const addWidgetToDashboardCommand = async (
   dashboardId: string,
-  options: DefinitionFlags & { name?: string; description?: string },
+  options: WidgetFlags,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
-  const definition = definitionOf(options);
+  const { definition } = definitionOf(options);
   if (!options.name || !definition) {
     console.error(
       chalk.red(
@@ -127,14 +146,15 @@ export const addWidgetToDashboardCommand = async (
 export const updateWidgetOnDashboardCommand = async (
   dashboardId: string,
   widgetId: string,
-  options: DefinitionFlags & { name?: string; description?: string },
+  options: WidgetFlags,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
-  const definition = definitionOf(options);
-  if (options.name === undefined && options.description === undefined && !definition) {
+  const { definition, sources } = definitionOf(options);
+  const named = options.name !== undefined || options.description !== undefined;
+  if (!named && !definition && !sources) {
     console.error(
       chalk.red(
-        "Error: nothing to update — pass --name, --description, or --code / --code-file with --queries-file",
+        "Error: nothing to update — pass --name, --description, --sources, or --code / --code-file with --queries-file",
       ),
     );
     process.exit(1);
@@ -142,13 +162,24 @@ export const updateWidgetOnDashboardCommand = async (
   const spinner = createSpinner(`Updating widget "${widgetId}"...`).start();
 
   try {
-    const widget = await new DashboardsApiService().updateWidget({
+    const service = new DashboardsApiService();
+    // --sources alone: every stored query, sent back with the new list.
+    const resourced =
+      !definition && sources
+        ? {
+            queries: (await service.getWidget({ dashboardId, widgetId })).definition.queries.map(
+              (query) => ({ ...query, sources }),
+            ),
+          }
+        : {};
+    const widget = await service.updateWidget({
       dashboardId,
       widgetId,
       changes: {
         ...(options.name === undefined ? {} : { name: options.name }),
         ...(options.description === undefined ? {} : { description: options.description }),
         ...definition,
+        ...resourced,
       },
     });
     spinner.succeed(`Updated widget "${chalk.cyan(sanitizeTerminalText(widget.name))}"`);

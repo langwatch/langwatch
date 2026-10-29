@@ -756,6 +756,7 @@ export interface LwqlPrismaRows {
     readonly createdById: "String?";
     readonly scope: "DashboardScope";
     readonly organizationId: "String?";
+    readonly excludedOrigins: "Json?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
@@ -1759,6 +1760,7 @@ export interface LwqlPrismaRows {
     readonly ingestionTemplateId: "String?";
     readonly createdByDeviceLabel: "String?";
     readonly isSystemManaged: "Boolean";
+    readonly createdByBrowserSessionId: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };

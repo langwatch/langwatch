@@ -376,7 +376,7 @@ export interface paths {
         put?: never;
         /**
          * Create a widget on a dashboard
-         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API.
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one widget, placed on this dashboard at the next free row. `source` records where the widget came from; without it, the widget is recorded as made through the API. Each query's `sources` lists the trace origins it counts; a query that names none counts `["application"]`.
          */
         post: operations["postApiDashboardsByDashboardIdWidgets"];
         delete?: never;
@@ -408,7 +408,7 @@ export interface paths {
         head?: never;
         /**
          * Update a widget on a dashboard
-         * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value. A body with none of these fields is refused.
+         * @description Changes a widget's name, code, queries, description or source. A field the body leaves out keeps its stored value; a query sent without `sources` keeps the sources stored under its name, and `sources: null` clears them. A body with none of these fields is refused.
          */
         patch: operations["patchApiDashboardsByDashboardIdWidgetsByWidgetId"];
         trace?: never;
@@ -5967,6 +5967,7 @@ export interface operations {
                                         type: "string" | "number" | "boolean";
                                         default?: string | number | boolean;
                                     }[];
+                                    sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                                 }[];
                                 description?: string;
                                 prompt?: string;
@@ -6172,6 +6173,7 @@ export interface operations {
                             type: "string" | "number" | "boolean";
                             default?: string | number | boolean;
                         }[];
+                        sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                     }[];
                     description?: string;
                     prompt?: string;
@@ -6214,6 +6216,7 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6428,6 +6431,7 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -6813,6 +6817,7 @@ export interface operations {
                             type: "string" | "number" | "boolean";
                             default?: string | number | boolean;
                         }[];
+                        sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                     }[];
                     description?: string;
                     source?: {
@@ -6854,6 +6859,7 @@ export interface operations {
                                     type: "string" | "number" | "boolean";
                                     default?: string | number | boolean;
                                 }[];
+                                sources?: ("application" | "simulation" | "evaluation" | "sample" | "coding_agent" | "ai_tool" | "gateway" | "workflow" | "playground" | "langy" | "other")[] | null;
                             }[];
                             description?: string;
                             prompt?: string;
@@ -9254,6 +9260,7 @@ export interface operations {
                         [key: string]: string | number | boolean;
                     };
                     row_indices?: number[];
+                    concurrency?: number;
                 };
             };
         };
@@ -12594,9 +12601,9 @@ export interface operations {
                         options?: (string | number | boolean)[];
                         required?: boolean;
                     }[];
-                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default. */
                     simulatorModel?: string | null;
-                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;
@@ -12747,9 +12754,9 @@ export interface operations {
                         options?: (string | number | boolean)[];
                         required?: boolean;
                     }[];
-                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default. */
                     simulatorModel?: string | null;
-                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;
@@ -12882,9 +12889,9 @@ export interface operations {
                         options?: (string | number | boolean)[];
                         required?: boolean;
                     }[];
-                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default. */
                     simulatorModel?: string | null;
-                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;

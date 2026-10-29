@@ -128,7 +128,7 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
       ...(input.granularitySeconds === undefined
         ? {}
         : { granularitySeconds: input.granularitySeconds }),
-      ...(input.excludeOrigins ? { excludeOrigins: input.excludeOrigins } : {}),
+      ...(input.sources === undefined ? {} : { sources: input.sources }),
       ...(signal ? { signal } : {}),
     });
   })

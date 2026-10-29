@@ -3,12 +3,6 @@ import { deriveBindingRole } from "./api-key-permissions.ts";
 
 export const LEGACY_KEY_REPLACEMENT_NAME = "Project API Key";
 
-/** Shown over the create drawer once the legacy key is revoked, until its replacement exists. */
-export const LEGACY_KEY_REVOKED_NOTICE = {
-  title: "The legacy project key no longer works",
-  body: "Create this key and put it wherever the legacy key was used. If you close this drawer, the project has no key until you create one.",
-};
-
 /**
  * The key that takes over from a revoked legacy key: full access to its project, no expiry.
  * An organization admin gets an ownerless service key, like the legacy key; others a personal one.

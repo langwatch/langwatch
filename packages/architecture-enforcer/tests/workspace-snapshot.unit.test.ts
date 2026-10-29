@@ -29,6 +29,27 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 describe("given a workspace snapshot", () => {
+  /** @scenario "Static docs is a recognized UI application" */
+  it("classifies static docs as a UI application and rejects arbitrary app roots", () => {
+    write(
+      "apps/docs/package.json",
+      JSON.stringify({ name: "@langwatch/docs-site", private: true }),
+    );
+    write(
+      "apps/unknown/package.json",
+      JSON.stringify({ name: "@langwatch/unknown", private: true }),
+    );
+    const snapshot = buildWorkspaceSnapshot({ root, changedFiles: [] });
+    const docs = snapshot.packages.find((pkg) => pkg.name === "@langwatch/docs-site");
+    expect(docs?.kind).toBe("application");
+    expect(docs?.applicationRole).toBe("ui");
+    expect(
+      snapshot.discoveryViolations.filter((violation) => violation.policy === "application-layout"),
+    ).toEqual([
+      expect.objectContaining({ message: "Unknown application workspace apps/unknown." }),
+    ]);
+  });
+
   describe("when two policies ask for the same directory", () => {
     it("answers both from one walk, and filters each caller's own way", () => {
       const snapshot = buildWorkspaceSnapshot({ root, changedFiles: [] });

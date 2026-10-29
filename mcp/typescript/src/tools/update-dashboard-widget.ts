@@ -7,9 +7,11 @@
 import type { DashboardWidget } from "../langwatch-api-dashboard-widgets.js";
 import { getWidgetOnDashboard, updateWidgetOnDashboard } from "../langwatch-api-dashboards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
+import type { WidgetSource } from "../schemas/widget-sources.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,
+  withSources,
 } from "./dashboard-widget-queries.js";
 
 export interface UpdateDashboardWidgetParams {
@@ -19,24 +21,29 @@ export interface UpdateDashboardWidgetParams {
   code?: string;
   queries?: DashboardWidgetQueriesInput;
   description?: string;
+  /** Set on every query; alone, it is sent with the widget's stored queries. */
+  sources?: WidgetSource[] | null;
 }
 
 export async function handleUpdateDashboardWidget(
   params: UpdateDashboardWidgetParams,
 ): Promise<string> {
-  const { dashboardId, widgetId, name, code, description } = params;
-  if (
-    name === undefined &&
-    code === undefined &&
-    params.queries === undefined &&
-    description === undefined
-  ) {
-    throw new Error("Provide at least one of name, code, queries or description to change.");
+  const { dashboardId, widgetId, name, code, description, sources } = params;
+  const fields = [name, code, params.queries, description, sources];
+  if (fields.every((field) => field === undefined)) {
+    throw new Error(
+      "Provide at least one of name, code, queries, description or sources to change.",
+    );
   }
-  const queries =
+
+  const current = await widgetOnDashboardOrRefused({ widgetId, dashboardId });
+  const given =
     params.queries === undefined
       ? undefined
       : normalizeDashboardWidgetQueries({ queries: params.queries });
+  // Sources alone: the stored queries go back with the new list on each.
+  const base = given ?? (sources === undefined ? undefined : current.definition.queries);
+  const queries = base === undefined ? undefined : withSources({ queries: base, sources });
 
   const changes = {
     ...(name === undefined ? {} : { name }),
@@ -45,7 +52,6 @@ export async function handleUpdateDashboardWidget(
     ...(description === undefined ? {} : { description }),
   };
 
-  const current = await widgetOnDashboardOrRefused({ widgetId, dashboardId });
   const widget = await updateWidgetOnDashboard({ dashboardId, widgetId: current.id, ...changes });
 
   return [

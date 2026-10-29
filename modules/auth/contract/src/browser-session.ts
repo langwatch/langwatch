@@ -48,6 +48,8 @@ const browserSessionSchemaDefinition = z
       impersonator: browserSessionActorSchema.optional(),
     }),
     expires: z.string().datetime(),
+    /** When the sign-in that minted this session happened; absent where none was read. */
+    startedAt: z.iso.datetime().optional(),
     sessionId: z.string().min(1),
   })
   .strict();

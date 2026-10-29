@@ -4,9 +4,11 @@
 
 import { createWidgetOnDashboard } from "../langwatch-api-dashboards.js";
 import { LangWatchApiError } from "../langwatch-api.js";
+import type { WidgetSource } from "../schemas/widget-sources.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,
+  withSources,
 } from "./dashboard-widget-queries.js";
 
 export interface AddDashboardWidgetParams {
@@ -14,10 +16,15 @@ export interface AddDashboardWidgetParams {
   name: string;
   code: string;
   queries: DashboardWidgetQueriesInput;
+  /** Set on every query; absent, the platform stores application on each. */
+  sources?: WidgetSource[] | null;
 }
 
 export async function handleAddDashboardWidget(params: AddDashboardWidgetParams): Promise<string> {
-  const queries = normalizeDashboardWidgetQueries({ queries: params.queries });
+  const queries = withSources({
+    queries: normalizeDashboardWidgetQueries({ queries: params.queries }),
+    sources: params.sources,
+  });
 
   let widget;
   try {

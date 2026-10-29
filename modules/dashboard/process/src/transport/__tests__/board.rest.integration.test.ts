@@ -421,6 +421,32 @@ describe("given two Dashboards boards, one holding a widget", () => {
     });
   });
 
+  /** @scenario "AC200j Sources: the API and the CLI read and write a query's sources" */
+  it("stores application on a new query, a picked set as sent, and keeps it through a rename", async () => {
+    const { other, send } = await twoBoards();
+    const widgets = `${BOARDS}/${other.id}/widgets`;
+    const query = { name: "turns", sql: "SELECT count() FROM traces" };
+
+    const created = await send("dashboards", widgets, {
+      method: "POST",
+      body: { name: "Langy refusals", code: CODE, queries: [query] },
+    });
+    const path = `${widgets}/${created.json?.id}`;
+    const picked = await send("dashboards", path, {
+      method: "PATCH",
+      body: { queries: [{ ...query, sources: ["langy"] }] },
+    });
+    const renamed = await send("dashboards", path, { method: "PATCH", body: { name: "Refused" } });
+    const sources = (response: typeof created) =>
+      response.json?.definition?.queries?.map((q: { sources?: unknown }) => q.sources);
+
+    expect({
+      created: sources(created),
+      picked: sources(picked),
+      renamed: sources(renamed),
+    }).toEqual({ created: [["application"]], picked: [["langy"]], renamed: [["langy"]] });
+  });
+
   /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */
   it("answers a widget reached through another board's path as not found, and leaves it", async () => {
     const { board, other, widget, send } = await twoBoards();

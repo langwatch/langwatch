@@ -28,6 +28,7 @@ import {
   triggerActionSchema,
   validateActionParamsForAction,
 } from "./schemas/triggers.ts";
+import { widgetSourcesInput } from "./schemas/widget-sources.ts";
 import { handleExperimentResults } from "./tools/get-experiment-results.ts";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.ts";
 import { handleExperimentList } from "./tools/list-experiments.ts";
@@ -38,7 +39,7 @@ import { handleUpdateTestSuite } from "./tools/update-test-suite.ts";
 const modelSchema = z
   .string()
   .describe(
-    'Model in "provider/model-name" format, e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-5-20250929"',
+    'Model in "provider/model-name" format, e.g., "openai/gpt-6-luna", "anthropic/claude-sonnet-4-5-20250929"',
   );
 
 /**
@@ -1458,6 +1459,7 @@ function registerDashboardTools(server: McpServer): void {
         .describe(
           "The widget's named LangWatchQL queries: either {name: sql} or an array of {name, sql}. Max 8. Validate each statement with run_query first.",
         ),
+      sources: widgetSourcesInput,
     },
     withToolLogging("add_dashboard_widget", async (params) => {
       requireApiKey();
@@ -1470,7 +1472,7 @@ function registerDashboardTools(server: McpServer): void {
 
   server.tool(
     "update_dashboard_widget",
-    "Changes one custom widget on a dashboard: its name, its TSX `code`, its named LangWatchQL `queries` or its `description`. Pass only the fields to change; every field left out keeps its stored value. Validate any new query's SQL with run_query first. Returns the updated widget.",
+    "Changes one custom widget on a dashboard: its name, its TSX `code`, its named LangWatchQL `queries`, its `description` or the `sources` its queries count. Pass only the fields to change; every field left out keeps its stored value. Validate any new query's SQL with run_query first. Returns the updated widget.",
     {
       dashboardId: z.string().describe("The dashboard the widget is on"),
       widgetId: z.string().describe("The widget to change, as add_dashboard_widget returned it"),
@@ -1501,6 +1503,7 @@ function registerDashboardTools(server: McpServer): void {
         .string()
         .optional()
         .describe("What the widget's info tip says: a sentence or two"),
+      sources: widgetSourcesInput,
     },
     withToolLogging("update_dashboard_widget", async (params) => {
       requireApiKey();
@@ -2121,6 +2124,15 @@ function registerExperimentTools(server: McpServer): void {
     "Start an experiment run by slug. Returns a run ID for polling status.",
     {
       slug: z.string().describe("The experiment slug to run"),
+      concurrency: z
+        .number()
+        .int()
+        .min(1)
+        .max(24)
+        .optional()
+        .describe(
+          "Cells (one row against one target) to run at once, for this run only (default: the server's setting). Use 1 to run them one at a time, in order.",
+        ),
     },
     withToolLogging("platform_run_experiment", async (params) => {
       requireApiKey();

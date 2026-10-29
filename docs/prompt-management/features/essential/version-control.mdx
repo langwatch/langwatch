@@ -94,10 +94,9 @@ curl --request POST \
   --header "Content-Type: application/json" \
   --data '{
     "prompt": "Updated prompt text...",
-    "model": "openai/gpt-5",
+    "model": "openai/gpt-6-luna",
     "commitMessage": "Improved customer support prompt",
 
-    "temperature": 0.7,
     "maxTokens": 1000,
     "responseFormat": {"type": "text"},
     "inputs": [{"identifier": "input", "type": "str"}],
@@ -149,11 +148,11 @@ Create new prompts with templates and variables:
        handle: "customer-support-bot",                    // Required
        scope: "PROJECT",                                  // Optional: defaults to "PROJECT"
        prompt: "You are a helpful customer support agent. Help with: {{input}}", // Optional
-       model: "openai/gpt-5-mini",                       // Optional
+       model: "openai/gpt-6-luna",                       // Optional
 
        // Optional fields:
        maxTokens: 1000,                                   // Optional: Maximum tokens to generate
-       // temperature: 0.7,                               // Optional, but the GPT-5 family rejects it
+       // temperature: 0.7,                               // Optional, but reasoning models such as the GPT-6 family reject it
        // messages: [...],                                // Optional: Messages array in OpenAI format { role: "system" | "user" | "assistant", content: "..." }
      });
 
@@ -201,7 +200,7 @@ Modify existing prompts while maintaining version history:
        prompt: "You are an expert customer support agent. Help with: {{input}}",
 
        // Optional fields:
-       model: "openai/gpt-5.5",                           // Optional: Change the model
+       model: "openai/gpt-6-sol",                         // Optional: Change the model
        maxTokens: 2000,                                  // Optional: Change max tokens
        // messages: [...],                                 // Optional: Messages array in OpenAI format { role: "system" | "user" | "assistant", content: "..." }
      });

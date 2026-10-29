@@ -67,6 +67,7 @@ it("binds every declared procedure once and preserves its access declaration", (
     ["orgProjects", "query", { ...KEY_ASSIGNMENT, allow: MEMBER_ONLY }],
     ["orgTeams", "query", { ...KEY_ASSIGNMENT, allow: MEMBER_ONLY }],
     ["orgMembers", "query", { ...KEY_ASSIGNMENT, allow: MEMBER_ONLY }],
+    ["mintDocsSessionKey", "mutation", "project:view"],
   ]);
 });
 
