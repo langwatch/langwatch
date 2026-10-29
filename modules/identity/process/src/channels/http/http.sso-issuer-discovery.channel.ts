@@ -5,6 +5,8 @@ import {
   type EgressTlsPolicy,
   type FencedFetchOptions,
   isBlockedCloudDomain,
+  type OutboundProxyConfig,
+  OutboundProxyMisconfiguredError,
   RedirectRefusedError,
   type SsrfUrlValidator,
   type SsrfValidationResult,
@@ -113,6 +115,7 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
   private readonly dialableInternalOrigins: () => readonly string[];
   private readonly fetchValidated: FencedDiscoveryFetch;
   private readonly tls: EgressTlsPolicy;
+  private readonly proxy: OutboundProxyConfig | undefined;
 
   private constructor({
     validate,
@@ -120,22 +123,28 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
     dialableInternalOrigins,
     fetchValidated,
     tls,
+    proxy,
   }: {
     validate: SsrfUrlValidator;
     validateVouched: SsrfUrlValidator;
     dialableInternalOrigins: () => readonly string[];
     fetchValidated: FencedDiscoveryFetch;
     tls: EgressTlsPolicy;
+    proxy: OutboundProxyConfig | undefined;
   }) {
     this.validate = validate;
     this.validateVouched = validateVouched;
     this.dialableInternalOrigins = dialableInternalOrigins;
     this.fetchValidated = fetchValidated;
     this.tls = tls;
+    this.proxy = proxy;
   }
 
   static create(options: {
     policy: SsoDomainProofEgressPolicy;
+    /** The outbound proxy, which carries each judged hop that neither `NO_PROXY`
+     *  nor `dialableInternalOrigins` names. */
+    proxy?: OutboundProxyConfig;
     /** Origins an operator named in advance, which may answer privately. */
     dialableInternalOrigins?: () => readonly string[];
     validate?: SsrfUrlValidator;
@@ -153,6 +162,7 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
       dialableInternalOrigins: options.dialableInternalOrigins ?? (() => []),
       fetchValidated: options.fetchValidated ?? fetchValidatedDestination,
       tls: { rejectUnauthorized: options.policy.verifyTls },
+      proxy: options.proxy,
     });
   }
 
@@ -163,13 +173,25 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
    */
   private readonly judge: SsrfUrlValidator = async (url) => {
     if (!url.toLowerCase().startsWith("https://")) throw new DiscoveryDowngradedError();
-    if (!this.dialableInternalOrigins().includes(new URL(url).origin)) return this.validate(url);
+    if (!this.isVouched(url)) return this.validate(url);
 
     const vouched = await this.validateVouched(url);
     if (vouched.type === "unresolved") throw new VouchedOriginUnresolvableError();
 
     return vouched;
   };
+
+  private isVouched(url: string): boolean {
+    return this.dialableInternalOrigins().includes(new URL(url).origin);
+  }
+
+  /**
+   * A vouched origin answers inside the network, so its hop keeps the direct
+   * connection pinned to the address `validateVouched` resolved; the proxy
+   * carries every other hop. Per hop, like the vouching itself.
+   */
+  private readonly bypassProxy = (hop: SsrfValidationResult): boolean =>
+    this.isVouched(hop.originalUrl);
 
   async discover({ issuer }: { issuer: string }): Promise<SsoIssuerDiscovery> {
     const endpoint = discoveryEndpointFor({ issuer });
@@ -185,6 +207,8 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
           signal: controller.signal,
           followRedirects: true,
           revalidate: this.judge,
+          proxy: this.proxy,
+          bypassProxy: this.bypassProxy,
         },
         this.tls,
       );
@@ -224,6 +248,7 @@ function reasonFor({ error, aborted }: { error: unknown; aborted: boolean }): st
   if (error instanceof DiscoveryDowngradedError) return "not_https";
   if (error instanceof VouchedOriginUnresolvableError) return "unresolvable";
   if (error instanceof RedirectRefusedError) return "redirect_refused";
+  if (error instanceof OutboundProxyMisconfiguredError) return "proxy_misconfigured";
   if (aborted) return "timeout";
   const code =
     typeof error === "object" &&

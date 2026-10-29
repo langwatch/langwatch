@@ -1,5 +1,5 @@
 import type { SsrfUrlValidator, SsrfValidationResult } from "@langwatch/egress";
-import { RedirectRefusedError } from "@langwatch/egress";
+import { OutboundProxyMisconfiguredError, RedirectRefusedError } from "@langwatch/egress";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -165,6 +165,18 @@ describe("given a fetch of the verification file", () => {
         reason: "redirect_refused",
       });
     });
+
+    /** @scenario "A fetch that could not happen says so, and blames nobody" */
+    it("reports a malformed outbound proxy setting as its own reason", async () => {
+      const { channel } = channelAnswering(async () => {
+        throw new OutboundProxyMisconfiguredError();
+      });
+
+      expect(await fetchFile(channel)).toEqual({
+        outcome: "unreachable",
+        reason: "proxy_misconfigured",
+      });
+    });
   });
 
   describe("when the fence turns the destination away", () => {
@@ -204,5 +216,29 @@ describe("given the memory twin of the file channel", () => {
       }),
     ).toEqual({ outcome: "absent" });
     expect(channel.asked).toHaveLength(2);
+  });
+});
+
+describe("given a deployment that reaches the internet only through an outbound proxy", () => {
+  /** @scenario "The file is fetched through the deployment's outbound proxy" */
+  it("judges the address first, then hands the proxy to the fetch", async () => {
+    const proxy = { httpsProxy: "http://proxy.corp.example:3128" };
+    const steps: string[] = [];
+    const channel = HttpsSsoDomainProofFileChannel.create({
+      policy: POLICY,
+      proxy,
+      validate: async (url) => {
+        steps.push("judged");
+        return admitted(url);
+      },
+      fetchValidated: async (_validated, init) => {
+        steps.push("fetched");
+        expect(init.proxy).toEqual(proxy);
+        return respond(200, "lw-token-123");
+      },
+    });
+
+    expect(await fetchFile(channel)).toEqual({ outcome: "served", values: ["lw-token-123"] });
+    expect(steps).toEqual(["judged", "fetched"]);
   });
 });

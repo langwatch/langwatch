@@ -1,5 +1,5 @@
 import type { SsrfUrlValidator, SsrfValidationResult } from "@langwatch/egress";
-import { RedirectRefusedError } from "@langwatch/egress";
+import { OutboundProxyMisconfiguredError, RedirectRefusedError } from "@langwatch/egress";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -122,6 +122,17 @@ describe("given an issuer an administrator typed", () => {
     await expect(channel.discover({ issuer: ISSUER })).resolves.toEqual({
       reachable: false,
       reason: "redirect_refused",
+    });
+  });
+
+  it("names a malformed outbound proxy setting, not the issuer", async () => {
+    const { channel } = channelAnswering(async () => {
+      throw new OutboundProxyMisconfiguredError();
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toEqual({
+      reachable: false,
+      reason: "proxy_misconfigured",
     });
   });
 
@@ -282,6 +293,99 @@ describe("given an issuer origin an operator vouched for", () => {
     });
 
     await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({
+      reachable: false,
+    });
+    expect(asked).toEqual([]);
+  });
+});
+
+describe("given a deployment that reaches the internet only through an outbound proxy", () => {
+  const proxy = { httpsProxy: "http://proxy.corp.example:3128", noProxy: "corp.example" };
+
+  /** @scenario "Issuer discovery leaves through the deployment's outbound proxy" */
+  it("judges the issuer first, then hands the proxy to the fetch", async () => {
+    const steps: string[] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy,
+      validate: async (url) => {
+        steps.push("judged");
+        return admitted(url);
+      },
+      fetchValidated: async (_validated, init) => {
+        steps.push("fetched");
+        expect(init.proxy).toEqual(proxy);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({ reachable: true });
+    expect(steps).toEqual(["judged", "fetched"]);
+  });
+
+  /** @scenario "Issuer discovery leaves through the deployment's outbound proxy" */
+  it("never reaches the proxy for an issuer the fence refuses", async () => {
+    const asked: string[] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy,
+      validate: async () => {
+        throw new Error("resolves to a private address");
+      },
+      fetchValidated: async (validated) => {
+        asked.push(validated.originalUrl);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({
+      reachable: false,
+    });
+    expect(asked).toEqual([]);
+  });
+
+  /** @scenario "An issuer origin an operator vouched for is reached directly, not through the proxy" */
+  it("routes the vouched origin around the proxy and a redirect out of it through the proxy", async () => {
+    const vouched = "https://idp.corp.internal";
+    const routes: [string, boolean][] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy,
+      dialableInternalOrigins: () => [vouched],
+      validate: async (url) => admitted(url),
+      validateVouched: async (url) => ({ ...admitted(url), resolvedIp: "10.0.0.7" }),
+      fetchValidated: async (validated, init) => {
+        expect(init.proxy).toEqual(proxy);
+        routes.push([validated.originalUrl, init.bypassProxy?.(validated) ?? false]);
+        if (!init.revalidate) throw new Error("discovery follows redirects by its own judge");
+        const next = await init.revalidate(ENDPOINT);
+        routes.push([next.originalUrl, init.bypassProxy?.(next) ?? false]);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: `${vouched}/realms/acme` })).resolves.toMatchObject({
+      reachable: true,
+    });
+    expect(routes).toEqual([
+      [`${vouched}/realms/acme/.well-known/openid-configuration`, true],
+      [ENDPOINT, false],
+    ]);
+  });
+
+  /** @scenario "NO_PROXY does not lift the public-address check on discovery" */
+  it("refuses an issuer NO_PROXY names when it resolves privately", async () => {
+    const asked: string[] = [];
+    const channel = HttpsSsoIssuerDiscoveryChannel.create({
+      policy: POLICY,
+      proxy: { httpsProxy: "http://proxy.corp.example:3128", noProxy: "127.0.0.1" },
+      fetchValidated: async (validated) => {
+        asked.push(validated.originalUrl);
+        return respond(200, DISCOVERY_DOCUMENT);
+      },
+    });
+
+    await expect(channel.discover({ issuer: "https://127.0.0.1/" })).resolves.toMatchObject({
       reachable: false,
     });
     expect(asked).toEqual([]);

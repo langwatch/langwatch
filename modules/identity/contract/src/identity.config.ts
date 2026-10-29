@@ -4,6 +4,7 @@ import {
   isSaas,
   localPasswords,
   mfaEnrollmentOpen,
+  outboundProxy,
   passkeysEnabled,
   publicBaseUrl,
 } from "@langwatch/config";
@@ -30,6 +31,8 @@ export const identityConfig = Config.define((c) => ({
   isSaas,
   /** The shared deployment origin: what a SAML identity provider is told LangWatch is called. */
   publicBaseUrl,
+  /** The corporate proxy SSO issuer discovery and the domain proof file leave through. */
+  outboundProxy,
   /** The sign-in capability switches auth also reads (round 48, A1-a). */
   passkeysEnabled,
   mfaEnrollmentOpen,
