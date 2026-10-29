@@ -125,7 +125,7 @@ func TestALambdaTagWithNoRevisionFailsClosed(t *testing.T) {
 	assert.Empty(t, run.reg.puts)
 }
 
-// @scenario "A dispatch with a custom tag that is already there fails the run"
+// @scenario "A dispatch whose custom tag is already there for another commit or none fails the run"
 func TestACustomLambdaTag(t *testing.T) {
 	t.Run("already there for another commit fails and writes nothing", func(t *testing.T) {
 		run := withTags(map[string]entry{

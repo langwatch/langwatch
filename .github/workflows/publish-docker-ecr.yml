@@ -653,21 +653,20 @@ jobs:
           cache-dependency-path: "*/go.sum"
 
       # See the same check in build-and-push. A push run may have re-tagged an
-      # unchanged ancestor image as this commit's tag. A re-run of that push
-      # run counts the copy as published; a dispatch, which builds every image,
-      # fails on it, as the tag cannot be moved to the new build.
+      # unchanged ancestor image as this commit's tag; a run that builds the
+      # image fails on it, as the tag cannot be moved. A push run never builds
+      # an image it re-tagged: both follow the same `built` list.
       - name: Check whether ${{ matrix.image }} is already published
         id: exists
         env:
           IMAGE: ${{ matrix.image }}
           TAG: ${{ needs.meta.outputs.image_tag }}
           CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
-          RETAG: ${{ github.event_name == 'push' && 'accept' || 'refuse' }}
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
           set -euo pipefail
           EXISTS=$(go run ./cmd/ecrtag published -repository "${IMAGE}" -tag "${TAG}" \
-            -source label -revision "${GITHUB_SHA}" -custom="${CUSTOM_TAG}" -retag="${RETAG}")
+            -source label -revision "${GITHUB_SHA}" -custom="${CUSTOM_TAG}" -refuse-retag)
           if [ "${EXISTS}" = "true" ]; then
             echo "::notice::${IMAGE}:${TAG} is already in ECR; skipping the build"
           fi

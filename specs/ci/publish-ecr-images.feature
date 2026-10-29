@@ -103,7 +103,7 @@ Feature: Publish every deployable image to the artifacts registry
     And the run succeeds
 
   @unit
-  Scenario: A dispatch with a custom tag that is already there fails the run
+  Scenario: A dispatch whose custom tag is already there for another commit or none fails the run
     Given an image already has the tag a dispatcher typed as image_tag, recording another commit or none
     When publish-docker-ecr is dispatched with that image_tag
     Then it fails and asks for a new tag
@@ -159,7 +159,7 @@ Feature: Publish every deployable image to the artifacts registry
     Then it fails, saying the tag cannot be moved, instead of counting the image as published
 
   @unit
-  Scenario: A private build never reuses a custom tag
+  Scenario: A private build reuses a tag only for the commit it records
     Given publish-docker-private already published langwatch-app under a tag
     When it is dispatched again
     Then with a tag recording that commit it skips the build and succeeds

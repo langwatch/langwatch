@@ -3,15 +3,15 @@
 //
 // Usage:
 //
-//	go run ./cmd/ecrtag published -repository R -tag T -source label|annotation -revision SHA [-custom] [-retag accept|refuse] [-built-from TAG]
+//	go run ./cmd/ecrtag published -repository R -tag T -source label|annotation -revision SHA [-custom] [-refuse-retag] [-built-from TAG]
 //	go run ./cmd/ecrtag lambda -repository R -tag T -revision SHA [-built] [-custom]
 //
 // published prints "true" when the tag is already there for this commit (skip
 // the push) and "false" when it is not there (push it); any other state fails.
 // lambda gives a Lambda image the tag (see tools/ecrtag.Lambda). -registry is
-// the registry host; -retag and lambda read git history from the working
-// directory. -retag accept counts a push run's re-tag as published, -retag
-// refuse fails on it; -built-from is the per-arch tag an index must name.
+// the registry host; -refuse-retag and lambda read git history from the
+// working directory. -refuse-retag fails on a tag naming the image a push
+// run's re-tag would copy; -built-from is the per-arch tag an index must name.
 //
 // Spec: specs/ci/publish-ecr-images.feature
 package main
@@ -29,8 +29,8 @@ import (
 const ancestorScript = ".github/scripts/nearest-ancestor-tag.sh"
 
 type options struct {
-	repository, tag, source, revision, host, head, retag, builtFrom string
-	custom, built                                                   bool
+	repository, tag, source, revision, host, head, builtFrom string
+	custom, built, refuseRetag                               bool
 }
 
 func main() {
@@ -67,7 +67,7 @@ func parse(command string, args []string) (options, error) {
 	fs.StringVar(&o.head, "head", "", "the commit whose history a re-tag reads (default -revision)")
 	fs.BoolVar(&o.custom, "custom", false, "the tag is a dispatcher's, not the default commit tag")
 	fs.BoolVar(&o.built, "built", false, "lambda: this run rebuilt the image and pushed the tag itself")
-	fs.StringVar(&o.retag, "retag", "", "published: accept or refuse a tag naming the image a re-tag would copy")
+	fs.BoolVar(&o.refuseRetag, "refuse-retag", false, "published: fail on a tag naming the image a re-tag would copy")
 	fs.StringVar(&o.builtFrom, "built-from", "", "published: the per-arch tag this run built, which an index tag must name")
 	if err := fs.Parse(args); err != nil {
 		return o, err
@@ -77,9 +77,6 @@ func parse(command string, args []string) (options, error) {
 	}
 	if o.head == "" {
 		o.head = o.revision
-	}
-	if o.retag != "" && o.retag != "accept" && o.retag != "refuse" {
-		return o, fmt.Errorf("%s: -retag is accept or refuse, not %q", command, o.retag)
 	}
 
 	return o, nil
@@ -98,23 +95,30 @@ func run(ctx context.Context, command string, o options) error {
 
 func (o options) ref() ecrtag.Ref { return ecrtag.Ref{Repository: o.repository, Tag: o.tag} }
 
+// check is the Check published asks about. A Check never accepts a re-tag
+// here: only the Lambda re-tag itself does (tools/ecrtag.Lambda).
+func (o options) check(ctx context.Context, reg ecrtag.Registry, anc ecrtag.Ancestry) (ecrtag.Check, error) {
+	c := ecrtag.Check{Ref: o.ref(), Source: ecrtag.Source(o.source), Revision: o.revision, Custom: o.custom, BuiltFrom: o.builtFrom}
+	if o.refuseRetag {
+		_, digest, err := ecrtag.Retag{Registry: reg, Ancestry: anc, Ref: o.ref(), Head: o.head}.Source(ctx)
+		if err != nil {
+			return c, err
+		}
+		c.RefuseDigest = digest
+	}
+
+	return c, nil
+}
+
 func (o options) registry() ecrtag.CLI { return ecrtag.CLI{Host: o.host, Run: ecrtag.Run} }
 
 func ancestry() ecrtag.Script { return ecrtag.Script{Path: ancestorScript, Run: ecrtag.Run} }
 
 func published(ctx context.Context, o options) error {
 	reg := o.registry()
-	c := ecrtag.Check{Ref: o.ref(), Source: ecrtag.Source(o.source), Revision: o.revision, Custom: o.custom, BuiltFrom: o.builtFrom}
-	if o.retag != "" {
-		_, digest, err := ecrtag.Retag{Registry: reg, Ancestry: ancestry(), Ref: o.ref(), Head: o.head}.Source(ctx)
-		if err != nil {
-			return err
-		}
-		if o.retag == "accept" {
-			c.AcceptDigest = digest
-		} else {
-			c.RefuseDigest = digest
-		}
+	c, err := o.check(ctx, reg, ancestry())
+	if err != nil {
+		return err
 	}
 	done, err := ecrtag.Published(ctx, reg, c)
 	if err != nil {
