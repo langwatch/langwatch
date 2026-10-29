@@ -2155,16 +2155,20 @@ body {
   }
 }
 
-/* Phones and tablets: a slim contents bar under the header with a reading-progress line. */
+/* Phones and tablets: a slim contents bar under the header with a reading-progress line. The bar
+   bleeds into the gutter and pads back, so its label stays on the article's edge while the hover
+   tint and the progress line clear the text. */
 .docs-toc-disclosure {
   position: sticky;
   top: var(--docs-header-h);
   z-index: 5;
+  margin-inline: -12px;
   background: var(--chakra-colors-docs-paper);
   border-bottom: 1px solid var(--chakra-colors-border);
 }
 .docs-toc-disclosure > summary {
   position: relative;
+  padding-inline: 12px;
   transition: background-color 160ms ease-out;
 }
 @media (hover: hover) {

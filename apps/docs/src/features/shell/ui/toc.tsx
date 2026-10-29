@@ -132,7 +132,7 @@ export function TocDisclosure({ entries, always }: { entries: TocEntry[]; always
         <ChevronDown size={16} className="docs-toc-chevron" aria-hidden="true" />
         <span className="docs-toc-bar" aria-hidden="true" />
       </Box>
-      <Box paddingX="2" paddingBottom="2">
+      <Box paddingX="3" paddingBottom="2">
         <TocLinks
           entries={entries}
           active={active}
