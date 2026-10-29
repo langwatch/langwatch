@@ -303,17 +303,21 @@ Feature: Every query door takes the same parameters and says what it ran with
 
     # Decided by the owner's question (2026-10-29): "is there an easy way for us to send back from
     # the query permission limitations? like 'this is a subset of data based on your permissions?'"
-    # Each diagnostic is non-fatal and appears only when the server actually limited this run.
+    # Each diagnostic is non-fatal and appears only when it applies to this run. SOURCES_IGNORED
+    # applies only when the run names its sources: a run that names none gets no note (coordinator,
+    # 2026-10-29).
     # PROJECTS_NOT_READABLE is not a code: a named project the caller cannot read refuses the whole
     # run with the 404 of QP09, so nothing is dropped and nothing is left to report.
 
+    # Changed from the first spec: no FIELDS_REDACTED code exists. A column a protection hides is
+    # refused at validation, so no successful run ever read a hidden field to report.
     @unit @integration
-    Scenario: QP25 FIELDS_REDACTED appears when a data protection hid fields the query reads
-      Given a project whose data protection hides captured input and a statement that selects CapturedInput
+    Scenario: QP25 A statement reading a column a data protection hides is refused, with no FIELDS_REDACTED
+      Given a project whose data protection hides captured output and a statement that selects Comment from annotations
       When the statement runs
-      Then diagnostics holds one FIELDS_REDACTED entry whose message reads "Some fields were hidden by data protection"
-      And its meta holds no project id and no count of projects
-      # Evidence: a real REST answer quoted, and a haven browser screenshot of the card's (i) line
+      Then it is refused with the code "lwql_not_permitted" (400) and a GATED_COLUMN violation that names the field
+      And the violation names no project and no count of projects
+      # Evidence: the REST refusal quoted
 
     @unit @integration
     Scenario: QP26 SHARE_WINDOW_LIMITED appears when a dated member's rows were cut by its window
@@ -327,13 +331,13 @@ Feature: Every query door takes the same parameters and says what it ran with
     Scenario: QP27 A run the server did not limit carries neither diagnostic
       Given a statement over a project with no protection that touches it and no dated member
       When the statement runs
-      Then diagnostics holds no FIELDS_REDACTED and no SHARE_WINDOW_LIMITED entry
+      Then diagnostics holds no SHARE_WINDOW_LIMITED entry
       # Evidence: a real REST answer quoted, and a haven browser screenshot of a card with no (i) line
 
     @unit @integration
     Scenario: QP28 No limiting diagnostic names or counts a project the caller cannot read
-      Given a run limited by a protection and by a share window
-      Then no message, meta or detail of FIELDS_REDACTED or SHARE_WINDOW_LIMITED holds a project id, a project name or a number of projects
+      Given a run limited by a share window
+      Then no message, meta or detail of SHARE_WINDOW_LIMITED holds a project id, a project name or a number of projects
       # Evidence: the answer's diagnostics quoted
 
     @unit @integration

@@ -332,8 +332,26 @@ describe("given a run limited by a dated member's window", () => {
 
     for (const { result } of [whole, plain]) {
       expect(result.diagnostics.map(({ code }) => code)).not.toContain("SHARE_WINDOW_LIMITED");
-      expect(result.diagnostics.map(({ code }) => code)).not.toContain("FIELDS_REDACTED");
     }
+  });
+
+  /** @scenario "QP25 A statement reading a column a data protection hides is refused, with no FIELDS_REDACTED" */
+  it("refuses a hidden column at validation, naming the field and no project", async () => {
+    const refusal = await refusalOf({
+      sql: "SELECT Comment FROM analytics.annotations LIMIT 1",
+      protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
+        canSeeCosts: true,
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+      },
+    });
+
+    expect(refusal).toMatchObject({ code: "lwql_not_permitted", httpStatus: 400 });
+    const violations = JSON.stringify((refusal as { meta?: unknown }).meta);
+    expect(violations).toContain("GATED_COLUMN");
+    expect(violations).toContain('The field \\"Comment\\" is not available to you');
+    expect(violations).not.toContain("project-1");
   });
 
   /** @scenario "QP28 No limiting diagnostic names or counts a project the caller cannot read" */

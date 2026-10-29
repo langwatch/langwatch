@@ -2143,7 +2143,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC213 Diagnostics: a card shows what the server limited as one (i) line
-    Given a card whose run answered FIELDS_REDACTED or SHARE_WINDOW_LIMITED
+    Given a card whose run answered SHARE_WINDOW_LIMITED, SOURCES_IGNORED or GRANULARITY_COARSENED
     Then the card shows one (i) line holding the messages of those diagnostics
     And a card whose run was not limited shows no such line
     And the line names no project and counts none
@@ -2152,7 +2152,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit
   Scenario: AC212 Skill: the dashboard-widgets skill teaches projects, the reserved names and params
     Given Langy builds or edits a widget with the dashboard-widgets skill
-    Then the skill names {dashboard_context_sources} and {dashboard_context_projects} as reserved, the type Array(String), that a query is kept to its sources only where its SQL reads the first, that `projects` defaults to the board's project, and that every run answers with params, a flat map of each declared placeholder by its SQL name, and diagnostics, which say when the server limited the run or ignored a setting (FIELDS_REDACTED, SHARE_WINDOW_LIMITED, SOURCES_IGNORED, GRANULARITY_COARSENED)
+    Then the skill names {dashboard_context_sources} and {dashboard_context_projects} as reserved, the type Array(String), that a query is kept to its sources only where its SQL reads the first, that `projects` defaults to the board's project, and that every run answers with params, a flat map of each declared placeholder by its SQL name, and diagnostics, which say when the server limited the run or ignored a setting (SHARE_WINDOW_LIMITED, SOURCES_IGNORED, GRANULARITY_COARSENED)
     And it shows `--projects A,B` and the queries file's "projects"
     # Evidence: the compiled skill text, quoted
 

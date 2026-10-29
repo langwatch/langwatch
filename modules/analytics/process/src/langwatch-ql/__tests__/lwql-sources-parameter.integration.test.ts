@@ -39,10 +39,10 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
       query: `CREATE TABLE ${DATABASE}.spans (TenantId String, TraceId String) ENGINE = Memory`,
     });
     await client.command({
-      query: `INSERT INTO ${DATABASE}.trace_metrics VALUES ('t', 'app1', NULL), ('t', 'app2', 'application'), ('t', 'chat1', 'langy'), ('t', 'chat2', 'langy'), ('t', 'sim1', 'simulation')`,
+      query: `INSERT INTO ${DATABASE}.trace_metrics VALUES ('t', 'app1', NULL), ('t', 'app2', 'application'), ('t', 'chat1', 'langy'), ('t', 'chat2', 'langy'), ('t', 'sim1', 'simulation'), ('u', 'app1', 'langy')`,
     });
     await client.command({
-      query: `INSERT INTO ${DATABASE}.spans VALUES ('t', 'app1'), ('t', 'app1'), ('t', 'app2'), ('t', 'chat1'), ('t', 'chat1'), ('t', 'chat2'), ('t', 'sim1')`,
+      query: `INSERT INTO ${DATABASE}.spans VALUES ('t', 'app1'), ('t', 'app1'), ('t', 'app2'), ('t', 'chat1'), ('t', 'chat1'), ('t', 'chat2'), ('t', 'sim1'), ('u', 'app1')`,
     });
   });
 
@@ -64,6 +64,7 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
       without,
     );
 
+    // Another project's langy trace shares id "app1"; looked up by trace id alone it would count.
     expect(traces).toBe(3);
     expect(spans).toBe(4);
   });
@@ -73,7 +74,7 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
     const every = ["application", "simulation", "langy", "other"];
 
     expect(await count(`SELECT count() AS n FROM ${DATABASE}.spans WHERE ${BY_TRACE}`, every)).toBe(
-      7,
+      8,
     );
   });
 
@@ -88,8 +89,8 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
 
   /** @scenario "AC194 Langy: a query run outside a board is not scoped" */
   it("counts every origin when the statement does not read the parameter", async () => {
-    expect(await count(`SELECT count() AS n FROM ${DATABASE}.trace_metrics`)).toBe(5);
-    expect(await count(`SELECT count() AS n FROM ${DATABASE}.spans`)).toBe(7);
+    expect(await count(`SELECT count() AS n FROM ${DATABASE}.trace_metrics`)).toBe(6);
+    expect(await count(`SELECT count() AS n FROM ${DATABASE}.spans`)).toBe(8);
   });
 
   /** @scenario "AC202d Stock widgets: a widget whose list did not change returns the same rows" */
