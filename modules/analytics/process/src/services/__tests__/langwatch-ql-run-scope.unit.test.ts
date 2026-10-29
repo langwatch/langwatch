@@ -12,7 +12,10 @@ import { LangWatchQLRunScopeService } from "../langwatch-ql-run-scope.service.ts
 const service = LangWatchQLRunScopeService.create({
   queryScope: { resolveMemberProjects: () => Promise.reject(new Error("not asked")) },
   aggregateScope: { getMemberScope: () => Promise.reject(new Error("not asked")) },
-  readable: { allIdsFor: () => Promise.reject(new Error("not asked")) },
+  readable: {
+    allIdsFor: () => Promise.reject(new Error("not asked")),
+    isAggregate: () => Promise.resolve(false),
+  },
   bounds: { assertQueryWithinBounds: () => Promise.resolve() },
 });
 
@@ -104,7 +107,10 @@ describe("resolve", () => {
         },
       },
       aggregateScope: { getMemberScope: () => Promise.reject(new Error("not asked")) },
-      readable: { allIdsFor: () => Promise.resolve(["A", "B"]) },
+      readable: {
+        allIdsFor: () => Promise.resolve(["A", "B"]),
+        isAggregate: () => Promise.resolve(false),
+      },
       bounds: { assertQueryWithinBounds: () => Promise.resolve() },
     });
 
@@ -129,7 +135,10 @@ describe("resolve", () => {
     const aggregate = LangWatchQLRunScopeService.create({
       queryScope: { resolveMemberProjects: () => Promise.reject(new Error("not asked")) },
       aggregateScope: { getMemberScope: () => Promise.resolve(members) },
-      readable: { allIdsFor: () => Promise.resolve(["a", "b", "c"]) },
+      readable: {
+        allIdsFor: () => Promise.reject(new Error("not asked")),
+        isAggregate: () => Promise.resolve(false),
+      },
       bounds: { assertQueryWithinBounds: () => Promise.resolve() },
     });
 
@@ -141,5 +150,28 @@ describe("resolve", () => {
     });
 
     expect(scope).toEqual({ kind: "aggregate", ...members });
+  });
+
+  /** @scenario "QP03f2 The word all on an aggregate project's card reads the whole aggregate" */
+  it("reads the aggregate alone for all before its members are attached, as no projects does", async () => {
+    const before = LangWatchQLRunScopeService.create({
+      queryScope: { resolveMemberProjects: () => Promise.reject(new Error("not asked")) },
+      aggregateScope: { getMemberScope: () => Promise.reject(new Error("not asked")) },
+      readable: {
+        allIdsFor: () => Promise.reject(new Error("not asked")),
+        isAggregate: () => Promise.resolve(true),
+      },
+      bounds: { assertQueryWithinBounds: () => Promise.resolve() },
+    });
+    const ask = (all: boolean) =>
+      before.resolve({
+        authorization: analyticsProof({ projectId: "agg", shared: [] }),
+        project: { id: "agg", lwqlKey: "key_agg" },
+        selection: { named: undefined, all },
+        userId: "user-1",
+      });
+
+    expect(await ask(true)).toEqual(await ask(false));
+    expect(await ask(true)).toEqual({ kind: "own" });
   });
 });

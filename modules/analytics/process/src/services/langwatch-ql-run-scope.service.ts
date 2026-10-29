@@ -37,7 +37,7 @@ export type LangWatchQLRunScope =
 type Dependencies = Readonly<{
   queryScope: Pick<LangWatchQLQueryScopeService, "resolveMemberProjects">;
   aggregateScope: Pick<LangWatchQLAggregateScopeService, "getMemberScope">;
-  readable: Pick<LangWatchQLReadableProjectsService, "allIdsFor">;
+  readable: Pick<LangWatchQLReadableProjectsService, "allIdsFor" | "isAggregate">;
   bounds: Pick<LangWatchQLBoundsService, "assertQueryWithinBounds">;
 }>;
 
@@ -71,6 +71,26 @@ export class LangWatchQLRunScopeService {
     return { named, all };
   }
 
+  /**
+   * The ids "all" stands for; none on an aggregate, which has no list to narrow to. Before its
+   * members are attached it has no shared windows, yet "all" still never widens to the
+   * organization's projects.
+   */
+  private async namesForAll({
+    projectId,
+    userId,
+    hasSharedWindows,
+  }: {
+    projectId: string;
+    userId: string | undefined;
+    hasSharedWindows: boolean;
+  }): Promise<string[] | undefined> {
+    const { readable } = this.dependencies;
+    if (hasSharedWindows || (await readable.isAggregate({ projectId }))) return undefined;
+
+    return readable.allIdsFor({ projectId, userId });
+  }
+
   /** @throws {LangWatchQLProjectNotFoundError} for a name the member may not read. */
   async resolve({
     authorization,
@@ -81,18 +101,20 @@ export class LangWatchQLRunScopeService {
     selection: { named: readonly string[] | undefined; all: boolean };
     authorization: Authorization | undefined;
   }): Promise<LangWatchQLRunScope> {
-    const { queryScope, aggregateScope, bounds, readable } = this.dependencies;
+    const { queryScope, aggregateScope, bounds } = this.dependencies;
     const shared = authorization
       ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
       : [];
     // "all" names the member's readable ids, then is checked per project as a named run is; the
     // second check costs what naming them costs, and the route's own permission covers "own".
     // On an aggregate it is the whole aggregate, which is no list of ids to narrow to.
-    let named = selection.named;
-    if (selection.all) {
-      named =
-        shared.length > 0 ? undefined : await readable.allIdsFor({ projectId: project.id, userId });
-    }
+    const named = selection.all
+      ? await this.namesForAll({
+          projectId: project.id,
+          userId,
+          hasSharedWindows: shared.length > 0,
+        })
+      : selection.named;
     await bounds.assertQueryWithinBounds({ projectId: project.id });
 
     if (shared.length > 0) {

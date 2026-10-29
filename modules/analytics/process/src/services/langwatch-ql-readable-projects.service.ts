@@ -5,7 +5,7 @@ import {
 import { LWQL_MAX_MEMBER_PROJECTS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
 import { inStableOrder } from "../rules/langwatch-ql-project-selection.rules.ts";
 
@@ -46,6 +46,13 @@ export class LangWatchQLReadableProjectsService {
     return identities
       .filter(({ id }) => decided.projects.get(id) === true)
       .map(({ id, name }) => ({ id, name }));
+  }
+
+  /** Whether the card's own project is an aggregate, whose members may not be attached yet. */
+  async isAggregate({ projectId }: { projectId: string }): Promise<boolean> {
+    const project = await this.dependencies.projects.findById(projectId);
+
+    return project?.kind === PROJECT_KIND.AGGREGATE;
   }
 
   /**

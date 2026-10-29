@@ -82,6 +82,9 @@ Feature: Every query door takes the same parameters and says what it ran with
       When the card runs with `projects` set to the string "all"
       Then the statement runs over the aggregate's members "A" and "B"
       And it is not refused as a missing project
+      # Own call (batch 18): before the aggregate's members are attached it has no shared windows,
+      # and "all" must still not widen to the organization's projects.
+      And before its members are attached, "all" reads what a card with no `projects` reads
 
     @unit @integration
     Scenario: QP03g The word all never reaches a project the caller cannot read, or another organization
