@@ -11,10 +11,16 @@ import (
 	"strings"
 )
 
-// GitTree is the Tree of a commit in the repository at root, read from its
-// tree objects alone, so a clone without file contents can read it.
-func GitTree(ctx context.Context, run Exec, root, rev string) (Tree, error) {
-	out, err := run(ctx, Command{Name: "git", Args: []string{"-C", root, "ls-tree", "-r", "-z", "--full-tree", rev}})
+// GitRepo is the git repository at Root, read by running git with Run.
+type GitRepo struct {
+	Run  Exec
+	Root string
+}
+
+// Tree is the Tree of a commit, read from its tree objects alone, so a clone
+// without file contents can read it.
+func (g GitRepo) Tree(ctx context.Context, rev string) (Tree, error) {
+	out, err := g.Run(ctx, Command{Name: "git", Args: []string{"-C", g.Root, "ls-tree", "-r", "-z", "--full-tree", rev}})
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +47,7 @@ func GitTree(ctx context.Context, run Exec, root, rev string) (Tree, error) {
 // the Tree lists.
 func ReadFile(root string) func(string) (string, error) {
 	return func(name string) (string, error) {
-		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name))) //nolint:gosec // G304: a Dockerfile path from the workflow's own build table
+		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
 		return string(b), err
 	}
 }
@@ -66,41 +72,60 @@ func GoList(run Exec, root string) GoDeps {
 // goListFiles is the repository files of `go list -json` output, relative to
 // root. A standard library or module cache package is not the repository's.
 func goListFiles(out, root string) ([]string, error) {
-	// go reports directories with symlinks resolved, so compare resolved.
-	absRoot, err := filepath.Abs(root)
+	absRoot, err := resolvedRoot(root)
 	if err != nil {
-		return nil, err
-	}
-	if absRoot, err = filepath.EvalSymlinks(absRoot); err != nil {
 		return nil, err
 	}
 	var files []string
 	dec := json.NewDecoder(strings.NewReader(out))
 	for {
-		var p struct {
-			Dir                                                                        string
-			Standard                                                                   bool
-			GoFiles, CgoFiles, SFiles, HFiles, CFiles, CXXFiles, SysoFiles, EmbedFiles []string
-		}
+		var p goPackage
 		if err := dec.Decode(&p); errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
 			return nil, fmt.Errorf("read go list: %w", err)
 		}
-		dir, err := filepath.EvalSymlinks(p.Dir)
-		if err != nil {
-			dir = p.Dir
-		}
-		rel, err := filepath.Rel(absRoot, dir)
-		if p.Standard || err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			continue
-		}
-		for _, group := range [][]string{p.GoFiles, p.CgoFiles, p.SFiles, p.HFiles, p.CFiles, p.CXXFiles, p.SysoFiles, p.EmbedFiles} {
-			for _, f := range group {
-				files = append(files, filepath.ToSlash(filepath.Join(rel, f)))
-			}
-		}
+		files = append(files, p.repoFiles(absRoot)...)
 	}
 
 	return files, nil
+}
+
+// resolvedRoot is root as an absolute path with symlinks resolved, since go
+// reports directories that way.
+func resolvedRoot(root string) (string, error) {
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.EvalSymlinks(absRoot)
+}
+
+// goPackage is the part of a `go list -json` package that names its files.
+type goPackage struct {
+	Dir                                                                        string
+	Standard                                                                   bool
+	GoFiles, CgoFiles, SFiles, HFiles, CFiles, CXXFiles, SysoFiles, EmbedFiles []string
+}
+
+// repoFiles is the package's files relative to absRoot, or none when the
+// package is outside it.
+func (p goPackage) repoFiles(absRoot string) []string {
+	dir, err := filepath.EvalSymlinks(p.Dir)
+	if err != nil {
+		dir = p.Dir
+	}
+	rel, err := filepath.Rel(absRoot, dir)
+	if p.Standard || err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil
+	}
+	var files []string
+	for _, group := range [][]string{p.GoFiles, p.CgoFiles, p.SFiles, p.HFiles, p.CFiles, p.CXXFiles, p.SysoFiles, p.EmbedFiles} {
+		for _, f := range group {
+			files = append(files, filepath.ToSlash(filepath.Join(rel, f)))
+		}
+	}
+
+	return files
 }

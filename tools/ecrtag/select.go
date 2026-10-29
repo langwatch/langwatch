@@ -33,7 +33,7 @@ func (s *ImageSpec) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Plan is what a run does with one image: build it, labelled with Inputs, or
+// Plan is what a run does with one image: build it, labeled with Inputs, or
 // re-tag the image of the nearest ancestor (Retag.Source).
 type Plan struct {
 	Image  string `json:"image"`

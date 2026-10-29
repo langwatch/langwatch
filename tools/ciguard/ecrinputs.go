@@ -71,9 +71,11 @@ func ECRInputsReadable(repoRoot string) ([]string, error) {
 }
 
 func selectStep(wf *ciscan.Workflow) (*ciscan.Step, []string) {
-	for i, step := range wf.Jobs[changesJob].Steps {
+	steps := wf.Jobs[changesJob].Steps
+	for i := range steps {
+		step := &steps[i]
 		if step.ID == "select" && strings.Contains(step.Run, ecrtagSelect+" ") && strings.Contains(step.Run, selectImages) {
-			return &wf.Jobs[changesJob].Steps[i], nil
+			return step, nil
 		}
 	}
 
@@ -85,33 +87,50 @@ func selectStep(wf *ciscan.Workflow) (*ciscan.Step, []string) {
 func labelProblems(wf *ciscan.Workflow) []string {
 	var problems []string
 	for _, job := range buildJobs {
-		found := false
-		for _, step := range wf.Jobs[job].Steps {
-			if !strings.HasPrefix(step.Uses, "docker/build-push-action@") {
-				continue
-			}
-			if push, _ := step.BoolWith("push"); !push {
-				continue
-			}
-			found = true
-			labels, _ := step.StringWith("labels")
-			if !hasLine(labels, inputsLabel) {
-				problems = append(problems, fmt.Sprintf("%s job %s: step %q must label the image %s", ImagesWorkflow, job, step.Name, inputsLabel))
-			}
-		}
-		if !found {
-			problems = append(problems, fmt.Sprintf("%s job %s pushes no image with docker/build-push-action", ImagesWorkflow, job))
-		}
+		problems = append(problems, jobLabelProblems(job, wf.Jobs[job].Steps)...)
 	}
 
 	return problems
+}
+
+// jobLabelProblems reports a job that pushes no image, or pushes one without
+// the inputs label.
+func jobLabelProblems(job string, steps []ciscan.Step) []string {
+	var problems []string
+	found := false
+	for i := range steps {
+		step := &steps[i]
+		if !pushesImage(step) {
+			continue
+		}
+		found = true
+		labels, _ := step.StringWith("labels")
+		if !hasLine(labels, inputsLabel) {
+			problems = append(problems, fmt.Sprintf("%s job %s: step %q must label the image %s", ImagesWorkflow, job, step.Name, inputsLabel))
+		}
+	}
+	if !found {
+		problems = append(problems, fmt.Sprintf("%s job %s pushes no image with docker/build-push-action", ImagesWorkflow, job))
+	}
+
+	return problems
+}
+
+// pushesImage holds for a docker/build-push-action step that pushes.
+func pushesImage(step *ciscan.Step) bool {
+	if !strings.HasPrefix(step.Uses, "docker/build-push-action@") {
+		return false
+	}
+	push, _ := step.BoolWith("push")
+
+	return push
 }
 
 // inputsProblems reads every image's inputs from this checkout, as the
 // select step will.
 func inputsProblems(repoRoot string, rows [][]string) []string {
 	ctx := context.Background()
-	tree, err := ecrtag.GitTree(ctx, ecrtag.Run, repoRoot, "HEAD")
+	tree, err := ecrtag.GitRepo{Run: ecrtag.Run, Root: repoRoot}.Tree(ctx, "HEAD")
 	if err != nil {
 		return []string{fmt.Sprintf("read the files of HEAD: %v", err)}
 	}

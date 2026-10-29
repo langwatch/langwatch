@@ -68,7 +68,7 @@ func TestAnImageIsBuiltUnlessItsReTagHasTheSameInputs(t *testing.T) {
 			p := plan(t, c.reg, false)
 			assert.True(t, p.Build)
 			assert.Equal(t, c.reason, p.Reason)
-			assert.Equal(t, gatewayHash(t), p.Inputs, "the build is labelled with its inputs")
+			assert.Equal(t, gatewayHash(t), p.Inputs, "the build is labeled with its inputs")
 		})
 	}
 }
@@ -85,7 +85,7 @@ func TestADispatchBuildsEveryImageAndReadsNoRegistry(t *testing.T) {
 
 // @scenario "An image whose inputs cannot be read is rebuilt"
 func TestAnImageWhoseInputsCannotBeReadIsBuilt(t *testing.T) {
-	in := inputsOf(goTree(), "FROM golang\nCOPY cmd/ cmd/\nRUN go build github.com/x/y\n")
+	in := inputsOf(goTree(), "FROM golang\nCOPY cmd ./cmd\nRUN go build github.com/x/y\n")
 	plans, err := ecrtag.Select{
 		Registry: newRegistry().push("git-b", entry{inputs: ""}), Ancestry: &fakeAncestry{history: []string{"git-b"}},
 		Inputs: in, Tag: "git-c", Head: this,

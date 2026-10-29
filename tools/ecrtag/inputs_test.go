@@ -16,8 +16,8 @@ const goDockerfile = `# syntax=docker/dockerfile:1.7
 FROM golang:1 AS build
 COPY go.work go.work.sum ./
 COPY cmd/go.* cmd/
-COPY cmd/ cmd/
-COPY pkg/ pkg/
+COPY cmd ./cmd
+COPY pkg ./pkg
 RUN --mount=type=cache,target=/go/pkg/mod \
     # comments inside a continued RUN are dropped
     CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${VERSION}" \
@@ -146,8 +146,8 @@ func TestAGoBuildAfterCdReadsFromThatDirectory(t *testing.T) {
 // @scenario "An image whose inputs cannot be read is rebuilt"
 func TestWhatItCannotReadFails(t *testing.T) {
 	for name, dockerfile := range map[string]string{
-		"a go build of an import path": "FROM golang\nCOPY cmd/ cmd/\nRUN go build github.com/x/y\n",
-		"a cd that leaves the context": "FROM golang\nCOPY cmd/ cmd/\nRUN cd /src && go build ./cmd/service\n",
+		"a go build of an import path": "FROM golang\nCOPY cmd ./cmd\nRUN go build github.com/x/y\n",
+		"a cd that leaves the context": "FROM golang\nCOPY cmd ./cmd\nRUN cd /src && go build ./cmd/service\n",
 		"a source that names no file":  "FROM node\nCOPY missing/ ./\n",
 		"a variable in a source":       "FROM node\nARG DIR\nCOPY ${DIR} ./\n",
 		"a heredoc":                    "FROM node\nRUN <<EOF\necho hi\nEOF\n",

@@ -84,7 +84,9 @@ func parse(command string, args []string) (options, error) {
 		return o, err
 	}
 	if command == "select" {
-		return o, selectOptions(&o, *images)
+		err := selectOptions(&o, *images)
+
+		return o, err
 	}
 	if o.repository == "" || o.tag == "" || o.revision == "" {
 		return o, fmt.Errorf("%s: -repository, -tag and -revision are required", command)
@@ -173,10 +175,8 @@ func selectOptions(o *options, images string) error {
 	if len(o.images) == 0 {
 		return errors.New("select: -images names no image")
 	}
-	for _, img := range o.images {
-		if img.Image == "" || img.Dockerfile == "" {
-			return fmt.Errorf("select: image %+v needs an image and a dockerfile", img)
-		}
+	if err := checkImages(o.images); err != nil {
+		return err
 	}
 	if o.revision == "" || (!o.all && o.tag == "") {
 		return errors.New("select: -revision, and -tag unless -all, are required")
@@ -188,8 +188,19 @@ func selectOptions(o *options, images string) error {
 	return nil
 }
 
+// checkImages fails an image without a name or a Dockerfile.
+func checkImages(images []ecrtag.ImageSpec) error {
+	for _, img := range images {
+		if img.Image == "" || img.Dockerfile == "" {
+			return fmt.Errorf("select: image %+v needs an image and a dockerfile", img)
+		}
+	}
+
+	return nil
+}
+
 func selectImages(ctx context.Context, o options) error {
-	tree, err := ecrtag.GitTree(ctx, ecrtag.Run, ".", o.revision)
+	tree, err := ecrtag.GitRepo{Run: ecrtag.Run, Root: "."}.Tree(ctx, o.revision)
 	if err != nil {
 		return err
 	}

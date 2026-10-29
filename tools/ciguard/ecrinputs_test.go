@@ -28,7 +28,7 @@ func inputsProblems(t *testing.T, images string) []string {
 func TestEveryImageIsPlannedFromItsInputs(t *testing.T) {
 	root, err := ciscan.RepoRoot(".")
 	require.NoError(t, err)
-	raw, err := os.ReadFile(filepath.Join(root, ciguard.ImagesWorkflow)) //nolint:gosec // G304: this repository's own workflow
+	raw, err := os.ReadFile(filepath.Join(root, ciguard.ImagesWorkflow))
 	require.NoError(t, err)
 	workflow := string(raw)
 
