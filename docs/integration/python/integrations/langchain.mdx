@@ -77,6 +77,12 @@ if __name__ == "__main__":
 
 The `@langwatch.trace()` decorator creates a parent trace, and `get_langchain_callback()` provides a callback handler that captures Langchain events as spans. Pass the callback to your agent or chain's `RunnableConfig` to enable instrumentation.
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Langchain - Weather Agent" appears in the traces list within a few seconds. Open it to see the LangChain chain, tool and LLM steps nested inside it.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## Related
 
 - [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from LangChain retrievers and tools

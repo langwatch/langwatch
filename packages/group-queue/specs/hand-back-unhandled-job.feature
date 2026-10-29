@@ -5,10 +5,16 @@ Feature: GroupQueue hands back a job the worker has no handler for
   or block its group, and a worker that knows the job runs it (Alex, 2026-10-12).
 
   A hand-back keeps the job's attempt count, records no failure for the group and
-  logs at warn. It returns the job ready after a short delay, so the same worker
-  does not take it straight back. A job handed back for longer than the hand-back
-  window falls back to spending attempts, logged at error, so a kind no worker
-  knows still surfaces and is dead-lettered once its attempts are spent.
+  logs at warn. It returns the job ready after a short delay and adds the worker
+  that handed it back to the group's record. Each worker in the record passes the
+  group over for two signal waits from its own hand-back, so a peer asleep in its
+  wait claims the job first; meanwhile it waits for that pass-over to lapse rather
+  than polling the group. The completion of that job, not of a sibling, clears the
+  record. Each entry's expiry is the only other bound: the only worker, or one
+  whose peers are gone, takes the job back once its own entry lapses. A job handed
+  back for longer than the hand-back window falls back to spending attempts,
+  logged at error, so a kind no worker knows still surfaces and is dead-lettered
+  once its attempts are spent (#9148).
 
   @unit
   Scenario: A handed-back job keeps its attempt count and its group is not blocked
@@ -44,3 +50,73 @@ Feature: GroupQueue hands back a job the worker has no handler for
     When a worker hands it back
     Then the window starts now and the job is handed back
     And the start is carried unchanged on every later hand-back and retry
+
+  @integration
+  Scenario: A worker with the handler, asleep when the job is handed back, runs it first
+    Given a worker with the job's handler, asleep in its signal wait while another worker holds the job
+    When the worker without the handler hands the job back
+    Then the worker with the handler runs it on its first attempt
+    And the job is handed back only once
+
+  @integration
+  Scenario: Every worker that handed a job back passes it over, so the worker with the handler runs it
+    Given two workers without the job's handler and one with it
+    When each worker without the handler has handed the job back
+    Then neither of them claims it again
+    And the worker with the handler runs it on its first attempt
+
+  @integration
+  Scenario: The worker that handed a job back passes over that group only
+    Given a worker that handed back the job of one group while another group has a job ready
+    When that worker claims
+    Then it claims the other group's job
+    And the handed-back job stays ready for another worker
+    And the claim says when that worker's pass-over lapses
+
+  @unit
+  Scenario: The worker that handed a job back waits out its pass-over instead of polling
+    Given the worker's last claim passed over a group that is due
+    When it waits for its next signal
+    Then it waits until the pass-over lapses, or a group due after that claim comes due
+    And it does not poll at the shortest interval
+
+  @unit
+  Scenario: A listed run's worker that handed a job back waits out its pass-over instead of polling
+    Given the worker's last claim from a listed run passed over a group that is due
+    When it waits for its next poll
+    Then it waits until the pass-over lapses, or a candidate due after that claim comes due
+    And the group stays due for every other worker
+
+  @integration
+  Scenario: Each worker's pass-over lapses on its own
+    Given a job two workers handed back, one of them with a short pass-over
+    When that worker's pass-over lapses
+    Then that worker claims the job on the same attempt
+    And the other still passes it over
+
+  @integration
+  Scenario: The handed-back job's completion clears the hand-back record
+    Given a job one worker handed back
+    When another worker claims it and completes it
+    Then the group holds no record of who handed it back
+    And the worker that handed it back claims the group's next job
+
+  @integration
+  Scenario: A sibling's completion leaves the hand-back record
+    Given a job one worker handed back, and a sibling staged ahead of its new due time
+    When another worker claims and completes the sibling
+    Then the worker that handed the job back still passes it over
+    And the record clears when the handed-back job completes
+
+  @integration
+  Scenario: An ordinary retry is not passed over
+    Given a job re-staged by a retry, not a hand-back
+    When the worker that retried it claims after the backoff
+    Then it claims the job again
+
+  @integration
+  Scenario: The only worker, or one whose peers are gone, takes back a job it handed back once its pass-over lapses
+    Given one worker on the queue, with no handler for the job
+    When it hands the job back
+    Then it takes the job again only after two signal waits
+    And the job is still on its first attempt

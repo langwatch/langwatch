@@ -304,13 +304,12 @@ import langwatch
 langwatch.setup()
 
 result = langwatch.test_suites.run(
-"suite_abc123",
-targets=[{"type": "http", "referenceId": "agent_abc123"}],
-parameters={"plan": "enterprise", "region": "eu-central"},
+    "suite_abc123",
+    targets=[{"type": "http", "referenceId": "agent_abc123"}],
+    parameters={"plan": "enterprise", "region": "eu-central"},
 )
 print(result["batchRunId"])
-
-````
+```
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -323,7 +322,7 @@ const result = await langwatch.testSuites.run("suite_abc123", {
   parameters: { plan: "enterprise", region: "eu-central" },
 });
 console.log(result.batchRunId);
-````
+```
 
   </Tab>
 </Tabs>

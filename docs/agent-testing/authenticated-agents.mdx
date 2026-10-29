@@ -329,6 +329,8 @@ The claim uses the entry's own name with `_CLAIM` after it, so there is no secon
 ### Cache API
 
 ```python
+import langwatch
+
 langwatch.cache.set("ACME_SESSION", session, ttl_seconds=840)
 langwatch.cache.get("ACME_SESSION", default=None)
 langwatch.cache.claim("ACME_SESSION_CLAIM", "taken", ttl_seconds=15)

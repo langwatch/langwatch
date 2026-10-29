@@ -30,6 +30,10 @@
       "types": "./dist/client-doubles/stripe.double.d.ts",
       "default": "./src/client-doubles/stripe.double.ts"
     },
+    "./integration-file-concurrency": {
+      "types": "./dist/integration-file-concurrency.d.ts",
+      "default": "./src/integration-file-concurrency.ts"
+    },
     "./nlpgo": {
       "types": "./dist/nlpgo.d.ts",
       "default": "./src/nlpgo.ts"
@@ -65,7 +69,7 @@
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
-    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test": "vitest run --fsModuleCache --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {

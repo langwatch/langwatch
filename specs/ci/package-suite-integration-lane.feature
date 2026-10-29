@@ -68,7 +68,19 @@ Feature: A package's integration suite runs in CI when it declares one
     Scenario: Shards are balanced by measured weight
       Given a weights file recording how many seconds each slow package takes
       When the packages are split over the shards
-      Then the heaviest packages are placed first, each on the shard with the least weight so far
+      Then the heaviest packages are placed first, each on the shard whose wall time it raises least
+
+    # A shard's wall time is the sum of its heavy suites, which run alone, plus
+    # its light suites divided by the concurrency, since they share the shard,
+    # unless its integration or browser lane is longer: each runs one suite at a
+    # time. Measured on main that model is within 1% of every shard, and
+    # balancing raw seconds instead let one shard run 1073s while another ran 473s.
+    @unit
+    Scenario: Shards are balanced by the wall time each package adds
+      Given a heavy package that runs alone and light packages that share the shard
+      When the packages are split over the shards
+      Then a heavy package counts for all of its seconds and a light one for its share of the concurrency
+      And a shard's integration and browser lanes count at full weight, one suite at a time
 
     @unit
     Scenario: Every shard computes the same split
@@ -149,6 +161,32 @@ Feature: A package's integration suite runs in CI when it declares one
       When the package suites job runs concurrently
       Then no other suite runs while a heavy suite runs
       And every heavy suite starts before any light one
+
+    # Alone with the launcher's two workers, a heavy suite left half of a
+    # four-core runner idle, and heavy suites are about half of a shard's work.
+    @unit
+    Scenario: A heavy unit suite running alone uses every core
+      Given a heavy package's unit suite on a runner with four cores
+      When the package suites job starts it
+      Then it runs with four workers
+
+    @unit
+    Scenario: A heavy suite that needs a quiet CPU keeps the launcher's workers
+      Given design-system's suite, or a heavy package's integration or browser suite
+      When the package suites job starts it
+      Then it keeps the worker count its config and the launcher give it
+
+    # A heavy suite has its shard to itself, so one whose files are isolated by
+    # construction can use the cores the rule leaves idle. @langwatch/analytics-process's
+    # integration lane spent 270 to 400s standing up a container and a database per
+    # file, two files at a time.
+    @unit
+    Scenario: A heavy integration suite whose files are isolated runs more of them at once in CI
+      Given an integration suite whose files cannot see one another's state
+      When its config asks for three workers and it runs in CI
+      Then its files run three at a time, with concurrency asked for by name
+      And off CI the launcher's own worker count stands
+      And a worker count exported on purpose, other than the launcher's default, stands
 
     @unit
     Scenario: A shard starts its heaviest suites first

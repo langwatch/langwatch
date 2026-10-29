@@ -145,6 +145,8 @@ jobs:
               - '.github/workflows/gateway-matrix.yaml'
               # Read by .github/scripts/release-please-timer.test.ts.
               - '.github/workflows/release-please-sdks.yml'
+              # Read by .github/scripts/guard-breaking-change-scope.test.ts.
+              - '.github/workflows/pr-conventions.yml'
               # Read by .github/scripts/pr-workflow-filters.test.ts.
               - '.github/workflows/e2e-ci.yml'
               - '.github/workflows/langwatch-nlp-ci.yml'
@@ -863,6 +865,44 @@ jobs:
       - name: Adopt the restored suite results index
         run: mkdir -p .nx/suites/data && bash .github/scripts/adopt-nx-cache-index.sh .nx/suites/data
 
+      # Vitest's transformed modules (fsModuleCache), kept between runs so a suite
+      # skips the transform share of its time (specs/ci/package-suites-transform-cache.feature).
+      # Vitest keys each entry by the module's own source, the vitest config and its
+      # plugins, and drops the whole cache when the lockfile changes. It does not key
+      # how an import resolves (package manifests) or what a tsconfig tells the
+      # transform, so a cache is restored only when those are identical too: the
+      # hash is over the blob ids of the lockfile, every package.json and tsconfig,
+      # and packages/vitest-config: the shared config is loaded from the package, so
+      # vitest does not count its source (plugin options, React compiler) as a config file.
+      # Main's one job saves under `all`, which a shard falls back to: entries are keyed by content.
+      - name: Hash what a cached transform depends on besides its source
+        id: transform-inputs
+        run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' packages/vitest-config | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the vitest transforms
+        if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vitest-cache
+          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+
+      - name: Restore the vitest transforms, saving them at the end of the job
+        if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vitest-cache
+          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+
+      - uses: ./.github/actions/prune-pr-caches
+        with:
+          prefix: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-
+
       - name: Run every workspace package suite
         env:
           NX_CACHE_DIRECTORY: ${{ github.workspace }}/.nx/suites/cache
@@ -890,6 +930,15 @@ jobs:
       - name: Check suites declare what they read outside their package
         if: ${{ !cancelled() }}
         run: node --experimental-strip-types .github/scripts/check-test-reads.ts "$RUNNER_TEMP/test-reads"
+
+      # Keeps the saved cache bounded. Nothing records which entry a run read: a
+      # restored file keeps the time it was first written, so purging by age would
+      # drop the hottest entries first. A new lockfile, manifest, tsconfig or shared
+      # config already starts a fresh cache (the key above); between those, a cache
+      # past 400 MB is emptied, so the save stores a small one the next run restores.
+      - name: Drop the vitest transforms before saving if they grew past 400 MB
+        if: ${{ !cancelled() }}
+        run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
 
   # Its own job, so a run that times out (cancelled, no failed step) still posts.
   package-suites-notify:
@@ -1409,9 +1458,6 @@ jobs:
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh
 
-      - name: Test publish-lambda-tag.sh
-        run: bash .github/scripts/__tests__/publish-lambda-tag.test.sh
-
       - name: Test publish-docker-ecr.yml path filters
         run: bash .github/scripts/__tests__/publish-ecr-filters.test.sh
 
@@ -1434,12 +1480,8 @@ jobs:
           export PICOMATCH="$picomatch_dir/node_modules/picomatch"
           bash .github/scripts/__tests__/detect-changes-pathspec-parity.test.sh
 
-      # Lives here rather than in deployment-impact-check.yml because that
-      # workflow filters `on.paths` down to deployment surface, which
-      # .github/** is not — so it would never start for a change to its own
-      # guard. This job's gate already lists `.github/scripts/**`.
-      - name: Test guard-deployment-impact.ts
-        run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
+      - name: Test guard-breaking-change-scope.ts
+        run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
 
       - name: Test that every generated file is marked generated
         run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts

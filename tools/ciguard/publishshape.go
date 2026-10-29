@@ -35,7 +35,7 @@ var (
 )
 
 // PublishShape reports every way the publish workflows could reach a public
-// registry, sign the private copy, publish from a release, or leave a chart
+// registry, sign the private copy, publish off main, or leave a chart
 // unpushed.
 func PublishShape(repoRoot string) ([]string, error) {
 	charts, err := codeLines(repoRoot, ChartsWorkflow)
@@ -50,14 +50,10 @@ func PublishShape(repoRoot string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	release, err := hasReleaseTrigger(repoRoot, ImagesWorkflow)
-	if err != nil {
-		return nil, err
-	}
 
 	problems := chartDestinations(charts)
 	problems = append(problems, chartSigning(charts)...)
-	problems = append(problems, imagesOnlyFromMain(release, meta)...)
+	problems = append(problems, imagesOnlyFromMain(meta)...)
 	problems = append(problems, everyChartListed(charts, onDisk)...)
 
 	return problems, nil
@@ -117,11 +113,10 @@ func chartSigning(lines []string) []string {
 	return nil
 }
 
-func imagesOnlyFromMain(release bool, workflow *ciscan.Workflow) []string {
+// imagesOnlyFromMain: a dispatch on a tag ref stops at meta. The triggers
+// themselves are ECRDispatchTags's.
+func imagesOnlyFromMain(workflow *ciscan.Workflow) []string {
 	var problems []string
-	if release {
-		problems = append(problems, ImagesWorkflow+" has a release trigger")
-	}
 	if job, ok := workflow.Jobs["meta"]; !ok || strings.TrimSpace(job.If) != mainOnly {
 		problems = append(problems, fmt.Sprintf("%s: the meta job, which every other job needs, must run only on %s", ImagesWorkflow, mainOnly))
 	}
@@ -129,24 +124,7 @@ func imagesOnlyFromMain(release bool, workflow *ciscan.Workflow) []string {
 	return problems
 }
 
-// hasReleaseTrigger parses the workflow and reads its top-level `on:` in any
-// of GitHub's forms: a mapping, a list or a single event name.
-func hasReleaseTrigger(repoRoot, rel string) (bool, error) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot, rel))
-	if err != nil {
-		return false, fmt.Errorf("read %s: %w", rel, err)
-	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(raw, &doc); err != nil {
-		return false, fmt.Errorf("parse %s: %w", rel, err)
-	}
-	if len(doc.Content) == 0 {
-		return false, nil
-	}
-
-	return namesRelease(valueOf(doc.Content[0], "on")), nil
-}
-
+// valueOf is the value of key in a YAML mapping, or nil.
 func valueOf(mapping *yaml.Node, key string) *yaml.Node {
 	if mapping.Kind != yaml.MappingNode {
 		return nil
@@ -158,28 +136,6 @@ func valueOf(mapping *yaml.Node, key string) *yaml.Node {
 	}
 
 	return nil
-}
-
-func namesRelease(on *yaml.Node) bool {
-	if on == nil {
-		return false
-	}
-	switch on.Kind {
-	case yaml.MappingNode:
-		return valueOf(on, "release") != nil
-	case yaml.SequenceNode:
-		for _, event := range on.Content {
-			if event.Value == "release" {
-				return true
-			}
-		}
-	case yaml.ScalarNode:
-		return on.Value == "release"
-	case yaml.DocumentNode, yaml.AliasNode:
-		return false
-	}
-
-	return false
 }
 
 // chartsOnDisk is every chart name under charts/*/Chart.yaml, sorted.

@@ -115,31 +115,6 @@ func TestChartsAreNotSigned(t *testing.T) {
 
 // @scenario "A release publishes nothing to the artifacts registry"
 func TestImagesPublishOnlyFromMain(t *testing.T) {
-	t.Run("a release trigger is refused", func(t *testing.T) {
-		images := strings.Replace(goodImages, "  workflow_dispatch:\n", "  workflow_dispatch:\n  release:\n    types: [published]\n", 1)
-
-		problems := shapeProblems(t, publishRepo(t, goodCharts, images, "alpha", "beta"))
-
-		require.Len(t, problems, 1)
-		assert.Contains(t, problems[0], "release trigger")
-	})
-
-	for name, on := range map[string]string{
-		"a quoted on: key":       "\"on\":\n    release:\n      types: [published]\n",
-		"a list of events":       "on: [push, release]\n",
-		"a single event":         "on: release\n",
-		"four-space indentation": "on:\n    release:\n        types: [published]\n",
-	} {
-		t.Run(name+" naming release is refused", func(t *testing.T) {
-			images := strings.Replace(goodImages, "on:\n  push:\n    branches: [main]\n  workflow_dispatch:\n", on, 1)
-
-			problems := shapeProblems(t, publishRepo(t, goodCharts, images, "alpha", "beta"))
-
-			require.Len(t, problems, 1, images)
-			assert.Contains(t, problems[0], "release trigger")
-		})
-	}
-
 	t.Run("a meta job that runs off main is refused", func(t *testing.T) {
 		images := strings.Replace(goodImages, "    if: github.ref == 'refs/heads/main'\n", "", 1)
 

@@ -6,7 +6,7 @@ sidebarTitle: Messages
 
 ## Endpoint
 
-```
+```http
 POST /v1/messages
 x-api-key: vk-lw-<ULID>
 anthropic-version: 2023-06-01
@@ -77,7 +77,7 @@ The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-hea
 
 Set `"stream": true`. The response is `text/event-stream` in Anthropic's own event framing, and there is no `data: [DONE]` trailer. On an Anthropic-compatible provider the frames reach the client as the provider wrote them. On a translated lane the gateway builds the Anthropic events itself from the provider's own stream. A failure after the stream opens adds one terminal `event: error` frame:
 
-```
+```text
 event: message_start
 data: {"type":"message_start","message":{"id":"msg_01ABC","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-5","stop_reason":null,"usage":{"input_tokens":8,"output_tokens":1}}}
 
