@@ -19,11 +19,11 @@ export type InstantEvalJudgeMode = (typeof INSTANT_EVAL_JUDGE_MODES)[number];
  * `text`: user and assistant messages, no tool calls or results. `tools`: the agent's tool calls
  * with their arguments and results, and the user request they answer. `full`: the whole trace.
  */
-export const INSTANT_EVAL_JUDGE_INPUT_VIEWS = ["text", "tools", "full"] as const;
+const INSTANT_EVAL_JUDGE_INPUT_VIEWS = ["text", "tools", "full"] as const;
 export type InstantEvalJudgeInputView = (typeof INSTANT_EVAL_JUDGE_INPUT_VIEWS)[number];
 
 /** The request shapes a routed backend speaks. */
-export const INSTANT_EVAL_JUDGE_BACKEND_KINDS = [
+const INSTANT_EVAL_JUDGE_BACKEND_KINDS = [
   "jev",
   "decisions",
   "anthropic_messages",
@@ -32,11 +32,7 @@ export const INSTANT_EVAL_JUDGE_BACKEND_KINDS = [
 export type InstantEvalJudgeBackendKind = (typeof INSTANT_EVAL_JUDGE_BACKEND_KINDS)[number];
 
 /** Where the arithmetic flag comes from: the caller, the question regex, or the caller first. */
-export const INSTANT_EVAL_JUDGE_ARITHMETIC_SOURCES = [
-  "request",
-  "regex",
-  "request_then_regex",
-] as const;
+const INSTANT_EVAL_JUDGE_ARITHMETIC_SOURCES = ["request", "regex", "request_then_regex"] as const;
 
 /** The slot an arithmetic question takes instead of its length bucket. */
 export const INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT = "arithmetic";
@@ -45,20 +41,19 @@ export const INSTANT_EVAL_JUDGE_ARITHMETIC_SLOT = "arithmetic";
  * How sure a score answer is: `spread` reads the levels' weighted standard deviation against
  * half the range, so one level is sure and an even split between the ends is not.
  */
-export const INSTANT_EVAL_JUDGE_SCORE_SURENESS_RULES = ["spread"] as const;
+const INSTANT_EVAL_JUDGE_SCORE_SURENESS_RULES = ["spread"] as const;
 
 /**
  * How sure a category answer is: `margin` is the likeliest option's probability less the
  * runner-up's, `top` the likeliest option's probability alone.
  */
-export const INSTANT_EVAL_JUDGE_CATEGORY_SURENESS_RULES = ["margin", "top"] as const;
+const INSTANT_EVAL_JUDGE_CATEGORY_SURENESS_RULES = ["margin", "top"] as const;
 export type InstantEvalJudgeSurenessRule =
   | (typeof INSTANT_EVAL_JUDGE_SCORE_SURENESS_RULES)[number]
   | (typeof INSTANT_EVAL_JUDGE_CATEGORY_SURENESS_RULES)[number];
 
 /** The question kinds the table may route besides yes or no; one it leaves out is not routed. */
-export const INSTANT_EVAL_JUDGE_ROUTED_KINDS = ["score", "category"] as const;
-export type InstantEvalJudgeRoutedKind = (typeof INSTANT_EVAL_JUDGE_ROUTED_KINDS)[number];
+const INSTANT_EVAL_JUDGE_ROUTED_KINDS = ["score", "category"] as const;
 
 const jobSchema = z.enum(INSTANT_EVAL_JUDGE_JOBS);
 const modeSchema = z.enum(INSTANT_EVAL_JUDGE_MODES);
@@ -101,7 +96,7 @@ const backendSchema = z
     fallbacks: z.array(z.string().min(1)).readonly().default([]),
   })
   .readonly();
-export type InstantEvalJudgeBackend = z.infer<typeof backendSchema>;
+type InstantEvalJudgeBackend = z.infer<typeof backendSchema>;
 
 const perJob = <T extends z.ZodType>(schema: T) =>
   z.object({ search: schema, llm_judge: schema, scenario_judge: schema });
@@ -426,7 +421,6 @@ const backendPriceSchema = z
       .optional(),
   })
   .readonly();
-export type InstantEvalJudgeBackendPrice = z.infer<typeof backendPriceSchema>;
 
 const instantEvalJudgeRoutePricingSchemaDefinition = z.object({
   /** Stamped on the priced fact, so a replay is told from a re-rating. */

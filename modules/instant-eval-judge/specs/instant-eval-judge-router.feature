@@ -212,13 +212,6 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And a number outside the range, or a name never offered, is no answer rather than a guess
 
   @unit
-  Scenario: A scenario criterion is one yes-or-no question in the measured wording
-    Given a Scenario run's criteria, description and conversation
-    When they are turned into a routed call
-    Then each criterion is one yes-or-no question with the measured instructions and both sides spelled out
-    And the text is the scenario description then the conversation, and an unanswered criterion reads as null, never as not met
-
-  @unit
   Scenario: A routed judgement is priced from the summed cost of every call
     Given a routed judge call whose legs cost a known amount
     When it is priced

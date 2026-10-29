@@ -17,10 +17,7 @@ import {
   instantEvalJudgeRouteBootIssues,
 } from "../instant-eval-judge-route-boot.rules.ts";
 import { instantEvalJudgeCallCostOf } from "../instant-eval-judge-route-cost.rules.ts";
-import {
-  instantEvalJudgeRoutePlanOf,
-  isArithmeticQuestion,
-} from "../instant-eval-judge-route.rules.ts";
+import { instantEvalJudgeRoutePlanOf } from "../instant-eval-judge-route.rules.ts";
 import {
   instantEvalVerdictSurenessOf,
   isUnsureAnswer,
@@ -271,12 +268,15 @@ describe("the route plan", () => {
   });
 });
 
-describe("the arithmetic rule", () => {
+describe("the arithmetic rule, on a job that reads it from the question", () => {
+  const slotOf = (instructions: string) =>
+    plan({ job: "llm_judge" }, yesNo("q", instructions)).slot;
+
   it("fires on counting words, currency and any digit", () => {
-    expect(isArithmeticQuestion("How many items were refunded?")).toBe(true);
-    expect(isArithmeticQuestion("cost over €5")).toBe(true);
-    expect(isArithmeticQuestion("order 7 arrived")).toBe(true);
-    expect(isArithmeticQuestion("was the user polite")).toBe(false);
+    expect(slotOf("How many items were refunded?")).toBe("arithmetic");
+    expect(slotOf("cost over €5")).toBe("arithmetic");
+    expect(slotOf("order 7 arrived")).toBe("arithmetic");
+    expect(slotOf("was the user polite")).not.toBe("arithmetic");
   });
 });
 

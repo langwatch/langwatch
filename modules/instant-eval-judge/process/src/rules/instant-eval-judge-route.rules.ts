@@ -299,7 +299,7 @@ const ARITHMETIC_PATTERN = new RegExp(
   "i",
 );
 
-export function isArithmeticQuestion(instructions: string): boolean {
+function isArithmeticQuestion(instructions: string): boolean {
   return ARITHMETIC_PATTERN.test(instructions);
 }
 
