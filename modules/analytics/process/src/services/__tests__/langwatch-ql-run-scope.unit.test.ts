@@ -6,6 +6,7 @@
 import { LWQL_PROJECTS_SEND_ALL_OR_LIST } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
+import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import { LangWatchQLRunScopeService } from "../langwatch-ql-run-scope.service.ts";
 
 const service = LangWatchQLRunScopeService.create({
@@ -115,5 +116,30 @@ describe("resolve", () => {
     });
 
     expect(asked).toEqual([{ userId: "u", projectIds: ["A", "B"], anchorProjectId: "A" }]);
+  });
+});
+
+describe("resolve", () => {
+  /** @scenario "QP03f2 The word all on an aggregate project's card reads the whole aggregate" */
+  it("reads the whole aggregate for all, without asking for the organization's projects", async () => {
+    const members = {
+      projects: [{ id: "a", lwqlKey: "key_a" }],
+      memberWindows: [{ projectId: "a", from: 0 }],
+    };
+    const aggregate = LangWatchQLRunScopeService.create({
+      queryScope: { resolveMemberProjects: () => Promise.reject(new Error("not asked")) },
+      aggregateScope: { getMemberScope: () => Promise.resolve(members) },
+      readable: { allIdsFor: () => Promise.resolve(["a", "b", "c"]) },
+      bounds: { assertQueryWithinBounds: () => Promise.resolve() },
+    });
+
+    const scope = await aggregate.resolve({
+      authorization: analyticsProof({ projectId: "agg", shared: [{ projectId: "a", from: 0 }] }),
+      project: { id: "agg", lwqlKey: "key_agg" },
+      selection: { named: undefined, all: true },
+      userId: "user-1",
+    });
+
+    expect(scope).toEqual({ kind: "aggregate", ...members });
   });
 });

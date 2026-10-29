@@ -74,6 +74,15 @@ Feature: Every query door takes the same parameters and says what it ran with
       # sent by itself asks for every project (the CLI lowercases what a person types).
       And "all" inside a list is refused with a 422 whose own message says "all" stands alone, and `projectId` with "all" is refused as both named
 
+    @unit
+    Scenario: QP03f2 The word all on an aggregate project's card reads the whole aggregate
+      # Own call (batch 17): "all" listed every readable project of the organization, so an
+      # aggregate card saw ids outside its group and refused with project_not_found.
+      Given a card on an aggregate project whose members are "A" and "B", and a project "C" outside the group
+      When the card runs with `projects` set to the string "all"
+      Then the statement runs over the aggregate's members "A" and "B"
+      And it is not refused as a missing project
+
     @unit @integration
     Scenario: QP03g The word all never reaches a project the caller cannot read, or another organization
       Given a project "C" of the key's organization without analytics:view for it, and a project "X" of another organization

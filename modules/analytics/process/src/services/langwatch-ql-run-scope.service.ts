@@ -82,14 +82,17 @@ export class LangWatchQLRunScopeService {
     authorization: Authorization | undefined;
   }): Promise<LangWatchQLRunScope> {
     const { queryScope, aggregateScope, bounds, readable } = this.dependencies;
-    // "all" names the member's readable ids, then is checked per project as a named run is; the
-    // second check costs what naming them costs, and the route's own permission covers "own".
-    const named = selection.all
-      ? await readable.allIdsFor({ projectId: project.id, userId })
-      : selection.named;
     const shared = authorization
       ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
       : [];
+    // "all" names the member's readable ids, then is checked per project as a named run is; the
+    // second check costs what naming them costs, and the route's own permission covers "own".
+    // On an aggregate it is the whole aggregate, which is no list of ids to narrow to.
+    let named = selection.named;
+    if (selection.all) {
+      named =
+        shared.length > 0 ? undefined : await readable.allIdsFor({ projectId: project.id, userId });
+    }
     await bounds.assertQueryWithinBounds({ projectId: project.id });
 
     if (shared.length > 0) {

@@ -134,12 +134,17 @@ origin, or pick one from **Add source**:
 - `langy`: your conversations with Langy.
 - `other`: any origin not listed above.
 
-A new widget counts `application`, and so does a widget saved before sources
-existed. A widget about Langy's failed requests adds `langy`. The preview runs
+A new widget counts `application`, and a stock widget from the template
+does too. A widget about Langy's failed requests adds `langy`. The preview runs
 again when you change the sources, and each card names its sources in a quiet
 line underneath. A query with no source picked returns no rows, and its widget
-says **No sources picked**. Widgets on From LangWatch dashboards count every
-origin except `langy`.
+says **No sources picked**.
+
+Sources only apply where the SQL reads the parameter. A query that does not read
+`{dashboard_context_sources:Array(String)}` counts every origin, and its card
+says **Sources: all sources**. A widget saved before this release keeps its SQL,
+so it counts every origin until you edit it to read the parameter or add it
+again from the template.
 
 ## Who can see a dashboard
 
