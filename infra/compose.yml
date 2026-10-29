@@ -68,11 +68,12 @@ services:
         condition: service_healthy
     restart: always
 
-  # nlpgo — the Go NLP engine. langwatch/langwatch_nlp is now a static Go
-  # binary (Dockerfile.langwatch_nlp); it still binds :5561 and reads
+  # nlpgo — the Go NLP engine, the `nlpgo` command of langwatch/langwatch_nlp
+  # (the nlp target of Dockerfile.go-services). It binds SERVER_ADDR, :5561, and reads
   # LANGWATCH_ENDPOINT for evaluator + agent-workflow callbacks.
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
+    command: [nlpgo]
     env_file:
       - path: .env
         required: false
@@ -86,6 +87,7 @@ services:
     pull_policy: always
     environment:
       - LANGWATCH_ENDPOINT=http://app:5560
+      - SERVER_ADDR=:5561
 
   langevals:
     image: langwatch/langevals:latest
