@@ -4,7 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { idIndexRetentionRaises } from "../idIndexRetention.ts";
+import {
+  idIndexRaiseParamBytes,
+  idIndexRetentionRaises,
+} from "../idIndexRetention.ts";
 
 describe("idIndexRetentionRaises", () => {
   describe("given tenants of differing retention", () => {
@@ -19,7 +22,10 @@ describe("idIndexRetentionRaises", () => {
       });
 
       expect(raises).toEqual([
-        { tenantIds: ["project-a", "project-b", "project-c"], retentionDays: [65_535, 30, 365] },
+        {
+          tenantIds: ["project-a", "project-b", "project-c"],
+          retentionDays: [65_535, 30, 365],
+        },
       ]);
     });
   });
@@ -27,10 +33,13 @@ describe("idIndexRetentionRaises", () => {
   describe("given more tenant ids than one URL carries", () => {
     it("splits the raise only at the byte budget, not per retention value", () => {
       const daysByTenant = new Map(
-        Array.from({ length: 30 }, (_, at) => [`project-${String(at).padStart(2, "0")}`, at % 3]),
+        Array.from({ length: 30 }, (_, at) => [
+          `project-${String(at).padStart(2, "0")}`,
+          at % 3,
+        ]),
       );
 
-      const raises = idIndexRetentionRaises({ daysByTenant, paramBytes: 260 });
+      const raises = idIndexRetentionRaises({ daysByTenant, paramBytes: 200 });
 
       expect(raises.map((each) => each.tenantIds.length)).toEqual([10, 10, 10]);
       expect(idIndexRetentionRaises({ daysByTenant })).toHaveLength(1);
@@ -42,15 +51,22 @@ describe("idIndexRetentionRaises", () => {
     const MAX_FIELD_VALUE_BYTES = 128 * 1024;
 
     /** One parameter as `@clickhouse/client` puts it in the URL: an array literal, encoded. */
-    const urlField = (name: string, values: readonly (string | number)[]): number => {
+    const urlField = (
+      name: string,
+      values: readonly (string | number)[],
+    ): number => {
       const literal = `[${values
         .map((value) =>
           typeof value === "number"
             ? String(value)
-            : `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`,
+            : `'${value
+                .replace(/\\/g, "\\\\")
+                .replace(/'/g, "\\'")
+                .replace(/\t/g, "\\t")}'`,
         )
         .join(",")}]`;
-      return new URLSearchParams([[`param_${name}`, literal]]).toString().length;
+      return new URLSearchParams([[`param_${name}`, literal]]).toString()
+        .length;
     };
 
     const daysByTenant = new Map(
@@ -64,17 +80,61 @@ describe("idIndexRetentionRaises", () => {
       const raises = idIndexRetentionRaises({ daysByTenant });
 
       expect(raises.length).toBeGreaterThan(1);
-      expect(raises.flatMap((each) => each.tenantIds)).toHaveLength(daysByTenant.size);
+      expect(raises.flatMap((each) => each.tenantIds)).toHaveLength(
+        daysByTenant.size,
+      );
       for (const raise of raises) {
-        expect(urlField("tenantIds", raise.tenantIds)).toBeLessThan(MAX_FIELD_VALUE_BYTES);
-        expect(urlField("retentionDays", raise.retentionDays)).toBeLessThan(MAX_FIELD_VALUE_BYTES);
+        expect(urlField("tenantIds", raise.tenantIds)).toBeLessThan(
+          MAX_FIELD_VALUE_BYTES,
+        );
+        expect(urlField("retentionDays", raise.retentionDays)).toBeLessThan(
+          MAX_FIELD_VALUE_BYTES,
+        );
       }
     });
 
-    it("would pass the field cap at the old 512 KiB budget", () => {
-      const [first] = idIndexRetentionRaises({ daysByTenant, paramBytes: 512 * 1024 });
+    it("keeps ids full of quotes and backslashes under the cap, sized as the client escapes them", () => {
+      const escapeHeavy = new Map(
+        Array.from({ length: 6_000 }, (_, at) => [
+          `${at % 2 === 0 ? "'".repeat(20) : "\\".repeat(20)}\t${String(at).padStart(8, "0")}`,
+          30,
+        ]),
+      );
 
-      expect(urlField("tenantIds", first?.tenantIds ?? [])).toBeGreaterThan(MAX_FIELD_VALUE_BYTES);
+      const raises = idIndexRetentionRaises({ daysByTenant: escapeHeavy });
+
+      expect(raises.flatMap((each) => each.tenantIds)).toHaveLength(
+        escapeHeavy.size,
+      );
+      for (const raise of raises) {
+        expect(urlField("tenantIds", raise.tenantIds)).toBeLessThan(
+          MAX_FIELD_VALUE_BYTES,
+        );
+      }
+      const [id] = escapeHeavy.keys();
+      expect(idIndexRaiseParamBytes(id!)).toBe(
+        urlField("tenantIds", [id!, id!]) - urlField("tenantIds", [id!]),
+      );
+    });
+
+    it("refuses a single id that no raise can carry", () => {
+      expect(() =>
+        idIndexRetentionRaises({
+          daysByTenant: new Map([["'".repeat(30), 30]]),
+          paramBytes: 100,
+        }),
+      ).toThrow(/cannot fit/);
+    });
+
+    it("would pass the field cap at the old 512 KiB budget", () => {
+      const [first] = idIndexRetentionRaises({
+        daysByTenant,
+        paramBytes: 512 * 1024,
+      });
+
+      expect(urlField("tenantIds", first?.tenantIds ?? [])).toBeGreaterThan(
+        MAX_FIELD_VALUE_BYTES,
+      );
     });
   });
 });

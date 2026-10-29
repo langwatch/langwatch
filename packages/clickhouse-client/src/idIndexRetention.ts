@@ -14,14 +14,35 @@ export const ID_INDEX_KEPT_FOREVER_DAYS = 65_535;
  */
 export const ID_INDEX_RAISE_PARAM_BYTES = 100 * 1024;
 
+/** The array's URL-encoded brackets, `%5B` and `%5D`. The days travel in their own, smaller field. */
+const ARRAY_BRACKET_BYTES = 6;
+
+/** The client's string escapes in a query parameter (`formatQueryParams` in `@clickhouse/client`). */
+const PARAM_STRING_ESCAPES: Record<string, string> = {
+  "\t": "\\t",
+  "\n": "\\n",
+  "\r": "\\r",
+  "'": "\\'",
+  "\\": "\\\\",
+};
+
 /**
- * Per id: the URL-encoded quotes and comma around it (9 bytes), with margin. The days travel in
- * their own, smaller field.
+ * Bytes one id adds to the `{tenantIds}` field as the client sends it: escaped, quoted, followed by
+ * a comma, and form-encoded by `URLSearchParams`. A quote or backslash costs 6 bytes, not 1.
  */
-const PER_TENANT_OVERHEAD_BYTES = 16;
+export function idIndexRaiseParamBytes(tenantId: string): number {
+  const escaped = tenantId.replace(
+    /[\t\n\r'\\]/g,
+    (c) => PARAM_STRING_ESCAPES[c]!,
+  );
+  return new URLSearchParams([["", `'${escaped}',`]]).toString().length - 1;
+}
 
 /** One raise's parameters: the tenants, and each one's days at the same position. */
-export type IdIndexRetentionBatch = { tenantIds: string[]; retentionDays: number[] };
+export type IdIndexRetentionBatch = {
+  tenantIds: string[];
+  retentionDays: number[];
+};
 
 /** A source's `0` (kept forever) as the index writes it. */
 export function idIndexRetentionDays(retentionDays: number): number {
@@ -48,14 +69,21 @@ export function idIndexRetentionRaises({
 }): IdIndexRetentionBatch[] {
   const raises: IdIndexRetentionBatch[] = [];
   let current: IdIndexRetentionBatch = { tenantIds: [], retentionDays: [] };
-  let bytes = 0;
-  const sorted = [...daysByTenant].toSorted(([left], [right]) => left.localeCompare(right));
+  let bytes = ARRAY_BRACKET_BYTES;
+  const sorted = [...daysByTenant].toSorted(([left], [right]) =>
+    left.localeCompare(right),
+  );
   for (const [tenantId, days] of sorted) {
-    const size = encodeURIComponent(tenantId).length + PER_TENANT_OVERHEAD_BYTES;
+    const size = idIndexRaiseParamBytes(tenantId);
+    if (ARRAY_BRACKET_BYTES + size > paramBytes) {
+      throw new Error(
+        `Tenant id of ${size} encoded bytes cannot fit one id index raise of ${paramBytes} bytes`,
+      );
+    }
     if (current.tenantIds.length > 0 && bytes + size > paramBytes) {
       raises.push(current);
       current = { tenantIds: [], retentionDays: [] };
-      bytes = 0;
+      bytes = ARRAY_BRACKET_BYTES;
     }
     current.tenantIds.push(tenantId);
     current.retentionDays.push(idIndexRetentionDays(days));
